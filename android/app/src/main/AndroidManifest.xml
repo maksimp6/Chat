@@ -6,7 +6,7 @@
 
     <application
         android:theme="@style/AppTheme"
-        android:label="Alice Pro"
+        android:label="Logos"
         android:icon="@drawable/ic_launcher"
         android:roundIcon="@drawable/ic_launcher"
         android:usesCleartextTraffic="true">
@@ -36,7 +36,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Owner-started loopback device-control agent for Alice Pro" />
+                android:value="Owner-started loopback device-control agent for Logos" />
         </service>
 
         <provider

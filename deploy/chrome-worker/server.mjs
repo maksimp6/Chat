@@ -83,7 +83,7 @@ export function createWorker(options = {}) {
     stateDir: options.stateDir ?? process.env.CHROME_STATE_DIR,
     authDir,
   });
-  // Central Alice IdP (optional): verifies its tokens for the MCP endpoint only.
+  // Central Logos IdP (optional): verifies its tokens for the MCP endpoint only.
   const publicUrl = options.publicUrl ?? process.env.BROWSER_PUBLIC_URL ?? "";
   const idp = createIdpAuth({
     issuer: process.env.BROWSER_IDP_ISSUER,

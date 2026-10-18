@@ -1,4 +1,4 @@
-"""Config loading and validation for Alice Platform."""
+"""Config loading and validation for Keel Platform."""
 
 import json
 import re

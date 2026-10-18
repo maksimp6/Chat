@@ -1,8 +1,8 @@
-# API Gateway для Alice Pro
+# API Gateway для Logos
 
 `alice-openapi.example.json` — намеренно маленький starter для
 Shared API Gateway OpenAPI template: `/healthz`, `/api/chat`, `/mcp`. Он **не
-описывает полный Flask route map Алисы** и не готов для импорта/публикации, пока
+описывает полный Flask route map Logos** и не готов для импорта/публикации, пока
 не заполнены UUID Container Apps, log group и limits, не добавлены остальные
 routes UI/API и не выполнены проверки ниже. Изменение файла само ничего в облаке
 не создаёт. OpenAPI JSON принимается Cloud Gateway; расширения документированы.
@@ -29,7 +29,7 @@ Gateway до изменения конфигурации. Не подставл�
    API-key/OIDC policy шлюза применяется лишь к отдельному machine-to-machine API
    после отдельной проверки client flow и credentials.
 3. `x-cloud-limit-count` ограничивает **суммарные** вызовы маршрута/хоста за окно,
-   не квоту на Alice user. В starter лимит 120 chat запросов за 60 секунд — лишь
+   не квоту на Logos user. В starter лимит 120 chat запросов за 60 секунд — лишь
    консервативный пример, не измерение производительности и не справедливый
    per-user rate limit. Настроить отдельно для входа, MCP и тяжёлых операций после
    нагрузочного теста; проверять 429, нормальную нагрузку и общий эффект нескольких
@@ -40,7 +40,7 @@ Gateway до изменения конфигурации. Не подставл�
    отключить чувствительные поля и проверить тестовыми секретными маркерами.
    Redaction после записи не исправляет утечку. Приложение обязано отдельно
    очищать stdout/trace согласно #478.
-5. Кэширование не включать для любого Alice endpoint: ответы пользователя,
+5. Кэширование не включать для любого Logos endpoint: ответы пользователя,
    OAuth, MCP, SSE и streaming персональны либо зависят от состояния. Ни cookies,
    ни Authorization не делают общий proxy cache безопасным автоматически.
 6. Подсоединить домен из Cloud DNS к системному адресу Gateway и включить
@@ -56,16 +56,16 @@ Gateway до изменения конфигурации. Не подставл�
    Gateway timeout/read timeout и buffering могут нарушить потоковый ответ.
    Не переключать DNS production до завершения этих тестов.
 
-### Как различать Gateway auth и Alice users
+### Как различать Gateway auth и Logos users
 
 API Gateway user/key policy отвечает за доступ к самому gateway. IAM authenticates
 Cloud.ru organization/project users; Gateway static key identifies an API client;
-OIDC connects an external identity provider. Alice user table, GitHub immutable
+OIDC connects an external identity provider. Logos user table, GitHub immutable
 account ID, session cookie/short token and MCP OAuth continue enforcing identity
 and ownership in the application. Эти слои не взаимозаменяемы.
 
 Пример `/api/chat` применяет только request limit; он не отключает собственный
-Alice auth. `/healthz` может быть публичным, не должен выдавать конфигурацию/
+Logos auth. `/healthz` может быть публичным, не должен выдавать конфигурацию/
 DB metadata. Проверить rate/response logs перед включением других routes.
 
 Источники:
