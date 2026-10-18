@@ -318,9 +318,9 @@ class SecretManagementRef:
     Cloud.ru versions cannot be edited in place, so "rotate" and "rollback"
     are purely local: which version_id this app currently trusts for a given
     purpose (e.g. ``alice_short_token``, ``github_oauth_client_secret``,
-    ``provider_credential:yandex``, ``alice_database_url``). The value itself
-    is never stored here; it is resolved on demand through
-    ``resolve_secret_management_value``.
+    ``provider_credential:yandex``). ``alice_database_url`` is retired; see
+    ``docs/production-deployment.md``. The value itself is never stored here;
+    it is resolved on demand through ``resolve_secret_management_value``.
     """
 
     purpose: str
