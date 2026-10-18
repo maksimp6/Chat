@@ -66,9 +66,7 @@ def validate_stl(path: Path, variant: str = "v3") -> dict[str, object]:
     }
 
 
-def inspect_sliced(
-    path: Path, result_path: Path, variant: str = "v3"
-) -> dict[str, object]:
+def inspect_sliced(path: Path, result_path: Path, variant: str = "v3") -> dict[str, object]:
     settings, gcode = _read_sliced_archive(path)
     _validate_profile(settings)
     layers = _validate_gcode(gcode)
