@@ -39,7 +39,7 @@ class UpdateManager(private val activity: Activity) {
         private const val OWNER = "maksimp6"
         private const val REPO = "Chat"
         private const val WORKFLOW = "ci.yml"
-        private const val ARTIFACT_NAME = "alice-pro-debug-apk"
+        private const val ARTIFACT_NAME_PREFIX = "alice-pro-debug-apk-"
         private const val NIGHTLY_BASE = "https://nightly.link"
         private const val API_BASE = "https://api.github.com/repos/$OWNER/$REPO"
         private const val PREFS = "alice_pro_updates"
@@ -57,6 +57,8 @@ class UpdateManager(private val activity: Activity) {
             }
             return String.format(Locale.US, "%.1f %s", number, units[index])
         }
+
+        internal fun isDebugApkArtifactName(name: String): Boolean = name.startsWith(ARTIFACT_NAME_PREFIX)
     }
 
     data class BuildInfo(
@@ -405,8 +407,9 @@ class UpdateManager(private val activity: Activity) {
             val run = runs.getJSONObject(i)
             val artifacts = fetchArtifacts(run.getLong("id"))
             val artifact = artifacts.firstOrNull {
-                !it.optBoolean("expired", true) && it.optString("name") == ARTIFACT_NAME
+                !it.optBoolean("expired", true) && isDebugApkArtifactName(it.optString("name"))
             } ?: continue
+            val artifactName = artifact.optString("name")
             result += BuildInfo(
                 runId = run.getLong("id"),
                 runNumber = run.getInt("run_number"),
@@ -416,7 +419,7 @@ class UpdateManager(private val activity: Activity) {
                 artifactId = artifact.getLong("id"),
                 artifactSize = artifact.optLong("size_in_bytes", 0L),
                 artifactDigest = artifact.optString("digest", "").removePrefix("sha256:"),
-                downloadUrl = "$NIGHTLY_BASE/$OWNER/$REPO/actions/runs/${run.getLong("id")}/$ARTIFACT_NAME.zip",
+                downloadUrl = "$NIGHTLY_BASE/$OWNER/$REPO/actions/runs/${run.getLong("id")}/$artifactName.zip",
             )
         }
         return result
