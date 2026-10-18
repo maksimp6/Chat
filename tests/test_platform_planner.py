@@ -1,4 +1,4 @@
-"""Tests for Logos Platform planner (desired vs observed state)."""
+"""Tests for Keel Platform planner (desired vs observed state)."""
 
 import pytest
 from keel.planner import (
