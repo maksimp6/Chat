@@ -104,3 +104,46 @@ def test_runtime_has_no_sql_connection_boundary():
         ):
             offenders.append(relative)
     assert not offenders, offenders
+
+
+DATABASE_DOC = ROOT / "docs/database.md"
+CLOUDRU_SERVICES = ROOT / "deploy/cloudru/services.md"
+CLOUDRU_IDENTITIES = ROOT / "deploy/cloudru/identities-and-secrets.md"
+
+
+def _only_line(text, needle):
+    matches = [line for line in text.splitlines() if needle in line]
+    assert len(matches) == 1, (needle, matches)
+    return matches[0]
+
+
+def test_database_doc_describes_only_the_native_store():
+    text = DATABASE_DOC.read_text(encoding="utf-8")
+    assert "## One writer per journal" in text
+    assert "`kristall.Kristall`" in text
+    assert "`ALICE_DATABASE_URL` is retired" in text
+    for deployment in ("Local development", "Termux", "Shared or cloud deployment"):
+        assert deployment in text
+    for banned in (
+        "## Default: SQLite",
+        "## Optional: PostgreSQL",
+        "postgresql://",
+        "docker-compose.postgres.yml",
+    ):
+        assert banned not in text
+
+
+def test_cloudru_services_retire_external_postgresql_requirements():
+    text = CLOUDRU_SERVICES.read_text(encoding="utf-8")
+    assert "retired" in _only_line(text, "| Внешний PostgreSQL").lower()
+    assert "retired" in _only_line(text, "external PostgreSQL connection").lower()
+
+
+def test_cloudru_identities_retire_postgresql_secrets_without_renaming_paths():
+    text = CLOUDRU_IDENTITIES.read_text(encoding="utf-8")
+    assert "retired" in _only_line(text, "| PostgreSQL role password").lower()
+    assert "retired" in _only_line(text, "`alice/runtime/postgres-dsn`").lower()
+    assert "retired" in _only_line(text, "`alice/backup/postgres-role-password`").lower()
+    assert "retired" in _only_line(text, "sslrootcert").lower()
+    assert "`alice/runtime/postgres-dsn`" in text
+    assert "`alice/backup/postgres-role-password`" in text

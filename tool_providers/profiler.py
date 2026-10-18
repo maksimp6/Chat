@@ -3,10 +3,12 @@
 import cProfile
 import pstats
 import io
-import os
 import sys
 import gc
 import logging
+
+from kristall import KristallError
+from storage.db import memory_file_path
 
 logger = logging.getLogger("logos_profiler")
 
@@ -35,18 +37,29 @@ def profile_application_performance(arguments: dict, cfg: dict = None) -> dict:
     }
 
 
+def _native_journal_status() -> dict[str, object]:
+    """Describe the native Kristall journal without opening, locking or repairing it."""
+    try:
+        path = memory_file_path()
+    except KristallError as exc:
+        return {"path": None, "exists": False, "size_bytes": 0, "error": str(exc)}
+    exists = path.exists()
+    return {
+        "path": str(path),
+        "exists": exists,
+        "size_bytes": path.stat().st_size if exists else 0,
+    }
+
+
 def inspect_app_internals(arguments: dict, cfg: dict = None) -> dict:
     """Возвращает полную карту модулей, путей и состояние окружения приложения."""
     loaded_modules = [m for m in sys.modules.keys() if not m.startswith("_")]
-    db_path = os.path.abspath("alice_pro.db")
-    db_exists = os.path.exists(db_path)
-    db_size = os.path.getsize(db_path) if db_exists else 0
 
     return {
         "success": True,
         "python_version": sys.version,
         "platform": sys.platform,
-        "database": {"path": db_path, "exists": db_exists, "size_bytes": db_size},
+        "database": _native_journal_status(),
         "active_modules_count": len(loaded_modules),
         "sample_modules": loaded_modules[:20],
     }

@@ -148,7 +148,7 @@ def merge_plate_stl(source: Path, destination: Path) -> int:
             for v in mesh.findall(f"{NS}vertices/{NS}vertex")
         ]
         obj_meshes[obj.attrib["id"]] = (pts, _triangle_indices(mesh, len(pts)))
-    raw = bytearray(b"Alice bag clip PR1113: three separated parts".ljust(80, b" "))
+    raw = bytearray(b"Logos bag clip PR1113: three separated parts".ljust(80, b" "))
     raw.extend(struct.pack("<I", sum(len(v[1]) for v in obj_meshes.values())))
     total = 0
     for item in root.findall(f".//{NS}build/{NS}item"):

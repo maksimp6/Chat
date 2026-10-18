@@ -6,8 +6,9 @@ yet start a model; handlers are plain Python functions registered by task kind.
 
 ## Pieces
 
-- `agent_shell/store.py`: SQLite store of tasks and their events. A task is claimed
-  atomically, so several runners can share one file.
+- `agent_shell/store.py`: native Kristall store of tasks and their events (SQLite is
+  retired). A task is claimed atomically; runners in one process share one writer, and a
+  second process is refused by the writer lock.
 - `agent_shell/runner.py`: runs one queued task through a handler. An unknown kind fails
   without running anything. A failure stores only a fixed code (`task_failed`,
   `unknown_kind`, `invalid_result`, `interrupted`, plus `invalid_payload`, `agent_failed`,

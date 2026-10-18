@@ -9,13 +9,13 @@ permissions, or rotate credentials.
 ## What is verified
 
 The script `scripts/local_launch_smoke.py` starts the documented
-`python app.py` entrypoint with an isolated SQLite database and verifies:
+`python app.py` entrypoint with an isolated native Kristall journal and verifies:
 
 1. the tracked checkout is clean;
 2. Flask starts and `GET /healthz` returns `{"status":"ok"}`;
 3. the root UI returns non-empty HTML;
 4. a local runtime session can be bootstrapped;
-5. the SQLite database exists after shutdown;
+5. the native Kristall journal exists after shutdown;
 6. Logos starts again against the same database;
 7. the runtime session survives the restart.
 
@@ -64,7 +64,7 @@ export ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID='...'
 python scripts/local_launch_smoke.py
 ```
 
-The script uses a temporary SQLite database by default. To inspect persistence
+The script uses a temporary native Kristall journal by default. To inspect persistence
 against an explicit local path:
 
 ```bash
@@ -110,7 +110,7 @@ Example offline shape:
 {
   "status": "PARTIAL",
   "mode": "offline",
-  "database_backend": "sqlite",
+  "database_backend": "memory",
   "provider_inputs_present": false,
   "checks": {
     "healthz": true,
@@ -130,7 +130,7 @@ Passing the local full smoke proves that the current protected application
 baseline can start, talk to the configured provider through the canonical path,
 persist an ExecutionTrace and survive an application restart.
 
-It does **not** prove Container Apps, EDS, external PostgreSQL, DNS/TLS, backup
+It does **not** prove Container Apps, EDS, durable Kristall journal storage on Cloud.ru, DNS/TLS, backup
 restore, or production routing. Those remain separate gates in #427. This order
 is intentional: debugging cloud orchestration before proving the application
 runtime would merely distribute the same uncertainty across more expensive

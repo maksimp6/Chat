@@ -402,6 +402,10 @@ class BagClipValidationTests(SlicerFixtureTests):
         self.assertEqual(3940, total)  # 1460 + 1412 + 1068, no decimation
         data = destination.read_bytes()
         self.assertEqual(84 + 3940 * 50, len(data))
+        self.assertEqual(
+            b"Logos bag clip PR1113: three separated parts".ljust(80, b" "),
+            data[:80],
+        )
         self.assertEqual(3940, struct.unpack_from("<I", data, 80)[0])
 
     def test_merge_rejects_invalid_indices_without_writing_stl(self) -> None:
