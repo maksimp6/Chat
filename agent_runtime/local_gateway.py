@@ -148,7 +148,7 @@ def register_local_agent():
 
     data = request.get_json(silent=True) or {}
     agent_id = str(data.get("agent_id") or f"android-{uuid4().hex[:12]}").strip()
-    name = str(data.get("name") or "Alice Pro Android Agent").strip()
+    name = str(data.get("name") or "Logos Android Agent").strip()
     version = str(data.get("version") or "1.0").strip()
     capabilities = data.get("capabilities") or []
 
