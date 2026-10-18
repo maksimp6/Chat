@@ -209,7 +209,7 @@ registry digest, публичный origin и pipeline с подтвержден
 
 ## Native storage transition
 
-The deployment example uses schema version 2 and `memory_engine.MemoryStore`.
+The deployment example uses schema version 2 and `kristall.Kristall`.
 PostgreSQL provisioning, SQL backups and SQL driver installation are retired.
 `--check-db` verifies an existing journal under its exclusive writer lock; it
 never repairs, replaces or deletes source data. Static config success is not
