@@ -195,6 +195,30 @@ def test_logos_mention_is_an_alice_trigger_beside_the_alice_mention():
     assert unrelated.owner_agent == "human"
 
 
+def test_logos_mention_in_issue_title_is_a_trigger_but_not_in_pull_request_title():
+    # logos.yml starts on issues.opened when the title or the body names @logos.
+    titled = issue()
+    titled["title"] = "@logos fix login"
+    titled["author_association"] = "OWNER"
+    thread = build_thread(titled, [])
+    assert thread.trigger_eligible_dispatches == [("alice", NOW - timedelta(hours=10), False)]
+    assert thread.owner_agent == "alice"
+
+    # Trigger eligibility still needs a maintainer-level author.
+    outsider = dict(titled, author_association="NONE")
+    outsider_thread = build_thread(outsider, [])
+    assert outsider_thread.dispatches == [("alice", NOW - timedelta(hours=10))]
+    assert outsider_thread.trigger_eligible_dispatches == []
+
+    # Pull requests never start the Logos workflow, so the same title records nothing.
+    pr = pr_item()
+    pr["title"] = "@logos fix login"
+    pr["author_association"] = "OWNER"
+    pr_thread = build_thread(pr, [], pull())
+    assert pr_thread.dispatches == []
+    assert pr_thread.trigger_eligible_dispatches == []
+
+
 # --- findings ---------------------------------------------------------------
 
 
@@ -509,7 +533,7 @@ def test_digest_groups_findings_and_neutralises_mentions():
     assert digest.startswith(observer.DIGEST_MARKER)
     assert digest.count("[#2]") == 1
     assert "CI красный: tests; конфликт с master" in digest
-    assert not re.search(r"@(claude|codex|alice)\b", digest)
+    assert not re.search(r"@(claude|codex|alice|logos)\b", digest)
     assert "<b>" not in digest
     assert "Задача #3" in digest
     assert "Задача #4" not in digest
@@ -815,7 +839,7 @@ def test_digest_escapes_actor_names():
     }
     bot_commit = dict(commit, author={"name": "claude[bot] <i>", "date": ts(1)})
     digest = render_digest([build_thread(issue(), [commit, bot_commit])], [], NOW, "o/r")
-    assert not re.search(r"@(claude|codex|alice)\b", digest)
+    assert not re.search(r"@(claude|codex|alice|logos)\b", digest)
     assert "<b>" not in digest and "<i>" not in digest
 
 

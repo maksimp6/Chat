@@ -351,9 +351,10 @@ def build_thread(
         )
     )
     if not is_pr:
+        # logos.yml also starts on the issue title, so a title mention counts like a body mention.
         _record_dispatch(
             thread,
-            body,
+            f"{thread.title}\n{body}",
             created_at,
             author,
             author_association=item.get("author_association"),
