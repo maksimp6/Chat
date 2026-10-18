@@ -173,7 +173,7 @@ def test_legacy_workflow_is_validation_only_and_has_no_deploy_credentials():
     assert "docker compose" in scripts
     assert "desktop-session.test.cjs" in scripts
     assert "pairing-handoff.test.cjs" in scripts
-    assert "Alice Dev" not in source
+    assert "Logos Dev" not in source
     assert "oauth" not in scripts.lower()
     assert "browser-smoke-test" not in scripts
     assert "chromium" not in scripts.lower()

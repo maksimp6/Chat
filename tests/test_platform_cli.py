@@ -1,4 +1,4 @@
-"""Tests for the fail-closed Logos Platform CLI."""
+"""Tests for the fail-closed Keel Platform CLI."""
 
 import argparse
 from unittest.mock import patch
