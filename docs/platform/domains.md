@@ -1,6 +1,6 @@
 # Domain Configuration
 
-Alice Platform uses domain routing to direct traffic to the correct service. This document explains how domains work and are configured.
+Keel Platform uses domain routing to direct traffic to the correct service. This document explains how domains work and are configured.
 
 ## Domain Concepts
 

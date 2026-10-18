@@ -1,4 +1,4 @@
-"""Typed durable aggregate for Alice user identity state."""
+"""Typed durable aggregate for Logos user identity state."""
 
 from __future__ import annotations
 

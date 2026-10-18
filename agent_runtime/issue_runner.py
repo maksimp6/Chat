@@ -1,7 +1,7 @@
-"""Run Alice headlessly on a GitHub issue against her own checkout.
+"""Run Logos headlessly on a GitHub issue against its own checkout.
 
-Alice only gets her filesystem tools, which are sandboxed to this repository
-(tool_providers.filesystem.BASE_DIR). She never commits, pushes or runs commands:
+Logos only gets its filesystem tools, which are sandboxed to this repository
+(tool_providers.filesystem.BASE_DIR). Logos never commits, pushes or runs commands:
 the calling workflow reviews the diff and opens the pull request.
 """
 
@@ -16,14 +16,14 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_MODEL = "aliceai-llm"
+DEFAULT_MODEL = "logos-runtime"
 TOOL_CATEGORIES = ["filesystem"]
 MAX_SUMMARY_CHARS = 4000
 
 
 def build_prompt(issue_number: int, title: str, body: str, rules: str) -> str:
     return (
-        "You are Alice Pro working on your own source code in this repository.\n"
+        "You are Logos working on your own source code in this repository.\n"
         "Use only your filesystem tools. Make the smallest change that solves the task, "
         "add or update deterministic tests, and do not touch .github/ or secrets.\n"
         "When done, reply with a short summary of what you changed and why.\n\n"
@@ -97,17 +97,17 @@ def run_issue_task(
 
     if client_factory is None:
         from core.config import Config
-        from chat.mcp_routes import AliceClient
+        from chat.mcp_routes import LogosClient
 
         seed_provider_credential()
 
         def client_factory():
-            return AliceClient(Config)
+            return LogosClient(Config)
 
     rules = (repo_root / "AGENTS.md").read_text(encoding="utf-8")
     before = set(changed_files(repo_root))
     session = f"github-issue-{issue_number}"
-    invocation = create_invocation(session, session, metadata={"source": "alice.yml"})
+    invocation = create_invocation(session, session, metadata={"source": "logos.yml"})
     trace = create_invocation_trace(invocation)
     start_invocation(invocation.invocation_id)
     result: Dict[str, Any] = {
@@ -130,7 +130,7 @@ def run_issue_task(
         )
         pending = extract_function_calls(response)
         if pending:
-            # AliceClient stops instead of running approval-gated tools; never auto-approve.
+            # LogosClient stops instead of running approval-gated tools; never auto-approve.
             result["status"] = "needs_approval"
             result["pending_tools"] = sorted(
                 {call.get("name") or (call.get("function") or {}).get("name") for call in pending}

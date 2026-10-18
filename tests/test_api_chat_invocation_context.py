@@ -24,11 +24,11 @@ class ApiChatInvocationContextTests(unittest.TestCase):
         with (
             patch("chat.mcp_routes.get_conv_settings", return_value={}),
             patch("chat.mcp_routes.add_message"),
-            patch("chat.mcp_routes.AliceClient.ask_with_mcp", side_effect=assert_trace_is_bound),
+            patch("chat.mcp_routes.LogosClient.ask_with_mcp", side_effect=assert_trace_is_bound),
         ):
             response = client.post(
                 "/api/chat",
-                json={"conversation_id": "conv-test", "message": "hello", "model": "aliceai-llm"},
+                json={"conversation_id": "conv-test", "message": "hello", "model": "logos-runtime"},
             )
 
         self.assertEqual(response.status_code, 200)
@@ -46,7 +46,7 @@ class ApiChatInvocationContextTests(unittest.TestCase):
         with (
             patch("chat.mcp_routes.get_conv_settings", return_value={}),
             patch("chat.mcp_routes.add_message"),
-            patch("chat.mcp_routes.AliceClient.ask_with_mcp", side_effect=RuntimeError("boom")),
+            patch("chat.mcp_routes.LogosClient.ask_with_mcp", side_effect=RuntimeError("boom")),
         ):
             response = client.post(
                 "/api/chat",

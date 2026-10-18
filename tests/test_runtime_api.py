@@ -107,7 +107,7 @@ def test_trace_endpoint_returns_correlated_persisted_trace(client):
     )
     trace_data = trace.finalize()
 
-    db.create_conversation("conversation-trace", "Trace", "aliceai-llm")
+    db.create_conversation("conversation-trace", "Trace", "logos-runtime")
     db.add_message("conversation-trace", "assistant", "ok", trace=trace_data)
     close_memory_clients()
 

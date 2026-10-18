@@ -1,6 +1,6 @@
 # Async/concurrency runtime contract
 
-This document records the concurrency semantics currently proven by Alice Pro tests.
+This document records the concurrency semantics currently proven by Logos tests.
 It is a contract for the existing sync + threadpool runtime, not a promise to rewrite
 the backend around native asyncio.
 
@@ -91,19 +91,19 @@ remain domain operations owned by `BudgetController`, not by the LLM.
 
 ## Provider quota atomicity
 
-`provider_quotas.reserve_request()` is the provider-request admission boundary.
+`reserve_request()` in `provider_accounts/quotas.py` is the provider-request admission boundary.
 
-Atomicity requirements differ by backend:
-
-- SQLite uses `BEGIN IMMEDIATE`;
-- PostgreSQL locks the user's usage row with `SELECT ... FOR UPDATE`.
+Atomicity comes from the native Kristall write barrier: the usage read and the usage
+write run in one `store.transaction()` for the user's quota key. SQLite
+`BEGIN IMMEDIATE` and PostgreSQL `SELECT ... FOR UPDATE` are retired.
 
 Concurrent async callers must not spend the same quota slot twice. The async
-harness executes this path through `asyncio.to_thread` and is run by both the
-SQLite/Application CI path and the PostgreSQL CI path.
+harness executes this path through `asyncio.to_thread` against the native Kristall
+store.
 
-Tests that claim PostgreSQL coverage must not force `db.DB_PATH` to a temporary
-SQLite database when `ALICE_DATABASE_URL` is active.
+Tests that claim transaction coverage must exercise the real native Kristall store
+in a temporary journal, not a substitute, and must not reintroduce
+`ALICE_DATABASE_URL`.
 
 ## Task cleanup
 
@@ -120,13 +120,12 @@ Thread cleanup is a separate concern from asyncio task cleanup.
 
 ## Database/backend expectations
 
-Concurrency tests that touch shared durable state must preserve backend semantics.
+Concurrency tests that touch shared durable state must preserve native store semantics.
 
-- Local/default tests may use isolated SQLite files.
-- PostgreSQL CI must exercise the real PostgreSQL code path when that is the
-  behavior under test.
-- Do not silently substitute SQLite in tests that claim row-lock or transaction
-  coverage for PostgreSQL.
+- Local/default tests use isolated native Kristall journals in a temporary directory.
+- Tests that claim transaction or write-barrier coverage must exercise the real
+  `kristall.Kristall` path under the one-writer rule, not a substitute.
+- SQLite and PostgreSQL are retired and are not test backends (see `docs/database.md`).
 - Existing thread-race tests remain required; async tests complement them.
 
 ## ExecutionTrace and tool-loop boundaries
@@ -171,7 +170,7 @@ The current regression surface includes:
 - representative invocation lifecycle task cleanup;
 - budget reservation contention and mutation-control;
 - provider quota reservation atomicity;
-- SQLite and PostgreSQL CI execution.
+- native Kristall transaction execution (SQLite and PostgreSQL are retired).
 
 Relevant commands:
 
@@ -180,5 +179,5 @@ pytest -q tests/test_async_runtime_concurrency.py
 pytest --durations=30 -q
 ```
 
-The ordinary protected CI remains authoritative for PostgreSQL and full-suite
+The ordinary protected CI remains authoritative for full-suite
 validation.

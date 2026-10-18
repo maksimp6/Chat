@@ -10,7 +10,7 @@ from typing import Any
 
 import requests
 
-from core.config import TEXT_MODELS, VOICE_MODELS
+from core.config import TEXT_MODELS, VOICE_MODELS, registry_key_for_upstream
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +107,8 @@ class ModelDiscovery:
         if not model_id:
             return None
 
-        existing = TEXT_MODELS.get(model_id, {})
+        registry_key = registry_key_for_upstream(model_id) or model_id
+        existing = TEXT_MODELS.get(registry_key, {})
         name = item.get("name") or existing.get("name") or model_id
         capabilities = item.get("capabilities")
         if not isinstance(capabilities, dict):
@@ -117,7 +118,7 @@ class ModelDiscovery:
             "name": name,
             "type": "text",
             "capabilities": capabilities,
-            "id": model_id,
+            "id": registry_key,
             "available": True,
         }
         for key in ("input", "cached", "tool", "output"):

@@ -1,4 +1,4 @@
-"""MCP server package for Alice Pro."""
+"""MCP server package for Logos."""
 
 from mcp_server.protocol import (
     MCP_PATH,

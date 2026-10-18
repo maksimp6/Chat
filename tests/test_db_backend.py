@@ -1,4 +1,4 @@
-"""Alice's single native storage boundary, including fresh-process recovery."""
+"""Logos's single native storage boundary, including fresh-process recovery."""
 
 import json
 import os

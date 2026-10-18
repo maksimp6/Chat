@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic local launch smoke for the Alice Pro P0 baseline.
+"""Deterministic local launch smoke for the Logos P0 baseline.
 
 Offline mode proves the local Flask/UI/session/restart path without external
 provider credentials. Full mode additionally configures Yandex through the
@@ -107,7 +107,7 @@ def _request_json(
             timeout=REQUEST_TIMEOUT,
         )
     except requests.RequestException as exc:
-        raise SmokeFailure(f"{method} {path} could not reach Alice") from exc
+        raise SmokeFailure(f"{method} {path} could not reach Logos") from exc
 
     data = _json_response(response)
     if response.status_code not in expected:
@@ -128,7 +128,7 @@ def _root_ok(session: requests.Session, base_url: str) -> None:
     try:
         response = session.get(f"{base_url}/", timeout=REQUEST_TIMEOUT)
     except requests.RequestException as exc:
-        raise SmokeFailure("GET / could not reach Alice") from exc
+        raise SmokeFailure("GET / could not reach Logos") from exc
     if response.status_code != 200:
         raise SmokeFailure(f"GET / returned HTTP {response.status_code}")
     if "text/html" not in response.headers.get("content-type", "").lower():
@@ -145,13 +145,13 @@ def _wait_ready(
     deadline = time.monotonic() + STARTUP_TIMEOUT
     while time.monotonic() < deadline:
         if process.poll() is not None:
-            raise SmokeFailure(f"Alice exited during startup with code {process.returncode}")
+            raise SmokeFailure(f"Logos exited during startup with code {process.returncode}")
         try:
             _health_ok(session, base_url)
             return
         except SmokeFailure:
             time.sleep(0.5)
-    raise SmokeFailure("Alice did not become healthy before the startup timeout")
+    raise SmokeFailure("Logos did not become healthy before the startup timeout")
 
 
 def _start_server(
@@ -259,7 +259,7 @@ def _create_conversation(session: requests.Session, base_url: str) -> str:
         "POST",
         base_url,
         "/api/conversations",
-        payload={"title": "Alice launch smoke", "model": "aliceai-llm"},
+        payload={"title": "Logos launch smoke", "model": "logos-runtime"},
         expected=(200, 201),
     )
     conversation_id = str(payload.get("id") or "").strip() if isinstance(payload, dict) else ""
@@ -284,7 +284,7 @@ def _send_live_chat(
             "conversation_id": conversation_id,
             "session_id": session_id,
             "message": "Reply with one short sentence confirming this launch smoke request.",
-            "model": "aliceai-llm",
+            "model": "logos-runtime",
         },
     )
     if not isinstance(payload, dict):

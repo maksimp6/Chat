@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = (ROOT / ".github" / "workflows" / "alice.yml").read_text(encoding="utf-8")
+WORKFLOW = (ROOT / ".github" / "workflows" / "logos.yml").read_text(encoding="utf-8")
 
 
 def _step_run(name: str) -> str:
@@ -33,7 +33,7 @@ def test_actions_are_pinned_and_do_not_persist_credentials():
 
 def test_only_trusted_mentions_or_label_trigger_alice():
     condition = WORKFLOW.split("    if: |", 1)[1].split("    runs-on:", 1)[0]
-    assert condition.count("contains(github.event.comment.body, '@alice')") == 1
+    assert condition.count("contains(github.event.comment.body, '@logos')") == 1
     assert condition.count('["OWNER","MEMBER","COLLABORATOR"]') == 2
     assert "github.event.label.name == 'alice'" in condition
     assert "!github.event.issue.pull_request" in condition
@@ -93,19 +93,19 @@ def test_issue_text_is_saved_verbatim_and_report_does_not_mention_alice(tmp_path
         "RUNNER_TEMP": str(tmp_path),
         "ISSUE_TITLE": "Fix $(touch pwned) `id`",
         "ISSUE_BODY": "Body",
-        "COMMENT_BODY": "@alice go",
+        "COMMENT_BODY": "@logos go",
     }
     subprocess.run(["bash", "-e", "-c", _step_run("Save issue text")], env=env, check=True)
     assert (tmp_path / "title.txt").read_text() == "Fix $(touch pwned) `id`\n"
-    assert "@alice go" in (tmp_path / "body.txt").read_text()
+    assert "@logos go" in (tmp_path / "body.txt").read_text()
     assert not Path("pwned").exists()
 
     (tmp_path / "result.json").write_text(
         json.dumps(
             {
                 "status": "no_changes",
-                "model": "aliceai-llm",
-                "summary": "Ask @alice again",
+                "model": "logos-runtime",
+                "summary": "Ask @logos again",
                 "billing": {"total_cost": 0.12, "currency": "RUB", "cost_status": "calculated"},
                 "trace_id": "t1",
                 "pending_tools": ["delete_path"],
@@ -120,7 +120,7 @@ def test_issue_text_is_saved_verbatim_and_report_does_not_mention_alice(tmp_path
     subprocess.run(["bash", "-e", "-c", report_part], env={**env, "GH_TOKEN": "unused"}, check=True)
 
     report = (tmp_path / "report.md").read_text(encoding="utf-8")
-    assert "@alice" not in report
+    assert "@logos" not in report
     assert "0.12 RUB (calculated)" in report
     assert "delete_path" in report
 

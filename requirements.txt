@@ -5,6 +5,6 @@ python-dotenv>=1.2.4
 
 cryptography==50.0.1
 
-# Alice Platform config management (reads YAML at deployment time)
+# Keel Platform config management (reads YAML at deployment time)
 PyYAML>=6.0
 jsonschema>=4.26.0

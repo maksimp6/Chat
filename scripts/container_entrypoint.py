@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Container entrypoint: Alice Pro, plus OpenAI Secure MCP Tunnel when configured.
+"""Container entrypoint: Logos, plus OpenAI Secure MCP Tunnel when configured.
 
 Without tunnel settings this only runs ``python app.py``. With all of
 OPENAI_TUNNEL_ID, OPENAI_TUNNEL_API_KEY, ALICE_MCP_BEARER_TOKEN and
-ALICE_MCP_USER_ID it also runs openai/tunnel-client next to Alice. The tunnel
+ALICE_MCP_USER_ID it also runs openai/tunnel-client next to Logos. The tunnel
 client polls OpenAI over outbound HTTPS and forwards MCP requests from ChatGPT
-to Alice's /mcp on loopback, adding Alice's MCP bearer token itself.
+to Logos's /mcp on loopback, adding Logos's MCP bearer token itself.
 
 Each process gets only its own secrets, no secret is put on a command line,
 and if either process exits the other is stopped and the container exits
@@ -32,7 +32,7 @@ TUNNEL_SETTINGS = (
 )
 TUNNEL_ONLY = ("OPENAI_TUNNEL_ID", "OPENAI_TUNNEL_API_KEY")
 MCP_AUTH_ENV = "ALICE_TUNNEL_MCP_AUTHORIZATION"
-# Variables the tunnel client may inherit; everything else (Alice secrets) stays out.
+# Variables the tunnel client may inherit; everything else (Logos secrets) stays out.
 TUNNEL_INHERIT = ("PATH", "HOME", "TZ", "SSL_CERT_FILE", "SSL_CERT_DIR", "HTTPS_PROXY", "NO_PROXY")
 _TUNNEL_ID_RE = re.compile(r"^tunnel_[A-Za-z0-9_-]{8,128}$")
 MIN_BEARER_LENGTH = 24
@@ -112,7 +112,7 @@ def _stop(proc: subprocess.Popen) -> None:
 
 
 def _supervise(app_argv: list[str], app_env: dict[str, str], tunnel: Process) -> int:
-    """Run Alice and the tunnel client; when either exits, stop both and fail."""
+    """Run Logos and the tunnel client; when either exits, stop both and fail."""
     procs = [subprocess.Popen(app_argv, env=app_env)]
     try:
         procs.append(subprocess.Popen(tunnel.argv, env=tunnel.env))
@@ -136,9 +136,9 @@ def _supervise(app_argv: list[str], app_env: dict[str, str], tunnel: Process) ->
             signal.signal(s, handler)
     if stopping:
         return 0
-    names = ("alice", "tunnel-client")
+    names = ("logos", "tunnel-client")
     for name, proc in zip(names, procs):
-        print(f"alice-entrypoint: {name} exited with {proc.returncode}", file=sys.stderr)
+        print(f"logos-entrypoint: {name} exited with {proc.returncode}", file=sys.stderr)
     return 1
 
 
@@ -152,12 +152,12 @@ def main(
     try:
         chosen = plan(environ, tunnel_binary, app_argv)
     except TunnelConfigError as exc:
-        print(f"alice-entrypoint: {exc}", file=sys.stderr)
+        print(f"logos-entrypoint: {exc}", file=sys.stderr)
         return 2
 
     if chosen.tunnel is None:
         if replace_process:
-            # Same process as before the entrypoint existed: Alice is PID 1 and gets signals directly.
+            # Same process as before the entrypoint existed: Logos is PID 1 and gets signals directly.
             os.execvpe(chosen.app_argv[0], chosen.app_argv, chosen.app_env)
         return subprocess.call(chosen.app_argv, env=chosen.app_env)
 

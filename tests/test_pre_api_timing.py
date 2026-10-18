@@ -13,7 +13,7 @@ class TestPreApiTiming(unittest.TestCase):
     def test_pre_api_pipeline_is_recorded_from_request_initialization_to_api_send(self):
         trace = ExecutionTrace()
         trace.set_request(
-            {"conversation_id": "conv", "message": "hello", "model": "aliceai-llm", "params": {}}
+            {"conversation_id": "conv", "message": "hello", "model": "logos-runtime", "params": {}}
         )
 
         request_initialized = next(
@@ -91,7 +91,7 @@ class TestPreApiTiming(unittest.TestCase):
                 return None
 
         with (
-            patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
+            patch.object(mcp_routes, "LogosClient", lambda _config: FakeClient()),
             patch.object(mcp_routes, "get_conv_settings", return_value={}),
             patch.object(mcp_routes, "add_message"),
             patch.object(
@@ -108,7 +108,7 @@ class TestPreApiTiming(unittest.TestCase):
                     json={
                         "conversation_id": conversation_id,
                         "message": "hello",
-                        "model": "aliceai-llm",
+                        "model": "logos-runtime",
                         "params": {},
                     },
                 )
@@ -141,7 +141,7 @@ class TestPreApiTiming(unittest.TestCase):
                 return None
 
         with (
-            patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
+            patch.object(mcp_routes, "LogosClient", lambda _config: FakeClient()),
             patch.object(mcp_routes, "get_conv_settings", return_value={}),
             patch.object(mcp_routes, "add_message"),
             patch.object(
@@ -160,7 +160,7 @@ class TestPreApiTiming(unittest.TestCase):
                     json={
                         "conversation_id": "settlement-failure-test",
                         "message": "hello",
-                        "model": "aliceai-llm",
+                        "model": "logos-runtime",
                         "params": {},
                     },
                 )
@@ -191,7 +191,7 @@ class TestPreApiTiming(unittest.TestCase):
         }
         defaults.update(patches)
         with contextlib.ExitStack() as stack:
-            stack.enter_context(patch.object(mcp_routes, "AliceClient", client_factory))
+            stack.enter_context(patch.object(mcp_routes, "LogosClient", client_factory))
             for name, kwargs in defaults.items():
                 stack.enter_context(patch.object(mcp_routes, name, **kwargs))
             app.config["TESTING"] = True
@@ -201,7 +201,7 @@ class TestPreApiTiming(unittest.TestCase):
                     json={
                         "conversation_id": "post-finalize-test",
                         "message": "hello",
-                        "model": "aliceai-llm",
+                        "model": "logos-runtime",
                         "params": {},
                     },
                 )
@@ -278,7 +278,7 @@ class TestPreApiTiming(unittest.TestCase):
                 raise RuntimeError("pipeline-internal-marker")
 
         with (
-            patch.object(mcp_routes, "AliceClient", lambda _config: FailingClient()),
+            patch.object(mcp_routes, "LogosClient", lambda _config: FailingClient()),
             patch.object(mcp_routes, "get_conv_settings", return_value={}),
             patch.object(mcp_routes, "add_message"),
             patch.object(
@@ -294,7 +294,7 @@ class TestPreApiTiming(unittest.TestCase):
                     json={
                         "conversation_id": "trace-persist-failure-test",
                         "message": "hello",
-                        "model": "aliceai-llm",
+                        "model": "logos-runtime",
                         "params": {},
                     },
                 )

@@ -4,13 +4,13 @@ Issue: #751
 
 This document defines the external tool boundary for the persistent Chrome Worker.
 It is intentionally transport-neutral so the same browser operations can be
-exposed to ChatGPT through an MCP/plugin adapter and to Alice Pro.
+exposed to ChatGPT through an MCP/plugin adapter and to Logos.
 
 ## Request path
 
 ```
 ChatGPT -> OAuth-authenticated MCP client -> Cloud.ru API Gateway -> Playwright MCP -> Chrome Worker
-Alice   -> authenticated client -> Cloud.ru API Gateway -> Playwright API -> Chrome Worker
+Logos   -> authenticated client -> Cloud.ru API Gateway -> Playwright API -> Chrome Worker
 ```
 
 The Gateway is the supported public boundary. The worker must not expose CDP,
@@ -29,7 +29,7 @@ MCP endpoint uses the standard official Playwright MCP tool set.
 - `extract`: return bounded structured/text page content.
 - `screenshot`: return a bounded screenshot artifact/reference.
 
-Each operation carries a generated request ID. Alice-originated calls may also
+Each operation carries a generated request ID. Logos-originated calls may also
 carry an ExecutionTrace correlation ID. Neither identifier is authorization.
 
 ## Authentication boundary
@@ -40,8 +40,8 @@ Direct container ingress retains provider authentication.
 The Gateway must preserve application Authorization, MCP session/protocol headers,
 OAuth query parameters and cookies. The worker validates OAuth access tokens
 for ChatGPT's MCP calls and a machine bearer token for operations clients.
-They do not inherit Alice's browser cookie merely because Alice and the browser
-worker share a project. ChatGPT and Alice are distinct clients.
+They do not inherit Logos's browser cookie merely because Logos and the browser
+worker share a project. ChatGPT and Logos are distinct clients.
 
 OAuth discovery, dynamic client registration and GitHub sign-in are routed on
 the same public origin. Authorization requires PKCE S256 and the configured
@@ -120,7 +120,7 @@ including token refresh and revocation handling.
 
 ### Short-token (machine) authentication
 
-Alice Pro's own browser operations use the `ALICE_SHORT_TOKEN` (or `BROWSER_API_TOKEN`)
+Logos's own browser operations use the `ALICE_SHORT_TOKEN` (or `BROWSER_API_TOKEN`)
 bearer token for direct worker calls, bypassing OAuth. This skips the interactive
 flow and is suitable for automated Playwright operations.
 

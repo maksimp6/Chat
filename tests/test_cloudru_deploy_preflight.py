@@ -1,6 +1,8 @@
 """Native deployment storage configuration stays fail-closed and secret-safe."""
 
 from __future__ import annotations
+import importlib
+import inspect
 import json
 from pathlib import Path
 import pytest
@@ -62,6 +64,7 @@ def test_rejects_unsafe_journal_paths(inputs, value):
     "field,value",
     [
         ("engine", "other"),
+        ("engine", "memory_engine.MemoryStore"),
         ("writer_processes", 2),
         ("writer_processes", True),
         ("data_root", "relative"),
@@ -73,6 +76,17 @@ def test_storage_contract_is_explicit(inputs, field, value):
     config, env = inputs
     config["database"][field] = value
     assert preflight.validate(config, env)
+
+
+def test_template_engine_resolves_to_implemented_native_class():
+    repo = Path(__file__).parents[1].resolve()
+    template = json.loads((repo / "deploy/cloudru/deployment.example.json").read_text())
+    module_name, _, class_name = template["database"]["engine"].rpartition(".")
+    assert module_name and class_name
+    resolved = getattr(importlib.import_module(module_name), class_name)
+    assert inspect.isclass(resolved)
+    assert resolved is Kristall
+    assert Path(inspect.getfile(resolved)).resolve().is_relative_to(repo)
 
 
 def test_retired_sql_selector_is_rejected_without_echoing_secret(inputs):

@@ -151,7 +151,7 @@ class SSHRuntime:
         mapped_users = dict(target.identity_map)
         if mapped_users:
             if not identity_id:
-                raise SSHRuntimeError("Trusted Alice identity is required for this SSH target")
+                raise SSHRuntimeError("Trusted Logos identity is required for this SSH target")
             mapped = mapped_users.get(str(identity_id))
             if not mapped:
                 raise SSHRuntimeError(

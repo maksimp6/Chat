@@ -3,7 +3,7 @@
 Status: baseline deploy path, not yet run against a live Cloud.ru project.
 Issue: #427
 
-Alice Pro runs as one Cloud.ru Evolution **Container Apps** service built from an
+Logos runs as one Cloud.ru Evolution **Container Apps** service built from an
 exact commit and pulled from **Artifact Registry** by digest. No VM or Kubernetes
 cluster is created. Evolution has no separate Functions product for Docker
 images, so Container Apps is the serverless runtime.
@@ -52,7 +52,7 @@ cleanup step runs under `always()`: a service created by this run is deleted, a
 pre-existing service is restored from the configuration captured before the
 run, and nothing is touched when no acceptance-owned change is proven. The
 workflow forwards the GitHub-login configuration but no longer passes
-`ALICE_DATABASE_URL`, so the acceptance revision uses the container's SQLite.
+`ALICE_DATABASE_URL`, so the acceptance revision uses the native Kristall journal on the container's ephemeral filesystem.
 The application image installs only `requirements.txt`; the PostgreSQL backend is
 retired (#1191). A successful preflight checks configuration only; it does not
 prove connectivity, IAM permissions, database readiness or a live deployment.
@@ -123,12 +123,12 @@ The first request after idle pays a cold start.
 
 - **No durable database in acceptance runs.** The workflow does not pass
   `ALICE_DATABASE_URL` ([#1002](https://github.com/maksimp6/Chat/pull/1002)), so
-  data lives in the container's SQLite and is lost when the instance sleeps, a
+  data lives in the native Kristall journal on the container's ephemeral filesystem and is lost when the instance sleeps, a
   new revision starts, or cleanup removes or restores the service.
 - **In-process state is lost on sleep.** Branch environment runtimes (git
   worktrees under `.alice-environments`), voice sessions, and uploaded files
   live in the container. Keep `CLOUDRU_MAX_INSTANCES=1` until they move to
-  Postgres/Object Storage, or requests may land on an instance without them.
+  a persistent Kristall journal or Object Storage, or requests may land on an instance without them.
 - **Scale to zero stops background work.** Background threads and SSH runtime
   containers stop when the instance sleeps; they need to move to request-driven
   work or Container Apps jobs.

@@ -16,7 +16,7 @@ from provider_accounts.key_rotation import rotate_active_key
 from yandex_client_modules.api_key_provider import YandexApiKeyProvider
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("alice_provider_key_rotation")
+logger = logging.getLogger("logos_provider_key_rotation")
 
 
 def main() -> int:

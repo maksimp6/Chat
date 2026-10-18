@@ -4,7 +4,7 @@
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd -- "$SCRIPT_DIR/.." || exit 1
 
-# === DEBUG.SH: Скрипт диагностики проекта Alice Pro ===
+# === DEBUG.SH: Скрипт диагностики проекта Logos ===
 # Использование: bash scripts/debug.sh [logs|errors|api|all]
 
 LOGS_DIR="logs"
@@ -35,7 +35,7 @@ case "${1:-all}" in
     ;;
   all|*)
     echo "╔══════════════════════════════════════════════════════════╗"
-    echo "║       Диагностика проекта Alice Pro                      ║"
+    echo "║       Диагностика проекта Logos                          ║"
     echo "╚══════════════════════════════════════════════════════════╝"
     echo "Дата: $(date)"
     echo ""
