@@ -278,7 +278,7 @@ class EnvironmentRuntime:
     """Managed runtime thread for one immutable environment scope.
 
     The source worktree remains immutable metadata for the selected commit, but
-    the runtime itself stays inside the Alice Pro Python process. Runtime work
+    the runtime itself stays inside the Logos Python process. Runtime work
     is executed only after RuntimeDispatcher binds the environment scope.
     """
 

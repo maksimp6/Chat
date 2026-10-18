@@ -16,7 +16,7 @@ RDC and headless Chromium run together in this one container. The persistent
 browser profile lives in `state/.config/chromium`; it is private session data,
 not a CI artifact. The browser's control endpoint listens only on
 `127.0.0.1:9222` inside the container; no host port is published. This does not
-add a graphical desktop, automatic site login, or register an Alice browser adapter.
+add a graphical desktop, automatic site login, or register a Logos browser adapter.
 
 Chromium starts before RDC, with a 30-second readiness budget. Startup fails
 if Chromium cannot run with its namespace sandbox; no `--no-sandbox` fallback
@@ -165,7 +165,7 @@ dedicated service: `rdc-<first 12 project UUID hex digits>`. It uses 0.2 vCPU,
 existing service with any other resource profile.
 Hot instances remain active between HTTP requests and incur continuous compute
 charges; see [scaling](https://cloud.ru/docs/container-apps-evolution/ug/topics/container__scaling).
-It never takes over the separate compatibility-probe record or the Alice app.
+It never takes over the separate compatibility-probe record or the Logos app.
 
 Run `preflight`, then `install` from protected `master`. `install` requires the
 workflow input `image`: a prebuilt immutable image digest reference. The workflow
@@ -283,16 +283,16 @@ durable connectivity. Account confirmation cannot be performed automatically.
 The Commander startup preload observes the official `/device/start` response
 without changing RDC's PKCE or polling. Only `verification_uri_complete` and a
 maximum ten-minute expiry are written to `pairing/handoff.json`. This separate
-directory is mounted read-only into production Alice; RDC's credential directory
-is **not** mounted into Alice. The handoff is removed after authorization or a
+directory is mounted read-only into production Logos; RDC's credential directory
+is **not** mounted into Logos. The handoff is removed after authorization or a
 terminal provider error and cleared on process startup.
 
 After both deployments use this revision, visit `/<short-token>/rdc` while the
-server is waiting for authorization. Alice returns a 303 redirect to the exact
+server is waiting for authorization. Logos returns a 303 redirect to the exact
 server-generated verification URL. Complete the provider's account confirmation
 there. An expired or absent handoff returns 503; unauthenticated access is denied.
 No new OAuth callback or startup token flag is introduced.
 
-Deployment order: deploy production Alice with this revision, then install RDC
+Deployment order: deploy production Logos with this revision, then install RDC
 with this revision using the existing protected deployment workflows. This code
 does not authorize the device automatically: the account owner must confirm it.

@@ -101,11 +101,11 @@ window.changeModel = function (newModel, skipPatch) {
 function initializeShell() {
   window.AliceTheme.apply(savedTheme, false);
 
-  if (!window.__aliceThemeActionRegistered) {
+  if (!window.__logosThemeActionRegistered) {
     window.AliceCoreAPI.ui.actions.register("theme.cycle", function () {
       window.AliceTheme.cycle();
     });
-    window.__aliceThemeActionRegistered = true;
+    window.__logosThemeActionRegistered = true;
   }
 }
 

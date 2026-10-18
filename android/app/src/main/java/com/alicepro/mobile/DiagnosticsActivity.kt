@@ -209,7 +209,7 @@ class DiagnosticsActivity : AppCompatActivity() {
 
     private fun copyText(text: String) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("Alice Pro diagnostics", text))
+        clipboard.setPrimaryClip(ClipData.newPlainText("Logos diagnostics", text))
         AppLogger.debug("DiagnosticsActivity", "Diagnostic data copied", mapOf("chars" to text.length.toString()))
     }
 
