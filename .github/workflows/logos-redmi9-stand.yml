@@ -73,6 +73,47 @@ jobs:
             --output-dir "$GITHUB_WORKSPACE/out-stand"
           test -s out-stand/Logos_Redmi9_Stand_v3_Generic_PLA_A1mini.gcode.3mf
           cat out-stand/stand_audit.json
+      - name: Build and validate compact Redmi 9 stand with cable slot
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out-small
+          openscad --export-format binstl \
+            -o out-small/Logos_Redmi9_Compact_A1mini.stl \
+            3d-models/logos-redmi9-stand/Logos_Redmi9_Compact_A1mini.scad
+          python3 scripts/logos_redmi9_stand_slice.py \
+            --variant compact --validate-only \
+            --model out-small/Logos_Redmi9_Compact_A1mini.stl \
+            --output-dir out-small
+          head -c 84 out-small/Logos_Redmi9_Compact_A1mini.stl > out-small/invalid.stl
+          if python3 scripts/logos_redmi9_stand_slice.py \
+            --variant compact --validate-only \
+            --model out-small/invalid.stl --output-dir out-small; then
+            echo 'Compact negative control unexpectedly succeeded' >&2
+            exit 1
+          fi
+      - name: Slice compact Redmi 9 stand under the same A1 mini profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/logos_redmi9_stand_slice.py \
+            --variant compact \
+            --model "$GITHUB_WORKSPACE/out-small/Logos_Redmi9_Compact_A1mini.stl" \
+            --slicer-root "$GITHUB_WORKSPACE/squashfs-root" \
+            --output-dir "$GITHUB_WORKSPACE/out-small"
+          test -s out-small/Logos_Redmi9_Stand_Compact_Generic_PLA_A1mini.gcode.3mf
+          cat out-small/stand_audit.json
+      - name: Publish compact sliced but unprinted stand
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: logos-redmi9-compact-sliced-not-printed
+          path: |
+            out-small/Logos_Redmi9_Stand_Compact_Generic_PLA_A1mini.gcode.3mf
+            out-small/stand_audit.json
+            out-small/Logos_Redmi9_Compact_A1mini.stl
+            out-small/preview.png
+          if-no-files-found: error
+          retention-days: 7
       - name: Publish sliced but unprinted stand
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

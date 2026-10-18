@@ -21,6 +21,7 @@ from alice_a1mini_pla_cube_slice import (
 from alice_a1mini_preview import embed_preview
 
 OUTPUT = "Logos_Redmi9_Stand_v3_Generic_PLA_A1mini.gcode.3mf"
+SMALL_OUTPUT = "Logos_Redmi9_Stand_Compact_Generic_PLA_A1mini.gcode.3mf"
 
 
 def _collect_geometry(data: bytes, count: int):
@@ -39,18 +40,20 @@ def _collect_geometry(data: bytes, count: int):
     return axes, edges
 
 
-def validate_stl(path: Path) -> dict[str, object]:
+def validate_stl(path: Path, variant: str = "v3") -> dict[str, object]:
     data = path.read_bytes()
     if len(data) < 84:
         raise ValueError("STL has no triangles")
     count = struct.unpack_from("<I", data, 80)[0]
-    if not 400 <= count <= 10000 or len(data) != 84 + count * 50:
+    minimum_faces = 40 if variant == "compact" else 400
+    if not minimum_faces <= count <= 10000 or len(data) != 84 + count * 50:
         raise ValueError("unexpected STL count or length")
     axes, edges = _collect_geometry(data, count)
     if any(n != 2 for n in edges.values()):
         raise ValueError("non-manifold STL")
     size = [round(max(ax) - min(ax), 2) for ax in axes]
-    if any(abs(a - b) > 0.35 for a, b in zip(size, (112, 104, 107))):
+    expected = (78, 85, 60) if variant == "compact" else (112, 104, 107)
+    if any(abs(a - b) > 0.35 for a, b in zip(size, expected)):
         raise ValueError(f"stand dimension mismatch: {size}")
     if abs(min(axes[2])) > 0.01 or any(n > 180 for n in size):
         raise ValueError("STL outside A1 mini build area")
@@ -58,15 +61,19 @@ def validate_stl(path: Path) -> dict[str, object]:
         "source_sha256": hashlib.sha256(data).hexdigest(),
         "source_faces": count,
         "size_mm": size,
-        "usb_gap_mm": 30,
+        "usb_gap_mm": 27 if variant == "compact" else 30,
+        "variant": variant,
     }
 
 
-def inspect_sliced(path: Path, result_path: Path) -> dict[str, object]:
+def inspect_sliced(
+    path: Path, result_path: Path, variant: str = "v3"
+) -> dict[str, object]:
     settings, gcode = _read_sliced_archive(path)
     _validate_profile(settings)
     layers = _validate_gcode(gcode)
-    if not 500 <= layers <= 545:
+    low_layers, high_layers = (290, 315) if variant == "compact" else (500, 545)
+    if not low_layers <= layers <= high_layers:
         raise RuntimeError(f"unanticipated layer count: {layers}")
     result = json.loads(result_path.read_text(encoding="utf-8"))
     if result.get("return_code") != 0:
@@ -75,11 +82,13 @@ def inspect_sliced(path: Path, result_path: Path) -> dict[str, object]:
     if len(plates) != 1 or plates[0].get("warning_message"):
         raise RuntimeError("slicer warning or multiple plates")
     objs = plates[0].get("objects") or []
-    if len(objs) != 1 or int(objs[0].get("triangle_count", 0)) < 400:
+    minimum_faces = 40 if variant == "compact" else 400
+    if len(objs) != 1 or int(objs[0].get("triangle_count", 0)) < minimum_faces:
         raise RuntimeError("stand geometry lost during slicing")
     dims = objs[0].get("bbox", {})
     xyz = [float(dims.get(k, 0)) for k in ("width", "depth", "height")]
-    if not all(0 < d <= 180 for d in xyz) or abs(xyz[2] - 107) > 0.35:
+    expected_height = 60 if variant == "compact" else 107
+    if not all(0 < d <= 180 for d in xyz) or abs(xyz[2] - expected_height) > 0.35:
         raise RuntimeError(f"bad sliced geometry {xyz}")
     return {
         "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
@@ -101,8 +110,9 @@ def main() -> int:
     ap.add_argument("--slicer-root", type=Path)
     ap.add_argument("--output-dir", type=Path, required=True)
     ap.add_argument("--validate-only", action="store_true")
+    ap.add_argument("--variant", choices=("v3", "compact"), default="v3")
     args = ap.parse_args()
-    info = validate_stl(args.model)
+    info = validate_stl(args.model, args.variant)
     print("MODEL_VERIFIED", json.dumps(info, sort_keys=True), flush=True)
     if args.validate_only:
         return 0
@@ -115,13 +125,14 @@ def main() -> int:
     out = args.output_dir.resolve()
     out.mkdir(exist_ok=True, parents=True)
     machine, process, filament = profiles(root / "resources" / "profiles" / "BBL", out)
+    output_name = SMALL_OUTPUT if args.variant == "compact" else OUTPUT
     env = dict(os.environ, LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))
     cmd = [
         str(exe),
         "--slice",
         "0",
         "--export-3mf",
-        OUTPUT,
+        output_name,
         "--load-settings",
         f"{machine};{process}",
         "--load-filaments",
@@ -135,13 +146,13 @@ def main() -> int:
     print("SLICER_LOG_TAIL", (res.stdout + res.stderr)[-1500:], flush=True)
     if res.returncode:
         raise RuntimeError("Bambu Studio CLI exited nonzero")
-    dest = out / OUTPUT
+    dest = out / output_name
     preview = embed_preview(dest, args.model)
     with zipfile.ZipFile(dest) as archive:
         (out / "preview.png").write_bytes(archive.read("Metadata/plate_1.png"))
     report = dict(
         info,
-        **inspect_sliced(dest, out / "result.json"),
+        **inspect_sliced(dest, out / "result.json", args.variant),
         preview=preview,
         state="SLICED_NOT_PRINTED",
     )
