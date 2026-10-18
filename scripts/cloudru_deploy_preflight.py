@@ -50,6 +50,10 @@ def https_origin(value: object) -> bool:
         return False
 
 
+# Module.Class of the native store implemented in the repository (kristall/store.py).
+NATIVE_ENGINE = "kristall.Kristall"
+
+
 def database_parameters(path: str, database: dict) -> tuple[dict, list[str]]:
     """Validate native storage scope without opening any database or network."""
     errors = []
@@ -61,8 +65,8 @@ def database_parameters(path: str, database: dict) -> tuple[dict, list[str]]:
         "persistence_evidence",
         "restore_evidence",
     }
-    if set(database) != allowed or database.get("engine") != "memory_engine.MemoryStore":
-        errors.append("database: native MemoryStore schema required")
+    if set(database) != allowed or database.get("engine") != NATIVE_ENGINE:
+        errors.append("database: native Kristall schema required")
     if type(database.get("writer_processes")) is not int or database.get("writer_processes") != 1:
         errors.append("database: exactly one writer process required")
     if (
@@ -137,7 +141,7 @@ def validate(config: object, env: dict, *, workflow: bool = False) -> list[str]:
     if not isinstance(database, dict):
         return errors + ["database: object required"]
     if env.get("ALICE_DATABASE_URL"):
-        errors.append("ALICE_DATABASE_URL: retired setting; native MemoryStore required")
+        errors.append("ALICE_DATABASE_URL: retired setting; native Kristall required")
 
     required = (
         "ALICE_SHORT_TOKEN",
