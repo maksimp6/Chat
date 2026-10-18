@@ -79,7 +79,7 @@ from invocation.trace import create_invocation_trace
 | Файлы, плагины, организация, беседы | `workspace/`, `plugin_system/`, `organization/`, `conversations/` | #1268 |
 
 Корневых Python-файлов осталось 21: точки входа (`app.py`, `issue_runner.py`),
-конфигурация (`config.py`), базовая инфраструктура (`db.py`, `storage.py`,
+конфигурация (`config.py`), базовая инфраструктура (`storage/db.py`, `storage.py`,
 `sdk.py`, `memory_*`) и реестр/платформа инструментов (`tool_registry.py`,
 `universal_tool_platform.py`, `runtime_api.py`, `runtime_tools.py`,
 `mcp_routes.py`, `voice_routes.py`). Их перенос требует отдельных контрактов,

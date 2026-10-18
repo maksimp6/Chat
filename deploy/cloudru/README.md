@@ -100,7 +100,10 @@ Bootstrap identity для чтения Secret Management должна сущес
    timeout=300s, idleTimeout=600s. Проверить cold start и streaming на выбранном
    протоколе; фоновые задачи в scale-to-zero процессе ненадёжны.
 6. Заполнить `deployment.local.json` по example, затем выполнить проверку в
-   подготовленной среде (секреты уже в environment):
+   подготовленной среде (секреты уже в environment). Если `deployment.local.json`
+   скопирован из старого example, в нём может остаться retired engine
+   `memory_engine.MemoryStore`; preflight такой файл отклонит, поэтому замените
+   `"engine"` на `"kristall.Kristall"`:
 
 ```bash
 python scripts/cloudru_deploy_preflight.py --config deploy/cloudru/deployment.local.json

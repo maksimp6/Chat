@@ -91,7 +91,7 @@ remain domain operations owned by `BudgetController`, not by the LLM.
 
 ## Provider quota atomicity
 
-`provider_quotas.reserve_request()` is the provider-request admission boundary.
+`reserve_request()` in `provider_accounts/quotas.py` is the provider-request admission boundary.
 
 Atomicity comes from the native Kristall write barrier: the usage read and the usage
 write run in one `store.transaction()` for the user's quota key. SQLite
