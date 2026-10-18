@@ -37,7 +37,7 @@ def profile_application_performance(arguments: dict, cfg: dict = None) -> dict:
     }
 
 
-def _native_journal_status() -> dict:
+def _native_journal_status() -> dict[str, object]:
     """Describe the native Kristall journal without opening, locking or repairing it."""
     try:
         path = memory_file_path()
