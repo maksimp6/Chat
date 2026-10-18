@@ -1,47 +1,136 @@
-# Database backends
+# Database backend
 
-Logos supports two database backends through the same application data-access layer.
+Logos stores its authoritative runtime data in one native durable store,
+`kristall.Kristall`, backed by a single append-only journal file. There is no SQL
+backend.
 
-## Default: SQLite
+## Retired settings and modes
 
-When `ALICE_DATABASE_URL` is not set, Logos uses the local SQLite database `alice_pro.db`. This is the default for development and Termux.
+- `ALICE_DATABASE_URL` is retired. Nothing in the runtime reads it. The deploy
+  preflight (`scripts/cloudru_deploy_preflight.py`) rejects it with
+  `ALICE_DATABASE_URL: retired setting; native MemoryStore required`. Do not set it
+  in any environment.
+- SQLite (`alice_pro.db`) and PostgreSQL are not runtime modes. There is no
+  PostgreSQL service, compose file, SQL migration or SQL driver to install.
+- `tests/test_sql_free_contract.py` keeps SQL driver imports and SQL connection
+  helpers out of the runtime.
 
-No PostgreSQL service is required for this mode.
+## The store
 
-## Optional: PostgreSQL
+`kristall.Kristall` is a synchronous name/value store. Names are non-empty strings.
+Values are JSON scalars, lists and string-keyed dictionaries.
 
-Set `ALICE_DATABASE_URL` explicitly to switch the server-side persistence layer to PostgreSQL:
+- `set(name, value)` stages a copy. `commit()` appends the staged names to the
+  journal as one durable frame and returns the new sequence number.
+- `transaction()` is the required form for concurrent read-modify-write code.
+  Staging belongs to one client instance.
+- `get`, `items(prefix)`, `delete`, `info`, `checkpoint`, `backup`, `restore` and
+  `close` complete the API.
 
-```env
-ALICE_DATABASE_URL=postgresql://alice:<password>@localhost:5432/alice_pro
-```
+Durability and integrity:
 
-The application keeps the existing SQLite-oriented SQL surface and translates the small SQLite-specific subset used by the project for PostgreSQL. The goal is one application code path, not separate feature implementations.
+- A commit is acknowledged only after its frame is fsynced. A new journal file is
+  also synced through its directory.
+- Each frame is chained to the previous SHA-256 digest with a monotonic sequence
+  number. Replay detects reordered, missing or damaged frames (`corrupt committed
+  journal`). The chain is an integrity check, not protection against deliberate
+  rewrites.
+- Opening a store replays the whole journal into memory. A torn final frame stops
+  the open with `incomplete journal tail; recovery required`. Nothing is repaired
+  automatically.
+- Limits: one frame is at most 1 MiB, a value may nest at most 64 levels and 100,000
+  nodes, and the text in one value is limited to 1 MiB.
 
-## Runtime policy
+## Journal location
 
-PostgreSQL is intentionally **not enabled by default**. Current deployment and local startup continue to work without a PostgreSQL server.
+`storage/db.py` (`memory_file_path`) chooses the journal in this order:
 
-The optional compose file is:
+1. Inside a preview runtime, `<runtime data root>/alice.memory`.
+2. `ALICE_MEMORY_PATH`, when set, is used as the journal path.
+3. Otherwise `ALICE_DB_PATH` (default `alice.memory`). A name that does not end in
+   `.memory` maps to `alice.memory` in the same directory.
 
-```bash
-docker compose -f docker-compose.postgres.yml up -d
-```
+`.env.example` sets `ALICE_MEMORY_PATH=./alice.memory`. Deployments set an explicit
+absolute `ALICE_MEMORY_PATH` on persistent storage.
 
-Do not add `ALICE_DATABASE_URL` to the normal Termux environment unless PostgreSQL is intentionally being tested.
+## Deployment modes
+
+Every deployment uses the same store and code path. Only the journal path and the
+filesystem under it change.
+
+- **Local development:** a journal file in the working directory, for example
+  `./alice.memory`. No database server is started.
+- **Termux:** the same file-based journal, with no separate service process.
+- **Shared or cloud deployment:** a journal on a persistent filesystem under the
+  approved `data_root`, with exactly one writer process. An ephemeral container
+  filesystem is not durable storage, and cloud object storage is a backup target,
+  not the live journal (see [`deploy/cloudru/README.md`](../deploy/cloudru/README.md),
+  "Native storage transition").
+
+## One writer per journal
+
+- `Kristall(path)` takes an exclusive, non-blocking `flock` on `<journal>.lock`. The
+  lock is a separate file, so replacing the journal cannot release ownership. A
+  second writer fails with `database already has a writer`.
+- Inside one process, `agent_memory.client.get_memory_client` returns one shared
+  client per canonical path. Repositories use that client and must not close it.
+  A preview runtime that stops or fails to start releases its writer through
+  `close_memory_clients`.
+- Do not open the same journal from several processes. The deployment config
+  requires `writer_processes: 1`.
+- Read-only checks take the same lock. `--check-db` therefore fails while a service
+  holds the journal.
+
+## Legacy SQLite data
+
+- `alice_pro.db` is legacy SQLite data. Kristall never opens it. The runtime only
+  checks whether it exists, and the profiler tool reports its size.
+- If the native journal is missing and `alice_pro.db` exists beside it, startup
+  refuses to create an empty store (`legacy data exists; explicit verified native
+  activation required`).
+- Nothing imports legacy data automatically. Activation is a separate, verified step.
+  Historical SQL data and backups are not changed by the runtime.
+
+## Backup and restore
+
+- `backup(destination)` writes a new, verified, fsynced copy of the confirmed state.
+  It refuses an existing destination and an unhealthy store.
+- `restore(source)` restores a verified backup only into an empty store. It never
+  targets the live journal path.
+- `checkpoint()` replaces the journal with one verified snapshot frame. Sequence
+  numbers stay monotonic.
+- Deployment requires `database.persistence_evidence` and
+  `database.restore_evidence` before rollout.
 
 ## Shared stores
 
-Both backends are expected to serve the same server-side stores:
+Server-side repositories use this store under separate key prefixes, for example
+`chat/conversation/`, `config/` and `department/`. They cover:
 
-- conversations and messages;
-- conversation settings and configuration;
-- provider credentials and managed keys;
-- MCP server/configuration state;
-- sessions and invocations;
-- local-agent state and queued jobs;
-- treasury state;
-- user identity;
-- departments.
+- conversations, messages and conversation settings;
+- configuration;
+- user identity and conversation ownership;
+- sessions, invocations and traces;
+- agent memory;
+- MCP selection;
+- local-agent jobs and environments;
+- provider metadata and encrypted provider credentials;
+- quotas;
+- departments;
+- Treasury and business workflows.
 
-Schema bootstrap remains application-controlled, so a new installation can initialize either backend without a separate manual migration step.
+There is no schema to migrate. A new installation starts with an empty journal.
+
+## Operator check
+
+The deployment config names the store as `memory_engine.MemoryStore`. The preflight
+validates that exact string as a schema label. No module with that name exists. The
+implementation is `kristall.Kristall`.
+
+```bash
+ALICE_MEMORY_PATH=/absolute/persistent/path/alice.memory \
+  python scripts/cloudru_deploy_preflight.py --config deployment.json --check-db
+```
+
+`--check-db` verifies an existing journal under its writer lock. It never repairs,
+replaces or deletes source data. A passing result does not mark a deployment ready.
