@@ -68,7 +68,7 @@ class CliClient:
         if response.status_code >= 400:
             error = data.get("error") if isinstance(data, dict) else None
             message = str(error or "request failed")
-            raise CliError(f"Alice Pro HTTP {response.status_code}: {message}")
+            raise CliError(f"Logos HTTP {response.status_code}: {message}")
 
         if not isinstance(data, dict):
             raise CliError("Logos backend returned an invalid response")
@@ -168,7 +168,7 @@ def main() -> None:
                 title=os.getenv("ALICE_CLI_TITLE", "Logos CLI").strip() or "Logos CLI"
             )
     except CliError as exc:
-        print(f"Alice Pro CLI startup failed: {exc}")
+        print(f"Logos CLI startup failed: {exc}")
         return
 
     session_id = os.getenv("ALICE_SESSION_ID", "").strip() or conversation_id
@@ -197,7 +197,7 @@ def main() -> None:
             else:
                 _print_reply(payload)
         except CliError as exc:
-            print(f"\nAlice Pro request failed: {exc}\n")
+            print(f"\nLogos request failed: {exc}\n")
 
 
 if __name__ == "__main__":
