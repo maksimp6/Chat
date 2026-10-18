@@ -15,7 +15,7 @@ placing secret values in the repo. See the Codex instructions at
 | Foundation Models API key | Optional future Cloud.ru AI evaluation; not Logos's current AI backend | Issued for Foundation Models on a service account; expiry 1 day–1 year; docs recommend a moderate interval such as 90 days | IAM/EDS slots, user session, trace |
 | S3 access key pair + tenant ID | Object Storage S3 client | Separate storage principal; restrict bucket/prefix/operations | PostgreSQL password, FM key |
 | Logos short token / GitHub OAuth secret | Logos's own auth middleware | Application-level identity; owner IDs checked in backend | Cloud API key slots |
-| PostgreSQL role password | `alice_app` over TLS | One DB, non-superuser, max connections; rotate as a DB operation | URLs in stdout/process args/issues |
+| PostgreSQL role password (retired) | Former `alice_app` over TLS; not provisioned | Historical: one DB, non-superuser, max connections; rotation procedure no longer applies | URLs in stdout/process args/issues |
 | Certificate key | TLS terminator | Gateway custom hostname certificate | JSON payload, Docker image, CI log, tracked files |
 
 Cloud console humans, service accounts, Gateway API-key clients and Logos browser
@@ -40,13 +40,13 @@ Initial logical entries; actual service IDs/version syntax must come from the
 current API/console and are deliberately not fabricated here:
 
 - `alice/runtime/short-token`
-- `alice/runtime/postgres-dsn`
+- `alice/runtime/postgres-dsn` (retired: no DSN is created or read; the name is kept for existing state)
 - `alice/runtime/provider-credential-key` (preserve existing value at migration)
 - `alice/runtime/github-oauth-client-secret`
 - `alice/runtime/foundation-models-api-key` (if managed-key path is selected)
 - `alice/control-plane/iam-key-secret`
 - `alice/control-plane/eds-api-key`
-- `alice/backup/postgres-role-password`
+- `alice/backup/postgres-role-password` (retired with the PostgreSQL role password; the name is kept for existing state)
 
 Record resolved secret IDs/version IDs and consuming app revision in a protected
 operator inventory; issue/config/log output should contain only secret name and
@@ -62,11 +62,11 @@ certificate status/expiry, Gateway binding and renewal. Cloud.ru's Certificate
 Manager can issue Let's Encrypt certificates after DNS validation/delegation or
 store imported certificate versions. Never put the private key in this repo.
 
-PostgreSQL `sslrootcert` has a separate trust job: runtime needs the public root
-CA to verify the DB server. The PostgreSQL host retains its private server key.
-If mTLS is later required, manage the client certificate/private key through a
-separate protected runtime path and server-side role mapping. No mTLS client
-certificate feature is configured by this kit.
+Retired: the PostgreSQL `sslrootcert` trust job no longer applies, because the
+runtime opens no database server and needs no DB server CA. If mTLS is later
+required, manage the client certificate/private key through a separate protected
+runtime path and server-side role mapping. No mTLS client certificate feature is
+configured by this kit.
 
 User-facing TLS sequence: `Gateway custom domain → matching Certificate Manager
 certificate → CNAME custom FQDN to <gateway UUID>.apigw.cloud.ru → validate DNS,
