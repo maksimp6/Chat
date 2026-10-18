@@ -1,6 +1,6 @@
 # Recovery Procedures
 
-Alice Platform provides automated recovery from common failure scenarios. This document explains how to recover from service failures, data loss, and configuration errors.
+Keel Platform provides automated recovery from common failure scenarios. This document explains how to recover from service failures, data loss, and configuration errors.
 
 ## Recovery Types
 

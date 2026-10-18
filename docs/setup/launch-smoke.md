@@ -1,7 +1,7 @@
 # P0 local launch smoke
 
 This smoke test turns the launch baseline from issue #427 into a reproducible
-check against Alice Pro itself before Cloud.ru deployment work continues.
+check against Logos itself before Cloud.ru deployment work continues.
 
 It does **not** deploy production, mutate Cloud.ru resources, change GitHub
 permissions, or rotate credentials.
@@ -16,7 +16,7 @@ The script `scripts/local_launch_smoke.py` starts the documented
 3. the root UI returns non-empty HTML;
 4. a local runtime session can be bootstrapped;
 5. the SQLite database exists after shutdown;
-6. Alice starts again against the same database;
+6. Logos starts again against the same database;
 7. the runtime session survives the restart.
 
 Those checks are the deterministic **offline** half of the P0 baseline. The
@@ -34,7 +34,7 @@ The optional **full** mode additionally verifies the provider-dependent half:
 5. require a non-empty reply, invocation id and trace id;
 6. load the persisted trace through
    `GET /api/invocations/<invocation_id>/trace`;
-7. restart Alice;
+7. restart Logos;
 8. verify the conversation, provider metadata, runtime session and exact trace
    correlation are still readable.
 

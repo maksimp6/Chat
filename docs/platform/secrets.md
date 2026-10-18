@@ -1,6 +1,6 @@
 # Secrets Configuration
 
-Alice Platform uses external secret storage to keep sensitive credentials out of configuration files. This document explains how secrets are configured and referenced.
+Keel Platform uses external secret storage to keep sensitive credentials out of configuration files. This document explains how secrets are configured and referenced.
 
 ## Secret Concepts
 

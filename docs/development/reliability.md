@@ -1,6 +1,6 @@
 # Reliability rules
 
-Alice runs tools, spends money and changes cloud infrastructure on the user's
+Logos runs tools, spends money and changes cloud infrastructure on the user's
 behalf, so its code follows flight-software discipline: NASA/JPL "Power of
 Ten" adapted to Python and browser JavaScript, plus an explicit idempotency
 contract. `tests/test_reliability_rules.py` enforces the mechanical rules as a

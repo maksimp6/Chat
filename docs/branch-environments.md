@@ -1,6 +1,6 @@
 # Branch-aware environments
 
-Alice Pro treats a branch environment as an immutable application runtime created
+Logos treats a branch environment as an immutable application runtime created
 from one exact Git commit. It is infrastructure state, not a Session,
 Conversation, or InvocationContext.
 
