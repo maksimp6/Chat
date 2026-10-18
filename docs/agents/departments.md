@@ -2,7 +2,7 @@
 
 Departments are first-class domain containers that group an agent, capabilities, tools, policies, knowledge scope, session configuration and status.
 
-The repository provides a persistent SQLite-backed registry and REST API:
+The repository provides a persistent registry, stored in the native Kristall journal, and REST API:
 
 - GET /api/departments
 - GET /api/departments/:id

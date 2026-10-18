@@ -35,7 +35,7 @@ are never updated when a branch advances.
 ## Isolation
 
 Each environment receives its own worktree, process, runtime data directory,
-SQLite database, environment id, namespace, branch and commit metadata.
+native Kristall journal, environment id, namespace, branch and commit metadata.
 
 master remains a separate production deployment. The existing GitHub Preview
 Deployment workflow continues to provide public tokenized PR/branch previews.
