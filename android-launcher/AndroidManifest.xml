@@ -4,7 +4,7 @@
 
     <uses-permission android:name="com.alicepro.mobile.STATUS" />
 
-    <application android:label="Alice Launcher">
+    <application android:label="Logos Launcher">
         <activity
             android:name=".LauncherActivity"
             android:exported="true"
