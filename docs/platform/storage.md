@@ -1,10 +1,10 @@
 # Storage Configuration
 
-Alice Platform manages persistent storage for services that require it. This document explains storage configuration and backup policies.
+Keel Platform manages persistent storage for services that require it. This document explains storage configuration and backup policies.
 
 ## Storage Concepts
 
-**Persistent storage** is data that survives service restarts and redeployments. Alice Platform distinguishes between:
+**Persistent storage** is data that survives service restarts and redeployments. Keel Platform distinguishes between:
 
 - **Ephemeral**: Container-local temporary data (lost on restart)
 - **Persistent**: Named volumes shared across container instances

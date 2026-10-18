@@ -157,7 +157,7 @@ def test_candidate_script_runs_directly_from_repo_root():
         check=False,
     )
     assert result.returncode == 0
-    assert "Deploy an isolated lightweight Alice Dev candidate" in result.stdout
+    assert "Deploy an isolated lightweight Logos Dev candidate" in result.stdout
 
 
 def test_candidate_refuses_mismatched_existing_resource(monkeypatch):

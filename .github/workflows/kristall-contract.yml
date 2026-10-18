@@ -28,7 +28,7 @@ jobs:
           python-version: "3.14"
       - name: Install independent core tooling
         run: python -m pip install pytest==9.1.1 mypy==2.4.0
-      - name: Verify core without Alice or its test configuration
+      - name: Verify core without Logos or its test configuration
         run: |
           core_dir=$(mktemp -d)
           cp -R kristall "$core_dir/"

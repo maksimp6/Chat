@@ -72,7 +72,7 @@ public class AgentStatusClient {
             bound = false;
         }
         if (!bound) {
-            view.setText("Alice Pro не подключена");
+            view.setText("Logos не подключена");
         }
         handler.post(poll);
     }
@@ -95,7 +95,7 @@ public class AgentStatusClient {
         try {
             service.send(msg);
         } catch (Exception e) {
-            view.setText("Alice Pro не отвечает");
+            view.setText("Logos не отвечает");
         }
     }
 }

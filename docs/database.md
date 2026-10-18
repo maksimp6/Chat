@@ -1,10 +1,10 @@
 # Database backends
 
-Alice Pro supports two database backends through the same application data-access layer.
+Logos supports two database backends through the same application data-access layer.
 
 ## Default: SQLite
 
-When `ALICE_DATABASE_URL` is not set, Alice Pro uses the local SQLite database `alice_pro.db`. This is the default for development and Termux.
+When `ALICE_DATABASE_URL` is not set, Logos uses the local SQLite database `alice_pro.db`. This is the default for development and Termux.
 
 No PostgreSQL service is required for this mode.
 

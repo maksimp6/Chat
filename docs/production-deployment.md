@@ -1,10 +1,10 @@
-# Alice Pro production deployment
+# Logos production deployment
 
 Production uses the existing VPS reverse proxy and Docker network already used by Preview.
 
 ## Domains and DNS
 
-Point both domains to the Alice Pro VM public address:
+Point both domains to the Logos VM public address:
 
 - `maxxxpavlov.ru`
 - `maxxxpavlov.online`
@@ -143,7 +143,7 @@ Changing production data or `ALICE_DATABASE_URL` needs the owner's approval (see
 
 ## Cloud budget limits
 
-Alice reads real spend from the Cloud.ru billing API (`organization.api.cloud.ru`, method `consumption`) and compares it with a monthly limit.
+Logos reads real spend from the Cloud.ru billing API (`organization.api.cloud.ru`, method `consumption`) and compares it with a monthly limit.
 
 | Variable | Meaning |
 | --- | --- |
@@ -163,7 +163,7 @@ Behaviour:
 - The guard reads billing for the current month (`YYYY-MM`) at most once every 5 minutes per process; `cloud.budget.status` with `refresh: true` reads it immediately.
 - Warn, block and unknown results are recorded in the ExecutionTrace as `cloud_budget_<status>` events.
 
-For a hard stop that does not depend on Alice, also set a budget alert in the Cloud.ru console.
+For a hard stop that does not depend on Logos, also set a budget alert in the Cloud.ru console.
 
 ## Troubleshooting
 

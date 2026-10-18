@@ -1,6 +1,6 @@
 # Synthetic Android SMS and notification examples
 
-This dataset contains **20 entirely synthetic Russian-language examples** for testing classification and redaction in Alice Pro.
+This dataset contains **20 entirely synthetic Russian-language examples** for testing classification and redaction in Logos.
 
 - Source: manually authored generic templates. **No SMS bodies, contacts, phone numbers, real timestamps, device identifiers, screenshots or notification content were extracted from the user's Android.**
 - `synthetic: true` on every row. This is **not** an anonymized sample of the user's actual messages and does not reproduce their statistical distribution.

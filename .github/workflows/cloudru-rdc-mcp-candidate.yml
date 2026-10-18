@@ -1,4 +1,4 @@
-name: Deploy Alice Dev worker
+name: Deploy Logos Dev worker
 
 on:
   push:
@@ -69,7 +69,7 @@ jobs:
           echo "origin=$origin" >> "$GITHUB_OUTPUT"
           python -c 'import json,sys; r=json.loads(sys.argv[1]); print(json.dumps({"commit": sys.argv[2], "container_id": r["container_id"], "name": r["name"], "origin": r["origin"]}, sort_keys=True))' "$result" "$GITHUB_SHA" > "/tmp/alice-dev-container-$GITHUB_SHA.json"
           {
-            echo "## Alice Dev containers"
+            echo "## Logos Dev containers"
             echo
             python -c 'import json,sys; d=json.loads(sys.argv[1]); [print("- `{}` — {} — id `{}`".format(x.get("name"), x.get("origin") or "no public address", x.get("id"))) for x in d["containers"]]' "$inventory"
           } >> "$GITHUB_STEP_SUMMARY"

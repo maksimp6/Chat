@@ -3,7 +3,7 @@
 Status: baseline deploy path, not yet run against a live Cloud.ru project.
 Issue: #427
 
-Alice Pro runs as one Cloud.ru Evolution **Container Apps** service built from an
+Logos runs as one Cloud.ru Evolution **Container Apps** service built from an
 exact commit and pulled from **Artifact Registry** by digest. No VM or Kubernetes
 cluster is created. Evolution has no separate Functions product for Docker
 images, so Container Apps is the serverless runtime.

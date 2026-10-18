@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deploy an isolated lightweight Alice Dev candidate without touching persistent RDC."""
+"""Deploy an isolated lightweight Logos Dev candidate without touching persistent RDC."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ TOMBSTONES = Path(__file__).resolve().parents[1] / "config" / "alice" / "alice-d
 
 
 def fail(code: str) -> None:
-    raise CloudProviderError("Alice Dev candidate operation failed", code=code)
+    raise CloudProviderError("Logos Dev candidate operation failed", code=code)
 
 
 def project_id() -> str:

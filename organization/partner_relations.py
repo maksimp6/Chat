@@ -1,6 +1,6 @@
 """Partner Relations Department: trusted-owner CRM, communications and follow-up tools.
 
-The module keeps partner data scoped to the authenticated Alice Pro identity.
+The module keeps partner data scoped to the authenticated Logos identity.
 External delivery is intentionally separated from preparation/history storage:
 the current implementation can prepare and queue approved outgoing messages,
 but it does not pretend to have an external transport when none is configured.
