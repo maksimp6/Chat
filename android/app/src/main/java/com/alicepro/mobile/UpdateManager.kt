@@ -58,7 +58,11 @@ class UpdateManager(private val activity: Activity) {
             return String.format(Locale.US, "%.1f %s", number, units[index])
         }
 
-        internal fun isDebugApkArtifactName(name: String): Boolean = name.startsWith(ARTIFACT_NAME_PREFIX)
+        internal fun isDebugApkArtifactName(name: String): Boolean {
+            if (!name.startsWith(ARTIFACT_NAME_PREFIX)) return false
+            val runNumber = name.substring(ARTIFACT_NAME_PREFIX.length)
+            return runNumber.isNotEmpty() && runNumber.all { it in '0'..'9' }
+        }
     }
 
     data class BuildInfo(
