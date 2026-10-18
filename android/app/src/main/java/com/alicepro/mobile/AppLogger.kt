@@ -124,7 +124,7 @@ object AppLogger {
 
     fun createShareIntent(context: Context): Intent {
         val exportDir = File(context.cacheDir, LOG_DIR).apply { mkdirs() }
-        val export = File(exportDir, "alice-pro-diagnostics-${System.currentTimeMillis()}.log")
+        val export = File(exportDir, "logos-diagnostics-${System.currentTimeMillis()}.log")
         export.bufferedWriter().use { writer ->
             readEntries().forEach { entry ->
                 writer.appendLine(toJson(entry).toString())
