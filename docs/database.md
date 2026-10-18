@@ -84,7 +84,7 @@ filesystem under it change.
 ## Legacy SQLite data
 
 - `alice_pro.db` is legacy SQLite data. Kristall never opens it. The runtime only
-  checks whether it exists, and the profiler tool reports its size.
+  checks whether it exists; the profiler tool reports the native journal, not this file.
 - If the native journal is missing and `alice_pro.db` exists beside it, startup
   refuses to create an empty store (`legacy data exists; explicit verified native
   activation required`).
