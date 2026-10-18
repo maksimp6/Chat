@@ -5,10 +5,7 @@ description: "Prepare and operate Logos on Cloud.ru Evolution: EDS and Workflow 
 
 # Cloud.ru / Logos
 
-Read repository `AGENTS.md` and the current issue first. Work from the current
-`develop` HEAD in a focused branch; ordinary PRs target `develop` only. Keep
-existing authorization in scope: do not ask again for authorized read-only
-discovery, code or configuration work. Apply
+Read repository `AGENTS.md` and the current issue first. Work from current `develop` HEAD in a focused branch; all ordinary PRs target `develop` only. Keep existing authorization in scope: do not ask again for authorized read-only discovery, code or configuration work. Apply
 the repository's production/data/secret approval rules to actual live changes.
 
 ## Start here
