@@ -61,7 +61,7 @@ def cube_stl() -> bytes:
         (3, 0, 4),
         (3, 4, 7),
     ]
-    payload = bytearray(b"Alice Pro A1 mini Generic PLA 20 mm cube".ljust(80, b" "))
+    payload = bytearray(b"Logos A1 mini Generic PLA 20 mm cube".ljust(80, b" "))
     payload.extend(struct.pack("<I", len(triangles)))
     volume = 0.0
     for face in triangles:
