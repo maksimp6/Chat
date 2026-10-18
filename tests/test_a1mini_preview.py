@@ -58,6 +58,15 @@ class PreviewTests(unittest.TestCase):
         self.stl.write_bytes(cube_stl())
         archive(self.path)
 
+    def test_cube_stl_header_names_the_logos_product_in_80_bytes(self) -> None:
+        data = cube_stl()
+        self.assertEqual(684, len(data))
+        self.assertEqual(
+            b"Logos A1 mini Generic PLA 20 mm cube".ljust(80, b" "),
+            data[:80],
+        )
+        self.assertEqual(12, struct.unpack_from("<I", data, 80)[0])
+
     def test_embeddings_are_real_and_gcode_md5_unchanged(self) -> None:
         first = embed_preview(self.path, self.stl)
         self.assertEqual(GCODE, zipfile.ZipFile(self.path).read("Metadata/plate_1.gcode"))

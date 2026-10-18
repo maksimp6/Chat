@@ -11,7 +11,7 @@
   ▼
 Flask / app.py
   │
-  ├──────────────► SQLite / db.py
+  ├──────────────► Kristall / storage/db.py
   │
   ├──────────────► Yandex AI Studio
   │               │
@@ -39,7 +39,7 @@ Flask / app.py
 
 ### 2. Бэкенд (Flask)
 * `app.py` — главный файл приложения;
-* `db.py` — работа с SQLite;
+* `storage/db.py` — репозитории поверх нативного Kristall journal;
 * `config.py` — конфигурация;
 * `observability/system_log.py` — системный лог (запуск и сбои до появления Trace);
 * `file_routes.py` — маршруты работы с файлами;
@@ -59,7 +59,7 @@ Flask / app.py
 * Yandex AI Studio подключается через общий provider/Responses pipeline, а не напрямую из интерфейсных адаптеров.
 
 ### 5. Система хранения
-* **SQLite** (`db.py`) — основное хранилище данных;
+* **Нативный Kristall journal** (`storage/db.py`) — основное хранилище данных; SQLite и PostgreSQL выведены из эксплуатации;
 * файловая система — векторные хранилища и файлы.
 
 ## Взаимодействие компонентов
@@ -74,7 +74,7 @@ Flask / app.py
    * использует MCP‑инструменты для файловых операций.
 
 3. **Хранение данных**:
-   * структурированные данные — в SQLite (`db.py`);
+   * структурированные данные — в нативном Kristall journal (`storage/db.py`);
    * файлы и векторные данные — в файловой системе.
 
 4. **Логирование**:
@@ -83,7 +83,7 @@ Flask / app.py
 ## Технологический стек
 
 * **Бэкенд**: Python, Flask;
-* **База данных**: SQLite;
+* **Хранилище**: нативный Kristall journal (SQLite и PostgreSQL выведены из эксплуатации);
 * **Фронтенд**: HTML, JavaScript, CSS (без React/Vite в основной версии);
 * **AI**: Yandex AI Studio;
 * **MCP**: собственные инструменты на Python;

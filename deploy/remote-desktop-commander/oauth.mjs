@@ -232,7 +232,7 @@ export function createOAuth(options = {}) {
       "content-security-policy": `default-src 'none'; form-action 'self' ${redirectOrigin}; frame-ancestors 'none'; base-uri 'none'`,
       "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
     });
-    response.end(`<!doctype html><html lang="ru"><meta charset="utf-8"><title>Подключить Alice Dev к ChatGPT</title><h1>Доступ к Alice Dev</h1><p>Приложение: ${escape(client.client_name)}.</p><p>Адрес возврата: ${escape(new URL(params.redirect_uri).origin)}.</p><p>Подключение разрешит ChatGPT использовать инструменты Alice Dev в вашем проекте. Введите short token владельца.</p><form method="post" action="${OAUTH_PATH}/authorize"><input type="hidden" name="transaction" value="${transaction}"><input type="password" name="password" autocomplete="current-password" required><button type="submit">Разрешить</button></form></html>`);
+    response.end(`<!doctype html><html lang="ru"><meta charset="utf-8"><title>Подключить Logos Dev к ChatGPT</title><h1>Доступ к Logos Dev</h1><p>Приложение: ${escape(client.client_name)}.</p><p>Адрес возврата: ${escape(new URL(params.redirect_uri).origin)}.</p><p>Подключение разрешит ChatGPT использовать инструменты Logos Dev в вашем проекте. Введите short token владельца.</p><form method="post" action="${OAUTH_PATH}/authorize"><input type="hidden" name="transaction" value="${transaction}"><input type="password" name="password" autocomplete="current-password" required><button type="submit">Разрешить</button></form></html>`);
   }
 
   // Wrong short tokens seen recently, in memory only. Registration is anonymous, so
