@@ -11,5 +11,5 @@ Follow `AGENTS.md`. Primary skills: `issue-to-pr`,
 `runtime-debugging`, `github-ci-diagnosis`.
 
 Own Flask/API/runtime/tool/database/Execution Trace changes. Preserve UniversalToolExecutor,
-runtime isolation, SQLite/PostgreSQL compatibility and fail-closed errors. Do not push
+runtime isolation, native store compatibility and fail-closed errors. Do not push
 directly to `master` or change production secrets.

@@ -1,4 +1,4 @@
-# Alice Pro GitHub Agent instructions
+# Logos GitHub Agent instructions
 
 ## Repository workflow
 
@@ -33,7 +33,7 @@ Every routine agent/task PR MUST target `develop`, never `master`. Before any PR
 
 ## Agent dispatch
 
-Alice Pro uses **roles first, model providers second**. The repository roles are
+Logos uses **roles first, model providers second**. The repository roles are
 defined in `.github/agents/*.agent.md`; the underlying model/service is an
 execution backend, not the employee identity.
 
@@ -88,7 +88,7 @@ stops converging.
 - `@codex` is the default repository implementation backend. Routine and mechanical
   Codex work uses **GPT-5.4 nano**; `.codex/config.toml` keeps nano/low defaults.
 - `@copilot` remains the native Copilot cloud agent and automatic PR reviewer.
-- `@logos` remains Alice Pro's self-improver for her own UI, translations,
+- `@logos` remains Logos's self-improver for its own UI, translations,
   prompts, tools and docs.
 - Anthropic/Claude execution backends are not part of the repository execution
   path. Do not dispatch routine or maintainer work to Claude.
@@ -136,7 +136,7 @@ starts the `maintainer_stall` clock only for actual executable-backend evidence.
 - Use deterministic GitHub evidence first; model review is supplementary and must not
   bypass protected admission.
 - Draft pull requests are not merged; the author marks them ready first.
-  Alice always opens drafts, so the maintainer marks an Alice draft ready once
+  Logos always opens drafts, so the maintainer marks a Logos draft ready once
   its CI is green, then reviews it like any other pull request.
 - Keep a pull request in working/draft state while implementation and CI are still changing. Do not request extra model review during this phase.
 - A pull request enters its single final review cycle only when the current head
