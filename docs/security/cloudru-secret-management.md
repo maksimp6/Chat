@@ -172,8 +172,8 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
   `provider_credentials.py`; Secret Management становится дополнительным
   источником ссылки на закреплённую версию, а не заменяет существующую
   таблицу `provider_credentials`;
-- `alice_database_url` — строка подключения к управляемому PostgreSQL
-  (`ALICE_DATABASE_URL`), см. известное ограничение "App secrets are plain
+- `alice_database_url` — retired: строка подключения к PostgreSQL больше не создаётся и не читается
+  (`ALICE_DATABASE_URL`; хранилище — нативный Kristall journal, см. `docs/database.md`), см. известное ограничение "App secrets are plain
   container env vars" в `docs/cloudru-container-apps.md`.
 
 ## Реальный bootstrap из Container Apps
@@ -197,7 +197,7 @@ limitations") секреты Container Apps — обычные переменн�
    секреты/версии и настраивает права (сегодня это уже так для
    `scripts/cloudru_deploy.py` и ротации provider-ключей).
 4. Реальные значения (`ALICE_SHORT_TOKEN`, OAuth-секреты, provider-ключи,
-   `ALICE_DATABASE_URL`) перестают быть переменными окружения контейнера и
+   `ALICE_DATABASE_URL` — retired, не переносится) перестают быть переменными окружения контейнера и
    становятся версиями в Secret Management; Container Apps перестаёт быть
    местом, где они видны в открытом виде.
 

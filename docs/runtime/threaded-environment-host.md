@@ -36,13 +36,12 @@ policy in `runtime-dispatcher-policy.md`.
 ### Database scope
 
 The runtime data root is carried with the worker through request-local
-`ContextVar` state. `db.get_conn()` detects that scope and opens
-`<runtime-data-root>/alice_pro.db` instead of the process database.
+`ContextVar` state. `storage.db.memory_file_path()` detects that scope and resolves it to
+`<runtime-data-root>/alice.memory` instead of the process journal.
 
-This rule also applies when the host is configured for PostgreSQL or the
-in-memory backend: a preview runtime does not silently inherit either shared
-backend. Its SQLite schema is initialized inside the runtime scope before the
-worker starts. The environment control-plane database remains outside that
+A preview runtime does not silently inherit the process journal. Its native Kristall
+journal is opened on first use inside the runtime scope. PostgreSQL and SQLite are
+retired (see `docs/database.md`). The environment control-plane database remains outside that
 scope.
 
 ## Request-local URL state

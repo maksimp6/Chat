@@ -18,10 +18,9 @@ assigned to a trusted user through the administrative quota API.
 ## Enforcement
 
 A request is admitted before the outbound Yandex POST. The reservation is
-atomic:
-
-- SQLite uses BEGIN IMMEDIATE;
-- PostgreSQL uses a transaction plus SELECT ... FOR UPDATE.
+atomic: it runs in one native Kristall transaction, and the Kristall write barrier
+serializes concurrent reservations. SQLite `BEGIN IMMEDIATE` and PostgreSQL
+`SELECT ... FOR UPDATE` are retired (see `docs/database.md`).
 
 Continuation/polling is part of the already admitted provider operation and is
 not counted as a separate user request. Actual token usage is recorded when a
