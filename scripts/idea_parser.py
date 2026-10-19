@@ -22,6 +22,7 @@ import json
 import re
 import sys
 from collections import Counter
+from collections.abc import Generator
 from pathlib import Path
 
 OFFER_MARKERS = [
@@ -109,18 +110,18 @@ def classify_sentence(role: str, text: str) -> str:
     return "noise"
 
 
-def split_sentences(text: str):
+def split_sentences(text: str) -> list[str]:
     parts = re.split(r"(?<=[.!?…])\s+(?=[А-ЯЁA-Z«\"'])", text)
     return [p.strip().strip("*`") for p in parts if 10 < len(p.strip()) < 600]
 
 
-def parse_deeplink_json(data: dict):
+def parse_deeplink_json(data: dict[str, object]) -> Generator[tuple[str, str, str], None, None]:
     for m in data.get("chatMessages", []):
         role = "OWNER" if m.get("role") == "USER" else "MODEL"
         yield role, m.get("createdAt", ""), m.get("value", "")
 
 
-def parse_markdown(text: str):
+def parse_markdown(text: str) -> Generator[tuple[str, str, str], None, None]:
     # Общий формат: строки "---" или заголовки не обязательны; ищем блоки диалога.
     # Правило: строки, начинающиеся с префикса имени говорящего.
     current = None
@@ -145,7 +146,7 @@ def parse_markdown(text: str):
         yield current, ts, "\n".join(buf)
 
 
-def main():
+def main() -> None:
     args = sys.argv[1:]
     if not args:
         print(__doc__)
@@ -172,7 +173,7 @@ def main():
         turn_iter = parse_markdown(text)
 
     ideas = []
-    offers = Counter()
+    offers: Counter[str] = Counter()
     questions = []
     for role, ts, val in turn_iter:
         for sent in split_sentences(val):
