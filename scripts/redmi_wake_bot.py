@@ -98,7 +98,11 @@ def find_packages(word: str) -> list[str]:
 
 def launch_package(pkg: str) -> bool:
     """Start the launcher activity of a resolved package."""
-    res = run(["am", "start", "--user", "0", "-n", _launcher(pkg)], as_root=True, check=False)
+    res = run(
+        ["monkey", "--user", "0", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1"],
+        as_root=True,
+        check=False,
+    )
     print(f"OPEN {pkg}: rc={res.returncode}")
     return res.returncode == 0
 
