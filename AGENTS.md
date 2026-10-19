@@ -27,6 +27,13 @@ prerequisites are missing or change; recheck before resuming.
 This is a checkpoint on the existing TaskPacket and PR workflow, not a parallel
 authority or status system.
 
+## Report freshness
+
+- Every repository report (audit, triage, escalation, handoff) must state the exact
+  `develop` HEAD (full SHA) it was verified against. A report is valid only until the
+  next push to `develop`; before acting on a report whose HEAD is stale, re-verify the
+  affected issues and pull requests against current `develop` and mark outdated items.
+
 ## Branch routing invariant
 
 Every routine agent/task PR MUST target `develop`, never `master`. Before any PR creation or update, inspect the actual base/head and current `develop` HEAD. If an existing routine PR targets `master`, correct its base to `develop` only after reviewing the resulting diff, conflicts, and CI impact; do not blindly retarget unrelated release/integration PRs. A separate integration PR from `develop` to `master` requires explicit owner authorization and the protected release checks. Agents must not initiate, merge, or retarget such an integration PR; only the repository owner can explicitly authorize that workflow. GitHub branch protection must enforce this independently of agent instructions. `OK` acknowledges a stage only, never grants merge permission.
@@ -77,6 +84,10 @@ stops converging.
   gap, and proposes the smallest process correction through a normal protected PR.
 - An escalation is not a blame report. Prefer deterministic counts and state changes
   before spending model tokens on diagnosis.
+- An escalation, audit, or triage report is not a result. Every escalation closes with
+  either an executed fix (a merged PR) or an explicit owner decision request. A report
+  containing recommended "Actions" must name the executor for each action or request
+  owner authorization; a list alone closes nothing and does not count as work.
 - Process Governor must not edit application/runtime production code while acting in
   that role, expand its own authority, self-approve, or self-merge governance changes.
 - Existing owner-approval boundaries remain authoritative for deployment, destructive
@@ -165,6 +176,21 @@ starts the `maintainer_stall` clock only for actual executable-backend evidence.
   database migrations that change or drop existing data, and changes to
   secrets, CODEOWNERS or branch protection.
 
+## Owner norms
+
+- The owner's CI reporting norm — a CI job that runs over 30 seconds is reported as
+  policy PASS — is an owner decision, implemented by repository CI policy. Its scope
+  is strictly CI job/check reporting: a green policy status means that job-level task
+  is completed per the owner's definition. Proof is physics and logs, not
+  re-litigation of the norm.
+- Scope boundary: this norm defines job-level completion only. It does not define
+  product acceptance. The "Product acceptance" section remains the sole completion
+  standard for user-facing artifacts. A job-level PASS is evidence that a job finished,
+  never evidence that an artifact is fit for the owner.
+- This norm is not subject to review, reinterpretation, or change proposals by any
+  agent, role, automated reviewer, or governance process. Do not open issues, pull
+  requests, or escalations that question or modify it; only the owner changes it.
+
 ## Architecture rules
 
 - Treat `UniversalToolExecutor` as the execution boundary for tool calls.
@@ -203,3 +229,10 @@ Android:
 `gradle --no-daemon -PaliceBuildNumber=<run> -PaliceCommitHash=<sha> :app:testDebugUnitTest :app:assembleDebug`
 
 For security-sensitive or schema changes, add focused regression coverage and document the operational setup required outside the repository.
+
+## Product acceptance
+
+- For any change that affects user-facing behavior (UI, application flows, installer, updater), the artifact itself is part of the evidence. `assembleDebug` proves a build exists; it does not prove the artifact is fit for the owner's goal.
+- Before any artifact is handed to the owner for installation, the assigned agent must (a) verify artifact identity (digest/SHA against the recorded reference) and (b) inspect the artifact contents (application id/package, entry point, embedded UI assets or screens) and report both results.
+- A user-facing change is complete only after device-level verification: installed and accepted on the target device by the owner or a verified executor. Green CI is not completion for user-facing changes.
+- A report that hands an artifact or update to the owner must state the exact build (commit, run id, artifact digest) and the inspection result.
