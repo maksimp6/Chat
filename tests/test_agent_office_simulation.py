@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
-import io
 import json
-import runpy
 import subprocess
 import sys
 import tempfile
@@ -83,35 +80,6 @@ class OfficeSimulationTests(unittest.TestCase):
                 self.assertEqual(hashlib.sha256((output / name).read_bytes()).hexdigest(), digest)
             self.assertIn("reviewer identity", (output / "report.md").read_text())
 
-    def test_python_entrypoint_preserves_red_and_green_exit_codes(self) -> None:
-        for negative, expected in ((False, 0), (True, 1)):
-            with tempfile.TemporaryDirectory() as directory:
-                args = [
-                    "simulation",
-                    "--source-sha",
-                    SOURCE_SHA,
-                    "--run-id",
-                    "123",
-                    "--output",
-                    directory,
-                ]
-                if negative:
-                    args.append("--negative-control")
-                original = simulation.states.derive_agent_task_state
-                with (
-                    patch.object(sys, "argv", args),
-                    patch.object(simulation.states, "derive_agent_task_state", original),
-                    contextlib.redirect_stdout(io.StringIO()),
-                    self.assertRaises(SystemExit) as outcome,
-                ):
-                    runpy.run_path(str(Path(simulation.__file__)), run_name="__main__")
-                self.assertEqual(outcome.exception.code, expected)
-                payload = json.loads((Path(directory) / "report.json").read_text())
-                self.assertEqual(payload["source_sha"], SOURCE_SHA)
-                self.assertEqual(
-                    payload["status"], "SIMULATION_FAIL" if negative else "SIMULATION_PASS"
-                )
-
     def test_real_cli_negative_control_is_red_then_normal_cli_is_green(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             base = [
@@ -125,10 +93,12 @@ class OfficeSimulationTests(unittest.TestCase):
                 "--output",
                 directory,
             ]
-            red = subprocess.run(base + ["--negative-control"], capture_output=True, timeout=10)
+            red = subprocess.run(
+                base + ["--negative-control"], capture_output=True, timeout=10, check=False
+            )
             self.assertEqual(red.returncode, 1, red.stderr.decode())
             self.assertIn(b"SIMULATION_FAIL", red.stdout)
-            green = subprocess.run(base, capture_output=True, timeout=10)
+            green = subprocess.run(base, capture_output=True, timeout=10, check=False)
             self.assertEqual(green.returncode, 0, green.stderr.decode())
             self.assertIn(b"SIMULATION_PASS", green.stdout)
 

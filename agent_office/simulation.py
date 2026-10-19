@@ -13,6 +13,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass, replace
 from functools import partial
 from pathlib import Path
+from unittest.mock import patch
 
 from agent_office import dispatch_model as dispatch
 from agent_office import task_state as states
@@ -272,7 +273,7 @@ def write_report(report: Report, output: Path) -> None:
     (output / "SHA256SUMS").write_text("\n".join(checksums) + "\n", encoding="ascii")
 
 
-def unsafe_state(evidence: states.AgentTaskEvidence) -> str:
+def unsafe_state(_evidence: states.AgentTaskEvidence) -> str:
     """Deliberately broken function, activated only for the negative control."""
     return "done"
 
@@ -285,7 +286,7 @@ def main() -> int:
     parser.add_argument("--negative-control", action="store_true")
     args = parser.parse_args()
     if args.negative_control:
-        states.derive_agent_task_state = unsafe_state
+        patch.object(states, "derive_agent_task_state", unsafe_state).start()
     report = simulate(args.source_sha, args.run_id)
     write_report(report, args.output)
     print(markdown(report), end="")
