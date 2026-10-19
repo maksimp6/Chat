@@ -1,6 +1,5 @@
 {
   "try_blocks": {
-    "android-launcher/src/com/alicepro/launcher/AgentStatusClient.java": 2,
     "android/app/src/main/java/com/alicepro/mobile/AppLogger.kt": 1,
     "android/app/src/main/java/com/alicepro/mobile/DiagnosticsActivity.kt": 1,
     "android/app/src/main/java/com/alicepro/mobile/MainActivity.kt": 4,
