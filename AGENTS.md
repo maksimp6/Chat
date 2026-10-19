@@ -38,7 +38,9 @@ authority or status system.
 
 - One request equals one complete available cycle: inspect current state, execute,
   test, review, fix, re-verify. Do not stop after a plan and do not ask "next?" when
-  the next step is safe and available.
+  the next step is safe and available. A step is safe only when it lies outside
+  protected operations: merge, cutover, destructive or external actions, and
+  anything else reserved for the owner in this document.
 - A blocker is reported with its exact cause. Do not simulate work and do not
   fabricate results: an unexecuted step is reported as unexecuted.
 - After two failed attempts with the same method, change the method; do not repeat
