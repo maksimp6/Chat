@@ -285,9 +285,12 @@ def main() -> int:
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--negative-control", action="store_true")
     args = parser.parse_args()
-    if args.negative_control:
-        patch.object(states, "derive_agent_task_state", unsafe_state).start()
-    report = simulate(args.source_sha, args.run_id)
+    with patch.object(
+        states,
+        "derive_agent_task_state",
+        unsafe_state if args.negative_control else states.derive_agent_task_state,
+    ):
+        report = simulate(args.source_sha, args.run_id)
     write_report(report, args.output)
     print(markdown(report), end="")
     return 0 if report.passed else 1
