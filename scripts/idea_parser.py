@@ -64,6 +64,8 @@ def classify_sentence(role: str, text: str) -> str:
         return "relay"
     if any(m in low for m in RELAY_MARKERS) and role == "OWNER":
         return "relay"
+    if re.match(r"^если (нужно|хочешь|хотите)", low) or "могу выгрузить" in low or "могу помочь" in low:
+        return "offer"
     if any(h in low for h in QUESTION_HINTS):
         return "question"
     if any(h in low for h in PROPOSAL_HINTS):
