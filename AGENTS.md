@@ -34,6 +34,21 @@ authority or status system.
   next push to `develop`; before acting on a report whose HEAD is stale, re-verify the
   affected issues and pull requests against current `develop` and mark outdated items.
 
+## Request discipline
+
+- One request equals one complete available cycle: inspect current state, execute,
+  test, review, fix, re-verify. Do not stop after a plan and do not ask "next?" when
+  the next step is safe and available.
+- A blocker is reported with its exact cause. Do not simulate work and do not
+  fabricate results: an unexecuted step is reported as unexecuted.
+- After two failed attempts with the same method, change the method; do not repeat
+  a failing approach a third time.
+- Exit code 0, HTTP 200, and green CI do not prove end-to-end behavior on a real
+  device. Claims about user-facing behavior require device-level verification per the
+  "Product acceptance" section.
+- Before any device action, verify device identity, channel direction, and the
+  allowed channel. Do not replace a device action with a chat link.
+
 ## Branch routing invariant
 
 Every routine agent/task PR MUST target `develop`, never `master`. Before any PR creation or update, inspect the actual base/head and current `develop` HEAD. If an existing routine PR targets `master`, correct its base to `develop` only after reviewing the resulting diff, conflicts, and CI impact; do not blindly retarget unrelated release/integration PRs. A separate integration PR from `develop` to `master` requires explicit owner authorization and the protected release checks. Agents must not initiate, merge, or retarget such an integration PR; only the repository owner can explicitly authorize that workflow. GitHub branch protection must enforce this independently of agent instructions. `OK` acknowledges a stage only, never grants merge permission.
