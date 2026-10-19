@@ -24,6 +24,7 @@ import sys
 from collections import Counter
 from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 
 OFFER_MARKERS = [
     "если хочешь",
@@ -115,7 +116,7 @@ def split_sentences(text: str) -> list[str]:
     return [p.strip().strip("*`") for p in parts if 10 < len(p.strip()) < 600]
 
 
-def parse_deeplink_json(data: dict[str, object]) -> Generator[tuple[str, str, str], None, None]:
+def parse_deeplink_json(data: dict[str, Any]) -> Generator[tuple[str, str, str], None, None]:
     for m in data.get("chatMessages", []):
         role = "OWNER" if m.get("role") == "USER" else "MODEL"
         yield role, m.get("createdAt", ""), m.get("value", "")
@@ -199,9 +200,7 @@ def main() -> None:
         "",
     ]
     for n, it in enumerate(ideas, 1):
-        report.append(
-            f"{n}. [{it['ts']}] {it['quote']} (source: {it['source'] or path.name})"
-        )
+        report.append(f"{n}. [{it['ts']}] {it['quote']} (source: {it['source'] or path.name})")
     report += ["", "## Offer counts", ""]
     for k, v in offers.most_common():
         report.append(f"- `{k}`: {v} повторов")
