@@ -33,6 +33,20 @@ OFFER_MARKERS = [
     "первое сообщение",
     "доказательство выполнения",
 ]
+OFFER_MARKERS = [
+    "если хочешь",
+    "патчплейт",
+    "карточки для",
+    "карточка для",
+    "ветку интерфейса",
+    "первое сообщение",
+    "доказательство выполнения",
+    "могу выгрузить",
+    "могу помочь",
+    "могу встроить",
+    "могу подготовить",
+]
+RELAY_MARKERS = ["pr #", "sha", "коммит", "head develop", "merge", "```", "ci ", "apk ", "gh-run"]
 PROPOSAL_HINTS = [
     "надо ", "нужно ", "сделай", "убрать", "удали", "замени", "создать", "создать",
     "хочу", "давай", "перестань", "запрет", "обязательно", "почему бы не",
@@ -47,6 +61,8 @@ def classify_sentence(role: str, text: str) -> str:
             return "offer"
         return "noise"
     if any(h in low for h in RELAY_HINTS) and len(text) > 600:
+        return "relay"
+    if any(m in low for m in RELAY_MARKERS) and role == "OWNER":
         return "relay"
     if any(h in low for h in QUESTION_HINTS):
         return "question"
