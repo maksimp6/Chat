@@ -4,17 +4,17 @@ Reads a dialog export (GigaChat deeplink JSON or plain markdown) and extracts
 proposals: sentences by the OWNER that state an idea, wish, directive or
 question-to-answer, plus recurring OFFERS by the assistant model. Outputs:
 
-  ideas_report.md   human-readable digest with counts and quotes
+  ideas_report.md     human-readable digest with counts and quotes
   ideas_to_file.json  ready-to-post issue drafts {title, body, labels, source}
 
 Usage:
   python scripts/idea_parser.py <input.json|input.md> [--out-dir DIR] [--source URL]
 
 Categories (lexicon-driven, no external deps):
-  proposal   - owner states an idea/directive ("надо", "нужно", "сделай", "почему бы не", ...)
-  question   - owner asks a personal/reflective question (kept, not filed as issue)
-  relay      - owner pasted agent output (likely long markdown/code blocks)
-  offer      - assistant model repeats an offer ("Если хочешь, я могу", "патчплейт", ...)
+  proposal   - owner states an idea/directive
+  question   - owner asks a personal/reflective question (kept, not filed)
+  relay      - owner pasted agent output (not a proposal)
+  offer      - assistant model repeats an offer; counted with repeats
   noise      - everything else
 """
 
@@ -26,15 +26,6 @@ from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
-OFFER_MARKERS = [
-    "если хочешь",
-    "патчплейт",
-    "карточки для",
-    "карточка для",
-    "ветку интерфейса",
-    "первое сообщение",
-    "доказательство выполнения",
-]
 OFFER_MARKERS = [
     "если хочешь",
     "патчплейт",
@@ -67,7 +58,6 @@ PROPOSAL_HINTS = [
     "удали",
     "замени",
     "создать",
-    "создать",
     "хочу",
     "давай",
     "перестань",
@@ -75,153 +65,171 @@ PROPOSAL_HINTS = [
     "обязательно",
     "почему бы не",
 ]
-QUESTION_HINTS = [
-    "почему я",
-    "почему когда",
-    "почему алиса",
-    "это эго",
-    "чувствую",
-    "чувству",
-]
-RELAY_HINTS = ["```", "СДЕЛАНО", "## Доказательства", "PR #", "SHA", "HEAD "]
+QUESTION_HINTS = ["почему я", "почему когда", "почему алиса", "это эго", "чувствую", "чувству"]
+
+OPENING_OFFER = re.compile(r"^если (нужно|хочешь|хотите)")
+OPENING_ACTION = re.compile(r"^(как |что если |зачем |сделай|судите?|перечитай)")
 
 
-def classify_sentence(role: str, text: str) -> str:
-    low = text.lower()
-    if role == "MODEL":
-        if any(m in low for m in OFFER_MARKERS):
-            return "offer"
-        return "noise"
-    if any(h in low for h in RELAY_HINTS) and len(text) > 600:
+def _owner_category(low: str, length: int) -> str:
+    """Classify an OWNER sentence by its lowercase text."""
+    if any(h in low for h in RELAY_MARKERS) and (length > 600 or "```" in low or "pr #" in low):
         return "relay"
-    if any(m in low for m in RELAY_MARKERS) and role == "OWNER":
+    if any(m in low for m in RELAY_MARKERS):
         return "relay"
-    if (
-        re.match(r"^если (нужно|хочешь|хотите)", low)
-        or "могу выгрузить" in low
-        or "могу помочь" in low
-    ):
-        return "offer"
     if any(h in low for h in QUESTION_HINTS):
         return "question"
-    if any(h in low for h in PROPOSAL_HINTS):
-        return "proposal"
-    if re.match(r"^(как |что если |зачем |сделай|судите?|перечитай)", low):
+    if any(h in low for h in PROPOSAL_HINTS) or OPENING_ACTION.match(low):
         return "proposal"
     return "noise"
 
 
+def _model_category(low: str) -> str:
+    """Classify a MODEL sentence by its lowercase text."""
+    if any(m in low for m in OFFER_MARKERS) or OPENING_OFFER.match(low):
+        return "offer"
+    return "noise"
+
+
+def classify_sentence(role: str, text: str) -> str:
+    """Return the category of a single dialogue sentence."""
+    low = text.lower()
+    if any(m in low for m in OFFER_MARKERS) or OPENING_OFFER.match(low):
+        return "offer"
+    if role != "OWNER":
+        return _model_category(low)
+    return _owner_category(low, len(text))
+
+
 def split_sentences(text: str) -> list[str]:
+    """Split a dialogue value into candidate sentences."""
     parts = re.split(r"(?<=[.!?…])\s+(?=[А-ЯЁA-Z«\"'])", text)
     return [p.strip().strip("*`") for p in parts if 10 < len(p.strip()) < 600]
 
 
 def parse_deeplink_json(data: dict[str, Any]) -> Generator[tuple[str, str, str], None, None]:
+    """Yield (role, timestamp, value) triples from a GigaChat deeplink export."""
     for m in data.get("chatMessages", []):
         role = "OWNER" if m.get("role") == "USER" else "MODEL"
         yield role, m.get("createdAt", ""), m.get("value", "")
 
 
 def parse_markdown(text: str) -> Generator[tuple[str, str, str], None, None]:
-    # Общий формат: строки "---" или заголовки не обязательны; ищем блоки диалога.
-    # Правило: строки, начинающиеся с префикса имени говорящего.
-    current = None
-    buf = []
-    ts = ""
+    """Yield (role, timestamp, value) triples from a plain markdown dialogue log."""
+    speaker_lines = {
+        "владелец": "OWNER",
+        "максим": "OWNER",
+        "gigachat": "MODEL",
+        "модель": "MODEL",
+        "ассистент": "MODEL",
+    }
+    current: str | None = None
+    buf: list[str] = []
     for line in text.splitlines():
-        speaker = None
-        low = line.strip().lower()
-        if low.startswith(("владелец:", "максим:")):
-            speaker = "OWNER"
-        elif low.startswith(("gigachat:", "модель:", "ассистент:")):
-            speaker = "MODEL"
-        if speaker:
+        stripped = line.strip()
+        head = stripped.split(":", 1)[0].strip().lower()
+        role = speaker_lines.get(head)
+        if role:
             if current and buf:
-                yield current, ts, "\n".join(buf)
-            current = speaker
-            buf = [line.split(":", 1)[1].strip()] if ":" in line else []
-            ts = ""
+                yield current, "", "\n".join(buf)
+            current = role
+            buf = [stripped.split(":", 1)[1].strip()] if ":" in stripped else []
         elif current:
             buf.append(line)
     if current and buf:
-        yield current, ts, "\n".join(buf)
+        yield current, "", "\n".join(buf)
 
 
-def main() -> None:
-    args = sys.argv[1:]
-    if not args:
-        print(__doc__)
-        sys.exit(1)
-    path = Path(args[0])
-    out_dir = Path("reports")
-    src = ""
-    i = 1
-    while i < len(args):
-        if args[i] == "--out-dir" and i + 1 < len(args):
-            out_dir = Path(args[i + 1])
-            i += 2
-        elif args[i] == "--source" and i + 1 < len(args):
-            src = args[i + 1]
-            i += 2
-        else:
-            i += 1
-
-    text = path.read_text(encoding="utf-8")
-    if path.suffix == ".json":
-        data = json.loads(text)
-        turn_iter = parse_deeplink_json(data)
-    else:
-        turn_iter = parse_markdown(text)
-
-    ideas = []
-    offers: Counter[str] = Counter()
-    questions = []
-    for role, ts, val in turn_iter:
-        for sent in split_sentences(val):
-            cat = classify_sentence(role, sent)
-            if cat == "proposal":
-                ideas.append({"role": role, "ts": ts, "quote": sent, "source": src})
-            elif cat == "offer":
-                key = next((m for m in OFFER_MARKERS if m in sent.lower()), "unknown")
-                offers[key] += 1
-            elif cat == "question":
-                questions.append({"role": role, "ts": ts, "quote": sent, "source": src})
-
-    out_dir.mkdir(exist_ok=True)
-    report = [
+def _report_lines(
+    proposals: list[dict[str, str]],
+    offers: Counter[str],
+    questions: list[dict[str, str]],
+    src: str,
+    name: str,
+) -> list[str]:
+    lines = [
         "# Idea parser report",
-        f"Source: {src or path.name}",
+        f"Source: {src or name}",
         "",
-        f"Proposals (candidate issues): {len(ideas)}",
+        f"Proposals (candidate issues): {len(proposals)}",
         f"Recurring offers: {sum(offers.values())} hits across {len(offers)} markers",
         f"Personal questions (not filed): {len(questions)}",
         "",
         "## Proposals",
         "",
     ]
-    for n, it in enumerate(ideas, 1):
-        report.append(f"{n}. [{it['ts']}] {it['quote']} (source: {it['source'] or path.name})")
-    report += ["", "## Offer counts", ""]
-    for k, v in offers.most_common():
-        report.append(f"- `{k}`: {v} повторов")
-    report += ["", "## Questions (kept out of issues)", ""]
-    for it in questions:
-        report.append(f"- [{it['ts']}] {it['quote']}")
-    (out_dir / "ideas_report.md").write_text("\n".join(report), encoding="utf-8")
+    for n, it in enumerate(proposals, 1):
+        lines.append(f"{n}. [{it['ts']}] {it['quote']} (source: {it['source'] or name})")
+    lines += ["", "## Offer counts", ""]
+    for key, count in offers.most_common():
+        lines.append(f"- `{key}`: {count} повторов")
+    lines += ["", "## Questions (kept out of issues)", ""]
+    lines += [f"- [{it['ts']}] {it['quote']}" for it in questions]
+    return lines
 
+
+def run_parser(input_path: Path, out_dir: Path, src: str) -> tuple[int, Counter[str], int]:
+    """Parse the input file and write reports; return counters."""
+    text = input_path.read_text(encoding="utf-8")
+    if input_path.suffix == ".json":
+        turns = parse_deeplink_json(json.loads(text))
+    else:
+        turns = parse_markdown(text)
+
+    proposals: list[dict[str, str]] = []
+    offers: Counter[str] = Counter()
+    questions: list[dict[str, str]] = []
+    for role, ts, value in turns:
+        for sent in split_sentences(value):
+            cat = classify_sentence(role, sent)
+            if cat == "proposal":
+                proposals.append({"role": role, "ts": ts, "quote": sent, "source": src})
+            elif cat == "offer":
+                key = next((m for m in OFFER_MARKERS if m in sent.lower()), "unknown")
+                offers[key] += 1
+            elif cat == "question":
+                questions.append({"role": role, "ts": ts, "quote": sent, "source": src})
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    report = "\n".join(_report_lines(proposals, offers, questions, src, input_path.name))
+    (out_dir / "ideas_report.md").write_text(report, encoding="utf-8")
     payload = {
-        "generated": src or path.name,
-        "proposals": ideas,
+        "generated": src or input_path.name,
+        "proposals": proposals,
         "offers": dict(offers),
         "questions": questions,
     }
     (out_dir / "ideas_to_file.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8"
     )
+    return len(proposals), offers, len(questions)
+
+
+def main() -> int:
+    """CLI entry point."""
+    args = sys.argv[1:]
+    if not args:
+        print(__doc__)
+        return 1
+    input_path = Path(args[0])
+    out_dir = Path("reports")
+    src = ""
+    i = 1
+    while i < len(args) - 1:
+        if args[i] == "--out-dir":
+            out_dir = Path(args[i + 1])
+            i += 2
+        elif args[i] == "--source":
+            src = args[i + 1]
+            i += 2
+        else:
+            i += 1
+    n_prop, offers, n_q = run_parser(input_path, out_dir, src)
     print(
-        f"OK: {len(ideas)} proposals, {sum(offers.values())} offer hits, {len(questions)} questions -> {out_dir}"
+        f"OK: {n_prop} proposals, {sum(offers.values())} offer hits, {n_q} questions -> {out_dir}"
     )
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
