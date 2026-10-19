@@ -38,16 +38,20 @@ PACKAGE_HINTS: dict[str, tuple[str, ...]] = {
 
 CLAUSE_SPLIT = re.compile(r"[,;.!?]|\\bи затем\\b|\\bпотом\\b|\\bзатем\\b", re.IGNORECASE)
 
-def run(cmd: list[str], as_root: bool = False, check: bool = True) -> subprocess.CompletedProcess[str]:
+
+def run(
+    cmd: list[str], as_root: bool = False, check: bool = True
+) -> subprocess.CompletedProcess[str]:
     """Run a command on the device, elevating through su when asked."""
     if as_root:
         argv = ["su", "-c", shlex.join(cmd)]
     else:
         argv = cmd
-    result = subprocess.run(argv, capture_output=True, text=True, timeout=30)
+    result = subprocess.run(argv, capture_output=True, text=True, timeout=30, check=False)
     if check and result.returncode != 0:
         print(f"FAIL {' '.join(argv)}: rc={result.returncode} {result.stderr.strip()}")
     return result
+
 
 def wake() -> bool:
     """Wake the screen."""
@@ -56,6 +60,7 @@ def wake() -> bool:
     lock = run(["termux-wake-lock"], check=False)
     print(f"WAKEUP rc={res.returncode} wake-lock rc={lock.returncode}")
     return ok and lock.returncode == 0
+
 
 def unlock() -> bool:
     """Wake and dismiss the keyguard (root); fall back to a menu swipe."""
@@ -68,6 +73,7 @@ def unlock() -> bool:
     print(f"UNLOCK: fallback menu-swipe rc={res.returncode}")
     return res.returncode == 0
 
+
 def packages() -> list[str]:
     """List installed package names."""
     res = run(["pm", "list", "packages"], as_root=True, check=False)
@@ -76,6 +82,7 @@ def packages() -> list[str]:
         for line in res.stdout.splitlines()
         if line.startswith("package:")
     ]
+
 
 def find_packages(word: str) -> list[str]:
     """Resolve a spoken app word to installed package names."""
@@ -88,22 +95,27 @@ def find_packages(word: str) -> list[str]:
             found.append(pkg)
     return found
 
+
 def launch_package(pkg: str) -> bool:
     """Start the launcher activity of a resolved package."""
     res = run(["am", "start", "--user", "0", "-n", _launcher(pkg)], as_root=True, check=False)
     print(f"OPEN {pkg}: rc={res.returncode}")
     return res.returncode == 0
 
+
 def open_app(word: str) -> bool:
     """Start an app resolved by a spoken word."""
     found = find_packages(word)
     if not found:
-        print(f"OPEN: no package matches '{word}' (hints: {PACKAGE_HINTS.get(word.lower().strip())})")
+        print(
+            f"OPEN: no package matches '{word}' (hints: {PACKAGE_HINTS.get(word.lower().strip())})"
+        )
         return False
     if len(found) > 1:
         print(f"OPEN: ambiguous, candidates: {', '.join(found)} — re-run with a package name")
         return False
     return launch_package(found[0])
+
 
 def execute(clause: str) -> bool:
     """Execute one parsed clause of the owner's command."""
@@ -120,6 +132,7 @@ def execute(clause: str) -> bool:
     print(f"SKIP: unknown clause '{clause.strip()}'")
     return True
 
+
 def main() -> int:
     """CLI entry: python redmi_bot.py \"разблокируй экран, открой алиса, разбуди\"."""
     if len(sys.argv) < 2:
@@ -130,6 +143,7 @@ def main() -> int:
     ok = all(results)
     print("RESULT:", "DONE" if ok else "PARTIAL/FAIL")
     return 0 if ok else 2
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
