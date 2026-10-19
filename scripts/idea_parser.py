@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Idea parser for Logos dialog exports.
 
 Reads a dialog export (GigaChat deeplink JSON or plain markdown) and extracts
@@ -18,6 +17,7 @@ Categories (lexicon-driven, no external deps):
   offer      - assistant model repeats an offer ("Если хочешь, я могу", "патчплейт", ...)
   noise      - everything else
 """
+
 import json
 import re
 import sys
@@ -46,13 +46,43 @@ OFFER_MARKERS = [
     "могу встроить",
     "могу подготовить",
 ]
-RELAY_MARKERS = ["pr #", "sha", "коммит", "head develop", "merge", "```", "ci ", "apk ", "gh-run"]
-PROPOSAL_HINTS = [
-    "надо ", "нужно ", "сделай", "убрать", "удали", "замени", "создать", "создать",
-    "хочу", "давай", "перестань", "запрет", "обязательно", "почему бы не",
+RELAY_MARKERS = [
+    "pr #",
+    "sha",
+    "коммит",
+    "head develop",
+    "merge",
+    "```",
+    "ci ",
+    "apk ",
+    "gh-run",
 ]
-QUESTION_HINTS = ["почему я", "почему когда", "почему алиса", "это эго", "чувствую", "чувству"]
+PROPOSAL_HINTS = [
+    "надо ",
+    "нужно ",
+    "сделай",
+    "убрать",
+    "удали",
+    "замени",
+    "создать",
+    "создать",
+    "хочу",
+    "давай",
+    "перестань",
+    "запрет",
+    "обязательно",
+    "почему бы не",
+]
+QUESTION_HINTS = [
+    "почему я",
+    "почему когда",
+    "почему алиса",
+    "это эго",
+    "чувствую",
+    "чувству",
+]
 RELAY_HINTS = ["```", "СДЕЛАНО", "## Доказательства", "PR #", "SHA", "HEAD "]
+
 
 def classify_sentence(role: str, text: str) -> str:
     low = text.lower()
@@ -64,7 +94,11 @@ def classify_sentence(role: str, text: str) -> str:
         return "relay"
     if any(m in low for m in RELAY_MARKERS) and role == "OWNER":
         return "relay"
-    if re.match(r"^если (нужно|хочешь|хотите)", low) or "могу выгрузить" in low or "могу помочь" in low:
+    if (
+        re.match(r"^если (нужно|хочешь|хотите)", low)
+        or "могу выгрузить" in low
+        or "могу помочь" in low
+    ):
         return "offer"
     if any(h in low for h in QUESTION_HINTS):
         return "question"
@@ -74,14 +108,17 @@ def classify_sentence(role: str, text: str) -> str:
         return "proposal"
     return "noise"
 
+
 def split_sentences(text: str):
     parts = re.split(r"(?<=[.!?…])\s+(?=[А-ЯЁA-Z«\"'])", text)
     return [p.strip().strip("*`") for p in parts if 10 < len(p.strip()) < 600]
+
 
 def parse_deeplink_json(data: dict):
     for m in data.get("chatMessages", []):
         role = "OWNER" if m.get("role") == "USER" else "MODEL"
         yield role, m.get("createdAt", ""), m.get("value", "")
+
 
 def parse_markdown(text: str):
     # Общий формат: строки "---" или заголовки не обязательны; ищем блоки диалога.
@@ -107,6 +144,7 @@ def parse_markdown(text: str):
     if current and buf:
         yield current, ts, "\n".join(buf)
 
+
 def main():
     args = sys.argv[1:]
     if not args:
@@ -118,9 +156,11 @@ def main():
     i = 1
     while i < len(args):
         if args[i] == "--out-dir" and i + 1 < len(args):
-            out_dir = Path(args[i + 1]); i += 2
+            out_dir = Path(args[i + 1])
+            i += 2
         elif args[i] == "--source" and i + 1 < len(args):
-            src = args[i + 1]; i += 2
+            src = args[i + 1]
+            i += 2
         else:
             i += 1
 
@@ -146,11 +186,21 @@ def main():
                 questions.append({"role": role, "ts": ts, "quote": sent, "source": src})
 
     out_dir.mkdir(exist_ok=True)
-    report = ["# Idea parser report", f"Source: {src or path.name}", "",
-              f"Proposals (candidate issues): {len(ideas)}", f"Recurring offers: {sum(offers.values())} hits across {len(offers)} markers",
-              f"Personal questions (not filed): {len(questions)}", "", "## Proposals", ""]
+    report = [
+        "# Idea parser report",
+        f"Source: {src or path.name}",
+        "",
+        f"Proposals (candidate issues): {len(ideas)}",
+        f"Recurring offers: {sum(offers.values())} hits across {len(offers)} markers",
+        f"Personal questions (not filed): {len(questions)}",
+        "",
+        "## Proposals",
+        "",
+    ]
     for n, it in enumerate(ideas, 1):
-        report.append(f"{n}. [{it['ts']}] {it['quote']} (source: {it['source'] or path.name})")
+        report.append(
+            f"{n}. [{it['ts']}] {it['quote']} (source: {it['source'] or path.name})"
+        )
     report += ["", "## Offer counts", ""]
     for k, v in offers.most_common():
         report.append(f"- `{k}`: {v} повторов")
@@ -159,9 +209,19 @@ def main():
         report.append(f"- [{it['ts']}] {it['quote']}")
     (out_dir / "ideas_report.md").write_text("\n".join(report), encoding="utf-8")
 
-    payload = {"generated": src or path.name, "proposals": ideas, "offers": dict(offers), "questions": questions}
-    (out_dir / "ideas_to_file.json").write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(f"OK: {len(ideas)} proposals, {sum(offers.values())} offer hits, {len(questions)} questions -> {out_dir}")
+    payload = {
+        "generated": src or path.name,
+        "proposals": ideas,
+        "offers": dict(offers),
+        "questions": questions,
+    }
+    (out_dir / "ideas_to_file.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8"
+    )
+    print(
+        f"OK: {len(ideas)} proposals, {sum(offers.values())} offer hits, {len(questions)} questions -> {out_dir}"
+    )
+
 
 if __name__ == "__main__":
     main()
