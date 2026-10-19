@@ -31,11 +31,10 @@ class OfficeSimulationTests(unittest.TestCase):
 
     def test_trace_has_real_model_states_and_no_work_from_green_workflow(self) -> None:
         report = simulation.simulate()
-        states = [
-            c.actual for c in report.checks if c.name.startswith("lifecycle/")
-        ]
+        states = [c.actual for c in report.checks if c.name.startswith("lifecycle/")]
         self.assertEqual(
-            states, ["queued", "acknowledged", "dispatched", "working", "verifying", "review", "done"]
+            states,
+            ["queued", "acknowledged", "dispatched", "working", "verifying", "review", "done"],
         )
         checks = {c.name: c for c in report.checks}
         self.assertEqual(checks["green-workflow-without-backend"].actual, "queued")

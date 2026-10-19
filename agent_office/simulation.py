@@ -67,9 +67,7 @@ def state_check(name: str, evidence: states.AgentTaskEvidence, expected: str) ->
     return Check(name, expected, states.derive_agent_task_state(evidence))
 
 
-def rejection_check(
-    name: str, operation: Callable[[], object], error: type[Exception]
-) -> Check:
+def rejection_check(name: str, operation: Callable[[], object], error: type[Exception]) -> Check:
     expected = "rejected:" + error.__name__
     try:
         operation()
@@ -246,8 +244,15 @@ def markdown(report: Report) -> str:
     rows += ["| " + p.stage + " | " + str(p.role) + " | " + p.backend + " |" for p in report.plans]
     rows += ["", "| Scenario | Expected | Actual | Result |", "| --- | --- | --- | --- |"]
     rows += [
-        "| " + c.name + " | " + c.expected + " | " + c.actual + " | "
-        + ("PASS" if c.passed else "FAIL") + " |"
+        "| "
+        + c.name
+        + " | "
+        + c.expected
+        + " | "
+        + c.actual
+        + " | "
+        + ("PASS" if c.passed else "FAIL")
+        + " |"
         for c in report.checks
     ]
     rows += ["", "## Boundaries", ""] + ["- " + text for text in LIMITS]
@@ -267,7 +272,7 @@ def write_report(report: Report, output: Path) -> None:
     (output / "SHA256SUMS").write_text("\n".join(checksums) + "\n", encoding="ascii")
 
 
-def unsafe_state(_evidence: states.AgentTaskEvidence) -> str:
+def unsafe_state(evidence: states.AgentTaskEvidence) -> str:
     """Deliberately broken function, activated only for the negative control."""
     return "done"
 
