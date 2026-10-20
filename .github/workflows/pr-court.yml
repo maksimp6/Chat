@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   judge:
-    # Only the owner's explicitly requested initial rehearsal, not a paid PR monitor.
+    # Only the owner's explicit PR rehearsal, not a paid PR monitor.
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.login == 'maksimp6' &&
@@ -38,9 +38,13 @@ jobs:
             exit 1
           fi
           python -c 'import json; from pathlib import Path; r=json.loads(Path("pr-court-output/replay.json").read_text()); assert r["status"] == "MODEL_OUTPUT_REJECTED"; assert r["paid_calls"] == 0'
-          echo "Original uncited verdict rejected; no additional model calls." >> "$GITHUB_STEP_SUMMARY"
+          echo "Offline negative control rejected the original uncited verdict." >> "$GITHUB_STEP_SUMMARY"
       - name: One bounded model judgment (no tools or writes)
-        if: github.event.action == 'opened'
+        # One correction transition only; later pushes and rerun attempts do not bill.
+        if: >-
+          github.event.action == 'synchronize' &&
+          github.event.before == '8ef5a8b2b359c013bcf2dc9ed68058533acaadc5' &&
+          github.run_attempt == 1
         env:
           GH_TOKEN: ${{ github.token }}
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
