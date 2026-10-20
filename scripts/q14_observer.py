@@ -62,10 +62,7 @@ def redact(value: object, secrets: tuple[str, ...]) -> object:
     if isinstance(value, list):
         return [redact(item, secrets) for item in value]
     if isinstance(value, dict):
-        return {
-            str(redact(key, secrets)): redact(item, secrets)
-            for key, item in value.items()
-        }
+        return {str(redact(key, secrets)): redact(item, secrets) for key, item in value.items()}
     return value
 
 
@@ -109,17 +106,13 @@ def request(host: str, path: str, token: str, body: Json | None = None) -> Json:
 
 
 def github(path: str) -> Json:
-    return request(
-        "api.github.com", f"/repos/{REPO}/{path}", os.environ["GITHUB_TOKEN"]
-    )["data"]
+    return request("api.github.com", f"/repos/{REPO}/{path}", os.environ["GITHUB_TOKEN"])["data"]
 
 
 def git_text(path: str) -> str:
     if path not in FILES:
         raise ValueError("file_not_allowed")
-    return subprocess.check_output(
-        ["git", "show", f"{BASELINE}:{path}"], text=True, timeout=10
-    )
+    return subprocess.check_output(["git", "show", f"{BASELINE}:{path}"], text=True, timeout=10)
 
 
 def inventory() -> dict[str, Json]:
@@ -230,8 +223,7 @@ def observe(reads, sources, evidence, read, output, secrets) -> list[Json]:
 
 def inspect(sources, send, read, output: Path, secrets: tuple[str, ...]) -> Json:
     catalogue = {
-        key: {k: v for k, v in item.items() if k != "text"}
-        for key, item in sources.items()
+        key: {k: v for k, v in item.items() if k != "text"} for key, item in sources.items()
     }
     transcript: list[Json] = []
     evidence: list[Json] = []
@@ -333,9 +325,7 @@ def main() -> int:
         for finding in decision["findings"]:
             summary += json.dumps(finding, ensure_ascii=False, indent=2) + "\n\n"
         summary += decision["limitations"] + "\n"
-        (output / "model-answer.md").write_text(
-            str(redact(summary, secrets)), encoding="utf-8"
-        )
+        (output / "model-answer.md").write_text(str(redact(summary, secrets)), encoding="utf-8")
     except (
         OSError,
         ValueError,
