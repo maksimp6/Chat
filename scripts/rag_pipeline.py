@@ -80,9 +80,7 @@ STOP = {
 
 
 def api_get(path: str, token: str | None = None) -> dict:
-    req = urllib.request.Request(
-        API + path, headers={"Accept": "application/vnd.github+json"}
-    )
+    req = urllib.request.Request(API + path, headers={"Accept": "application/vnd.github+json"})
     if token:
         req.add_header("Authorization", f"Bearer {token}")
     with urllib.request.urlopen(req, timeout=30) as r:
@@ -112,9 +110,7 @@ def fetch_corpus(token: str | None) -> list[dict]:
     issues: list[dict] = []
     page = 1
     while True:
-        data = api_get(
-            f"/issues?labels={LABEL_SOURCE}&state=open&per_page=100&page={page}", token
-        )
+        data = api_get(f"/issues?labels={LABEL_SOURCE}&state=open&per_page=100&page={page}", token)
         if not data:
             break
         issues.extend(data)
@@ -235,9 +231,7 @@ def yandex_embeddings(texts: list[str]) -> list[list[float]] | None:
         return None
     out = []
     for t in texts[:64]:  # hard cap: cost control
-        payload = json.dumps(
-            {"modelUri": f"emb://{project}/text-search-doc", "text": t}
-        ).encode()
+        payload = json.dumps({"modelUri": f"emb://{project}/text-search-doc", "text": t}).encode()
         req = urllib.request.Request(
             "https://llm.api.cloud.yandex.net/foundationModels/v1/textEmbedding",
             data=payload,
@@ -279,9 +273,7 @@ def report(
         "",
     ]
     if not fragments:
-        lines.append(
-            "**PASS: релевантных фрагментов не найдено — ответ не выдумывается.**"
-        )
+        lines.append("**PASS: релевантных фрагментов не найдено — ответ не выдумывается.**")
         return "\n".join(lines)
     lines.append("| # | score | issue | фрагмент | verbatim |")
     lines.append("|---|---|---|---|---|")
@@ -358,9 +350,7 @@ def main() -> int:
             with open(args.dump_index, "w") as f:
                 json.dump(
                     {
-                        "units": [
-                            {"issue": u["issue"], "text": u["text"]} for u in units
-                        ],
+                        "units": [{"issue": u["issue"], "text": u["text"]} for u in units],
                         "sha256_full": hashlib.sha256(
                             "".join(c["text"] for c in corpus).encode()
                         ).hexdigest(),
@@ -368,11 +358,7 @@ def main() -> int:
                     f,
                     ensure_ascii=False,
                 )
-        print(
-            json.dumps(
-                {"sources": len(corpus), "units": len(units)}, ensure_ascii=False
-            )
-        )
+        print(json.dumps({"sources": len(corpus), "units": len(units)}, ensure_ascii=False))
         return 0
 
     if args.mode == "query":
