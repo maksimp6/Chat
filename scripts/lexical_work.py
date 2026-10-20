@@ -49,7 +49,7 @@ def find_issues(explicit: str) -> list[dict[str, object]]:
     if explicit.strip():
         issue = gh("GET", f"issues/{explicit.strip()}")
         return [issue]
-    return list(gh("GET", f"issues?labels={LABEL}&state=open&per_page=30"))
+    return list(gh("GET", f"issues?labels={LABEL}&state=open&per_page=200"))
 
 
 def parse_body(text: str, out_dir: Path, source: str) -> str:
@@ -80,6 +80,16 @@ def comment_body(report: str, number: int, source: str) -> str:
     return head + report
 
 
+def already_processed(number: int) -> bool:
+    """True when this runner already posted a report on the issue."""
+    comments = gh("GET", f"issues/{number}/comments?per_page=100")
+    return any(
+        "Лексическая работа (runner)" in str(c.get("body", ""))
+        for c in comments
+        if c.get("user", {}).get("login") == "github-actions[bot]"
+    )
+
+
 def main() -> int:
     """Entry point: iterate labeled issues, parse, comment, upload artifacts."""
     explicit = os.environ.get("ISSUE_INPUT", "")
@@ -92,6 +102,9 @@ def main() -> int:
     processed = 0
     for issue in find_issues(explicit):
         number = issue["number"]
+        if already_processed(number):
+            print(f"skip #{number}: already processed")
+            continue
         body = str(issue.get("body") or "")
         if len(body) < 40:
             print(f"skip #{number}: body too short for lexical work")
