@@ -37,6 +37,28 @@ class EvidenceTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_judgment(original["judgment"], RULE, FILES)
 
+    def test_actual_live_fenced_json_is_decoded_without_inventing_findings(self):
+        report = json.loads((FIXTURE.parent / "pr_court_1422_corrected_response.json").read_text())
+        self.assertEqual(report["response_id"], "42cd3b04-982c-4f54-a805-185617196135")
+        result = validate_judgment(report["judgment"], RULE, FILES)
+        self.assertEqual(result["status"], "NO_CANDIDATES_NOT_APPROVAL")
+        self.assertEqual(result["findings"], [])
+        self.assertEqual(result["semantic_quality"], "NOT_VERIFIED")
+
+    def test_fenced_json_allows_only_one_complete_json_document(self):
+        valid = '{"findings": [], "limitations": []}'
+        self.assertEqual(
+            validate_judgment("```json\n" + valid + "\n```", RULE, FILES)["findings"], []
+        )
+        for text in (
+            "Preface\n```\n" + valid + "\n```",
+            "```\n" + valid + "\n```\nConclusion",
+            "```\n" + valid + valid + "\n```",
+            "```\n{\n```",
+        ):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                validate_judgment(text, RULE, FILES)
+
     def test_invented_quote_path_line_and_source_rejected(self):
         for field, value in (
             ("rule_quote", "Invented rule that never existed in base"),

@@ -29,7 +29,9 @@ def added_lines(patch: str) -> dict[int, str]:
 
 def validate_judgment(text: str, rules: str, files: list) -> dict:
     """Reject missing/false citations; valid citations still require merits review."""
-    data = json.loads(text)
+    # Accept one complete Markdown code fence, never surrounding prose or partial JSON.
+    fenced = re.fullmatch(r"```(?:json)?[ \t]*\r?\n(.*?)\r?\n```", text.strip(), re.DOTALL)
+    data = json.loads(fenced[1] if fenced else text)
     if not isinstance(data, dict) or set(data) != {"findings", "limitations"}:
         raise ValueError("Expected findings and limitations, not a prose verdict")
     findings, limitations = data["findings"], data["limitations"]

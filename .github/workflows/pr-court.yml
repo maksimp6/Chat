@@ -39,6 +39,24 @@ jobs:
           fi
           python -c 'import json; from pathlib import Path; r=json.loads(Path("pr-court-output/replay.json").read_text()); assert r["status"] == "MODEL_OUTPUT_REJECTED"; assert r["paid_calls"] == 0'
           echo "Offline negative control rejected the original uncited verdict." >> "$GITHUB_STEP_SUMMARY"
+      - name: Decode actual live model response with corrected parser (offline)
+        run: |
+          python - <<'PYTHON'
+          import json
+          from pathlib import Path
+          from scripts.pr_court_evidence import validate_judgment
+          r = json.loads(Path("tests/fixtures/pr_court_1422_corrected_response.json").read_text())
+          result = validate_judgment(r["judgment"], "", [])
+          assert result["status"] == "NO_CANDIDATES_NOT_APPROVAL"
+          assert result["semantic_quality"] == "NOT_VERIFIED"
+          assert not result["merge_approval"]
+          result["source_run_id"] = r["run_id"]
+          result["source_head"] = r["head"]
+          result["response_id"] = r["response_id"]
+          result["additional_paid_calls"] = 0
+          Path("pr-court-output/live-response-replay.json").write_text(json.dumps(result, ensure_ascii=False, indent=2))
+          print(json.dumps(result, ensure_ascii=False))
+          PYTHON
       - name: One bounded model judgment (no tools or writes)
         # One correction transition only; later pushes and rerun attempts do not bill.
         if: >-
