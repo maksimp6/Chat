@@ -1,0 +1,44 @@
+name: Lexical pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "Dialog issue number (label lexical-dialog). Empty = process all dialog issues."
+        required: false
+        default: ""
+      source:
+        description: "Optional source URL to cite in the report (e.g. giga.chat/link/...)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: lexical-pipeline-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  lexical:
+    name: Run the full-cycle lexical pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+
+      - name: Run lexical work
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_INPUT: ${{ inputs.issue }}
+          SOURCE_URL: ${{ inputs.source }}
+        run: python scripts/lexical_pipeline.py
