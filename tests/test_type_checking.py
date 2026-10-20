@@ -76,6 +76,7 @@ STRICT_CLEAN_FILES = {
     "agent_office/__init__.py",
     "agent_office/dispatch_model.py",
     "agent_office/task_state.py",
+    "agent_office/simulation.py",
     "agent_retrieval/__init__.py",
     "agent_retrieval/models.py",
     "agent_shell/__init__.py",

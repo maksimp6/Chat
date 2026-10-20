@@ -1,0 +1,63 @@
+name: Office simulation
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - "agent_office/**"
+      - "tests/test_agent_office_simulation.py"
+      - ".github/workflows/office-simulation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: office-simulation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rehearse:
+    name: Office fixture rehearsal and negative control
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout exact source head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: Run regression tests including broken-gate negative controls
+        run: python -m unittest discover -s tests -p test_agent_office_simulation.py -v
+      - name: Prove deliberately broken evidence is rejected (RED)
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if python -m agent_office.simulation --negative-control --output office-simulation/negative-control --source-sha "$SOURCE_SHA" --run-id "$GITHUB_RUN_ID"; then
+            echo "Negative control unexpectedly passed" >&2
+            exit 1
+          fi
+          python -c 'import json; from pathlib import Path; r=json.loads(Path("office-simulation/negative-control/report.json").read_text()); assert r["status"] == "SIMULATION_FAIL"; assert any(not c["passed"] for c in r["checks"])'
+          echo "- RED: deliberately broken state guard was detected." >> "$GITHUB_STEP_SUMMARY"
+      - name: Rehearse existing office models (GREEN)
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          python -m agent_office.simulation --output office-simulation --source-sha "$SOURCE_SHA" --run-id "$GITHUB_RUN_ID"
+          (cd office-simulation && sha256sum -c SHA256SUMS)
+          cat office-simulation/report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Save exact-run reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: office-simulation-${{ github.run_id }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: office-simulation/
+          if-no-files-found: warn
+          retention-days: 7
