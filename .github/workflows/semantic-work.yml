@@ -8,9 +8,17 @@ on:
         required: true
         default: ""
       mode:
-        description: "query | red"
+        description: "search (no model call) | query | red"
+        type: choice
+        options: [search, query, red]
         required: true
-        default: "query"
+        default: "search"
+      corpus:
+        description: "All task history or labelled dialogue sources, both open and closed"
+        type: choice
+        options: [tasks, dialogues]
+        required: true
+        default: "tasks"
       publish_issue:
         description: "issue number for the report"
         required: false
@@ -55,6 +63,7 @@ jobs:
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
           SEM_MODE: ${{ inputs.mode }}
+          SEM_CORPUS: ${{ inputs.corpus }}
           SEM_QUERY: ${{ inputs.query }}
           SEM_PUBLISH_ISSUE: ${{ inputs.publish_issue }}
           SEM_ALLOW_MODEL: ${{ inputs.allow_model_call }}
@@ -62,7 +71,7 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s\n' "$SEM_QUERY" > /tmp/sem_query.txt
-          args=(--mode "$SEM_MODE" --query-file /tmp/sem_query.txt)
+          args=(--mode "$SEM_MODE" --corpus "$SEM_CORPUS" --query-file /tmp/sem_query.txt)
           if [ -n "$SEM_PUBLISH_ISSUE" ]; then
             args+=(--publish-issue "$SEM_PUBLISH_ISSUE")
           fi

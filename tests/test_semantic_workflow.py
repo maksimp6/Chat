@@ -23,6 +23,8 @@ def test_workflow_requires_owner_first_attempt_and_explicit_budget():
     events = data.get("on", data.get(True))
     assert set(events) == {"workflow_dispatch"}
     assert events["workflow_dispatch"]["inputs"]["allow_model_call"]["default"] is False
+    assert events["workflow_dispatch"]["inputs"]["mode"]["default"] == "search"
+    assert events["workflow_dispatch"]["inputs"]["corpus"]["default"] == "tasks"
     assert data["concurrency"]["cancel-in-progress"] is False
     guard = data["jobs"]["semantic"]["if"]
     assert "github.actor == github.repository_owner" in guard
@@ -65,6 +67,7 @@ def test_workflow_shell_admission_and_literal_query(
         "CAPTURE": str(capture),
         "SEM_QUERY": query,
         "SEM_MODE": "query",
+        "SEM_CORPUS": "tasks",
         "SEM_PUBLISH_ISSUE": issue,
         "SEM_ALLOW_MODEL": allow,
         "SEM_APPROVAL_REFERENCE": reference,
@@ -83,6 +86,8 @@ def test_workflow_shell_admission_and_literal_query(
             "scripts/semantic_pipeline.py",
             "--mode",
             "query",
+            "--corpus",
+            "tasks",
             "--query-file",
             str(query_path),
             *expected_args,

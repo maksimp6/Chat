@@ -1,8 +1,9 @@
 """Semantic pipeline for the Logos runner (stage 2: LLM over BM25 candidates).
 
 Design contract (aligned with scripts/rag_pipeline.py):
-- Corpus = GitHub issues carrying label `rag-source`; honest per_page=100 pagination.
-- Retrieval: BM25 over sentence units (deterministic, free) -> top-K candidates.
+- Corpora = all task Issues (title/body) or labelled `rag-source` dialogues;
+  both include open and closed Issues with honest per_page=100 pagination.
+- Retrieval: BM25 over sentence units (deterministic, no model call) -> top-K candidates.
 - One bounded YandexGPT call per query (model aliceai-llm-flash, background=False,
   store=False, max_output_tokens<=4096): the model may only RE-SELECT and cite
   verbatim fragments from the candidate list; it must refuse when nothing is
@@ -17,8 +18,10 @@ Design contract (aligned with scripts/rag_pipeline.py):
   remain INSUFFICIENT_EVIDENCE; NO_CANDIDATES is not a live-model refusal.
 
 Modes:
+  --mode search    : retrieval without a model over all task history by default
   --mode query     : run query from --query-file or --query, publish to --publish-issue
   --mode red       : same, but treat the query as a negative control (refusal expected)
+  --corpus tasks|dialogues : choose source scope explicitly
   --selftest       : offline controls only; live-model RED remains NOT_RUN
 """
 
@@ -134,49 +137,74 @@ def api_post(path: str, payload: dict, token: str) -> dict:
         return json.load(r)
 
 
-def fetch_corpus(token: str | None) -> list[dict]:
-    """Fetch bounded snapshots, keeping both the issue body and extraction identity."""
-    issues: list[dict] = []
-    page = 1
-    body_chars = 0
-    while True:
-        data = api_get(f"/issues?labels={LABEL_SOURCE}&state=open&per_page=100&page={page}", token)
+def _issue_snapshot(row: dict, kind: str, retrieved_at: str) -> dict:
+    """Keep source identity and GitHub state without interpreting completion."""
+    if type(row.get("number")) is not int or row["number"] <= 0:
+        raise ValueError("issue_number_invalid")
+    body = row.get("body") if row.get("body") is not None else ""
+    title = row.get("title", "")
+    if not isinstance(body, str) or not isinstance(title, str):
+        raise ValueError("issue_text_invalid")
+    state = row.get("state")
+    valid_state = (state is None and kind == "dialogues") or (
+        isinstance(state, str) and state in {"open", "closed"}
+    )
+    if not valid_state:
+        raise ValueError("issue_state_invalid")
+    reason = row.get("state_reason")
+    if reason is not None and not isinstance(reason, str):
+        raise ValueError("issue_state_reason_invalid")
+    parts = body.split("\n---\n", 1) if kind == "dialogues" else [body]
+    text = parts[-1]
+    return {
+        "issue": row["number"],
+        "text": text,
+        "title": title,
+        "corpus_kind": kind,
+        "sha256": hashlib.sha256(text.encode()).hexdigest(),
+        "title_sha256": hashlib.sha256(title.encode()).hexdigest(),
+        "body_sha256": hashlib.sha256(body.encode()).hexdigest(),
+        "body_offset": len(body) - len(text),
+        "url": f"https://github.com/{REPO}/issues/{row['number']}",
+        "state": row.get("state"),
+        "state_reason": row.get("state_reason"),
+        "closed_at": row.get("closed_at"),
+        "updated_at": row.get("updated_at"),
+        "retrieved_at": retrieved_at,
+    }
+
+
+def fetch_corpus(token: str | None, corpus_kind: str = "dialogues") -> list[dict]:
+    """Read every page of open and closed Issues; PRs never enter the corpus."""
+    if corpus_kind not in {"tasks", "dialogues"}:
+        raise ValueError("corpus_kind_invalid")
+    label = f"labels={LABEL_SOURCE}&" if corpus_kind == "dialogues" else ""
+    corpus, seen = [], set()
+    total = 0
+    retrieved_at = datetime.now(timezone.utc).isoformat()
+    for page in range(1, 51):
+        data = api_get(
+            f"/issues?{label}state=all&sort=created&direction=asc&per_page=100&page={page}",
+            token,
+        )
         if not isinstance(data, list):
             raise ValueError("corpus_page_not_list")
         if not data:
-            break
-        body_chars += sum(len(item.get("body") or "") for item in data)
-        if body_chars > MAX_CORPUS_CHARS:
-            raise ValueError("corpus_too_large")
-        issues.extend(data)
-        page += 1
-        if page > 50:
-            raise ValueError("corpus_page_limit")
-    out = []
-    total = 0
-    retrieved_at = datetime.now(timezone.utc).isoformat()
-    for it in issues:
-        if "pull_request" in it:
-            continue
-        body = it.get("body") or ""
-        parts = body.split("\n---\n", 1)
-        text = parts[1] if len(parts) > 1 else body
-        total += len(text)
-        if total > MAX_CORPUS_CHARS:
-            raise ValueError("corpus_too_large")
-        out.append(
-            {
-                "issue": it["number"],
-                "text": text,
-                "sha256": hashlib.sha256(text.encode()).hexdigest(),
-                "body_sha256": hashlib.sha256(body.encode()).hexdigest(),
-                "body_offset": len(body) - len(text),
-                "url": f"https://github.com/{REPO}/issues/{it['number']}",
-                "updated_at": it.get("updated_at"),
-                "retrieved_at": retrieved_at,
-            }
-        )
-    return out
+            return corpus
+        for row in data:
+            if not isinstance(row, dict):
+                raise ValueError("issue_row_invalid")
+            if "pull_request" in row:
+                continue
+            snapshot = _issue_snapshot(row, corpus_kind, retrieved_at)
+            if snapshot["issue"] in seen:
+                raise ValueError("duplicate_source")
+            seen.add(snapshot["issue"])
+            total += len(row.get("body") or "") + len(snapshot["title"])
+            if total > MAX_CORPUS_CHARS:
+                raise ValueError("corpus_too_large")
+            corpus.append(snapshot)
+    raise ValueError("corpus_page_limit")
 
 
 def split_sentences(text: str) -> list[str]:
@@ -197,9 +225,20 @@ def build_units(corpus: list[dict]) -> list[dict]:
     """Retain exact character offsets in each immutable extracted-text snapshot."""
     units = []
     for c in corpus:
+        if c.get("corpus_kind") == "tasks" and c["title"]:
+            units.append(
+                {
+                    "issue": c["issue"],
+                    "text": c["title"],
+                    "tokens": tokenize(c["title"]),
+                    "start": 0,
+                    "end": len(c["title"]),
+                    "field": "title",
+                }
+            )
         for match in re.finditer(r"[^.!?\u2026\n]+[.!?…]*", c["text"]):
             text = match.group().strip()
-            if len(text) <= 25:
+            if not text or (c.get("corpus_kind") != "tasks" and len(text) <= 25):
                 continue
             start = match.start() + len(match.group()) - len(match.group().lstrip())
             units.append(
@@ -209,6 +248,7 @@ def build_units(corpus: list[dict]) -> list[dict]:
                     "tokens": tokenize(text),
                     "start": start,
                     "end": start + len(text),
+                    "field": "body",
                 }
             )
     return units
@@ -410,6 +450,57 @@ def validate_response(obj: dict) -> None:
         raise ValueError("answer_without_evidence")
 
 
+def _source_metadata(source: dict) -> dict:
+    """Describe task state as source metadata, never as proof of implementation."""
+    fields = (
+        "issue",
+        "title",
+        "state",
+        "state_reason",
+        "closed_at",
+        "url",
+        "updated_at",
+        "retrieved_at",
+        "corpus_kind",
+        "title_sha256",
+        "body_sha256",
+    )
+    return {field: source.get(field) for field in fields}
+
+
+def _citation_evidence(citation: dict, candidate: dict, source: dict) -> dict:
+    """Check the exact cited field and preserve offsets within that field."""
+    field = candidate.get("field", "body")
+    if field not in {"title", "body"}:
+        raise ValueError("source_field_invalid")
+    text = source["title"] if field == "title" else source["text"]
+    digest = hashlib.sha256(text.encode()).hexdigest()
+    expected = source["title_sha256"] if field == "title" else source["sha256"]
+    if expected != digest:
+        raise ValueError("source_hash_mismatch")
+    start, end = candidate["start"], candidate["end"]
+    quote = citation["quote"]
+    if text[start:end] != candidate["text"]:
+        raise ValueError("candidate_snapshot_mismatch")
+    if not quote.strip() or quote not in candidate["text"]:
+        raise ValueError("quote_outside_candidate")
+    source_start = start + candidate["text"].index(quote)
+    checked = {
+        **_source_metadata(source),
+        "candidate_id": citation["id"],
+        "quote": quote,
+        "verbatim": True,
+        "sha256": digest,
+        "field": field,
+        "source_start": source_start,
+        "source_end": source_start + len(quote),
+    }
+    if field == "body":
+        checked["body_start"] = source["body_offset"] + source_start
+        checked["body_end"] = checked["body_start"] + len(quote)
+    return checked
+
+
 def verify_citations(
     citations: list[dict], candidates: list[dict], corpus: list[dict]
 ) -> list[dict]:
@@ -419,38 +510,11 @@ def verify_citations(
         raise ValueError("duplicate_source")
     checked = []
     for citation in citations:
-        cid, quote = citation["id"], citation["quote"]
+        cid = citation["id"]
         if type(cid) is not int or not 1 <= cid <= len(candidates):
             raise ValueError("unknown_candidate_id")
         candidate = candidates[cid - 1]
-        source = sources[candidate["issue"]]
-        text = source["text"]
-        digest = hashlib.sha256(text.encode()).hexdigest()
-        if source["sha256"] != digest:
-            raise ValueError("source_hash_mismatch")
-        start, end = candidate["start"], candidate["end"]
-        if text[start:end] != candidate["text"]:
-            raise ValueError("candidate_snapshot_mismatch")
-        if not quote.strip() or quote not in candidate["text"]:
-            raise ValueError("quote_outside_candidate")
-        source_start = start + candidate["text"].index(quote)
-        checked.append(
-            {
-                "candidate_id": cid,
-                "issue": candidate["issue"],
-                "quote": quote,
-                "verbatim": True,
-                "url": source["url"],
-                "sha256": digest,
-                "body_sha256": source["body_sha256"],
-                "source_start": source_start,
-                "source_end": source_start + len(quote),
-                "body_start": source["body_offset"] + source_start,
-                "body_end": source["body_offset"] + source_start + len(quote),
-                "updated_at": source["updated_at"],
-                "retrieved_at": source["retrieved_at"],
-            }
-        )
+        checked.append(_citation_evidence(citation, candidate, sources[candidate["issue"]]))
     return checked
 
 
@@ -480,15 +544,21 @@ def _code_block(value: object) -> str:
 
 def report(query: str, mode: str, outcome: dict, provider: dict, corpus: list[dict]) -> str:
     """Separate verified text identity from an unverified proposed claim."""
-    sources = [{"issue": c["issue"], "sha256": c["sha256"]} for c in corpus]
-    fingerprint = hashlib.sha256(json.dumps(sources, sort_keys=True).encode()).hexdigest()
+    manifest = [{**_source_metadata(c), "sha256": c["sha256"]} for c in corpus]
+    stable_manifest = [
+        {k: v for k, v in item.items() if k != "retrieved_at"}
+        for item in sorted(manifest, key=lambda item: item["issue"])
+    ]
+    fingerprint = hashlib.sha256(json.dumps(stable_manifest, sort_keys=True).encode()).hexdigest()
+    selected = {citation["issue"] for citation in outcome["citations"]}
+    sources = [item for item in manifest if item["issue"] in selected]
     claim_id = hashlib.sha256(
         json.dumps([query, outcome["answer"], fingerprint], ensure_ascii=False).encode()
     ).hexdigest()
     card = {
         "claim_id": claim_id,
         "claim": outcome["answer"],
-        "assessment": "INSUFFICIENT_EVIDENCE",
+        "assessment": "NOT_ASSESSED" if mode == "search" else "INSUFFICIENT_EVIDENCE",
         "rule": "semantic-citations/v1",
         "method": {"verbatim": "deterministic_snapshot_check", "semantic": "NOT_PERFORMED"},
         "query": query,
@@ -496,28 +566,76 @@ def report(query: str, mode: str, outcome: dict, provider: dict, corpus: list[di
         "code_sha": os.environ.get("GITHUB_SHA", "unknown"),
         "corpus_sha256": fingerprint,
         "corpus_sources": sources,
+        "corpus_sources_total": len(corpus),
+        "corpus_stats": corpus_stats(corpus),
+        "coverage": {
+            "fields": "title/body"
+            if any(c.get("corpus_kind") == "tasks" for c in corpus)
+            else "body",
+            "comments": "NOT_LOADED",
+            "linked_prs": "NOT_VERIFIED",
+            "completion": "NOT_ASSESSED",
+        },
         "model_called": outcome["model_called"],
         "mode": mode,
         "provider_request_id": provider.get("request_id"),
         "usage": provider.get("usage"),
         "cost": None,
+        "cost_scope": "total_execution_cost_not_measured",
     }
     lines = [
         "<!-- semantic-report -->",
-        "## Семантический отчёт: проверка цитат",
+        "## Поиск по истории задач и источникам",
         f"Status: **{outcome['status']}**",
         f"RED control: **{outcome['red_control']}**",
-        "Claim assessment: **INSUFFICIENT_EVIDENCE**",
+        f"Claim assessment: **{card['assessment']}**",
         "Дословность проверена только для перечисленных цитат. Смысловая достаточность "
         "не проверена; вывод модели не является подтверждённым фактом.",
         "NO_CANDIDATES означает отсутствие совпадений BM25, а не отсутствие ответа в корпусе.",
+        "GitHub open/closed и state_reason — состояние задачи, а не доказательство выполнения. "
+        "Комментарии, связанные PR и исходники требуют отдельного чтения.",
         _code_block(card),
     ]
     return "\n\n".join(lines)
 
 
+def corpus_stats(corpus: list[dict]) -> dict:
+    """Count declared states without equating closed or completed with delivered."""
+    states = Counter(source.get("state") for source in corpus)
+    reasons = Counter(
+        source.get("state_reason") or "unspecified"
+        for source in corpus
+        if source.get("state") == "closed"
+    )
+    return {
+        "total": len(corpus),
+        "open": states["open"],
+        "closed": states["closed"],
+        "unknown": states[None],
+        "closed_reasons": dict(reasons),
+    }
+
+
+def retrieval_outcome(query: str, candidates: list[dict], corpus: list[dict]) -> dict:
+    """Return bounded verbatim search excerpts without invoking a model."""
+    citations = []
+    for cid, candidate in enumerate(candidates, 1):
+        text = candidate["text"]
+        matches = [text.lower().find(term) for term in tokenize(query)]
+        first = min((position for position in matches if position >= 0), default=0)
+        start = max(0, first - 120)
+        citations.append({"id": cid, "quote": text[start : start + 512]})
+    return {
+        "status": "RETRIEVAL_ONLY" if candidates else "NO_CANDIDATES",
+        "answer": "",
+        "citations": verify_citations(citations, candidates, corpus),
+        "model_called": False,
+        "red_control": "NOT_REQUESTED",
+    }
+
+
 def selftest() -> int:
-    """Exercise free retrieval and citation controls, never a live model."""
+    """Exercise offline retrieval and citation controls, never a live model."""
     text = "Узкий канал даёт точность пересказа, но не новизну."
     source = {
         "issue": 9001,
@@ -578,7 +696,8 @@ def _run(args: argparse.Namespace) -> int:
     token = os.environ.get("GITHUB_TOKEN")
     if args.publish_issue is not None and (args.publish_issue <= 0 or not token):
         raise ValueError("publication_requires_positive_issue_and_token")
-    corpus = fetch_corpus(token)
+    corpus_kind = args.corpus or ("tasks" if args.mode == "search" else "dialogues")
+    corpus = fetch_corpus(token, corpus_kind)
     candidates = BM25Index(build_units(corpus)).search(query)
     provider = {}
     outcome = {
@@ -588,7 +707,9 @@ def _run(args: argparse.Namespace) -> int:
         "model_called": False,
         "red_control": "NOT_RUN" if args.mode == "red" else "NOT_REQUESTED",
     }
-    if candidates:
+    if args.mode == "search":
+        outcome = retrieval_outcome(query, candidates, corpus)
+    elif candidates:
         provider = _model_result(args, query, candidates)
         outcome = evaluate(parse_model_json(provider["text"]), candidates, corpus, args.mode)
     rendered = report(query, args.mode, outcome, provider, corpus)
@@ -622,7 +743,8 @@ def _publish(issue: int, rendered: str, token: str) -> bool:
 def main(argv: list[str] | None = None) -> int:
     """CLI entrypoint; contract/transport failures never publish a report."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["query", "red"], default="query")
+    parser.add_argument("--mode", choices=["query", "red", "search"], default="query")
+    parser.add_argument("--corpus", choices=["dialogues", "tasks"])
     parser.add_argument("--query-file")
     parser.add_argument("--query")
     parser.add_argument("--publish-issue", type=int)
