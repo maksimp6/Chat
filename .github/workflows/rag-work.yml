@@ -52,11 +52,19 @@ jobs:
           if [ "$RAG_MODE" = "index" ]; then
             python scripts/rag_pipeline.py --mode index
           else
-            printf '%s\n' "$RAG_QUERY" > /tmp/rag_query.txt
-            if [ "$RAG_QUERY" = "" ]; then
-              # query mode triggered by issue label: issue body holds the question
-              python scripts/rag_pipeline.py --mode query --publish-issue "$RAG_PUBLISH_ISSUE" --query-file /dev/stdin < /dev/null || true
+            if [ -n "$RAG_QUERY" ]; then
+              printf '%s\n' "$RAG_QUERY" > /tmp/rag_query.txt
             else
-              python scripts/rag_pipeline.py --mode query --publish-issue "$RAG_PUBLISH_ISSUE" --query-file /tmp/rag_query.txt
+              # label event: the issue body holds the question
+              python - <<'PYEOF'
+              import json, os, urllib.request
+              req = urllib.request.Request(
+                  "https://api.github.com/repos/maksimp6/Chat/issues/" + os.environ["RAG_PUBLISH_ISSUE"],
+                  headers={"Authorization": "Bearer " + os.environ["GITHUB_TOKEN"], "User-Agent": "rag-runner"},
+              )
+              body = json.load(urllib.request.urlopen(req)).get("body") or ""
+              open("/tmp/rag_query.txt", "w").write(body)
+              PYEOF
             fi
+            python scripts/rag_pipeline.py --mode query --publish-issue "$RAG_PUBLISH_ISSUE" --query-file /tmp/rag_query.txt
           fi
