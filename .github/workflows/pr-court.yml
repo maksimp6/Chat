@@ -2,7 +2,7 @@ name: PR court (one-shot)
 
 on:
   pull_request:
-    types: [opened]
+    types: [opened, synchronize]
     branches: [develop]
 
 permissions:
@@ -29,13 +29,23 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
       - name: Negative controls and regression tests (no credentials)
-        run: python -m unittest discover -s tests -p test_pr_court.py -v
+        run: python -m unittest discover -s tests -p 'test_pr_court*.py' -v
+      - name: Reject original uncited verdict without a model call
+        run: |
+          set -euo pipefail
+          if python scripts/pr_court_evidence.py --replay tests/fixtures/pr_court_1422_response.json --output pr-court-output; then
+            echo "Negative control unexpectedly passed" >&2
+            exit 1
+          fi
+          python -c 'import json; from pathlib import Path; r=json.loads(Path("pr-court-output/replay.json").read_text()); assert r["status"] == "MODEL_OUTPUT_REJECTED"; assert r["paid_calls"] == 0'
+          echo "Original uncited verdict rejected; no additional model calls." >> "$GITHUB_STEP_SUMMARY"
       - name: One bounded model judgment (no tools or writes)
+        if: github.event.action == 'opened'
         env:
           GH_TOKEN: ${{ github.token }}
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
-        run: python scripts/pr_court.py
+        run: python -m scripts.pr_court
       - name: Preserve judgment or explicit blocker
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

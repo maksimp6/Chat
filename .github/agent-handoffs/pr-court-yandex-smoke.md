@@ -13,3 +13,11 @@ Stop on missing secrets, wrong base, fork, changed/closed PR, partial inventory,
 Evidence: deterministic negative controls plus exact-head Actions execution. Model report is supplementary opinion, not an approval or verification of every allegation. Cost reported as unknown unless confirmed by provider. Existing standard CI and automatic reviewer remain separate. Runner artifact retention: seven days. No comment or mention is published by this runner.
 
 Official API reference: https://aistudio.yandex.ru/en/docs/ai-studio/operations/generation/create-prompt (Responses API, yandexgpt-lite and max_output_tokens).
+
+## Rejected stage: correction admission
+
+Owner selected “✗ Не работает” on PR #1422. Current stage is correcting verdict acceptance in the same PR, executor unchanged. Relevant PR head before correction: 46d32e0920135c569a68f897002ebd96c7d69029; develop remains d6f5cafbfcb337006444177d8f15400ab4ddb274. The prior live call succeeded but quality was rejected: unsupported accusations about secrets and new files.
+
+Correction: structured findings must cite a real rule quote and exact added source line, with reason/reproduction; incomplete/uncited outputs return MODEL_OUTPUT_REJECTED and exit 1 even if provider HTTP/status succeeded. Valid citations establish citation integrity only, never semantic truth/guilt; candidates require review, empty findings are not approval. Scope currently validates added diff lines, not unchanged/deleted code or legal rules.
+
+Validation uses the downloaded original report (ZIP digest verified against artifact 12247795147) as a negative-control fixture and mocks the live entrypoint to prove a completed provider call cannot approve that output. Pushes rerun offline tests/replay only; paid inference remains opened-only. This correction performs no second paid call, model switch, new monitor, merge or authority expansion. Fresh model behavior under the corrected prompt remains NOT_RUN; do not claim autonomous court correctness.
