@@ -1,0 +1,64 @@
+name: Semantic work
+
+on:
+  workflow_dispatch:
+    inputs:
+      query:
+        description: "query text"
+        required: true
+        default: ""
+      mode:
+        description: "query | red"
+        required: true
+        default: "query"
+      publish_issue:
+        description: "issue number for the report"
+        required: false
+        default: ""
+  issues:
+    types: [labeled]
+
+permissions: {}
+
+concurrency:
+  group: semantic-work
+  cancel-in-progress: true
+
+jobs:
+  semantic:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'semantic-query'
+    name: Semantic answer over corpus
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Run semantic pipeline
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+          YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
+          SEM_MODE: ${{ inputs.mode || 'query' }}
+          SEM_QUERY: ${{ inputs.query }}
+          SEM_PUBLISH_ISSUE: ${{ inputs.publish_issue || github.event.issue.number }}
+        run: |
+          set -eu
+          if [ -n "$SEM_QUERY" ]; then
+            printf '%s\n' "$SEM_QUERY" > /tmp/sem_query.txt
+          else
+            python -c "import json,os,urllib.request; r=urllib.request.Request('https://api.github.com/repos/' + os.environ['GITHUB_REPOSITORY'] + '/issues/' + os.environ['SEM_PUBLISH_ISSUE'], headers={'Authorization':'Bearer ' + os.environ['GITHUB_TOKEN'],'User-Agent':'semantic-runner'}); open('/tmp/sem_query.txt','w').write(json.load(urllib.request.urlopen(r)).get('body') or '')"
+            if grep -q '^---$' /tmp/sem_query.txt; then
+              sed -n '/^---$/,$p' /tmp/sem_query.txt | tail -n +2 > /tmp/sem_q2.txt
+              mv /tmp/sem_q2.txt /tmp/sem_query.txt
+            fi
+          fi
+          python scripts/semantic_pipeline.py --mode "$SEM_MODE" --publish-issue "$SEM_PUBLISH_ISSUE" --query-file /tmp/sem_query.txt
