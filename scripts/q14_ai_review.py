@@ -68,7 +68,9 @@ CONTEXT = {
 
 
 def digest(value: object) -> str:
-    return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+    return hashlib.sha256(
+        json.dumps(value, ensure_ascii=False, sort_keys=True).encode()
+    ).hexdigest()
 
 
 def clean(text: str, secrets: tuple[str, ...]) -> str:
@@ -108,6 +110,7 @@ def credentials(environ: dict[str, str]) -> tuple[str, str]:
 
 def make_transport(key: str, project: str) -> Transport:
     """Fixed HTTPS destination, bounded read, no redirects and no retries."""
+
     def send(method: str, path: str, payload: JsonObject | None) -> JsonObject:
         if (method, path) not in {("GET", "/v1/models"), ("POST", "/v1/responses")}:
             raise ValueError("provider_route_not_allowed")
@@ -139,6 +142,7 @@ def make_transport(key: str, project: str) -> Transport:
             }
         finally:
             connection.close()
+
     return send
 
 
@@ -152,7 +156,8 @@ def probe_access(send: Transport) -> JsonObject:
     if not isinstance(models, list) or not models:
         return {"status": "API_ACCESS_CHECK_FAILED", "detail": "no_model_catalogue"}
     ids = [
-        item["id"] for item in models
+        item["id"]
+        for item in models
         if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"]
     ]
     if not ids:
@@ -171,21 +176,28 @@ def probe_access(send: Transport) -> JsonObject:
 def evidence_for_model(results: list[JsonObject]) -> list[JsonObject]:
     evidence: list[JsonObject] = []
     for case, result in zip(CASES, results, strict=True):
-        evidence.append({
-            "id": case.id,
-            "title": case.title,
-            "events": case.events,
-            "arm_conditions_assumed": case.arm_conditions_assumed,
-            "hidden_voltage": case.hidden_voltage,
-            "valid_absence_evidence": case.valid_absence_evidence,
-            "guards_enabled": case.guards_enabled,
-            "trace": result["trace"],
-        })
+        evidence.append(
+            {
+                "id": case.id,
+                "title": case.title,
+                "events": case.events,
+                "arm_conditions_assumed": case.arm_conditions_assumed,
+                "hidden_voltage": case.hidden_voltage,
+                "valid_absence_evidence": case.valid_absence_evidence,
+                "guards_enabled": case.guards_enabled,
+                "trace": result["trace"],
+            }
+        )
     return evidence
 
 
 def prompt(stage: str, evidence: list[JsonObject], previous: list[JsonObject]) -> str:
-    value = {"stage": stage, "context": CONTEXT, "cases": evidence, "previous_untrusted_opinions": previous}
+    value = {
+        "stage": stage,
+        "context": CONTEXT,
+        "cases": evidence,
+        "previous_untrusted_opinions": previous,
+    }
     text = json.dumps(value, ensure_ascii=False)
     if len(text) > MAX_INPUT_CHARS:
         raise ValueError("input_budget_exceeded")
@@ -234,6 +246,35 @@ def response_text(data: JsonObject) -> str:
     return "".join(chunks)
 
 
+def validate_case_fields(row: JsonObject, evidence: JsonObject) -> None:
+    outcome = row.get("model_outcome")
+    allowed_outcomes = {
+        "MODEL_ACCEPTED",
+        "BLOCKED",
+        "HAZARDOUS_OPERATION",
+        "INCOMPLETE",
+        "ERROR",
+    }
+    if not isinstance(outcome, str) or outcome not in allowed_outcomes:
+        raise ValueError("review_outcome_invalid")
+    if row.get("actual_harm") != "NOT_ESTABLISHED":
+        raise ValueError("unsupported_actual_harm_claim")
+    fields = ("finding", "potential_victims", "responsibility", "repair", "uncertainty")
+    for field_name in fields:
+        text_value = row.get(field_name)
+        if not isinstance(text_value, str) or not text_value.strip():
+            raise ValueError("review_text_field_invalid")
+        if len(text_value) > 1000:
+            raise ValueError("review_text_field_invalid")
+    trace = evidence["trace"]
+    allowed = {item["evidence_id"] for item in trace}
+    refs = row.get("evidence_ids")
+    if not isinstance(refs, list) or not refs:
+        raise ValueError("review_evidence_invalid")
+    if not all(isinstance(ref, str) and ref in allowed for ref in refs):
+        raise ValueError("review_evidence_invalid")
+
+
 def validate_review(text: str, stage: str, evidence: list[JsonObject]) -> JsonObject:
     value = json.loads(text)
     if not isinstance(value, dict) or value.get("stage") != stage:
@@ -250,21 +291,7 @@ def validate_review(text: str, stage: str, evidence: list[JsonObject]) -> JsonOb
         if not isinstance(case_id, str) or case_id not in by_id or case_id in seen:
             raise ValueError("review_case_id_invalid")
         seen.add(case_id)
-        if row.get("model_outcome") not in {
-            "MODEL_ACCEPTED", "BLOCKED", "HAZARDOUS_OPERATION", "INCOMPLETE", "ERROR"
-        }:
-            raise ValueError("review_outcome_invalid")
-        if row.get("actual_harm") != "NOT_ESTABLISHED":
-            raise ValueError("unsupported_actual_harm_claim")
-        for field in ("finding", "potential_victims", "responsibility", "repair", "uncertainty"):
-            text_value = row.get(field)
-            if not isinstance(text_value, str) or not text_value.strip() or len(text_value) > 1000:
-                raise ValueError("review_text_field_invalid")
-        trace = by_id[case_id]["trace"]
-        allowed = {item["evidence_id"] for item in trace if isinstance(item, dict)} if isinstance(trace, list) else set()
-        refs = row.get("evidence_ids")
-        if not isinstance(refs, list) or not refs or not all(isinstance(ref, str) and ref in allowed for ref in refs):
-            raise ValueError("review_evidence_invalid")
+        validate_case_fields(row, by_id[case_id])
     roles = value.get("symbolic_roles")
     if not isinstance(roles, str) or not roles.strip() or len(roles) > 4000:
         raise ValueError("review_roles_missing")
@@ -275,27 +302,45 @@ def evaluate_decision(review: JsonObject) -> JsonObject:
     """Compare predictions after receipt, without supplying the oracle to the model."""
     predictions = {row["id"]: row["model_outcome"] for row in review["cases"]}
     rows = [
-        {"id": case.id, "expected": case.expected, "predicted": predictions[case.id],
-         "matches": predictions[case.id] == case.expected}
+        {
+            "id": case.id,
+            "expected": case.expected,
+            "predicted": predictions[case.id],
+            "matches": predictions[case.id] == case.expected,
+        }
         for case in CASES
     ]
     return {
-        "cases": rows, "all_match": all(row["matches"] for row in rows),
+        "cases": rows,
+        "all_match": all(row["matches"] for row in rows),
         "semantic_and_legal_review": "STILL_REQUIRES_HUMAN_REVIEW",
         "real_world_verified": False,
     }
 
 
-def live_review(send: Transport, project: str, output: Path, evidence: list[JsonObject], approved_calls: int, approval: str, secrets: tuple[str, ...]) -> JsonObject:
+def live_review(
+    send: Transport,
+    project: str,
+    output: Path,
+    evidence: list[JsonObject],
+    approved_calls: int,
+    approval: str,
+    secrets: tuple[str, ...],
+) -> JsonObject:
     if approved_calls != MAX_CALLS or not approval.strip():
         raise ValueError("owner_budget_approval_required")
     prior: list[JsonObject] = []
     calls: list[JsonObject] = []
     ledger: JsonObject = {
-        "status": "RUNNING", "calls": calls, "approved_calls": approved_calls,
-        "approval_reference": approval, "max_output_tokens_per_call": MAX_OUTPUT_TOKENS,
-        "hard_currency_cap": None, "provider_confirmed_spend": None,
-        "model": MODEL, "independent_experts": False,
+        "status": "RUNNING",
+        "calls": calls,
+        "approved_calls": approved_calls,
+        "approval_reference": approval,
+        "max_output_tokens_per_call": MAX_OUTPUT_TOKENS,
+        "hard_currency_cap": None,
+        "provider_confirmed_spend": None,
+        "model": MODEL,
+        "independent_experts": False,
     }
     try:
         for stage in STAGES:
@@ -303,11 +348,18 @@ def live_review(send: Transport, project: str, output: Path, evidence: list[Json
             call: JsonObject = {"stage": stage, "status": "ATTEMPTED", "input_sha256": digest(text)}
             calls.append(call)
             write_json(output / "ai-ledger.json", ledger, secrets)
-            result = send("POST", "/v1/responses", {
-                "model": f"gpt://{project}/{MODEL}/latest", "input": text,
-                "instructions": INSTRUCTIONS, "background": False, "store": False,
-                "max_output_tokens": MAX_OUTPUT_TOKENS,
-            })
+            result = send(
+                "POST",
+                "/v1/responses",
+                {
+                    "model": f"gpt://{project}/{MODEL}/latest",
+                    "input": text,
+                    "instructions": INSTRUCTIONS,
+                    "background": False,
+                    "store": False,
+                    "max_output_tokens": MAX_OUTPUT_TOKENS,
+                },
+            )
             call["request_id"] = result.get("request_id", "")
             call["elapsed_seconds"] = result.get("elapsed_seconds")
             if "error" in result:
@@ -321,7 +373,11 @@ def live_review(send: Transport, project: str, output: Path, evidence: list[Json
                 raise ValueError("provider_payload_invalid")
             call["response_id"] = safe_identifier(data.get("id", ""))
             usage = data.get("usage")
-            call["usage"] = {k: v for k, v in usage.items() if isinstance(v, int) and not isinstance(v, bool)} if isinstance(usage, dict) else None
+            call["usage"] = (
+                {k: v for k, v in usage.items() if isinstance(v, int) and not isinstance(v, bool)}
+                if isinstance(usage, dict)
+                else None
+            )
             call["status"] = "RESPONSE_RECEIVED"
             write_json(output / "ai-ledger.json", ledger, secrets)
             text_result = response_text(data)
@@ -343,9 +399,7 @@ def live_review(send: Transport, project: str, output: Path, evidence: list[Json
         raise
     comparison = evaluate_decision(prior[-1])
     write_json(output / "ai-comparison.json", comparison, secrets)
-    ledger["status"] = (
-        "AI_REVIEWS_RECEIVED" if comparison["all_match"] else "AI_REVIEW_DISAGREES"
-    )
+    ledger["status"] = "AI_REVIEWS_RECEIVED" if comparison["all_match"] else "AI_REVIEW_DISAGREES"
     write_json(output / "ai-ledger.json", ledger, secrets)
     return ledger
 
@@ -364,10 +418,14 @@ def main() -> int:
         "checkout_head": os.environ.get("Q14_CHECKOUT_SHA", "LOCAL_NOT_GITHUB_VERIFIED"),
         "run_id": os.environ.get("GITHUB_RUN_ID"),
         "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
-        "mode": args.mode, "scope": "EDUCATIONAL_LOGICAL_MODEL_ONLY",
-        "context_sha256": digest(CONTEXT), "cases_sha256": digest(results),
-        "actual_harm": "NOT_ESTABLISHED", "user_acceptance": "NOT_REQUESTED",
-        "status": "DETERMINISTIC_CASES_CHECKED", "ai_status": "NOT_RUN",
+        "mode": args.mode,
+        "scope": "EDUCATIONAL_LOGICAL_MODEL_ONLY",
+        "context_sha256": digest(CONTEXT),
+        "cases_sha256": digest(results),
+        "actual_harm": "NOT_ESTABLISHED",
+        "user_acceptance": "NOT_REQUESTED",
+        "status": "DETERMINISTIC_CASES_CHECKED",
+        "ai_status": "NOT_RUN",
     }
     write_json(args.out / "simulation.json", results)
     write_json(args.out / "context.json", CONTEXT)
@@ -383,41 +441,71 @@ def main() -> int:
                 metadata["status"] = access["status"]
             else:
                 metadata["ai_status"] = "RUNNING"
-                ledger = live_review(send, project, args.out, evidence_for_model(results), args.approved_calls, args.approval_reference, secrets)
+                ledger = live_review(
+                    send,
+                    project,
+                    args.out,
+                    evidence_for_model(results),
+                    args.approved_calls,
+                    args.approval_reference,
+                    secrets,
+                )
                 metadata["ai_status"] = ledger["status"]
                 metadata["status"] = ledger["status"]
     except (OSError, http.client.HTTPException, ValueError, UnicodeError) as exc:
         metadata["status"] = "BLOCKED"
         metadata["ai_status"] = "INCOMPLETE_NO_RETRY" if args.mode == "live" else "NOT_RUN"
         known = {
-            "missing_yandex_credentials", "invalid_yandex_credentials",
-            "owner_budget_approval_required", "input_budget_exceeded",
-            "provider_response_not_completed", "provider_output_missing",
-            "provider_text_missing", "unsupported_actual_harm_claim",
-            "review_stage_invalid", "review_case_count_invalid",
-            "review_case_invalid", "review_case_id_invalid",
-            "review_text_field_invalid", "review_evidence_invalid",
-            "review_roles_missing", "provider_payload_invalid",
-            "review_outcome_invalid", "provider_route_not_allowed",
+            "missing_yandex_credentials",
+            "invalid_yandex_credentials",
+            "owner_budget_approval_required",
+            "input_budget_exceeded",
+            "provider_response_not_completed",
+            "provider_output_missing",
+            "provider_text_missing",
+            "unsupported_actual_harm_claim",
+            "review_stage_invalid",
+            "review_case_count_invalid",
+            "review_case_invalid",
+            "review_case_id_invalid",
+            "review_text_field_invalid",
+            "review_evidence_invalid",
+            "review_roles_missing",
+            "provider_payload_invalid",
+            "review_outcome_invalid",
+            "provider_route_not_allowed",
         }
         metadata["error"] = str(exc) if str(exc) in known else type(exc).__name__
     write_json(args.out / "manifest.json", metadata, secrets)
     summary = "# Q14: учебная симуляция\n\n"
-    summary += f"Режим: `{args.mode}`. Статус: `{metadata['status']}`. ИИ: `{metadata['ai_status']}`.\n\n"
+    summary += (
+        f"Режим: `{args.mode}`. Статус: `{metadata['status']}`. ИИ: `{metadata['ai_status']}`.\n\n"
+    )
     summary += f"Проверено {len(results)} сценариев. Реальный вред: `NOT_ESTABLISHED`.\n\n"
     summary += "| Сценарий | Результат модели |\n| --- | --- |\n"
-    summary += "".join(f"| {case.id} | {result['outcome']} |\n" for case, result in zip(CASES, results, strict=True))
+    summary += "".join(
+        f"| {case.id} | {result['outcome']} |\n"
+        for case, result in zip(CASES, results, strict=True)
+    )
     summary += "\nЭто не проверка электроустановки, не окончательный приговор и не приёмка пользователем.\n"
-    summary += "Символические определения в context.json являются предложениями, не новым законом.\n"
+    summary += (
+        "Символические определения в context.json являются предложениями, не новым законом.\n"
+    )
     summary += "Три ИИ-этапа используют один backend и не являются независимыми экспертами.\n"
     (args.out / "report.md").write_text(summary, encoding="utf-8")
     hashes = {
         file.name: hashlib.sha256(file.read_bytes()).hexdigest()
-        for file in sorted(args.out.iterdir()) if file.is_file()
+        for file in sorted(args.out.iterdir())
+        if file.is_file()
     }
     write_json(args.out / "sha256.json", hashes)
     print(summary)
-    return 0 if metadata["status"] in {"DETERMINISTIC_CASES_CHECKED", "MODEL_CATALOGUE_READ", "AI_REVIEWS_RECEIVED"} else 1
+    return (
+        0
+        if metadata["status"]
+        in {"DETERMINISTIC_CASES_CHECKED", "MODEL_CATALOGUE_READ", "AI_REVIEWS_RECEIVED"}
+        else 1
+    )
 
 
 if __name__ == "__main__":

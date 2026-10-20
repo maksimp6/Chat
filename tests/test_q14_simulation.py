@@ -41,7 +41,17 @@ def fake_response(stage: str) -> dict[str, object]:
             "id": f"response-{stage}",
             "status": "completed",
             "usage": {"input_tokens": 12, "output_tokens": 24},
-            "output": [{"type": "message", "content": [{"type": "output_text", "text": json.dumps(valid_review(stage), ensure_ascii=False)}]}],
+            "output": [
+                {
+                    "type": "message",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": json.dumps(valid_review(stage), ensure_ascii=False),
+                        }
+                    ],
+                }
+            ],
         },
         "request_id": f"request-{stage}",
     }
@@ -73,7 +83,7 @@ class ModelTests(unittest.TestCase):
     def test_omitting_any_required_stage_never_admits(self) -> None:
         for index in range(len(NORMAL)):
             with self.subTest(omitted=NORMAL[index]):
-                case = Scenario("T", "omitted stage", NORMAL[:index] + NORMAL[index + 1:], "")
+                case = Scenario("T", "omitted stage", NORMAL[:index] + NORMAL[index + 1 :], "")
                 self.assertNotEqual(simulate(case)["outcome"], "MODEL_ACCEPTED")
 
     def test_no_actual_injury_inferred_from_hazard(self) -> None:
@@ -122,7 +132,10 @@ class ReviewTests(unittest.TestCase):
         for ref in ("S2:E1", "S1:E999"):
             value = valid_review("accusation")
             value["cases"][0]["evidence_ids"] = [ref]
-            with self.subTest(ref=ref), self.assertRaisesRegex(ValueError, "review_evidence_invalid"):
+            with (
+                self.subTest(ref=ref),
+                self.assertRaisesRegex(ValueError, "review_evidence_invalid"),
+            ):
                 ai.validate_review(json.dumps(value), "accusation", self.evidence)
 
     def test_rejects_wrong_stage(self) -> None:
@@ -192,6 +205,14 @@ class ReviewTests(unittest.TestCase):
             ai.write_json(path, {"echo": [secret]}, (secret,))
             self.assertEqual(json.loads(path.read_text())["echo"], ["[REDACTED]"])
 
+    def test_invalid_outcome_types_fail_closed(self) -> None:
+        for outcome in ([], {}, None, "invented"):
+            value = valid_review("accusation")
+            value["cases"][0]["model_outcome"] = outcome
+            with self.subTest(outcome=outcome):
+                with self.assertRaisesRegex(ValueError, "review_outcome_invalid"):
+                    ai.validate_review(json.dumps(value), "accusation", self.evidence)
+
     def test_missing_and_invalid_credentials(self) -> None:
         for env in ({}, {"YANDEX_API_KEY": "fake", "YANDEX_PROJECT_ID": "a\nb"}):
             with self.subTest(env=env), self.assertRaises(ValueError):
@@ -200,7 +221,9 @@ class ReviewTests(unittest.TestCase):
     def test_redaction_in_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "evidence.json"
-            ai.write_json(path, {"echo": "fake-secret fake-project"}, ("fake-secret", "fake-project"))
+            ai.write_json(
+                path, {"echo": "fake-secret fake-project"}, ("fake-secret", "fake-project")
+            )
             self.assertNotIn("fake-secret", path.read_text())
             self.assertNotIn("fake-project", path.read_text())
 
@@ -209,7 +232,15 @@ class ReviewTests(unittest.TestCase):
             for calls, reference in ((0, ""), (3, ""), (4, "owner")):
                 with patch.object(ai, "make_transport") as transport:
                     with self.assertRaisesRegex(ValueError, "owner_budget_approval_required"):
-                        ai.live_review(transport, "fake-project", Path(folder), self.evidence, calls, reference, ())
+                        ai.live_review(
+                            transport,
+                            "fake-project",
+                            Path(folder),
+                            self.evidence,
+                            calls,
+                            reference,
+                            (),
+                        )
                     transport.assert_not_called()
 
     def test_three_serial_calls_keep_usage_and_ids(self) -> None:
@@ -224,7 +255,9 @@ class ReviewTests(unittest.TestCase):
             return fake_response(stage)
 
         with tempfile.TemporaryDirectory() as folder:
-            result = ai.live_review(send, "fake-project", Path(folder), self.evidence, 3, "test-only-approval", ())
+            result = ai.live_review(
+                send, "fake-project", Path(folder), self.evidence, 3, "test-only-approval", ()
+            )
             self.assertEqual(seen, list(ai.STAGES))
             self.assertEqual(result["status"], "AI_REVIEWS_RECEIVED")
             self.assertEqual(len(result["calls"]), 3)
@@ -240,7 +273,9 @@ class ReviewTests(unittest.TestCase):
             return {"error": "provider_http_403", "request_id": "request-denied"}
 
         with tempfile.TemporaryDirectory() as folder:
-            result = ai.live_review(send, "fake-project", Path(folder), self.evidence, 3, "test-only", ())
+            result = ai.live_review(
+                send, "fake-project", Path(folder), self.evidence, 3, "test-only", ()
+            )
             self.assertEqual(len(seen), 1)
             self.assertEqual(result["status"], "BLOCKED")
             self.assertEqual(result["calls"][0]["error"], "provider_http_403")
@@ -255,7 +290,15 @@ class ReviewTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaises(TimeoutError):
-                ai.live_review(send, "fake-project", Path(folder), self.evidence, 3, "test-only", ("fake-secret",))
+                ai.live_review(
+                    send,
+                    "fake-project",
+                    Path(folder),
+                    self.evidence,
+                    3,
+                    "test-only",
+                    ("fake-secret",),
+                )
             text = (Path(folder) / "ai-ledger.json").read_text()
             self.assertNotIn("fake-secret", text)
             self.assertEqual(json.loads(text)["calls"][0]["status"], "AMBIGUOUS_REQUEST_NO_RETRY")
@@ -269,7 +312,9 @@ class ReviewTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaises(ValueError):
-                ai.live_review(send, "fake-project", Path(folder), self.evidence, 3, "test-only", ())
+                ai.live_review(
+                    send, "fake-project", Path(folder), self.evidence, 3, "test-only", ()
+                )
             ledger = json.loads((Path(folder) / "ai-ledger.json").read_text())
             self.assertEqual(ledger["status"], "INCOMPLETE_NO_RETRY")
             self.assertEqual(ledger["calls"][0]["response_id"], "response-accusation")
@@ -285,9 +330,15 @@ class ReviewTests(unittest.TestCase):
         self.assertFalse(result["generation_verified"])
 
     def test_probe_rejects_errors_and_empty_catalogue(self) -> None:
-        for value in ({"error": "provider_http_401"}, {"data": {"data": []}}, {"data": {"data": [None, {}]}}):
+        for value in (
+            {"error": "provider_http_401"},
+            {"data": {"data": []}},
+            {"data": {"data": [None, {}]}},
+        ):
+
             def send(method: str, path: str, payload: ai.JsonObject | None) -> ai.JsonObject:
                 return copy.deepcopy(value)
+
             self.assertEqual(ai.probe_access(send)["status"], "API_ACCESS_CHECK_FAILED")
 
 
