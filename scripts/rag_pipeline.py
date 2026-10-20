@@ -12,6 +12,7 @@ Contract (aligned with scripts/lexical_pipeline.py):
 Modes:
   --mode index  : build index, print stats
   --mode query  : search; publish comment when --publish-issue is given
+  --runner      : Actions entrypoint (reads event payload, no shell interpolation)
   --selftest    : embedded controls (positive, RED, verbatim, fail-closed)
 """
 
@@ -251,6 +252,31 @@ def report(query, fragments, units_n, sources_n):
     return "\n".join(lines)
 
 
+def run_query(query, publish_issue=None, token=None, corpus=None, idx=None):
+    if corpus is None:
+        token = token or os.environ.get("GITHUB_TOKEN")
+        corpus = fetch_corpus(token)
+        idx = BM25Index(build_units(corpus))
+    frags = verify_verbatim(idx.search(query), corpus)
+    rep = report(query, frags, len(idx.units), len(corpus))
+    if frags and all(f["verbatim"] for f in frags):
+        print(rep)
+        if publish_issue and token:
+            api_post(f"/issues/{publish_issue}/comments", {"body": rep}, token)
+        return 0
+    print("FAIL-CLOSED: non-verbatim fragment; report not published", file=sys.stderr)
+    print(rep, file=sys.stderr)
+    return 1
+
+
+def index_mode(token=None):
+    token = token or os.environ.get("GITHUB_TOKEN")
+    corpus = fetch_corpus(token)
+    units = build_units(corpus)
+    print(json.dumps({"sources": len(corpus), "units": len(units)}, ensure_ascii=False))
+    return 0
+
+
 def selftest():
     corpus = [
         {
@@ -280,47 +306,59 @@ def selftest():
     return 0
 
 
+def runner_mode():
+    token = os.environ.get("GITHUB_TOKEN")
+    corpus = fetch_corpus(token)
+    idx = BM25Index(build_units(corpus))
+    ev = os.environ.get("RAG_EVENT_NAME", "")
+    if ev == "issues":
+        ep = os.environ.get("GITHUB_EVENT_PATH", "")
+        if ep and os.path.exists(ep):
+            with open(ep) as evf:
+                event = json.load(evf)
+            query = (event.get("issue", {}).get("body") or "").strip()
+            publish = event.get("issue", {}).get("number")
+        else:
+            query, publish = "", None
+    else:
+        query = os.environ.get("RAG_QUERY", "")
+        publish = os.environ.get("RAG_PUBLISH_ISSUE") or None
+    if not query.strip():
+        print("empty query", file=sys.stderr)
+        return 2
+    return run_query(query, publish, token=token, corpus=corpus, idx=idx)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", choices=["index", "query"])
     ap.add_argument("--query")
     ap.add_argument("--query-file")
     ap.add_argument("--publish-issue", type=int)
+    ap.add_argument("--runner", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
 
     if args.selftest:
         return selftest()
-
-    token = os.environ.get("GITHUB_TOKEN")
-    corpus = fetch_corpus(token)
-    units = build_units(corpus)
-    idx = BM25Index(units)
+    if args.runner:
+        return runner_mode()
 
     if args.mode == "index":
-        print(
-            json.dumps(
-                {"sources": len(corpus), "units": len(units)}, ensure_ascii=False
-            )
-        )
-        return 0
+        return index_mode()
 
-    q = args.query or ""
-    if args.query_file:
-        with open(args.query_file) as qf:
-            q = qf.read()
-    if not q.strip():
-        print("empty query", file=sys.stderr)
-        return 2
-    frags = verify_verbatim(idx.search(q), corpus)
-    rep = report(q, frags, len(units), len(corpus))
-    if frags and all(f["verbatim"] for f in frags):
-        print(rep)
-        if args.publish_issue and token:
-            api_post(f"/issues/{args.publish_issue}/comments", {"body": rep}, token)
-        return 0
-    print("FAIL-CLOSED: non-verbatim fragment; report not published", file=sys.stderr)
-    return 1
+    if args.mode == "query":
+        query = args.query or ""
+        if args.query_file:
+            with open(args.query_file) as qf:
+                query = qf.read()
+        if not query.strip():
+            print("empty query", file=sys.stderr)
+            return 2
+        return run_query(query, args.publish_issue)
+
+    ap.print_help()
+    return 2
 
 
 if __name__ == "__main__":

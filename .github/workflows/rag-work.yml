@@ -34,12 +34,7 @@ jobs:
       - name: Run RAG pipeline
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ "${{ github.event_name }}" = "issues" ]; then
-            echo "${{ github.event.issue.body }}" > /tmp/q.md
-            python scripts/rag_pipeline.py --mode query --publish-issue ${{ github.event.issue.number }} --query-file /tmp/q.md
-          elif [ "${{ inputs.mode }}" = "index" ]; then
-            python scripts/rag_pipeline.py --mode index
-          else
-            python scripts/rag_pipeline.py --mode query --publish-issue "${{ inputs.publish_issue }}" --query "${{ inputs.query }}"
-          fi
+          RAG_EVENT_NAME: ${{ github.event_name }}
+          RAG_QUERY: ${{ inputs.query }}
+          RAG_PUBLISH_ISSUE: ${{ github.event_name == 'issues' && github.event.issue.number || inputs.publish_issue }}
+        run: python scripts/rag_pipeline.py --runner
