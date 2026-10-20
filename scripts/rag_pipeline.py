@@ -77,9 +77,7 @@ STOP = {
 
 
 def api_get(path, token=None):
-    req = urllib.request.Request(
-        API + path, headers={"Accept": "application/vnd.github+json"}
-    )
+    req = urllib.request.Request(API + path, headers={"Accept": "application/vnd.github+json"})
     if token:
         req.add_header("Authorization", f"Bearer {token}")
     with urllib.request.urlopen(req, timeout=30) as r:
@@ -104,9 +102,7 @@ def api_post(path, payload, token):
 def fetch_corpus(token=None):
     issues, page = [], 1
     while True:
-        data = api_get(
-            f"/issues?labels={LABEL_SOURCE}&state=open&per_page=100&page={page}", token
-        )
+        data = api_get(f"/issues?labels={LABEL_SOURCE}&state=open&per_page=100&page={page}", token)
         if not data:
             break
         issues.extend(data)
@@ -140,11 +136,7 @@ def split_sentences(text):
 
 
 def tokenize(s):
-    return [
-        w
-        for w in re.findall(r"[а-яёa-z0-9]+", s.lower())
-        if w not in STOP and len(w) > 2
-    ]
+    return [w for w in re.findall(r"[а-яёa-z0-9]+", s.lower()) if w not in STOP and len(w) > 2]
 
 
 def build_units(corpus):
@@ -216,9 +208,7 @@ class BM25Index:
 
 def verify_verbatim(fragments, corpus):
     by_issue = {c["issue"]: c["text"] for c in corpus}
-    return [
-        {**f, "verbatim": f["text"] in by_issue.get(f["issue"], "")} for f in fragments
-    ]
+    return [{**f, "verbatim": f["text"] in by_issue.get(f["issue"], "")} for f in fragments]
 
 
 def report(query, fragments, units_n, sources_n):
@@ -232,9 +222,7 @@ def report(query, fragments, units_n, sources_n):
         "",
     ]
     if not fragments:
-        lines.append(
-            "**PASS: релевантных фрагментов не найдено — ответ не выдумывается.**"
-        )
+        lines.append("**PASS: релевантных фрагментов не найдено — ответ не выдумывается.**")
         return "\n".join(lines)
     lines.append("| # | score | issue | фрагмент | verbatim |")
     lines.append("|---|---|---|---|---|")
