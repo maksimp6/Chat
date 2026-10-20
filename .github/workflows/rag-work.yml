@@ -1,0 +1,45 @@
+name: RAG work
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "index | query"
+        required: true
+        default: "query"
+      query:
+        description: "query text"
+        required: false
+        default: ""
+      publish_issue:
+        description: "issue number to publish report to"
+        required: false
+        default: ""
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  rag:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'rag-query'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run RAG pipeline
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            echo "${{ github.event.issue.body }}" > /tmp/q.md
+            python scripts/rag_pipeline.py --mode query --publish-issue ${{ github.event.issue.number }} --query-file /tmp/q.md
+          elif [ "${{ inputs.mode }}" = "index" ]; then
+            python scripts/rag_pipeline.py --mode index
+          else
+            python scripts/rag_pipeline.py --mode query --publish-issue "${{ inputs.publish_issue }}" --query "${{ inputs.query }}"
+          fi
