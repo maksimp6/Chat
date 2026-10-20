@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """RAG pipeline for the Logos runner (retrieval-augmented generation, stage 1).
 
 Design contract (aligned with scripts/lexical_pipeline.py):
@@ -37,8 +36,7 @@ LABEL_SOURCE = "rag-source"
 LABEL_QUERY = "rag-query"
 TOP_K = 5
 PER_ISSUE_CAP = 3
-STOP = set("""и в не на что это я ты он она а как то же по из за но мы у с о для есть был быть или от до
-the a an of is are to it and or""".split())
+STOP = {"и","в","не","на","что","это","я","ты","он","она","а","как","то","же","по","из","за","но","мы","у","с","о","для","есть","был","быть","или","от","до","the","a","an","of","is","are","to","it","and","or"}
 
 
 def api_get(path: str, token: str | None = None) -> dict:
@@ -263,7 +261,11 @@ def main() -> int:
         return 0
 
     if args.mode == "query":
-        q = args.query or (open(args.query_file).read() if args.query_file else "")
+        if args.query_file:
+            with open(args.query_file) as qf:
+                q = qf.read()
+        else:
+            q = args.query or ""
         if not q.strip():
             print("empty query", file=sys.stderr)
             return 2

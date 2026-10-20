@@ -33,14 +33,15 @@ jobs:
           python-version: "3.12"
       - name: Run RAG pipeline
         env:
+          QUERY: ${{ inputs.query }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
         run: |
           if [ "${{ github.event_name }}" = "issues" ]; then
-            python scripts/rag_pipeline.py --mode query \
-              --publish-issue ${{ github.event.issue.number }} \
-              --query-file <(echo "${{ github.event.issue.body }}")
+            ISSUE_NUM="${{ github.event.issue.number }}"
+            printf '%s' '${{ github.event.issue.body }}' > /tmp/issue_body.txt
+            python scripts/rag_pipeline.py --mode query --publish-issue "$ISSUE_NUM" --query-file /tmp/issue_body.txt
           else
             MODE="${{ inputs.mode }}"
             if [ "$MODE" = "index" ]; then
@@ -48,6 +49,6 @@ jobs:
             else
               python scripts/rag_pipeline.py --mode query \
                 --publish-issue "${{ inputs.publish_issue }}" \
-                --query "${{ inputs.query }}"
+                --query "$QUERY"
             fi
           fi
