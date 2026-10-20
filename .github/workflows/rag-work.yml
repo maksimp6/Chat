@@ -56,15 +56,12 @@ jobs:
               printf '%s\n' "$RAG_QUERY" > /tmp/rag_query.txt
             else
               # label event: the issue body holds the question
-              python - <<'PYEOF'
-              import json, os, urllib.request
-              req = urllib.request.Request(
-                  "https://api.github.com/repos/maksimp6/Chat/issues/" + os.environ["RAG_PUBLISH_ISSUE"],
-                  headers={"Authorization": "Bearer " + os.environ["GITHUB_TOKEN"], "User-Agent": "rag-runner"},
-              )
-              body = json.load(urllib.request.urlopen(req)).get("body") or ""
-              open("/tmp/rag_query.txt", "w").write(body)
-              PYEOF
+              python -c "import json,os,urllib.request; r=urllib.request.Request('https://api.github.com/repos/maksimp6/Chat/issues/'+os.environ['RAG_PUBLISH_ISSUE'], headers={'Authorization':'Bearer '+os.environ['GITHUB_TOKEN'],'User-Agent':'rag-runner'}); open('/tmp/rag_query.txt','w').write(json.load(urllib.request.urlopen(r)).get('body') or '')"
+              # keep only the part after the separator line, if present
+              if grep -q '^---$' /tmp/rag_query.txt; then
+                sed -n '/^---$/,$p' /tmp/rag_query.txt | tail -n +2 > /tmp/rag_query2.txt
+                mv /tmp/rag_query2.txt /tmp/rag_query.txt
+              fi
             fi
             python scripts/rag_pipeline.py --mode query --publish-issue "$RAG_PUBLISH_ISSUE" --query-file /tmp/rag_query.txt
           fi
