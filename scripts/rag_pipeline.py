@@ -270,7 +270,10 @@ def main():
         )
         return 0
 
-    q = args.query or (open(args.query_file).read() if args.query_file else "")
+    q = args.query or ""
+    if args.query_file:
+        with open(args.query_file) as qf:
+            q = qf.read()
     if not q.strip():
         print("empty query", file=sys.stderr)
         return 2
