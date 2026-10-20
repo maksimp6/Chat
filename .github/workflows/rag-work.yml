@@ -7,36 +7,56 @@ on:
         required: true
         default: "query"
       query:
-        description: "query text"
+        description: "query text (query mode)"
         required: false
         default: ""
       publish_issue:
-        description: "issue number to publish report to"
+        description: "issue number for the report"
         required: false
         default: ""
   issues:
     types: [labeled]
 
-permissions:
-  contents: read
-  issues: write
+permissions: {}
+
+concurrency:
+  group: rag-work
+  cancel-in-progress: true
 
 jobs:
   rag:
     if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'rag-query'
+    name: RAG index or query
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
       - name: Run RAG pipeline
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RAG_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_TOKEN: ${{ github.token }}
+          RAG_MODE: ${{ inputs.mode || 'query' }}
           RAG_QUERY: ${{ inputs.query }}
-          RAG_PUBLISH_ISSUE: ${{ github.event_name == 'issues' && github.event.issue.number || inputs.publish_issue }}
-        run: python scripts/rag_pipeline.py --runner
+          RAG_PUBLISH_ISSUE: ${{ inputs.publish_issue || github.event.issue.number }}
+        run: |
+          set -eu
+          if [ "$RAG_MODE" = "index" ]; then
+            python scripts/rag_pipeline.py --mode index
+          else
+            printf '%s\n' "$RAG_QUERY" > /tmp/rag_query.txt
+            if [ "$RAG_QUERY" = "" ]; then
+              # query mode triggered by issue label: issue body holds the question
+              python scripts/rag_pipeline.py --mode query --publish-issue "$RAG_PUBLISH_ISSUE" --query-file /dev/stdin < /dev/null || true
+            else
+              python scripts/rag_pipeline.py --mode query --publish-issue "$RAG_PUBLISH_ISSUE" --query-file /tmp/rag_query.txt
+            fi
+          fi
