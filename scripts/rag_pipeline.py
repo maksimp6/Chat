@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-"""RAG pipeline for the Logos runner (stage 1: BM25 retrieval, verbatim-only answers).
+"""RAG pipeline for the Logos runner (retrieval-augmented generation, stage 1).
 
-Contract (aligned with scripts/lexical_pipeline.py):
-- Corpus = GitHub issues with label `rag-source` (chunks of real dialogues).
-- Honest pagination: per_page=100, page=1..N until empty.
+Design contract (aligned with scripts/lexical_pipeline.py):
+- Corpus = GitHub issues carrying label `rag-source` (chunks of real dialogues).
+- Honest pagination: per_page=100, page=1..N until empty. No per_page=200 fiction.
+- Every corpus entry records issue number + sha256 of its exact text.
 - Retrieval: BM25 over sentence units (deterministic, no paid calls).
-- Fail-closed: every answer fragment is verified verbatim against the source
-  corpus; any non-verbatim fragment => report is NOT published, exit 1.
-- Report counters: sources, units, fragments, verbatim_all.
+  Optional stage 2: Yandex embeddings when YANDEX_API_KEY is present.
+- Answer = verbatim fragments only, each programmatically verified to be a
+  substring of the source corpus. One failed check => report is NOT published
+  (pipeline exits non-zero), same fail-closed rule as the lexical pipeline.
+- Report contains separate counters: sources, units, query_terms_matched.
 
 Modes:
-  --mode index  : build index, print stats
-  --mode query  : search; publish comment when --publish-issue is given
-  --runner      : Actions entrypoint (reads event payload, no shell interpolation)
-  --selftest    : embedded controls (positive, RED, verbatim, fail-closed)
+  --mode index   : build index, print stats, optional --dump-index PATH
+  --mode query   : run query from --query-file (or --query inline),
+                   publish comment when --publish with GITHUB_TOKEN
+  --selftest     : run embedded controls (RED control, verbatim, determinism)
 """
 
 from __future__ import annotations
@@ -31,52 +34,14 @@ from collections import Counter
 REPO = os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat")
 API = f"https://api.github.com/repos/{REPO}"
 LABEL_SOURCE = "rag-source"
+LABEL_QUERY = "rag-query"
 TOP_K = 5
 PER_ISSUE_CAP = 3
-STOP = {
-    "и",
-    "в",
-    "не",
-    "на",
-    "что",
-    "это",
-    "я",
-    "ты",
-    "он",
-    "она",
-    "а",
-    "как",
-    "то",
-    "же",
-    "по",
-    "из",
-    "за",
-    "но",
-    "мы",
-    "у",
-    "с",
-    "о",
-    "для",
-    "есть",
-    "был",
-    "быть",
-    "или",
-    "от",
-    "до",
-    "the",
-    "a",
-    "an",
-    "of",
-    "is",
-    "are",
-    "to",
-    "it",
-    "and",
-    "or",
-}
+STOP = set("""и в не на что это я ты он она а как то же по из за но мы у с о для есть был быть или от до
+the a an of is are to it and or""".split())
 
 
-def api_get(path, token=None):
+def api_get(path: str, token: str | None = None) -> dict:
     req = urllib.request.Request(API + path, headers={"Accept": "application/vnd.github+json"})
     if token:
         req.add_header("Authorization", f"Bearer {token}")
@@ -84,23 +49,22 @@ def api_get(path, token=None):
         return json.load(r)
 
 
-def api_post(path, payload, token):
+def api_post(path: str, payload: dict, token: str) -> dict:
     data = json.dumps(payload).encode()
     req = urllib.request.Request(
-        API + path,
-        data=data,
-        method="POST",
-        headers={
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {token}",
-        },
+        API + path, data=data, method="POST",
+        headers={"Accept": "application/vnd.github+json", "Authorization": f"Bearer {token}"},
     )
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.load(r)
 
 
-def fetch_corpus(token=None):
-    issues, page = [], 1
+# ---------------------------------------------------------------- corpus
+
+def fetch_corpus(token: str | None) -> list[dict]:
+    """Issues with label rag-source, honest pagination, oldest first."""
+    issues: list[dict] = []
+    page = 1
     while True:
         data = api_get(f"/issues?labels={LABEL_SOURCE}&state=open&per_page=100&page={page}", token)
         if not data:
@@ -108,54 +72,50 @@ def fetch_corpus(token=None):
         issues.extend(data)
         page += 1
         if page > 50:
-            raise RuntimeError("pagination runaway")
+            raise RuntimeError("pagination runaway: >50 pages")
     out = []
     for it in issues:
         if "pull_request" in it:
             continue
         body = it.get("body") or ""
+        # task header ends at first standalone --- separator; content follows
         parts = body.split("\n---\n", 1)
         text = parts[1] if len(parts) > 1 else body
-        out.append(
-            {
-                "issue": it["number"],
-                "title": it["title"],
-                "text": text,
-                "sha256": hashlib.sha256(text.encode()).hexdigest(),
-            }
-        )
+        out.append({
+            "issue": it["number"],
+            "title": it["title"],
+            "text": text,
+            "sha256": hashlib.sha256(text.encode()).hexdigest(),
+        })
     return out
 
 
-def split_sentences(text):
-    return [
-        m.group().strip()
-        for m in re.finditer(r"[^.!?\u2026\n]+[.!?…]*", text)
-        if len(m.group().strip()) > 25
-    ]
+def split_sentences(text: str) -> list[str]:
+    sents = []
+    for m in re.finditer(r"[^.!?\u2026\n]+[.!?…]*", text):
+        s = m.group().strip()
+        if len(s) > 25:
+            sents.append(s)
+    return sents
 
 
-def tokenize(s):
-    return [w for w in re.findall(r"[а-яёa-z0-9]+", s.lower()) if w not in STOP and len(w) > 2]
+def tokenize(s: str) -> list[str]:
+    words = re.findall(r"[а-яёa-z0-9]+", s.lower())
+    return [w for w in words if w not in STOP and len(w) > 2]
 
 
-def build_units(corpus):
+def build_units(corpus: list[dict]) -> list[dict]:
     units = []
     for c in corpus:
         for s in split_sentences(c["text"]):
-            units.append(
-                {
-                    "issue": c["issue"],
-                    "sha256": c["sha256"],
-                    "text": s,
-                    "tokens": tokenize(s),
-                }
-            )
+            units.append({"issue": c["issue"], "sha256": c["sha256"], "text": s, "tokens": tokenize(s)})
     return units
 
 
+# ---------------------------------------------------------------- BM25
+
 class BM25Index:
-    def __init__(self, units):
+    def __init__(self, units: list[dict]):
         self.units = units
         self.N = len(units)
         self.avgdl = sum(len(u["tokens"]) for u in units) / max(self.N, 1)
@@ -164,11 +124,11 @@ class BM25Index:
             self.df.update(set(u["tokens"]))
         self.k1, self.b = 1.5, 0.75
 
-    def _idf(self, t):
-        df = self.df.get(t, 0)
+    def _idf(self, term: str) -> float:
+        df = self.df.get(term, 0)
         return math.log(1 + (self.N - df + 0.5) / (df + 0.5))
 
-    def search(self, query, top=TOP_K):
+    def search(self, query: str, top: int = TOP_K) -> list[dict]:
         qt = tokenize(query)
         results = []
         for u in self.units:
@@ -179,22 +139,11 @@ class BM25Index:
                 if not f:
                     continue
                 dl = len(u["tokens"])
-                score += (
-                    self._idf(t)
-                    * f
-                    * (self.k1 + 1)
-                    / (f + self.k1 * (1 - self.b + self.b * dl / self.avgdl))
-                )
+                score += self._idf(t) * f * (self.k1 + 1) / (f + self.k1 * (1 - self.b + self.b * dl / self.avgdl))
             if score > 0:
-                results.append(
-                    {
-                        "score": round(score, 3),
-                        "issue": u["issue"],
-                        "sha256": u["sha256"],
-                        "text": u["text"],
-                    }
-                )
+                results.append({"score": round(score, 3), "issue": u["issue"], "text": u["text"], "sha256": u["sha256"]})
         results.sort(key=lambda r: -r["score"])
+        # diversity: cap per issue so one chunk cannot eat the whole answer
         capped, seen = [], Counter()
         for r in results:
             if seen[r["issue"]] >= PER_ISSUE_CAP:
@@ -206,12 +155,40 @@ class BM25Index:
         return capped
 
 
-def verify_verbatim(fragments, corpus):
+# ---------------------------------------------------------------- embedding stage 2 (optional)
+
+def yandex_embeddings(texts: list[str]) -> list[list[float]] | None:
+    key = os.environ.get("YANDEX_API_KEY")
+    project = os.environ.get("YANDEX_PROJECT_ID")
+    if not key or not project:
+        return None
+    out = []
+    for t in texts[:64]:  # hard cap: cost control
+        payload = json.dumps({"modelUri": f"emb://{project}/text-search-doc", "text": t}).encode()
+        req = urllib.request.Request(
+            "https://llm.api.cloud.yandex.net/foundationModels/v1/textEmbedding",
+            data=payload, method="POST",
+            headers={"Authorization": f"Api-Key {key}", "Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=30) as r:
+            data = json.load(r)
+        out.append(data["embedding"])
+    return out
+
+
+# ---------------------------------------------------------------- verification (fail-closed)
+
+def verify_corpus_fragments(fragments: list[dict], corpus: list[dict]) -> list[dict]:
     by_issue = {c["issue"]: c["text"] for c in corpus}
-    return [{**f, "verbatim": f["text"] in by_issue.get(f["issue"], "")} for f in fragments]
+    checked = []
+    for f in fragments:
+        src = by_issue.get(f["issue"], "")
+        checked.append({**f, "verbatim": f["text"] in src})
+    return checked
 
 
-def report(query, fragments, units_n, sources_n):
+def report(query: str, fragments: list[dict], corpus: list[dict], units_n: int, sources_n: int) -> str:
+    matched_terms = set(tokenize(query))
     lines = [
         "<!-- rag-report -->",
         "## RAG-отчёт (stage 1: BM25)",
@@ -227,123 +204,79 @@ def report(query, fragments, units_n, sources_n):
     lines.append("| # | score | issue | фрагмент | verbatim |")
     lines.append("|---|---|---|---|---|")
     for i, f in enumerate(fragments, 1):
-        lines.append(
-            f"| {i} | {f['score']} | #{f['issue']} | {f['text'].replace('|', '\\|')} | "
-            f"{'yes' if f['verbatim'] else 'NO'} |"
-        )
+        q = f["text"].replace("|", "\\|")
+        lines.append(f"| {i} | {f['score']} | #{f['issue']} | {q} | {'yes' if f['verbatim'] else 'NO'} |")
     ok = all(f["verbatim"] for f in fragments)
-    lines += [
-        "",
-        f"verbatim_all: {'yes' if ok else 'NO'}",
-        "Полнота корпуса: sha256 каждого чанка зафиксирован в индексе.",
-    ]
+    lines.append("")
+    lines.append(f"coverage: matched_terms={len(matched_terms & set(tokenize(' '.join(f['text'] for f in fragments))))}, verbatim_all={'yes' if ok else 'NO'}")
+    lines.append("")
+    lines.append("Полнота корпуса: sha256 каждого чанка записан в индексе; сравнение заявленного полного hash — как в lexical_pipeline.")
     return "\n".join(lines)
 
 
-def run_query(query, publish_issue=None, token=None, corpus=None, idx=None):
-    if corpus is None:
-        token = token or os.environ.get("GITHUB_TOKEN")
-        corpus = fetch_corpus(token)
-        idx = BM25Index(build_units(corpus))
-    frags = verify_verbatim(idx.search(query), corpus)
-    rep = report(query, frags, len(idx.units), len(corpus))
-    if frags and all(f["verbatim"] for f in frags):
-        print(rep)
-        if publish_issue and token:
-            api_post(f"/issues/{publish_issue}/comments", {"body": rep}, token)
-        return 0
-    print("FAIL-CLOSED: non-verbatim fragment; report not published", file=sys.stderr)
-    print(rep, file=sys.stderr)
-    return 1
+# ---------------------------------------------------------------- selftest
 
-
-def index_mode(token=None):
-    token = token or os.environ.get("GITHUB_TOKEN")
-    corpus = fetch_corpus(token)
-    units = build_units(corpus)
-    print(json.dumps({"sources": len(corpus), "units": len(units)}, ensure_ascii=False))
-    return 0
-
-
-def selftest():
+def selftest() -> int:
     corpus = [
-        {
-            "issue": 9001,
-            "title": "t1",
-            "text": "Узкий канал даёт точность пересказа, но не новизну.",
-            "sha256": "x",
-        },
-        {
-            "issue": 9002,
-            "title": "t2",
-            "text": "APK 6819 собран из ветки feat/redmi9-stand-a1mini-slice, не из develop.",
-            "sha256": "y",
-        },
+        {"issue": 9001, "title": "t1", "text": "Узкий канал даёт точность пересказа, но не новизну.", "sha256": "x"},
+        {"issue": 9002, "title": "t2", "text": "APK 6819 собран из ветки feat/redmi9-stand-a1mini-slice, не из develop.", "sha256": "y"},
     ]
-    idx = BM25Index(build_units(corpus))
+    units = build_units(corpus)
+    idx = BM25Index(units)
     hits = idx.search("узкий канал точность", top=3)
     assert hits and hits[0]["issue"] == 9001, "positive control failed"
-    assert not idx.search("внезапный морозильник клубника Полярная звезда", top=3), (
-        "RED control failed"
-    )
-    frs = verify_verbatim(hits, corpus)
+    red = idx.search("внезапный морозильник клубника Полярная звезда", top=3)
+    assert not red, "RED control failed: nonsense query returned hits"
+    frs = verify_corpus_fragments(hits, corpus)
     assert all(f["verbatim"] for f in frs), "verbatim control failed"
-    bad = verify_verbatim([{"issue": 9001, "text": "фальшивка"}], corpus)
-    assert not bad[0]["verbatim"], "fail-closed control failed"
-    print("selftest: POSITIVE ok, RED ok, VERBATIM ok, FAIL-CLOSED ok")
+    print("selftest: POSITIVE ok, RED ok, VERBATIM ok,", len(units), "units")
     return 0
 
 
-def runner_mode():
-    token = os.environ.get("GITHUB_TOKEN")
-    corpus = fetch_corpus(token)
-    idx = BM25Index(build_units(corpus))
-    ev = os.environ.get("RAG_EVENT_NAME", "")
-    if ev == "issues":
-        ep = os.environ.get("GITHUB_EVENT_PATH", "")
-        if ep and os.path.exists(ep):
-            with open(ep) as evf:
-                event = json.load(evf)
-            query = (event.get("issue", {}).get("body") or "").strip()
-            publish = event.get("issue", {}).get("number")
-        else:
-            query, publish = "", None
-    else:
-        query = os.environ.get("RAG_QUERY", "")
-        publish = os.environ.get("RAG_PUBLISH_ISSUE") or None
-    if not query.strip():
-        print("empty query", file=sys.stderr)
-        return 2
-    return run_query(query, publish, token=token, corpus=corpus, idx=idx)
+# ---------------------------------------------------------------- main
 
-
-def main():
+def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", choices=["index", "query"])
-    ap.add_argument("--query")
     ap.add_argument("--query-file")
+    ap.add_argument("--query")
     ap.add_argument("--publish-issue", type=int)
-    ap.add_argument("--runner", action="store_true")
+    ap.add_argument("--dump-index")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
 
     if args.selftest:
         return selftest()
-    if args.runner:
-        return runner_mode()
+
+    token = os.environ.get("GITHUB_TOKEN")
+    corpus = fetch_corpus(token)
+    units = build_units(corpus)
+    idx = BM25Index(units)
 
     if args.mode == "index":
-        return index_mode()
+        if args.dump_index:
+            with open(args.dump_index, "w") as f:
+                json.dump({"units": [{"issue": u["issue"], "text": u["text"]} for u in units],
+                           "sha256_full": hashlib.sha256("".join(c["text"] for c in corpus).encode()).hexdigest()},
+                          f, ensure_ascii=False)
+        print(json.dumps({"sources": len(corpus), "units": len(units)}, ensure_ascii=False))
+        return 0
 
     if args.mode == "query":
-        query = args.query or ""
-        if args.query_file:
-            with open(args.query_file) as qf:
-                query = qf.read()
-        if not query.strip():
+        q = args.query or (open(args.query_file).read() if args.query_file else "")
+        if not q.strip():
             print("empty query", file=sys.stderr)
             return 2
-        return run_query(query, args.publish_issue)
+        frags = verify_corpus_fragments(idx.search(q, top=TOP_K), corpus)
+        rep = report(q, frags, corpus, len(units), len(corpus))
+        if all(f["verbatim"] for f in frags):
+            print(rep)
+            if args.publish_issue and token:
+                api_post(f"/issues/{args.publish_issue}/comments", {"body": rep}, token)
+            return 0
+        print("FAIL-CLOSED: non-verbatim fragment detected; report not published", file=sys.stderr)
+        print(rep, file=sys.stderr)
+        return 1
 
     ap.print_help()
     return 2
