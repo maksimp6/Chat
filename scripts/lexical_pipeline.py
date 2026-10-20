@@ -141,6 +141,9 @@ def chunk_texts(chunk_numbers: list[int]) -> list[str]:
         body = str(issue.get("body") or "")
         if "---" in body:
             body = body.split("---", 1)[1]
+        # The separator split leaves leading newlines from the issue preamble;
+        # the chunk payload must be the exact source bytes, so strip only them.
+        body = body.lstrip("\n")
         texts.append(body)
     return texts
 
