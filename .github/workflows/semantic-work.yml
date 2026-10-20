@@ -15,18 +15,25 @@ on:
         description: "issue number for the report"
         required: false
         default: ""
-  issues:
-    types: [labeled]
+      allow_model_call:
+        description: "Owner approves one bounded model call within a separately agreed budget"
+        type: boolean
+        required: true
+        default: false
+      approval_reference:
+        description: "Reference to owner-approved scope and budget; not a currency cap"
+        required: false
+        default: ""
 
 permissions: {}
 
 concurrency:
   group: semantic-work
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   semantic:
-    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'semantic-query'
+    if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.run_attempt == '1'
     name: Semantic answer over corpus
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -47,18 +54,20 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
-          SEM_MODE: ${{ inputs.mode || 'query' }}
+          SEM_MODE: ${{ inputs.mode }}
           SEM_QUERY: ${{ inputs.query }}
-          SEM_PUBLISH_ISSUE: ${{ inputs.publish_issue || github.event.issue.number }}
+          SEM_PUBLISH_ISSUE: ${{ inputs.publish_issue }}
+          SEM_ALLOW_MODEL: ${{ inputs.allow_model_call }}
+          SEM_APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
         run: |
-          set -eu
-          if [ -n "$SEM_QUERY" ]; then
-            printf '%s\n' "$SEM_QUERY" > /tmp/sem_query.txt
-          else
-            python -c "import json,os,urllib.request; r=urllib.request.Request('https://api.github.com/repos/' + os.environ['GITHUB_REPOSITORY'] + '/issues/' + os.environ['SEM_PUBLISH_ISSUE'], headers={'Authorization':'Bearer ' + os.environ['GITHUB_TOKEN'],'User-Agent':'semantic-runner'}); open('/tmp/sem_query.txt','w').write(json.load(urllib.request.urlopen(r)).get('body') or '')"
-            if grep -q '^---$' /tmp/sem_query.txt; then
-              sed -n '/^---$/,$p' /tmp/sem_query.txt | tail -n +2 > /tmp/sem_q2.txt
-              mv /tmp/sem_q2.txt /tmp/sem_query.txt
-            fi
+          set -euo pipefail
+          printf '%s\n' "$SEM_QUERY" > /tmp/sem_query.txt
+          args=(--mode "$SEM_MODE" --query-file /tmp/sem_query.txt)
+          if [ -n "$SEM_PUBLISH_ISSUE" ]; then
+            args+=(--publish-issue "$SEM_PUBLISH_ISSUE")
           fi
-          python scripts/semantic_pipeline.py --mode "$SEM_MODE" --publish-issue "$SEM_PUBLISH_ISSUE" --query-file /tmp/sem_query.txt
+          if [ "$SEM_ALLOW_MODEL" = "true" ]; then
+            test -n "$SEM_APPROVAL_REFERENCE" || { echo "missing owner budget approval reference" >&2; exit 2; }
+            args+=(--allow-model-call)
+          fi
+          python scripts/semantic_pipeline.py "${args[@]}"
