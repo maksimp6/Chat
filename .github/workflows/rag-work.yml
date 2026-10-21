@@ -3,11 +3,11 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "index | query"
+        description: "index | query | logos"
         required: true
         default: "query"
       query:
-        description: "query text (query mode)"
+        description: "query text or question for Logos"
         required: false
         default: ""
       publish_issue:
@@ -20,12 +20,12 @@ on:
 permissions: {}
 
 concurrency:
-  group: rag-work
-  cancel-in-progress: true
+  group: rag-work-${{ inputs.mode || 'query' }}
+  cancel-in-progress: false
 
 jobs:
   rag:
-    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'rag-query'
+    if: (github.event_name == 'workflow_dispatch' && inputs.mode != 'logos') || github.event.label.name == 'rag-query'
     name: RAG index or query
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -65,3 +65,53 @@ jobs:
             fi
             python scripts/rag_pipeline.py --mode query --publish-issue "$RAG_PUBLISH_ISSUE" --query-file /tmp/rag_query.txt
           fi
+
+  logos:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'logos'
+    name: Ask Logos in its repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Save question
+        env:
+          LOGOS_QUESTION: ${{ inputs.query }}
+        run: |
+          set -euo pipefail
+          test -n "$LOGOS_QUESTION" || { echo '::error::A question is required.'; exit 1; }
+          printf '%s' "$LOGOS_QUESTION" > "$RUNNER_TEMP/logos-question.txt"
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+
+      - name: Install runtime dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run Logos dialogue
+        env:
+          YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+          YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          ALICE_PROVIDER_CREDENTIAL_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+          export ALICE_PROVIDER_CREDENTIAL_KEY
+          export ALICE_MEMORY_PATH="$RUNNER_TEMP/logos-dialogue.memory"
+          python -m scripts.logos_dialogue \
+            --question-file "$RUNNER_TEMP/logos-question.txt" \
+            --out "$RUNNER_TEMP/logos-answer.json"
+
+      - name: Save dialogue result
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: logos-answer-${{ github.run_id }}
+          path: ${{ runner.temp }}/logos-answer.json
+          if-no-files-found: warn
+          retention-days: 7

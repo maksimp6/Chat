@@ -68,4 +68,6 @@ def run_tool_loop(
         tool_outputs = build_continuation_input(response, results)
         continuation_input = list(response.get("output", []) or []) + tool_outputs
         response = continue_request(continuation_input, response)
+    if not extract_function_calls(response):
+        return response
     raise RuntimeError("Responses API tool loop exceeded max_rounds")

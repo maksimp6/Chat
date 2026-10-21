@@ -196,6 +196,41 @@ python scripts/semantic_pipeline.py \
   --approval-reference owner-approved
 ```
 
+## Ask the native Logos runtime in GitHub Actions
+
+The existing `RAG work` workflow also accepts `mode=logos`. This checks out the
+selected branch, installs the runtime dependencies and calls the same
+`LogosClient` used by the application. The question is passed through a UTF-8 file;
+the reply comes from the native runtime and its `InvocationContext`,
+`ExecutionTrace` and `UniversalToolExecutor` path.
+
+Choose the branch and enter the question in `query`. Dispatching this mode starts
+a model-backed dialogue under GitHub's normal workflow access controls. The
+workflow uses the existing Yandex Actions secrets and a temporary encrypted
+credential store outside the checkout. It requires no application server,
+website or phone.
+
+At the owner's request, this adapter adds no generation-count, file-read, prompt
+or output caps and no read-only tool policy. It uses `logos-runtime-flash` and the
+native filesystem tool category, including tools for editing files and running
+commands in the checkout. Existing runtime validation, tool approvals and provider
+limits still apply. There is no hard currency cap. Provider usage and response
+identifiers are recorded when available; unconfirmed cost remains unknown. The
+adapter does not retry a failed model call.
+
+The `logos-answer-<run_id>` artifact contains the actual reply, status, correlation
+IDs and available usage. It excludes the credential store and raw trace. A
+question about the repository can cause Logos to inspect or work with files;
+an ordinary knowledge question may need no tools. Each dispatch runs one dialogue
+turn. This workflow does not schedule recurring work or publish repository edits.
+
+Local invocation, with provider credentials configured separately:
+
+```sh
+python -m scripts.logos_dialogue \
+  --question-file /tmp/question.txt --out /tmp/logos-answer.json
+```
+
 ## Later work
 
 A live quality experiment requires separately approved scope/call count/budget.
