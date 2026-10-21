@@ -171,9 +171,9 @@ jobs:
       github.ref == 'refs/heads/feat/semantic-pipeline' &&
       github.actor == github.repository_owner &&
       github.triggering_actor == github.repository_owner &&
-      github.event.before == 'dcd1dfa8d7101d452667f121a3faaa616aa1732d' &&
-      github.event.head_commit.message == 'diag(vector-store): inspect existing stores read-only'
-    name: Read-only Yandex Vector Store inventory
+      github.event.before == 'de3dfb8e62ff1fe818712b6e87bcee30dd19138f' &&
+      github.event.head_commit.message == 'fix(vector-store): reuse indexed legacy task store'
+    name: One-time Yandex repository and model demo
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -188,10 +188,19 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
-      - name: Inspect existing Vector Stores without writes
+      - name: Add repository snapshot to the existing store and ask YandexGPT once
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
+          VECTOR_QUERY: "Какая модель генерирует ответы semantic pipeline и что известно о модели эмбеддингов Vector Store?"
+          VECTOR_APPROVAL_REFERENCE: "owner-approved-vector-store-repository-model-demo"
         run: >-
           python scripts/semantic_pipeline.py
-          --mode vector-store-inspect
+          --mode vector-store
+          --corpus tasks
+          --query "$VECTOR_QUERY"
+          --allow-vector-store-write
+          --include-repository
+          --allow-model-call
+          --approval-reference "$VECTOR_APPROVAL_REFERENCE"

@@ -1263,18 +1263,34 @@ def ensure_task_history_vector_store(name: str, project: str, key: str) -> tuple
         store_id = matches[0].get("id")
         if not isinstance(store_id, str) or not store_id:
             raise ValueError("vector_store_id_invalid")
-        return store_id, name
-    suffix = f"-c{MAX_VECTOR_CHUNK_SIZE_TOKENS}-o{MAX_VECTOR_CHUNK_OVERLAP_TOKENS}"
-    compatible = [
-        store
-        for store in stores
-        if isinstance(store.get("name"), str)
-        and store["name"].startswith("chat-task-history-")
-        and store["name"].endswith(suffix)
-    ]
-    if compatible:
-        compatible.sort(key=lambda item: str(item.get("created_at", "")))
-        selected = compatible[-1]
+    chunking = vector_store_chunking_strategy()
+    if matches:
+        attached = list_yandex_objects(
+            f"/vector_stores/{quote(store_id, safe='')}/files", project, key, ("files",)
+        )
+        if not attached or all(item.get("chunking_strategy") == chunking for item in attached):
+            return store_id, name
+    populated, empty = [], []
+    for store in stores:
+        if not isinstance(store.get("name"), str) or not store["name"].startswith(
+            "chat-task-history-"
+        ):
+            continue
+        store_id = store.get("id")
+        if not isinstance(store_id, str) or not store_id:
+            continue
+        attached = list_yandex_objects(
+            f"/vector_stores/{quote(store_id, safe='')}/files", project, key, ("files",)
+        )
+        if attached:
+            if all(item.get("chunking_strategy") == chunking for item in attached):
+                populated.append(store)
+        elif store.get("chunking_strategy") in (None, chunking):
+            empty.append(store)
+    candidates = populated or empty
+    if candidates:
+        candidates.sort(key=lambda item: str(item.get("created_at", "")))
+        selected = candidates[-1]
         store_id = selected.get("id")
         selected_name = selected.get("name")
         if not isinstance(store_id, str) or not store_id or not isinstance(selected_name, str):
