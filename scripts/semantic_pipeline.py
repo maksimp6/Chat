@@ -700,6 +700,27 @@ def stable_snapshot_content(content: bytes) -> bytes:
     return stable.encode("utf-8")
 
 
+def _safe_yandex_path(path: str) -> str:
+    """Keep only a static API route in diagnostics; omit cursors and object IDs."""
+    parts = path.partition("?")[0].strip("/").split("/")
+    if not parts or parts[0] not in {"files", "vector_stores"}:
+        return "/<unknown>"
+    if len(parts) > 1:
+        identifier = "file_id" if parts[0] == "files" else "store_id"
+        parts[1] = "{" + identifier + "}"
+    return "/" + "/".join(parts)
+
+
+class YandexHTTPError(OSError):
+    """HTTP status plus a sanitized method and API route, never response text."""
+
+    def __init__(self, status: int, method: str, path: str):
+        self.status = status
+        self.method = method.upper()
+        self.path = _safe_yandex_path(path)
+        super().__init__(f"yandex_http_{status}")
+
+
 def yandex_api_request(
     method: str,
     path: str,
@@ -715,8 +736,7 @@ def yandex_api_request(
     headers = {
         "Authorization": f"Api-Key {key}",
         "Accept": "application/json",
-        "OpenAI-Project": project,
-        "x-yc-project-id": project,
+        "x-project": project,
     }
     if body is not None:
         headers["Content-Type"] = content_type
@@ -727,7 +747,7 @@ def yandex_api_request(
         if len(raw) > max_response_bytes:
             raise ValueError("yandex_response_too_large")
         if response.status < 200 or response.status >= 300:
-            raise OSError(f"yandex_http_{response.status}")
+            raise YandexHTTPError(response.status, method, path)
         return raw
     finally:
         conn.close()
@@ -1028,7 +1048,9 @@ def vector_store_search(store_id: str, query: str, project: str, key: str) -> li
 
 
 def technical_error_code(error: OSError | http.client.HTTPException) -> str:
-    """Return a safe transport diagnostic without exposing URLs or response bodies."""
+    """Return safe transport details without exposing credentials or response bodies."""
+    if isinstance(error, YandexHTTPError):
+        return f"HTTP_{error.status} method={error.method} path={error.path}"
     status = getattr(error, "code", None)
     if type(status) is int:
         return f"HTTP_{status}"

@@ -176,10 +176,46 @@ def test_vector_store_api_uses_fixed_yandex_host_and_project_headers(monkeypatch
     assert response == b'{"id":"vs-1"}'
     assert calls[0] == ("connection", pipeline.HOST, 90)
     assert calls[1][1:4] == ("POST", "/v1/vector_stores", {"name": "test"})
-    assert calls[1][4]["OpenAI-Project"] == "offline-project"
-    assert calls[1][4]["x-yc-project-id"] == "offline-project"
+    assert calls[1][4]["x-project"] == "offline-project"
     assert calls[1][4]["Authorization"] == "Api-Key offline-key"
     assert calls[-1] == ("close",)
+
+
+def test_yandex_http_error_omits_response_body_and_dynamic_ids(monkeypatch):
+    class Response:
+        status = 400
+
+        @staticmethod
+        def read(limit):
+            return b"private provider response"
+
+    class Connection:
+        def __init__(self, host, timeout):
+            pass
+
+        @staticmethod
+        def request(method, path, *, body, headers):
+            pass
+
+        @staticmethod
+        def getresponse():
+            return Response()
+
+        @staticmethod
+        def close():
+            pass
+
+    monkeypatch.setattr(pipeline.http.client, "HTTPSConnection", Connection)
+
+    with pytest.raises(pipeline.YandexHTTPError) as raised:
+        pipeline.yandex_api_request(
+            "GET", "/files/private-file-id/content?cursor=private-cursor", "project", "key"
+        )
+
+    assert pipeline.technical_error_code(raised.value) == (
+        "HTTP_400 method=GET path=/files/{file_id}/content"
+    )
+    assert "private" not in str(raised.value)
 
 
 @pytest.mark.parametrize(
@@ -192,6 +228,22 @@ def test_vector_store_api_uses_fixed_yandex_host_and_project_headers(monkeypatch
 )
 def test_technical_error_code_exposes_only_safe_diagnostics(error, expected):
     assert pipeline.technical_error_code(error) == expected
+
+
+@pytest.mark.parametrize(
+    "method,path,safe_path",
+    [
+        ("GET", "/files?limit=100&after=private-cursor", "/files"),
+        ("GET", "/files/file-private-id/content", "/files/{file_id}/content"),
+        ("POST", "/files", "/files"),
+        ("GET", "/vector_stores/store-private-id", "/vector_stores/{store_id}"),
+    ],
+)
+def test_yandex_http_error_reports_method_and_sanitized_route(method, path, safe_path):
+    error = pipeline.YandexHTTPError(400, method, path)
+
+    assert pipeline.technical_error_code(error) == (f"HTTP_400 method={method} path={safe_path}")
+    assert "private" not in str(error)
 
 
 def test_index_wait_polls_until_file_is_completed(monkeypatch):

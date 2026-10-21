@@ -108,6 +108,10 @@ jobs:
         (
           github.event.before == 'c21ab3fda8ec9e17fcd4acdc84edaa52a6387ddc' &&
           github.event.head_commit.message == 'fix(vector-store): report safe runner diagnostics'
+        ) ||
+        (
+          github.event.before == '6dce6099a4cc85bc3ca99adce2a842aa9453dd4c' &&
+          github.event.head_commit.message == 'fix(vector-store): use native Yandex project header'
         )
       )
     name: One-time Yandex Vector Store demo

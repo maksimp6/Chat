@@ -126,13 +126,15 @@ the runner does not call a model or claim that an Issue's state proves delivery.
 The indexed scope is GitHub Issue title/body and source metadata, as defined by
 this PR's task-history contract.
 
-The initial upload and demonstration run is owner-only and pinned to its exact PR
-commit. One separately pinned recovery commit is available if the initial run
-fails: it reports the safe stage and HTTP status, then follows the same
-fingerprint-based reuse path instead of overwriting a file. Each admitted run
-allows at most one snapshot file and one direct search query. The workflow uses
-the existing `YANDEX_API_KEY` and `YANDEX_PROJECT_ID` Actions secrets;
-provider-side API limits remain authoritative. For a later manual run, choose
+The initial upload and demonstration run and its recovery commits are owner-only
+and individually pinned to exact PR commits. Recovery diagnostics report only
+the HTTP method and sanitized API route, without credentials, object IDs or
+response bodies. The request uses the Yandex `x-project` header and Python's
+standard library; no SDK or additional Python dependency is needed.
+The fingerprint-based reuse path never overwrites an existing file. Each
+admitted run allows at most one snapshot file and one direct search query. The
+workflow uses the existing `YANDEX_API_KEY` and `YANDEX_PROJECT_ID` Actions
+secrets; provider-side API limits remain authoritative. For a later manual run, choose
 `vector-store`, enable
 `allow_vector_store_write`, provide the approval reference, and use a task-history
 query:
