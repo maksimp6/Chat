@@ -171,8 +171,8 @@ jobs:
       github.ref == 'refs/heads/feat/semantic-pipeline' &&
       github.actor == github.repository_owner &&
       github.triggering_actor == github.repository_owner &&
-      github.event.before == 'b02addd3fa930597cd1d55f9d2a6a68a406b0312' &&
-      github.event.head_commit.message == 'fix(vector-store): create configured repository store'
+      github.event.before == 'c40caff2cf49b79a30a977a0995a4fc62f1b2ad4' &&
+      github.event.head_commit.message == 'fix(vector-store): stay below overlap boundary'
     name: One-time Yandex repository and model demo
     runs-on: ubuntu-latest
     timeout-minutes: 30

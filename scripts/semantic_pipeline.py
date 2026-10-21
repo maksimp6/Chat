@@ -64,7 +64,8 @@ MAX_VECTOR_SEARCH_RESULTS = 50
 MAX_VECTOR_MODEL_CANDIDATES = 12
 MAX_VECTOR_MODEL_EXCERPT_CHARS = 2500
 MAX_VECTOR_CHUNK_SIZE_TOKENS = 4096
-MAX_VECTOR_CHUNK_OVERLAP_TOKENS = MAX_VECTOR_CHUNK_SIZE_TOKENS // 2
+# The provider rejects the documented exact half-size boundary.
+MAX_VECTOR_CHUNK_OVERLAP_TOKENS = MAX_VECTOR_CHUNK_SIZE_TOKENS // 2 - 1
 VECTOR_STORE_POLL_ATTEMPTS = 60
 VECTOR_STORE_POLL_INTERVAL_SECONDS = 10
 STOP = {
@@ -1350,7 +1351,7 @@ def inspect_yandex_vector_stores() -> int:
 
 
 def vector_store_chunking_strategy() -> dict:
-    """Use Yandex's documented maximum static chunk size and allowed overlap."""
+    """Use maximum static chunk size and stay below Yandex's rejected overlap boundary."""
     return {
         "type": "static",
         "static": {
