@@ -714,11 +714,30 @@ def _safe_yandex_path(path: str) -> str:
 class YandexHTTPError(OSError):
     """HTTP status plus a sanitized method and API route, never response text."""
 
-    def __init__(self, status: int, method: str, path: str):
+    def __init__(self, status: int, method: str, path: str, provider_code: str | None = None):
         self.status = status
         self.method = method.upper()
         self.path = _safe_yandex_path(path)
+        self.provider_code = provider_code
         super().__init__(f"yandex_http_{status}")
+
+
+def _safe_yandex_error_code(raw: bytes) -> str | None:
+    """Extract only a short provider code/type, never a response message."""
+    try:
+        payload = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    nested = payload.get("error")
+    sources = [nested, payload] if isinstance(nested, dict) else [payload]
+    for source in sources:
+        for field in ("code", "type"):
+            value = source.get(field)
+            if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", value):
+                return value
+    return None
 
 
 def yandex_api_request(
@@ -748,7 +767,7 @@ def yandex_api_request(
         if len(raw) > max_response_bytes:
             raise ValueError("yandex_response_too_large")
         if response.status < 200 or response.status >= 300:
-            raise YandexHTTPError(response.status, method, path)
+            raise YandexHTTPError(response.status, method, path, _safe_yandex_error_code(raw))
         return raw
     finally:
         conn.close()
@@ -843,7 +862,7 @@ def _multipart_file(filename: str, content: bytes) -> tuple[bytes, str]:
         "assistants\r\n"
         f"--{boundary}\r\n"
         f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
-        "Content-Type: text/markdown; charset=utf-8\r\n\r\n"
+        "Content-Type: text/markdown\r\n\r\n"
     ).encode("ascii")
     suffix = f"\r\n--{boundary}--\r\n".encode("ascii")
     return prefix + content + suffix, f"multipart/form-data; boundary={boundary}"
@@ -1051,7 +1070,8 @@ def vector_store_search(store_id: str, query: str, project: str, key: str) -> li
 def technical_error_code(error: OSError | http.client.HTTPException) -> str:
     """Return safe transport details without exposing credentials or response bodies."""
     if isinstance(error, YandexHTTPError):
-        return f"HTTP_{error.status} method={error.method} path={error.path}"
+        code = f" provider_code={error.provider_code}" if error.provider_code else ""
+        return f"HTTP_{error.status} method={error.method} path={error.path}{code}"
     status = getattr(error, "code", None)
     if type(status) is int:
         return f"HTTP_{status}"

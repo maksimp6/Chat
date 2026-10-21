@@ -120,6 +120,10 @@ jobs:
         (
           github.event.before == '58480b798d867c23f5176ab811ea729f86fd08ad' &&
           github.event.head_commit.message == 'fix(vector-store): restore Yandex compatibility routing'
+        ) ||
+        (
+          github.event.before == '29d477f6aef91e5447717cbbdc29c35e13348c75' &&
+          github.event.head_commit.message == 'fix(vector-store): normalize multipart upload payload'
         )
       )
     name: One-time Yandex Vector Store demo

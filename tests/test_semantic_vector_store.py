@@ -254,6 +254,19 @@ def test_yandex_http_error_reports_method_and_sanitized_route(method, path, safe
     assert "private" not in str(error)
 
 
+def test_provider_error_diagnostic_keeps_code_but_discards_message():
+    raw = json.dumps(
+        {"error": {"code": "invalid_file", "message": "private response contents"}}
+    ).encode()
+    code = pipeline._safe_yandex_error_code(raw)
+    error = pipeline.YandexHTTPError(400, "POST", "/files", code)
+
+    assert pipeline.technical_error_code(error) == (
+        "HTTP_400 method=POST path=/files provider_code=invalid_file"
+    )
+    assert "private response contents" not in str(error)
+
+
 def test_index_wait_polls_until_file_is_completed(monkeypatch):
     store_statuses = iter(["in_progress", "completed"])
     file_statuses = iter(["in_progress", "completed"])
@@ -410,3 +423,4 @@ def test_multipart_file_contains_assistant_purpose_and_snapshot_content():
     assert content_type.startswith("multipart/form-data; boundary=")
     assert b'name="purpose"' in body and b"assistants" in body
     assert b'filename="snapshot.md"' in body and b"all task data" in body
+    assert b"Content-Type: text/markdown\r\n" in body
