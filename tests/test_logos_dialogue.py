@@ -115,6 +115,34 @@ def native_transport(monkeypatch):
     return setup
 
 
+@pytest.fixture
+def stored_response_transport(monkeypatch, native_transport):
+    def setup(payload, *, status_code=200):
+        client, _ = native_transport()
+        calls = []
+        response = requests.Response()
+        response.status_code = status_code
+        response._content = json.dumps(payload).encode("utf-8")
+        response.headers["Content-Type"] = "application/json"
+
+        def get(url, *, timeout):
+            calls.append((url, timeout))
+            response.url = url
+            return response
+
+        def forbidden(*args, **kwargs):
+            pytest.fail("Reading a stored response must not generate or execute tools")
+
+        monkeypatch.setattr(client.session, "get", get)
+        monkeypatch.setattr(client.session, "post", forbidden)
+        monkeypatch.setattr(client, "create_conversation", forbidden)
+        monkeypatch.setattr(client, "ask_with_mcp", forbidden)
+        monkeypatch.setattr(client, "_execute_single_tool", forbidden)
+        return client, calls
+
+    return setup
+
+
 def test_native_dialogue_reads_repository_and_preserves_answer_usage_and_trace(
     repo, native_transport
 ):
@@ -202,6 +230,133 @@ def test_native_command_evidence_uses_real_exit_code_and_hashes_without_raw_outp
     serialized = json.dumps(result)
     assert private_output not in serialized and private_error not in serialized
     assert command not in serialized and "LOGOS_TEST_OUTPUT" not in serialized
+
+
+@pytest.mark.parametrize("pending_tool", [False, True])
+def test_inspect_stored_response_uses_one_get_without_generation_or_tool_execution(
+    stored_response_transport, pending_tool
+):
+    response_id = "541186dc-6749-4466-830d-511f762830e8"
+    payload = native_response(1, read=pending_tool)
+    payload["id"] = response_id
+    client, calls = stored_response_transport(payload)
+
+    result = dialogue.inspect_response(response_id, client_factory=lambda: client)
+
+    assert result["status"] == "retrieved"
+    assert result["provider_status"] == "completed"
+    assert result["response_ids"] == [response_id]
+    assert result["generation_requests"] == 0
+    assert result["retrieval_requests"] == 1
+    assert result["tool_calls"] == []
+    assert calls == [(client.responses_url + "/" + response_id, 15)]
+
+
+def test_inspect_stored_failure_exposes_machine_diagnostics_without_provider_message(
+    stored_response_transport,
+):
+    response_id = "541186dc-6749-4466-830d-511f762830e8"
+    private_message = "provider body contains private credential details"
+    client, _ = stored_response_transport(
+        {
+            "id": response_id,
+            "status": "failed",
+            "error": {
+                "code": "server_error",
+                "type": "provider_error",
+                "message": private_message,
+            },
+            "incomplete_details": {"reason": "max_output_tokens"},
+        }
+    )
+
+    result = dialogue.inspect_response(response_id, client_factory=lambda: client)
+
+    assert result["status"] == "retrieved" and result["provider_status"] == "failed"
+    assert result["provider_error_code"] == "server_error"
+    assert result["provider_error_type"] == "provider_error"
+    assert result["provider_reason"] == "max_output_tokens"
+    assert result["generation_requests"] == 0
+    assert private_message not in json.dumps(result)
+
+
+@pytest.mark.parametrize("response_id", ["../../responses?secret=private", None])
+def test_inspect_rejects_invalid_uuid_before_initializing_client(response_id):
+    result = dialogue.inspect_response(
+        response_id,
+        client_factory=lambda: pytest.fail("Invalid response ID initialized the provider"),
+    )
+
+    assert result["status"] == "failed" and result["error"] == "ValueError"
+    assert result["generation_requests"] == result["retrieval_requests"] == 0
+    assert "secret=private" not in json.dumps(result)
+
+
+@pytest.mark.parametrize("stored_id", ["00000000-0000-4000-8000-000000000001", None, 123])
+def test_inspect_rejects_a_different_stored_response(stored_response_transport, stored_id):
+    client, calls = stored_response_transport({"id": stored_id, "status": "completed"})
+
+    result = dialogue.inspect_response(
+        "541186dc-6749-4466-830d-511f762830e8", client_factory=lambda: client
+    )
+
+    assert result["status"] == "failed" and result["error"] == "ValueError"
+    assert result["generation_requests"] == 0 and len(calls) == 1
+
+
+def test_inspect_http_error_reports_status_without_provider_body(stored_response_transport):
+    private_message = "Bearer private-test-credential"
+    client, calls = stored_response_transport(
+        {"error": {"code": "unauthenticated", "message": private_message}},
+        status_code=401,
+    )
+
+    result = dialogue.inspect_response(
+        "541186dc-6749-4466-830d-511f762830e8", client_factory=lambda: client
+    )
+
+    assert result["status"] == "failed" and result["http_status"] == 401
+    assert result["generation_requests"] == 0 and len(calls) == 1
+    assert private_message not in json.dumps(result)
+
+
+def test_inspect_rejects_secret_like_and_non_token_diagnostics(stored_response_transport):
+    response_id = "541186dc-6749-4466-830d-511f762830e8"
+    client, _ = stored_response_transport(
+        {
+            "id": response_id,
+            "status": "failed",
+            "error": {"code": "ghp_private-test-token", "type": "private\nmessage"},
+            "incomplete_details": {"reason": {"private": "data"}},
+        }
+    )
+
+    result = dialogue.inspect_response(response_id, client_factory=lambda: client)
+
+    assert result["status"] == "retrieved" and result["provider_status"] == "failed"
+    assert not {"provider_error_code", "provider_error_type", "provider_reason"} & result.keys()
+    assert "private" not in json.dumps(result)
+
+
+@pytest.mark.parametrize("read_existing", [False, True])
+def test_persistence_failure_produces_safe_result(
+    repo, stored_response_transport, monkeypatch, read_existing
+):
+    from storage.memory_db import DatabaseError
+
+    def fail_persistence(*args, **kwargs):
+        raise DatabaseError("private database details")
+
+    monkeypatch.setattr(dialogue, "persist_invocation_trace", fail_persistence)
+    if read_existing:
+        response_id = "541186dc-6749-4466-830d-511f762830e8"
+        client, _ = stored_response_transport({"id": response_id, "status": "completed"})
+        result = dialogue.inspect_response(response_id, client_factory=lambda: client)
+    else:
+        result = dialogue.run_dialogue("question", repo_root=repo, client_factory=OfflineClient)
+
+    assert result["status"] == "failed" and result["error"] == "DatabaseError"
+    assert "private database" not in json.dumps(result)
 
 
 class OfflineClient:
@@ -347,6 +502,56 @@ def test_cli_writes_actual_result_without_approval_flag(tmp_path, monkeypatch, c
     lines = capsys.readouterr().out.splitlines()
     assert len(lines) == 1 and lines[0].startswith("LOGOS_RESULT=")
     assert json.loads(lines[0].removeprefix("LOGOS_RESULT=")) == result
+
+
+def test_cli_response_id_reads_existing_response_without_dialogue(tmp_path, monkeypatch, capsys):
+    response_id = "541186dc-6749-4466-830d-511f762830e8"
+    output = tmp_path / "answer.json"
+    captured = []
+    expected = {"status": "retrieved", "generation_requests": 0, "response_ids": [response_id]}
+
+    def inspect(value):
+        captured.append(value)
+        return expected
+
+    monkeypatch.setattr(dialogue, "inspect_response", inspect)
+    monkeypatch.setattr(
+        dialogue, "run_dialogue", lambda *args, **kwargs: pytest.fail("Read mode generated")
+    )
+
+    assert dialogue.main(["--response-id", response_id, "--out", str(output)]) == 0
+    assert captured == [response_id]
+    assert json.loads(output.read_text()) == expected
+    assert json.loads(capsys.readouterr().out.removeprefix("LOGOS_RESULT=")) == expected
+
+
+def test_cli_rejects_mixing_response_retrieval_and_new_question(tmp_path):
+    with pytest.raises(SystemExit) as exc:
+        dialogue.main(
+            [
+                "--response-id",
+                "541186dc-6749-4466-830d-511f762830e8",
+                "--question-file",
+                str(tmp_path / "question.txt"),
+                "--out",
+                str(tmp_path / "answer.json"),
+            ]
+        )
+
+    assert exc.value.code == 2
+    assert not (tmp_path / "answer.json").exists()
+
+
+def test_cli_empty_response_id_fails_without_question_fallback(tmp_path, monkeypatch):
+    output = tmp_path / "answer.json"
+    monkeypatch.setattr(
+        dialogue, "run_dialogue", lambda *args, **kwargs: pytest.fail("Read mode generated")
+    )
+
+    assert dialogue.main(["--response-id", "", "--out", str(output)]) == 1
+    result = json.loads(output.read_text())
+    assert result["error"] == "ValueError"
+    assert result["generation_requests"] == result["retrieval_requests"] == 0
 
 
 def test_cli_missing_input_fails_safely_and_writes_status(tmp_path, capsys):

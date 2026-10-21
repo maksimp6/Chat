@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 from typing import Any, Callable
 import uuid
 
@@ -68,6 +69,7 @@ def _native_client():
 def _new_result() -> dict[str, Any]:
     return {
         "status": "failed",
+        "provider_status": "unknown",
         "model": DEFAULT_MODEL,
         "reply": "",
         "pending_tools": [],
@@ -77,6 +79,31 @@ def _new_result() -> dict[str, Any]:
         "usage": {},
         "cost": {"status": "unknown", "provider_confirmed": False},
     }
+
+
+def _provider_token(value: Any) -> str | None:
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]{0,63}", value):
+        return None
+    if value.startswith(("ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_", "sk-")):
+        return None
+    return value
+
+
+def _provider_diagnostics(result: dict[str, Any], response: dict[str, Any]) -> None:
+    error = response.get("error")
+    error = error if isinstance(error, dict) else {}
+    details = response.get("incomplete_details")
+    details = details if isinstance(details, dict) else {}
+    values = {
+        "provider_status": response.get("status"),
+        "provider_error_code": error.get("code"),
+        "provider_error_type": error.get("type"),
+        "provider_reason": details.get("reason") or error.get("reason"),
+    }
+    for key, value in values.items():
+        token = _provider_token(value)
+        if token is not None:
+            result[key] = token
 
 
 def _ask(client, prompt: str, trace, result: dict[str, Any]) -> None:
@@ -105,7 +132,8 @@ def _ask(client, prompt: str, trace, result: dict[str, Any]) -> None:
         result["response_ids"].append(response["id"])
     pending = extract_function_calls(response)
     result["pending_tools"] = sorted({call.get("name") or "unknown" for call in pending})
-    result["provider_status"] = response.get("status") or "unknown"
+    result["provider_status"] = "unknown"
+    _provider_diagnostics(result, response)
     if pending:
         result["status"] = "needs_approval"
     elif response.get("status") not in (None, "completed"):
@@ -147,6 +175,8 @@ def _finish(invocation, trace, result: dict[str, Any]) -> None:
     result["tool_calls"] = [_tool_evidence(entry) for entry in finalized.get("tool_calls", [])]
     result["generation_requests"] = len(finalized.get("api_requests", []))
     responses = finalized.get("responses", [])
+    if responses and isinstance(responses[-1].get("raw"), dict):
+        _provider_diagnostics(result, responses[-1]["raw"])
     response_ids = [item["response_id"] for item in responses if item.get("response_id")]
     result["response_ids"] = list(dict.fromkeys(response_ids + result["response_ids"]))
     if any((item.get("raw") or {}).get("usage") for item in responses):
@@ -202,19 +232,80 @@ def run_dialogue(
     return result
 
 
+def inspect_response(
+    response_id: str, *, client_factory: Callable[[], Any] | None = None
+) -> dict[str, Any]:
+    """Read one stored provider response without starting or continuing a generation."""
+    result = _new_result()
+    result["retrieval_requests"] = 0
+    invocation = None
+    trace = None
+    try:
+        if not isinstance(response_id, str):
+            raise ValueError("The response ID must be a UUID string")
+        response_id = str(uuid.UUID(response_id))
+        result["response_ids"] = [response_id]
+        import app  # noqa: F401 -- initialize the native credential and invocation store
+        from yandex_client_modules.request_mixin import _resolve_global_provider_credential
+
+        session_id = "github-response-" + str(uuid.uuid4())
+        invocation = create_invocation(
+            session_id, session_id, metadata={"source": "logos_response_inspection"}
+        )
+        trace = create_invocation_trace(invocation)
+        start_invocation(invocation.invocation_id)
+        result.update(
+            invocation_id=invocation.invocation_id,
+            trace_id=invocation.trace_id,
+            session_id=session_id,
+        )
+        client = (client_factory or _native_client)()
+        _resolve_global_provider_credential(client, trace)
+        result["retrieval_requests"] = 1
+        response = client.session.get(client.responses_url + "/" + response_id, timeout=15)
+        result["http_status"] = response.status_code
+        response.raise_for_status()
+        data = response.json()
+        stored_id = data.get("id") if isinstance(data, dict) else None
+        if not isinstance(stored_id, str) or str(uuid.UUID(stored_id)) != response_id:
+            raise ValueError("Stored response ID does not match the requested response")
+        trace.add_response(data, step_index=1, kind="retrieved_response")
+        _provider_diagnostics(result, data)
+        result["status"] = "retrieved"
+    except RUNTIME_ERRORS as exc:
+        result.update(status="failed", error=type(exc).__name__)
+        if trace is not None:
+            trace.record_error(
+                "logos_response_inspection",
+                "Response inspection failed",
+                error_type=type(exc).__name__,
+            )
+    if trace is not None and invocation is not None:
+        try:
+            _finish(invocation, trace, result)
+        except RUNTIME_ERRORS as exc:
+            result.update(status="failed", error=type(exc).__name__)
+    return result
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--question-file", type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--question-file", type=Path)
+    source.add_argument("--response-id")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        result = run_dialogue(args.question_file.read_text(encoding="utf-8"))
+        if args.response_id is not None:
+            result = inspect_response(args.response_id)
+        else:
+            result = run_dialogue(args.question_file.read_text(encoding="utf-8"))
     except RUNTIME_ERRORS as exc:
         result = _new_result()
         result["error"] = type(exc).__name__
     args.out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     print("LOGOS_RESULT=" + json.dumps(result, ensure_ascii=False))
-    return 0 if result["status"] == "completed" else 1
+    return 0 if result["status"] in {"completed", "retrieved"} else 1
 
 
 if __name__ == "__main__":  # pragma: no cover

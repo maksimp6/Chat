@@ -3,11 +3,11 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "index | query | logos | logos-result"
+        description: "index | query | logos | logos-result | logos-response"
         required: true
         default: "query"
       query:
-        description: "query, question for Logos, or run ID for logos-result"
+        description: "query, Logos question, run ID (logos-result), or response UUID (logos-response)"
         required: false
         default: ""
       publish_issue:
@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   rag:
-    if: (github.event_name == 'workflow_dispatch' && inputs.mode != 'logos' && inputs.mode != 'logos-result') || github.event.label.name == 'rag-query'
+    if: (github.event_name == 'workflow_dispatch' && inputs.mode != 'logos' && inputs.mode != 'logos-result' && inputs.mode != 'logos-response') || github.event.label.name == 'rag-query'
     name: RAG index or query
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -67,8 +67,8 @@ jobs:
           fi
 
   logos:
-    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'logos'
-    name: Ask Logos in its repository
+    if: github.event_name == 'workflow_dispatch' && (inputs.mode == 'logos' || inputs.mode == 'logos-response')
+    name: Run Logos or inspect a saved provider response
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -94,18 +94,29 @@ jobs:
       - name: Install runtime dependencies
         run: python -m pip install -r requirements.txt
 
-      - name: Run Logos dialogue
+      - name: Run Logos dialogue or read a saved provider response
         env:
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
+          LOGOS_MODE: ${{ inputs.mode }}
         run: |
           set -euo pipefail
           ALICE_PROVIDER_CREDENTIAL_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
           export ALICE_PROVIDER_CREDENTIAL_KEY
           export ALICE_MEMORY_PATH="$RUNNER_TEMP/logos-dialogue.memory"
-          python -m scripts.logos_dialogue \
-            --question-file "$RUNNER_TEMP/logos-question.txt" \
-            --out "$RUNNER_TEMP/logos-answer.json"
+          case "$LOGOS_MODE" in
+            logos)
+              python -m scripts.logos_dialogue \
+                --question-file "$RUNNER_TEMP/logos-question.txt" \
+                --out "$RUNNER_TEMP/logos-answer.json"
+              ;;
+            logos-response)
+              python -m scripts.logos_dialogue \
+                --response-id "$(cat "$RUNNER_TEMP/logos-question.txt")" \
+                --out "$RUNNER_TEMP/logos-answer.json"
+              ;;
+            *) echo '::error::Unsupported Logos mode.'; exit 1 ;;
+          esac
 
       - name: Save dialogue result
         if: always()

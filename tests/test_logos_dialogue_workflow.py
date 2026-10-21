@@ -160,3 +160,53 @@ def test_saved_result_rejects_invalid_run_id_before_download(tmp_path, source_ru
     assert "A numeric run ID is required." in result.stdout
     assert not call_file.exists()
     assert not (tmp_path / "escaped").exists()
+
+
+def test_stored_response_mode_routes_to_read_only_cli_with_literal_id(tmp_path):
+    data = workflow()
+    job = data["jobs"]["logos"]
+    assert "inputs.mode == 'logos-response'" in job["if"]
+    assert "inputs.mode != 'logos-response'" in data["jobs"]["rag"]["if"]
+    step = next(step for step in job["steps"] if "LOGOS_MODE" in step.get("env", {}))
+    assert step["env"]["LOGOS_MODE"] == "${{ inputs.mode }}"
+    tools = tmp_path / "bin"
+    tools.mkdir()
+    python = tools / "python"
+    python.write_text(
+        f"#!{sys.executable}\n"
+        "import json, os, sys\n"
+        "from pathlib import Path\n"
+        "if sys.argv[1] == '-c':\n"
+        "    print('offline-test-encryption-key')\n"
+        "else:\n"
+        "    Path(os.environ['FAKE_PYTHON_CALL']).write_text(json.dumps(sys.argv[1:]))\n"
+    )
+    python.chmod(0o755)
+    call_file = tmp_path / "python-call.json"
+    untrusted_id = '$(touch escaped) `touch escaped` "quoted"\nnext line'
+    (tmp_path / "logos-question.txt").write_text(untrusted_id)
+
+    result = subprocess.run(
+        ["/bin/bash", "-c", step["run"]],
+        cwd=tmp_path,
+        env={
+            "PATH": str(tools) + ":/usr/bin:/bin",
+            "RUNNER_TEMP": str(tmp_path),
+            "LOGOS_MODE": "logos-response",
+            "FAKE_PYTHON_CALL": str(call_file),
+        },
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert not (tmp_path / "escaped").exists()
+    assert json.loads(call_file.read_text()) == [
+        "-m",
+        "scripts.logos_dialogue",
+        "--response-id",
+        untrusted_id,
+        "--out",
+        str(tmp_path / "logos-answer.json"),
+    ]

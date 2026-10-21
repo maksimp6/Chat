@@ -241,11 +241,23 @@ that run's answer artifact and writes its JSON to the log. It needs Actions read
 access and receives no provider credentials. The artifact's seven-day retention
 still applies.
 
+For a provider failure whose response ID was saved, `mode=logos-response` accepts
+that UUID in `query`. It uses the native credential resolver for a single GET of
+the stored provider response. It creates no conversation and makes no generation
+request. A successful read is reported as `retrieved`, independently of the
+original `provider_status`. The report exposes symbolic error codes/reasons, not
+raw provider messages or payloads. Original dialogue failures also preserve these
+diagnostics from their native trace when available. A missing or expired response
+is reported as a retrieval failure; it never triggers another generation.
+
 Local invocation, with provider credentials configured separately:
 
 ```sh
 python -m scripts.logos_dialogue \
   --question-file /tmp/question.txt --out /tmp/logos-answer.json
+
+python -m scripts.logos_dialogue \
+  --response-id <stored-response-uuid> --out /tmp/logos-diagnostic.json
 ```
 
 ## Later work
