@@ -1969,7 +1969,15 @@ def _vector_store_demo_report(
 
 def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
     """Upload a task/repository snapshot, retrieve it, and optionally ask YandexGPT once."""
-    if not args.allow_vector_store_write or not args.approval_reference.strip():
+    existing_store_id = getattr(args, "existing_store_id", None)
+    if existing_store_id and (
+        not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", existing_store_id)
+        or not getattr(args, "include_repository", False)
+    ):
+        raise ValueError("existing_vector_store_id_invalid")
+    if not existing_store_id and (
+        not args.allow_vector_store_write or not args.approval_reference.strip()
+    ):
         raise ValueError("vector_store_write_not_authorized")
     if args.corpus not in {None, "tasks"}:
         raise ValueError("vector_store_corpus_must_be_tasks")
@@ -1997,34 +2005,85 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
             )
             issue_filename = f"chat-task-history-{fingerprint[:16]}.md"
             filename = f"chat-repository-{repository_fingerprint[:16]}.md"
-            stage = "ensure_repository_vector_store"
-            store_id = ensure_vector_store(store_name, project, key)
-            stage = "ensure_issue_snapshot_file"
-            issue_file_id, _issue_file_meta = ensure_yandex_file(
-                issue_filename, issue_content, project, key
-            )
-            stage = "ensure_repository_snapshot_file"
-            file_id, file_meta = ensure_yandex_file(filename, content, project, key)
-            stage = "attach_snapshots"
-            attached_file_ids = ensure_vector_store_files_attached(
-                store_id, [issue_file_id, file_id], project, key
-            )
+            if existing_store_id:
+                stage = "inspect_existing_store"
+                store_id = existing_store_id
+                store = yandex_json_request(
+                    "GET", f"/vector_stores/{quote(store_id, safe='')}", project, key
+                )
+                store_name = store.get("name")
+                if store.get("id") != store_id or not isinstance(store_name, str):
+                    raise ValueError("existing_vector_store_receipt_invalid")
+                attached = list_yandex_objects(
+                    f"/vector_stores/{quote(store_id, safe='')}/files",
+                    project,
+                    key,
+                    ("files",),
+                )
+                attached_file_ids = [_attached_file_id(item) for item in attached]
+                if any(item is None for item in attached_file_ids) or len(
+                    set(attached_file_ids)
+                ) != len(attached_file_ids):
+                    raise ValueError("vector_store_file_id_invalid")
+                file_catalog = list_yandex_objects("/files", project, key, ("files",))
+                file_by_id = {item.get("id"): item for item in file_catalog}
+                store_files = []
+                for attached_file_id in attached_file_ids:
+                    metadata = file_by_id.get(attached_file_id)
+                    attached_filename = metadata.get("filename") if metadata else None
+                    if not isinstance(attached_filename, str) or not attached_filename.startswith(
+                        ("chat-task-history-", "chat-repository-")
+                    ):
+                        raise ValueError("vector_store_unexpected_files")
+                    store_files.append(
+                        {
+                            "file_id": attached_file_id,
+                            "file_name": attached_filename,
+                            "bytes": metadata.get("bytes"),
+                        }
+                    )
+                issue_files = [
+                    item
+                    for item in store_files
+                    if item["file_name"].startswith("chat-task-history-")
+                ]
+                repository_snapshots = [
+                    item for item in store_files if item["file_name"].startswith("chat-repository-")
+                ]
+                if len(issue_files) != 1 or len(repository_snapshots) != 1:
+                    raise ValueError("existing_vector_store_snapshots_invalid")
+                file_id = repository_snapshots[0]["file_id"]
+                filename = repository_snapshots[0]["file_name"]
+                file_meta = file_by_id[file_id]
+            else:
+                stage = "ensure_repository_vector_store"
+                store_id = ensure_vector_store(store_name, project, key)
+                stage = "ensure_issue_snapshot_file"
+                issue_file_id, _issue_file_meta = ensure_yandex_file(
+                    issue_filename, issue_content, project, key
+                )
+                stage = "ensure_repository_snapshot_file"
+                file_id, file_meta = ensure_yandex_file(filename, content, project, key)
+                stage = "attach_snapshots"
+                attached_file_ids = ensure_vector_store_files_attached(
+                    store_id, [issue_file_id, file_id], project, key
+                )
+                file_catalog = list_yandex_objects("/files", project, key, ("files",))
+                file_by_id = {item.get("id"): item for item in file_catalog}
+                store_files = [
+                    {
+                        "file_id": attached_file_id,
+                        "file_name": file_by_id[attached_file_id].get("filename"),
+                        "bytes": file_by_id[attached_file_id].get("bytes"),
+                    }
+                    for attached_file_id in attached_file_ids
+                    if attached_file_id in file_by_id
+                ]
+                if len(store_files) != len(attached_file_ids):
+                    raise ValueError("vector_store_file_metadata_missing")
             stage = "wait_for_index"
-            for attached_file_id in (issue_file_id, file_id):
+            for attached_file_id in attached_file_ids:
                 wait_for_vector_store_index(store_id, attached_file_id, project, key)
-            file_catalog = list_yandex_objects("/files", project, key, ("files",))
-            file_by_id = {item.get("id"): item for item in file_catalog}
-            store_files = [
-                {
-                    "file_id": attached_file_id,
-                    "file_name": file_by_id[attached_file_id].get("filename"),
-                    "bytes": file_by_id[attached_file_id].get("bytes"),
-                }
-                for attached_file_id in attached_file_ids
-                if attached_file_id in file_by_id
-            ]
-            if len(store_files) != len(attached_file_ids):
-                raise ValueError("vector_store_file_metadata_missing")
         else:
             fingerprint, content = build_vector_store_document(corpus)
             repository_fingerprint = None
@@ -2043,17 +2102,20 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
             wait_for_vector_store_index(store_id, file_id, project, key)
             store_files = [{"file_id": file_id, "file_name": filename, "bytes": len(content)}]
         print(
-            "Vector Store indexed: "
+            "Vector Store ready: "
             f"store_id={store_id} files={len(store_files)} "
             f"issues={len(corpus)} repository_files={len(repository_files or [])} "
-            f"fingerprint={repository_fingerprint or fingerprint}"
+            f"fingerprint={repository_fingerprint or fingerprint}",
+            flush=True,
         )
         stage = "direct_vector_search"
         results = vector_store_search(store_id, query, project, key)
+        print(f"Vector Store search complete: results={len(results)}", flush=True)
         model_result = None
         provider = None
         if getattr(args, "allow_model_call", False):
             stage = "model_answer"
+            print("Calling Yandex model once.", flush=True)
             model_result, provider = vector_store_model_result(
                 query,
                 results,
@@ -2064,9 +2126,17 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
                 project,
                 key,
             )
+            print("Yandex model response validated.", flush=True)
     except (OSError, http.client.HTTPException) as exc:
         print(
             f"VECTOR_STORE_DEMO_FAILED stage={stage} error={technical_error_code(exc)}",
+            file=sys.stderr,
+        )
+        raise
+    except (TypeError, ValueError) as exc:
+        reason = re.sub(r"[^A-Za-z0-9_.:-]", "_", str(exc))[:80] or "contract_violation"
+        print(
+            f"VECTOR_STORE_DEMO_FAILED stage={stage} contract={reason}",
             file=sys.stderr,
         )
         raise
@@ -2270,6 +2340,10 @@ def main(argv: list[str] | None = None) -> int:
         "--include-repository",
         action="store_true",
         help="include tracked text files and binary file metadata in the snapshot",
+    )
+    parser.add_argument(
+        "--existing-store-id",
+        help="search an already indexed Yandex store without creating or attaching files",
     )
     parser.add_argument("--approval-reference", default="")
     parser.add_argument("--selftest", action="store_true")

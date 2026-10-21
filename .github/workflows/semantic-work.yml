@@ -171,9 +171,9 @@ jobs:
       github.ref == 'refs/heads/feat/semantic-pipeline' &&
       github.actor == github.repository_owner &&
       github.triggering_actor == github.repository_owner &&
-      github.event.before == '1b814d38149672173031ee385d869c48e72ecc9f' &&
-      github.event.head_commit.message == 'fix(vector-store): accept unreported chunking metadata'
-    name: One-time Yandex repository and model demo
+      github.event.before == 'd0015dd2ecd4a10db7819b7e0a36c034a499793a' &&
+      github.event.head_commit.message == 'fix(vector-store): query indexed store once'
+    name: One-time Yandex model query over indexed repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -188,19 +188,18 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
-      - name: Index task and repository snapshots, search, and ask YandexGPT once
+      - name: Search the indexed store and ask YandexGPT once
         env:
           GITHUB_TOKEN: ${{ github.token }}
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
+          VECTOR_STORE_ID: "fvtvp6t2su0g5q4ft2ev"
           VECTOR_QUERY: "Какая модель генерирует ответы semantic pipeline и что известно о модели эмбеддингов Vector Store?"
-          VECTOR_APPROVAL_REFERENCE: "owner-approved-vector-store-repository-model-demo"
         run: >-
           python scripts/semantic_pipeline.py
           --mode vector-store
           --corpus tasks
           --query "$VECTOR_QUERY"
-          --allow-vector-store-write
           --include-repository
+          --existing-store-id "$VECTOR_STORE_ID"
           --allow-model-call
-          --approval-reference "$VECTOR_APPROVAL_REFERENCE"
