@@ -129,8 +129,9 @@ this PR's task-history contract.
 The initial upload and demonstration run and its recovery commits are owner-only
 and individually pinned to exact PR commits. Recovery diagnostics report only
 the HTTP method and sanitized API route, without credentials, object IDs or
-response bodies. The request uses the Yandex `x-yc-project-id` header and Python's
-standard library; no SDK or additional Python dependency is needed.
+response bodies. Requests go only to Yandex's `ai.api.cloud.yandex.net` host and
+use its `/v1` project-routing headers. The runner uses Python's standard library;
+it makes no OpenAI service call and adds no SDK or Python dependency.
 The fingerprint-based reuse path never overwrites an existing file. Each
 admitted run allows at most one snapshot file and one direct search query. The
 workflow uses the existing `YANDEX_API_KEY` and `YANDEX_PROJECT_ID` Actions

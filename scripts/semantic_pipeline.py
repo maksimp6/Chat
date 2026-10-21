@@ -736,6 +736,7 @@ def yandex_api_request(
     headers = {
         "Authorization": f"Api-Key {key}",
         "Accept": "application/json",
+        "OpenAI-Project": project,
         "x-yc-project-id": project,
     }
     if body is not None:

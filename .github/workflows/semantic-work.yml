@@ -116,6 +116,10 @@ jobs:
         (
           github.event.before == 'd192ef492ef5f70b8a842c29891d8d172ba4b092' &&
           github.event.head_commit.message == 'fix(vector-store): use Yandex-native project header'
+        ) ||
+        (
+          github.event.before == '58480b798d867c23f5176ab811ea729f86fd08ad' &&
+          github.event.head_commit.message == 'fix(vector-store): restore Yandex compatibility routing'
         )
       )
     name: One-time Yandex Vector Store demo
