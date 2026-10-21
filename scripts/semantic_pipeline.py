@@ -1308,6 +1308,21 @@ def inspect_yandex_vector_stores() -> int:
     stores = list_yandex_objects("/vector_stores", project, key, ("vector_stores",))
     files = list_yandex_objects("/files", project, key, ("files",))
     file_by_id = {item.get("id"): item for item in files if isinstance(item.get("id"), str)}
+
+    def safe_chunking(value: object) -> dict | None:
+        if not isinstance(value, dict):
+            return None
+        kind = value.get("type")
+        result = {"type": kind if isinstance(kind, str) else "unknown"}
+        static = value.get("static")
+        if isinstance(static, dict):
+            result["static"] = {
+                field: static[field]
+                for field in ("max_chunk_size_tokens", "chunk_overlap_tokens")
+                if type(static.get(field)) is int
+            }
+        return result
+
     report = []
     for store in stores:
         store_id = store.get("id")
@@ -1338,6 +1353,7 @@ def inspect_yandex_vector_stores() -> int:
                         "file_name": filename,
                         "bytes": file.get("bytes"),
                         "status": record.get("status"),
+                        "chunking_strategy": safe_chunking(record.get("chunking_strategy")),
                     }
                 )
         report.append(
@@ -1345,12 +1361,37 @@ def inspect_yandex_vector_stores() -> int:
                 "name": name,
                 "status": store.get("status"),
                 "created_at": store.get("created_at"),
+                "chunking_strategy": safe_chunking(store.get("chunking_strategy")),
                 "file_count": len(attached_files),
                 "files": attached_files,
             }
         )
     report.sort(key=lambda item: item["name"])
-    print(_code_block({"operation": "read_only_vector_store_inspection", "stores": report}))
+    relevant_files = []
+    for item in files:
+        filename = item.get("filename")
+        if not isinstance(filename, str) or not filename.startswith(
+            ("chat-task-history-", "chat-repository-")
+        ):
+            continue
+        filename, _ = _redact_repository_text(filename)
+        relevant_files.append(
+            {
+                "file_name": filename,
+                "bytes": item.get("bytes"),
+                "status": item.get("status"),
+                "purpose": item.get("purpose"),
+            }
+        )
+    print(
+        _code_block(
+            {
+                "operation": "read_only_vector_store_inspection",
+                "stores": report,
+                "relevant_files": relevant_files,
+            }
+        )
+    )
     return 0
 
 
