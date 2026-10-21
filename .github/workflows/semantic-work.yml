@@ -171,8 +171,8 @@ jobs:
       github.ref == 'refs/heads/feat/semantic-pipeline' &&
       github.actor == github.repository_owner &&
       github.triggering_actor == github.repository_owner &&
-      github.event.before == 'd0015dd2ecd4a10db7819b7e0a36c034a499793a' &&
-      github.event.head_commit.message == 'fix(vector-store): query indexed store once'
+      github.event.before == 'b33f774ba779e4c6117125ac442bd903dce6440a' &&
+      github.event.head_commit.message == 'fix(vector-store): accept fenced model JSON once'
     name: One-time Yandex model query over indexed repository
     runs-on: ubuntu-latest
     timeout-minutes: 30

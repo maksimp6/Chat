@@ -115,7 +115,7 @@ INSTRUCTIONS = (
     " 2) на каждый выбранный фрагмент дай его номер id и точную цитату;"
     " 3) если ни один кандидат не отвечает на вопрос — верни refusal=true и"
     " пустой список citations, не выдумывай ничего; 4) не добавляй фактов,"
-    " которых нет в кандидатах. Ответ — только JSON вида"
+    " которых нет в кандидатах. Ответ — только JSON без Markdown-ограждения, вида"
     ' {"answer": "<краткий ответ по-русски>", "refusal": false,'
     ' "citations": [{"id": <номер>, "quote": "<дословный фрагмент>"}]}'
     " При refusal=true answer должен быть пустым и citations=[]."
@@ -429,8 +429,16 @@ def _reject_constant(value: str) -> None:
 
 
 def parse_model_json(text: str) -> dict:
-    """Accept exactly one JSON object, without prose, fences or duplicate keys."""
-    obj = json.loads(text, object_pairs_hook=_unique_object, parse_constant=_reject_constant)
+    """Accept a JSON object, optionally in one Markdown fence, with no duplicate keys."""
+    normalized = text.strip()
+    fenced = re.fullmatch(
+        r"```(?:json)?[ \t]*\r?\n(.*?)\r?\n```",
+        normalized,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if fenced:
+        normalized = fenced.group(1).strip()
+    obj = json.loads(normalized, object_pairs_hook=_unique_object, parse_constant=_reject_constant)
     if not isinstance(obj, dict):
         raise ValueError("model_output_not_object")
     return obj
