@@ -3,11 +3,11 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "index | query | logos"
+        description: "index | query | logos | logos-result"
         required: true
         default: "query"
       query:
-        description: "query text or question for Logos"
+        description: "query, question for Logos, or run ID for logos-result"
         required: false
         default: ""
       publish_issue:
@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   rag:
-    if: (github.event_name == 'workflow_dispatch' && inputs.mode != 'logos') || github.event.label.name == 'rag-query'
+    if: (github.event_name == 'workflow_dispatch' && inputs.mode != 'logos' && inputs.mode != 'logos-result') || github.event.label.name == 'rag-query'
     name: RAG index or query
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -115,3 +115,27 @@ jobs:
           path: ${{ runner.temp }}/logos-answer.json
           if-no-files-found: warn
           retention-days: 7
+
+  logos-result:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'logos-result'
+    name: Read a saved Logos answer
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - name: Read existing result without calling the model
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          LOGOS_SOURCE_RUN: ${{ inputs.query }}
+        run: |
+          set -euo pipefail
+          [[ "$LOGOS_SOURCE_RUN" =~ ^[1-9][0-9]*$ ]] || { echo '::error::A numeric run ID is required.'; exit 1; }
+          gh run download "$LOGOS_SOURCE_RUN" \
+            --name "logos-answer-$LOGOS_SOURCE_RUN" --dir "$RUNNER_TEMP/logos-result"
+          python - "$RUNNER_TEMP/logos-result/logos-answer.json" <<'PY'
+          import json, sys
+          from pathlib import Path
+          result = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          print("LOGOS_RESULT=" + json.dumps(result, ensure_ascii=False))
+          PY

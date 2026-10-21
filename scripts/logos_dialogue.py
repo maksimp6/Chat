@@ -176,11 +176,7 @@ def main(argv: list[str] | None = None) -> int:
         result = _new_result()
         result["error"] = type(exc).__name__
     args.out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(
-        json.dumps(
-            {"status": result["status"], "generation_requests": result["generation_requests"]}
-        )
-    )
+    print("LOGOS_RESULT=" + json.dumps(result, ensure_ascii=False))
     return 0 if result["status"] == "completed" else 1
 
 

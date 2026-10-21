@@ -218,11 +218,18 @@ limits still apply. There is no hard currency cap. Provider usage and response
 identifiers are recorded when available; unconfirmed cost remains unknown. The
 adapter does not retry a failed model call.
 
-The `logos-answer-<run_id>` artifact contains the actual reply, status, correlation
-IDs and available usage. It excludes the credential store and raw trace. A
+The `logos-answer-<run_id>` artifact and the `LOGOS_RESULT=` JSON line in the job
+log contain the actual reply, status, correlation IDs and available usage. They
+exclude the credential store and raw trace. A
 question about the repository can cause Logos to inspect or work with files;
 an ordinary knowledge question may need no tools. Each dispatch runs one dialogue
 turn. This workflow does not schedule recurring work or publish repository edits.
+
+To retrieve an existing answer without another model call, dispatch
+`mode=logos-result` and put the earlier run ID in `query`. This job only downloads
+that run's answer artifact and writes its JSON to the log. It needs Actions read
+access and receives no provider credentials. The artifact's seven-day retention
+still applies.
 
 Local invocation, with provider credentials configured separately:
 

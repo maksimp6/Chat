@@ -258,21 +258,26 @@ def test_empty_answer_is_failed_and_missing_usage_stays_unknown(repo):
     assert result["cost"] == {"status": "unknown", "provider_confirmed": False}
 
 
-def test_cli_writes_actual_result_without_approval_flag(tmp_path, monkeypatch):
+def test_cli_writes_actual_result_without_approval_flag(tmp_path, monkeypatch, capsys):
     question = tmp_path / "question.txt"
     question.write_text("вопрос пользователя", encoding="utf-8")
     output = tmp_path / "answer.json"
     captured = []
+    reply = 'ответ\n::error::literal text\r$(touch escaped) "quote"'
 
     def run(question_text):
         captured.append(question_text)
-        return {"status": "completed", "reply": "ответ", "generation_requests": 1}
+        return {"status": "completed", "reply": reply, "generation_requests": 1}
 
     monkeypatch.setattr(dialogue, "run_dialogue", run)
 
     assert dialogue.main(["--question-file", str(question), "--out", str(output)]) == 0
     assert captured == ["вопрос пользователя"]
-    assert json.loads(output.read_text(encoding="utf-8"))["reply"] == "ответ"
+    result = json.loads(output.read_text(encoding="utf-8"))
+    assert result["reply"] == reply
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 1 and lines[0].startswith("LOGOS_RESULT=")
+    assert json.loads(lines[0].removeprefix("LOGOS_RESULT=")) == result
 
 
 def test_cli_missing_input_fails_safely_and_writes_status(tmp_path, capsys):
