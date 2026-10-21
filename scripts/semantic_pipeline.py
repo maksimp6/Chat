@@ -63,9 +63,8 @@ MAX_VECTOR_RESULT_CHARS = 4096
 MAX_VECTOR_SEARCH_RESULTS = 50
 MAX_VECTOR_MODEL_CANDIDATES = 12
 MAX_VECTOR_MODEL_EXCERPT_CHARS = 2500
-MAX_VECTOR_CHUNK_SIZE_TOKENS = 4096
-# The provider rejects the documented exact half-size boundary.
-MAX_VECTOR_CHUNK_OVERLAP_TOKENS = MAX_VECTOR_CHUNK_SIZE_TOKENS // 2 - 1
+VECTOR_CHUNK_SIZE_TOKENS = 800
+VECTOR_CHUNK_OVERLAP_TOKENS = 100
 VECTOR_STORE_POLL_ATTEMPTS = 60
 VECTOR_STORE_POLL_INTERVAL_SECONDS = 10
 STOP = {
@@ -1351,12 +1350,12 @@ def inspect_yandex_vector_stores() -> int:
 
 
 def vector_store_chunking_strategy() -> dict:
-    """Use maximum static chunk size and stay below Yandex's rejected overlap boundary."""
+    """Use the static chunk settings shown in Yandex AI Studio's official example."""
     return {
         "type": "static",
         "static": {
-            "max_chunk_size_tokens": MAX_VECTOR_CHUNK_SIZE_TOKENS,
-            "chunk_overlap_tokens": MAX_VECTOR_CHUNK_OVERLAP_TOKENS,
+            "max_chunk_size_tokens": VECTOR_CHUNK_SIZE_TOKENS,
+            "chunk_overlap_tokens": VECTOR_CHUNK_OVERLAP_TOKENS,
         },
     }
 
@@ -1993,7 +1992,7 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
             )
             store_name = (
                 f"chat-repo-{repository_fingerprint[:16]}-{fingerprint[:16]}"
-                f"-c{MAX_VECTOR_CHUNK_SIZE_TOKENS}-o{MAX_VECTOR_CHUNK_OVERLAP_TOKENS}"
+                f"-c{VECTOR_CHUNK_SIZE_TOKENS}-o{VECTOR_CHUNK_OVERLAP_TOKENS}"
             )
             issue_filename = f"chat-task-history-{fingerprint[:16]}.md"
             filename = f"chat-repository-{repository_fingerprint[:16]}.md"
@@ -2030,7 +2029,7 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
             repository_fingerprint = None
             store_name = (
                 f"chat-task-history-{fingerprint[:16]}"
-                f"-c{MAX_VECTOR_CHUNK_SIZE_TOKENS}-o{MAX_VECTOR_CHUNK_OVERLAP_TOKENS}"
+                f"-c{VECTOR_CHUNK_SIZE_TOKENS}-o{VECTOR_CHUNK_OVERLAP_TOKENS}"
             )
             filename = f"chat-task-history-{fingerprint[:16]}.md"
             stage = "ensure_vector_store"
