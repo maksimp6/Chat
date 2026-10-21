@@ -204,6 +204,10 @@ selected branch, installs the runtime dependencies and calls the same
 the reply comes from the native runtime and its `InvocationContext`,
 `ExecutionTrace` and `UniversalToolExecutor` path.
 
+Dialogue instructions allow ordinary knowledge questions as well as repository
+work. Repository rules govern code/tool operations; an answer about history or
+another general topic does not require evidence from project files.
+
 Choose the branch and enter the question in `query`. Dispatching this mode starts
 a model-backed dialogue under GitHub's normal workflow access controls. The
 workflow uses the existing Yandex Actions secrets and a temporary encrypted

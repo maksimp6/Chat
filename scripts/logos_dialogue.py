@@ -23,6 +23,14 @@ from yandex_client_modules.parsers import extract_reasoning_and_text
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MODEL = "logos-runtime-flash"
+DIALOGUE_INSTRUCTIONS = (
+    "Ты — Логос, помощник владельца репозитория. Отвечай по существу на языке вопроса. "
+    "На общие вопросы отвечай на основе своих знаний, обозначая неопределённость. "
+    "Инструменты используй по необходимости: доступ к репозиторию не ограничивает темы "
+    "разговора и не требует подтверждать общие знания файлами проекта. "
+    "Правила репозитория относятся к работе с кодом и инструментами. "
+    "Отличай исторические сведения от религиозных представлений и других интерпретаций."
+)
 RUNTIME_ERRORS = (
     OSError,
     RuntimeError,
@@ -77,6 +85,7 @@ def _ask(client, prompt: str, trace, result: dict[str, Any]) -> None:
         model_key=DEFAULT_MODEL,
         conversation_id=conversation_id,
         params={
+            "instructions": DIALOGUE_INSTRUCTIONS,
             "active_tool_categories": ["filesystem"],
             "tools_config": {
                 "web_search": {"enabled": False},

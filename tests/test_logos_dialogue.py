@@ -131,6 +131,8 @@ def test_native_dialogue_reads_repository_and_preserves_answer_usage_and_trace(r
     assert "offline-yandex-key" not in json.dumps(result)
     assert calls[2][1]["input"][-1]["type"] == "function_call_output"
     assert "Logos repository context." in calls[2][1]["input"][-1]["output"]
+    assert calls[1][1]["instructions"] == dialogue.DIALOGUE_INSTRUCTIONS
+    assert calls[2][1]["instructions"] == dialogue.DIALOGUE_INSTRUCTIONS
     available = {tool.get("name") for tool in calls[1][1]["tools"]}
     assert {"read_file", "write_file", "run_command"} <= available
 
