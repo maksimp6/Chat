@@ -6,11 +6,11 @@ on:
       query:
         description: "query text"
         required: true
-        default: ""
+        default: "симуляция офиса"
       mode:
-        description: "search (no model call) | query | red"
+        description: "BM25 search, bounded model answer, or Vector Store upload/search"
         type: choice
-        options: [search, query, red]
+        options: [search, query, red, vector-store]
         required: true
         default: "search"
       corpus:
@@ -28,10 +28,17 @@ on:
         type: boolean
         required: true
         default: false
+      allow_vector_store_write:
+        description: "Owner approves one task snapshot upload and one direct Vector Store search"
+        type: boolean
+        required: true
+        default: false
       approval_reference:
-        description: "Reference to owner-approved scope and budget; not a currency cap"
+        description: "Reference to owner-approved scope and API limit"
         required: false
         default: ""
+  push:
+    branches: [feat/semantic-pipeline]
 
 permissions: {}
 
@@ -41,7 +48,7 @@ concurrency:
 
 jobs:
   semantic:
-    if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.run_attempt == '1'
+    if: github.event_name == 'workflow_dispatch' && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.run_attempt == '1'
     name: Semantic answer over corpus
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -67,6 +74,7 @@ jobs:
           SEM_QUERY: ${{ inputs.query }}
           SEM_PUBLISH_ISSUE: ${{ inputs.publish_issue }}
           SEM_ALLOW_MODEL: ${{ inputs.allow_model_call }}
+          SEM_ALLOW_VECTOR_STORE_WRITE: ${{ inputs.allow_vector_store_write }}
           SEM_APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
         run: |
           set -euo pipefail
@@ -79,4 +87,47 @@ jobs:
             test -n "$SEM_APPROVAL_REFERENCE" || { echo "missing owner budget approval reference" >&2; exit 2; }
             args+=(--allow-model-call)
           fi
+          if [ "$SEM_MODE" = "vector-store" ]; then
+            test "$SEM_ALLOW_VECTOR_STORE_WRITE" = "true" || { echo "Vector Store write was not approved" >&2; exit 2; }
+            test -n "$SEM_APPROVAL_REFERENCE" || { echo "missing owner approval reference" >&2; exit 2; }
+            args+=(--allow-vector-store-write --approval-reference "$SEM_APPROVAL_REFERENCE")
+          fi
           python scripts/semantic_pipeline.py "${args[@]}"
+
+  vector-store-demo:
+    if: >
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/feat/semantic-pipeline' &&
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner &&
+      github.event.before == '41a388a2c309423a4c100c3d1fec683c620a5d37' &&
+      github.event.head_commit.message == 'feat(vector-store): add task snapshot upload and direct search'
+    name: One-time Yandex Vector Store demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Upload the complete task snapshot and search it once
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+          YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
+          VECTOR_QUERY: "симуляция офиса"
+          VECTOR_APPROVAL_REFERENCE: "owner-confirmed-vector-store-demo"
+        run: >-
+          python scripts/semantic_pipeline.py
+          --mode vector-store
+          --corpus tasks
+          --query "$VECTOR_QUERY"
+          --allow-vector-store-write
+          --approval-reference "$VECTOR_APPROVAL_REFERENCE"

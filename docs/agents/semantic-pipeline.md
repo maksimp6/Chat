@@ -108,6 +108,37 @@ priced by this pipeline. The report keeps `cost: null` and
 `cost_scope: total_execution_cost_not_measured`; it never reports total cost as zero
 merely because the model was not called.
 
+## Yandex AI Studio Vector Store demonstration
+
+`--mode vector-store` is a separate owner-approved runner operation. It reads the
+complete open and closed Issue corpus, preserves each title and full body with its
+URL, declared state/reason, update/close times and SHA256 values, then uploads one
+deterministic Markdown snapshot through the AI Studio Files API and attaches it to
+a versioned Vector Store. The filename and store name include the stable corpus
+fingerprint, so a retry reuses the same file and store. Existing data is never
+removed or overwritten.
+
+After indexing completes, the runner makes one direct
+`vector_stores.search` request and prints its ranked excerpts with file identity.
+It checks each excerpt against the captured Issue title/body and reports a source
+URL and exact offset only when the text matches verbatim. This is retrieval only;
+the runner does not call a model or claim that an Issue's state proves delivery.
+The indexed scope is GitHub Issue title/body and source metadata, as defined by
+this PR's task-history contract.
+
+The one-time upload and demonstration run is owner-only, bounded to this PR head,
+one snapshot file and one search query. The workflow uses the existing
+`YANDEX_API_KEY` and `YANDEX_PROJECT_ID` Actions secrets; provider-side API limits
+remain authoritative. For a later manual run, choose `vector-store`, enable
+`allow_vector_store_write`, provide the approval reference, and use a task-history
+query:
+
+```sh
+python scripts/semantic_pipeline.py \
+  --mode vector-store --corpus tasks --query "симуляция офиса" \
+  --allow-vector-store-write --approval-reference owner-approved
+```
+
 ## Later work
 
 A live quality experiment requires separately approved scope/call count/budget.
