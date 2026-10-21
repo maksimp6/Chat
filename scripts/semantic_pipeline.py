@@ -33,8 +33,8 @@ import http.client
 import json
 import math
 import os
-import subprocess
 import re
+import subprocess
 import sys
 import time
 import urllib.request
@@ -960,6 +960,83 @@ def build_vector_store_document(
     return fingerprint, content
 
 
+def build_repository_vector_store_document(
+    repository_files: list[dict], excluded_sensitive_files: int
+) -> tuple[str, bytes]:
+    """Build the tracked repository as a separate file for the existing task store."""
+    if not repository_files:
+        raise ValueError("empty_repository_snapshot")
+    manifest = [
+        {
+            key: item.get(key)
+            for key in ("path", "kind", "bytes", "sha256", "index_sha256", "redactions")
+        }
+        for item in repository_files
+    ]
+    fingerprint = hashlib.sha256(
+        json.dumps(
+            {"repository": manifest, "excluded_sensitive_files": excluded_sensitive_files},
+            ensure_ascii=False,
+            sort_keys=True,
+        ).encode()
+    ).hexdigest()
+    text_count = sum(item["kind"] == "text" for item in repository_files)
+    binary_count = sum(item["kind"] in {"binary", "symlink"} for item in repository_files)
+    lines = [
+        f"# Tracked repository files for {REPO}",
+        "Scope: all tracked UTF-8 text; binary files and symlinks are metadata only.",
+        f"Repository fingerprint: {fingerprint}",
+        f"File count: {len(repository_files)}",
+        f"Text files: {text_count}",
+        f"Binary files and symlinks: {binary_count}",
+        f"Credential-bearing files excluded before reading: {excluded_sensitive_files}",
+        "Untracked and ignored files are not part of this snapshot.",
+    ]
+    for item in repository_files:
+        metadata = {
+            "path": item["path"],
+            "kind": item["kind"],
+            "bytes": item["bytes"],
+            "sha256": item["sha256"],
+            "index_sha256": item.get("index_sha256", item["sha256"]),
+            "redactions": item.get("redactions", 0),
+        }
+        lines.extend(
+            [
+                "",
+                "## Repository file",
+                "Metadata: " + json.dumps(metadata, ensure_ascii=False, sort_keys=True),
+            ]
+        )
+        if item["kind"] != "text":
+            lines.append("Content omitted; this entry preserves only file identity and size.")
+            continue
+        text = item.get("text")
+        if not isinstance(text, str):
+            raise ValueError("repository_text_invalid")
+        segments = [text[offset : offset + 3000] for offset in range(0, len(text), 3000)] or [""]
+        for number, segment in enumerate(segments, 1):
+            fence = "`" * max(
+                3,
+                1 + max((len(match.group()) for match in re.finditer(r"`+", segment)), default=0),
+            )
+            lines.extend(
+                [
+                    "",
+                    f"### Segment {number} of {len(segments)}",
+                    "Repository path JSON: " + json.dumps(item["path"], ensure_ascii=False),
+                    "Content:",
+                    fence,
+                    segment,
+                    fence,
+                ]
+            )
+    content = ("\n".join(lines) + "\n").encode("utf-8")
+    if len(content) > MAX_VECTOR_FILE_BYTES:
+        raise ValueError("vector_store_file_too_large")
+    return fingerprint, content
+
+
 def stable_snapshot_content(content: bytes) -> bytes:
     """Ignore only the fetch-time label when comparing a fingerprinted snapshot retry."""
     try:
@@ -1131,6 +1208,36 @@ def ensure_vector_store(name: str, project: str, key: str) -> str:
     return store_id
 
 
+def ensure_task_history_vector_store(name: str, project: str, key: str) -> tuple[str, str]:
+    """Reuse the existing task-history store before considering a new store."""
+    stores = list_yandex_objects("/vector_stores", project, key, ("vector_stores",))
+    matches = [store for store in stores if store.get("name") == name]
+    if len(matches) > 1:
+        raise ValueError("duplicate_vector_store_name")
+    if matches:
+        store_id = matches[0].get("id")
+        if not isinstance(store_id, str) or not store_id:
+            raise ValueError("vector_store_id_invalid")
+        return store_id, name
+    suffix = f"-c{MAX_VECTOR_CHUNK_SIZE_TOKENS}-o{MAX_VECTOR_CHUNK_OVERLAP_TOKENS}"
+    compatible = [
+        store
+        for store in stores
+        if isinstance(store.get("name"), str)
+        and store["name"].startswith("chat-task-history-")
+        and store["name"].endswith(suffix)
+    ]
+    if compatible:
+        compatible.sort(key=lambda item: str(item.get("created_at", "")))
+        selected = compatible[-1]
+        store_id = selected.get("id")
+        selected_name = selected.get("name")
+        if not isinstance(store_id, str) or not store_id or not isinstance(selected_name, str):
+            raise ValueError("vector_store_id_invalid")
+        return store_id, selected_name
+    return ensure_vector_store(name, project, key), name
+
+
 def vector_store_chunking_strategy() -> dict:
     """Use Yandex's documented maximum static chunk size and allowed overlap."""
     return {
@@ -1242,6 +1349,58 @@ def ensure_file_attached(store_id: str, file_id: str, project: str, key: str) ->
         raise ValueError("vector_store_attachment_receipt_invalid")
 
 
+def ensure_vector_store_files_attached(
+    store_id: str, file_ids: list[str], project: str, key: str
+) -> list[str]:
+    """Add snapshots to the existing task store while preserving its known files."""
+    path = f"/vector_stores/{quote(store_id, safe='')}/files"
+    available = list_yandex_objects("/files", project, key, ("files",))
+    filenames = {
+        item.get("id"): item.get("filename")
+        for item in available
+        if isinstance(item.get("id"), str) and isinstance(item.get("filename"), str)
+    }
+    attached = list_yandex_objects(path, project, key, ("files",))
+    current_ids = [_attached_file_id(item) for item in attached]
+    if any(file_id is None for file_id in current_ids) or len(set(current_ids)) != len(current_ids):
+        raise ValueError("vector_store_file_id_invalid")
+    for record, existing_id in zip(attached, current_ids, strict=True):
+        filename = filenames.get(existing_id)
+        if not isinstance(filename, str) or not filename.startswith(
+            ("chat-task-history-", "chat-repository-")
+        ):
+            raise ValueError("vector_store_unexpected_files")
+        if record.get("chunking_strategy") != vector_store_chunking_strategy():
+            raise ValueError("vector_store_chunking_strategy_mismatch")
+    requested_ids = set(file_ids)
+    if not requested_ids or any(file_id not in filenames for file_id in requested_ids):
+        raise ValueError("vector_store_file_id_invalid")
+    for file_id in sorted(requested_ids - set(current_ids)):
+        receipt = yandex_json_request(
+            "POST",
+            path,
+            project,
+            key,
+            {"file_id": file_id, "chunking_strategy": vector_store_chunking_strategy()},
+        )
+        attached_id = receipt.get("file_id") or receipt.get("id")
+        if attached_id is not None and attached_id != file_id:
+            raise ValueError("vector_store_attachment_receipt_invalid")
+    confirmed = list_yandex_objects(path, project, key, ("files",))
+    confirmed_ids = [_attached_file_id(item) for item in confirmed]
+    if (
+        any(file_id is None for file_id in confirmed_ids)
+        or len(set(confirmed_ids)) != len(confirmed_ids)
+        or set(confirmed_ids) != requested_ids | set(current_ids)
+        or any(
+            record.get("chunking_strategy") != vector_store_chunking_strategy()
+            for record in confirmed
+        )
+    ):
+        raise ValueError("vector_store_attachment_receipt_invalid")
+    return sorted(set(confirmed_ids))
+
+
 def wait_for_vector_store_index(store_id: str, file_id: str, project: str, key: str) -> None:
     """Wait for indexing to complete, with bounded reads and no write retries."""
     store_path = f"/vector_stores/{quote(store_id, safe='')}"
@@ -1281,6 +1440,11 @@ def _vector_result_texts(item: dict) -> list[str]:
     ]
 
 
+def _safe_vector_result_texts(item: dict) -> list[str]:
+    """Redact recognizable credentials before excerpts reach the model or report."""
+    return [_redact_repository_text(text)[0] for text in _vector_result_texts(item)]
+
+
 def _longest_exact_excerpt(
     snippet: str, source_text: str, minimum: int = 24
 ) -> tuple[int, int] | None:
@@ -1318,7 +1482,7 @@ def _longest_exact_excerpt(
 def verify_repository_vector_result(item: dict, repository_files: list[dict]) -> dict:
     """Resolve an excerpt to the tracked text file path stamped into its segment."""
     by_path = {source["path"]: source for source in repository_files}
-    for snippet in _vector_result_texts(item):
+    for snippet in _safe_vector_result_texts(item):
         paths = set()
         for raw_path in re.findall(r"(?m)^Repository path JSON: (.+)$", snippet):
             try:
@@ -1369,7 +1533,7 @@ def verify_vector_result(
     repository_files: list[dict] | None = None,
 ) -> dict:
     """Bind an exact search excerpt to a hashed source body or title when possible."""
-    for snippet in _vector_result_texts(item):
+    for snippet in _safe_vector_result_texts(item):
         snippet = snippet[:MAX_VECTOR_RESULT_CHARS]
         declared_ids = {
             int(match.group(1)) for match in re.finditer(r"(?m)^## Issue (\d{1,10})\s*$", snippet)
@@ -1443,15 +1607,16 @@ def vector_store_search(store_id: str, query: str, project: str, key: str) -> li
 
 
 def build_vector_store_prompt(
-    query: str, results: list[dict], file_id: str
+    query: str, results: list[dict], file_id: str, allowed_file_ids: set[str] | None = None
 ) -> tuple[str, list[dict]]:
     """Bound top search excerpts for one answer call; keep all text as untrusted data."""
+    allowed_file_ids = allowed_file_ids or {file_id}
     candidates = []
     for rank, item in enumerate(results[:MAX_VECTOR_MODEL_CANDIDATES], 1):
-        result_file_id = item.get("file_id")
-        if result_file_id is not None and result_file_id != file_id:
+        result_file_id = item.get("file_id") or file_id
+        if result_file_id not in allowed_file_ids:
             raise ValueError("vector_store_search_file_mismatch")
-        text = "\n".join(_vector_result_texts(item))[:MAX_VECTOR_MODEL_EXCERPT_CHARS]
+        text = "\n".join(_safe_vector_result_texts(item))[:MAX_VECTOR_MODEL_EXCERPT_CHARS]
         if not text.strip():
             continue
         score = item.get("score")
@@ -1468,7 +1633,7 @@ def build_vector_store_prompt(
             {
                 "id": len(candidates) + 1,
                 "rank": rank,
-                "file_id": file_id,
+                "file_id": result_file_id,
                 "file_name": file_name,
                 "score": score,
                 "text": text,
@@ -1501,11 +1666,12 @@ def vector_store_model_result(
     file_id: str,
     corpus: list[dict],
     repository_files: list[dict] | None,
+    allowed_file_ids: set[str],
     project: str,
     key: str,
 ) -> tuple[dict, dict]:
     """Ask YandexGPT once over retrieved excerpts and verify every quoted citation."""
-    prompt, candidates = build_vector_store_prompt(query, results, file_id)
+    prompt, candidates = build_vector_store_prompt(query, results, file_id, allowed_file_ids)
     provider = yandex_call(project, key, prompt)
     if not isinstance(provider, dict) or "error" in provider:
         raise OSError("PROVIDER_ERROR")
@@ -1513,6 +1679,7 @@ def vector_store_model_result(
         raise ValueError("provider_text_missing")
     response = parse_model_json(provider["text"])
     validate_response(response)
+    response["answer"], answer_redactions = _redact_repository_text(response["answer"])
     citations = []
     for citation in response["citations"]:
         candidate_id = citation["id"]
@@ -1525,7 +1692,7 @@ def vector_store_model_result(
             {
                 "rank": candidate["rank"],
                 "quote": citation["quote"],
-                "file_id": file_id,
+                "file_id": candidate["file_id"],
                 "file_name": candidate["file_name"],
                 "source_match": verify_vector_result(candidate["item"], corpus, repository_files),
             }
@@ -1538,6 +1705,7 @@ def vector_store_model_result(
             "citations": citations,
             "model_called": True,
             "semantic_entailment": "NOT_ASSESSED",
+            "answer_redactions": answer_redactions,
         },
         provider,
     )
@@ -1577,14 +1745,19 @@ def _vector_store_demo_report(
     excluded_sensitive_files: int = 0,
     model_result: dict | None = None,
     provider: dict | None = None,
+    store_files: list[dict] | None = None,
+    repository_fingerprint: str | None = None,
 ) -> str:
     """Render bounded direct-search results and their verified source matches."""
     hits = []
+    known_file_ids = {
+        item.get("file_id") for item in (store_files or []) if isinstance(item.get("file_id"), str)
+    } or {file_id}
     for rank, item in enumerate(results, 1):
         result_file_id = item.get("file_id")
-        if result_file_id is not None and result_file_id != file_id:
+        if result_file_id is not None and result_file_id not in known_file_ids:
             raise ValueError("vector_store_search_file_mismatch")
-        snippet = "\n".join(_vector_result_texts(item))[:2000]
+        snippet = "\n".join(_safe_vector_result_texts(item))[:2000]
         score = item.get("score")
         if (
             not isinstance(score, (int, float))
@@ -1633,12 +1806,15 @@ def _vector_store_demo_report(
             source.get("credential_redactions", 0) for source in corpus
         ),
         "corpus_fingerprint": fingerprint,
+        "repository_fingerprint": repository_fingerprint,
         "retrieved_at": corpus[0].get("retrieved_at") if corpus else None,
         "vector_store_name": store_name,
         "vector_store_id": store_id,
         "file_id": file_id,
         "file_name": filename,
         "file_bytes": file_meta.get("bytes", len(content)),
+        "vector_store_files": store_files
+        or [{"file_id": file_id, "file_name": filename, "bytes": len(content)}],
         "repository_files": (
             {
                 "tracked_file_count": len(repository_files),
@@ -1698,27 +1874,67 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
             read_repository_snapshot() if include_repository else (None, 0)
         )
         stage = "build_snapshot"
-        fingerprint, content = build_vector_store_document(
-            corpus, repository_files, excluded_sensitive_files
-        )
-        prefix = "chat-repository" if include_repository else "chat-task-history"
-        store_name = (
-            f"{prefix}-{fingerprint[:16]}"
-            f"-c{MAX_VECTOR_CHUNK_SIZE_TOKENS}-o{MAX_VECTOR_CHUNK_OVERLAP_TOKENS}"
-        )
-        filename = f"{prefix}-{fingerprint[:16]}.md"
-        stage = "ensure_vector_store"
-        store_id = ensure_vector_store(store_name, project, key)
-        stage = "ensure_yandex_file"
-        file_id, file_meta = ensure_yandex_file(filename, content, project, key)
-        stage = "attach_snapshot"
-        ensure_file_attached(store_id, file_id, project, key)
-        stage = "wait_for_index"
-        wait_for_vector_store_index(store_id, file_id, project, key)
+        if include_repository:
+            fingerprint, issue_content = build_vector_store_document(corpus)
+            repository_fingerprint, content = build_repository_vector_store_document(
+                repository_files, excluded_sensitive_files
+            )
+            store_name = (
+                f"chat-task-history-{fingerprint[:16]}"
+                f"-c{MAX_VECTOR_CHUNK_SIZE_TOKENS}-o{MAX_VECTOR_CHUNK_OVERLAP_TOKENS}"
+            )
+            issue_filename = f"chat-task-history-{fingerprint[:16]}.md"
+            filename = f"chat-repository-{repository_fingerprint[:16]}.md"
+            stage = "ensure_existing_vector_store"
+            store_id, store_name = ensure_task_history_vector_store(store_name, project, key)
+            stage = "ensure_issue_snapshot_file"
+            issue_file_id, _issue_file_meta = ensure_yandex_file(
+                issue_filename, issue_content, project, key
+            )
+            stage = "ensure_repository_snapshot_file"
+            file_id, file_meta = ensure_yandex_file(filename, content, project, key)
+            stage = "attach_snapshots"
+            attached_file_ids = ensure_vector_store_files_attached(
+                store_id, [issue_file_id, file_id], project, key
+            )
+            stage = "wait_for_index"
+            for attached_file_id in (issue_file_id, file_id):
+                wait_for_vector_store_index(store_id, attached_file_id, project, key)
+            file_catalog = list_yandex_objects("/files", project, key, ("files",))
+            file_by_id = {item.get("id"): item for item in file_catalog}
+            store_files = [
+                {
+                    "file_id": attached_file_id,
+                    "file_name": file_by_id[attached_file_id].get("filename"),
+                    "bytes": file_by_id[attached_file_id].get("bytes"),
+                }
+                for attached_file_id in attached_file_ids
+                if attached_file_id in file_by_id
+            ]
+            if len(store_files) != len(attached_file_ids):
+                raise ValueError("vector_store_file_metadata_missing")
+        else:
+            fingerprint, content = build_vector_store_document(corpus)
+            repository_fingerprint = None
+            store_name = (
+                f"chat-task-history-{fingerprint[:16]}"
+                f"-c{MAX_VECTOR_CHUNK_SIZE_TOKENS}-o{MAX_VECTOR_CHUNK_OVERLAP_TOKENS}"
+            )
+            filename = f"chat-task-history-{fingerprint[:16]}.md"
+            stage = "ensure_vector_store"
+            store_id = ensure_vector_store(store_name, project, key)
+            stage = "ensure_yandex_file"
+            file_id, file_meta = ensure_yandex_file(filename, content, project, key)
+            stage = "attach_snapshot"
+            ensure_file_attached(store_id, file_id, project, key)
+            stage = "wait_for_index"
+            wait_for_vector_store_index(store_id, file_id, project, key)
+            store_files = [{"file_id": file_id, "file_name": filename, "bytes": len(content)}]
         print(
             "Vector Store indexed: "
-            f"store_id={store_id} file_id={file_id} file_name={filename} "
-            f"sources={len(corpus)} fingerprint={fingerprint}"
+            f"store_id={store_id} files={len(store_files)} "
+            f"issues={len(corpus)} repository_files={len(repository_files or [])} "
+            f"fingerprint={repository_fingerprint or fingerprint}"
         )
         stage = "direct_vector_search"
         results = vector_store_search(store_id, query, project, key)
@@ -1732,6 +1948,7 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
                 file_id,
                 corpus,
                 repository_files,
+                {item["file_id"] for item in store_files},
                 project,
                 key,
             )
@@ -1756,6 +1973,8 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
         excluded_sensitive_files,
         model_result,
         provider,
+        store_files,
+        repository_fingerprint,
     )
     print(
         "Yandex AI Studio Vector Store demo (retrieval plus one Yandex model call)."

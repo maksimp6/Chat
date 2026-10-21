@@ -29,7 +29,7 @@ on:
         required: true
         default: false
       allow_vector_store_write:
-        description: "Owner approves one versioned snapshot upload and one Vector Store search"
+        description: "Owner approves one Vector Store snapshot update and one search"
         type: boolean
         required: true
         default: false
@@ -171,8 +171,8 @@ jobs:
       github.ref == 'refs/heads/feat/semantic-pipeline' &&
       github.actor == github.repository_owner &&
       github.triggering_actor == github.repository_owner &&
-      github.event.before == '0dc6dd660276a1967b79281c931a23a41ff1f1a7' &&
-      github.event.head_commit.message == 'feat(vector-store): index repository and ask Yandex model'
+      github.event.before == 'ffb22ae93bb00806d94467adac6a8838846ae143' &&
+      github.event.head_commit.message == 'fix(vector-store): reuse task store for repository index'
     name: One-time Yandex repository and model demo
     runs-on: ubuntu-latest
     timeout-minutes: 30

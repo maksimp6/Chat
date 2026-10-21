@@ -118,11 +118,12 @@ represented by path, byte count and SHA256 only. Untracked/ignored files, commen
 threads, pull-request bodies/reviews and credential-bearing files are excluded.
 Known credential patterns in Issue and repository text are redacted before upload.
 
-The resulting deterministic Markdown snapshot is uploaded through the AI Studio
-Files API and attached to a versioned Vector Store. The filename and store name
-include the stable corpus fingerprint, so a retry reuses the same file and store.
-Existing data is never removed or overwritten. File size remains bounded by the
-documented 128 MB limit.
+The deterministic repository Markdown file is uploaded through the AI Studio
+Files API and attached to the existing task-history Vector Store alongside its
+Issue snapshot. The two files have stable fingerprints, so a retry reuses them.
+Existing files are never removed or overwritten. A changed Issue snapshot is
+added as another versioned file. Each file remains bounded by the documented
+128 MB limit.
 
 After indexing, the runner makes one direct `vector_stores.search` request with
 the maximum 50 results. It verifies exact search excerpts against Issue content
@@ -174,8 +175,9 @@ credentials, object IDs or response messages. Requests go only to Yandex's
 `ai.api.cloud.yandex.net` host and use its `/v1` project-routing headers. The runner uses Python's standard library;
 it makes no OpenAI service call and adds no SDK or Python dependency.
 The fingerprint-based reuse path never overwrites an existing file. Each admitted
-run allows at most one snapshot file, one direct search query and (when enabled)
-one Yandex model call. The workflow uses the existing `YANDEX_API_KEY` and
+run allows at most one new repository file, one Issue snapshot version, one direct
+search query and (when enabled) one Yandex model call. The workflow uses the
+existing `YANDEX_API_KEY` and
 `YANDEX_PROJECT_ID` Actions secrets; provider-side API limits remain authoritative.
 For a manual run, choose `vector-store`, enable `allow_vector_store_write`, and
 provide the approved reference. To index the tracked repository and generate an
