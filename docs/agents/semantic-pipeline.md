@@ -139,9 +139,22 @@ configuration. The runner still makes one search request and no text-generation
 request. It leaves file and store expiration unset, preserving Yandex's documented
 default persistence for non-batch files and avoiding automatic index expiry.
 
+Embedding transparency: this runner uploads files to the managed Vector Store and
+searches it; it does not call the standalone Embeddings API or pass an embedder
+model URI, model version, or output dimension. Yandex describes AI Search indexing
+as automatic, but the Vector Store API used here does not expose the exact internal
+embedding model/version/dimension. Treat the embeddings as Yandex-managed and opaque:
+do not identify them as `text-search-doc` or claim a vector size. Chunk size and
+overlap above are text-splitting settings, not embedding dimensions; retrieval
+scores are not an embedding-quality benchmark. The direct Embeddings API has an
+optional `dim` field for models that support multidimensional outputs, but selecting
+and recording it would require a separate embedding/indexing path.
+
 References: [Yandex file upload API](https://aistudio.yandex.ru/ru/docs/ai-studio/api/Files/createFile),
 [add a file to a Vector Store](https://aistudio.yandex.ru/en/docs/ai-studio/api/Vector-stores/createVectorStoreFile),
 [search a Vector Store](https://aistudio.yandex.ru/en/docs/ai-studio/api/Vector-stores/searchVectorStore),
+[AI Search indexing overview](https://aistudio.yandex.ru/docs/en/ai-studio/concepts/search/),
+[Embedding API](https://aistudio.yandex.ru/docs/ru/ai-studio/embeddings/api-ref/grpc/),
 and [AI Studio quotas and limits](https://aistudio.yandex.ru/en/docs/ai-studio/concepts/limits).
 
 The initial upload and demonstration run and its recovery commits are owner-only
