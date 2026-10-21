@@ -118,12 +118,12 @@ represented by path, byte count and SHA256 only. Untracked/ignored files, commen
 threads, pull-request bodies/reviews and credential-bearing files are excluded.
 Known credential patterns in Issue and repository text are redacted before upload.
 
-The deterministic repository Markdown file is uploaded through the AI Studio
-Files API and attached to the existing task-history Vector Store alongside its
-Issue snapshot. The two files have stable fingerprints, so a retry reuses them.
-Existing files are never removed or overwritten. A changed Issue snapshot is
-added as another versioned file. Each file remains bounded by the documented
-128 MB limit.
+The deterministic repository Markdown file and Issue snapshot are uploaded
+through the AI Studio Files API and attached to one repository-specific Vector
+Store. This keeps the repository snapshot and task history together without
+mixing their chunking metadata with the legacy task-history store. File and store
+names are fingerprinted so a retry reuses them. Existing files are never removed
+or overwritten. Each file remains bounded by the documented 128 MB limit.
 
 After indexing, the runner makes one direct `vector_stores.search` request with
 the maximum 50 results. It verifies exact search excerpts against Issue content
@@ -132,23 +132,29 @@ When `--allow-model-call` is also enabled, one `aliceai-llm-flash` request to
 Yandex's Responses API receives at most 12 retrieved excerpts, each capped at
 2,500 characters. The input is bounded to 60,000 characters, output to 4,096
 tokens, and the call is synchronous, non-stored and not retried. The model may
-answer only from the retrieved excerpts and must quote them exactly. Citation
-quotes are checked against the excerpts; semantic entailment is not assessed,
-so the generated answer remains a proposal rather than a proven fact. Provider
-request ID and usage are reported when returned; total cost is not measured.
+answer only from retrieved excerpts and returns their candidate IDs. The runner
+copies exact quotes from those excerpts and verifies them against the indexed
+source where possible. Semantic entailment is not assessed, so the generated
+answer remains a proposal rather than a proven fact. Provider request ID and
+usage are reported when returned; total cost is not measured.
 
 The Yandex AI Studio API settings were checked against the official documentation
-on 2026-10-21. Each snapshot file is capped at the documented 128 MB. Vector Store
-creation and file attachment both set static chunks to 4,096 tokens with 2,048
-tokens of overlap, the documented maximum size and largest allowed overlap. The
-index name includes these settings so a store created with the earlier defaults
-is not silently reused. Direct search asks for the maximum 50 results, enables
+on 2026-10-21. Each snapshot file is capped at the documented 128 MB. The API
+reference lists a static chunk maximum of 4,096 tokens and overlap no greater
+than half the chunk size. Live attachment attempts at 4,096/2,048 and 4,096/2,047
+were rejected with `CHUNKING_CONFIGURATION`, so the runner now uses 800/100, the
+static settings shown in Yandex's official example. Store creation sends only a
+name; chunking is configured on each attached file. The store name includes the
+chunk settings. Yandex's file listing omits the accepted chunking strategy from
+the attachment metadata, so the settings are known from the request rather than
+an echoed response field. Direct search asks for the maximum 50 results, enables
 query rewriting and the `auto` ranker, and uses a `0.0` score threshold to avoid
-discarding lower-scored candidates. These are recall-oriented ceiling settings;
-they can return broader chunks and more ambiguous evidence than a tuned quality
-configuration. The runner makes one search request. Text generation occurs only
-when explicitly allowed by the workflow. It leaves file and store expiration unset, preserving Yandex's documented
-default persistence for non-batch files and avoiding automatic index expiry.
+discarding lower-scored candidates. These recall-oriented settings can return
+broader chunks and more ambiguous evidence than a tuned quality configuration.
+The runner makes one search request. Text generation occurs only when explicitly
+allowed by the workflow. It leaves file and store expiration unset, preserving
+Yandex's documented default persistence for non-batch files and avoiding
+automatic index expiry.
 
 Embedding transparency: this runner uploads files to the managed Vector Store and
 searches it; it does not call the standalone Embeddings API or pass an embedder
