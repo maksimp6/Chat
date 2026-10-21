@@ -1423,6 +1423,16 @@ def _attached_file_id(record: dict) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+def _chunking_strategy_matches(record: dict) -> bool:
+    """Accept omitted/legacy metadata; compare explicitly reported strategies."""
+    actual = record.get("chunking_strategy")
+    return (
+        actual is None
+        or (isinstance(actual, dict) and actual.get("type") == "other")
+        or actual == vector_store_chunking_strategy()
+    )
+
+
 def ensure_file_attached(store_id: str, file_id: str, project: str, key: str) -> None:
     """Attach the snapshot once and reject unexpected files in this versioned store."""
     path = f"/vector_stores/{quote(store_id, safe='')}/files"
@@ -1433,10 +1443,7 @@ def ensure_file_attached(store_id: str, file_id: str, project: str, key: str) ->
     if file_id in ids:
         if len(ids) != 1:
             raise ValueError("vector_store_unexpected_files")
-        if (
-            attached[ids.index(file_id)].get("chunking_strategy")
-            != vector_store_chunking_strategy()
-        ):
+        if not _chunking_strategy_matches(attached[ids.index(file_id)]):
             raise ValueError("vector_store_chunking_strategy_mismatch")
         return
     if ids:
@@ -1453,10 +1460,7 @@ def ensure_file_attached(store_id: str, file_id: str, project: str, key: str) ->
         raise ValueError("vector_store_attachment_receipt_invalid")
     confirmed = list_yandex_objects(path, project, key, ("files",))
     confirmed_ids = [_attached_file_id(item) for item in confirmed]
-    if (
-        confirmed_ids != [file_id]
-        or confirmed[0].get("chunking_strategy") != vector_store_chunking_strategy()
-    ):
+    if confirmed_ids != [file_id] or not _chunking_strategy_matches(confirmed[0]):
         raise ValueError("vector_store_attachment_receipt_invalid")
 
 
@@ -1481,7 +1485,7 @@ def ensure_vector_store_files_attached(
             ("chat-task-history-", "chat-repository-")
         ):
             raise ValueError("vector_store_unexpected_files")
-        if record.get("chunking_strategy") != vector_store_chunking_strategy():
+        if not _chunking_strategy_matches(record):
             raise ValueError("vector_store_chunking_strategy_mismatch")
     requested_ids = set(file_ids)
     if not requested_ids or any(file_id not in filenames for file_id in requested_ids):
@@ -1503,10 +1507,7 @@ def ensure_vector_store_files_attached(
         any(file_id is None for file_id in confirmed_ids)
         or len(set(confirmed_ids)) != len(confirmed_ids)
         or set(confirmed_ids) != requested_ids | set(current_ids)
-        or any(
-            record.get("chunking_strategy") != vector_store_chunking_strategy()
-            for record in confirmed
-        )
+        or any(not _chunking_strategy_matches(record) for record in confirmed)
     ):
         raise ValueError("vector_store_attachment_receipt_invalid")
     return sorted(set(confirmed_ids))
