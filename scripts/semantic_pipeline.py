@@ -538,6 +538,16 @@ def validate_response(obj: dict) -> None:
         raise ValueError("answer_without_evidence")
 
 
+def _validate_vector_store_citation(citation: object) -> int:
+    """Return a strictly typed model-selected result ID."""
+    if not isinstance(citation, dict) or set(citation) != {"id"}:
+        raise ValueError("citation_fields")
+    candidate_id = citation["id"]
+    if type(candidate_id) is not int:
+        raise ValueError("citation_types")
+    return candidate_id
+
+
 def validate_vector_store_response(obj: dict) -> None:
     """Validate model-selected result IDs before deriving exact quotes locally."""
     if set(obj) != {"answer", "refusal", "citations"}:
@@ -549,11 +559,7 @@ def validate_vector_store_response(obj: dict) -> None:
         raise ValueError("citation_list")
     seen_ids = set()
     for citation in citations:
-        if not isinstance(citation, dict) or set(citation) != {"id"}:
-            raise ValueError("citation_fields")
-        candidate_id = citation["id"]
-        if type(candidate_id) is not int:
-            raise ValueError("citation_types")
+        candidate_id = _validate_vector_store_citation(citation)
         if candidate_id in seen_ids:
             raise ValueError("duplicate_candidate_id")
         seen_ids.add(candidate_id)
@@ -837,6 +843,32 @@ def sanitize_vector_store_corpus(corpus: list[dict]) -> tuple[list[dict], int]:
     return sanitized, total_redactions
 
 
+def _repository_file_record(path: str, raw: bytes, is_symlink: bool) -> dict:
+    """Describe one tracked file, redacting text before it enters the index."""
+    digest = hashlib.sha256(raw).hexdigest()
+    record = {"path": path, "bytes": len(raw), "sha256": digest, "index_sha256": digest}
+    if is_symlink:
+        record.update({"kind": "symlink", "text": None, "redactions": 0})
+        return record
+    try:
+        decoded = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        decoded = None
+    if decoded is None or "\0" in decoded:
+        record.update({"kind": "binary", "text": None, "redactions": 0})
+    else:
+        safe_text, redactions = _redact_repository_text(decoded)
+        record.update(
+            {
+                "kind": "text",
+                "text": safe_text,
+                "index_sha256": hashlib.sha256(safe_text.encode()).hexdigest(),
+                "redactions": redactions,
+            }
+        )
+    return record
+
+
 def read_repository_snapshot(root: str | None = None) -> tuple[list[dict], int]:
     """Read tracked repository files only; keep binary content out of the text index."""
     cwd = os.path.abspath(root or os.getcwd())
@@ -876,34 +908,89 @@ def read_repository_snapshot(root: str | None = None) -> tuple[list[dict], int]:
         total_bytes += len(raw)
         if total_bytes > MAX_VECTOR_FILE_BYTES:
             raise ValueError("repository_snapshot_too_large")
-        record = {
-            "path": path,
-            "bytes": len(raw),
-            "sha256": hashlib.sha256(raw).hexdigest(),
-            "index_sha256": hashlib.sha256(raw).hexdigest(),
-        }
-        if is_symlink:
-            record.update({"kind": "symlink", "text": None, "redactions": 0})
-        else:
-            try:
-                decoded = raw.decode("utf-8")
-            except UnicodeDecodeError:
-                decoded = None
-            if decoded is None or "\0" in decoded:
-                record.update({"kind": "binary", "text": None, "redactions": 0})
-            else:
-                safe_text, redactions = _redact_repository_text(decoded)
-                record.update(
-                    {
-                        "kind": "text",
-                        "text": safe_text,
-                        "index_sha256": hashlib.sha256(safe_text.encode()).hexdigest(),
-                        "redactions": redactions,
-                    }
-                )
-        files.append(record)
+        files.append(_repository_file_record(path, raw, is_symlink))
     files.sort(key=lambda item: item["path"])
     return files, excluded_sensitive
+
+
+def _repository_document_lines(repository_files: list[dict]) -> list[str]:
+    """Render tracked-file metadata and bounded, path-labelled text segments."""
+    lines = []
+    for item in repository_files:
+        metadata = {
+            "path": item["path"],
+            "kind": item["kind"],
+            "bytes": item["bytes"],
+            "sha256": item["sha256"],
+            "index_sha256": item.get("index_sha256", item["sha256"]),
+            "redactions": item.get("redactions", 0),
+        }
+        lines.extend(
+            [
+                "",
+                "## Repository file",
+                "Metadata: " + json.dumps(metadata, ensure_ascii=False, sort_keys=True),
+            ]
+        )
+        if item["kind"] != "text":
+            lines.append("Content omitted; this entry preserves only file identity and size.")
+            continue
+        text = item.get("text")
+        if not isinstance(text, str):
+            raise ValueError("repository_text_invalid")
+        segments = [text[offset : offset + 3000] for offset in range(0, len(text), 3000)] or [""]
+        for number, segment in enumerate(segments, 1):
+            fence = "`" * max(
+                3,
+                1 + max((len(match.group()) for match in re.finditer(r"`+", segment)), default=0),
+            )
+            lines.extend(
+                [
+                    "",
+                    f"### Segment {number} of {len(segments)}",
+                    "Repository path JSON: " + json.dumps(item["path"], ensure_ascii=False),
+                    "Content:",
+                    fence,
+                    segment,
+                    fence,
+                ]
+            )
+    return lines
+
+
+def _issue_document_lines(source: dict, include_redaction_count: bool) -> list[str]:
+    """Check source hashes before rendering one complete Issue snapshot."""
+    title = source.get("title", "")
+    body = source.get("text", "")
+    if not isinstance(title, str) or not isinstance(body, str):
+        raise TypeError("source_text_invalid")
+    title_sha256 = hashlib.sha256(title.encode()).hexdigest()
+    body_sha256 = hashlib.sha256(body.encode()).hexdigest()
+    if source.get("title_sha256") != title_sha256 or source.get("sha256") != body_sha256:
+        raise ValueError("source_hash_mismatch")
+    if source.get("body_sha256") != body_sha256:
+        raise ValueError("source_body_hash_mismatch")
+    metadata = {
+        "issue": source["issue"],
+        "url": source["url"],
+        "state": source.get("state"),
+        "state_reason": source.get("state_reason"),
+        "closed_at": source.get("closed_at"),
+        "updated_at": source.get("updated_at"),
+        "title_sha256": title_sha256,
+        "body_sha256": body_sha256,
+    }
+    if include_redaction_count or source.get("credential_redactions", 0):
+        metadata["credential_redactions"] = source.get("credential_redactions", 0)
+    return [
+        "",
+        f"## Issue {source['issue']}",
+        "Metadata: " + json.dumps(metadata, ensure_ascii=False, sort_keys=True),
+        "Title:",
+        title,
+        "Body:",
+        body,
+    ]
 
 
 def build_vector_store_document(
@@ -965,39 +1052,7 @@ def build_vector_store_document(
             f"Issue count: {len(corpus)}",
         ]
     for source in sorted(corpus, key=lambda item: item["issue"]):
-        title = source.get("title", "")
-        body = source.get("text", "")
-        if not isinstance(title, str) or not isinstance(body, str):
-            raise TypeError("source_text_invalid")
-        title_sha256 = hashlib.sha256(title.encode()).hexdigest()
-        body_sha256 = hashlib.sha256(body.encode()).hexdigest()
-        if source.get("title_sha256") != title_sha256 or source.get("sha256") != body_sha256:
-            raise ValueError("source_hash_mismatch")
-        if source.get("body_sha256") != body_sha256:
-            raise ValueError("source_body_hash_mismatch")
-        metadata = {
-            "issue": source["issue"],
-            "url": source["url"],
-            "state": source.get("state"),
-            "state_reason": source.get("state_reason"),
-            "closed_at": source.get("closed_at"),
-            "updated_at": source.get("updated_at"),
-            "title_sha256": title_sha256,
-            "body_sha256": body_sha256,
-        }
-        if repository_files is not None or source.get("credential_redactions", 0):
-            metadata["credential_redactions"] = source.get("credential_redactions", 0)
-        lines.extend(
-            [
-                "",
-                f"## Issue {source['issue']}",
-                "Metadata: " + json.dumps(metadata, ensure_ascii=False, sort_keys=True),
-                "Title:",
-                title,
-                "Body:",
-                body,
-            ]
-        )
+        lines.extend(_issue_document_lines(source, repository_files is not None))
     if repository_files is not None:
         text_count = sum(item["kind"] == "text" for item in repository_files)
         binary_count = sum(item["kind"] in {"binary", "symlink"} for item in repository_files)
@@ -1012,48 +1067,7 @@ def build_vector_store_document(
                 "Untracked and ignored files are not part of this snapshot.",
             ]
         )
-        for item in repository_files:
-            metadata = {
-                "path": item["path"],
-                "kind": item["kind"],
-                "bytes": item["bytes"],
-                "sha256": item["sha256"],
-                "index_sha256": item.get("index_sha256", item["sha256"]),
-                "redactions": item.get("redactions", 0),
-            }
-            lines.extend(
-                [
-                    "",
-                    "## Repository file",
-                    "Metadata: " + json.dumps(metadata, ensure_ascii=False, sort_keys=True),
-                ]
-            )
-            if item["kind"] != "text":
-                lines.append("Content omitted; this entry preserves only file identity and size.")
-                continue
-            text = item.get("text")
-            if not isinstance(text, str):
-                raise ValueError("repository_text_invalid")
-            segments = [text[offset : offset + 3000] for offset in range(0, len(text), 3000)] or [
-                ""
-            ]
-            for number, segment in enumerate(segments, 1):
-                fence = "`" * max(
-                    3,
-                    1
-                    + max((len(match.group()) for match in re.finditer(r"`+", segment)), default=0),
-                )
-                lines.extend(
-                    [
-                        "",
-                        f"### Segment {number} of {len(segments)}",
-                        "Repository path JSON: " + json.dumps(item["path"], ensure_ascii=False),
-                        "Content:",
-                        fence,
-                        segment,
-                        fence,
-                    ]
-                )
+        lines.extend(_repository_document_lines(repository_files))
     content = ("\n".join(lines) + "\n").encode("utf-8")
     if len(content) > MAX_VECTOR_FILE_BYTES:
         raise ValueError("vector_store_file_too_large")
@@ -1092,45 +1106,7 @@ def build_repository_vector_store_document(
         f"Credential-bearing files excluded before reading: {excluded_sensitive_files}",
         "Untracked and ignored files are not part of this snapshot.",
     ]
-    for item in repository_files:
-        metadata = {
-            "path": item["path"],
-            "kind": item["kind"],
-            "bytes": item["bytes"],
-            "sha256": item["sha256"],
-            "index_sha256": item.get("index_sha256", item["sha256"]),
-            "redactions": item.get("redactions", 0),
-        }
-        lines.extend(
-            [
-                "",
-                "## Repository file",
-                "Metadata: " + json.dumps(metadata, ensure_ascii=False, sort_keys=True),
-            ]
-        )
-        if item["kind"] != "text":
-            lines.append("Content omitted; this entry preserves only file identity and size.")
-            continue
-        text = item.get("text")
-        if not isinstance(text, str):
-            raise ValueError("repository_text_invalid")
-        segments = [text[offset : offset + 3000] for offset in range(0, len(text), 3000)] or [""]
-        for number, segment in enumerate(segments, 1):
-            fence = "`" * max(
-                3,
-                1 + max((len(match.group()) for match in re.finditer(r"`+", segment)), default=0),
-            )
-            lines.extend(
-                [
-                    "",
-                    f"### Segment {number} of {len(segments)}",
-                    "Repository path JSON: " + json.dumps(item["path"], ensure_ascii=False),
-                    "Content:",
-                    fence,
-                    segment,
-                    fence,
-                ]
-            )
+    lines.extend(_repository_document_lines(repository_files))
     content = ("\n".join(lines) + "\n").encode("utf-8")
     if len(content) > MAX_VECTOR_FILE_BYTES:
         raise ValueError("vector_store_file_too_large")
@@ -1173,6 +1149,60 @@ class YandexHTTPError(OSError):
         super().__init__(f"yandex_http_{status}")
 
 
+def _provider_error_code(source: dict) -> str | None:
+    """Accept only bounded code strings or recognized numeric status codes."""
+    for field in ("code", "type"):
+        value = source.get(field)
+        if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", value):
+            return value
+        if type(value) is int and 0 < value < 17:
+            return {
+                1: "CANCELLED",
+                2: "UNKNOWN",
+                3: "INVALID_ARGUMENT",
+                4: "DEADLINE_EXCEEDED",
+                5: "NOT_FOUND",
+                6: "ALREADY_EXISTS",
+                7: "PERMISSION_DENIED",
+                8: "RESOURCE_EXHAUSTED",
+                9: "FAILED_PRECONDITION",
+                10: "ABORTED",
+                11: "OUT_OF_RANGE",
+                12: "UNIMPLEMENTED",
+                13: "INTERNAL",
+                14: "UNAVAILABLE",
+                15: "DATA_LOSS",
+                16: "UNAUTHENTICATED",
+            }[value]
+    return None
+
+
+def _provider_error_messages(source: dict) -> list[str]:
+    """Collect provider descriptions for classification without exposing them."""
+    return [
+        source[field].casefold()
+        for field in ("message", "description")
+        if isinstance(source.get(field), str)
+    ]
+
+
+def _classify_yandex_error(message: str) -> str | None:
+    """Map message terms to fixed diagnostics, preserving classification priority."""
+    rules = (
+        ("QUOTA_OR_LIMIT", ("quota", "resource exhausted", "limit exceeded"), ""),
+        ("CHUNKING_CONFIGURATION", ("chunk", "overlap", "chunking"), ""),
+        ("STORE_NAME", ("invalid", "long", "length"), "name"),
+        ("ALREADY_EXISTS", ("already exists", "already_exist"), ""),
+        ("AUTHORIZATION", ("permission", "unauthorized", "forbidden"), ""),
+        ("PROJECT_CONFIGURATION", ("project",), ""),
+        ("INVALID_ARGUMENT", ("invalid", "bad request"), ""),
+    )
+    for code, terms, required in rules:
+        if required in message and any(term in message for term in terms):
+            return code
+    return None
+
+
 def _safe_yandex_error_code(raw: bytes) -> str | None:
     """Extract a safe provider code or classify its message without logging it."""
     try:
@@ -1185,55 +1215,14 @@ def _safe_yandex_error_code(raw: bytes) -> str | None:
     sources = [nested, payload] if isinstance(nested, dict) else [payload]
     messages = []
     for source in sources:
-        for field in ("code", "type"):
-            value = source.get(field)
-            if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", value):
-                return value
-            if type(value) is int and 0 < value < 17:
-                return {
-                    1: "CANCELLED",
-                    2: "UNKNOWN",
-                    3: "INVALID_ARGUMENT",
-                    4: "DEADLINE_EXCEEDED",
-                    5: "NOT_FOUND",
-                    6: "ALREADY_EXISTS",
-                    7: "PERMISSION_DENIED",
-                    8: "RESOURCE_EXHAUSTED",
-                    9: "FAILED_PRECONDITION",
-                    10: "ABORTED",
-                    11: "OUT_OF_RANGE",
-                    12: "UNIMPLEMENTED",
-                    13: "INTERNAL",
-                    14: "UNAVAILABLE",
-                    15: "DATA_LOSS",
-                    16: "UNAUTHENTICATED",
-                }[value]
-        for field in ("message", "description"):
-            value = source.get(field)
-            if isinstance(value, str):
-                messages.append(value.casefold())
+        code = _provider_error_code(source)
+        if code is not None:
+            return code
+        messages.extend(_provider_error_messages(source))
     for detail in payload.get("details", []):
         if isinstance(detail, dict):
-            for field in ("message", "description"):
-                value = detail.get(field)
-                if isinstance(value, str):
-                    messages.append(value.casefold())
-    joined = " ".join(messages)
-    if any(term in joined for term in ("quota", "resource exhausted", "limit exceeded")):
-        return "QUOTA_OR_LIMIT"
-    if any(term in joined for term in ("chunk", "overlap", "chunking")):
-        return "CHUNKING_CONFIGURATION"
-    if "name" in joined and any(term in joined for term in ("invalid", "long", "length")):
-        return "STORE_NAME"
-    if any(term in joined for term in ("already exists", "already_exist")):
-        return "ALREADY_EXISTS"
-    if any(term in joined for term in ("permission", "unauthorized", "forbidden")):
-        return "AUTHORIZATION"
-    if "project" in joined:
-        return "PROJECT_CONFIGURATION"
-    if "invalid" in joined or "bad request" in joined:
-        return "INVALID_ARGUMENT"
-    return None
+            messages.extend(_provider_error_messages(detail))
+    return _classify_yandex_error(" ".join(messages))
 
 
 def yandex_api_request(
@@ -1353,6 +1342,22 @@ def ensure_vector_store(name: str, project: str, key: str) -> str:
     return store_id
 
 
+def _safe_chunking(value: object) -> dict | None:
+    """Keep only typed chunk settings in metadata inspection output."""
+    if not isinstance(value, dict):
+        return None
+    kind = value.get("type")
+    result = {"type": kind if isinstance(kind, str) else "unknown"}
+    static = value.get("static")
+    if isinstance(static, dict):
+        result["static"] = {
+            field: static[field]
+            for field in ("max_chunk_size_tokens", "chunk_overlap_tokens")
+            if type(static.get(field)) is int
+        }
+    return result
+
+
 def inspect_yandex_vector_stores() -> int:
     """Print safe metadata for existing stores and files without making writes."""
     key = os.environ.get("YANDEX_API_KEY", "")
@@ -1362,20 +1367,6 @@ def inspect_yandex_vector_stores() -> int:
     stores = list_yandex_objects("/vector_stores", project, key, ("vector_stores",))
     files = list_yandex_objects("/files", project, key, ("files",))
     file_by_id = {item.get("id"): item for item in files if isinstance(item.get("id"), str)}
-
-    def safe_chunking(value: object) -> dict | None:
-        if not isinstance(value, dict):
-            return None
-        kind = value.get("type")
-        result = {"type": kind if isinstance(kind, str) else "unknown"}
-        static = value.get("static")
-        if isinstance(static, dict):
-            result["static"] = {
-                field: static[field]
-                for field in ("max_chunk_size_tokens", "chunk_overlap_tokens")
-                if type(static.get(field)) is int
-            }
-        return result
 
     report = []
     for store in stores:
@@ -1407,7 +1398,7 @@ def inspect_yandex_vector_stores() -> int:
                         "file_name": filename,
                         "bytes": file.get("bytes"),
                         "status": record.get("status"),
-                        "chunking_strategy": safe_chunking(record.get("chunking_strategy")),
+                        "chunking_strategy": _safe_chunking(record.get("chunking_strategy")),
                     }
                 )
         report.append(
@@ -1415,7 +1406,7 @@ def inspect_yandex_vector_stores() -> int:
                 "name": name,
                 "status": store.get("status"),
                 "created_at": store.get("created_at"),
-                "chunking_strategy": safe_chunking(store.get("chunking_strategy")),
+                "chunking_strategy": _safe_chunking(store.get("chunking_strategy")),
                 "file_count": len(attached_files),
                 "files": attached_files,
             }
@@ -1691,18 +1682,24 @@ def _longest_exact_excerpt(
     return best[0], best[1]
 
 
+def _declared_repository_paths(snippet: str, by_path: dict) -> set[str]:
+    """Read only valid path labels that identify a file in the local snapshot."""
+    paths = set()
+    for raw_path in re.findall(r"(?m)^Repository path JSON: (.+)$", snippet):
+        try:
+            path = json.loads(raw_path)
+        except ValueError:
+            continue
+        if isinstance(path, str) and path in by_path:
+            paths.add(path)
+    return paths
+
+
 def verify_repository_vector_result(item: dict, repository_files: list[dict]) -> dict:
     """Resolve an excerpt to the tracked text file path stamped into its segment."""
     by_path = {source["path"]: source for source in repository_files}
     for snippet in _safe_vector_result_texts(item):
-        paths = set()
-        for raw_path in re.findall(r"(?m)^Repository path JSON: (.+)$", snippet):
-            try:
-                path = json.loads(raw_path)
-            except ValueError:
-                continue
-            if isinstance(path, str) and path in by_path:
-                paths.add(path)
+        paths = _declared_repository_paths(snippet, by_path)
         for path in sorted(paths):
             source = by_path[path]
             if source["kind"] == "text":
@@ -1711,7 +1708,11 @@ def verify_repository_vector_result(item: dict, repository_files: list[dict]) ->
                 if match is None:
                     continue
                 start, end = match
-                quote_text = source_text[start:end].strip()
+                excerpt = source_text[start:end]
+                leading = len(excerpt) - len(excerpt.lstrip())
+                quote_text = excerpt.strip()
+                start += leading
+                end = start + len(quote_text)
                 if not quote_text:
                     continue
                 evidence = {
@@ -1739,6 +1740,37 @@ def verify_repository_vector_result(item: dict, repository_files: list[dict]) ->
     return {"verbatim": False}
 
 
+def _issue_vector_matches(snippet: str, source: dict) -> list[dict]:
+    """Collect exact title/body overlaps for one eligible Issue snapshot."""
+    matches = []
+    for field, value in (("body", source["text"]), ("title", source["title"])):
+        match = _longest_exact_excerpt(snippet, value)
+        if match is None:
+            continue
+        start, end = match
+        excerpt = value[start:end]
+        leading = len(excerpt) - len(excerpt.lstrip())
+        excerpt = excerpt.strip()
+        start += leading
+        end = start + len(excerpt)
+        evidence = {
+            "issue": source["issue"],
+            "title": source["title"],
+            "url": source["url"],
+            "field": field,
+            "quote": excerpt,
+            "verbatim": True,
+            "sha256": source["sha256"] if field == "body" else source["title_sha256"],
+            "source_start": start,
+            "source_end": end,
+        }
+        if field == "body":
+            evidence["body_start"] = source["body_offset"] + start
+            evidence["body_end"] = evidence["body_start"] + len(excerpt)
+        matches.append(evidence)
+    return matches
+
+
 def verify_vector_result(
     item: dict,
     corpus: list[dict],
@@ -1759,31 +1791,7 @@ def verify_vector_result(
         for source in corpus:
             if declared_ids and source["issue"] not in declared_ids:
                 continue
-            for field, value in (("body", source["text"]), ("title", source["title"])):
-                match = _longest_exact_excerpt(snippet, value)
-                if match is None:
-                    continue
-                start, end = match
-                excerpt = value[start:end]
-                leading = len(excerpt) - len(excerpt.lstrip())
-                excerpt = excerpt.strip()
-                start += leading
-                end = start + len(excerpt)
-                evidence = {
-                    "issue": source["issue"],
-                    "title": source["title"],
-                    "url": source["url"],
-                    "field": field,
-                    "quote": excerpt,
-                    "verbatim": True,
-                    "sha256": source["sha256"] if field == "body" else source["title_sha256"],
-                    "source_start": start,
-                    "source_end": end,
-                }
-                if field == "body":
-                    evidence["body_start"] = source["body_offset"] + start
-                    evidence["body_end"] = evidence["body_start"] + len(excerpt)
-                matches.append(evidence)
+            matches.extend(_issue_vector_matches(snippet, source))
         unique_matches = {
             (match["issue"], match["field"], match["source_start"], match["source_end"]): match
             for match in matches
@@ -2076,8 +2084,153 @@ def _vector_store_demo_report(
     return _code_block(report_data)
 
 
-def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
-    """Upload a task/repository snapshot, retrieve it, and optionally ask YandexGPT once."""
+def _existing_vector_store_snapshot(store_id: str, project: str, key: str) -> dict:
+    """Inspect the existing task/repository pair without creating or attaching files."""
+    store = yandex_json_request("GET", f"/vector_stores/{quote(store_id, safe='')}", project, key)
+    store_name = store.get("name")
+    if store.get("id") != store_id or not isinstance(store_name, str):
+        raise ValueError("existing_vector_store_receipt_invalid")
+    attached = list_yandex_objects(
+        f"/vector_stores/{quote(store_id, safe='')}/files", project, key, ("files",)
+    )
+    attached_file_ids = [_attached_file_id(item) for item in attached]
+    if any(item is None for item in attached_file_ids) or len(set(attached_file_ids)) != len(
+        attached_file_ids
+    ):
+        raise ValueError("vector_store_file_id_invalid")
+    file_catalog = list_yandex_objects("/files", project, key, ("files",))
+    file_by_id = {item.get("id"): item for item in file_catalog}
+    store_files = []
+    for file_id in attached_file_ids:
+        metadata = file_by_id.get(file_id)
+        filename = metadata.get("filename") if metadata else None
+        if not isinstance(filename, str) or not filename.startswith(
+            ("chat-task-history-", "chat-repository-")
+        ):
+            raise ValueError("vector_store_unexpected_files")
+        store_files.append(
+            {"file_id": file_id, "file_name": filename, "bytes": metadata.get("bytes")}
+        )
+    issue_files = [
+        item for item in store_files if item["file_name"].startswith("chat-task-history-")
+    ]
+    repository_snapshots = [
+        item for item in store_files if item["file_name"].startswith("chat-repository-")
+    ]
+    if len(issue_files) != 1 or len(repository_snapshots) != 1:
+        raise ValueError("existing_vector_store_snapshots_invalid")
+    repository_file = repository_snapshots[0]
+    return {
+        "store_id": store_id,
+        "store_name": store_name,
+        "file_id": repository_file["file_id"],
+        "filename": repository_file["file_name"],
+        "file_meta": file_by_id[repository_file["file_id"]],
+        "store_files": store_files,
+    }
+
+
+def _upload_repository_snapshots(
+    snapshot: dict, issue_content: bytes, project: str, key: str, progress: dict
+) -> dict:
+    """Upload the two fingerprinted documents and confirm their attachment metadata."""
+    progress["stage"] = "ensure_repository_vector_store"
+    store_id = ensure_vector_store(snapshot["store_name"], project, key)
+    progress["stage"] = "ensure_issue_snapshot_file"
+    issue_filename = f"chat-task-history-{snapshot['fingerprint'][:16]}.md"
+    issue_file_id, _issue_file_meta = ensure_yandex_file(
+        issue_filename, issue_content, project, key
+    )
+    progress["stage"] = "ensure_repository_snapshot_file"
+    file_id, file_meta = ensure_yandex_file(snapshot["filename"], snapshot["content"], project, key)
+    progress["stage"] = "attach_snapshots"
+    attached_file_ids = ensure_vector_store_files_attached(
+        store_id, [issue_file_id, file_id], project, key
+    )
+    file_catalog = list_yandex_objects("/files", project, key, ("files",))
+    file_by_id = {item.get("id"): item for item in file_catalog}
+    store_files = [
+        {
+            "file_id": attached_file_id,
+            "file_name": file_by_id[attached_file_id].get("filename"),
+            "bytes": file_by_id[attached_file_id].get("bytes"),
+        }
+        for attached_file_id in attached_file_ids
+        if attached_file_id in file_by_id
+    ]
+    if len(store_files) != len(attached_file_ids):
+        raise ValueError("vector_store_file_metadata_missing")
+    return {
+        "store_id": store_id,
+        "file_id": file_id,
+        "file_meta": file_meta,
+        "store_files": store_files,
+    }
+
+
+def _prepare_repository_vector_store(
+    corpus: list[dict],
+    repository_files: list[dict],
+    excluded_sensitive_files: int,
+    existing_store_id: str | None,
+    project: str,
+    key: str,
+    progress: dict,
+) -> dict:
+    """Prepare a repository snapshot, either by inspection or by authorized upload."""
+    fingerprint, issue_content = build_vector_store_document(corpus)
+    repository_fingerprint, content = build_repository_vector_store_document(
+        repository_files, excluded_sensitive_files
+    )
+    snapshot = {
+        "fingerprint": fingerprint,
+        "repository_fingerprint": repository_fingerprint,
+        "content": content,
+        "store_name": (
+            f"chat-repo-{repository_fingerprint[:16]}-{fingerprint[:16]}"
+            f"-c{VECTOR_CHUNK_SIZE_TOKENS}-o{VECTOR_CHUNK_OVERLAP_TOKENS}"
+        ),
+        "filename": f"chat-repository-{repository_fingerprint[:16]}.md",
+    }
+    if existing_store_id:
+        progress["stage"] = "inspect_existing_store"
+        snapshot.update(_existing_vector_store_snapshot(existing_store_id, project, key))
+    else:
+        snapshot.update(
+            _upload_repository_snapshots(snapshot, issue_content, project, key, progress)
+        )
+    return snapshot
+
+
+def _prepare_task_vector_store(corpus: list[dict], project: str, key: str, progress: dict) -> dict:
+    """Prepare the original single-file task-history store."""
+    fingerprint, content = build_vector_store_document(corpus)
+    store_name = (
+        f"chat-task-history-{fingerprint[:16]}"
+        f"-c{VECTOR_CHUNK_SIZE_TOKENS}-o{VECTOR_CHUNK_OVERLAP_TOKENS}"
+    )
+    filename = f"chat-task-history-{fingerprint[:16]}.md"
+    progress["stage"] = "ensure_vector_store"
+    store_id = ensure_vector_store(store_name, project, key)
+    progress["stage"] = "ensure_yandex_file"
+    file_id, file_meta = ensure_yandex_file(filename, content, project, key)
+    progress["stage"] = "attach_snapshot"
+    ensure_file_attached(store_id, file_id, project, key)
+    return {
+        "fingerprint": fingerprint,
+        "repository_fingerprint": None,
+        "store_name": store_name,
+        "store_id": store_id,
+        "filename": filename,
+        "file_id": file_id,
+        "file_meta": file_meta,
+        "content": content,
+        "store_files": [{"file_id": file_id, "file_name": filename, "bytes": len(content)}],
+    }
+
+
+def _validate_vector_store_demo_args(args: argparse.Namespace) -> str | None:
+    """Check admission before reading any sources or calling Yandex."""
     existing_store_id = getattr(args, "existing_store_id", None)
     if existing_store_id and (
         not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", existing_store_id)
@@ -2090,183 +2243,11 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
         raise ValueError("vector_store_write_not_authorized")
     if args.corpus not in {None, "tasks"}:
         raise ValueError("vector_store_corpus_must_be_tasks")
-    key = os.environ.get("YANDEX_API_KEY", "")
-    project = os.environ.get("YANDEX_PROJECT_ID", "")
-    if not key or not project:
-        raise ValueError("missing_yandex_credentials")
-    stage = "read_github_issues"
-    try:
-        corpus = fetch_corpus(os.environ.get("GITHUB_TOKEN"), "tasks")
-        corpus, _issue_redactions = sanitize_vector_store_corpus(corpus)
-        include_repository = bool(getattr(args, "include_repository", False))
-        repository_files, excluded_sensitive_files = (
-            read_repository_snapshot() if include_repository else (None, 0)
-        )
-        stage = "build_snapshot"
-        if include_repository:
-            fingerprint, issue_content = build_vector_store_document(corpus)
-            repository_fingerprint, content = build_repository_vector_store_document(
-                repository_files, excluded_sensitive_files
-            )
-            store_name = (
-                f"chat-repo-{repository_fingerprint[:16]}-{fingerprint[:16]}"
-                f"-c{VECTOR_CHUNK_SIZE_TOKENS}-o{VECTOR_CHUNK_OVERLAP_TOKENS}"
-            )
-            issue_filename = f"chat-task-history-{fingerprint[:16]}.md"
-            filename = f"chat-repository-{repository_fingerprint[:16]}.md"
-            if existing_store_id:
-                stage = "inspect_existing_store"
-                store_id = existing_store_id
-                store = yandex_json_request(
-                    "GET", f"/vector_stores/{quote(store_id, safe='')}", project, key
-                )
-                store_name = store.get("name")
-                if store.get("id") != store_id or not isinstance(store_name, str):
-                    raise ValueError("existing_vector_store_receipt_invalid")
-                attached = list_yandex_objects(
-                    f"/vector_stores/{quote(store_id, safe='')}/files",
-                    project,
-                    key,
-                    ("files",),
-                )
-                attached_file_ids = [_attached_file_id(item) for item in attached]
-                if any(item is None for item in attached_file_ids) or len(
-                    set(attached_file_ids)
-                ) != len(attached_file_ids):
-                    raise ValueError("vector_store_file_id_invalid")
-                file_catalog = list_yandex_objects("/files", project, key, ("files",))
-                file_by_id = {item.get("id"): item for item in file_catalog}
-                store_files = []
-                for attached_file_id in attached_file_ids:
-                    metadata = file_by_id.get(attached_file_id)
-                    attached_filename = metadata.get("filename") if metadata else None
-                    if not isinstance(attached_filename, str) or not attached_filename.startswith(
-                        ("chat-task-history-", "chat-repository-")
-                    ):
-                        raise ValueError("vector_store_unexpected_files")
-                    store_files.append(
-                        {
-                            "file_id": attached_file_id,
-                            "file_name": attached_filename,
-                            "bytes": metadata.get("bytes"),
-                        }
-                    )
-                issue_files = [
-                    item
-                    for item in store_files
-                    if item["file_name"].startswith("chat-task-history-")
-                ]
-                repository_snapshots = [
-                    item for item in store_files if item["file_name"].startswith("chat-repository-")
-                ]
-                if len(issue_files) != 1 or len(repository_snapshots) != 1:
-                    raise ValueError("existing_vector_store_snapshots_invalid")
-                file_id = repository_snapshots[0]["file_id"]
-                filename = repository_snapshots[0]["file_name"]
-                file_meta = file_by_id[file_id]
-            else:
-                stage = "ensure_repository_vector_store"
-                store_id = ensure_vector_store(store_name, project, key)
-                stage = "ensure_issue_snapshot_file"
-                issue_file_id, _issue_file_meta = ensure_yandex_file(
-                    issue_filename, issue_content, project, key
-                )
-                stage = "ensure_repository_snapshot_file"
-                file_id, file_meta = ensure_yandex_file(filename, content, project, key)
-                stage = "attach_snapshots"
-                attached_file_ids = ensure_vector_store_files_attached(
-                    store_id, [issue_file_id, file_id], project, key
-                )
-                file_catalog = list_yandex_objects("/files", project, key, ("files",))
-                file_by_id = {item.get("id"): item for item in file_catalog}
-                store_files = [
-                    {
-                        "file_id": attached_file_id,
-                        "file_name": file_by_id[attached_file_id].get("filename"),
-                        "bytes": file_by_id[attached_file_id].get("bytes"),
-                    }
-                    for attached_file_id in attached_file_ids
-                    if attached_file_id in file_by_id
-                ]
-                if len(store_files) != len(attached_file_ids):
-                    raise ValueError("vector_store_file_metadata_missing")
-            stage = "wait_for_index"
-            for attached_file_id in attached_file_ids:
-                wait_for_vector_store_index(store_id, attached_file_id, project, key)
-        else:
-            fingerprint, content = build_vector_store_document(corpus)
-            repository_fingerprint = None
-            store_name = (
-                f"chat-task-history-{fingerprint[:16]}"
-                f"-c{VECTOR_CHUNK_SIZE_TOKENS}-o{VECTOR_CHUNK_OVERLAP_TOKENS}"
-            )
-            filename = f"chat-task-history-{fingerprint[:16]}.md"
-            stage = "ensure_vector_store"
-            store_id = ensure_vector_store(store_name, project, key)
-            stage = "ensure_yandex_file"
-            file_id, file_meta = ensure_yandex_file(filename, content, project, key)
-            stage = "attach_snapshot"
-            ensure_file_attached(store_id, file_id, project, key)
-            stage = "wait_for_index"
-            wait_for_vector_store_index(store_id, file_id, project, key)
-            store_files = [{"file_id": file_id, "file_name": filename, "bytes": len(content)}]
-        print(
-            "Vector Store ready: "
-            f"store_id={store_id} files={len(store_files)} "
-            f"issues={len(corpus)} repository_files={len(repository_files or [])} "
-            f"fingerprint={repository_fingerprint or fingerprint}",
-            flush=True,
-        )
-        stage = "direct_vector_search"
-        results = vector_store_search(store_id, query, project, key)
-        print(f"Vector Store search complete: results={len(results)}", flush=True)
-        model_result = None
-        provider = None
-        if getattr(args, "allow_model_call", False):
-            stage = "model_answer"
-            print("Calling Yandex model once.", flush=True)
-            model_result, provider = vector_store_model_result(
-                query,
-                results,
-                file_id,
-                corpus,
-                repository_files,
-                {item["file_id"] for item in store_files},
-                project,
-                key,
-            )
-            print("Yandex model response validated.", flush=True)
-    except (OSError, http.client.HTTPException) as exc:
-        print(
-            f"VECTOR_STORE_DEMO_FAILED stage={stage} error={technical_error_code(exc)}",
-            file=sys.stderr,
-        )
-        raise
-    except (TypeError, ValueError) as exc:
-        reason = re.sub(r"[^A-Za-z0-9_.:-]", "_", str(exc))[:80] or "contract_violation"
-        print(
-            f"VECTOR_STORE_DEMO_FAILED stage={stage} contract={reason}",
-            file=sys.stderr,
-        )
-        raise
-    rendered = _vector_store_demo_report(
-        query,
-        corpus,
-        fingerprint,
-        store_name,
-        store_id,
-        file_id,
-        filename,
-        file_meta,
-        content,
-        results,
-        repository_files,
-        excluded_sensitive_files,
-        model_result,
-        provider,
-        store_files,
-        repository_fingerprint,
-    )
+    return existing_store_id
+
+
+def _write_vector_store_demo_report(rendered: str, model_result: dict | None) -> None:
+    """Write the same bounded report to stdout and the optional runner summary."""
     print(
         "Yandex AI Studio Vector Store demo (retrieval plus one Yandex model call)."
         if model_result is not None
@@ -2286,6 +2267,89 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
                 )
             )
             summary_file.write(rendered + "\n")
+
+
+def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
+    """Upload a task/repository snapshot, retrieve it, and optionally ask YandexGPT once."""
+    existing_store_id = _validate_vector_store_demo_args(args)
+    key = os.environ.get("YANDEX_API_KEY", "")
+    project = os.environ.get("YANDEX_PROJECT_ID", "")
+    if not key or not project:
+        raise ValueError("missing_yandex_credentials")
+    progress = {"stage": "read_github_issues"}
+    try:
+        corpus = fetch_corpus(os.environ.get("GITHUB_TOKEN"), "tasks")
+        corpus, _issue_redactions = sanitize_vector_store_corpus(corpus)
+        include_repository = bool(getattr(args, "include_repository", False))
+        repository_files, excluded_sensitive_files = (
+            read_repository_snapshot() if include_repository else (None, 0)
+        )
+        progress["stage"] = "build_snapshot"
+        if include_repository:
+            snapshot = _prepare_repository_vector_store(
+                corpus,
+                repository_files,
+                excluded_sensitive_files,
+                existing_store_id,
+                project,
+                key,
+                progress,
+            )
+        else:
+            snapshot = _prepare_task_vector_store(corpus, project, key, progress)
+        progress["stage"] = "wait_for_index"
+        for item in snapshot["store_files"]:
+            wait_for_vector_store_index(snapshot["store_id"], item["file_id"], project, key)
+        print(
+            "Vector Store ready: "
+            f"store_id={snapshot['store_id']} files={len(snapshot['store_files'])} "
+            f"issues={len(corpus)} repository_files={len(repository_files or [])} "
+            f"fingerprint={snapshot['repository_fingerprint'] or snapshot['fingerprint']}",
+            flush=True,
+        )
+        progress["stage"] = "direct_vector_search"
+        results = vector_store_search(snapshot["store_id"], query, project, key)
+        print(f"Vector Store search complete: results={len(results)}", flush=True)
+        model_result = None
+        provider = None
+        if getattr(args, "allow_model_call", False):
+            progress["stage"] = "model_answer"
+            print("Calling Yandex model once.", flush=True)
+            model_result, provider = vector_store_model_result(
+                query,
+                results,
+                snapshot["file_id"],
+                corpus,
+                repository_files,
+                {item["file_id"] for item in snapshot["store_files"]},
+                project,
+                key,
+            )
+            print("Yandex model response validated.", flush=True)
+    except (OSError, http.client.HTTPException) as exc:
+        print(
+            f"VECTOR_STORE_DEMO_FAILED stage={progress['stage']} error={technical_error_code(exc)}",
+            file=sys.stderr,
+        )
+        raise
+    except (TypeError, ValueError) as exc:
+        reason = re.sub(r"[^A-Za-z0-9_.:-]", "_", str(exc))[:80] or "contract_violation"
+        print(
+            f"VECTOR_STORE_DEMO_FAILED stage={progress['stage']} contract={reason}",
+            file=sys.stderr,
+        )
+        raise
+    rendered = _vector_store_demo_report(
+        query=query,
+        corpus=corpus,
+        results=results,
+        repository_files=repository_files,
+        excluded_sensitive_files=excluded_sensitive_files,
+        model_result=model_result,
+        provider=provider,
+        **snapshot,
+    )
+    _write_vector_store_demo_report(rendered, model_result)
     return 0
 
 
@@ -2375,6 +2439,11 @@ def _run(args: argparse.Namespace) -> int:
         if args.publish_issue is not None:
             raise ValueError("vector_store_mode_side_effect_conflict")
         return run_vector_store_demo(args, query)
+    return _run_bm25(args, query, token)
+
+
+def _run_bm25(args: argparse.Namespace, query: str, token: str | None) -> int:
+    """Keep BM25 retrieval and its publication guard independent of Vector Store modes."""
     if args.include_repository:
         raise ValueError("repository_snapshot_requires_vector_store_mode")
     if args.publish_issue is not None and (args.publish_issue <= 0 or not token):

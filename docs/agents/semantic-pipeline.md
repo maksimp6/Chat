@@ -83,7 +83,7 @@ Offline controls:
 
 ```sh
 python scripts/semantic_pipeline.py --selftest
-python -m pytest -q tests/test_semantic_pipeline.py tests/test_semantic_task_search.py tests/test_semantic_workflow.py
+python -m pytest -q tests/test_semantic_pipeline.py tests/test_semantic_task_search.py tests/test_semantic_vector_store.py tests/test_semantic_workflow.py
 ```
 
 The CLI does not call a model without explicit allowance. `--allow-model-call` is an admission
