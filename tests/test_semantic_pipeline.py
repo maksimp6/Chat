@@ -201,11 +201,11 @@ def test_negative_control_blocks_publication(obj, transport, monkeypatch):
         "not JSON",
         "{",
         '{"answer": NaN}',
-        "```json\n" + json.dumps(model_answer()) + "\n```",
+        "```python\n" + json.dumps(model_answer()) + "\n```",
         "prose before " + json.dumps(model_answer()),
         '{"answer":"a","answer":"b","refusal":true,"citations":[]}',
     ],
-    ids=["plain-text", "truncated", "nan", "fenced", "prefixed", "duplicate-keys"],
+    ids=["plain-text", "truncated", "nan", "unsupported-fence", "prefixed", "duplicate-keys"],
 )
 def test_malformed_json_never_publishes(text, transport, monkeypatch):
     transport.model_text = text
