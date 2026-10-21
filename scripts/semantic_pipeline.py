@@ -1086,6 +1086,65 @@ def technical_error_code(error: OSError | http.client.HTTPException) -> str:
     return type(error).__name__.upper()
 
 
+def _vector_store_demo_report(
+    query: str,
+    corpus: list[dict],
+    fingerprint: str,
+    store_name: str,
+    store_id: str,
+    file_id: str,
+    filename: str,
+    file_meta: dict,
+    content: bytes,
+    results: list[dict],
+) -> str:
+    """Render bounded direct-search results and their verified source matches."""
+    hits = []
+    for rank, item in enumerate(results, 1):
+        result_file_id = item.get("file_id")
+        if result_file_id is not None and result_file_id != file_id:
+            raise ValueError("vector_store_search_file_mismatch")
+        snippet = "\n".join(_vector_result_texts(item))[:2000]
+        score = item.get("score")
+        if (
+            not isinstance(score, (int, float))
+            or isinstance(score, bool)
+            or not math.isfinite(score)
+        ):
+            score = None
+        hits.append(
+            {
+                "rank": rank,
+                "score": score,
+                "file_id": item.get("file_id"),
+                "file_name": item.get("file_name"),
+                "snippet": snippet,
+                "source_match": verify_vector_result(item, corpus),
+            }
+        )
+    report_data = {
+        "operation": "upload_task_history_and_direct_vector_search",
+        "repository": REPO,
+        "source_scope": (
+            "all GitHub Issues in open and closed states; title/body and source metadata"
+        ),
+        "excluded": ["pull requests", "issue comments", "linked PRs", "repository file tree"],
+        "corpus_sources": len(corpus),
+        "corpus_fingerprint": fingerprint,
+        "retrieved_at": corpus[0].get("retrieved_at") if corpus else None,
+        "vector_store_name": store_name,
+        "vector_store_id": store_id,
+        "file_id": file_id,
+        "file_name": filename,
+        "file_bytes": file_meta.get("bytes", len(content)),
+        "query": query,
+        "model_called": False,
+        "result_count": len(hits),
+        "results": hits,
+    }
+    return _code_block(report_data)
+
+
 def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
     """Upload a complete task snapshot and show one direct Vector Store search."""
     if not args.allow_vector_store_write or not args.approval_reference.strip():
@@ -1124,52 +1183,18 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
             file=sys.stderr,
         )
         raise
-    hits = []
-    for rank, item in enumerate(results, 1):
-        result_file_id = item.get("file_id")
-        if result_file_id is not None and result_file_id != file_id:
-            raise ValueError("vector_store_search_file_mismatch")
-        texts = _vector_result_texts(item)
-        snippet = "\n".join(texts)[:2000]
-        score = item.get("score")
-        if (
-            not isinstance(score, (int, float))
-            or isinstance(score, bool)
-            or not math.isfinite(score)
-        ):
-            score = None
-        hits.append(
-            {
-                "rank": rank,
-                "score": score,
-                "file_id": item.get("file_id"),
-                "file_name": item.get("file_name"),
-                "snippet": snippet,
-                "source_match": verify_vector_result(item, corpus),
-            }
-        )
-    retrieved_at = corpus[0].get("retrieved_at") if corpus else None
-    report_data = {
-        "operation": "upload_task_history_and_direct_vector_search",
-        "repository": REPO,
-        "source_scope": (
-            "all GitHub Issues in open and closed states; title/body and source metadata"
-        ),
-        "excluded": ["pull requests", "issue comments", "linked PRs", "repository file tree"],
-        "corpus_sources": len(corpus),
-        "corpus_fingerprint": fingerprint,
-        "retrieved_at": retrieved_at,
-        "vector_store_name": store_name,
-        "vector_store_id": store_id,
-        "file_id": file_id,
-        "file_name": filename,
-        "file_bytes": file_meta.get("bytes", len(content)),
-        "query": query,
-        "model_called": False,
-        "result_count": len(hits),
-        "results": hits,
-    }
-    rendered = _code_block(report_data)
+    rendered = _vector_store_demo_report(
+        query,
+        corpus,
+        fingerprint,
+        store_name,
+        store_id,
+        file_id,
+        filename,
+        file_meta,
+        content,
+        results,
+    )
     print("Yandex AI Studio Vector Store demo (direct retrieval; no model call):")
     print(rendered)
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
