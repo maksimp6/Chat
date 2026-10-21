@@ -736,7 +736,7 @@ def yandex_api_request(
     headers = {
         "Authorization": f"Api-Key {key}",
         "Accept": "application/json",
-        "x-project": project,
+        "x-yc-project-id": project,
     }
     if body is not None:
         headers["Content-Type"] = content_type

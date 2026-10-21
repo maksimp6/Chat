@@ -176,8 +176,14 @@ def test_vector_store_api_uses_fixed_yandex_host_and_project_headers(monkeypatch
     assert response == b'{"id":"vs-1"}'
     assert calls[0] == ("connection", pipeline.HOST, 90)
     assert calls[1][1:4] == ("POST", "/v1/vector_stores", {"name": "test"})
-    assert calls[1][4]["x-project"] == "offline-project"
+    assert calls[1][4]["x-yc-project-id"] == "offline-project"
     assert calls[1][4]["Authorization"] == "Api-Key offline-key"
+    assert set(calls[1][4]) == {
+        "Authorization",
+        "Accept",
+        "x-yc-project-id",
+        "Content-Type",
+    }
     assert calls[-1] == ("close",)
 
 
