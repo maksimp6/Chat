@@ -229,6 +229,12 @@ question about the repository can cause Logos to inspect or work with files;
 an ordinary knowledge question may need no tools. Each dispatch runs one dialogue
 turn. This workflow does not schedule recurring work or publish repository edits.
 
+The result also reports recorded tool calls by name, call ID and native execution
+success. For command tools it includes the available exit code and SHA256 of the
+recorded command and stdout, without exposing those strings. Missing evidence
+remains unknown; recognizable redaction or truncation prevents reporting an exact
+string hash. A model's claim that a build succeeded is not itself tool evidence.
+
 To retrieve an existing answer without another model call, dispatch
 `mode=logos-result` and put the earlier run ID in `query`. This job only downloads
 that run's answer artifact and writes its JSON to the log. It needs Actions read

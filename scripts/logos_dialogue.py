@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, Callable
@@ -71,6 +72,7 @@ def _new_result() -> dict[str, Any]:
         "reply": "",
         "pending_tools": [],
         "response_ids": [],
+        "tool_calls": [],
         "generation_requests": 0,
         "usage": {},
         "cost": {"status": "unknown", "provider_confirmed": False},
@@ -114,9 +116,35 @@ def _ask(client, prompt: str, trace, result: dict[str, Any]) -> None:
         raise RuntimeError("Provider returned no answer")
 
 
+def _tool_evidence(entry: dict[str, Any]) -> dict[str, Any]:
+    output = entry.get("result") or {}
+    data = output.get("data")
+    data = data if isinstance(data, dict) else {}
+    evidence = {
+        "name": entry.get("name"),
+        "call_id": entry.get("call_id"),
+        "success": output.get("success"),
+    }
+    if "returncode" in data:
+        evidence["returncode"] = data["returncode"]
+    arguments = entry.get("arguments") or {}
+    values = {"command_sha256": arguments.get("command") or arguments.get("cmd")}
+    if entry.get("name") == "run_command":
+        values["stdout_sha256"] = data.get("stdout")
+    for key, value in values.items():
+        # The native trace may redact or truncate strings. Such a value cannot
+        # establish a digest of the original tool input/output.
+        if isinstance(value, str) and not any(
+            marker in value for marker in ("<redacted", "<truncated")
+        ):
+            evidence[key] = hashlib.sha256(value.encode("utf-8")).hexdigest()
+    return evidence
+
+
 def _finish(invocation, trace, result: dict[str, Any]) -> None:
     finalized = trace.finalize()
     persist_invocation_trace(invocation.invocation_id, finalized)
+    result["tool_calls"] = [_tool_evidence(entry) for entry in finalized.get("tool_calls", [])]
     result["generation_requests"] = len(finalized.get("api_requests", []))
     responses = finalized.get("responses", [])
     response_ids = [item["response_id"] for item in responses if item.get("response_id")]

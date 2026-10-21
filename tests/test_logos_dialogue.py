@@ -1,8 +1,11 @@
 """Offline checks of the native Logos dialogue, transport, and persisted trace."""
 
+import hashlib
 import json
 from pathlib import Path
+import shlex
 import subprocess
+import sys
 
 import pytest
 import requests
@@ -75,23 +78,14 @@ def native_response(number, *, read=False):
     }
 
 
-def test_native_dialogue_reads_repository_and_preserves_answer_usage_and_trace(repo, monkeypatch):
+@pytest.fixture
+def native_transport(monkeypatch):
     from agent_runtime.issue_runner import seed_provider_credential
-    from invocation.manager import get_invocation
 
     monkeypatch.setenv("ALICE_PROVIDER_CREDENTIAL_KEY", "offline-credential-encryption-key")
     monkeypatch.setenv("YANDEX_API_KEY", "offline-yandex-key")
     monkeypatch.setenv("YANDEX_PROJECT_ID", "offline-project")
     seed_provider_credential()
-    client = LogosClient(Config)
-    calls = []
-    provider_responses = iter(
-        [
-            {"id": "00000000-0000-4000-8000-000000000001"},
-            native_response(1, read=True),
-            native_response(2),
-        ]
-    )
 
     class Response:
         status_code = 200
@@ -106,11 +100,27 @@ def test_native_dialogue_reads_repository_and_preserves_answer_usage_and_trace(r
         def raise_for_status(self):
             pass
 
-    def post(url, *, json, timeout):
-        calls.append((url, json))
-        return Response(next(provider_responses))
+    def setup(*responses):
+        client = LogosClient(Config)
+        calls = []
+        provider_responses = iter([{"id": "00000000-0000-4000-8000-000000000001"}, *responses])
 
-    monkeypatch.setattr(client.session, "post", post)
+        def post(url, *, json, timeout):
+            calls.append((url, json))
+            return Response(next(provider_responses))
+
+        monkeypatch.setattr(client.session, "post", post)
+        return client, calls
+
+    return setup
+
+
+def test_native_dialogue_reads_repository_and_preserves_answer_usage_and_trace(
+    repo, native_transport
+):
+    from invocation.manager import get_invocation
+
+    client, calls = native_transport(native_response(1, read=True), native_response(2))
     result = dialogue.run_dialogue(
         "почему распнули иисуса",
         repo_root=repo,
@@ -124,6 +134,7 @@ def test_native_dialogue_reads_repository_and_preserves_answer_usage_and_trace(r
     assert result["response_ids"] == ["offline-response-1", "offline-response-2"]
     assert result["usage"] == {"input_tokens": 22, "output_tokens": 6, "total_tokens": 28}
     assert result["cost"]["provider_confirmed"] is False
+    assert result["tool_calls"] == [{"name": "read_file", "call_id": "read-1", "success": True}]
     invocation = get_invocation(result["invocation_id"])
     assert invocation["status"] == "completed"
     assert invocation["trace"]["trace_id"] == result["trace_id"]
@@ -135,6 +146,62 @@ def test_native_dialogue_reads_repository_and_preserves_answer_usage_and_trace(r
     assert calls[2][1]["instructions"] == dialogue.DIALOGUE_INSTRUCTIONS
     available = {tool.get("name") for tool in calls[1][1]["tools"]}
     assert {"read_file", "write_file", "run_command"} <= available
+
+
+@pytest.mark.parametrize("returncode", [0, 7])
+def test_native_command_evidence_uses_real_exit_code_and_hashes_without_raw_output(
+    repo, monkeypatch, native_transport, returncode
+):
+    private_output = "private-test-output-not-for-artifact"
+    private_error = "private-test-stderr-not-for-artifact"
+    monkeypatch.setenv("LOGOS_TEST_OUTPUT", private_output)
+    code = (
+        "import os, sys; from pathlib import Path; "
+        "print(Path('README.md').read_text().strip()); "
+        "print(os.environ['LOGOS_TEST_OUTPUT']); "
+        f"print({private_error!r}, file=sys.stderr); sys.exit({returncode})"
+    )
+    command = shlex.join([sys.executable, "-c", code])
+    response = native_response(1)
+    response["output"] = [
+        {
+            "type": "function_call",
+            "name": "run_command",
+            "call_id": "command-1",
+            "arguments": json.dumps({"command": command}),
+        }
+    ]
+    client, calls = native_transport(response, native_response(2))
+
+    result = dialogue.run_dialogue(
+        "Run the local check and report its exit code.",
+        repo_root=repo,
+        client_factory=lambda: client,
+    )
+
+    expected_stdout = "Logos repository context.\n" + private_output
+    assert result["status"] == "completed"
+    assert result["generation_requests"] == 2
+    expected_evidence = {
+        "name": "run_command",
+        "call_id": "command-1",
+        "success": returncode == 0,
+        "command_sha256": hashlib.sha256(command.encode()).hexdigest(),
+    }
+    if returncode == 0:
+        expected_evidence.update(
+            returncode=0,
+            stdout_sha256=hashlib.sha256(expected_stdout.encode()).hexdigest(),
+        )
+    # Native UTE omits failed result data: unavailable exit/output evidence stays absent.
+    assert result["tool_calls"] == [expected_evidence]
+    continuation = calls[2][1]["input"][-1]
+    assert continuation["type"] == "function_call_output"
+    if returncode == 0:
+        assert private_output in continuation["output"]
+    serialized = json.dumps(result)
+    assert private_output not in serialized and private_error not in serialized
+    assert command not in serialized and "LOGOS_TEST_OUTPUT" not in serialized
 
 
 class OfflineClient:
