@@ -171,9 +171,9 @@ jobs:
       github.ref == 'refs/heads/feat/semantic-pipeline' &&
       github.actor == github.repository_owner &&
       github.triggering_actor == github.repository_owner &&
-      github.event.before == 'c40caff2cf49b79a30a977a0995a4fc62f1b2ad4' &&
-      github.event.head_commit.message == 'fix(vector-store): stay below overlap boundary'
-    name: One-time Yandex repository and model demo
+      github.event.before == 'ad75f3ee174f899adced46daed008b4926075a85' &&
+      github.event.head_commit.message == 'diag(vector-store): inspect failed repository indexes read-only'
+    name: Read-only Yandex Vector Store attachment inspection
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -188,19 +188,10 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
-      - name: Index task and repository snapshots, search, and ask YandexGPT once
+      - name: Inspect store and file attachments without writes
         env:
-          GITHUB_TOKEN: ${{ github.token }}
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
-          VECTOR_QUERY: "Какая модель генерирует ответы semantic pipeline и что известно о модели эмбеддингов Vector Store?"
-          VECTOR_APPROVAL_REFERENCE: "owner-approved-vector-store-repository-model-demo"
         run: >-
           python scripts/semantic_pipeline.py
-          --mode vector-store
-          --corpus tasks
-          --query "$VECTOR_QUERY"
-          --allow-vector-store-write
-          --include-repository
-          --allow-model-call
-          --approval-reference "$VECTOR_APPROVAL_REFERENCE"
+          --mode vector-store-inspect
