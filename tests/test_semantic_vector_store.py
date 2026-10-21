@@ -293,7 +293,13 @@ def test_file_attachment_reuses_existing_snapshot_without_second_write(monkeypat
     monkeypatch.setattr(
         pipeline,
         "list_yandex_objects",
-        lambda *args: [{"file_id": "file-1", "id": "vsfile-1"}],
+        lambda *args: [
+            {
+                "file_id": "file-1",
+                "id": "vsfile-1",
+                "chunking_strategy": pipeline.vector_store_chunking_strategy(),
+            }
+        ],
     )
     monkeypatch.setattr(
         pipeline,
@@ -304,6 +310,85 @@ def test_file_attachment_reuses_existing_snapshot_without_second_write(monkeypat
     pipeline.ensure_file_attached("vs-1", "file-1", "project", "key")
 
     assert writes == []
+
+
+def test_vector_store_creation_uses_documented_maximum_chunk_settings(monkeypatch):
+    requests = []
+    monkeypatch.setattr(pipeline, "list_yandex_objects", lambda *args: [])
+
+    def request(method, path, project, key, payload=None):
+        requests.append((method, path, payload))
+        return {"id": "vs-1", "name": "store"}
+
+    monkeypatch.setattr(pipeline, "yandex_json_request", request)
+
+    assert pipeline.ensure_vector_store("store", "project", "key") == "vs-1"
+    assert requests == [
+        (
+            "POST",
+            "/vector_stores",
+            {"name": "store", "chunking_strategy": pipeline.vector_store_chunking_strategy()},
+        )
+    ]
+
+
+def test_vector_store_attachment_sets_and_confirms_documented_chunking(monkeypatch):
+    listings = iter(
+        [
+            [],
+            [
+                {
+                    "file_id": "file-1",
+                    "id": "vsfile-1",
+                    "chunking_strategy": pipeline.vector_store_chunking_strategy(),
+                }
+            ],
+        ]
+    )
+    requests = []
+    monkeypatch.setattr(pipeline, "list_yandex_objects", lambda *args: next(listings))
+
+    def request(method, path, project, key, payload=None):
+        requests.append((method, path, payload))
+        return {"file_id": "file-1"}
+
+    monkeypatch.setattr(pipeline, "yandex_json_request", request)
+
+    pipeline.ensure_file_attached("vs-1", "file-1", "project", "key")
+
+    assert requests == [
+        (
+            "POST",
+            "/vector_stores/vs-1/files",
+            {"file_id": "file-1", "chunking_strategy": pipeline.vector_store_chunking_strategy()},
+        )
+    ]
+
+
+def test_vector_store_search_uses_max_recall_settings(monkeypatch):
+    requests = []
+
+    def request(method, path, project, key, payload=None):
+        requests.append((method, path, payload))
+        return {"data": [{"rank": rank} for rank in range(60)]}
+
+    monkeypatch.setattr(pipeline, "yandex_json_request", request)
+
+    results = pipeline.vector_store_search("vs-1", "query", "project", "key")
+
+    assert len(results) == pipeline.MAX_VECTOR_SEARCH_RESULTS == 50
+    assert requests == [
+        (
+            "POST",
+            "/vector_stores/vs-1/search",
+            {
+                "query": "query",
+                "rewrite_query": True,
+                "max_num_results": 50,
+                "ranking_options": {"ranker": "auto", "score_threshold": 0.0},
+            },
+        )
+    ]
 
 
 def test_vector_store_demo_uploads_once_then_shows_direct_retrieval(monkeypatch, tmp_path, capsys):
@@ -360,6 +445,8 @@ def test_vector_store_demo_uploads_once_then_shows_direct_retrieval(monkeypatch,
     assert pipeline.run_vector_store_demo(args, "симуляция офиса") == 0
     output = capsys.readouterr().out
     assert "model_called" in output and "false" in output
+    assert '"max_num_results": 50' in output
+    assert '"max_chunk_size_tokens": 4096' in output
     assert "verbatim" in output and "https://github.com/maksimp6/Chat/issues/9001" in output
     assert [call[0] for call in calls] == ["store", "file", "attach", "indexed", "search"]
     assert calls[-1] == ("search", "vs-1", "симуляция офиса")

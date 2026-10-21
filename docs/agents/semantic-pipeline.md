@@ -126,6 +126,24 @@ the runner does not call a model or claim that an Issue's state proves delivery.
 The indexed scope is GitHub Issue title/body and source metadata, as defined by
 this PR's task-history contract.
 
+The Yandex AI Studio API settings were checked against the official documentation
+on 2026-10-21. Each snapshot file is capped at the documented 128 MB. Vector Store
+creation and file attachment both set static chunks to 4,096 tokens with 2,048
+tokens of overlap, the documented maximum size and largest allowed overlap. The
+index name includes these settings so a store created with the earlier defaults
+is not silently reused. Direct search asks for the maximum 50 results, enables
+query rewriting and the `auto` ranker, and uses a `0.0` score threshold to avoid
+discarding lower-scored candidates. These are recall-oriented ceiling settings;
+they can return broader chunks and more ambiguous evidence than a tuned quality
+configuration. The runner still makes one search request and no text-generation
+request. It leaves file and store expiration unset, preserving Yandex's documented
+default persistence for non-batch files and avoiding automatic index expiry.
+
+References: [Yandex file upload API](https://aistudio.yandex.ru/ru/docs/ai-studio/api/Files/createFile),
+[add a file to a Vector Store](https://aistudio.yandex.ru/en/docs/ai-studio/api/Vector-stores/createVectorStoreFile),
+[search a Vector Store](https://aistudio.yandex.ru/en/docs/ai-studio/api/Vector-stores/searchVectorStore),
+and [AI Studio quotas and limits](https://aistudio.yandex.ru/en/docs/ai-studio/concepts/limits).
+
 The initial upload and demonstration run and its recovery commits are owner-only
 and individually pinned to exact PR commits. Recovery diagnostics report the
 HTTP method, sanitized API route and a validated provider code, without

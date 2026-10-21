@@ -56,9 +56,12 @@ MAX_QUERY_CHARS = 8000
 MAX_CORPUS_CHARS = 2000000
 MAX_REPORT_CHARS = 60000
 MAX_API_BYTES = 8388608
-MAX_VECTOR_FILE_BYTES = 100 * 1024 * 1024
+MAX_VECTOR_FILE_BYTES = 128 * 1024 * 1024
 MAX_VECTOR_RESPONSE_BYTES = 16 * 1024 * 1024
 MAX_VECTOR_RESULT_CHARS = 4096
+MAX_VECTOR_SEARCH_RESULTS = 50
+MAX_VECTOR_CHUNK_SIZE_TOKENS = 4096
+MAX_VECTOR_CHUNK_OVERLAP_TOKENS = MAX_VECTOR_CHUNK_SIZE_TOKENS // 2
 VECTOR_STORE_POLL_ATTEMPTS = 60
 VECTOR_STORE_POLL_INTERVAL_SECONDS = 10
 STOP = {
@@ -844,11 +847,28 @@ def ensure_vector_store(name: str, project: str, key: str) -> str:
         if not isinstance(store_id, str) or not store_id:
             raise ValueError("vector_store_id_invalid")
         return store_id
-    created = yandex_json_request("POST", "/vector_stores", project, key, {"name": name})
+    created = yandex_json_request(
+        "POST",
+        "/vector_stores",
+        project,
+        key,
+        {"name": name, "chunking_strategy": vector_store_chunking_strategy()},
+    )
     store_id = created.get("id")
     if not isinstance(store_id, str) or not store_id or created.get("name") != name:
         raise ValueError("vector_store_create_receipt_invalid")
     return store_id
+
+
+def vector_store_chunking_strategy() -> dict:
+    """Use Yandex's documented maximum static chunk size and allowed overlap."""
+    return {
+        "type": "static",
+        "static": {
+            "max_chunk_size_tokens": MAX_VECTOR_CHUNK_SIZE_TOKENS,
+            "chunk_overlap_tokens": MAX_VECTOR_CHUNK_OVERLAP_TOKENS,
+        },
+    }
 
 
 def _multipart_file(filename: str, content: bytes) -> tuple[bytes, str]:
@@ -924,16 +944,30 @@ def ensure_file_attached(store_id: str, file_id: str, project: str, key: str) ->
     if file_id in ids:
         if len(ids) != 1:
             raise ValueError("vector_store_unexpected_files")
+        if (
+            attached[ids.index(file_id)].get("chunking_strategy")
+            != vector_store_chunking_strategy()
+        ):
+            raise ValueError("vector_store_chunking_strategy_mismatch")
         return
     if ids:
         raise ValueError("vector_store_unexpected_files")
-    receipt = yandex_json_request("POST", path, project, key, {"file_id": file_id})
+    receipt = yandex_json_request(
+        "POST",
+        path,
+        project,
+        key,
+        {"file_id": file_id, "chunking_strategy": vector_store_chunking_strategy()},
+    )
     attached_id = receipt.get("file_id") or receipt.get("id")
     if attached_id is not None and attached_id != file_id:
         raise ValueError("vector_store_attachment_receipt_invalid")
     confirmed = list_yandex_objects(path, project, key, ("files",))
     confirmed_ids = [_attached_file_id(item) for item in confirmed]
-    if confirmed_ids != [file_id]:
+    if (
+        confirmed_ids != [file_id]
+        or confirmed[0].get("chunking_strategy") != vector_store_chunking_strategy()
+    ):
         raise ValueError("vector_store_attachment_receipt_invalid")
 
 
@@ -1060,11 +1094,22 @@ def verify_vector_result(item: dict, corpus: list[dict]) -> dict:
 def vector_store_search(store_id: str, query: str, project: str, key: str) -> list[dict]:
     """Run one direct Vector Stores search and validate its result envelope."""
     path = f"/vector_stores/{quote(store_id, safe='')}/search"
-    data = yandex_json_request("POST", path, project, key, {"query": query, "max_num_results": 5})
+    data = yandex_json_request(
+        "POST",
+        path,
+        project,
+        key,
+        {
+            "query": query,
+            "rewrite_query": True,
+            "max_num_results": MAX_VECTOR_SEARCH_RESULTS,
+            "ranking_options": {"ranker": "auto", "score_threshold": 0.0},
+        },
+    )
     results = data.get("data", data.get("results", data.get("hits")))
     if not isinstance(results, list) or any(not isinstance(item, dict) for item in results):
         raise ValueError("vector_store_search_response_invalid")
-    return results[:5]
+    return results[:MAX_VECTOR_SEARCH_RESULTS]
 
 
 def technical_error_code(error: OSError | http.client.HTTPException) -> str:
@@ -1137,7 +1182,14 @@ def _vector_store_demo_report(
         "file_id": file_id,
         "file_name": filename,
         "file_bytes": file_meta.get("bytes", len(content)),
+        "index_settings": vector_store_chunking_strategy(),
         "query": query,
+        "search_settings": {
+            "rewrite_query": True,
+            "max_num_results": MAX_VECTOR_SEARCH_RESULTS,
+            "ranker": "auto",
+            "score_threshold": 0.0,
+        },
         "model_called": False,
         "result_count": len(hits),
         "results": hits,
@@ -1160,7 +1212,10 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
         corpus = fetch_corpus(os.environ.get("GITHUB_TOKEN"), "tasks")
         stage = "build_snapshot"
         fingerprint, content = build_vector_store_document(corpus)
-        store_name = f"chat-task-history-{fingerprint[:16]}"
+        store_name = (
+            f"chat-task-history-{fingerprint[:16]}"
+            f"-c{MAX_VECTOR_CHUNK_SIZE_TOKENS}-o{MAX_VECTOR_CHUNK_OVERLAP_TOKENS}"
+        )
         filename = f"chat-task-history-{fingerprint[:16]}.md"
         stage = "ensure_vector_store"
         store_id = ensure_vector_store(store_name, project, key)
