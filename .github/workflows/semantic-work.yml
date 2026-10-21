@@ -100,8 +100,16 @@ jobs:
       github.ref == 'refs/heads/feat/semantic-pipeline' &&
       github.actor == github.repository_owner &&
       github.triggering_actor == github.repository_owner &&
-      github.event.before == '41a388a2c309423a4c100c3d1fec683c620a5d37' &&
-      github.event.head_commit.message == 'feat(vector-store): add task snapshot upload and direct search'
+      (
+        (
+          github.event.before == '41a388a2c309423a4c100c3d1fec683c620a5d37' &&
+          github.event.head_commit.message == 'feat(vector-store): add task snapshot upload and direct search'
+        ) ||
+        (
+          github.event.before == 'c21ab3fda8ec9e17fcd4acdc84edaa52a6387ddc' &&
+          github.event.head_commit.message == 'fix(vector-store): report safe runner diagnostics'
+        )
+      )
     name: One-time Yandex Vector Store demo
     runs-on: ubuntu-latest
     timeout-minutes: 30

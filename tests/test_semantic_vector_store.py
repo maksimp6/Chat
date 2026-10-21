@@ -182,6 +182,18 @@ def test_vector_store_api_uses_fixed_yandex_host_and_project_headers(monkeypatch
     assert calls[-1] == ("close",)
 
 
+@pytest.mark.parametrize(
+    "error,expected",
+    [
+        (OSError("yandex_http_403"), "HTTP_403"),
+        (OSError("sensitive response body"), "OSERROR"),
+        (TimeoutError("sensitive endpoint details"), "TIMEOUTERROR"),
+    ],
+)
+def test_technical_error_code_exposes_only_safe_diagnostics(error, expected):
+    assert pipeline.technical_error_code(error) == expected
+
+
 def test_index_wait_polls_until_file_is_completed(monkeypatch):
     store_statuses = iter(["in_progress", "completed"])
     file_statuses = iter(["in_progress", "completed"])
@@ -279,6 +291,41 @@ def test_vector_store_demo_uploads_once_then_shows_direct_retrieval(monkeypatch,
     assert [call[0] for call in calls] == ["store", "file", "attach", "indexed", "search"]
     assert calls[-1] == ("search", "vs-1", "симуляция офиса")
     assert "Yandex AI Studio Vector Store demo" in summary.read_text(encoding="utf-8")
+
+
+def test_vector_store_demo_reports_safe_search_failure_after_indexing(monkeypatch, capsys):
+    row = source()
+    monkeypatch.setattr(pipeline, "fetch_corpus", lambda *args: [row])
+    monkeypatch.setattr(pipeline, "ensure_vector_store", lambda *args: "vs-1")
+    monkeypatch.setattr(
+        pipeline,
+        "ensure_yandex_file",
+        lambda *args: ("file-1", {"bytes": 1}),
+    )
+    monkeypatch.setattr(pipeline, "ensure_file_attached", lambda *args: None)
+    monkeypatch.setattr(pipeline, "wait_for_vector_store_index", lambda *args: None)
+    monkeypatch.setattr(
+        pipeline,
+        "vector_store_search",
+        lambda *args: (_ for _ in ()).throw(OSError("yandex_http_403")),
+    )
+    monkeypatch.setenv("YANDEX_API_KEY", "must-not-be-logged")
+    monkeypatch.setenv("YANDEX_PROJECT_ID", "must-not-be-logged")
+    args = SimpleNamespace(
+        allow_vector_store_write=True,
+        approval_reference="owner-confirmed-vector-store-demo",
+        corpus="tasks",
+        publish_issue=None,
+        allow_model_call=False,
+    )
+
+    with pytest.raises(OSError):
+        pipeline.run_vector_store_demo(args, "симуляция офиса")
+
+    captured = capsys.readouterr()
+    assert "store_id=vs-1 file_id=file-1" in captured.out
+    assert "stage=direct_vector_search error=HTTP_403" in captured.err
+    assert "must-not-be-logged" not in captured.out + captured.err
 
 
 def test_vector_store_write_requires_explicit_approval_before_source_read(monkeypatch):

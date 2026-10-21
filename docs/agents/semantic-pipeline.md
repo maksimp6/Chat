@@ -126,10 +126,14 @@ the runner does not call a model or claim that an Issue's state proves delivery.
 The indexed scope is GitHub Issue title/body and source metadata, as defined by
 this PR's task-history contract.
 
-The one-time upload and demonstration run is owner-only, bounded to this PR head,
-one snapshot file and one search query. The workflow uses the existing
-`YANDEX_API_KEY` and `YANDEX_PROJECT_ID` Actions secrets; provider-side API limits
-remain authoritative. For a later manual run, choose `vector-store`, enable
+The initial upload and demonstration run is owner-only and pinned to its exact PR
+commit. One separately pinned recovery commit is available if the initial run
+fails: it reports the safe stage and HTTP status, then follows the same
+fingerprint-based reuse path instead of overwriting a file. Each admitted run
+allows at most one snapshot file and one direct search query. The workflow uses
+the existing `YANDEX_API_KEY` and `YANDEX_PROJECT_ID` Actions secrets;
+provider-side API limits remain authoritative. For a later manual run, choose
+`vector-store`, enable
 `allow_vector_store_write`, provide the approval reference, and use a task-history
 query:
 

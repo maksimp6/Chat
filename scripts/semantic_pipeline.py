@@ -1027,6 +1027,22 @@ def vector_store_search(store_id: str, query: str, project: str, key: str) -> li
     return results[:5]
 
 
+def technical_error_code(error: OSError | http.client.HTTPException) -> str:
+    """Return a safe transport diagnostic without exposing URLs or response bodies."""
+    status = getattr(error, "code", None)
+    if type(status) is int:
+        return f"HTTP_{status}"
+    message = str(error)
+    if message == "PROVIDER_ERROR":
+        return message
+    match = re.fullmatch(r"[a-zA-Z0-9_-]+_http_(\d{3})", message)
+    if match:
+        return f"HTTP_{match.group(1)}"
+    if message == "vector_store_index_timeout":
+        return "VECTOR_STORE_INDEX_TIMEOUT"
+    return type(error).__name__.upper()
+
+
 def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
     """Upload a complete task snapshot and show one direct Vector Store search."""
     if not args.allow_vector_store_write or not args.approval_reference.strip():
@@ -1037,15 +1053,34 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
     project = os.environ.get("YANDEX_PROJECT_ID", "")
     if not key or not project:
         raise ValueError("missing_yandex_credentials")
-    corpus = fetch_corpus(os.environ.get("GITHUB_TOKEN"), "tasks")
-    fingerprint, content = build_vector_store_document(corpus)
-    store_name = f"chat-task-history-{fingerprint[:16]}"
-    filename = f"chat-task-history-{fingerprint[:16]}.md"
-    store_id = ensure_vector_store(store_name, project, key)
-    file_id, file_meta = ensure_yandex_file(filename, content, project, key)
-    ensure_file_attached(store_id, file_id, project, key)
-    wait_for_vector_store_index(store_id, file_id, project, key)
-    results = vector_store_search(store_id, query, project, key)
+    stage = "read_github_issues"
+    try:
+        corpus = fetch_corpus(os.environ.get("GITHUB_TOKEN"), "tasks")
+        stage = "build_snapshot"
+        fingerprint, content = build_vector_store_document(corpus)
+        store_name = f"chat-task-history-{fingerprint[:16]}"
+        filename = f"chat-task-history-{fingerprint[:16]}.md"
+        stage = "ensure_vector_store"
+        store_id = ensure_vector_store(store_name, project, key)
+        stage = "ensure_yandex_file"
+        file_id, file_meta = ensure_yandex_file(filename, content, project, key)
+        stage = "attach_snapshot"
+        ensure_file_attached(store_id, file_id, project, key)
+        stage = "wait_for_index"
+        wait_for_vector_store_index(store_id, file_id, project, key)
+        print(
+            "Vector Store indexed: "
+            f"store_id={store_id} file_id={file_id} file_name={filename} "
+            f"sources={len(corpus)} fingerprint={fingerprint}"
+        )
+        stage = "direct_vector_search"
+        results = vector_store_search(store_id, query, project, key)
+    except (OSError, http.client.HTTPException) as exc:
+        print(
+            f"VECTOR_STORE_DEMO_FAILED stage={stage} error={technical_error_code(exc)}",
+            file=sys.stderr,
+        )
+        raise
     hits = []
     for rank, item in enumerate(results, 1):
         result_file_id = item.get("file_id")
@@ -1074,7 +1109,9 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
     report_data = {
         "operation": "upload_task_history_and_direct_vector_search",
         "repository": REPO,
-        "source_scope": "all GitHub Issues in open and closed states; title/body and source metadata",
+        "source_scope": (
+            "all GitHub Issues in open and closed states; title/body and source metadata"
+        ),
         "excluded": ["pull requests", "issue comments", "linked PRs", "repository file tree"],
         "corpus_sources": len(corpus),
         "corpus_fingerprint": fingerprint,
@@ -1259,8 +1296,8 @@ def main(argv: list[str] | None = None) -> int:
     except (TypeError, ValueError):
         print("FAIL-CLOSED: CONTRACT_VIOLATION; report not published", file=sys.stderr)
         return 1
-    except (OSError, http.client.HTTPException):
-        print("TECHNICAL_ERROR: PROVIDER_ERROR or transport failure; no retry", file=sys.stderr)
+    except (OSError, http.client.HTTPException) as exc:
+        print(f"TECHNICAL_ERROR: {technical_error_code(exc)}; no retry", file=sys.stderr)
         return 3
 
 

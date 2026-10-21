@@ -35,7 +35,12 @@ def test_workflow_requires_owner_first_attempt_and_explicit_budget():
     demo_guard = data["jobs"]["vector-store-demo"]["if"]
     assert "github.event.before == '41a388a2c309423a4c100c3d1fec683c620a5d37'" in demo_guard
     assert (
-        "github.event.head_commit.message == 'feat(vector-store): add task snapshot upload and direct search'"
+        "github.event.head_commit.message == "
+        "'feat(vector-store): add task snapshot upload and direct search'" in demo_guard
+    )
+    assert "github.event.before == 'c21ab3fda8ec9e17fcd4acdc84edaa52a6387ddc'" in demo_guard
+    assert (
+        "github.event.head_commit.message == 'fix(vector-store): report safe runner diagnostics'"
         in demo_guard
     )
     assert "github.actor == github.repository_owner" in demo_guard
