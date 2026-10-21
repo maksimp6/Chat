@@ -111,20 +111,30 @@ merely because the model was not called.
 ## Yandex AI Studio Vector Store demonstration
 
 `--mode vector-store` is a separate owner-approved runner operation. It reads the
-complete open and closed Issue corpus, preserves each title and full body with its
-URL, declared state/reason, update/close times and SHA256 values, then uploads one
-deterministic Markdown snapshot through the AI Studio Files API and attaches it to
-a versioned Vector Store. The filename and store name include the stable corpus
-fingerprint, so a retry reuses the same file and store. Existing data is never
-removed or overwritten.
+complete open and closed Issue corpus, preserving titles, full bodies and source
+metadata. With `--include-repository`, it also reads every Git-tracked file from
+the checked-out PR revision. UTF-8 text is indexed; binary files and symlinks are
+represented by path, byte count and SHA256 only. Untracked/ignored files, comment
+threads, pull-request bodies/reviews and credential-bearing files are excluded.
+Known credential patterns in Issue and repository text are redacted before upload.
 
-After indexing completes, the runner makes one direct
-`vector_stores.search` request and prints its ranked excerpts with file identity.
-It checks each excerpt against the captured Issue title/body and reports a source
-URL and exact offset only when the text matches verbatim. This is retrieval only;
-the runner does not call a model or claim that an Issue's state proves delivery.
-The indexed scope is GitHub Issue title/body and source metadata, as defined by
-this PR's task-history contract.
+The resulting deterministic Markdown snapshot is uploaded through the AI Studio
+Files API and attached to a versioned Vector Store. The filename and store name
+include the stable corpus fingerprint, so a retry reuses the same file and store.
+Existing data is never removed or overwritten. File size remains bounded by the
+documented 128 MB limit.
+
+After indexing, the runner makes one direct `vector_stores.search` request with
+the maximum 50 results. It verifies exact search excerpts against Issue content
+or repository-file text when the source path is present in the indexed chunk.
+When `--allow-model-call` is also enabled, one `aliceai-llm-flash` request to
+Yandex's Responses API receives at most 12 retrieved excerpts, each capped at
+2,500 characters. The input is bounded to 60,000 characters, output to 4,096
+tokens, and the call is synchronous, non-stored and not retried. The model may
+answer only from the retrieved excerpts and must quote them exactly. Citation
+quotes are checked against the excerpts; semantic entailment is not assessed,
+so the generated answer remains a proposal rather than a proven fact. Provider
+request ID and usage are reported when returned; total cost is not measured.
 
 The Yandex AI Studio API settings were checked against the official documentation
 on 2026-10-21. Each snapshot file is capped at the documented 128 MB. Vector Store
@@ -135,8 +145,8 @@ is not silently reused. Direct search asks for the maximum 50 results, enables
 query rewriting and the `auto` ranker, and uses a `0.0` score threshold to avoid
 discarding lower-scored candidates. These are recall-oriented ceiling settings;
 they can return broader chunks and more ambiguous evidence than a tuned quality
-configuration. The runner still makes one search request and no text-generation
-request. It leaves file and store expiration unset, preserving Yandex's documented
+configuration. The runner makes one search request. Text generation occurs only
+when explicitly allowed by the workflow. It leaves file and store expiration unset, preserving Yandex's documented
 default persistence for non-batch files and avoiding automatic index expiry.
 
 Embedding transparency: this runner uploads files to the managed Vector Store and
@@ -157,24 +167,25 @@ References: [Yandex file upload API](https://aistudio.yandex.ru/ru/docs/ai-studi
 [Embedding API](https://aistudio.yandex.ru/docs/ru/ai-studio/embeddings/api-ref/grpc/),
 and [AI Studio quotas and limits](https://aistudio.yandex.ru/en/docs/ai-studio/concepts/limits).
 
-The initial upload and demonstration run and its recovery commits are owner-only
-and individually pinned to exact PR commits. Recovery diagnostics report the
+The initial upload and demonstration runs are owner-only and individually pinned
+to exact PR commits. Recovery diagnostics report the
 HTTP method, sanitized API route and a validated provider code, without
 credentials, object IDs or response messages. Requests go only to Yandex's
 `ai.api.cloud.yandex.net` host and use its `/v1` project-routing headers. The runner uses Python's standard library;
 it makes no OpenAI service call and adds no SDK or Python dependency.
-The fingerprint-based reuse path never overwrites an existing file. Each
-admitted run allows at most one snapshot file and one direct search query. The
-workflow uses the existing `YANDEX_API_KEY` and `YANDEX_PROJECT_ID` Actions
-secrets; provider-side API limits remain authoritative. For a later manual run, choose
-`vector-store`, enable
-`allow_vector_store_write`, provide the approval reference, and use a task-history
-query:
+The fingerprint-based reuse path never overwrites an existing file. Each admitted
+run allows at most one snapshot file, one direct search query and (when enabled)
+one Yandex model call. The workflow uses the existing `YANDEX_API_KEY` and
+`YANDEX_PROJECT_ID` Actions secrets; provider-side API limits remain authoritative.
+For a manual run, choose `vector-store`, enable `allow_vector_store_write`, and
+provide the approved reference. To index the tracked repository and generate an
+answer, also enable `include_repository` and `allow_model_call`:
 
 ```sh
 python scripts/semantic_pipeline.py \
   --mode vector-store --corpus tasks --query "симуляция офиса" \
-  --allow-vector-store-write --approval-reference owner-approved
+  --allow-vector-store-write --include-repository --allow-model-call \
+  --approval-reference owner-approved
 ```
 
 ## Later work

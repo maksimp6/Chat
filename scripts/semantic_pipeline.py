@@ -33,6 +33,7 @@ import http.client
 import json
 import math
 import os
+import subprocess
 import re
 import sys
 import time
@@ -60,6 +61,8 @@ MAX_VECTOR_FILE_BYTES = 128 * 1024 * 1024
 MAX_VECTOR_RESPONSE_BYTES = 16 * 1024 * 1024
 MAX_VECTOR_RESULT_CHARS = 4096
 MAX_VECTOR_SEARCH_RESULTS = 50
+MAX_VECTOR_MODEL_CANDIDATES = 12
+MAX_VECTOR_MODEL_EXCERPT_CHARS = 2500
 MAX_VECTOR_CHUNK_SIZE_TOKENS = 4096
 MAX_VECTOR_CHUNK_OVERLAP_TOKENS = MAX_VECTOR_CHUNK_SIZE_TOKENS // 2
 VECTOR_STORE_POLL_ATTEMPTS = 60
@@ -633,24 +636,234 @@ def corpus_fingerprint(corpus: list[dict]) -> str:
     return hashlib.sha256(json.dumps(stable_manifest, sort_keys=True).encode()).hexdigest()
 
 
-def build_vector_store_document(corpus: list[dict]) -> tuple[str, bytes]:
-    """Build a deterministic Markdown source file with full issue provenance."""
+def _repository_path_is_sensitive(path: str) -> bool:
+    """Exclude credential files before reading their contents."""
+    name = path.rsplit("/", 1)[-1].lower()
+    if name in {
+        ".env",
+        ".npmrc",
+        ".pypirc",
+        "secrets.yaml",
+        "secrets.yml",
+        "secrets.json",
+        "credentials.yaml",
+        "credentials.yml",
+        "credentials.json",
+        "auth.json",
+        "private.key",
+        "id_rsa",
+        "id_ed25519",
+    }:
+        return True
+    if name.startswith(".env.") and name != ".env.example":
+        return True
+    if any(word in name for word in ("secret", "credential")) and name.endswith(
+        (".yaml", ".yml", ".json", ".toml", ".ini", ".cfg")
+    ):
+        return True
+    return name.endswith((".pem", ".key", ".p12", ".pfx", ".jks"))
+
+
+_SECRET_TOKEN_RE = re.compile(
+    r"gh[pousr]_[A-Za-z0-9_]{30,}|github_pat_[A-Za-z0-9_]{30,}|"
+    r"sk-[A-Za-z0-9]{24,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}"
+)
+_PRIVATE_KEY_BLOCK_RE = re.compile(
+    r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----"
+)
+_BEARER_TOKEN_RE = re.compile(r"(?i)(\bauthorization\s*[:=]\s*bearer\s+)[A-Za-z0-9._~+/=-]{12,}")
+_SECRET_ASSIGNMENT_RE = re.compile(
+    r"(?im)(?P<prefix>\b(?:api[_-]?key|access[_-]?token|client[_-]?secret|password|"
+    r"private[_-]?key|secret[_-]?key|yandex_api_key|aws_secret_access_key|"
+    r"token|secret|credential)\b\s*[:=]\s*)"
+    r"(?:(?P<quote>['\"])(?P<quoted>[^'\"\r\n]{8,})(?P=quote)|"
+    r"(?P<bare>[A-Za-z0-9_~+/=-]{16,}))"
+)
+
+
+def _redact_repository_text(text: str) -> tuple[str, int]:
+    """Remove recognizable credential values while preserving surrounding source."""
+    redactions = 0
+
+    def redact_token(match: re.Match) -> str:
+        nonlocal redactions
+        redactions += 1
+        return "[REDACTED]"
+
+    text = _SECRET_TOKEN_RE.sub(redact_token, text)
+    text = _PRIVATE_KEY_BLOCK_RE.sub(redact_token, text)
+
+    def redact_bearer(match: re.Match) -> str:
+        nonlocal redactions
+        redactions += 1
+        return f"{match.group(1)}[REDACTED]"
+
+    text = _BEARER_TOKEN_RE.sub(redact_bearer, text)
+
+    def redact_assignment(match: re.Match) -> str:
+        nonlocal redactions
+        value = match.group("quoted") or match.group("bare") or ""
+        if value.casefold().startswith(("${{", "${", "$", "your_", "changeme", "placeholder")):
+            return match.group(0)
+        redactions += 1
+        return f"{match.group('prefix')}{match.group('quote') or ''}[REDACTED]{match.group('quote') or ''}"
+
+    text = _SECRET_ASSIGNMENT_RE.sub(redact_assignment, text)
+    return text, redactions
+
+
+def sanitize_vector_store_corpus(corpus: list[dict]) -> tuple[list[dict], int]:
+    """Redact recognizable credential values before indexing GitHub Issue text."""
+    sanitized = []
+    total_redactions = 0
+    for source in corpus:
+        item = dict(source)
+        title, title_redactions = _redact_repository_text(item["title"])
+        body, body_redactions = _redact_repository_text(item["text"])
+        redactions = title_redactions + body_redactions
+        item.update(
+            {
+                "title": title,
+                "text": body,
+                "title_sha256": hashlib.sha256(title.encode()).hexdigest(),
+                "sha256": hashlib.sha256(body.encode()).hexdigest(),
+                "body_sha256": hashlib.sha256(body.encode()).hexdigest(),
+                "body_offset": 0,
+                "credential_redactions": redactions,
+            }
+        )
+        sanitized.append(item)
+        total_redactions += redactions
+    return sanitized, total_redactions
+
+
+def read_repository_snapshot(root: str | None = None) -> tuple[list[dict], int]:
+    """Read tracked repository files only; keep binary content out of the text index."""
+    cwd = os.path.abspath(root or os.getcwd())
+    try:
+        listing = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=cwd,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        raise ValueError("repository_file_list_unavailable") from None
+
+    files = []
+    excluded_sensitive = 0
+    total_bytes = 0
+    for encoded_path in listing.split(b"\0"):
+        if not encoded_path:
+            continue
+        path = os.fsdecode(encoded_path).replace(os.sep, "/")
+        if path.startswith("/") or ".." in path.split("/"):
+            raise ValueError("repository_path_invalid")
+        if _repository_path_is_sensitive(path):
+            excluded_sensitive += 1
+            continue
+        local_path = os.path.join(cwd, *path.split("/"))
+        try:
+            is_symlink = os.path.islink(local_path)
+            if is_symlink:
+                raw = os.readlink(local_path).encode("utf-8")
+            else:
+                with open(local_path, "rb") as source_file:
+                    raw = source_file.read()
+        except OSError:
+            raise ValueError("repository_file_read_failed") from None
+        total_bytes += len(raw)
+        if total_bytes > MAX_VECTOR_FILE_BYTES:
+            raise ValueError("repository_snapshot_too_large")
+        record = {
+            "path": path,
+            "bytes": len(raw),
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "index_sha256": hashlib.sha256(raw).hexdigest(),
+        }
+        if is_symlink:
+            record.update({"kind": "symlink", "text": None, "redactions": 0})
+        else:
+            try:
+                decoded = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                decoded = None
+            if decoded is None or "\0" in decoded:
+                record.update({"kind": "binary", "text": None, "redactions": 0})
+            else:
+                safe_text, redactions = _redact_repository_text(decoded)
+                record.update(
+                    {
+                        "kind": "text",
+                        "text": safe_text,
+                        "index_sha256": hashlib.sha256(safe_text.encode()).hexdigest(),
+                        "redactions": redactions,
+                    }
+                )
+        files.append(record)
+    files.sort(key=lambda item: item["path"])
+    return files, excluded_sensitive
+
+
+def build_vector_store_document(
+    corpus: list[dict],
+    repository_files: list[dict] | None = None,
+    excluded_sensitive_files: int = 0,
+) -> tuple[str, bytes]:
+    """Build a deterministic issue snapshot, optionally with the tracked repository."""
     if not corpus:
         raise ValueError("empty_corpus")
-    fingerprint = corpus_fingerprint(corpus)
+    if repository_files is None:
+        fingerprint = corpus_fingerprint(corpus)
+    else:
+        repo_manifest = [
+            {
+                key: item.get(key)
+                for key in ("path", "kind", "bytes", "sha256", "index_sha256", "redactions")
+            }
+            for item in repository_files
+        ]
+        fingerprint = hashlib.sha256(
+            json.dumps(
+                {
+                    "issues": corpus_fingerprint(corpus),
+                    "repository": repo_manifest,
+                    "excluded_sensitive_files": excluded_sensitive_files,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ).encode()
+        ).hexdigest()
     retrieved_at = corpus[0].get("retrieved_at")
     if not isinstance(retrieved_at, str) or any(
         source.get("retrieved_at") != retrieved_at for source in corpus
     ):
         raise ValueError("corpus_retrieval_time_invalid")
-    lines = [
-        f"# GitHub issue history for {REPO}",
-        "Source scope: every open and closed Issue; pull requests are excluded.",
-        "Each body below is verbatim. Metadata identifies the source snapshot.",
-        f"Corpus fingerprint: {fingerprint}",
-        f"Snapshot retrieved at: {retrieved_at}",
-        f"Source count: {len(corpus)}",
-    ]
+    redactions_present = any(source.get("credential_redactions", 0) for source in corpus)
+    if repository_files is None and not redactions_present:
+        lines = [
+            f"# GitHub issue history for {REPO}",
+            "Source scope: every open and closed Issue; pull requests are excluded.",
+            "Each body below is verbatim. Metadata identifies the source snapshot.",
+            f"Corpus fingerprint: {fingerprint}",
+            f"Snapshot retrieved at: {retrieved_at}",
+            f"Source count: {len(corpus)}",
+        ]
+    else:
+        lines = [
+            f"# {'Complete repository' if repository_files is not None else 'GitHub issue history'} snapshot for {REPO}",
+            (
+                "Source scope: all open and closed Issues plus all tracked repository files. "
+                "Text files are indexed; binary files are represented by metadata only."
+                if repository_files is not None
+                else "Source scope: every open and closed Issue; pull requests are excluded."
+            ),
+            "Issue bodies and included text files are verbatim apart from credential redaction.",
+            f"Corpus fingerprint: {fingerprint}",
+            f"Snapshot retrieved at: {retrieved_at}",
+            f"Issue count: {len(corpus)}",
+        ]
     for source in sorted(corpus, key=lambda item: item["issue"]):
         title = source.get("title", "")
         body = source.get("text", "")
@@ -672,6 +885,8 @@ def build_vector_store_document(corpus: list[dict]) -> tuple[str, bytes]:
             "title_sha256": title_sha256,
             "body_sha256": body_sha256,
         }
+        if repository_files is not None or source.get("credential_redactions", 0):
+            metadata["credential_redactions"] = source.get("credential_redactions", 0)
         lines.extend(
             [
                 "",
@@ -683,6 +898,62 @@ def build_vector_store_document(corpus: list[dict]) -> tuple[str, bytes]:
                 body,
             ]
         )
+    if repository_files is not None:
+        text_count = sum(item["kind"] == "text" for item in repository_files)
+        binary_count = sum(item["kind"] in {"binary", "symlink"} for item in repository_files)
+        lines.extend(
+            [
+                "",
+                "# Tracked repository files",
+                f"File count: {len(repository_files)}",
+                f"Text files: {text_count}",
+                f"Binary files and symlinks (metadata only): {binary_count}",
+                f"Credential-bearing files excluded before reading: {excluded_sensitive_files}",
+                "Untracked and ignored files are not part of this snapshot.",
+            ]
+        )
+        for item in repository_files:
+            metadata = {
+                "path": item["path"],
+                "kind": item["kind"],
+                "bytes": item["bytes"],
+                "sha256": item["sha256"],
+                "index_sha256": item.get("index_sha256", item["sha256"]),
+                "redactions": item.get("redactions", 0),
+            }
+            lines.extend(
+                [
+                    "",
+                    "## Repository file",
+                    "Metadata: " + json.dumps(metadata, ensure_ascii=False, sort_keys=True),
+                ]
+            )
+            if item["kind"] != "text":
+                lines.append("Content omitted; this entry preserves only file identity and size.")
+                continue
+            text = item.get("text")
+            if not isinstance(text, str):
+                raise ValueError("repository_text_invalid")
+            segments = [text[offset : offset + 3000] for offset in range(0, len(text), 3000)] or [
+                ""
+            ]
+            for number, segment in enumerate(segments, 1):
+                fence = "`" * max(
+                    3,
+                    1
+                    + max((len(match.group()) for match in re.finditer(r"`+", segment)), default=0),
+                )
+                lines.extend(
+                    [
+                        "",
+                        f"### Segment {number} of {len(segments)}",
+                        "Repository path JSON: " + json.dumps(item["path"], ensure_ascii=False),
+                        "Content:",
+                        fence,
+                        segment,
+                        fence,
+                    ]
+                )
     content = ("\n".join(lines) + "\n").encode("utf-8")
     if len(content) > MAX_VECTOR_FILE_BYTES:
         raise ValueError("vector_store_file_too_large")
@@ -1044,13 +1315,70 @@ def _longest_exact_excerpt(
     return best[0], best[1]
 
 
-def verify_vector_result(item: dict, corpus: list[dict]) -> dict:
+def verify_repository_vector_result(item: dict, repository_files: list[dict]) -> dict:
+    """Resolve an excerpt to the tracked text file path stamped into its segment."""
+    by_path = {source["path"]: source for source in repository_files}
+    for snippet in _vector_result_texts(item):
+        paths = set()
+        for raw_path in re.findall(r"(?m)^Repository path JSON: (.+)$", snippet):
+            try:
+                path = json.loads(raw_path)
+            except ValueError:
+                continue
+            if isinstance(path, str) and path in by_path:
+                paths.add(path)
+        for path in sorted(paths):
+            source = by_path[path]
+            if source["kind"] == "text":
+                source_text = source.get("text")
+                match = _longest_exact_excerpt(snippet[:MAX_VECTOR_RESULT_CHARS], source_text or "")
+                if match is None:
+                    continue
+                start, end = match
+                quote_text = source_text[start:end].strip()
+                if not quote_text:
+                    continue
+                evidence = {
+                    "path": path,
+                    "field": "content",
+                    "quote": quote_text,
+                    "verbatim": True,
+                    "sha256": source["sha256"],
+                    "redactions_applied": source.get("redactions", 0),
+                }
+                if not source.get("redactions"):
+                    evidence["source_start"] = start
+                    evidence["source_end"] = end
+                return evidence
+            metadata_excerpt = f'"path": {json.dumps(path, ensure_ascii=False)}'
+            if metadata_excerpt in snippet:
+                return {
+                    "path": path,
+                    "field": "metadata",
+                    "quote": metadata_excerpt,
+                    "verbatim": True,
+                    "sha256": source["sha256"],
+                    "kind": source["kind"],
+                }
+    return {"verbatim": False}
+
+
+def verify_vector_result(
+    item: dict,
+    corpus: list[dict],
+    repository_files: list[dict] | None = None,
+) -> dict:
     """Bind an exact search excerpt to a hashed source body or title when possible."""
     for snippet in _vector_result_texts(item):
         snippet = snippet[:MAX_VECTOR_RESULT_CHARS]
         declared_ids = {
             int(match.group(1)) for match in re.finditer(r"(?m)^## Issue (\d{1,10})\s*$", snippet)
         }
+        if repository_files and not declared_ids:
+            repository_match = verify_repository_vector_result(item, repository_files)
+            if repository_match.get("verbatim"):
+                return repository_match
+            continue
         matches = []
         for source in corpus:
             if declared_ids and source["issue"] not in declared_ids:
@@ -1088,6 +1416,8 @@ def verify_vector_result(item: dict, corpus: list[dict]) -> dict:
             return next(iter(unique_matches.values()))
         if len(unique_matches) > 1:
             return {"verbatim": False, "reason": "ambiguous_source_match"}
+    if repository_files:
+        return verify_repository_vector_result(item, repository_files)
     return {"verbatim": False}
 
 
@@ -1110,6 +1440,107 @@ def vector_store_search(store_id: str, query: str, project: str, key: str) -> li
     if not isinstance(results, list) or any(not isinstance(item, dict) for item in results):
         raise ValueError("vector_store_search_response_invalid")
     return results[:MAX_VECTOR_SEARCH_RESULTS]
+
+
+def build_vector_store_prompt(
+    query: str, results: list[dict], file_id: str
+) -> tuple[str, list[dict]]:
+    """Bound top search excerpts for one answer call; keep all text as untrusted data."""
+    candidates = []
+    for rank, item in enumerate(results[:MAX_VECTOR_MODEL_CANDIDATES], 1):
+        result_file_id = item.get("file_id")
+        if result_file_id is not None and result_file_id != file_id:
+            raise ValueError("vector_store_search_file_mismatch")
+        text = "\n".join(_vector_result_texts(item))[:MAX_VECTOR_MODEL_EXCERPT_CHARS]
+        if not text.strip():
+            continue
+        score = item.get("score")
+        if (
+            not isinstance(score, (int, float))
+            or isinstance(score, bool)
+            or not math.isfinite(score)
+        ):
+            score = None
+        file_name = item.get("file_name")
+        if not isinstance(file_name, str):
+            file_name = None
+        candidates.append(
+            {
+                "id": len(candidates) + 1,
+                "rank": rank,
+                "file_id": file_id,
+                "file_name": file_name,
+                "score": score,
+                "text": text,
+                "item": item,
+            }
+        )
+    if not candidates:
+        raise ValueError("vector_store_model_no_candidates")
+    payload = {
+        "query": query,
+        "sources": [
+            {
+                "id": candidate["id"],
+                "file_name": candidate["file_name"],
+                "score": candidate["score"],
+                "text": candidate["text"],
+            }
+            for candidate in candidates
+        ],
+    }
+    prompt = json.dumps(payload, ensure_ascii=False)
+    if len(prompt) + len(INSTRUCTIONS) > MAX_PROMPT_CHARS:
+        raise ValueError("prompt_too_large")
+    return prompt, candidates
+
+
+def vector_store_model_result(
+    query: str,
+    results: list[dict],
+    file_id: str,
+    corpus: list[dict],
+    repository_files: list[dict] | None,
+    project: str,
+    key: str,
+) -> tuple[dict, dict]:
+    """Ask YandexGPT once over retrieved excerpts and verify every quoted citation."""
+    prompt, candidates = build_vector_store_prompt(query, results, file_id)
+    provider = yandex_call(project, key, prompt)
+    if not isinstance(provider, dict) or "error" in provider:
+        raise OSError("PROVIDER_ERROR")
+    if not isinstance(provider.get("text"), str):
+        raise ValueError("provider_text_missing")
+    response = parse_model_json(provider["text"])
+    validate_response(response)
+    citations = []
+    for citation in response["citations"]:
+        candidate_id = citation["id"]
+        if not 1 <= candidate_id <= len(candidates):
+            raise ValueError("unknown_candidate_id")
+        candidate = candidates[candidate_id - 1]
+        if citation["quote"] not in candidate["text"]:
+            raise ValueError("quote_outside_candidate")
+        citations.append(
+            {
+                "rank": candidate["rank"],
+                "quote": citation["quote"],
+                "file_id": file_id,
+                "file_name": candidate["file_name"],
+                "source_match": verify_vector_result(candidate["item"], corpus, repository_files),
+            }
+        )
+    return (
+        {
+            "status": "MODEL_REFUSAL" if response["refusal"] else "CITATIONS_ONLY",
+            "answer": response["answer"],
+            "refusal": response["refusal"],
+            "citations": citations,
+            "model_called": True,
+            "semantic_entailment": "NOT_ASSESSED",
+        },
+        provider,
+    )
 
 
 def technical_error_code(error: OSError | http.client.HTTPException) -> str:
@@ -1142,6 +1573,10 @@ def _vector_store_demo_report(
     file_meta: dict,
     content: bytes,
     results: list[dict],
+    repository_files: list[dict] | None = None,
+    excluded_sensitive_files: int = 0,
+    model_result: dict | None = None,
+    provider: dict | None = None,
 ) -> str:
     """Render bounded direct-search results and their verified source matches."""
     hits = []
@@ -1164,17 +1599,39 @@ def _vector_store_demo_report(
                 "file_id": item.get("file_id"),
                 "file_name": item.get("file_name"),
                 "snippet": snippet,
-                "source_match": verify_vector_result(item, corpus),
+                "source_match": verify_vector_result(item, corpus, repository_files),
             }
         )
     report_data = {
-        "operation": "upload_task_history_and_direct_vector_search",
+        "operation": (
+            "upload_repository_snapshot_search_and_model"
+            if model_result is not None
+            else "upload_repository_snapshot_and_direct_vector_search"
+            if repository_files is not None
+            else "upload_task_history_and_direct_vector_search"
+        ),
         "repository": REPO,
         "source_scope": (
-            "all GitHub Issues in open and closed states; title/body and source metadata"
+            "all open and closed GitHub Issues plus all tracked repository files; "
+            "text content indexed, binary files represented by metadata"
+            if repository_files is not None
+            else "all GitHub Issues in open and closed states; title/body and source metadata"
         ),
-        "excluded": ["pull requests", "issue comments", "linked PRs", "repository file tree"],
+        "excluded": (
+            [
+                "pull request bodies and review comments",
+                "issue comments",
+                "untracked and ignored files",
+                "credential-bearing files",
+                "binary file contents",
+            ]
+            if repository_files is not None
+            else ["pull requests", "issue comments", "linked PRs", "repository file tree"]
+        ),
         "corpus_sources": len(corpus),
+        "issue_content_redactions": sum(
+            source.get("credential_redactions", 0) for source in corpus
+        ),
         "corpus_fingerprint": fingerprint,
         "retrieved_at": corpus[0].get("retrieved_at") if corpus else None,
         "vector_store_name": store_name,
@@ -1182,6 +1639,19 @@ def _vector_store_demo_report(
         "file_id": file_id,
         "file_name": filename,
         "file_bytes": file_meta.get("bytes", len(content)),
+        "repository_files": (
+            {
+                "tracked_file_count": len(repository_files),
+                "text_files": sum(item["kind"] == "text" for item in repository_files),
+                "binary_and_symlink_metadata": sum(
+                    item["kind"] in {"binary", "symlink"} for item in repository_files
+                ),
+                "excluded_credential_files": excluded_sensitive_files,
+                "redactions_applied": sum(item.get("redactions", 0) for item in repository_files),
+            }
+            if repository_files is not None
+            else None
+        ),
         "index_settings": vector_store_chunking_strategy(),
         "query": query,
         "search_settings": {
@@ -1190,7 +1660,19 @@ def _vector_store_demo_report(
             "ranker": "auto",
             "score_threshold": 0.0,
         },
-        "model_called": False,
+        "model_called": model_result is not None,
+        "model": (
+            {
+                "name": MODEL,
+                "request_id": provider.get("request_id") if provider else None,
+                "usage": provider.get("usage") if provider else None,
+                "cost": None,
+                "cost_scope": "total_execution_cost_not_measured",
+                "result": model_result,
+            }
+            if model_result is not None
+            else None
+        ),
         "result_count": len(hits),
         "results": hits,
     }
@@ -1198,7 +1680,7 @@ def _vector_store_demo_report(
 
 
 def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
-    """Upload a complete task snapshot and show one direct Vector Store search."""
+    """Upload a task/repository snapshot, retrieve it, and optionally ask YandexGPT once."""
     if not args.allow_vector_store_write or not args.approval_reference.strip():
         raise ValueError("vector_store_write_not_authorized")
     if args.corpus not in {None, "tasks"}:
@@ -1210,13 +1692,21 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
     stage = "read_github_issues"
     try:
         corpus = fetch_corpus(os.environ.get("GITHUB_TOKEN"), "tasks")
+        corpus, _issue_redactions = sanitize_vector_store_corpus(corpus)
+        include_repository = bool(getattr(args, "include_repository", False))
+        repository_files, excluded_sensitive_files = (
+            read_repository_snapshot() if include_repository else (None, 0)
+        )
         stage = "build_snapshot"
-        fingerprint, content = build_vector_store_document(corpus)
+        fingerprint, content = build_vector_store_document(
+            corpus, repository_files, excluded_sensitive_files
+        )
+        prefix = "chat-repository" if include_repository else "chat-task-history"
         store_name = (
-            f"chat-task-history-{fingerprint[:16]}"
+            f"{prefix}-{fingerprint[:16]}"
             f"-c{MAX_VECTOR_CHUNK_SIZE_TOKENS}-o{MAX_VECTOR_CHUNK_OVERLAP_TOKENS}"
         )
-        filename = f"chat-task-history-{fingerprint[:16]}.md"
+        filename = f"{prefix}-{fingerprint[:16]}.md"
         stage = "ensure_vector_store"
         store_id = ensure_vector_store(store_name, project, key)
         stage = "ensure_yandex_file"
@@ -1232,6 +1722,19 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
         )
         stage = "direct_vector_search"
         results = vector_store_search(store_id, query, project, key)
+        model_result = None
+        provider = None
+        if getattr(args, "allow_model_call", False):
+            stage = "model_answer"
+            model_result, provider = vector_store_model_result(
+                query,
+                results,
+                file_id,
+                corpus,
+                repository_files,
+                project,
+                key,
+            )
     except (OSError, http.client.HTTPException) as exc:
         print(
             f"VECTOR_STORE_DEMO_FAILED stage={stage} error={technical_error_code(exc)}",
@@ -1249,15 +1752,28 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
         file_meta,
         content,
         results,
+        repository_files,
+        excluded_sensitive_files,
+        model_result,
+        provider,
     )
-    print("Yandex AI Studio Vector Store demo (direct retrieval; no model call):")
+    print(
+        "Yandex AI Studio Vector Store demo (retrieval plus one Yandex model call)."
+        if model_result is not None
+        else "Yandex AI Studio Vector Store demo (direct retrieval; no model call):"
+    )
     print(rendered)
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_path:
         with open(summary_path, "a", encoding="utf-8") as summary_file:
             summary_file.write("## Yandex AI Studio Vector Store demo\n\n")
             summary_file.write(
-                "Direct retrieval from the uploaded GitHub task snapshot; no model call.\n\n"
+                "Retrieved passages from the uploaded GitHub repository snapshot. "
+                + (
+                    "One Yandex model call generated the cited answer.\n\n"
+                    if model_result
+                    else "No model call was requested.\n\n"
+                )
             )
             summary_file.write(rendered + "\n")
     return 0
@@ -1342,9 +1858,11 @@ def _run(args: argparse.Namespace) -> int:
     query = _query(args)
     token = os.environ.get("GITHUB_TOKEN")
     if args.mode == "vector-store":
-        if args.publish_issue is not None or args.allow_model_call:
+        if args.publish_issue is not None:
             raise ValueError("vector_store_mode_side_effect_conflict")
         return run_vector_store_demo(args, query)
+    if args.include_repository:
+        raise ValueError("repository_snapshot_requires_vector_store_mode")
     if args.publish_issue is not None and (args.publish_issue <= 0 or not token):
         raise ValueError("publication_requires_positive_issue_and_token")
     corpus_kind = args.corpus or ("tasks" if args.mode == "search" else "dialogues")
@@ -1409,7 +1927,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--allow-vector-store-write",
         action="store_true",
-        help="upload one complete task snapshot and run one direct Vector Store search",
+        help="upload one versioned snapshot and run one Vector Store search",
+    )
+    parser.add_argument(
+        "--include-repository",
+        action="store_true",
+        help="include tracked text files and binary file metadata in the snapshot",
     )
     parser.add_argument("--approval-reference", default="")
     parser.add_argument("--selftest", action="store_true")
