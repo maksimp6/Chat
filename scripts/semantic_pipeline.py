@@ -1230,7 +1230,7 @@ def list_yandex_objects(
 
 
 def ensure_vector_store(name: str, project: str, key: str) -> str:
-    """Reuse a uniquely named snapshot store or create it once."""
+    """Reuse or create a named store; Yandex chunking is configured per file."""
     stores = list_yandex_objects("/vector_stores", project, key, ("vector_stores",))
     matches = [store for store in stores if store.get("name") == name]
     if len(matches) > 1:
@@ -1245,58 +1245,12 @@ def ensure_vector_store(name: str, project: str, key: str) -> str:
         "/vector_stores",
         project,
         key,
-        {"name": name, "chunking_strategy": vector_store_chunking_strategy()},
+        {"name": name},
     )
     store_id = created.get("id")
     if not isinstance(store_id, str) or not store_id or created.get("name") != name:
         raise ValueError("vector_store_create_receipt_invalid")
     return store_id
-
-
-def ensure_task_history_vector_store(name: str, project: str, key: str) -> tuple[str, str]:
-    """Reuse the existing task-history store before considering a new store."""
-    stores = list_yandex_objects("/vector_stores", project, key, ("vector_stores",))
-    matches = [store for store in stores if store.get("name") == name]
-    if len(matches) > 1:
-        raise ValueError("duplicate_vector_store_name")
-    if matches:
-        store_id = matches[0].get("id")
-        if not isinstance(store_id, str) or not store_id:
-            raise ValueError("vector_store_id_invalid")
-    chunking = vector_store_chunking_strategy()
-    if matches:
-        attached = list_yandex_objects(
-            f"/vector_stores/{quote(store_id, safe='')}/files", project, key, ("files",)
-        )
-        if not attached or all(item.get("chunking_strategy") == chunking for item in attached):
-            return store_id, name
-    populated, empty = [], []
-    for store in stores:
-        if not isinstance(store.get("name"), str) or not store["name"].startswith(
-            "chat-task-history-"
-        ):
-            continue
-        store_id = store.get("id")
-        if not isinstance(store_id, str) or not store_id:
-            continue
-        attached = list_yandex_objects(
-            f"/vector_stores/{quote(store_id, safe='')}/files", project, key, ("files",)
-        )
-        if attached:
-            if all(item.get("chunking_strategy") == chunking for item in attached):
-                populated.append(store)
-        elif store.get("chunking_strategy") in (None, chunking):
-            empty.append(store)
-    candidates = populated or empty
-    if candidates:
-        candidates.sort(key=lambda item: str(item.get("created_at", "")))
-        selected = candidates[-1]
-        store_id = selected.get("id")
-        selected_name = selected.get("name")
-        if not isinstance(store_id, str) or not store_id or not isinstance(selected_name, str):
-            raise ValueError("vector_store_id_invalid")
-        return store_id, selected_name
-    return ensure_vector_store(name, project, key), name
 
 
 def inspect_yandex_vector_stores() -> int:
@@ -2037,13 +1991,13 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
                 repository_files, excluded_sensitive_files
             )
             store_name = (
-                f"chat-task-history-{fingerprint[:16]}"
+                f"chat-repo-{repository_fingerprint[:16]}-{fingerprint[:16]}"
                 f"-c{MAX_VECTOR_CHUNK_SIZE_TOKENS}-o{MAX_VECTOR_CHUNK_OVERLAP_TOKENS}"
             )
             issue_filename = f"chat-task-history-{fingerprint[:16]}.md"
             filename = f"chat-repository-{repository_fingerprint[:16]}.md"
-            stage = "ensure_existing_vector_store"
-            store_id, store_name = ensure_task_history_vector_store(store_name, project, key)
+            stage = "ensure_repository_vector_store"
+            store_id = ensure_vector_store(store_name, project, key)
             stage = "ensure_issue_snapshot_file"
             issue_file_id, _issue_file_meta = ensure_yandex_file(
                 issue_filename, issue_content, project, key

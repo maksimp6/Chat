@@ -312,7 +312,7 @@ def test_file_attachment_reuses_existing_snapshot_without_second_write(monkeypat
     assert writes == []
 
 
-def test_vector_store_creation_uses_documented_maximum_chunk_settings(monkeypatch):
+def test_vector_store_creation_leaves_chunking_for_file_attachment(monkeypatch):
     requests = []
     monkeypatch.setattr(pipeline, "list_yandex_objects", lambda *args: [])
 
@@ -327,7 +327,7 @@ def test_vector_store_creation_uses_documented_maximum_chunk_settings(monkeypatc
         (
             "POST",
             "/vector_stores",
-            {"name": "store", "chunking_strategy": pipeline.vector_store_chunking_strategy()},
+            {"name": "store"},
         )
     ]
 
