@@ -1074,7 +1074,7 @@ class YandexHTTPError(OSError):
 
 
 def _safe_yandex_error_code(raw: bytes) -> str | None:
-    """Extract only a short provider code/type, never a response message."""
+    """Extract a safe provider code or classify its message without logging it."""
     try:
         payload = json.loads(raw)
     except (UnicodeDecodeError, json.JSONDecodeError):
@@ -1083,11 +1083,56 @@ def _safe_yandex_error_code(raw: bytes) -> str | None:
         return None
     nested = payload.get("error")
     sources = [nested, payload] if isinstance(nested, dict) else [payload]
+    messages = []
     for source in sources:
         for field in ("code", "type"):
             value = source.get(field)
             if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", value):
                 return value
+            if type(value) is int and 0 < value < 17:
+                return {
+                    1: "CANCELLED",
+                    2: "UNKNOWN",
+                    3: "INVALID_ARGUMENT",
+                    4: "DEADLINE_EXCEEDED",
+                    5: "NOT_FOUND",
+                    6: "ALREADY_EXISTS",
+                    7: "PERMISSION_DENIED",
+                    8: "RESOURCE_EXHAUSTED",
+                    9: "FAILED_PRECONDITION",
+                    10: "ABORTED",
+                    11: "OUT_OF_RANGE",
+                    12: "UNIMPLEMENTED",
+                    13: "INTERNAL",
+                    14: "UNAVAILABLE",
+                    15: "DATA_LOSS",
+                    16: "UNAUTHENTICATED",
+                }[value]
+        for field in ("message", "description"):
+            value = source.get(field)
+            if isinstance(value, str):
+                messages.append(value.casefold())
+    for detail in payload.get("details", []):
+        if isinstance(detail, dict):
+            for field in ("message", "description"):
+                value = detail.get(field)
+                if isinstance(value, str):
+                    messages.append(value.casefold())
+    joined = " ".join(messages)
+    if any(term in joined for term in ("quota", "resource exhausted", "limit exceeded")):
+        return "QUOTA_OR_LIMIT"
+    if any(term in joined for term in ("chunk", "overlap", "chunking")):
+        return "CHUNKING_CONFIGURATION"
+    if "name" in joined and any(term in joined for term in ("invalid", "long", "length")):
+        return "STORE_NAME"
+    if any(term in joined for term in ("already exists", "already_exist")):
+        return "ALREADY_EXISTS"
+    if any(term in joined for term in ("permission", "unauthorized", "forbidden")):
+        return "AUTHORIZATION"
+    if "project" in joined:
+        return "PROJECT_CONFIGURATION"
+    if "invalid" in joined or "bad request" in joined:
+        return "INVALID_ARGUMENT"
     return None
 
 
@@ -1236,6 +1281,61 @@ def ensure_task_history_vector_store(name: str, project: str, key: str) -> tuple
             raise ValueError("vector_store_id_invalid")
         return store_id, selected_name
     return ensure_vector_store(name, project, key), name
+
+
+def inspect_yandex_vector_stores() -> int:
+    """Print safe metadata for existing stores and files without making writes."""
+    key = os.environ.get("YANDEX_API_KEY", "")
+    project = os.environ.get("YANDEX_PROJECT_ID", "")
+    if not key or not project:
+        raise ValueError("missing_yandex_credentials")
+    stores = list_yandex_objects("/vector_stores", project, key, ("vector_stores",))
+    files = list_yandex_objects("/files", project, key, ("files",))
+    file_by_id = {item.get("id"): item for item in files if isinstance(item.get("id"), str)}
+    report = []
+    for store in stores:
+        store_id = store.get("id")
+        name = store.get("name")
+        if not isinstance(store_id, str) or not isinstance(name, str):
+            raise ValueError("vector_store_metadata_invalid")
+        if not re.fullmatch(r"[A-Za-z0-9._-]{1,100}", name):
+            name = "[omitted]"
+        name, _ = _redact_repository_text(name)
+        attached = list_yandex_objects(
+            f"/vector_stores/{quote(store_id, safe='')}/files", project, key, ("files",)
+        )
+        attached_files = []
+        for record in attached:
+            file_id = _attached_file_id(record)
+            file = file_by_id.get(file_id)
+            if file is None:
+                attached_files.append({"file_name": None, "status": record.get("status")})
+            else:
+                raw_filename = file.get("filename")
+                filename = (
+                    _redact_repository_text(raw_filename)[0]
+                    if isinstance(raw_filename, str)
+                    else None
+                )
+                attached_files.append(
+                    {
+                        "file_name": filename,
+                        "bytes": file.get("bytes"),
+                        "status": record.get("status"),
+                    }
+                )
+        report.append(
+            {
+                "name": name,
+                "status": store.get("status"),
+                "created_at": store.get("created_at"),
+                "file_count": len(attached_files),
+                "files": attached_files,
+            }
+        )
+    report.sort(key=lambda item: item["name"])
+    print(_code_block({"operation": "read_only_vector_store_inspection", "stores": report}))
+    return 0
 
 
 def vector_store_chunking_strategy() -> dict:
@@ -2074,6 +2174,10 @@ def _model_result(args: argparse.Namespace, query: str, candidates: list[dict]) 
 
 def _run(args: argparse.Namespace) -> int:
     """Run retrieval, validation and publication once, with no paid retries."""
+    if args.mode == "vector-store-inspect":
+        if args.publish_issue is not None or args.allow_model_call or args.allow_vector_store_write:
+            raise ValueError("vector_store_inspection_must_be_read_only")
+        return inspect_yandex_vector_stores()
     query = _query(args)
     token = os.environ.get("GITHUB_TOKEN")
     if args.mode == "vector-store":
@@ -2132,7 +2236,9 @@ def main(argv: list[str] | None = None) -> int:
     """CLI entrypoint; contract/transport failures never publish a report."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--mode", choices=["query", "red", "search", "vector-store"], default="query"
+        "--mode",
+        choices=["query", "red", "search", "vector-store", "vector-store-inspect"],
+        default="query",
     )
     parser.add_argument("--corpus", choices=["dialogues", "tasks"])
     parser.add_argument("--query-file")
