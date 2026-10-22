@@ -126,6 +126,51 @@ jobs:
             *) echo '::error::Unsupported Logos mode.'; exit 1 ;;
           esac
 
+      - name: Capture native Logos changes for review
+        if: always() && inputs.mode == 'logos'
+        env:
+          LOGOS_BASE_SHA: ${{ github.sha }}
+        run: |
+          python -I - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          allowed = (
+              "tool_providers/registry.py", "tool_providers/universal_tool_platform.py",
+              "tool_providers/filesystem.py", "yandex_client_modules/mcp_mixin.py",
+              "tests/test_tool_registry.py", "tests/test_universal_tool_platform.py",
+              "tests/test_logos_tool_probe.py", "scripts/logos_tool_probe.py",
+              "tests/test_logos_tool_repairs.py",
+          )
+          def git(*args):
+              return subprocess.run(["git", *args], check=True, capture_output=True).stdout
+          base = os.environ["LOGOS_BASE_SHA"]
+          new_test = Path("tests/test_logos_tool_repairs.py")
+          if new_test.is_file() or new_test.is_symlink():
+              git("add", "--intent-to-add", "--", str(new_test))
+          changed = git("diff", "--no-ext-diff", "--no-textconv", "--no-renames", "--name-only", "-z", base, "--")
+          untracked = git("ls-files", "--others", "--exclude-standard", "-z")
+          patch = git("diff", "--no-ext-diff", "--no-textconv", "--no-renames", base, "--", *allowed).decode("utf-8", errors="replace")
+          result = {
+              "base_sha": base,
+              "head_sha": git("rev-parse", "HEAD").decode().strip(),
+              "changed_paths": sorted({name.decode("utf-8", errors="replace") for name in (changed + untracked).split(b"\0") if name}),
+              "patch": patch,
+              "patch_sha256": hashlib.sha256(patch.encode("utf-8")).hexdigest(),
+          }
+          encoded = json.dumps(result, ensure_ascii=False)
+          (Path(os.environ["RUNNER_TEMP"]) / "logos-changes.json").write_text(encoded, encoding="utf-8")
+          print("LOGOS_CHANGES=" + encoded)
+          PY
+
+      - name: Save native Logos changes for review
+        if: always() && inputs.mode == 'logos'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: logos-changes-${{ github.run_id }}
+          path: ${{ runner.temp }}/logos-changes.json
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Save dialogue result
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
