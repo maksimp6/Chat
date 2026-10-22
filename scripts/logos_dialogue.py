@@ -117,6 +117,30 @@ def _provider_diagnostics(result: dict[str, Any], response: dict[str, Any]) -> N
         token = _provider_token(value)
         if token is not None:
             result[key] = token
+    _provider_echo(result, response)
+
+
+def _provider_echo(result: dict[str, Any], response: dict[str, Any]) -> None:
+    echo: dict[str, Any] = {}
+    model = response.get("model")
+    if isinstance(model, str) and re.fullmatch(r"[A-Za-z0-9_.:/-]{1,256}", model):
+        echo["model"] = model
+    for key in ("max_output_tokens", "max_tool_calls"):
+        value = response.get(key)
+        if type(value) is int and value >= 0:
+            echo[key] = value
+    truncation = _provider_token(response.get("truncation"))
+    if truncation is not None:
+        echo["truncation"] = truncation
+    reasoning = response.get("reasoning")
+    if isinstance(reasoning, dict):
+        effort = _provider_token(reasoning.get("effort"))
+        if effort is not None:
+            echo["reasoning"] = {"effort": effort}
+    if echo:
+        result["provider_echo"] = echo
+        if "capability_receipt" in result:
+            result["capability_receipt"]["provider_echo"] = echo
 
 
 def _ask(client, prompt: str, trace, result: dict[str, Any], params: dict) -> None:
@@ -131,7 +155,7 @@ def _ask(client, prompt: str, trace, result: dict[str, Any], params: dict) -> No
     )
     _, reply = extract_reasoning_and_text(response)
     result["reply"] = (reply or "").strip()
-    if response.get("id"):
+    if response.get("id") and response["id"] not in result["response_ids"]:
         result["response_ids"].append(response["id"])
     pending = extract_function_calls(response)
     result["pending_tools"] = sorted({call.get("name") or "unknown" for call in pending})
@@ -200,25 +224,13 @@ def _response_evidence(responses: list[dict], result: dict[str, Any]) -> None:
                 evidence = {key: output[key] for key in ("type", "id", "status") if key in output}
                 if evidence not in result["hosted_tool_calls"]:
                     result["hosted_tool_calls"].append(evidence)
-        if "capability_receipt" in result:
-            echo = {
-                key: raw[key]
-                for key in (
-                    "model",
-                    "reasoning",
-                    "max_output_tokens",
-                    "max_tool_calls",
-                    "truncation",
-                )
-                if key in raw
-            }
-            if echo:
-                result["capability_receipt"]["provider_echo"] = echo
+        _provider_echo(result, raw)
 
 
 def _finish(invocation, trace, result: dict[str, Any]) -> None:
     finalized = trace.finalize()
-    persist_invocation_trace(invocation.invocation_id, finalized)
+    # Export independent runtime evidence before any durable write. A storage
+    # failure must never erase completed provider/tool execution from the report.
     result["tool_calls"] = [_tool_evidence(entry) for entry in finalized.get("tool_calls", [])]
     result["generation_requests"] = len(finalized.get("api_requests", []))
     result["api_failures"] = _api_failure_evidence(finalized.get("events", []))
@@ -235,10 +247,49 @@ def _finish(invocation, trace, result: dict[str, Any]) -> None:
             for key in ("input_tokens", "output_tokens", "total_tokens")
             if key in billing
         }
-    if result["status"] in {"failed", "incomplete"}:
-        fail_invocation(invocation.invocation_id, error={"type": result["error"]})
-    else:
-        finish_invocation(invocation.invocation_id, result=result)
+    trace_bytes = len(json.dumps(finalized, ensure_ascii=False).encode("utf-8"))
+    stage = "trace"
+    result["persistence"] = {
+        "status": "writing",
+        "engine": "native_kristall",
+        "trace_bytes": trace_bytes,
+    }
+    try:
+        if not persist_invocation_trace(invocation.invocation_id, finalized):
+            raise RuntimeError("invocation record missing")
+        result["persistence"]["status"] = "stored"
+        stage = "completion"
+        if result["status"] == "completed" and result["reply"]:
+            result["checkpoint"] = {
+                "state": "completed",
+                "reply_verified": True,
+                "verification_scope": "provider_reply_and_invocation_persistence",
+            }
+        if result["status"] in {"failed", "incomplete"}:
+            saved = fail_invocation(invocation.invocation_id, error={"type": result["error"]})
+        else:
+            saved = finish_invocation(invocation.invocation_id, result=result)
+        if not saved:
+            raise RuntimeError("invocation completion unavailable")
+    except RUNTIME_ERRORS as exc:
+        reasons = {
+            "value text exceeds size limit": "value_text_limit",
+            "value structure exceeds limit": "value_structure_limit",
+            "journal frame exceeds size limit": "journal_frame_limit",
+            "commit failed; recovery required": "journal_commit_recovery_required",
+            "database is closed": "store_closed",
+            "invocation record missing": "invocation_missing",
+            "invocation completion unavailable": "completion_unavailable",
+        }
+        result["persistence"].update(
+            status="failed",
+            stage=stage,
+            error_type=type(exc).__name__,
+            reason=reasons.get(str(exc), "unclassified"),
+        )
+        if "checkpoint" in result:
+            result["checkpoint"].update(state="finalization_failed", reply_verified=False)
+        raise
 
 
 def _api_failure_evidence(events: list[dict]) -> list[dict]:

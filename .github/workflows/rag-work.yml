@@ -187,6 +187,7 @@ jobs:
               "tests/test_logos_context.py", "tests/test_logos_knowledge.py",
               "tests/test_logos_continuation_quality.py", "core/config.py",
               "scripts/logos_project_tools.py", "tests/test_logos_project_tools.py",
+              "invocation/manager.py", "tests/test_invocation_large_values.py",
           )
           def git(*args):
               return subprocess.run(["git", *args], check=True, capture_output=True).stdout
