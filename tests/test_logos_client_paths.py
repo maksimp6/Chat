@@ -35,7 +35,7 @@ def test_continuation_after_a_non_approval_tool_call_reissues_the_request(monkey
         lambda self, call, servers, trace=None: {"result": "ok"},
     )
 
-    def run_tool_loop_once(response, execute_tool, continue_request, max_rounds):
+    def run_tool_loop_once(response, execute_tool, continue_request, max_rounds, should_pause):
         execute_tool({"name": "inspect"})
         return continue_request([{"type": "function_call_output", "output": "ok"}], response)
 

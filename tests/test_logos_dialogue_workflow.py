@@ -22,7 +22,13 @@ def test_dialogue_is_manual_with_native_runtime_and_safe_checkout():
     events = data.get("on", data.get(True))
     assert "allow_model_call" not in events["workflow_dispatch"]["inputs"]
     job = data["jobs"]["logos"]
-    assert job["permissions"] == {"contents": "read"}
+    assert job["permissions"] == {
+        "contents": "read",
+        "issues": "read",
+        "pull-requests": "read",
+        "actions": "read",
+    }
+    assert job["timeout-minutes"] == 360
     for condition in (
         "github.event_name == 'workflow_dispatch'",
         "inputs.mode == 'logos'",

@@ -51,23 +51,37 @@ def run_tool_loop(
     execute_tool: Callable[[dict[str, Any]], Any],
     continue_request: Callable[[list[dict[str, Any]], dict[str, Any]], dict[str, Any]],
     *,
-    max_rounds: int = 16,
+    max_rounds: int | None = 16,
+    should_pause: Callable[[list[dict[str, Any]]], bool] | None = None,
 ) -> dict[str, Any]:
     """Execute function calls and continue until a response has no tool calls.
 
     ``continue_request`` receives the complete previous ``output`` plus the
     generated ``function_call_output`` items. This preserves reasoning and
     other response items required by the Responses API protocol.
+
+    ``max_rounds=None`` leaves the caller's job/task lifetime as the boundary;
+    it does not impose an arbitrary tool-round ceiling. ``should_pause`` is
+    checked before every batch, including continuations, so approvals never
+    become implicit after the initial request.
     """
+    if max_rounds is not None and (
+        isinstance(max_rounds, bool) or not isinstance(max_rounds, int) or max_rounds < 0
+    ):
+        raise ValueError("max_rounds must be a non-negative integer or None")
     response = initial_response
-    for _ in range(max_rounds):
+    rounds = 0
+    while max_rounds is None or rounds < max_rounds:
         calls = extract_function_calls(response)
         if not calls:
+            return response
+        if should_pause is not None and should_pause(calls):
             return response
         results = [execute_tool(call) for call in calls]
         tool_outputs = build_continuation_input(response, results)
         continuation_input = list(response.get("output", []) or []) + tool_outputs
         response = continue_request(continuation_input, response)
+        rounds += 1
     if not extract_function_calls(response):
         return response
     raise RuntimeError("Responses API tool loop exceeded max_rounds")

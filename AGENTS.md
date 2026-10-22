@@ -127,6 +127,12 @@ the cheapest backend/model that can reliably perform that role.
 
 ### Cost-control policy
 
+- For native Logos in PR #1435, the owner's quality-first direction takes
+  precedence over economy defaults: use the strongest available compatible
+  profile, full applicable initial context and tools, with explicit requested
+  parameters and no silent downgrade. Follow `docs/agents/logos-native-quality.md`.
+  Budget limits work volume, not the quality of an accepted unit of work.
+
 - Choose the cheapest sufficient tool, backend, and model. Prefer deterministic connectors, search, or page reads when they suffice; a static fetch is not a substitute for required interactive browser verification.
 - Before a new paid tool or agent run, require owner-approved task scope and budget; wallet balance is not spending permission. An expensive-model escalation, increased paid concurrency, or larger budget requires explicit owner approval unless already covered by that approval. Do not ask again for every safe step within the approved scope.
 - Pass supported step, call, and time limits as actual tool arguments. For a small browser diagnosis, default to at most 10 steps and 120 seconds when supported. Size longer workflows upfront within approval; these defaults are not spending authorization.

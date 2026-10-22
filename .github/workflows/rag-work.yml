@@ -14,6 +14,14 @@ on:
         description: "issue number for the report"
         required: false
         default: ""
+      case_issue:
+        description: "Canonical issue whose complete discussion forms the initial context"
+        required: false
+        default: "1413"
+      case_pr:
+        description: "PR whose full discussion and reviews form the initial context"
+        required: false
+        default: "1435"
   issues:
     types: [labeled]
 
@@ -70,8 +78,12 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && (inputs.mode == 'logos' || inputs.mode == 'logos-response' || inputs.mode == 'logos-tools')
     name: Run Logos or inspect runtime tools and saved responses
     runs-on: ubuntu-latest
+    timeout-minutes: 360
     permissions:
       contents: read
+      issues: read
+      pull-requests: read
+      actions: read
     steps:
       - name: Save question
         if: inputs.mode != 'logos-tools'
@@ -95,6 +107,29 @@ jobs:
       - name: Install runtime dependencies
         run: python -m pip install -r requirements.txt
 
+      - name: Capture complete initial context
+        if: inputs.mode == 'logos'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LOGOS_CASE_ISSUE: ${{ inputs.case_issue || '1413' }}
+          LOGOS_CASE_PR: ${{ inputs.case_pr || '1435' }}
+        run: |
+          python -m scripts.logos_context \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --issue "$LOGOS_CASE_ISSUE" --pr "$LOGOS_CASE_PR" --reference-case \
+            --owner-context-file docs/agents/logos-native-quality.md \
+            --out "$RUNNER_TEMP/logos-context.json"
+
+      - name: Attach complete case to existing project knowledge
+        if: inputs.mode == 'logos'
+        env:
+          YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+          YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
+        run: |
+          python -m scripts.logos_knowledge \
+            --context-file "$RUNNER_TEMP/logos-context.json" \
+            --out "$RUNNER_TEMP/logos-knowledge.json"
+
       - name: Audit native Logos tools
         if: inputs.mode == 'logos-tools'
         run: |
@@ -106,6 +141,7 @@ jobs:
         env:
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
           LOGOS_MODE: ${{ inputs.mode }}
         run: |
           set -euo pipefail
@@ -116,6 +152,8 @@ jobs:
             logos)
               python -m scripts.logos_dialogue \
                 --question-file "$RUNNER_TEMP/logos-question.txt" \
+                --context-file "$RUNNER_TEMP/logos-context.json" \
+                --knowledge-file "$RUNNER_TEMP/logos-knowledge.json" \
                 --out "$RUNNER_TEMP/logos-answer.json"
               ;;
             logos-response)
@@ -140,6 +178,13 @@ jobs:
               "tests/test_tool_registry.py", "tests/test_universal_tool_platform.py",
               "tests/test_logos_tool_probe.py", "scripts/logos_tool_probe.py",
               "tests/test_logos_tool_repairs.py",
+              "scripts/logos_dialogue.py", "scripts/logos_quality.py",
+              "scripts/logos_context.py", "scripts/logos_knowledge.py",
+              "agent_runtime/responses_tool_loop.py", "chat/mcp_routes.py",
+              "yandex_client_modules/request_builder.py", "yandex_client_modules/request_mixin.py",
+              "tests/test_logos_dialogue.py", "tests/test_logos_quality.py",
+              "tests/test_logos_context.py", "tests/test_logos_knowledge.py",
+              "tests/test_logos_continuation_quality.py", "core/config.py",
           )
           def git(*args):
               return subprocess.run(["git", *args], check=True, capture_output=True).stdout

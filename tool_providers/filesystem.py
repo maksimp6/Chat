@@ -8,7 +8,7 @@
 - Сетевые HTTP-запросы без внешних зависимостей (urllib.request)
 - Поиск файлов (glob) и содержимого (grep / regex)
 - Управление файлами и папками (os, shutil): copy, move, delete, mkdir
-- Запуск bash-команд (subprocess) и сбор сведений о системе (platform, shutil)
+- Запуск команд через shell текущей ОС (subprocess) и сбор сведений о системе
 """
 
 import os
@@ -631,7 +631,7 @@ def file_stat(args: dict) -> dict:
 
 
 def run_command(args: dict) -> dict:
-    """Безопасное выполнение терминальной команды bash в рабочей директории."""
+    """Выполнение команды через shell текущей ОС в рабочей директории проекта."""
     command = args.get("command") or args.get("cmd")
     if not command:
         return {"error": "Параметр 'command' обязателен"}
@@ -675,11 +675,16 @@ def get_system_info(args: dict) -> dict:
 TOOL_REGISTRY = {
     "apply_patch": {
         "func": apply_patch,
-        "description": "Apply patch/changes to file.",
+        "description": "Заменить первое точное вхождение search_text на replace_text в файле; пустой replace_text удаляет вхождение. Требуется подтверждение.",
         "parameters": {
             "type": "object",
-            "properties": {"path": {"type": "string"}, "patch": {"type": "string"}},
-            "required": ["path", "patch"],
+            "properties": {
+                "path": {"type": "string", "minLength": 1},
+                "search_text": {"type": "string", "minLength": 1},
+                "replace_text": {"type": "string"},
+            },
+            "required": ["path", "search_text", "replace_text"],
+            "additionalProperties": False,
         },
     },
     "read_file": {
@@ -889,7 +894,7 @@ TOOL_REGISTRY = {
     },
     "run_command": {
         "func": run_command,
-        "description": "Выполнить bash-команду в рабочей директории проекта Termux и получить stdout/stderr.",
+        "description": "Выполнить команду через shell текущей ОС в рабочей директории проекта и получить exit code, stdout и stderr. Среда определяется хостом выполнения.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -905,7 +910,7 @@ TOOL_REGISTRY = {
     },
     "get_system_info": {
         "func": get_system_info,
-        "description": "Получить данные о дисковом пространстве, платформе Android/Termux и версии Python.",
+        "description": "Получить данные о дисковом пространстве, текущей ОС, архитектуре хоста, директории проекта и версии Python.",
         "parameters": {"type": "object", "properties": {}, "required": []},
         "requires_approval": False,
     },

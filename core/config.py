@@ -104,6 +104,18 @@ TEXT_MODELS = {
         "tool": 0.025,
         "output": 0.20,
     },
+    "deepseek-v4.1-flash": {
+        "name": "DeepSeek V4.1 Flash",
+        "type": "text",
+        "capabilities": {"tools": True, "function_calling": True, "multimodal": False},
+        "context_window": 1048576,
+        # Yandex common-instance RUB/1000 tokens, checked 2026-10-22.
+        # Hosted tool/session charges are additional; this is not a billed total.
+        "input": 0.30,
+        "cached": 0.075,
+        "tool": 0.075,
+        "output": 0.50,
+    },
     "deepseek-v4-flash": {
         "name": "DeepSeek V4 Flash",
         "type": "text",

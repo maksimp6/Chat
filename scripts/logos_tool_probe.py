@@ -1,13 +1,11 @@
-"""Audit native filesystem tools; --external also reads public GitHub metadata."""
+"""Audit a filesystem subset; inventory the full native profile without invoking it."""
 
 import argparse
-import ast
 import hashlib
 import http.server
 import json
 import os
 import re
-from pathlib import Path
 import shlex
 import shutil
 import subprocess
@@ -15,6 +13,7 @@ import sys
 import tempfile
 import threading
 import zipfile
+from pathlib import Path
 
 PROBE_ERRORS = (
     AssertionError,
@@ -53,6 +52,8 @@ if __name__ == "__main__":
         return str(path.relative_to(ROOT))
 
     try:
+        from scripts.logos_knowledge import DEFAULT_STORE_ID
+        from scripts.logos_quality import MODEL, dialogue_params
         from tool_providers import filesystem
         from tool_providers.registry import registry
         from tool_providers.universal_tool_platform import (
@@ -65,27 +66,31 @@ if __name__ == "__main__":
         executor = UniversalToolExecutor(registry)
         categories = registry.get_available_categories()
         report["categories"] = {name: len(names) for name, names in sorted(categories.items())}
-        tree = ast.parse((ROOT / "scripts/logos_dialogue.py").read_text())
-        params = next(
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Dict)
-            and any(
-                isinstance(key, ast.Constant) and key.value == "active_tool_categories"
-                for key in node.keys
-            )
-        )
-        settings = {
-            key.value: value
-            for key, value in zip(params.keys, params.values)
-            if isinstance(key, ast.Constant)
+        native = dialogue_params([DEFAULT_STORE_ID], list(categories))
+        native_definitions = registry.get_definitions(set(native["active_tool_categories"]))
+        report["native_profile"] = {
+            "model": MODEL,
+            "categories": native["active_tool_categories"],
+            "offered_count": len(native_definitions),
+            "hosted_enabled": {
+                name: cfg["enabled"] for name, cfg in native["tools_config"].items()
+            },
+            "configured_vector_store_ids": native["tools_config"]["file_search"][
+                "vector_store_ids"
+            ],
+            "verification": "configuration_only; hosted_and_other_categories_not_executed",
+            "knowledge_status": "not_prepared_or_verified_by_diagnostic",
         }
-        active = ast.literal_eval(settings["active_tool_categories"])
-        hosted = ast.literal_eval(settings["tools_config"])
+        # logos-tools deliberately executes only temporary filesystem fixtures.
+        # Native dialogue uses the full profile above after knowledge preparation.
+        active = ["filesystem"]
         definitions = registry.get_definitions(set(active))
         exposed = {tool["name"]: tool["parameters"] for tool in definitions}
+        report["mode"] = "logos-tools"
+        report["generation_requests"] = 0
+        report["provider_credentials_used"] = False
         report["active_categories"] = active
-        report["hosted_enabled"] = {name: cfg["enabled"] for name, cfg in hosted.items()}
+        report["hosted_enabled"] = dict.fromkeys(native["tools_config"], False)
         report["exposed_count"] = len(exposed)
         report["head"] = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
         check(
@@ -272,7 +277,7 @@ if __name__ == "__main__":
         before_patch = python_file.read_bytes()
         probe(
             "apply_patch",
-            {"path": rel(python_file), "patch": "replacement"},
+            {"path": rel(python_file), "search_text": "import math", "replace_text": "replacement"},
             lambda data: check(False),
         )
         check(python_file.read_bytes() == before_patch)
