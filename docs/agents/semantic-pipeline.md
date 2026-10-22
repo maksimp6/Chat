@@ -260,6 +260,19 @@ python -m scripts.logos_dialogue \
   --response-id <stored-response-uuid> --out /tmp/logos-diagnostic.json
 ```
 
+The runner's enabled filesystem tools can be audited with
+`python -m scripts.logos_tool_probe`. The probe invokes the native
+UniversalToolExecutor with approval disabled, checks results against temporary
+fixtures and removes them afterwards. It reports positive scenarios, omitted
+optional arguments, and provider-advertised nullable arguments separately.
+The default run uses a loopback HTTP fixture; `--external` additionally checks a
+read-only GET of this public repository through GitHub's API. Disabled categories
+are inventoried, not executed. A completed audit can report failed or blocked
+tools: its exit code is not an all-tools-pass assertion.
+Dispatch `RAG work` with `mode=logos-tools` to run this audit in the same runner
+without a model call or provider credentials. The JSON log and answer artifact
+contain the measured results; `query` is not required in this mode.
+
 ## Later work
 
 A live quality experiment requires separately approved scope/call count/budget.

@@ -210,3 +210,52 @@ def test_stored_response_mode_routes_to_read_only_cli_with_literal_id(tmp_path):
         "--out",
         str(tmp_path / "logos-answer.json"),
     ]
+
+
+def test_tool_audit_routes_without_question_or_provider_credentials():
+    data = workflow()
+    job = data["jobs"]["logos"]
+    assert "inputs.mode == 'logos-tools'" in job["if"]
+    assert "inputs.mode != 'logos-tools'" in data["jobs"]["rag"]["if"]
+    assert "env" not in data and "env" not in job
+    steps = {step["name"]: step for step in job["steps"]}
+    assert steps["Save question"]["if"] == "inputs.mode != 'logos-tools'"
+    provider = steps["Run Logos dialogue or read a saved provider response"]
+    assert provider["if"] == "inputs.mode != 'logos-tools'"
+    audit = steps["Audit native Logos tools"]
+    assert audit["if"] == "inputs.mode == 'logos-tools'"
+    assert "env" not in audit
+    assert "secrets." not in json.dumps(audit)
+    assert "logos_dialogue" not in audit["run"]
+    assert steps["Save dialogue result"]["if"] == "always()"
+
+
+@pytest.mark.parametrize("probe_exit", [0, 7])
+def test_tool_audit_saves_exact_json_and_preserves_probe_failure(tmp_path, probe_exit):
+    job = workflow()["jobs"]["logos"]
+    step = next(step for step in job["steps"] if step["name"] == "Audit native Logos tools")
+    tools = tmp_path / "bin"
+    tools.mkdir()
+    python = tools / "python"
+    python.write_text(
+        f"#!{sys.executable}\n"
+        "import json, sys\n"
+        "assert sys.argv[1:] == ['-m', 'scripts.logos_tool_probe', '--external']\n"
+        "print(json.dumps({'native_tool_audit': True, 'generation_requests': 0}))\n"
+        f"raise SystemExit({probe_exit})\n"
+    )
+    python.chmod(0o755)
+    result = subprocess.run(
+        ["/bin/bash", "-c", step["run"]],
+        cwd=tmp_path,
+        env={"PATH": str(tools) + ":/usr/bin:/bin", "RUNNER_TEMP": str(tmp_path)},
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+
+    assert result.returncode == probe_exit, result.stderr
+    artifact = (tmp_path / "logos-answer.json").read_text()
+    assert artifact == result.stdout
+    assert json.loads(artifact) == {"native_tool_audit": True, "generation_requests": 0}
+    assert not (tmp_path / "logos-question.txt").exists()

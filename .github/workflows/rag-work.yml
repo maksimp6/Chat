@@ -3,11 +3,11 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "index | query | logos | logos-result | logos-response"
+        description: "index | query | logos | logos-result | logos-response | logos-tools"
         required: true
         default: "query"
       query:
-        description: "query, Logos question, run ID (logos-result), or response UUID (logos-response)"
+        description: "query, Logos question, run ID (logos-result), or response UUID (logos-response); unused for logos-tools"
         required: false
         default: ""
       publish_issue:
@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   rag:
-    if: (github.event_name == 'workflow_dispatch' && inputs.mode != 'logos' && inputs.mode != 'logos-result' && inputs.mode != 'logos-response') || github.event.label.name == 'rag-query'
+    if: (github.event_name == 'workflow_dispatch' && inputs.mode != 'logos' && inputs.mode != 'logos-result' && inputs.mode != 'logos-response' && inputs.mode != 'logos-tools') || github.event.label.name == 'rag-query'
     name: RAG index or query
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -67,13 +67,14 @@ jobs:
           fi
 
   logos:
-    if: github.event_name == 'workflow_dispatch' && (inputs.mode == 'logos' || inputs.mode == 'logos-response')
-    name: Run Logos or inspect a saved provider response
+    if: github.event_name == 'workflow_dispatch' && (inputs.mode == 'logos' || inputs.mode == 'logos-response' || inputs.mode == 'logos-tools')
+    name: Run Logos or inspect runtime tools and saved responses
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - name: Save question
+        if: inputs.mode != 'logos-tools'
         env:
           LOGOS_QUESTION: ${{ inputs.query }}
         run: |
@@ -94,7 +95,14 @@ jobs:
       - name: Install runtime dependencies
         run: python -m pip install -r requirements.txt
 
+      - name: Audit native Logos tools
+        if: inputs.mode == 'logos-tools'
+        run: |
+          set -euo pipefail
+          python -m scripts.logos_tool_probe --external | tee "$RUNNER_TEMP/logos-answer.json"
+
       - name: Run Logos dialogue or read a saved provider response
+        if: inputs.mode != 'logos-tools'
         env:
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
