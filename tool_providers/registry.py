@@ -11,7 +11,7 @@ import copy
 import logging
 from typing import Any, Mapping, Optional
 
-from tool_providers.universal_tool_platform import UniversalToolDefinition
+from tool_providers.universal_tool_platform import UniversalToolDefinition, validate_json_schema
 
 logger = logging.getLogger("tool_registry")
 
@@ -217,9 +217,8 @@ class ToolRegistry:
 
             original_required = set(schema.get("required") or [])
             for name, prop in normalized.items():
-                if name not in original_required:
-                    if isinstance(prop, dict) and "anyOf" not in prop:
-                        normalized[name] = {"anyOf": [prop, {"type": "null"}]}
+                if name not in original_required and validate_json_schema(None, prop):
+                    normalized[name] = {"anyOf": [prop, {"type": "null"}]}
         elif schema_type == "array" and isinstance(result.get("items"), dict):
             result["items"] = ToolRegistry._strict_schema(result["items"])
         elif isinstance(result.get("anyOf"), list):
