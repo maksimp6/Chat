@@ -1,7 +1,9 @@
 import time
 
 import os
+import math
 import requests
+from typing import Any
 
 from observability.trace_manager import ExecutionTrace
 from storage.db import get_store
@@ -16,6 +18,19 @@ from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_fo
 from yandex_client_modules.request_builder import build_response_payload
 from yandex_client_modules.errors import YandexClientError
 from provider_accounts.quotas import ProviderQuotaExceeded, record_usage, reserve_request
+
+
+def _transport_timeout(params: dict[str, Any], key: str, default: float, maximum: float) -> float:
+    """Validate local transport limits without sending them as provider fields."""
+    value = params.get(key, default)
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+        or not 0 < value <= maximum
+    ):
+        raise ValueError(f"{key} must be a finite number in (0, {maximum}]")
+    return value
 
 
 def _resolve_quota_user_id(execution_trace=None):
@@ -105,6 +120,11 @@ class YandexRequestMixin:
         trace_step=None,
     ):
         params = params or {}
+        request_timeout = _transport_timeout(params, "request_timeout", 90, 900)
+        poll_timeout = _transport_timeout(params, "poll_timeout", 180, 7200)
+        on_provider_response = params.get("on_provider_response")
+        if on_provider_response is not None and not callable(on_provider_response):
+            raise ValueError("on_provider_response must be callable or None")
         is_background = params.get("background", True)
         is_stream = params.get("stream", False)
         if is_background:
@@ -179,7 +199,7 @@ class YandexRequestMixin:
         resp = None
         try:
             resp = self._log_response(
-                self.session.post(self.responses_url, json=payload, timeout=90)
+                self.session.post(self.responses_url, json=payload, timeout=request_timeout)
             )
             resp.raise_for_status()
         except requests.RequestException as e:
@@ -252,14 +272,23 @@ class YandexRequestMixin:
                     "status": data.get("status"),
                 },
             )
+        if on_provider_response is not None:
+            on_provider_response(data)
         task_id = data.get("id")
-        if not is_background:
-            status = data.get("status")
-            if status in ("completed", "incomplete"):
-                _record_quota_usage(execution_trace, quota_reservation, data)
-                return data
-            if status in ("failed", "cancelled"):
-                raise YandexClientError(f"Task status: {status}")
-        result = self._wait(task_id, execution_trace=execution_trace, trace_step=trace_step_number)
+        status = data.get("status")
+        if status in ("completed", "incomplete"):
+            _record_quota_usage(execution_trace, quota_reservation, data)
+            return data
+        if status in ("failed", "cancelled"):
+            raise YandexClientError(f"Task status: {status}")
+        wait_params = {"timeout": poll_timeout} if "poll_timeout" in params else {}
+        result = self._wait(
+            task_id,
+            execution_trace=execution_trace,
+            trace_step=trace_step_number,
+            **wait_params,
+        )
+        if on_provider_response is not None:
+            on_provider_response(result)
         _record_quota_usage(execution_trace, quota_reservation, result)
         return result

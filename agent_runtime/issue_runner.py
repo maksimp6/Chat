@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MODEL = "logos-runtime"
 TOOL_CATEGORIES = ["filesystem"]
 MAX_SUMMARY_CHARS = 4000

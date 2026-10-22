@@ -66,3 +66,35 @@ def test_run_tool_loop_executes_tool_and_returns_final_response():
         "call_id": "call-1",
         "output": '{"commits": ["abc"]}',
     }
+
+
+def test_terminal_response_on_last_allowed_continuation_is_returned():
+    first = {"output": [{"type": "function_call", "call_id": "call-1"}]}
+    final = {"id": "response-final", "output": [{"type": "message", "content": []}]}
+    calls = []
+
+    def continue_request(items, previous):
+        calls.append(items)
+        return final
+
+    assert run_tool_loop(first, lambda call: "source", continue_request, max_rounds=1) == final
+    assert len(calls) == 1
+
+
+def test_pending_calls_after_last_round_are_not_executed():
+    first = {"output": [{"type": "function_call", "call_id": "call-1"}]}
+    next_response = {"output": [{"type": "function_call", "call_id": "call-2"}]}
+    executed = []
+    continued = []
+
+    def continue_request(items, previous):
+        continued.append(items)
+        return next_response
+
+    with pytest.raises(RuntimeError, match="max_rounds"):
+        run_tool_loop(
+            first, lambda call: executed.append(call["call_id"]), continue_request, max_rounds=1
+        )
+
+    assert executed == ["call-1"]
+    assert len(continued) == 1
