@@ -107,7 +107,7 @@ TEXT_MODELS = {
     "deepseek-v4.1-flash": {
         "name": "DeepSeek V4.1 Flash",
         "type": "text",
-        "capabilities": {"tools": True, "function_calling": True, "multimodal": False},
+        "capabilities": {"tools": True, "function_calling": True, "multimodal": None},
         "context_window": 1048576,
         # Yandex common-instance RUB/1000 tokens, checked 2026-10-22.
         # Hosted tool/session charges are additional; this is not a billed total.

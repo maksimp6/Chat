@@ -208,23 +208,50 @@ Dialogue instructions allow ordinary knowledge questions as well as repository
 work. Repository rules govern code/tool operations; an answer about history or
 another general topic does not require evidence from project files.
 
-Choose the branch and enter the question in `query`. Dispatching this mode starts
-a model-backed dialogue under GitHub's normal workflow access controls. The
-workflow uses the existing Yandex Actions secrets and a temporary encrypted
-credential store outside the checkout. It requires no application server,
+Choose the branch, enter the question in `query`, and select the canonical
+`case_issue` and `case_pr` (defaults: 1413 and 1435). Before generation, the
+workflow captures the complete GitHub case and applicable repository guidance,
+then attaches that same versioned context to the existing project Vector Store.
+The initial prompt includes the full captured case, not just retrieved excerpts.
+Preparation fails if required context or its matching indexed receipt is missing.
+Reference-case mode records the selected PR's revision separately from the current
+checkout. Earlier ChatGPT conversations unavailable to the checkout are not
+claimed as included. See [Native Logos quality and context](logos-native-quality.md)
+for the exact scope, provenance and acceptance criteria.
+
+The selected model is `deepseek-v4.1-flash`, with Yandex's documented
+1,048,576-token context window. The request explicitly asks for reasoning `high`
+and 393,216 output tokens; that output value is a compatibility candidate from
+DeepSeek upstream, not a confirmed Yandex maximum. Unsupported parameters fail
+visibly without automatic reduction or a weaker-model fallback. Temperature 0.3
+follows Yandex's code example. `truncation=disabled` prevents silent removal of
+early conversation when the input exceeds the provider's context window.
+
+The dialogue enables every registered local tool category through the native
+executor, hosted web search with high search context, file search over the prepared
+project index, and Code Interpreter. Scoped project readers provide authenticated
+GitHub REST and Discussions reads. Declaring these tools does not establish that
+each external dependency works; live tool results remain separate evidence.
+Existing runtime validation and approvals still apply.
+
+The adapter adds no file-read, file-write or local round-count cap. The request
+uses background mode, with a known response ID checkpointed before up to 7,200
+seconds of GET polling; the POST transport allowance is 900 seconds. The Actions
+job has a 360-minute timeout. Provider limits remain authoritative, and the
+unknown maximum number of hosted calls is not replaced by an invented number.
+There is no hard currency cap. Provider usage and response identifiers are
+recorded when available; unconfirmed cost remains unknown. A failed or timed-out
+generation is not automatically retried.
+
+The workflow uses existing Yandex Actions secrets and a temporary encrypted
+credential store outside the checkout. GitHub credentials are kept out of the
+initial context and exported receipts. This requires no application server,
 website or phone.
 
-At the owner's request, this adapter adds no generation-count, file-read, prompt
-or output caps and no read-only tool policy. It uses `logos-runtime-flash` and the
-native filesystem tool category, including tools for editing files and running
-commands in the checkout. Existing runtime validation, tool approvals and provider
-limits still apply. There is no hard currency cap. Provider usage and response
-identifiers are recorded when available; unconfirmed cost remains unknown. The
-adapter does not retry a failed model call.
-
 The `logos-answer-<run_id>` artifact and the `LOGOS_RESULT=` JSON line in the job
-log contain the actual reply, status, correlation IDs and available usage. They
-exclude the credential store and raw trace. A
+log contain the actual reply, status, correlation IDs, capability receipt,
+available usage, local tool evidence and recorded hosted-tool calls. They exclude
+the credential store and raw trace. A
 question about the repository can cause Logos to inspect or work with files;
 an ordinary knowledge question may need no tools. Each dispatch runs one dialogue
 turn. This workflow does not schedule recurring work or publish repository edits.
@@ -250,11 +277,24 @@ raw provider messages or payloads. Original dialogue failures also preserve thes
 diagnostics from their native trace when available. A missing or expired response
 is reported as a retrieval failure; it never triggers another generation.
 
-Local invocation, with provider credentials configured separately:
+Local invocation requires provider credentials configured separately and GitHub
+read access for context preparation and the scoped project readers. Prepare the
+context and its matching knowledge receipt before requesting a new generation:
 
 ```sh
+python -m scripts.logos_context \
+  --repo-root . --issue 1413 --pr 1435 --reference-case \
+  --owner-context-file docs/agents/logos-native-quality.md \
+  --out /tmp/logos-context.json
+
+python -m scripts.logos_knowledge \
+  --context-file /tmp/logos-context.json --out /tmp/logos-knowledge.json
+
 python -m scripts.logos_dialogue \
-  --question-file /tmp/question.txt --out /tmp/logos-answer.json
+  --question-file /tmp/question.txt \
+  --context-file /tmp/logos-context.json \
+  --knowledge-file /tmp/logos-knowledge.json \
+  --out /tmp/logos-answer.json
 
 python -m scripts.logos_dialogue \
   --response-id <stored-response-uuid> --out /tmp/logos-diagnostic.json
