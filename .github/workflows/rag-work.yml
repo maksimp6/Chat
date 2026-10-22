@@ -84,6 +84,7 @@ jobs:
       issues: read
       pull-requests: read
       actions: read
+      discussions: read
     steps:
       - name: Save question
         if: inputs.mode != 'logos-tools'
@@ -185,6 +186,7 @@ jobs:
               "tests/test_logos_dialogue.py", "tests/test_logos_quality.py",
               "tests/test_logos_context.py", "tests/test_logos_knowledge.py",
               "tests/test_logos_continuation_quality.py", "core/config.py",
+              "scripts/logos_project_tools.py", "tests/test_logos_project_tools.py",
           )
           def git(*args):
               return subprocess.run(["git", *args], check=True, capture_output=True).stdout

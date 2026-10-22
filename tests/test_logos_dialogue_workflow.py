@@ -27,6 +27,7 @@ def test_dialogue_is_manual_with_native_runtime_and_safe_checkout():
         "issues": "read",
         "pull-requests": "read",
         "actions": "read",
+        "discussions": "read",
     }
     assert job["timeout-minutes"] == 360
     for condition in (
