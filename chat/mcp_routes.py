@@ -3,6 +3,7 @@
 from flask import Blueprint, request, jsonify
 import logging
 import json as _json
+from typing import Any
 from yandex_client_modules.client import YandexResponsesClient
 from core.config import Config, calculate_full_cost
 from observability.trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
@@ -68,7 +69,7 @@ def _tool_call_parts(tool_call):
     return name, arguments
 
 
-def _tool_call_needs_approval(tool_call):
+def _tool_call_needs_approval(tool_call: dict[str, Any]) -> bool:
     name, arguments = _tool_call_parts(tool_call)
     tool_config = registry.get_tool_meta(name) if name else None
     return bool(tool_config and tool_call_requires_approval(tool_config, arguments))
@@ -127,7 +128,10 @@ class LogosClient(YandexResponsesClient):
                     response,
                     execute_tool,
                     continue_request,
-                    max_rounds=16,
+                    max_rounds=base_params.get("max_rounds", 16),
+                    should_pause=lambda batch: any(
+                        _tool_call_needs_approval(call) for call in batch
+                    ),
                 )
 
         if trace is not None:
