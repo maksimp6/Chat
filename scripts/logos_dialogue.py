@@ -11,6 +11,12 @@ import re
 from typing import Any, Callable
 import uuid
 
+from agent_runtime.provider_receipt import (
+    assistant_text,
+    capture_provider_diagnostics as _provider_diagnostics,
+    provider_echo,
+    provider_token as _provider_token,
+)
 from agent_runtime.responses_tool_loop import extract_function_calls
 from invocation.manager import (
     create_invocation,
@@ -22,7 +28,6 @@ from invocation.manager import (
 from invocation.trace import create_invocation_trace
 from storage.memory_db import DatabaseError
 from yandex_client_modules.errors import YandexClientError
-from yandex_client_modules.parsers import extract_reasoning_and_text
 from scripts.logos_quality import MODEL, OWNER_DIRECTIVE, capability_receipt, dialogue_params
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -94,49 +99,8 @@ def _new_result() -> dict[str, Any]:
     }
 
 
-def _provider_token(value: Any) -> str | None:
-    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]{0,63}", value):
-        return None
-    if value.startswith(("ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_", "sk-")):
-        return None
-    return value
-
-
-def _provider_diagnostics(result: dict[str, Any], response: dict[str, Any]) -> None:
-    error = response.get("error")
-    error = error if isinstance(error, dict) else {}
-    details = response.get("incomplete_details")
-    details = details if isinstance(details, dict) else {}
-    values = {
-        "provider_status": response.get("status"),
-        "provider_error_code": error.get("code"),
-        "provider_error_type": error.get("type"),
-        "provider_reason": details.get("reason") or error.get("reason"),
-    }
-    for key, value in values.items():
-        token = _provider_token(value)
-        if token is not None:
-            result[key] = token
-    _provider_echo(result, response)
-
-
 def _provider_echo(result: dict[str, Any], response: dict[str, Any]) -> None:
-    echo: dict[str, Any] = {}
-    model = response.get("model")
-    if isinstance(model, str) and re.fullmatch(r"[A-Za-z0-9_.:/-]{1,256}", model):
-        echo["model"] = model
-    for key in ("max_output_tokens", "max_tool_calls"):
-        value = response.get(key)
-        if type(value) is int and value >= 0:
-            echo[key] = value
-    truncation = _provider_token(response.get("truncation"))
-    if truncation is not None:
-        echo["truncation"] = truncation
-    reasoning = response.get("reasoning")
-    if isinstance(reasoning, dict):
-        effort = _provider_token(reasoning.get("effort"))
-        if effort is not None:
-            echo["reasoning"] = {"effort": effort}
+    echo = provider_echo(response)
     if echo:
         result["provider_echo"] = echo
         if "capability_receipt" in result:
@@ -153,19 +117,20 @@ def _ask(client, prompt: str, trace, result: dict[str, Any], params: dict) -> No
         params=params,
         trace=trace,
     )
-    _, reply = extract_reasoning_and_text(response)
-    result["reply"] = (reply or "").strip()
+    _stored_reply(result, response)
     if response.get("id") and response["id"] not in result["response_ids"]:
         result["response_ids"].append(response["id"])
     pending = extract_function_calls(response)
     result["pending_tools"] = sorted({call.get("name") or "unknown" for call in pending})
     result["provider_status"] = "unknown"
     _provider_diagnostics(result, response)
-    if pending:
+    if result["provider_error_present"]:
+        result.update(status="failed", error="ProviderResponseError")
+    elif pending:
         result["status"] = "needs_approval"
     elif response.get("status") not in (None, "completed"):
         result.update(status="incomplete", error="IncompleteResponse")
-    elif result["reply"]:
+    elif result["reply"].strip():
         result["status"] = "completed"
     else:
         raise RuntimeError("Provider returned no answer")
@@ -177,6 +142,7 @@ def _checkpoint_response(result: dict[str, Any], response: dict, path: Path | No
     if isinstance(response_id, str) and response_id not in result["response_ids"]:
         result["response_ids"].append(response_id)
     _provider_diagnostics(result, response)
+    _stored_reply(result, response)
     result["checkpoint"] = {"state": "response_received", "reply_verified": False}
     if path is not None:
         snapshot = {**result, "status": "running"}
@@ -238,6 +204,8 @@ def _finish(invocation, trace, result: dict[str, Any]) -> None:
     _response_evidence(responses, result)
     if responses and isinstance(responses[-1].get("raw"), dict):
         _provider_diagnostics(result, responses[-1]["raw"])
+        if result["provider_error_present"] and result["status"] != "retrieved":
+            result.update(status="failed", error="ProviderResponseError")
     response_ids = [item["response_id"] for item in responses if item.get("response_id")]
     result["response_ids"] = list(dict.fromkeys(response_ids + result["response_ids"]))
     if any((item.get("raw") or {}).get("usage") for item in responses):
@@ -402,11 +370,34 @@ def run_dialogue(
     return result
 
 
+def _stored_reply(result: dict[str, Any], response: dict[str, Any]) -> None:
+    """Export explicit assistant text, never reasoning or arbitrary diagnostic text."""
+    result.update(reply="", reply_state="unknown")
+    result.pop("reply_chars", None)
+    result.pop("reply_sha256", None)
+    reply, state = assistant_text(response)
+    if state != "unknown":
+        result.update(
+            reply=reply,
+            reply_state="available" if reply else "empty",
+            reply_chars=len(reply),
+            reply_sha256=hashlib.sha256(reply.encode("utf-8")).hexdigest(),
+        )
+        receipt = {
+            "response_id": response.get("id"),
+            **{key: result[key] for key in ("reply", "reply_state", "reply_chars", "reply_sha256")},
+        }
+        replies = result.setdefault("assistant_replies", [])
+        if receipt not in replies:
+            replies.append(receipt)
+
+
 def inspect_response(
     response_id: str, *, client_factory: Callable[[], Any] | None = None
 ) -> dict[str, Any]:
     """Read one stored provider response without starting or continuing a generation."""
     result = _new_result()
+    result["reply_state"] = "unknown"
     result["retrieval_requests"] = 0
     invocation = None
     trace = None
@@ -439,6 +430,7 @@ def inspect_response(
         stored_id = data.get("id") if isinstance(data, dict) else None
         if not isinstance(stored_id, str) or str(uuid.UUID(stored_id)) != response_id:
             raise ValueError("Stored response ID does not match the requested response")
+        _stored_reply(result, data)
         trace.add_response(data, step_index=1, kind="retrieved_response")
         _provider_diagnostics(result, data)
         result["status"] = "retrieved"
