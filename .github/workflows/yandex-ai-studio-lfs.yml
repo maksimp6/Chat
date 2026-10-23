@@ -76,7 +76,13 @@ jobs:
           git lfs fsck
           auth_header="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           echo "::add-mask::$auth_header"
-          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" lfs push origin HEAD
+          python - <<'PY' > "$RUNNER_TEMP/admitted-lfs-oids"
+          import json, pathlib
+          manifest = json.loads(pathlib.Path('docs/mirrors/yandex-ai-studio/manifest.json').read_text())
+          print('\n'.join(entry['sha256'] for entry in manifest['files']))
+          PY
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" \
+            lfs push --object-id origin --stdin < "$RUNNER_TEMP/admitted-lfs-oids"
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" \
             -c lfs.storage="$RUNNER_TEMP/independent-lfs" \
             lfs fetch --include="docs/mirrors/yandex-ai-studio/source/**" --exclude="" origin "$GITHUB_SHA"
