@@ -25,6 +25,12 @@ def repo(tmp_path, monkeypatch):
     return root
 
 
+@pytest.fixture(autouse=True)
+def owner_permitted_generation(monkeypatch):
+    # These tests model a permitted run; the closed default is in test_logos_generation_gate.py.
+    monkeypatch.setenv("LOGOS_GENERATION_ALLOWED", "true")
+
+
 def _message(text):
     return {"output": [{"type": "message", "content": [{"type": "output_text", "text": text}]}]}
 
