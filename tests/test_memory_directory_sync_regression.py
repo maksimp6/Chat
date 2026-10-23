@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from memory_engine import MemoryStore, StoreError
+from kristall import Kristall as MemoryStore, KristallError as StoreError
 
 
 def _directory_fsync_failure(monkeypatch):
