@@ -1701,8 +1701,95 @@ def _declared_repository_paths(snippet: str, by_path: dict) -> set[str]:
     return paths
 
 
+def _digest_matches(text: object, digest: object) -> bool:
+    return (
+        isinstance(text, str)
+        and isinstance(digest, str)
+        and digest == hashlib.sha256(text.encode("utf-8")).hexdigest()
+    )
+
+
+def _issue_vector_sources_valid(corpus: list[dict]) -> bool:
+    """Verify the bytes being matched, not an unexamined claimed snapshot hash.
+
+    A dialogue's text may be a suffix of the original body. Its body_sha256
+    therefore cannot be recomputed here; sha256 identifies the extracted text.
+    """
+    seen = set()
+    for source in corpus:
+        if not isinstance(source, dict):
+            return False
+        number = source.get("issue")
+        kind = source.get("corpus_kind")
+        body_digest = source.get("body_sha256")
+        if (
+            type(number) is not int
+            or number < 1
+            or number in seen
+            or source.get("url") != f"https://github.com/{REPO}/issues/{number}"
+            or not _digest_matches(source.get("text"), source.get("sha256"))
+            or not _digest_matches(source.get("title"), source.get("title_sha256"))
+            or type(source.get("body_offset")) is not int
+            or source["body_offset"] < 0
+            or kind not in {"tasks", "dialogues"}
+            or not isinstance(body_digest, str)
+            or re.fullmatch(r"[0-9a-f]{64}", body_digest) is None
+            or (kind == "tasks" and (source["body_offset"] != 0 or body_digest != source["sha256"]))
+        ):
+            return False
+        seen.add(number)
+    return True
+
+
+def _repository_vector_sources_valid(repository_files: list[dict]) -> bool:
+    """Validate indexed text separately from the original, possibly redacted bytes."""
+    seen = set()
+    for source in repository_files:
+        if not isinstance(source, dict):
+            return False
+        path = source.get("path")
+        digest = source.get("sha256")
+        if (
+            not isinstance(path, str)
+            or not path
+            or path in seen
+            or path.startswith("/")
+            or "\\" in path
+            or "\0" in path
+            or re.match(r"^[A-Za-z]:", path) is not None
+            or any(part in {"", ".", ".."} for part in path.split("/"))
+            or not isinstance(digest, str)
+            or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+        ):
+            return False
+        seen.add(path)
+        if source.get("kind") == "text":
+            if not _repository_vector_text_valid(source):
+                return False
+        elif source.get("kind") not in {"binary", "symlink"}:
+            return False
+    return True
+
+
+def _repository_vector_text_valid(source: dict) -> bool:
+    digest = source["sha256"]
+    index_digest = source.get("index_sha256", digest)
+    return (
+        (not source.get("redactions") or "index_sha256" in source)
+        and _digest_matches(source.get("text"), index_digest)
+        and (bool(source.get("redactions")) or digest == index_digest)
+    )
+
+
 def verify_repository_vector_result(item: dict, repository_files: list[dict]) -> dict:
     """Resolve an excerpt to the tracked text file path stamped into its segment."""
+    if not _repository_vector_sources_valid(repository_files):
+        return {"verbatim": False, "reason": "repository_source_hash_mismatch"}
+    return _repository_vector_match(item, repository_files)
+
+
+def _repository_vector_match(item: dict, repository_files: list[dict]) -> dict:
+    """Match a repository snapshot already validated by the public entrypoint."""
     by_path = {source["path"]: source for source in repository_files}
     for snippet in _safe_vector_result_texts(item):
         paths = _declared_repository_paths(snippet, by_path)
@@ -1729,6 +1816,11 @@ def verify_repository_vector_result(item: dict, repository_files: list[dict]) ->
                     "sha256": source["sha256"],
                     "redactions_applied": source.get("redactions", 0),
                 }
+                if source.get("redactions"):
+                    # The original is intentionally absent from this boundary.
+                    # Its supplied hash must not masquerade as recomputed bytes.
+                    evidence["index_sha256"] = source["index_sha256"]
+                    evidence["hash_verification"] = "indexed_text_only"
                 if not source.get("redactions"):
                     evidence["source_start"] = start
                     evidence["source_end"] = end
@@ -1771,8 +1863,13 @@ def _issue_vector_matches(snippet: str, source: dict) -> list[dict]:
             "source_end": end,
         }
         if field == "body":
-            evidence["body_start"] = source["body_offset"] + start
-            evidence["body_end"] = evidence["body_start"] + len(excerpt)
+            if source["body_offset"] == 0 and source["body_sha256"] == source["sha256"]:
+                evidence["body_start"] = start
+                evidence["body_end"] = end
+            else:
+                evidence["declared_body_offset"] = source["body_offset"]
+                evidence["original_body_sha256"] = source["body_sha256"]
+                evidence["hash_verification"] = "extracted_text_only"
         matches.append(evidence)
     return matches
 
@@ -1783,13 +1880,16 @@ def verify_vector_result(
     repository_files: list[dict] | None = None,
 ) -> dict:
     """Bind an exact search excerpt to a hashed source body or title when possible."""
+    source_error = _vector_source_error(corpus, repository_files)
+    if source_error:
+        return {"verbatim": False, "reason": source_error}
     for snippet in _safe_vector_result_texts(item):
         snippet = snippet[:MAX_VECTOR_RESULT_CHARS]
         declared_ids = {
             int(match.group(1)) for match in re.finditer(r"(?m)^## Issue (\d{1,10})\s*$", snippet)
         }
         if repository_files and not declared_ids:
-            repository_match = verify_repository_vector_result(item, repository_files)
+            repository_match = _repository_vector_match(item, repository_files)
             if repository_match.get("verbatim"):
                 return repository_match
             continue
@@ -1807,8 +1907,16 @@ def verify_vector_result(
         if len(unique_matches) > 1:
             return {"verbatim": False, "reason": "ambiguous_source_match"}
     if repository_files:
-        return verify_repository_vector_result(item, repository_files)
+        return _repository_vector_match(item, repository_files)
     return {"verbatim": False}
+
+
+def _vector_source_error(corpus: list[dict], repository_files: list[dict] | None) -> str | None:
+    if not _issue_vector_sources_valid(corpus):
+        return "source_hash_mismatch"
+    if repository_files is not None and not _repository_vector_sources_valid(repository_files):
+        return "repository_source_hash_mismatch"
+    return None
 
 
 def vector_store_search(store_id: str, query: str, project: str, key: str) -> list[dict]:
