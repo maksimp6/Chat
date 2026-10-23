@@ -44,6 +44,7 @@ def model_answer(**changes):
 @pytest.fixture
 def transport(monkeypatch):
     """Supply deterministic Issue snapshots and capture paid/public side effects."""
+    monkeypatch.setattr(pipeline, "enforce_native_launch_hold", lambda: None)
     state = SimpleNamespace(
         issues=[
             {

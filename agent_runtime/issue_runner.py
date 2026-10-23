@@ -15,6 +15,12 @@ import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from agent_runtime.logos_launch_hold import (
+    NativeLogosLaunchBlocked,
+    enforce_native_launch_hold,
+    hold_receipt,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MODEL = "logos-runtime"
 TOOL_CATEGORIES = ["filesystem"]
@@ -83,6 +89,19 @@ def run_issue_task(
     client_factory: Optional[Callable[[], Any]] = None,
     repo_root: Path = ROOT,
 ) -> Dict[str, Any]:
+    try:
+        enforce_native_launch_hold()
+    except NativeLogosLaunchBlocked:
+        return {
+            "issue": issue_number,
+            "model": model_key,
+            "status": "failed",
+            "error": "NativeLogosLaunchBlocked",
+            "launch_hold": hold_receipt(),
+            "generation_requests": 0,
+            "changed_files": [],
+            "pending_tools": [],
+        }
     import app  # noqa: F401  -- initializes the database schema and blueprints
     from invocation.manager import (
         create_invocation,

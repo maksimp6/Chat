@@ -28,6 +28,11 @@ import requests
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(ROOT))
+
+from agent_runtime.logos_launch_hold import NativeLogosLaunchBlocked, enforce_native_launch_hold
+
 DEFAULT_PORT = 8765
 REQUEST_TIMEOUT = 20.0
 STARTUP_TIMEOUT = 45.0
@@ -354,7 +359,13 @@ def _build_runtime_env(*, db_path: Path, port: int) -> dict[str, str]:
     return env
 
 
+def _admit_smoke_mode(*, offline: bool) -> None:
+    if not offline:
+        enforce_native_launch_hold()
+
+
 def run_smoke(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
+    _admit_smoke_mode(offline=args.offline)
     git = _git_state(require_master=args.require_master)
     api_key, project_id = _provider_inputs()
     provider_ready = bool(api_key and project_id)
@@ -533,6 +544,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         exit_code, result = run_smoke(args)
+    except NativeLogosLaunchBlocked as exc:
+        print(json.dumps({"status": "BLOCKED", "reason": str(exc)}, ensure_ascii=False))
+        return 1
     except SmokeFailure as exc:
         print(
             json.dumps(

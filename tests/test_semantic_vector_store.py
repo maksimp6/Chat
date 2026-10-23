@@ -574,6 +574,8 @@ def test_repository_document_preserves_identity_without_exposing_omitted_data(re
 
 @pytest.fixture
 def vector_model_transport(monkeypatch):
+    # Only synthetic provider transports run after this test-only substitution.
+    monkeypatch.setattr(pipeline, "enforce_native_launch_hold", lambda: None)
     calls = []
     reply = {
         "answer": "Проверка офиса описана в журнале.",

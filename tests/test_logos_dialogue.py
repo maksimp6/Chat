@@ -20,6 +20,10 @@ from tool_providers import filesystem
 
 @pytest.fixture(autouse=True)
 def no_network(monkeypatch):
+    # Permit this module's fake-only runtime tests. Production admission is
+    # exercised independently in test_logos_launch_hold.py.
+    monkeypatch.setattr(dialogue, "enforce_native_launch_hold", lambda: None)
+
     def reject(*args, **kwargs):
         pytest.fail("The dialogue tests must never use a live provider")
 
