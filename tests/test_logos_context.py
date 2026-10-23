@@ -205,6 +205,107 @@ def test_even_resealed_packet_cannot_omit_required_sources(repo, transport):
         context.validate_context(packet)
 
 
+def _reseal(packet):
+    packet["manifest"] = context._manifest(packet["owner_context"], packet["sources"])
+    packet.pop("packet_sha256")
+    return context._seal(packet)
+
+
+def test_resealed_packet_with_removed_comment_still_fails_captured_inventory(repo, transport):
+    packet = build(repo, transport)
+    packet["sources"] = [
+        source for source in packet["sources"] if source["kind"] != "issue_comment"
+    ]
+    _reseal(packet)
+    with pytest.raises(context.ContextError, match="comment count"):
+        context.validate_context(packet)
+
+
+@pytest.mark.parametrize("claim", ["all_archived_and_indexed", None])
+def test_resealed_packet_cannot_upgrade_unread_linked_evidence_to_complete(repo, transport, claim):
+    packet = build(repo, transport)
+    packet["coverage"]["actions_logs_and_artifacts"] = claim
+    _reseal(packet)
+    with pytest.raises(context.ContextError, match="coverage"):
+        context.validate_context(packet)
+
+
+@pytest.mark.parametrize(
+    "kind", ["issue", "pull_request", "issue_comment", "pr_comment", "review", "inline_comment"]
+)
+def test_resealed_packet_cannot_rebind_source_to_another_case_url(repo, transport, kind):
+    packet = build(repo, transport)
+    record = next(source for source in packet["sources"] if source["kind"] == kind)
+    record["url"] = "https://github.com/maksimp6/Chat/issues/999999"
+    _reseal(packet)
+    with pytest.raises(context.ContextError, match="URL.*declared case"):
+        context.validate_context(packet)
+
+
+@pytest.mark.parametrize("field", ["issue_number", "pr_number"])
+def test_resealed_packet_case_number_must_match_source_links(repo, transport, field):
+    packet = build(repo, transport)
+    packet["case"][field] = 999999
+    _reseal(packet)
+    with pytest.raises(context.ContextError, match="URL.*declared case"):
+        context.validate_context(packet)
+
+
+def test_captured_pr_source_revisions_must_match_case_manifest(repo, transport):
+    packet = build(repo, transport)
+    pr = next(source for source in packet["sources"] if source["kind"] == "pull_request")
+    pr["head_sha"] = "c" * 40
+    _reseal(packet)
+    with pytest.raises(context.ContextError, match="source revisions"):
+        context.validate_context(packet)
+
+
+def test_case_capture_rejects_misdirected_github_object_before_emitting_complete_packet(
+    repo, transport
+):
+    transport[0]["/repos/maksimp6/Chat/issues/1413"]["html_url"] = (
+        "https://github.com/maksimp6/Chat/issues/99"
+    )
+    with pytest.raises(context.ContextError, match="URL.*declared case"):
+        build(repo, transport)
+
+
+def test_source_fragments_are_bound_to_captured_comment_identity(repo, transport):
+    packet = build(repo, transport)
+    for source in packet["sources"]:
+        prefix = {
+            "issue_comment": "issuecomment-",
+            "pr_comment": "issuecomment-",
+            "review": "pullrequestreview-",
+            "inline_comment": "discussion_r",
+        }.get(source["kind"])
+        if prefix:
+            source["url"] += "#" + prefix + source["id"].rsplit(":", 1)[1]
+    assert context.validate_context(_reseal(packet)) is packet
+    comment = next(source for source in packet["sources"] if source["kind"] == "issue_comment")
+    comment["url"] = comment["url"].split("#", 1)[0] + "#issuecomment-999"
+    with pytest.raises(context.ContextError, match="URL.*declared case"):
+        context.validate_context(_reseal(packet))
+
+
+@pytest.mark.parametrize("damage", ["unknown_kind", "wrong_identity", "invalid_repository"])
+def test_context_source_links_fail_closed_for_unverifiable_identity(repo, transport, damage):
+    packet = build(repo, transport)
+    if damage == "unknown_kind":
+        record = dict(packet["sources"][-1], id="github:unknown:999", kind="unknown")
+        packet["sources"].append(record)
+        match = "source kind"
+    elif damage == "wrong_identity":
+        record = next(source for source in packet["sources"] if source["kind"] == "issue_comment")
+        record["id"] = "github:pr_comment:1"
+        match = "source identity"
+    else:
+        packet["repository"] = None
+        match = "owner/repository"
+    with pytest.raises(context.ContextError, match=match):
+        context.validate_context(_reseal(packet))
+
+
 def test_sensitive_files_and_escaping_symlinks_are_never_loaded(repo, transport, tmp_path):
     (repo / ".env").write_text("password=do-not-read-this-value")
     with pytest.raises(context.ContextError, match="Credential files"):
