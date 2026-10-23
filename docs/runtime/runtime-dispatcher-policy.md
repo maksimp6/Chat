@@ -1,6 +1,6 @@
 # Preview runtime dispatcher policy
 
-Alice Pro preview runtimes share one Python application process. A runtime thread is an execution unit, not a security boundary. Isolation is therefore enforced by an explicit `RuntimeDispatcher` contract and by static/runtime tests.
+Logos preview runtimes share one Python application process. A runtime thread is an execution unit, not a security boundary. Isolation is therefore enforced by an explicit `RuntimeDispatcher` contract and by static/runtime tests.
 
 ## Mandatory boundary
 

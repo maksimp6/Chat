@@ -7,7 +7,6 @@ omit =
     tests/*
     scripts/*
     android/*
-    r/frontend/*
     setup.py
     conftest.py
 exclude_also =

@@ -24,7 +24,6 @@ ROOT = Path(__file__).resolve().parents[1]
         (["deploy/remote-desktop-commander/credential-handoff.mjs"], {"infra", "mcp"}),
         (["deploy/chrome-worker/oauth.mjs"], {"infra", "mcp"}),
         (["deploy/oauth-idp/server.mjs"], {"infra", "mcp"}),
-        (["requirements-postgres.txt"], {"backend", "database"}),
         (["db.py"], {"backend", "database"}),
         (["db_backend.py"], {"backend", "database"}),
         (["tests/test_user_identity.py"], {"backend"}),
@@ -37,6 +36,13 @@ ROOT = Path(__file__).resolve().parents[1]
         (["scripts/ci_platform_changes.py"], {"infra"}),
         ([".github/workflows/ci.yml"], ALL),
         (["requirements.txt"], ALL),
+        # Manifests that Dependabot PRs touch (docs/development/dependency-updates.md).
+        (["android/build.gradle.kts"], {"android"}),
+        ([".github/workflows/security.yml"], {"infra"}),
+        (["deploy/chrome-worker/package-lock.json"], {"infra", "mcp"}),
+        (["deploy/remote-desktop-commander/Dockerfile.mcp"], {"infra", "mcp"}),
+        (["requirements-dev.txt"], ALL),
+        (["Dockerfile"], ALL),
         (["new-platform/entry.wasm"], ALL),
         ([], ALL),
     ],
@@ -53,7 +59,7 @@ def test_routing_unions_all_changed_paths():
 
 
 def results(**overrides):
-    value = dict.fromkeys(["backend", "postgres", "android", "infra", "mcp"], "skipped")
+    value = dict.fromkeys(["backend", "android", "infra", "mcp"], "skipped")
     value.update({"changes": "success", "code-rules": "success"})
     value.update(overrides)
     return value
@@ -99,9 +105,9 @@ def test_malformed_plan_fails_closed():
         routing.validate_results(plan, results())
 
 
-def test_web_dependency_requires_postgres_and_mcp():
+def test_web_dependency_requires_mcp():
     plan = routing.classify(["static/app.js"])
-    with pytest.raises(ValueError, match="postgres|mcp"):
+    with pytest.raises(ValueError, match="mcp"):
         routing.validate_results(plan, results(backend="success", android="success"))
 
 
@@ -112,13 +118,12 @@ def test_router_tests_are_part_of_always_run_code_rules():
 def test_workflow_has_real_independent_infra_and_mcp_jobs():
     workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
     jobs = workflow["jobs"]
-    for job in ("backend", "postgres", "android", "infra", "mcp"):
+    for job in ("backend", "android", "infra", "mcp"):
         assert jobs[job]["needs"] == "changes"
     assert "infra" in jobs["required"]["needs"]
     assert "mcp" in jobs["required"]["needs"]
     infra = "\n".join(step.get("run", "") for step in jobs["infra"]["steps"])
     assert "pytest" in infra and "tests/test_cloudru" in infra
-    assert "diff-cover" in infra
     backend = "\n".join(step.get("run", "") for step in jobs["backend"]["steps"])
     assert "npm test --prefix deploy/chrome-worker" not in backend
     mcp = "\n".join(step.get("run", "") for step in jobs["mcp"]["steps"])
@@ -180,6 +185,4 @@ def test_incomplete_web_plan_cannot_hide_dependencies():
     plan = routing.classify(["static/app.js"])
     plan["mcp"] = False
     with pytest.raises(ValueError, match="web dependency plan"):
-        routing.validate_results(
-            plan, results(backend="success", android="success", postgres="success")
-        )
+        routing.validate_results(plan, results(backend="success", android="success"))

@@ -1,4 +1,4 @@
-"""Domain services for the Alice Pro 3D-printing business MVP."""
+"""Domain services for the Logos 3D-printing business MVP."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
 
-from db import get_conn
+from printing3d.store import PrintStore
 
 ORDER_STATUSES = (
     "lead",
@@ -86,60 +86,13 @@ def calculate_quote(data: dict) -> dict:
     }
 
 
-def init_3d_printing_tables() -> None:
-    conn = get_conn()
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS print_orders (
-            id TEXT PRIMARY KEY,
-            owner_id TEXT NOT NULL,
-            customer_name TEXT,
-            source TEXT NOT NULL DEFAULT 'manual',
-            title TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'lead',
-            currency TEXT NOT NULL DEFAULT 'RUB',
-            quoted_price REAL,
-            actual_revenue REAL,
-            actual_cost REAL,
-            quote_json TEXT NOT NULL DEFAULT '{}',
-            notes TEXT,
-            settled_at TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            CHECK(status IN (
-                'lead', 'quote', 'accepted', 'printing',
-                'ready', 'delivered', 'paid', 'cancelled'
-            ))
-        )
-        """
-    )
-    columns = {row["name"] for row in conn.execute("PRAGMA table_info(print_orders)").fetchall()}
-    if "actual_cost" not in columns:
-        conn.execute("ALTER TABLE print_orders ADD COLUMN actual_cost REAL")
-    if "settled_at" not in columns:
-        conn.execute("ALTER TABLE print_orders ADD COLUMN settled_at TEXT")
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_print_orders_owner_created "
-        "ON print_orders(owner_id, created_at)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_print_orders_owner_status ON print_orders(owner_id, status)"
-    )
-    conn.commit()
-    conn.close()
-
-
 def _row_to_order(row) -> dict:
-    result = dict(row)
-    try:
-        result["quote"] = json.loads(result.pop("quote_json") or "{}")
-    except Exception:
-        result["quote"] = {}
-        result.pop("quote_json", None)
-    return result
+    if not isinstance(row.get("quote"), dict):
+        raise ValueError("invalid native order record")
+    return row
 
 
-def create_order(owner_id: str, data: dict) -> dict:
+def create_order(store: PrintStore, owner_id: str, data: dict) -> dict:
     if not owner_id:
         raise ValueError("owner identity is required")
     if not isinstance(data, dict):
@@ -173,88 +126,61 @@ def create_order(owner_id: str, data: dict) -> dict:
 
     now = datetime.utcnow().isoformat()
     order_id = str(uuid4())
-    init_3d_printing_tables()
-    conn = get_conn()
-    conn.execute(
-        """
-        INSERT INTO print_orders(
-            id, owner_id, customer_name, source, title, status, currency,
-            quoted_price, actual_revenue, actual_cost, quote_json, notes,
-            settled_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            order_id,
-            owner_id,
-            str(data.get("customer_name") or "").strip() or None,
-            str(data.get("source") or "manual").strip() or "manual",
-            title,
-            status,
-            str(data.get("currency") or quote.get("currency") or "RUB"),
-            quoted_price,
-            actual_revenue,
-            actual_cost,
-            json.dumps(quote, ensure_ascii=False),
-            str(data.get("notes") or "").strip() or None,
-            None,
-            now,
-            now,
-        ),
-    )
-    conn.commit()
-    conn.close()
-    return get_order(owner_id, order_id)
+    record = {
+        "id": order_id,
+        "owner_id": owner_id,
+        "customer_name": str(data.get("customer_name") or "").strip() or None,
+        "source": str(data.get("source") or "manual").strip() or "manual",
+        "title": title,
+        "status": status,
+        "currency": str(data.get("currency") or quote.get("currency") or "RUB"),
+        "quoted_price": quoted_price,
+        "actual_revenue": actual_revenue,
+        "actual_cost": actual_cost,
+        "quote": quote,
+        "notes": str(data.get("notes") or "").strip() or None,
+        "settled_at": None,
+        "created_at": now,
+        "updated_at": now,
+    }
+    with store.transaction() as tx:
+        tx.set("printing/order/" + order_id, record)
+    return get_order(store, owner_id, order_id)
 
 
-def get_order(owner_id: str, order_id: str) -> dict | None:
-    init_3d_printing_tables()
-    conn = get_conn()
-    row = conn.execute(
-        "SELECT * FROM print_orders WHERE id = ? AND owner_id = ?",
-        (order_id, owner_id),
-    ).fetchone()
-    conn.close()
-    return _row_to_order(row) if row else None
+def get_order(store: PrintStore, owner_id: str, order_id: str) -> dict | None:
+    row = store.get("printing/order/" + order_id)
+    return _row_to_order(row) if row is not None and row["owner_id"] == owner_id else None
 
 
-def list_orders(owner_id: str, *, status: str | None = None) -> list[dict]:
-    init_3d_printing_tables()
-    conn = get_conn()
-    if status:
-        if status not in ORDER_STATUSES:
-            conn.close()
-            raise ValueError("invalid order status")
-        rows = conn.execute(
-            "SELECT * FROM print_orders WHERE owner_id = ? AND status = ? ORDER BY created_at DESC",
-            (owner_id, status),
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT * FROM print_orders WHERE owner_id = ? ORDER BY created_at DESC",
-            (owner_id,),
-        ).fetchall()
-    conn.close()
-    return [_row_to_order(row) for row in rows]
+def list_orders(store: PrintStore, owner_id: str, *, status: str | None = None) -> list[dict]:
+    if status and status not in ORDER_STATUSES:
+        raise ValueError("invalid order status")
+    rows = [
+        row
+        for row in store.items(prefix="printing/order/").values()
+        if row["owner_id"] == owner_id and (not status or row["status"] == status)
+    ]
+    return sorted(rows, key=lambda row: row["created_at"], reverse=True)
 
 
-def update_order_status(owner_id: str, order_id: str, status: str) -> dict | None:
+def update_order_status(
+    store: PrintStore, owner_id: str, order_id: str, status: str
+) -> dict | None:
     if status not in ORDER_STATUSES:
         raise ValueError("invalid order status")
     if status == "paid":
         raise ValueError("paid status requires settlement")
-    init_3d_printing_tables()
-    conn = get_conn()
-    now = datetime.utcnow().isoformat()
-    conn.execute(
-        "UPDATE print_orders SET status = ?, updated_at = ? WHERE id = ? AND owner_id = ?",
-        (status, now, order_id, owner_id),
-    )
-    conn.commit()
-    conn.close()
-    return get_order(owner_id, order_id)
+    key = "printing/order/" + order_id
+    with store.transaction() as tx:
+        row = tx.get(key)
+        if row is not None and row["owner_id"] == owner_id:
+            tx.set(key, {**row, "status": status, "updated_at": datetime.utcnow().isoformat()})
+    return get_order(store, owner_id, order_id)
 
 
 def settle_order(
+    store: PrintStore,
     owner_id: str,
     order_id: str,
     *,
@@ -262,7 +188,7 @@ def settle_order(
     actual_cost=None,
 ) -> dict | None:
     """Finalize an order with actual revenue/cost values used by Treasury reporting."""
-    order = get_order(owner_id, order_id)
+    order = get_order(store, owner_id, order_id)
     if order is None:
         return None
 
@@ -295,27 +221,13 @@ def settle_order(
     cost = _money(_decimal(cost_source, "actual_cost"))
     now = datetime.utcnow().isoformat()
 
-    conn = get_conn()
-    conn.execute(
-        """
-        UPDATE print_orders
-           SET status = 'paid',
-               actual_revenue = ?,
-               actual_cost = ?,
-               settled_at = ?,
-               updated_at = ?
-         WHERE id = ? AND owner_id = ?
-        """,
-        (revenue, cost, now, now, order_id, owner_id),
-    )
-    conn.commit()
-    conn.close()
-    return get_order(owner_id, order_id)
+    _publish_settlement(store, owner_id, order_id, revenue, cost, now)
+    return get_order(store, owner_id, order_id)
 
 
-def get_financial_summary(owner_id: str) -> dict:
+def get_financial_summary(store: PrintStore, owner_id: str) -> dict:
     """Return Treasury-facing 3D-printing P&L grouped by currency."""
-    orders = list_orders(owner_id)
+    orders = list_orders(store, owner_id)
     by_currency: dict[str, dict] = {}
 
     for order in orders:
@@ -366,3 +278,30 @@ def get_financial_summary(owner_id: str) -> dict:
         "total_orders": len(orders),
         "currencies": currencies,
     }
+
+
+def _publish_settlement(
+    store: PrintStore, owner_id: str, order_id: str, revenue: float, cost: float, now: str
+) -> None:
+    key = "printing/order/" + order_id
+    with store.transaction() as tx:
+        current = tx.get(key)
+        if current is None or current["owner_id"] != owner_id:
+            return None
+        if current.get("settled_at"):
+            if current["actual_revenue"] != revenue or current["actual_cost"] != cost:
+                raise ValueError("order is already settled")
+        elif current["status"] == "cancelled":
+            raise ValueError("cancelled order cannot be settled")
+        else:
+            tx.set(
+                key,
+                {
+                    **current,
+                    "status": "paid",
+                    "actual_revenue": revenue,
+                    "actual_cost": cost,
+                    "settled_at": now,
+                    "updated_at": now,
+                },
+            )

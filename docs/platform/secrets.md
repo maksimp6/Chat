@@ -1,6 +1,6 @@
 # Secrets Configuration
 
-Alice Platform uses external secret storage to keep sensitive credentials out of configuration files. This document explains how secrets are configured and referenced.
+Keel Platform uses external secret storage to keep sensitive credentials out of configuration files. This document explains how secrets are configured and referenced.
 
 ## Secret Concepts
 
@@ -104,7 +104,7 @@ If found, the config is rejected with an error message.
 At deployment time, the system fetches actual secret values:
 
 ```python
-# alice_platform/providers/secrets.py (future)
+# keel/providers/secrets.py (future)
 def get_secret(path: str) -> str:
     """Fetch secret value from external storage."""
     # Fetches from vault/secrets manager

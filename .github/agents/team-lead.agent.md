@@ -1,6 +1,6 @@
 ---
 name: Team Lead
-description: Routes Alice Pro development tasks to the right specialist and keeps scope, dependencies, and merge readiness coherent.
+description: Routes Logos development tasks to the right specialist and keeps scope, dependencies, and merge readiness coherent.
 target: github-copilot
 model: gpt-5.4-mini
 user-invocable: true

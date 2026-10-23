@@ -1,0 +1,191 @@
+"""Regression tests for the dependency-free STL slicer."""
+
+import math
+import re
+import struct
+
+import pytest
+
+from printing3d.slicer import SliceError, SliceOptions, main, read_stl, slice_stl
+
+_FACES = [
+    (0, 2, 1),
+    (0, 3, 2),
+    (4, 5, 6),
+    (4, 6, 7),
+    (0, 1, 5),
+    (0, 5, 4),
+    (1, 2, 6),
+    (1, 6, 5),
+    (2, 3, 7),
+    (2, 7, 6),
+    (3, 0, 4),
+    (3, 4, 7),
+]
+
+
+def _cube_vertices(size: float) -> list[tuple[float, float, float]]:
+    s = size
+    return [(0, 0, 0), (s, 0, 0), (s, s, 0), (0, s, 0), (0, 0, s), (s, 0, s), (s, s, s), (0, s, s)]
+
+
+def _binary_cube(size: float, faces=_FACES) -> bytes:
+    vertices = _cube_vertices(size)
+    body = b"".join(
+        struct.pack("<3f", 0, 0, 0)
+        + b"".join(struct.pack("<3f", *vertices[i]) for i in face)
+        + b"\0\0"
+        for face in faces
+    )
+    return b"\0" * 80 + struct.pack("<I", len(faces)) + body
+
+
+def _ascii_cube(size: float) -> bytes:
+    vertices = _cube_vertices(size)
+    lines = ["solid cube"]
+    for face in _FACES:
+        lines.append("facet normal 0 0 0")
+        lines.append("outer loop")
+        lines.extend(f"vertex {x} {y} {z}" for x, y, z in (vertices[i] for i in face))
+        lines.append("endloop")
+        lines.append("endfacet")
+    lines.append("endsolid cube")
+    return "\n".join(lines).encode("ascii")
+
+
+def _extrusion_points(gcode: str) -> list[tuple[float, float]]:
+    return [
+        (float(x), float(y))
+        for x, y in re.findall(r"^G1 X([-\d.]+) Y([-\d.]+) E", gcode, flags=re.MULTILINE)
+    ]
+
+
+def test_binary_cube_has_expected_layers_and_height():
+    result = slice_stl(_binary_cube(20.0))
+    assert result.stats["layers"] == 100
+    assert result.stats["height_mm"] == 20.0
+
+
+def test_ascii_and_binary_cube_slice_identically():
+    binary = slice_stl(_binary_cube(20.0)).gcode
+    ascii_ = slice_stl(_ascii_cube(20.0)).gcode
+    assert binary == ascii_
+
+
+def test_filament_volume_matches_extruded_length_and_section():
+    options = SliceOptions()
+    stats = slice_stl(_binary_cube(20.0), options).stats
+    section = options.line_width * options.layer_height
+    assert stats["filament_volume_mm3"] == pytest.approx(stats["extrude_mm"] * section, abs=0.01)
+    assert stats["filament_grams"] == pytest.approx(
+        stats["filament_volume_mm3"] / 1000 * 1.24, abs=0.001
+    )
+
+
+def test_filament_length_follows_from_filament_diameter():
+    options = SliceOptions()
+    stats = slice_stl(_binary_cube(20.0), options).stats
+    area = math.pi * (options.filament_diameter / 2) ** 2
+    assert stats["filament_mm"] == pytest.approx(stats["filament_volume_mm3"] / area, abs=0.01)
+
+
+def test_extrusion_stays_on_bed_and_inside_model_footprint():
+    options = SliceOptions()
+    gcode = slice_stl(_binary_cube(20.0), options).gcode
+    points = _extrusion_points(gcode)
+    assert points, "expected extrusion moves"
+    center = options.bed_x / 2
+    for x, y in points:
+        assert center - 10.01 <= x <= center + 10.01
+        assert center - 10.01 <= y <= center + 10.01
+
+
+def test_extrusion_values_never_decrease():
+    gcode = slice_stl(_binary_cube(20.0)).gcode
+    values = [float(v) for v in re.findall(r" E([\d.]+) ", gcode)]
+    assert values == sorted(values)
+
+
+def test_infill_direction_alternates_between_layers():
+    gcode = slice_stl(_binary_cube(4.0)).gcode
+    first, second = gcode.split("; layer 2 ")[0], gcode.split("; layer 2 ")[1]
+    first_layer = first.split("; layer 1 ")[1]
+    first_xs = {x for x, _ in _extrusion_points(first_layer)}
+    second_xs = {x for x, _ in _extrusion_points(second)}
+    assert len(first_xs) > 2 and len(second_xs) > 2
+
+
+def test_open_mesh_is_rejected():
+    faces = [face for face in _FACES if face != (0, 1, 5)]
+    with pytest.raises(SliceError, match="not closed"):
+        slice_stl(_binary_cube(20.0, faces))
+
+
+def test_model_larger_than_bed_is_rejected():
+    with pytest.raises(SliceError, match="does not fit"):
+        slice_stl(_binary_cube(300.0))
+
+
+def test_invalid_options_are_rejected():
+    with pytest.raises(SliceError, match="layer_height must be positive"):
+        slice_stl(_binary_cube(10.0), SliceOptions(layer_height=0))
+    with pytest.raises(SliceError, match="line_width must not be smaller"):
+        slice_stl(_binary_cube(10.0), SliceOptions(layer_height=0.4, line_width=0.2))
+
+
+def test_garbage_input_is_rejected():
+    with pytest.raises(SliceError):
+        slice_stl(b"not an stl at all \xff\xfe")
+
+
+def test_ascii_stl_with_bad_coordinate_is_rejected():
+    bad = b"solid x\nvertex 0 0 nope\nvertex 1 0 0\nvertex 0 1 0\nendsolid x\n"
+    with pytest.raises(SliceError, match="invalid vertex"):
+        read_stl(bad)
+
+
+def test_cli_writes_gcode_and_prints_stats(tmp_path, capsys):
+    model = tmp_path / "cube.stl"
+    model.write_bytes(_binary_cube(10.0))
+    output = tmp_path / "cube.gcode"
+    assert main([str(model), str(output)]) == 0
+    assert output.read_text(encoding="utf-8").startswith("; generated by printing3d.slicer")
+    assert '"layers": 50' in capsys.readouterr().out
+
+
+def test_cli_usage_error_returns_two(capsys):
+    assert main([]) == 2
+    assert "usage" in capsys.readouterr().err
+
+
+def test_ascii_stl_without_triangles_is_rejected():
+    with pytest.raises(SliceError, match="no complete triangles"):
+        read_stl(b"solid empty\nendsolid empty\n")
+
+
+def test_binary_stl_without_triangles_is_rejected():
+    with pytest.raises(SliceError, match="no triangles"):
+        slice_stl(b"\0" * 80 + struct.pack("<I", 0))
+
+
+def test_span_narrower_than_a_line_gets_no_infill():
+    gcode = slice_stl(_binary_cube(0.4)).gcode
+    assert "; layer 1" in gcode
+    # only the perimeter is extruded: 2 layers x 8 mesh vertices per outline
+    assert len(_extrusion_points(gcode)) == 2 * 8
+
+
+def test_extrusion_before_first_travel_is_rejected():
+    from printing3d.slicer import SliceOptions, _Writer
+
+    with pytest.raises(SliceError, match="before first travel"):
+        _Writer(SliceOptions()).extrude((1.0, 1.0))
+
+
+def test_module_entry_point_exits_with_usage_status(monkeypatch):
+    import runpy
+
+    monkeypatch.setattr("sys.argv", ["printing3d.slicer"])
+    with pytest.raises(SystemExit) as info:
+        runpy.run_module("printing3d.slicer", run_name="__main__")
+    assert info.value.code == 2

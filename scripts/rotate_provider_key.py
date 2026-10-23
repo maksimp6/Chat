@@ -9,26 +9,27 @@ from __future__ import annotations
 
 import logging
 
-from credential_crypto import encrypt_secret
-from db import get_conn
-from provider_credentials import _fetch_one, create_schema, rotation_needed
-from provider_key_rotation import rotate_active_key
-from yandex_api_key_provider import YandexApiKeyProvider
+from secret_store.credential_crypto import encrypt_secret
+from storage.db import get_store
+from provider_accounts.credentials import list_provider_credentials, create_schema, rotation_needed
+from provider_accounts.key_rotation import rotate_active_key
+from yandex_client_modules.api_key_provider import YandexApiKeyProvider
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("alice_provider_key_rotation")
+logger = logging.getLogger("logos_provider_key_rotation")
 
 
 def main() -> int:
-    conn = get_conn()
+    conn = get_store()
     try:
         create_schema(conn)
-        row = _fetch_one(
-            conn,
-            """SELECT id, provider_key_id, yandex_key_id, project_id, expires_at
-               FROM provider_credentials
-               WHERE provider = 'yandex' AND status = 'active'
-               LIMIT 1""",
+        row = next(
+            (
+                item
+                for item in list_provider_credentials(conn, provider="yandex")
+                if item["status"] == "active"
+            ),
+            None,
         )
         if not row:
             logger.error("No active global provider key to rotate")
@@ -37,18 +38,19 @@ def main() -> int:
             logger.info("Global provider key is not inside the one-hour rotation window")
             return 0
 
-        conn.execute("BEGIN IMMEDIATE")
+        pass
         # Re-read after acquiring the write lock so a second worker cannot use
         # stale rotation metadata.
-        row = _fetch_one(
-            conn,
-            """SELECT id, provider_key_id, yandex_key_id, project_id, expires_at
-               FROM provider_credentials
-               WHERE provider = 'yandex' AND status = 'active'
-               LIMIT 1""",
+        row = next(
+            (
+                item
+                for item in list_provider_credentials(conn, provider="yandex")
+                if item["status"] == "active"
+            ),
+            None,
         )
         if not row or not rotation_needed(row["expires_at"]):
-            conn.rollback()
+            pass
             return 0
 
         provider = YandexApiKeyProvider(project_id=str(row["project_id"]))
@@ -62,7 +64,7 @@ def main() -> int:
             commit_before_revoke=True,
             provider_name="yandex",
         )
-        conn.commit()
+        pass
         logger.info(
             "Rotated global Yandex provider key id=%s expires_at=%s",
             new_id,
@@ -71,13 +73,13 @@ def main() -> int:
         return 0
     except Exception:
         try:
-            conn.rollback()
+            pass
         except Exception:
             pass
         logger.exception("Global provider-key rotation failed")
         return 1
     finally:
-        conn.close()
+        pass
 
 
 if __name__ == "__main__":

@@ -115,6 +115,16 @@ class DiagnosticsActivity : AppCompatActivity() {
         }, LinearLayout.LayoutParams(0, -2, 1f))
         root.addView(buttons)
 
+        val rootAgentRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        rootAgentRow.addView(Button(this).apply {
+            text = "RootAgent: панель"
+            isAllCaps = false
+            setOnClickListener { startActivity(Intent(this@DiagnosticsActivity, RootAgentDiagnosticsActivity::class.java)) }
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        root.addView(rootAgentRow)
+
         setContentView(root)
         SystemInsets.applySafePadding(root, baseLeft = 16, baseTop = 16, baseRight = 16, baseBottom = 16)
 
@@ -193,7 +203,7 @@ class DiagnosticsActivity : AppCompatActivity() {
 
     private fun copyText(text: String) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("Alice Pro diagnostics", text))
+        clipboard.setPrimaryClip(ClipData.newPlainText("Logos diagnostics", text))
         AppLogger.debug("DiagnosticsActivity", "Diagnostic data copied", mapOf("chars" to text.length.toString()))
     }
 
@@ -226,4 +236,5 @@ class DiagnosticsActivity : AppCompatActivity() {
 
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = onSelected()
         }
+
 }

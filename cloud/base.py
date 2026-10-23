@@ -1,4 +1,4 @@
-"""Provider-neutral cloud abstractions for Alice Pro tooling."""
+"""Provider-neutral cloud abstractions for Logos tooling."""
 
 from __future__ import annotations
 
