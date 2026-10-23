@@ -28,6 +28,8 @@ REDACTION_POLICY = "repository-redaction-v2"
 DEFAULT_STORE_ID = "fvtvp6t2su0g5q4ft2ev"
 MAX_SOURCE_BYTES = 128 * 1024 * 1024
 PACK_BYTES = 4 * 1024 * 1024
+INDEX_MAX_IN_FLIGHT = 8
+INDEX_TIMEOUT_SECONDS = 2 * 60 * 60
 EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])")
 PACK_HEADER = "<!-- repository-rag-pack-v1 "
 JSON_SECRET = re.compile(
@@ -278,17 +280,22 @@ class CorpusArchive:
         atomic(self.directory / "gaps.json", canonical(self.gaps))
 
     def summary(self) -> dict:
+        originals = sum(item.get("archive") == "saved_private" for item in self.entries.values())
         return {
             "repository": self.repository,
             "captured_at": self.captured_at,
             "sources_observed": len(self.observed),
             "source_versions_archived": len(self.entries),
+            "raw_originals_available": originals,
+            "raw_originals_missing": len(self.entries) - originals,
             "documents_prepared": len(list((self.directory / "documents").glob("*.md"))),
             "source_counts": dict(Counter(item["kind"] for item in self.entries.values())),
             "gap_count": len(self.gaps),
             "gap_reasons": dict(Counter(item["reason"] for item in self.gaps)),
             "coverage": "partial" if self.gaps else "collected_declared_scope",
-            "raw_archive": "local_private_not_a_durable_remote_backup",
+            "raw_archive": "local_private_not_a_durable_remote_backup"
+            if originals == len(self.entries)
+            else "sanitized_provider_copies_without_all_raw_originals",
             "generation_requests": 0,
         }
 
@@ -473,11 +480,20 @@ def _upload_new_packs(archive, documents_to_upload, known, prefix, pack_records,
         atomic(archive.directory / "upload-checkpoint.json", canonical(pack_records))
 
 
-def _attach_and_wait(store_path, selected, attached_ids, project, key):
-    for item in selected:
-        if item["file_id"] not in attached_ids:
-            if not item.get("attachment_allowed", True):
-                raise ValueError("mixed_historical_pack_attachment_forbidden")
+def _index_rows(store_path, project, key):
+    rows = semantic.list_yandex_objects(store_path + "/files", project, key, ("files",))
+    ids = [semantic._attached_file_id(item) for item in rows]
+    if None in ids or len(set(ids)) != len(ids):
+        raise ValueError("vector_store_file_id_invalid")
+    return {semantic._attached_file_id(item): item for item in rows}
+
+
+def _attach_pending(store_path, pending, capacity, project, key):
+    submitted = set()
+    for item in pending[:capacity]:
+        if not item.get("attachment_allowed", True):
+            raise ValueError("mixed_historical_pack_attachment_forbidden")
+        try:
             result = semantic.yandex_json_request(
                 "POST",
                 store_path + "/files",
@@ -488,25 +504,73 @@ def _attach_and_wait(store_path, selected, attached_ids, project, key):
                     "chunking_strategy": semantic.vector_store_chunking_strategy(),
                 },
             )
-            if (result.get("file_id") or result.get("id")) != item["file_id"]:
-                raise ValueError("vector_store_attachment_receipt_invalid")
+        except semantic.YandexHTTPError as exc:
+            if exc.status != 429:
+                raise
+            return submitted, exc
+        if (result.get("file_id") or result.get("id")) != item["file_id"]:
+            raise ValueError("vector_store_attachment_receipt_invalid")
+        submitted.add(item["file_id"])
+    return submitted, None
+
+
+def _index_progress(target_ids, by_id, submitted, checkpoint_path):
+    states = {item: by_id.get(item, {}).get("status", "not_visible") for item in sorted(target_ids)}
+    progress = {
+        "files": len(target_ids),
+        "submitted": len(target_ids & submitted),
+        "completed": sum(state == "completed" for state in states.values()),
+        "in_progress": sum(state == "in_progress" for state in states.values()),
+    }
+    if checkpoint_path:
+        atomic(
+            checkpoint_path,
+            canonical({"progress": progress, "files": states, "generation_requests": 0}),
+        )
+    return states, progress
+
+
+def _attach_and_wait(store_path, selected, attached_ids, project, key, *, checkpoint_path=None):
+    if any(
+        not item.get("attachment_allowed", True) and item["file_id"] not in attached_ids
+        for item in selected
+    ):
+        raise ValueError("mixed_historical_pack_attachment_forbidden")
     target_ids = {item["file_id"] for item in selected}
-    for attempt in range(60):
-        rows = semantic.list_yandex_objects(store_path + "/files", project, key, ("files",))
-        ids = [semantic._attached_file_id(item) for item in rows]
-        if None in ids or len(set(ids)) != len(ids):
-            raise ValueError("vector_store_file_id_invalid")
-        by_id = {semantic._attached_file_id(item): item for item in rows}
-        if any(
-            by_id.get(item, {}).get("status") in {"failed", "cancelled", "expired"}
-            for item in target_ids
-        ):
+    submitted = set(attached_ids)
+    deadline = time.monotonic() + INDEX_TIMEOUT_SECONDS
+    rate_failures = 0
+    previous_progress = None
+    next_report = 0.0
+    while True:
+        by_id = _index_rows(store_path, project, key)
+        submitted.update(by_id)
+        states, progress = _index_progress(target_ids, by_id, submitted, checkpoint_path)
+        if progress != previous_progress or time.monotonic() >= next_report:
+            print(json.dumps({"indexing_progress": progress}), flush=True)
+            previous_progress, next_report = progress, time.monotonic() + 60
+        if any(state in {"failed", "cancelled", "expired"} for state in states.values()):
             raise ValueError("vector_store_index_failed")
-        if all(by_id.get(item, {}).get("status") == "completed" for item in target_ids):
-            break
-        if attempt == 59:
+        if all(state == "completed" for state in states.values()):
+            return
+        if time.monotonic() >= deadline:
             raise ValueError("vector_store_index_timeout")
-        time.sleep(10)
+        active = sum(
+            item.get("status") not in {"completed", "failed", "cancelled", "expired"}
+            for item in by_id.values()
+        )
+        active += len(submitted - set(by_id))
+        pending = [item for item in selected if item["file_id"] not in submitted]
+        added, error = _attach_pending(
+            store_path, pending, max(0, INDEX_MAX_IN_FLIGHT - active), project, key
+        )
+        submitted.update(added)
+        rate_failures = rate_failures + 1 if error else 0
+        if error and rate_failures >= 3:
+            raise error
+        if added and error is None:
+            continue
+        time.sleep(30 if error else 10)
 
 
 def upload_archive(archive: CorpusArchive, store_id: str, project: str, key: str) -> dict:
@@ -524,7 +588,14 @@ def upload_archive(archive: CorpusArchive, store_id: str, project: str, key: str
     )
     _upload_new_packs(archive, documents_to_upload, known, prefix, pack_records, project, key)
     selected = [item for item in pack_records if required.intersection(item["documents"])]
-    _attach_and_wait(store_path, selected, attached_ids, project, key)
+    _attach_and_wait(
+        store_path,
+        selected,
+        attached_ids,
+        project,
+        key,
+        checkpoint_path=archive.directory / "index-checkpoint.json",
+    )
     return {
         "status": "indexed_available_corpus",
         "store_id": store_id,
@@ -645,6 +716,7 @@ def _arguments(argv: list[str] | None):
     parser.add_argument("--upload", action="store_true")
     parser.add_argument("--upload-only", action="store_true")
     parser.add_argument("--provider-check", action="store_true")
+    parser.add_argument("--resume-receipt", type=Path)
     parser.add_argument("--store-id", default=DEFAULT_STORE_ID)
     parser.add_argument(
         "--query", default="Как устроено исполнение инструментов UniversalToolExecutor?"
@@ -684,11 +756,19 @@ def _run(args, archive: CorpusArchive, result: dict) -> None:
         )
         result["status"] = "provider_inspected"
         return
-    _collect(args, archive, result)
+    if args.resume_receipt:
+        from scripts.repository_rag_resume import resume_from_receipt
+
+        result["upload"] = resume_from_receipt(
+            archive, args.resume_receipt, args.store_id, project, key
+        )
+    else:
+        _collect(args, archive, result)
     archive.checkpoint()
     result.update({**archive.summary(), "status": "prepared"})
-    if args.upload or args.upload_only:
+    if not args.resume_receipt and (args.upload or args.upload_only):
         result["upload"] = upload_archive(archive, args.store_id, project, key)
+    if "upload" in result:
         result["retrieval"] = verify_search(archive, result["upload"], args.query, project, key)
         result["status"] = "indexed_partial" if archive.gaps else "indexed_declared_scope"
         if result["retrieval"]["status"] != "verified_fragments":

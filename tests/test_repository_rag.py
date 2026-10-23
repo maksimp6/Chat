@@ -215,6 +215,91 @@ def test_provider_check_persists_inventory_without_collection_or_writes(tmp_path
     assert not writes
 
 
+def test_indexer_bounds_active_files_and_recovers_one_429(tmp_path, monkeypatch):
+    state = {"existing": {"id": "existing", "status": "in_progress"}}
+    posted, sleeps, clock = [], [], [0.0]
+    fail_once = [True]
+
+    def create(method, path, project, key, payload):
+        assert method == "POST" and path == "/vector_stores/store/files"
+        assert sum(item["status"] == "in_progress" for item in state.values()) < 2
+        if fail_once and fail_once.pop():
+            raise rag.semantic.YandexHTTPError(429, method, path, "RESOURCE_EXHAUSTED")
+        file_id = payload["file_id"]
+        posted.append(file_id)
+        state[file_id] = {"id": file_id, "status": "in_progress"}
+        return state[file_id]
+
+    def sleep(seconds):
+        sleeps.append(seconds)
+        clock[0] += seconds
+        for item in state.values():
+            item["status"] = "completed"
+
+    monkeypatch.setattr(rag, "INDEX_MAX_IN_FLIGHT", 2)
+    monkeypatch.setattr(rag.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(rag.time, "sleep", sleep)
+    monkeypatch.setattr(rag.semantic, "list_yandex_objects", lambda *a: list(state.values()))
+    monkeypatch.setattr(rag.semantic, "yandex_json_request", create)
+    checkpoint = tmp_path / "index.json"
+    selected = [{"file_id": item} for item in ["existing", "a", "b", "c"]]
+    rag._attach_and_wait(
+        "/vector_stores/store", selected, {"existing"}, "project", "key", checkpoint_path=checkpoint
+    )
+    assert posted == ["a", "b", "c"]
+    assert sleeps[0] == 30
+    assert set(json.loads(checkpoint.read_bytes())["files"].values()) == {"completed"}
+
+
+def test_indexer_stops_repeated_429_and_never_accepts_pending_as_complete(monkeypatch):
+    clock, calls = [0.0], []
+    monkeypatch.setattr(rag.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(rag.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    monkeypatch.setattr(rag.semantic, "list_yandex_objects", lambda *a: [])
+
+    def limited(method, path, *args):
+        calls.append(path)
+        raise rag.semantic.YandexHTTPError(429, method, path, "RESOURCE_EXHAUSTED")
+
+    monkeypatch.setattr(rag.semantic, "yandex_json_request", limited)
+    with pytest.raises(rag.semantic.YandexHTTPError):
+        rag._attach_and_wait("/vector_stores/store", [{"file_id": "a"}], set(), "p", "k")
+    assert len(calls) == 3
+    monkeypatch.setattr(rag, "INDEX_TIMEOUT_SECONDS", 25)
+    monkeypatch.setattr(
+        rag.semantic, "list_yandex_objects", lambda *a: [{"id": "a", "status": "in_progress"}]
+    )
+    with pytest.raises(ValueError, match="vector_store_index_timeout"):
+        rag._attach_and_wait("/vector_stores/store", [{"file_id": "a"}], {"a"}, "p", "k")
+    assert len(calls) == 3
+
+
+def test_indexer_counts_successful_but_not_yet_visible_attachments(monkeypatch):
+    visible, pending, posted = {}, set(), []
+    clock = [0.0]
+
+    def create(method, path, project, key, payload):
+        assert len(pending) < 2
+        file_id = payload["file_id"]
+        pending.add(file_id)
+        posted.append(file_id)
+        return {"id": file_id, "status": "in_progress"}
+
+    def sleep(seconds):
+        clock[0] += seconds
+        for file_id in pending:
+            visible[file_id] = {"id": file_id, "status": "completed"}
+        pending.clear()
+
+    monkeypatch.setattr(rag, "INDEX_MAX_IN_FLIGHT", 2)
+    monkeypatch.setattr(rag.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(rag.time, "sleep", sleep)
+    monkeypatch.setattr(rag.semantic, "list_yandex_objects", lambda *a: list(visible.values()))
+    monkeypatch.setattr(rag.semantic, "yandex_json_request", create)
+    rag._attach_and_wait("/vector_stores/store", [{"file_id": x} for x in "abc"], set(), "p", "k")
+    assert posted == ["a", "b", "c"]
+
+
 @pytest.mark.parametrize("already_attached", [True, False])
 def test_fresh_archive_reuses_unchanged_part_of_attached_history(
     tmp_path, monkeypatch, already_attached

@@ -83,6 +83,13 @@ Mode `repository-check` inspects existing provider files and attachment statuses
 without source collection, provider writes or generation. It does not assert that
 candidate pack contents have been verified. Failure receipts retain the HTTP
 method, sanitized API route and safe provider error code.
+Read-only checks may run while the serialized writer is active. Mode
+`repository-resume` accepts a prior successful check's `resume_run_id`, restores
+its exact receipt from this repository, and verifies every saved pack and source
+document before attaching anything. It reuses the provider files without Files
+uploads. Restored sanitized copies are not reported as recovered raw originals.
+Indexing admits at most eight pending files, polls file completion, and bounds
+HTTP 429 retries and the overall wait; progress survives in a separate checkpoint.
 It uploads only the receipt and omissions, never private raw originals. Hosted
 raw evidence lasts only for that runner; this is not a durable archive or a
 replacement for the separate Git LFS preservation requirement.

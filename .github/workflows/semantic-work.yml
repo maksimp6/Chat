@@ -10,7 +10,7 @@ on:
       mode:
         description: "BM25 search, bounded model answer, or Vector Store upload/search"
         type: choice
-        options: [search, query, red, vector-store, repository, repository-check]
+        options: [search, query, red, vector-store, repository, repository-check, repository-resume]
         required: true
         default: "search"
       corpus:
@@ -42,18 +42,22 @@ on:
         description: "Reference to owner-approved scope and API limit"
         required: false
         default: ""
+      resume_run_id:
+        description: "Prior successful repository-check run whose saved file manifest is resumed"
+        required: false
+        default: ""
   push:
     branches: [feat/semantic-pipeline]
 
 permissions: {}
 
 concurrency:
-  group: semantic-work
+  group: ${{ inputs.mode == 'repository-check' && format('repository-check-{0}', github.run_id) || 'semantic-work' }}
   cancel-in-progress: false
 
 jobs:
   repository-corpus:
-    if: github.event_name == 'workflow_dispatch' && (inputs.mode == 'repository' || inputs.mode == 'repository-check') && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.run_attempt == '1'
+    if: github.event_name == 'workflow_dispatch' && (inputs.mode == 'repository' || inputs.mode == 'repository-check' || inputs.mode == 'repository-resume') && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.run_attempt == '1'
     name: Archive repository evidence and update existing RAG without generation
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -112,6 +116,39 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends poppler-utils
           fi
+      - name: Validate receipt run for repository recovery
+        if: inputs.mode == 'repository-resume'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RESUME_RUN_ID: ${{ inputs.resume_run_id }}
+        run: |
+          python - <<'PY'
+          import json, os, re, urllib.request
+          run_id = os.environ["RESUME_RUN_ID"]
+          if not re.fullmatch(r"[0-9]{1,20}", run_id):
+              raise SystemExit("invalid_resume_run_id")
+          repository = os.environ["GITHUB_REPOSITORY"]
+          request = urllib.request.Request(
+              f"https://api.github.com/repos/{repository}/actions/runs/{run_id}",
+              headers={"Authorization": "Bearer " + os.environ["GITHUB_TOKEN"], "Accept": "application/vnd.github+json"},
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              run = json.load(response)
+          valid = (run.get("event") == "workflow_dispatch" and run.get("conclusion") == "success"
+                   and run.get("path") == ".github/workflows/semantic-work.yml"
+                   and run.get("actor", {}).get("login") == repository.split("/")[0]
+                   and run.get("head_repository", {}).get("full_name") == repository)
+          if not valid:
+              raise SystemExit("resume_run_scope_invalid")
+          PY
+      - name: Restore the exact saved provider receipt
+        if: inputs.mode == 'repository-resume'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
+          name: repository-rag-receipt-${{ inputs.resume_run_id }}
+          path: ${{ runner.temp }}/repository-rag-resume
       - name: Collect, redact, upload, and verify direct retrieval
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -121,9 +158,11 @@ jobs:
           RAG_MODE: ${{ inputs.mode }}
         run: |
           set -euo pipefail
-          operation=--upload
+          operation=(--upload)
           if [ "$RAG_MODE" = repository-check ]; then
-            operation=--provider-check
+            operation=(--provider-check)
+          elif [ "$RAG_MODE" = repository-resume ]; then
+            operation=(--resume-receipt "$RUNNER_TEMP/repository-rag-resume/repository-rag-receipt.json")
           fi
           python -m scripts.repository_rag \
             --git-root "$GITHUB_WORKSPACE" \
@@ -131,7 +170,7 @@ jobs:
             --archive-dir "$RUNNER_TEMP/repository-rag" \
             --receipt "$RUNNER_TEMP/repository-rag-receipt.json" \
             --fetch-status "$RUNNER_TEMP/repository-fetch-status.json" \
-            "$operation" --query "$RAG_QUERY"
+            "${operation[@]}" --query "$RAG_QUERY"
       - name: Preserve receipt and visible omissions
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -141,6 +180,7 @@ jobs:
             ${{ runner.temp }}/repository-rag-receipt.json
             ${{ runner.temp }}/repository-rag/gaps.json
             ${{ runner.temp }}/repository-rag/upload-checkpoint.json
+            ${{ runner.temp }}/repository-rag/index-checkpoint.json
             ${{ runner.temp }}/repository-fetch-status.json
           if-no-files-found: warn
           retention-days: 90
@@ -148,7 +188,7 @@ jobs:
       # as public-repository artifacts or caches. The receipt states this limit.
 
   semantic:
-    if: github.event_name == 'workflow_dispatch' && inputs.mode != 'repository' && inputs.mode != 'repository-check' && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.run_attempt == '1'
+    if: github.event_name == 'workflow_dispatch' && inputs.mode != 'repository' && inputs.mode != 'repository-check' && inputs.mode != 'repository-resume' && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.run_attempt == '1'
     name: Semantic answer over corpus
     runs-on: ubuntu-latest
     timeout-minutes: 10

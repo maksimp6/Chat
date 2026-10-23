@@ -47,7 +47,12 @@ def _public_attachment_url(url):
         and parsed.netloc == "github.com"
         and not parsed.query
         and not parsed.fragment
-        and re.fullmatch(r"/user-attachments/files/[1-9][0-9]*/[^/]+", parsed.path) is not None
+        and re.fullmatch(
+            r"/user-attachments/(?:files/[1-9][0-9]*/[^/]+|"
+            r"assets/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+            parsed.path,
+        )
+        is not None
     )
 
 
@@ -59,9 +64,11 @@ class _DownloadRedirect(urllib.request.HTTPRedirectHandler):
             req.timeout = min(req.timeout, _remaining(self.deadline))
         parsed = urlsplit(newurl)
         host = (parsed.hostname or "").lower()
-        allowed = host in {"api.github.com", "github.com"} or host.endswith(
-            (".githubusercontent.com", ".github.com", ".blob.core.windows.net")
-        )
+        allowed = host in {
+            "api.github.com",
+            "github.com",
+            "github-production-user-asset-6210df.s3.amazonaws.com",
+        } or host.endswith((".githubusercontent.com", ".github.com", ".blob.core.windows.net"))
         if parsed.scheme != "https" or not allowed or parsed.username or parsed.password:
             raise CollectionError("download_redirect_not_allowed")
         redirected = super().redirect_request(req, fp, code, msg, headers, newurl)

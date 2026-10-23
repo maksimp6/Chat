@@ -419,6 +419,33 @@ def test_public_attachment_deadline_is_bounded(tmp_path, monkeypatch):
     assert not list(reader.cache_dir.glob("*.body"))
 
 
+def test_public_image_attachment_has_no_authorization(tmp_path):
+    reader = GitHubReader("owner/repo", "sensitive-token", tmp_path)
+    reader.opener = Opener(b"\x89PNG\r\n\x1a\n")
+    url = "https://github.com/user-attachments/assets/5ac382c7-e004-429b-8e35-7feb3e8f9c6f"
+    assert reader.attachment(url).startswith(b"\x89PNG")
+    assert reader.opener.calls[0].get_header("Authorization") is None
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://github.com/user-attachments/assets/not-a-uuid",
+        "https://github.com/user-attachments/assets/5ac382c7-e004-429b-8e35-7feb3e8f9c6",
+        "https://github.com/user-attachments/assets/5ac382c7-e004-429b-8e35-7feb3e8f9c6f/file.png",
+        "https://user:secret@github.com/user-attachments/assets/5ac382c7-e004-429b-8e35-7feb3e8f9c6f",
+        "https://github.com/user-attachments/assets/5ac382c7-e004-429b-8e35-7feb3e8f9c6f?download=1",
+    ],
+)
+def test_public_image_attachment_rejects_other_forms(tmp_path, url):
+    reader = GitHubReader("owner/repo", "sensitive-token", tmp_path)
+    reader.opener = Opener(b"unused")
+    with pytest.raises(CollectionError, match="public_attachment_url_not_allowed"):
+        reader.attachment(url)
+    assert reader.requests == 0
+    assert reader.opener.calls == []
+
+
 def test_attachments_precede_reviews_and_keep_every_parent(tmp_path):
     url = "https://github.com/user-attachments/files/33870426/Logos-AI-Studio-Court-2026-10-23-public.zip"
 
@@ -519,16 +546,25 @@ def test_reader_limits_and_no_mutations(tmp_path):
         reader.graphql("mutation DeleteStuff { delete }", {})
 
 
-def test_signed_download_redirect_never_forwards_token():
+@pytest.mark.parametrize(
+    "destination",
+    [
+        "https://results.blob.core.windows.net/path?sig=signed",
+        "https://github-production-user-asset-6210df.s3.amazonaws.com/path?sig=signed",
+    ],
+)
+def test_signed_download_redirect_never_forwards_token(destination):
     request = urllib.request.Request(
         "https://api.github.com/repos/owner/repo/actions/artifacts/1/zip",
         headers={"Authorization": "Bearer sensitive", "If-None-Match": "old"},
     )
     redirect = _DownloadRedirect()
-    result = redirect.redirect_request(
-        request, None, 302, "found", {}, "https://results.blob.core.windows.net/path?sig=signed"
-    )
+    result = redirect.redirect_request(request, None, 302, "found", {}, destination)
     assert result.get_header("Authorization") is None
     assert result.get_header("If-none-match") is None
     with pytest.raises(CollectionError, match="download_redirect_not_allowed"):
         redirect.redirect_request(request, None, 302, "found", {}, "https://attacker.example/file")
+    with pytest.raises(CollectionError, match="download_redirect_not_allowed"):
+        redirect.redirect_request(
+            request, None, 302, "found", {}, "https://attacker.s3.amazonaws.com/file"
+        )
