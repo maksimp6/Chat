@@ -80,17 +80,31 @@ def test_offline_probe_reports_native_contracts_and_cleans_owned_files(tmp_path)
     assert native["verification"] == "configuration_only; hosted_and_other_categories_not_executed"
     assert native["knowledge_status"] == "not_prepared_or_verified_by_diagnostic"
     assert len(report["tools"]) == 17
-    assert sum(value == "pass" for value in report["tools"].values()) == 16
+    assert sum(value == "pass" for value in report["tools"].values()) == 15
     assert report["tools"]["apply_patch"]["s"] == "blocked"
     assert report["tools"]["apply_patch"]["phase"] == "approval_required"
+    assert report["tools"]["run_command"]["s"] == "blocked"
+    assert report["tools"]["run_command"]["phase"] == "approval_required"
+    assert report["command_execution"] == "not_run; approval_required; fixture_effect_absent"
     assert report["patch_schema_search_text"] is True
-    assert len(report["defaults"]) == 9 and set(report["defaults"].values()) == {"pass"}
+    assert len(report["defaults"]) == 9
+    assert all(
+        value == "pass" for name, value in report["defaults"].items() if name != "run_command"
+    )
+    assert report["defaults"]["run_command"]["s"] == "blocked"
+    assert report["defaults"]["run_command"]["phase"] == "approval_required"
     assert "http_fetch:external" not in report["defaults"]
     assert len(report["null"]) == 8
     assert all(
         value == {"advertised": True, "accepted": True, "phase": "execution"}
-        for value in report["null"].values()
+        for name, value in report["null"].items()
+        if name != "run_command"
     )
+    assert report["null"]["run_command"] == {
+        "advertised": True,
+        "accepted": False,
+        "phase": "approval_required",
+    }
     assert parent_memory.read_bytes() == b"do not use the parent invocation store"
     assert {
         path.name: path.read_bytes() for path in backups.glob("*") if path.is_file()

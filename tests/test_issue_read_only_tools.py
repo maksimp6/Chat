@@ -24,6 +24,19 @@ from tool_providers.universal_tool_platform import (
 from yandex_client_modules import mcp_mixin
 
 
+@pytest.fixture(autouse=True)
+def isolate_offline_issue_fixture(monkeypatch):
+    # This module exercises fake transports and local fixtures, never a model.
+    # Keep the independent D0 hold tests unmodified when changes are combined.
+    monkeypatch.setattr(issue_runner, "enforce_native_launch_hold", lambda: None, raising=False)
+    import requests
+
+    def reject_network(*args, **kwargs):
+        pytest.fail("Read-only tool controls must not call a live provider")
+
+    monkeypatch.setattr(requests.Session, "request", reject_network)
+
+
 @pytest.fixture
 def tools(tmp_path, monkeypatch):
     root = tmp_path / "checkout"
