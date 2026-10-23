@@ -14,7 +14,10 @@ concurrency:
 
 jobs:
   publish:
-    if: github.repository == 'maksimp6/Chat' && github.ref == 'refs/heads/docs/yandex-documentation-links' && github.event.head_commit.message == 'docs: upload admitted Russian AI Studio files to LFS'
+    if: >-
+      github.repository == 'maksimp6/Chat' &&
+      github.ref == 'refs/heads/docs/yandex-documentation-links' &&
+      github.event.head_commit.message == 'docs: upload admitted Russian AI Studio files to LFS'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
