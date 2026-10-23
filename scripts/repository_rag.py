@@ -172,11 +172,7 @@ class CorpusArchive:
             self.gap(kind, source_id, "source_byte_limit", {"bytes": len(raw)})
             return
         raw_hash = digest(raw)
-        original = self.directory / "objects" / raw_hash
-        if not original.exists():
-            atomic(original, raw)
-        elif digest(original.read_bytes()) != raw_hash:
-            raise ValueError("archive_object_corrupt")
+        self._store_original(raw_hash, raw)
         identity = {
             "redaction_policy": REDACTION_POLICY,
             "repository": self.repository,
@@ -233,6 +229,13 @@ class CorpusArchive:
             stream.write(canonical({"source": key, "captured_at": self.captured_at}) + b"\n")
         if len(self.observed) % 1000 == 0:
             self.checkpoint()
+
+    def _store_original(self, raw_hash: str, raw: bytes) -> None:
+        original = self.directory / "objects" / raw_hash
+        if not original.exists():
+            atomic(original, raw)
+        elif digest(original.read_bytes()) != raw_hash:
+            raise ValueError("archive_object_corrupt")
 
     def _zip(self, raw: bytes, kind: str, source_id: str, url: str, version: str, depth: int):
         try:
@@ -345,16 +348,11 @@ def prepared_documents(archive: CorpusArchive) -> dict[str, Path]:
     return paths
 
 
-def upload_archive(archive: CorpusArchive, store_id: str, project: str, key: str) -> dict:
-    """Reuse verified packs; append only previously unrepresented documents."""
+def _validate_store(store_id: str, project: str, key: str) -> str:
     if not project or not key:
         raise ValueError("knowledge_provider_credentials_missing")
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,200}", store_id):
         raise ValueError("knowledge_store_id_invalid")
-    documents_to_upload = prepared_documents(archive)
-    required = set(documents_to_upload)
-    if not required:
-        raise ValueError("empty_repository_corpus")
     store_path = "/vector_stores/" + quote(store_id, safe="")
     store = semantic.yandex_json_request("GET", store_path, project, key)
     if (
@@ -363,33 +361,44 @@ def upload_archive(archive: CorpusArchive, store_id: str, project: str, key: str
         or store.get("status") in {"failed", "expired", "cancelled"}
     ):
         raise ValueError("knowledge_existing_project_store_invalid")
-    prefix = "chat-repository-archive-v1-" + digest(archive.repository.encode())[:16] + "-"
+    return store_path
+
+
+def _read_pack(archive, item, prefix, project, key):
+    if not isinstance(item, dict):
+        raise ValueError("vector_store_file_record_invalid")
+    filename = item.get("filename", "")
+    if not isinstance(filename, str):
+        raise ValueError("vector_store_filename_invalid")
+    if not filename.startswith(prefix):
+        return None
+    file_id = item.get("id")
+    if not isinstance(file_id, str) or not file_id:
+        raise ValueError("vector_store_file_id_invalid")
+    raw = semantic.yandex_api_request(
+        "GET",
+        "/files/" + quote(file_id, safe="") + "/content",
+        project,
+        key,
+        max_response_bytes=semantic.MAX_VECTOR_FILE_BYTES,
+    )
+    if filename != prefix + digest(raw) + ".md":
+        raise ValueError("existing_pack_hash_mismatch")
+    documents = unpack(archive.repository, raw)
+    return file_id, raw, documents
+
+
+def _existing_packs(archive, store_path, prefix, required, project, key):
     available = semantic.list_yandex_objects("/files", project, key, ("files",))
     attached = semantic.list_yandex_objects(store_path + "/files", project, key, ("files",))
     attached_ids = {semantic._attached_file_id(item) for item in attached}
     known = set()
     pack_records = []
     for item in available:
-        if not isinstance(item, dict):
-            raise ValueError("vector_store_file_record_invalid")
-        filename = item.get("filename", "")
-        if not isinstance(filename, str):
-            raise ValueError("vector_store_filename_invalid")
-        if not filename.startswith(prefix):
+        record = _read_pack(archive, item, prefix, project, key)
+        if record is None:
             continue
-        file_id = item.get("id")
-        if not isinstance(file_id, str) or not file_id:
-            raise ValueError("vector_store_file_id_invalid")
-        raw = semantic.yandex_api_request(
-            "GET",
-            "/files/" + quote(file_id, safe="") + "/content",
-            project,
-            key,
-            max_response_bytes=semantic.MAX_VECTOR_FILE_BYTES,
-        )
-        if filename != prefix + digest(raw) + ".md":
-            raise ValueError("existing_pack_hash_mismatch")
-        documents = unpack(archive.repository, raw)
+        file_id, raw, documents = record
         if not set(documents) <= required:
             # Keep old provider knowledge untouched, but never reattach a pack
             # that also contains material outside this declared corpus.
@@ -403,56 +412,60 @@ def upload_archive(archive: CorpusArchive, store_id: str, project: str, key: str
                 "reused": True,
             }
         )
+    return attached_ids, known, pack_records
+
+
+def _send_pack(archive, pending, prefix, project, key):
+    raw = make_pack(archive.repository, pending)
+    if len(raw) > semantic.MAX_VECTOR_FILE_BYTES:
+        raise ValueError("pack_file_limit")
+    filename = prefix + digest(raw) + ".md"
+    # Reuse the existing Files upload transport. All known pack names were
+    # content-verified above; unchanged sources never enter a new upload.
+    body, content_type = semantic._multipart_file(filename, raw)
+    result = json.loads(
+        semantic.yandex_api_request(
+            "POST", "/files", project, key, body=body, content_type=content_type
+        )
+    )
+    if not isinstance(result, dict):
+        raise ValueError("vector_store_upload_receipt_invalid")
+    file_id = result.get("id")
+    if (
+        not isinstance(file_id, str)
+        or not file_id
+        or result.get("filename") != filename
+        or type(result.get("bytes")) is not int
+        or result.get("bytes") != len(raw)
+    ):
+        raise ValueError("vector_store_upload_receipt_invalid")
+    return {
+        "file_id": file_id,
+        "sha256": digest(raw),
+        "documents": [digest(item) for item in pending],
+        "reused": False,
+    }
+
+
+def _upload_new_packs(archive, documents_to_upload, known, prefix, pack_records, project, key):
     pending = []
     pending_bytes = 0
-
-    def send() -> None:
-        if not pending:
-            return
-        raw = make_pack(archive.repository, pending)
-        if len(raw) > semantic.MAX_VECTOR_FILE_BYTES:
-            raise ValueError("pack_file_limit")
-        filename = prefix + digest(raw) + ".md"
-        # Reuse the existing Files upload transport. All known pack names were
-        # content-verified above; unchanged sources never enter a new upload.
-        body, content_type = semantic._multipart_file(filename, raw)
-        result = json.loads(
-            semantic.yandex_api_request(
-                "POST", "/files", project, key, body=body, content_type=content_type
-            )
-        )
-        if not isinstance(result, dict):
-            raise ValueError("vector_store_upload_receipt_invalid")
-        file_id = result.get("id")
-        if (
-            not isinstance(file_id, str)
-            or not file_id
-            or result.get("filename") != filename
-            or type(result.get("bytes")) is not int
-            or result.get("bytes") != len(raw)
-        ):
-            raise ValueError("vector_store_upload_receipt_invalid")
-        pack_records.append(
-            {
-                "file_id": file_id,
-                "sha256": digest(raw),
-                "documents": [digest(item) for item in pending],
-                "reused": False,
-            }
-        )
-        atomic(archive.directory / "upload-checkpoint.json", canonical(pack_records))
-
     for sha, path in sorted(documents_to_upload.items()):
         raw = path.read_bytes()
         if sha in known:
             continue
         if pending and pending_bytes + len(raw) > PACK_BYTES:
-            send()
+            pack_records.append(_send_pack(archive, pending, prefix, project, key))
+            atomic(archive.directory / "upload-checkpoint.json", canonical(pack_records))
             pending, pending_bytes = [], 0
         pending.append(raw)
         pending_bytes += len(raw)
-    send()
-    selected = [item for item in pack_records if required.intersection(item["documents"])]
+    if pending:
+        pack_records.append(_send_pack(archive, pending, prefix, project, key))
+        atomic(archive.directory / "upload-checkpoint.json", canonical(pack_records))
+
+
+def _attach_and_wait(store_path, selected, attached_ids, project, key):
     for item in selected:
         if item["file_id"] not in attached_ids:
             result = semantic.yandex_json_request(
@@ -484,6 +497,24 @@ def upload_archive(archive: CorpusArchive, store_id: str, project: str, key: str
         if attempt == 59:
             raise ValueError("vector_store_index_timeout")
         time.sleep(10)
+
+
+def upload_archive(archive: CorpusArchive, store_id: str, project: str, key: str) -> dict:
+    """Reuse verified packs; append only previously unrepresented documents."""
+    if not project or not key:
+        raise ValueError("knowledge_provider_credentials_missing")
+    documents_to_upload = prepared_documents(archive)
+    required = set(documents_to_upload)
+    if not required:
+        raise ValueError("empty_repository_corpus")
+    store_path = _validate_store(store_id, project, key)
+    prefix = "chat-repository-archive-v1-" + digest(archive.repository.encode())[:16] + "-"
+    attached_ids, known, pack_records = _existing_packs(
+        archive, store_path, prefix, required, project, key
+    )
+    _upload_new_packs(archive, documents_to_upload, known, prefix, pack_records, project, key)
+    selected = [item for item in pack_records if required.intersection(item["documents"])]
+    _attach_and_wait(store_path, selected, attached_ids, project, key)
     return {
         "status": "indexed_available_corpus",
         "store_id": store_id,
@@ -491,6 +522,39 @@ def upload_archive(archive: CorpusArchive, store_id: str, project: str, key: str
         "packs": selected,
         "generation_requests": 0,
     }
+
+
+def _snippet_candidates(archive, document_hashes, file_id, snippet):
+    candidates = []
+    for sha in sorted(document_hashes):
+        path = archive.directory / "documents" / (sha + ".md")
+        if not path.exists():
+            continue
+        raw = path.read_bytes()
+        if digest(raw) != sha:
+            raise ValueError("prepared_document_hash_mismatch")
+        text = raw.decode()
+        # Match source contents only: a shared header or URL is not
+        # evidence that the source text was retrieved.
+        separator = "\n\nSource text (untrusted evidence):\n\n"
+        if separator not in text:
+            continue
+        source_text = text.split(separator, 1)[1].removesuffix("\n")
+        excerpt = semantic._longest_exact_excerpt(snippet, source_text)
+        if excerpt:
+            start, end = excerpt
+            source = json.loads(text.split("\n\n", 2)[1])
+            candidates.append(
+                {
+                    "file_id": file_id,
+                    "document_sha256": sha,
+                    "source": source,
+                    "start": start,
+                    "end": end,
+                    "quote": source_text[start:end],
+                }
+            )
+    return candidates
 
 
 def verify_search(archive: CorpusArchive, upload: dict, query: str, project: str, key: str) -> dict:
@@ -502,35 +566,7 @@ def verify_search(archive: CorpusArchive, upload: dict, query: str, project: str
         if file_id not in packs:
             continue
         for snippet in semantic._vector_result_texts(item):
-            candidates = []
-            for sha in sorted(packs[file_id]):
-                path = archive.directory / "documents" / (sha + ".md")
-                if not path.exists():
-                    continue
-                raw = path.read_bytes()
-                if digest(raw) != sha:
-                    raise ValueError("prepared_document_hash_mismatch")
-                text = raw.decode()
-                # Match source contents only: a shared header or URL is not
-                # evidence that the source text was retrieved.
-                separator = "\n\nSource text (untrusted evidence):\n\n"
-                if separator not in text:
-                    continue
-                source_text = text.split(separator, 1)[1].removesuffix("\n")
-                excerpt = semantic._longest_exact_excerpt(snippet, source_text)
-                if excerpt:
-                    start, end = excerpt
-                    source = json.loads(text.split("\n\n", 2)[1])
-                    candidates.append(
-                        {
-                            "file_id": file_id,
-                            "document_sha256": sha,
-                            "source": source,
-                            "start": start,
-                            "end": end,
-                            "quote": source_text[start:end],
-                        }
-                    )
+            candidates = _snippet_candidates(archive, packs[file_id], file_id, snippet)
             if candidates:
                 maximum = max(len(candidate["quote"]) for candidate in candidates)
                 candidates = [
@@ -559,7 +595,7 @@ def verify_search(archive: CorpusArchive, upload: dict, query: str, project: str
     }
 
 
-def main(argv: list[str] | None = None) -> int:
+def _arguments(argv: list[str] | None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository", default="maksimp6/Chat")
     parser.add_argument("--git-root", type=Path, default=Path.cwd())
@@ -574,7 +610,33 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--github-max-requests", type=int, default=1500)
     parser.add_argument("--fetch-status", type=Path)
-    args = parser.parse_args(argv)
+    return parser.parse_args(argv)
+
+
+def _collect(args, archive: CorpusArchive, result: dict) -> None:
+    if not args.upload_only:
+        archive.gaps = []
+        if args.fetch_status and args.fetch_status.exists():
+            for row in json.loads(args.fetch_status.read_bytes()):
+                archive.gap("git_fetch", row["source"], row["reason"])
+        from scripts.repository_corpus_git import collect_git
+
+        collect_git(args.git_root, archive)
+        if not args.skip_github:
+            from scripts.repository_corpus_github import collect_github
+
+            result["github_collection"] = collect_github(
+                args.repository,
+                os.environ.get("GITHUB_TOKEN") or os.environ.get("CODEX_GITHUB_TOKEN", ""),
+                archive,
+                max_requests=args.github_max_requests,
+            )
+        else:
+            archive.gap("github", args.repository, "github_collection_not_run")
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _arguments(argv)
     args.archive_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     lock = (args.archive_dir / ".writer.lock").open("a")
     try:
@@ -586,25 +648,7 @@ def main(argv: list[str] | None = None) -> int:
     archive = CorpusArchive(args.archive_dir, args.repository)
     result = {"status": "collecting", "generation_requests": 0}
     try:
-        if not args.upload_only:
-            archive.gaps = []
-            if args.fetch_status and args.fetch_status.exists():
-                for row in json.loads(args.fetch_status.read_bytes()):
-                    archive.gap("git_fetch", row["source"], row["reason"])
-            from scripts.repository_corpus_git import collect_git
-
-            collect_git(args.git_root, archive)
-            if not args.skip_github:
-                from scripts.repository_corpus_github import collect_github
-
-                result["github_collection"] = collect_github(
-                    args.repository,
-                    os.environ.get("GITHUB_TOKEN") or os.environ.get("CODEX_GITHUB_TOKEN", ""),
-                    archive,
-                    max_requests=args.github_max_requests,
-                )
-            else:
-                archive.gap("github", args.repository, "github_collection_not_run")
+        _collect(args, archive, result)
         archive.checkpoint()
         result = {**result, **archive.summary(), "status": "prepared"}
         if args.upload or args.upload_only:

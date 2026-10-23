@@ -145,6 +145,204 @@ def _lfs_payload(root: Path, raw: bytes, sink, url: str, pointer_oid: str) -> No
     sink.add("git_lfs", source_id, url, oid, content, metadata)
 
 
+def _is_partial_clone(root: Path) -> bool:
+    # Git versions vary in GIT_NO_LAZY_FETCH support. Reject configured
+    # promisor/partial clones before any object read to guarantee no fetch.
+    config = _git(root, "config", "--list").decode("utf-8", errors="replace")
+    return any(
+        line.lower().startswith("extensions.partialclone=")
+        or re.match(r"remote\..*\.promisor=", line, re.I)
+        or re.match(r"remote\..*\.partialclonefilter=", line, re.I)
+        for line in config.splitlines()
+    )
+
+
+def _collect_refs(root: Path, sink, base: str) -> tuple[list[bytes], set[str], set[str]]:
+    refs = _git(
+        root, "for-each-ref", "--format=%(refname)%00%(objectname)%00%(objecttype)"
+    ).splitlines()
+    tips, tags = set(), set()
+    for line in refs:
+        name_bytes, oid_bytes, kind_bytes = line.split(b"\0")
+        name, oid, kind = name_bytes.decode(), oid_bytes.decode(), kind_bytes.decode()
+        if name.startswith("refs/replace/"):
+            sink.gap("git_ref", f"git:ref:{name}", "replacement_ref_not_followed")
+            continue
+        sink.add(
+            "git_ref",
+            f"git:ref:{name}",
+            base + "/tree/" + quote(name, safe=""),
+            oid,
+            _json({"ref": name, "oid": oid, "object_type": kind}),
+            {"access_scope": "repository"},
+        )
+        if kind == "tag":
+            tags.add(oid)
+        try:
+            tips.add(_git(root, "rev-parse", "--verify", oid + "^{commit}").strip().decode())
+        except GitReadError:
+            sink.gap("git_ref", f"git:ref:{name}", "ref_does_not_resolve_to_commit", {"oid": oid})
+    return refs, tips, tags
+
+
+def _collect_head(root: Path, sink, base: str, tips: set[str]) -> None:
+    try:
+        head = _git(root, "rev-parse", "--verify", "HEAD^{commit}").strip().decode()
+        tips.add(head)
+        sink.add(
+            "git_ref",
+            "git:ref:HEAD",
+            base + "/commit/" + head,
+            head,
+            _json({"ref": "HEAD", "oid": head, "object_type": "commit"}),
+        )
+    except GitReadError:
+        sink.gap("git_ref", "git:ref:HEAD", "head_unavailable")
+
+
+def _collect_tags(root: Path, sink, base: str, tags: set[str]) -> None:
+    seen_tags = set()
+    while tags:
+        oid = tags.pop()
+        if oid in seen_tags:
+            continue
+        seen_tags.add(oid)
+        raw = _read_object(root, oid, "tag", sink)
+        if raw is not None:
+            sink.add("git_tag", f"git:tag:{oid}", base + "/tree/" + oid, oid, raw)
+            header = raw.split(b"\n\n", 1)[0].splitlines()
+            if b"type tag" in header:
+                tags.update(line[7:].decode() for line in header if line.startswith(b"object "))
+
+
+def _boundary_changes(root: Path, sha: str) -> list[dict]:
+    # A shallow boundary lacks its parent object. Enumerate its available
+    # tree as a root while retaining the history gap.
+    entries = _git(root, "ls-tree", "-rz", sha).split(b"\0")
+    changes = []
+    for entry in entries:
+        if not entry:
+            continue
+        details, path_bytes = entry.split(b"\t", 1)
+        mode, _, oid = details.decode().split()
+        changes.append(
+            {
+                "path": path_bytes.decode("utf-8", errors="replace"),
+                "path_hex": path_bytes.hex(),
+                "mode": mode,
+                "oid": oid,
+                "status": "BOUNDARY",
+                "old_oid": None,
+                "old_mode": None,
+                "source_url_path": quote_from_bytes(path_bytes, safe="/"),
+            }
+        )
+    return changes
+
+
+def _register_blob_occurrences(
+    sink, base: str, sha: str, changes: list[dict], blobs: dict, sensitive_oids: set[str]
+) -> None:
+    for change in changes:
+        path, oid, mode = change["path"], change["oid"], change["mode"]
+        if mode == "000000":
+            continue
+        metadata = {
+            "path": path,
+            "path_hex": change["path_hex"],
+            "commit": sha,
+            "mode": mode,
+            "url": base + "/blob/" + sha + "/" + change["source_url_path"],
+        }
+        if _repository_path_is_sensitive(path):
+            sensitive_oids.add(oid)
+            sink.gap("git_blob", f"git:path:{sha}:{path}", "sensitive_path_excluded", metadata)
+        elif mode == "160000":
+            sink.gap(
+                "git_submodule",
+                f"git:submodule:{sha}:{path}",
+                "submodule_repository_not_collected",
+                {**metadata, "oid": oid},
+            )
+        elif mode not in {"100644", "100755", "120000"}:
+            sink.gap("git_blob", f"git:path:{sha}:{path}", "git_mode_unsupported", metadata)
+        else:
+            blobs.setdefault(oid, []).append(metadata)
+
+
+def _collect_commit(
+    root: Path, sink, base: str, sha: str, shallow: bool, commit_set: set[str]
+) -> list[dict]:
+    raw = _read_object(root, sha, "commit", sink)
+    if raw is None:
+        return []
+    header = raw.split(b"\n\n", 1)[0].splitlines()
+    parents = [line[7:].decode() for line in header if line.startswith(b"parent ")]
+    tree = next((line[5:].decode() for line in header if line.startswith(b"tree ")), None)
+    sink.add(
+        "git_commit",
+        f"git:commit:{sha}",
+        base + "/commit/" + sha,
+        sha,
+        raw,
+        {"parents": parents, "tree": tree, "access_scope": "repository"},
+    )
+    try:
+        parent = parents[0] if parents else None
+        if shallow and parent and parent not in commit_set:
+            changes = _boundary_changes(root, sha)
+        else:
+            changes = _changes(root, sha, parent)
+    except GitReadError:
+        sink.gap("git_tree", f"git:changes:{sha}", "git_tree_unavailable")
+        return []
+    sink.add(
+        "git_changes",
+        f"git:changes:{sha}",
+        base + "/commit/" + sha,
+        sha,
+        _json(
+            {
+                "commit": sha,
+                "comparison_parent": parents[0] if parents else None,
+                "changes": changes,
+            }
+        ),
+        {"tree": tree, "changes": len(changes)},
+    )
+    return changes
+
+
+def _collect_blobs(root: Path, sink, blobs: dict, sensitive_oids: set[str]) -> None:
+    for oid, occurrences in sorted(blobs.items()):
+        if oid in sensitive_oids:
+            sink.gap("git_blob", f"git:blob:{oid}", "blob_also_present_at_sensitive_path")
+            continue
+        raw = _read_object(root, oid, "blob", sink)
+        if raw is None:
+            continue
+        is_pointer = raw.startswith(b"version https://git-lfs.github.com/spec/")
+        # Provenance grows in separate change maps. Keeping it out of the
+        # blob document avoids uploading identical content again merely
+        # because a new branch/path/commit points at the same object.
+        sink.add(
+            "git_lfs_pointer" if is_pointer else "git_blob",
+            f"git:blob:{oid}",
+            f"https://api.github.com/repos/{sink.repository}/git/blobs/{oid}",
+            oid,
+            raw,
+            {
+                "git_oid": oid,
+                "access_scope": "repository",
+                "path_provenance": "git_changes",
+                "pointer_only": is_pointer,
+                "targets_followed": False,
+            },
+        )
+        if is_pointer:
+            _lfs_payload(root, raw, sink, occurrences[0]["url"], oid)
+
+
 def collect_git(root: Path, sink) -> None:
     """Emit refs, commits, first-parent changes, unique blobs, and explicit gaps.
 
@@ -159,68 +357,12 @@ def collect_git(root: Path, sink) -> None:
         shallow = _git(root, "rev-parse", "--is-shallow-repository").strip() == b"true"
         if shallow:
             sink.gap("git_history", "git:history", "shallow_history")
-        # Git versions vary in GIT_NO_LAZY_FETCH support. Reject configured
-        # promisor/partial clones before any object read to guarantee no fetch.
-        config = _git(root, "config", "--list").decode("utf-8", errors="replace")
-        if any(
-            line.lower().startswith("extensions.partialclone=")
-            or re.match(r"remote\..*\.promisor=", line, re.I)
-            or re.match(r"remote\..*\.partialclonefilter=", line, re.I)
-            for line in config.splitlines()
-        ):
+        if _is_partial_clone(root):
             sink.gap("git_history", "git:history", "partial_clone_requires_explicit_fetch")
             return
-        refs = _git(
-            root, "for-each-ref", "--format=%(refname)%00%(objectname)%00%(objecttype)"
-        ).splitlines()
-        tips = set()
-        tags = set()
-        for line in refs:
-            name_bytes, oid_bytes, kind_bytes = line.split(b"\0")
-            name, oid, kind = name_bytes.decode(), oid_bytes.decode(), kind_bytes.decode()
-            if name.startswith("refs/replace/"):
-                sink.gap("git_ref", f"git:ref:{name}", "replacement_ref_not_followed")
-                continue
-            sink.add(
-                "git_ref",
-                f"git:ref:{name}",
-                base + "/tree/" + quote(name, safe=""),
-                oid,
-                _json({"ref": name, "oid": oid, "object_type": kind}),
-                {"access_scope": "repository"},
-            )
-            if kind == "tag":
-                tags.add(oid)
-            try:
-                tips.add(_git(root, "rev-parse", "--verify", oid + "^{commit}").strip().decode())
-            except GitReadError:
-                sink.gap(
-                    "git_ref", f"git:ref:{name}", "ref_does_not_resolve_to_commit", {"oid": oid}
-                )
-        try:
-            head = _git(root, "rev-parse", "--verify", "HEAD^{commit}").strip().decode()
-            tips.add(head)
-            sink.add(
-                "git_ref",
-                "git:ref:HEAD",
-                base + "/commit/" + head,
-                head,
-                _json({"ref": "HEAD", "oid": head, "object_type": "commit"}),
-            )
-        except GitReadError:
-            sink.gap("git_ref", "git:ref:HEAD", "head_unavailable")
-        seen_tags = set()
-        while tags:
-            oid = tags.pop()
-            if oid in seen_tags:
-                continue
-            seen_tags.add(oid)
-            raw = _read_object(root, oid, "tag", sink)
-            if raw is not None:
-                sink.add("git_tag", f"git:tag:{oid}", base + "/tree/" + oid, oid, raw)
-                header = raw.split(b"\n\n", 1)[0].splitlines()
-                if b"type tag" in header:
-                    tags.update(line[7:].decode() for line in header if line.startswith(b"object "))
+        refs, tips, tags = _collect_refs(root, sink, base)
+        _collect_head(root, sink, base, tips)
+        _collect_tags(root, sink, base, tags)
         if not tips:
             return
         commits = (
@@ -230,117 +372,9 @@ def collect_git(root: Path, sink) -> None:
         blobs: dict[str, list[dict]] = {}
         sensitive_oids = set()
         for sha in commits:
-            raw = _read_object(root, sha, "commit", sink)
-            if raw is None:
-                continue
-            header = raw.split(b"\n\n", 1)[0].splitlines()
-            parents = [line[7:].decode() for line in header if line.startswith(b"parent ")]
-            tree = next((line[5:].decode() for line in header if line.startswith(b"tree ")), None)
-            sink.add(
-                "git_commit",
-                f"git:commit:{sha}",
-                base + "/commit/" + sha,
-                sha,
-                raw,
-                {"parents": parents, "tree": tree, "access_scope": "repository"},
-            )
-            try:
-                # A shallow boundary lacks its parent object. Enumerate its
-                # available tree as a root while retaining the history gap.
-                parent = parents[0] if parents else None
-                if shallow and parent and parent not in commit_set:
-                    entries = _git(root, "ls-tree", "-rz", sha).split(b"\0")
-                    changes = []
-                    for entry in entries:
-                        if not entry:
-                            continue
-                        details, path_bytes = entry.split(b"\t", 1)
-                        mode, _, oid = details.decode().split()
-                        changes.append(
-                            {
-                                "path": path_bytes.decode("utf-8", errors="replace"),
-                                "path_hex": path_bytes.hex(),
-                                "mode": mode,
-                                "oid": oid,
-                                "status": "BOUNDARY",
-                                "old_oid": None,
-                                "old_mode": None,
-                                "source_url_path": quote_from_bytes(path_bytes, safe="/"),
-                            }
-                        )
-                else:
-                    changes = _changes(root, sha, parent)
-            except GitReadError:
-                sink.gap("git_tree", f"git:changes:{sha}", "git_tree_unavailable")
-                continue
-            sink.add(
-                "git_changes",
-                f"git:changes:{sha}",
-                base + "/commit/" + sha,
-                sha,
-                _json(
-                    {
-                        "commit": sha,
-                        "comparison_parent": parents[0] if parents else None,
-                        "changes": changes,
-                    }
-                ),
-                {"tree": tree, "changes": len(changes)},
-            )
-            for change in changes:
-                path, oid, mode = change["path"], change["oid"], change["mode"]
-                if mode == "000000":
-                    continue
-                metadata = {
-                    "path": path,
-                    "path_hex": change["path_hex"],
-                    "commit": sha,
-                    "mode": mode,
-                    "url": base + "/blob/" + sha + "/" + change["source_url_path"],
-                }
-                if _repository_path_is_sensitive(path):
-                    sensitive_oids.add(oid)
-                    sink.gap(
-                        "git_blob", f"git:path:{sha}:{path}", "sensitive_path_excluded", metadata
-                    )
-                elif mode == "160000":
-                    sink.gap(
-                        "git_submodule",
-                        f"git:submodule:{sha}:{path}",
-                        "submodule_repository_not_collected",
-                        {**metadata, "oid": oid},
-                    )
-                elif mode not in {"100644", "100755", "120000"}:
-                    sink.gap("git_blob", f"git:path:{sha}:{path}", "git_mode_unsupported", metadata)
-                else:
-                    blobs.setdefault(oid, []).append(metadata)
-        for oid, occurrences in sorted(blobs.items()):
-            if oid in sensitive_oids:
-                sink.gap("git_blob", f"git:blob:{oid}", "blob_also_present_at_sensitive_path")
-                continue
-            raw = _read_object(root, oid, "blob", sink)
-            if raw is None:
-                continue
-            is_pointer = raw.startswith(b"version https://git-lfs.github.com/spec/")
-            # Provenance grows in separate change maps. Keeping it out of the
-            # blob document avoids uploading identical content again merely
-            # because a new branch/path/commit points at the same object.
-            sink.add(
-                "git_lfs_pointer" if is_pointer else "git_blob",
-                f"git:blob:{oid}",
-                f"https://api.github.com/repos/{sink.repository}/git/blobs/{oid}",
-                oid,
-                raw,
-                {
-                    "git_oid": oid,
-                    "access_scope": "repository",
-                    "path_provenance": "git_changes",
-                    "pointer_only": is_pointer,
-                    "targets_followed": False,
-                },
-            )
-            if is_pointer:
-                _lfs_payload(root, raw, sink, occurrences[0]["url"], oid)
+            changes = _collect_commit(root, sink, base, sha, shallow, commit_set)
+            _register_blob_occurrences(sink, base, sha, changes, blobs, sensitive_oids)
+        _collect_blobs(root, sink, blobs, sensitive_oids)
         sink.add(
             "git_scope",
             "git:scope",

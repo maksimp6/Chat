@@ -131,18 +131,37 @@ class GitHubReader:
         binary: bool = False,
         immutable: bool = False,
     ) -> bytes:
-        if not path.startswith("/") or path.startswith("//") or "\n" in path or "\r" in path:
-            raise CollectionError("github_path_invalid")
-        if body is not None and path != "/graphql":
-            raise CollectionError("github_write_forbidden")
+        key = self._request_key(path, body, binary)
         limit = self.max_download_bytes if binary else MAX_PAGE_BYTES
-        key = path + ("|octet-stream" if binary else "|json")
-        if body is not None:
-            key += "|" + hashlib.sha256(body).hexdigest()
         cached = self._cached(key, limit)
         if immutable and cached:
             self.cache_hits += 1
             return cached[0]
+        self._check_budget()
+        headers = self._request_headers(body, binary, cached)
+        self.requests += 1
+        request = urllib.request.Request(API + path, data=body, headers=headers)
+        try:
+            raw, etag = self._read_response(request, limit)
+        except urllib.error.HTTPError as error:
+            return self._http_error(error, cached)
+        except (urllib.error.URLError, TimeoutError, socket.timeout, OSError):
+            raise CollectionError("github_transport_unavailable") from None
+        self._save_cache(key, raw, etag)
+        return raw
+
+    @staticmethod
+    def _request_key(path, body, binary):
+        if not path.startswith("/") or path.startswith("//") or "\n" in path or "\r" in path:
+            raise CollectionError("github_path_invalid")
+        if body is not None and path != "/graphql":
+            raise CollectionError("github_write_forbidden")
+        key = path + ("|octet-stream" if binary else "|json")
+        if body is not None:
+            key += "|" + hashlib.sha256(body).hexdigest()
+        return key
+
+    def _check_budget(self):
         if self.stop_reason:
             raise CollectionError(self.stop_reason)
         if self.requests >= self.max_requests:
@@ -151,6 +170,8 @@ class GitHubReader:
         if self.downloaded_bytes >= self.max_total_bytes:
             self.stop_reason = "download_budget_exhausted"
             raise CollectionError(self.stop_reason)
+
+    def _request_headers(self, body, binary, cached):
         headers = {
             "Accept": "application/octet-stream" if binary else "application/vnd.github+json",
             "User-Agent": "repository-corpus-collector",
@@ -162,33 +183,30 @@ class GitHubReader:
             headers["Content-Type"] = "application/json"
         elif cached and cached[1].get("etag"):
             headers["If-None-Match"] = cached[1]["etag"]
-        self.requests += 1
-        request = urllib.request.Request(API + path, data=body, headers=headers)
-        try:
-            with self.opener.open(request, timeout=45) as response:
-                raw = response.read(min(limit, self.max_total_bytes - self.downloaded_bytes) + 1)
-                self.downloaded_bytes += len(raw)
-                if len(raw) > limit:
-                    raise CollectionError("source_byte_limit_exceeded")
-                if self.downloaded_bytes > self.max_total_bytes:
-                    self.stop_reason = "download_budget_exhausted"
-                    raise CollectionError(self.stop_reason)
-                etag = response.headers.get("ETag")
-        except urllib.error.HTTPError as error:
-            if error.code == 304 and cached:
-                self.cache_hits += 1
-                return cached[0]
-            if error.code == 401:
-                self.stop_reason = "github_http_401"
-            elif error.code in {403, 429} and (
-                error.code == 429 or error.headers.get("X-RateLimit-Remaining") == "0"
-            ):
-                self.stop_reason = "github_rate_limit"
-            raise CollectionError(self.stop_reason or f"github_http_{error.code}") from None
-        except (urllib.error.URLError, TimeoutError, socket.timeout, OSError):
-            raise CollectionError("github_transport_unavailable") from None
-        self._save_cache(key, raw, etag)
-        return raw
+        return headers
+
+    def _read_response(self, request, limit):
+        with self.opener.open(request, timeout=45) as response:
+            raw = response.read(min(limit, self.max_total_bytes - self.downloaded_bytes) + 1)
+            self.downloaded_bytes += len(raw)
+            if len(raw) > limit:
+                raise CollectionError("source_byte_limit_exceeded")
+            if self.downloaded_bytes > self.max_total_bytes:
+                self.stop_reason = "download_budget_exhausted"
+                raise CollectionError(self.stop_reason)
+            return raw, response.headers.get("ETag")
+
+    def _http_error(self, error, cached):
+        if error.code == 304 and cached:
+            self.cache_hits += 1
+            return cached[0]
+        if error.code == 401:
+            self.stop_reason = "github_http_401"
+        elif error.code in {403, 429} and (
+            error.code == 429 or error.headers.get("X-RateLimit-Remaining") == "0"
+        ):
+            self.stop_reason = "github_rate_limit"
+        raise CollectionError(self.stop_reason or f"github_http_{error.code}") from None
 
     def json(self, path: str, *, immutable: bool = False):
         raw = self._request(path, immutable=immutable)
@@ -325,72 +343,80 @@ class _Collector:
     def pages(self, kind, path, *, key=None, immutable=False):
         """Exhaust pages and reconcile declared counts; repeated pages are gaps."""
         result, identities = [], set()
-        declared = None
+        state = {"expected": None, "consistent": True}
         complete = False
-        consistent = True
         separator = "&" if "?" in path else "?"
         try:
             for page in range(1, self.max_pages + 1):
                 response = self.reader.json(
                     f"{self.base}{path}{separator}per_page=100&page={page}", immutable=immutable
                 )
-                if key:
-                    if not isinstance(response, dict) or not isinstance(response.get(key), list):
-                        raise CollectionError("collection_shape_invalid")
-                    rows = response[key]
-                    total = response.get("total_count")
-                    if type(total) is int:
-                        if declared is not None and total != declared:
-                            consistent = False
-                            self.gap(
-                                kind,
-                                path,
-                                "inventory_changed_during_collection",
-                                {"before": declared, "after": total},
-                            )
-                        declared = total
-                else:
-                    rows = response
-                if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
-                    raise CollectionError("collection_shape_invalid")
+                rows = self._collection_rows(kind, path, response, key, state)
                 if not rows:
                     complete = True
                     break
-                additions = 0
-                for row in rows:
-                    identity = row.get("id") or row.get("node_id") or row.get("number")
-                    if type(identity) not in {str, int} or not identity:
-                        raise CollectionError("source_identity_missing")
-                    if identity in identities:
-                        consistent = False
-                        self.gap(kind, str(identity), "duplicate_id_during_pagination")
-                        continue
-                    identities.add(identity)
-                    result.append(row)
-                    additions += 1
-                if not additions:
-                    raise CollectionError("pagination_repeated_page")
+                self._append_page_rows(kind, rows, result, identities, state)
                 if len(rows) < 100:
                     complete = True
                     break
             if not complete:
                 raise CollectionError("pagination_limit_exceeded")
-            if declared is not None and declared != len(result):
+            if state["expected"] is not None and state["expected"] != len(result):
                 complete = False
                 self.gap(
                     kind,
                     path,
                     "inventory_count_mismatch",
-                    {"expected": declared, "collected": len(result)},
+                    {"expected": state["expected"], "collected": len(result)},
                 )
         except CollectionError as error:
-            self.gap(kind, path, str(error), {"collected": len(result), "expected": declared})
+            self.gap(
+                kind, path, str(error), {"collected": len(result), "expected": state["expected"]}
+            )
         self.inventory[kind + ":" + path] = {
-            "complete": complete and consistent,
+            "complete": complete and state["consistent"],
             "count": len(result),
-            "expected": declared,
+            "expected": state["expected"],
         }
         return result
+
+    def _collection_rows(self, kind, path, response, key, state):
+        if key:
+            if not isinstance(response, dict) or not isinstance(response.get(key), list):
+                raise CollectionError("collection_shape_invalid")
+            rows = response[key]
+            total = response.get("total_count")
+            if type(total) is int:
+                if state["expected"] is not None and total != state["expected"]:
+                    state["consistent"] = False
+                    self.gap(
+                        kind,
+                        path,
+                        "inventory_changed_during_collection",
+                        {"before": state["expected"], "after": total},
+                    )
+                state["expected"] = total
+        else:
+            rows = response
+        if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
+            raise CollectionError("collection_shape_invalid")
+        return rows
+
+    def _append_page_rows(self, kind, rows, result, identities, state):
+        additions = 0
+        for row in rows:
+            identity = row.get("id") or row.get("node_id") or row.get("number")
+            if type(identity) not in {str, int} or not identity:
+                raise CollectionError("source_identity_missing")
+            if identity in identities:
+                state["consistent"] = False
+                self.gap(kind, str(identity), "duplicate_id_during_pagination")
+                continue
+            identities.add(identity)
+            result.append(row)
+            additions += 1
+        if not additions:
+            raise CollectionError("pagination_repeated_page")
 
     def read_object(self, kind, path, *, immutable=False):
         try:
@@ -644,9 +670,23 @@ def collect_github(
     collector = _Collector(
         repository, reader, sink, max_pages, _Progress(Path(progress_dir), repository)
     )
+    inventories = _collect_inventories(collector)
+    # A denied GraphQL API is a visible gap, not an empty discussion set.
+    _discussions(collector)
+    # Reserve progress for every expensive family so Actions cannot starve artifacts.
+    _collect_reviews(collector, inventories["pull_request"])
+    _collect_runs(collector, inventories["actions_run"])
+    _collect_artifacts(collector, inventories["actions_artifact_metadata"])
+    _collect_releases(collector, inventories["release"])
+    return _collection_summary(collector)
+
+
+def _collect_inventories(collector):
     repository_metadata = collector.read_object("repository", "")
     if repository_metadata and repository_metadata.get("has_wiki"):
-        collector.gap("wiki", repository + ".wiki.git", "separate_wiki_repository_not_collected")
+        collector.gap(
+            "wiki", collector.repository + ".wiki.git", "separate_wiki_repository_not_collected"
+        )
     inventories = {}
     specs = (
         ("issue", "/issues?state=all&sort=created&direction=asc", None),
@@ -663,14 +703,12 @@ def collect_github(
         inventories[kind] = rows
         for row in rows:
             collector.record(kind, row)
+    return inventories
 
-    # Discussion inventory and texts use an API distinct from Issues/PR. A denied
-    # or unavailable GraphQL API is a visible gap, not an empty discussion set.
-    _discussions(collector)
 
-    # Reserve progress for each expensive source family. Without this, a large
-    # Actions history can indefinitely starve artifact downloads on every resume.
-    pulls = collector.resume("pull_request_reviews", inventories["pull_request"])
+def _collect_reviews(collector, rows):
+    reader = collector.reader
+    pulls = collector.resume("pull_request_reviews", rows)
     review_limit = collector.phase_limit(0.25)
     for index, pull in enumerate(pulls):
         if getattr(reader, "stop_reason", None):
@@ -693,7 +731,10 @@ def collect_github(
             collector.record("pull_request_review", {**review, "pull_request_number": number})
         collector.advance("pull_request_reviews", pull)
 
-    runs = collector.resume("actions_run_details", inventories["actions_run"])
+
+def _collect_runs(collector, rows):
+    reader = collector.reader
+    runs = collector.resume("actions_run_details", rows)
     run_limit = collector.phase_limit(0.45)
     for index, run in enumerate(runs):
         if getattr(reader, "stop_reason", None):
@@ -734,7 +775,10 @@ def collect_github(
                 break
         collector.advance("actions_run_details", run)
 
-    artifacts = collector.resume("actions_artifact", inventories["actions_artifact_metadata"])
+
+def _collect_artifacts(collector, rows):
+    reader = collector.reader
+    artifacts = collector.resume("actions_artifact", rows)
     artifact_limit = collector.phase_limit(0.9)
     for index, artifact in enumerate(artifacts):
         if getattr(reader, "stop_reason", None):
@@ -748,7 +792,10 @@ def collect_github(
         collector.download("actions_artifact", f"/actions/artifacts/{artifact['id']}/zip", artifact)
         collector.advance("actions_artifact", artifact)
 
-    releases = collector.resume("release_assets", inventories["release"])
+
+def _collect_releases(collector, rows):
+    reader = collector.reader
+    releases = collector.resume("release_assets", rows)
     for index, release in enumerate(releases):
         if getattr(reader, "stop_reason", None):
             collector.deferred("release_assets", releases[index:])
@@ -761,6 +808,9 @@ def collect_github(
             )
         collector.advance("release_assets", release)
 
+
+def _collection_summary(collector):
+    reader = collector.reader
     collector.gap(
         "provider_export",
         "provider-input-output-tool-events",
@@ -773,7 +823,7 @@ def collect_github(
     )
     return {
         "status": "partial" if collector.gaps else "collected",
-        "repository": repository,
+        "repository": collector.repository,
         "counts": collector.counts,
         "inventories": collector.inventory,
         "gap_count": collector.gaps,
