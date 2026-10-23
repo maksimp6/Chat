@@ -179,6 +179,74 @@ def test_wrong_store_and_missing_credentials_fail_before_upload(tmp_path, monkey
     assert not writes
 
 
+def test_provider_check_persists_inventory_without_collection_or_writes(tmp_path, monkeypatch):
+    source = archive(tmp_path / "source")
+    _, _, _, writes = provider(monkeypatch)
+    rag.upload_archive(source, "store1", "project", "key")
+    writes.clear()
+    monkeypatch.setenv("YANDEX_PROJECT_ID", "project")
+    monkeypatch.setenv("YANDEX_API_KEY", "key")
+    monkeypatch.setattr(rag, "_collect", lambda *a: pytest.fail("check collected sources"))
+    receipt = tmp_path / "receipt.json"
+    args = [
+        "--archive-dir",
+        str(tmp_path / "check"),
+        "--receipt",
+        str(receipt),
+        "--store-id",
+        "store1",
+        "--provider-check",
+    ]
+    assert rag.main(args) == 0
+    result = json.loads(receipt.read_bytes())
+    assert result["status"] == "provider_inspected"
+    assert len(result["provider_inventory"]["candidate_pack_files"]) == 1
+    assert not writes
+
+    def denied(*args):
+        raise rag.semantic.YandexHTTPError(429, "GET", "/files", "RESOURCE_EXHAUSTED")
+
+    monkeypatch.setattr(rag.semantic, "list_yandex_objects", denied)
+    assert rag.main(args) == 1
+    failure = json.loads(receipt.read_bytes())
+    assert failure["provider_method"] == "GET"
+    assert failure["provider_path"] == "/files"
+    assert failure["provider_code"] == "RESOURCE_EXHAUSTED"
+    assert not writes
+
+
+@pytest.mark.parametrize("already_attached", [True, False])
+def test_fresh_archive_reuses_unchanged_part_of_attached_history(
+    tmp_path, monkeypatch, already_attached
+):
+    first = archive(tmp_path / "first")
+    first.add("issue", "2", "https://github.com/maksimp6/Chat/issues/2", "v1", b"Old issue.")
+    files, contents, attached, writes = provider(monkeypatch)
+    old = rag.upload_archive(first, "store1", "project", "key")
+    unchanged = set(rag.prepared_documents(archive(tmp_path / "current")))
+    current = rag.CorpusArchive(tmp_path / "current" / "archive", first.repository)
+    current.add("issue", "2", "https://github.com/maksimp6/Chat/issues/2", "v2", b"Updated issue.")
+    if not already_attached:
+        attached.clear()
+    writes.clear()
+    result = rag.upload_archive(current, "store1", "project", "key")
+    assert len(files) == 2
+    uploaded = set(rag.unpack(current.repository, contents["file2"]))
+    assert bool(uploaded & unchanged) is not already_attached
+    assert {sha for pack in result["packs"] for sha in pack["documents"]} == set(
+        rag.prepared_documents(current)
+    )
+    if already_attached:
+        reused = next(pack for pack in result["packs"] if pack["reused"])
+        assert set(reused["documents"]) == unchanged
+        assert reused["excluded_from_current_scope_count"] == 1
+        assert not reused["attachment_allowed"]
+        with pytest.raises(ValueError, match="mixed_historical_pack_attachment_forbidden"):
+            rag._attach_and_wait("/vector_stores/store1", [reused], set(), "project", "key")
+    else:
+        assert old["packs"][0]["file_id"] not in {item["id"] for item in attached}
+
+
 def test_missing_source_blocks_upload_before_any_provider_call(tmp_path, monkeypatch):
     a = archive(tmp_path)
     next((a.directory / "documents").iterdir()).unlink()

@@ -10,7 +10,7 @@ on:
       mode:
         description: "BM25 search, bounded model answer, or Vector Store upload/search"
         type: choice
-        options: [search, query, red, vector-store, repository]
+        options: [search, query, red, vector-store, repository, repository-check]
         required: true
         default: "search"
       corpus:
@@ -53,7 +53,7 @@ concurrency:
 
 jobs:
   repository-corpus:
-    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'repository' && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.run_attempt == '1'
+    if: github.event_name == 'workflow_dispatch' && (inputs.mode == 'repository' || inputs.mode == 'repository-check') && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.run_attempt == '1'
     name: Archive repository evidence and update existing RAG without generation
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -80,6 +80,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Fetch all available repository and PR refs
+        if: inputs.mode == 'repository'
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -103,21 +104,34 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
+      - name: Prepare PDF text extraction
+        if: inputs.mode == 'repository'
+        continue-on-error: true
+        run: |
+          if ! command -v pdftotext >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends poppler-utils
+          fi
       - name: Collect, redact, upload, and verify direct retrieval
         env:
           GITHUB_TOKEN: ${{ github.token }}
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
           RAG_QUERY: ${{ inputs.query }}
+          RAG_MODE: ${{ inputs.mode }}
         run: |
           set -euo pipefail
+          operation=--upload
+          if [ "$RAG_MODE" = repository-check ]; then
+            operation=--provider-check
+          fi
           python -m scripts.repository_rag \
             --git-root "$GITHUB_WORKSPACE" \
             --repository "$GITHUB_REPOSITORY" \
             --archive-dir "$RUNNER_TEMP/repository-rag" \
             --receipt "$RUNNER_TEMP/repository-rag-receipt.json" \
             --fetch-status "$RUNNER_TEMP/repository-fetch-status.json" \
-            --upload --query "$RAG_QUERY"
+            "$operation" --query "$RAG_QUERY"
       - name: Preserve receipt and visible omissions
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -134,7 +148,7 @@ jobs:
       # as public-repository artifacts or caches. The receipt states this limit.
 
   semantic:
-    if: github.event_name == 'workflow_dispatch' && inputs.mode != 'repository' && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.run_attempt == '1'
+    if: github.event_name == 'workflow_dispatch' && inputs.mode != 'repository' && inputs.mode != 'repository-check' && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.run_attempt == '1'
     name: Semantic answer over corpus
     runs-on: ubuntu-latest
     timeout-minutes: 10

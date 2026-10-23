@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import urllib.error
 import urllib.request
 import zipfile
 
@@ -340,6 +341,157 @@ class Opener:
     def open(self, request, *, timeout):
         self.calls.append(request)
         return Response(self.response)
+
+
+class SequenceOpener(Opener):
+    def open(self, request, *, timeout):
+        self.calls.append(request)
+        result = self.response.pop(0)
+        if isinstance(result, Exception):
+            raise result
+        return Response(result)
+
+
+def test_invalid_json_is_retried_once_and_never_published_to_cache(tmp_path):
+    reader = GitHubReader("owner/repo", "token", tmp_path)
+    reader.opener = SequenceOpener([b'{"broken":', b'{"id":1}'])
+    assert reader.json("/repos/owner/repo") == {"id": 1}
+    assert reader.requests == 2
+    assert all(request.get_header("If-none-match") is None for request in reader.opener.calls)
+    assert next(reader.cache_dir.glob("*.body")).read_bytes() == b'{"id":1}'
+
+
+def test_existing_poisoned_etag_is_not_reused(tmp_path):
+    reader = GitHubReader("owner/repo", "token", tmp_path)
+    path = "/repos/owner/repo/actions/runs?per_page=100&page=240"
+    key = reader._request_key(path, None, False)
+    reader._save_cache(key, b'{"workflow_runs":[', '"poisoned"')
+    reader.opener = Opener(b'{"workflow_runs":[]}')
+    assert reader.json(path) == {"workflow_runs": []}
+    assert reader.opener.calls[0].get_header("If-none-match") is None
+    assert reader.requests == 1
+
+
+def test_two_malformed_responses_end_in_explicit_error_without_cache(tmp_path):
+    reader = GitHubReader("owner/repo", "token", tmp_path)
+    reader.opener = SequenceOpener([b'{"broken":', b'{"still_broken":'])
+    with pytest.raises(CollectionError, match="github_json_invalid"):
+        reader.json("/repos/owner/repo")
+    assert reader.requests == 2
+    assert not list(reader.cache_dir.glob("*.body"))
+
+
+@pytest.mark.parametrize(
+    "path,expected",
+    [
+        ("/repos/owner/repo/actions/runs/1/attempts/1/logs", "application/vnd.github+json"),
+        ("/repos/owner/repo/actions/artifacts/1/zip", "application/vnd.github+json"),
+        ("/repos/owner/repo/releases/assets/1", "application/octet-stream"),
+    ],
+)
+def test_download_accept_matches_rest_endpoint(tmp_path, path, expected):
+    reader = GitHubReader("owner/repo", "token", tmp_path)
+    reader.opener = Opener(archive())
+    reader.binary(path)
+    assert reader.opener.calls[0].get_header("Accept") == expected
+
+
+def test_public_attachment_has_no_authorization_and_rejects_other_urls(tmp_path):
+    reader = GitHubReader("owner/repo", "sensitive-token", tmp_path)
+    reader.opener = Opener(archive())
+    url = "https://github.com/user-attachments/files/33870426/Logos-AI-Studio-Court-2026-10-23-public.zip"
+    assert reader.attachment(url).startswith(b"PK")
+    assert reader.opener.calls[0].get_header("Authorization") is None
+    with pytest.raises(CollectionError, match="public_attachment_url_not_allowed"):
+        reader.attachment("https://attacker.example/user-attachments/files/33870426/file.zip")
+    with pytest.raises(CollectionError, match="public_attachment_url_not_allowed"):
+        reader.attachment("https://github.com/owner/repo/archive/branch.zip")
+
+
+def test_public_attachment_deadline_is_bounded(tmp_path, monkeypatch):
+    reader = GitHubReader("owner/repo", "token", tmp_path)
+    reader.opener = Opener(archive())
+    ticks = iter([0, 0, 46])
+    monkeypatch.setattr("scripts.repository_corpus_github.time.monotonic", lambda: next(ticks))
+    with pytest.raises(CollectionError, match="download_deadline_exceeded"):
+        reader.attachment("https://github.com/user-attachments/files/1/file.zip")
+    assert reader.requests == 1
+    assert not list(reader.cache_dir.glob("*.body"))
+
+
+def test_attachments_precede_reviews_and_keep_every_parent(tmp_path):
+    url = "https://github.com/user-attachments/files/33870426/Logos-AI-Studio-Court-2026-10-23-public.zip"
+
+    class AttachmentReader(Reader):
+        def __init__(self):
+            super().__init__(
+                {
+                    "/repos/owner/repo/issues?state=all&sort=created&direction=asc&per_page=100&page=1": [
+                        {"id": 1, "body": url}
+                    ],
+                    "/repos/owner/repo/issues/comments?sort=created&direction=asc&per_page=100&page=1": [
+                        {"id": 5, "body": url}
+                    ],
+                    "/repos/owner/repo/pulls?state=all&sort=created&direction=asc&per_page=100&page=1": [
+                        {"id": 2, "number": 2}
+                    ],
+                }
+            )
+            self.events = []
+
+        def json(self, path, *, immutable=False):
+            self.events.append(path)
+            return super().json(path, immutable=immutable)
+
+        def attachment(self, found_url):
+            self.events.append(found_url)
+            return archive()
+
+    reader, sink = AttachmentReader(), Sink(tmp_path)
+    collect_github("owner/repo", "", sink, reader=reader)
+    assert reader.events.index(url) < reader.events.index(
+        "/repos/owner/repo/pulls/2/reviews?per_page=100&page=1"
+    )
+    records = [row for row in sink.records if row["kind"] == "github_attachment"]
+    assert len(records) == 1
+    assert records[0]["url"] == url
+    assert {parent["source_id"] for parent in records[0]["metadata"]["parent_sources"]} == {
+        "github:owner/repo:issue:1",
+        "github:owner/repo:issue_comment:5",
+    }
+
+
+@pytest.mark.parametrize(
+    "status,retries", [(502, 1), (503, 1), (504, 1), (401, 0), (403, 0), (429, 0)]
+)
+def test_retry_only_transient_http_and_count_attempts(tmp_path, status, retries):
+    reader = GitHubReader("owner/repo", "token", tmp_path)
+    error = urllib.error.HTTPError(
+        "https://api.github.com/repos/owner/repo", status, "error", {}, None
+    )
+    reader.opener = SequenceOpener([error, b'{"id":1}'])
+    if retries:
+        assert reader.json("/repos/owner/repo") == {"id": 1}
+    else:
+        with pytest.raises(CollectionError):
+            reader.json("/repos/owner/repo")
+    assert reader.requests == 1 + retries
+
+
+def test_failed_transient_retry_stays_explicit_and_budget_can_stop_retry(tmp_path):
+    reader = GitHubReader("owner/repo", "token", tmp_path)
+    error = urllib.error.HTTPError(
+        "https://api.github.com/repos/owner/repo", 503, "error", {}, None
+    )
+    reader.opener = SequenceOpener([error, error])
+    with pytest.raises(CollectionError, match="github_http_503"):
+        reader.json("/repos/owner/repo")
+    assert reader.requests == 2
+    limited = GitHubReader("owner/repo", "token", tmp_path / "limited", max_requests=1)
+    limited.opener = SequenceOpener([error])
+    with pytest.raises(CollectionError, match="request_budget_exhausted"):
+        limited.json("/repos/owner/repo")
+    assert limited.requests == 1
 
 
 def test_immutable_cache_hash_and_credential_scope(tmp_path):

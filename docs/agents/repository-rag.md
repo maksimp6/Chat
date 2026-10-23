@@ -36,7 +36,8 @@ paths, shallow/partial history, missing LFS payloads and submodules are explicit
 gaps. An LFS pointer is not evidence that its payload was obtained.
 
 GitHub collection inventories open/closed Issues and PRs, comments, reviews,
-Discussions, Actions runs/attempts/jobs/logs/artifacts and releases. It records
+Discussions, Actions runs/attempts/jobs/logs/artifacts and releases. Public GitHub
+file attachments retain links to their parent records. It records
 access failures, expired sources, deferred request budgets and byte limits.
 Available local HTTP cache supports continuation without duplicating completed
 immutable reads. The API is not a transactionally frozen repository snapshot:
@@ -47,14 +48,19 @@ uploaded as GitHub artifacts/caches. The sanitized view preserves actor/action
 structure while masking recognized credentials and pseudonymizing email
 addresses. This is a documented recognizer set, not proof that arbitrary personal
 data has been anonymized. Binary originals are retained locally; supported ZIP
-members are inspected without filesystem extraction. Unsupported binary formats,
+and TAR/gzip members are inspected without filesystem extraction. PDF text layers
+use a bounded system decoder and preserve extractor provenance; images and drawing
+geometry are not interpreted. Unsupported binary formats,
 encrypted archives and missing external exports remain named gaps.
 
 Capture timestamps are observations, excluded from document identity. Provenance
 documents are separate from content. Provider packs carry a verifiable hash and
 per-document offsets/hashes. Repeated runs verify and reuse existing packs; new
 packs contain only new documents. Existing provider knowledge is not deleted.
-File-level `completed` status is required before reporting an indexed document.
+Already attached historical packs can represent the unchanged portion of a new
+snapshot; excluded historical documents are not counted as current evidence.
+Mixed historical packs are never newly attached. File-level `completed` status
+is required before reporting an indexed document.
 
 ## Run
 
@@ -73,6 +79,10 @@ python -m scripts.repository_rag --upload-only \
 Only one writer may use an archive directory. For hosted execution, the existing
 `Semantic work` workflow has mode `repository`; its existing concurrency group
 serializes jobs. It requires explicit upload scope and `allow_model_call=false`.
+Mode `repository-check` inspects existing provider files and attachment statuses
+without source collection, provider writes or generation. It does not assert that
+candidate pack contents have been verified. Failure receipts retain the HTTP
+method, sanitized API route and safe provider error code.
 It uploads only the receipt and omissions, never private raw originals. Hosted
 raw evidence lasts only for that runner; this is not a durable archive or a
 replacement for the separate Git LFS preservation requirement.

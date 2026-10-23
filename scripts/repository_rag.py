@@ -1,6 +1,6 @@
 """Collect repository evidence and attach immutable packs to existing Yandex RAG.
 
-No generation, dialogue, tool execution, store creation, deletion, or issue
+No model generation, dialogue, Logos execution, store creation, deletion, or issue
 publication is available here. The collectors report gaps instead of silently
 equating the available subset with the complete repository.
 """
@@ -223,7 +223,10 @@ class CorpusArchive:
             if _depth < 2 and zipfile.is_zipfile(io.BytesIO(raw)):
                 self._zip(raw, kind, source_id, url, version, _depth)
             else:
-                self.gap(kind, source_id, "binary_text_extraction_unavailable")
+                from scripts.repository_corpus_binary import extract_binary
+
+                if not extract_binary(self, raw, kind, source_id, url, version, _depth):
+                    self.gap(kind, source_id, "binary_text_extraction_unavailable")
         self.entries[key] = entry
         with (self.directory / "observations.jsonl").open("ab") as stream:
             stream.write(canonical({"source": key, "captured_at": self.captured_at}) + b"\n")
@@ -399,16 +402,21 @@ def _existing_packs(archive, store_path, prefix, required, project, key):
         if record is None:
             continue
         file_id, raw, documents = record
-        if not set(documents) <= required:
-            # Keep old provider knowledge untouched, but never reattach a pack
-            # that also contains material outside this declared corpus.
+        selected = set(documents) & required
+        attachment_allowed = set(documents) <= required
+        if not selected or (not attachment_allowed and file_id not in attached_ids):
+            # An already attached historical pack can represent unchanged current
+            # documents. Never newly attach its excluded historical contents.
             continue
-        known.update(documents)
+        known.update(selected)
         pack_records.append(
             {
                 "file_id": file_id,
                 "sha256": digest(raw),
-                "documents": list(documents),
+                "documents": sorted(selected),
+                "pack_document_count": len(documents),
+                "excluded_from_current_scope_count": len(documents) - len(selected),
+                "attachment_allowed": attachment_allowed,
                 "reused": True,
             }
         )
@@ -468,6 +476,8 @@ def _upload_new_packs(archive, documents_to_upload, known, prefix, pack_records,
 def _attach_and_wait(store_path, selected, attached_ids, project, key):
     for item in selected:
         if item["file_id"] not in attached_ids:
+            if not item.get("attachment_allowed", True):
+                raise ValueError("mixed_historical_pack_attachment_forbidden")
             result = semantic.yandex_json_request(
                 "POST",
                 store_path + "/files",
@@ -520,6 +530,36 @@ def upload_archive(archive: CorpusArchive, store_id: str, project: str, key: str
         "store_id": store_id,
         "documents": len(required),
         "packs": selected,
+        "generation_requests": 0,
+    }
+
+
+def provider_inventory(repository: str, store_id: str, project: str, key: str) -> dict:
+    """Inspect upload/attachment state without collection, generation or writes."""
+    store_path = _validate_store(store_id, project, key)
+    prefix = "chat-repository-archive-v1-" + digest(repository.encode())[:16] + "-"
+    files = semantic.list_yandex_objects("/files", project, key, ("files",))
+    attached = semantic.list_yandex_objects(store_path + "/files", project, key, ("files",))
+    candidates = [
+        {field: item.get(field) for field in ("id", "filename", "bytes")}
+        for item in files
+        if str(item.get("filename", "")).startswith(prefix)
+    ]
+    ids = {item["id"] for item in candidates}
+    return {
+        "status": "observed_without_content_verification",
+        "store_id": store_id,
+        "project_file_count": len(files),
+        "project_file_bytes": sum(
+            item.get("bytes", 0) for item in files if type(item.get("bytes")) is int
+        ),
+        "store_attachment_count": len(attached),
+        "candidate_pack_files": candidates,
+        "attachments": [
+            {"file_id": semantic._attached_file_id(item), "status": item.get("status")}
+            for item in attached
+            if semantic._attached_file_id(item) in ids
+        ],
         "generation_requests": 0,
     }
 
@@ -604,6 +644,7 @@ def _arguments(argv: list[str] | None):
     parser.add_argument("--skip-github", action="store_true")
     parser.add_argument("--upload", action="store_true")
     parser.add_argument("--upload-only", action="store_true")
+    parser.add_argument("--provider-check", action="store_true")
     parser.add_argument("--store-id", default=DEFAULT_STORE_ID)
     parser.add_argument(
         "--query", default="Как устроено исполнение инструментов UniversalToolExecutor?"
@@ -635,6 +676,25 @@ def _collect(args, archive: CorpusArchive, result: dict) -> None:
             archive.gap("github", args.repository, "github_collection_not_run")
 
 
+def _run(args, archive: CorpusArchive, result: dict) -> None:
+    project, key = os.environ.get("YANDEX_PROJECT_ID", ""), os.environ.get("YANDEX_API_KEY", "")
+    if args.provider_check:
+        result["provider_inventory"] = provider_inventory(
+            args.repository, args.store_id, project, key
+        )
+        result["status"] = "provider_inspected"
+        return
+    _collect(args, archive, result)
+    archive.checkpoint()
+    result.update({**archive.summary(), "status": "prepared"})
+    if args.upload or args.upload_only:
+        result["upload"] = upload_archive(archive, args.store_id, project, key)
+        result["retrieval"] = verify_search(archive, result["upload"], args.query, project, key)
+        result["status"] = "indexed_partial" if archive.gaps else "indexed_declared_scope"
+        if result["retrieval"]["status"] != "verified_fragments":
+            result["status"] = "retrieval_verification_failed"
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _arguments(argv)
     args.archive_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -648,19 +708,7 @@ def main(argv: list[str] | None = None) -> int:
     archive = CorpusArchive(args.archive_dir, args.repository)
     result = {"status": "collecting", "generation_requests": 0}
     try:
-        _collect(args, archive, result)
-        archive.checkpoint()
-        result = {**result, **archive.summary(), "status": "prepared"}
-        if args.upload or args.upload_only:
-            project, key = (
-                os.environ.get("YANDEX_PROJECT_ID", ""),
-                os.environ.get("YANDEX_API_KEY", ""),
-            )
-            result["upload"] = upload_archive(archive, args.store_id, project, key)
-            result["retrieval"] = verify_search(archive, result["upload"], args.query, project, key)
-            result["status"] = "indexed_partial" if archive.gaps else "indexed_declared_scope"
-            if result["retrieval"]["status"] != "verified_fragments":
-                result["status"] = "retrieval_verification_failed"
+        _run(args, archive, result)
     except (OSError, ValueError, TypeError, KeyError) as exc:
         result = {
             **archive.summary(),
@@ -672,6 +720,9 @@ def main(argv: list[str] | None = None) -> int:
             result["error_code"] = str(exc)
         if isinstance(exc, semantic.YandexHTTPError):
             result["http_status"] = exc.status
+            result["provider_method"] = exc.method
+            result["provider_path"] = exc.path
+            result["provider_code"] = exc.provider_code
     finally:
         archive.checkpoint()
         args.receipt.parent.mkdir(parents=True, exist_ok=True)

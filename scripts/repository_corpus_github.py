@@ -12,6 +12,7 @@ import json
 import os
 import re
 import socket
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -24,14 +25,38 @@ MAX_DOWNLOAD_BYTES = 128 * 1024 * 1024
 MAX_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
 MAX_REQUESTS = 1500
 MAX_PAGES = 10000
+DOWNLOAD_TIMEOUT_SECONDS = 45
+RETRYABLE_ERRORS = {"github_json_invalid", "github_http_502", "github_http_503", "github_http_504"}
 
 
 class CollectionError(ValueError):
     """Safe reason only: no transport error body, signed URL, or credential."""
 
 
+def _remaining(deadline):
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise CollectionError("download_deadline_exceeded")
+    return remaining
+
+
+def _public_attachment_url(url):
+    parsed = urlsplit(url)
+    return (
+        parsed.scheme == "https"
+        and parsed.netloc == "github.com"
+        and not parsed.query
+        and not parsed.fragment
+        and re.fullmatch(r"/user-attachments/files/[1-9][0-9]*/[^/]+", parsed.path) is not None
+    )
+
+
 class _DownloadRedirect(urllib.request.HTTPRedirectHandler):
+    deadline = None
+
     def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if self.deadline is not None:
+            req.timeout = min(req.timeout, _remaining(self.deadline))
         parsed = urlsplit(newurl)
         host = (parsed.hostname or "").lower()
         allowed = host in {"api.github.com", "github.com"} or host.endswith(
@@ -78,7 +103,8 @@ class GitHubReader:
         self.downloaded_bytes = 0
         self.cache_hits = 0
         self.stop_reason: str | None = None
-        self.opener = urllib.request.build_opener(_DownloadRedirect())
+        self.redirect_handler = _DownloadRedirect()
+        self.opener = urllib.request.build_opener(self.redirect_handler)
 
     def _cache_paths(self, key: str) -> tuple[Path, Path]:
         digest = hashlib.sha256(key.encode()).hexdigest()
@@ -123,6 +149,26 @@ class GitHubReader:
                 handle.write(content)
             temporary.replace(path)
 
+    def _discard_cache(self, key):
+        for path in self._cache_paths(key):
+            path.unlink(missing_ok=True)
+
+    @staticmethod
+    def _decode_json(raw):
+        try:
+            return json.loads(raw)
+        except (ValueError, UnicodeError):
+            raise CollectionError("github_json_invalid") from None
+
+    def _json_cache(self, key, cached):
+        if cached is not None:
+            try:
+                self._decode_json(cached[0])
+            except CollectionError:
+                self._discard_cache(key)
+                return None
+        return cached
+
     def _request(
         self,
         path: str,
@@ -131,14 +177,28 @@ class GitHubReader:
         binary: bool = False,
         immutable: bool = False,
     ) -> bytes:
+        for attempt in range(2):
+            try:
+                return self._request_once(path, body=body, binary=binary, immutable=immutable)
+            except CollectionError as error:
+                if str(error) not in RETRYABLE_ERRORS:
+                    raise
+                if str(error) == "github_json_invalid":
+                    self._discard_cache(self._request_key(path, body, binary))
+                if attempt:
+                    raise
+
+    def _request_once(self, path, *, body=None, binary=False, immutable=False):
         key = self._request_key(path, body, binary)
         limit = self.max_download_bytes if binary else MAX_PAGE_BYTES
         cached = self._cached(key, limit)
+        if not binary:
+            cached = self._json_cache(key, cached)
         if immutable and cached:
             self.cache_hits += 1
             return cached[0]
         self._check_budget()
-        headers = self._request_headers(body, binary, cached)
+        headers = self._request_headers(path, body, binary, cached)
         self.requests += 1
         request = urllib.request.Request(API + path, data=body, headers=headers)
         try:
@@ -147,6 +207,8 @@ class GitHubReader:
             return self._http_error(error, cached)
         except (urllib.error.URLError, TimeoutError, socket.timeout, OSError):
             raise CollectionError("github_transport_unavailable") from None
+        if not binary:
+            self._decode_json(raw)
         self._save_cache(key, raw, etag)
         return raw
 
@@ -171,9 +233,16 @@ class GitHubReader:
             self.stop_reason = "download_budget_exhausted"
             raise CollectionError(self.stop_reason)
 
-    def _request_headers(self, body, binary, cached):
+    def _request_headers(self, path, body, binary, cached):
+        release_asset = binary and re.fullmatch(
+            r"/repos/[^/]+/[^/]+/releases/assets/[1-9][0-9]*", path
+        )
         headers = {
-            "Accept": "application/octet-stream" if binary else "application/vnd.github+json",
+            # Actions downloads negotiate a JSON API redirect. Only release
+            # assets request octet-stream from the REST endpoint itself.
+            "Accept": "application/octet-stream"
+            if release_asset
+            else "application/vnd.github+json",
             "User-Agent": "repository-corpus-collector",
             "X-GitHub-Api-Version": "2022-11-28",
         }
@@ -208,26 +277,89 @@ class GitHubReader:
             self.stop_reason = "github_rate_limit"
         raise CollectionError(self.stop_reason or f"github_http_{error.code}") from None
 
+    def _json_request(self, path, *, body=None, immutable=False):
+        return self._decode_json(self._request(path, body=body, immutable=immutable))
+
     def json(self, path: str, *, immutable: bool = False):
-        raw = self._request(path, immutable=immutable)
-        try:
-            return json.loads(raw)
-        except (ValueError, UnicodeError):
-            raise CollectionError("github_json_invalid") from None
+        return self._json_request(path, immutable=immutable)
 
     def binary(self, path: str, *, immutable: bool = False) -> bytes:
         return self._request(path, binary=True, immutable=immutable)
 
+    def attachment(self, url: str) -> bytes:
+        deadline = time.monotonic() + DOWNLOAD_TIMEOUT_SECONDS
+        for attempt in range(2):
+            try:
+                return self._attachment_once(url, deadline)
+            except CollectionError as error:
+                if str(error) not in RETRYABLE_ERRORS or attempt:
+                    raise
+
+    def _attachment_once(self, url, deadline):
+        if not _public_attachment_url(url):
+            raise CollectionError("public_attachment_url_not_allowed")
+        key = url + "|octet-stream"
+        cached = self._cached(key, self.max_download_bytes)
+        if cached:
+            self.cache_hits += 1
+            return cached[0]
+        self._check_budget()
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/octet-stream",
+                "User-Agent": "repository-corpus-collector",
+            },
+        )
+        self.requests += 1
+        self.redirect_handler.deadline = deadline
+        try:
+            raw, etag = self._read_attachment(request, deadline)
+        except urllib.error.HTTPError as error:
+            return self._http_error(error, None)
+        except (urllib.error.URLError, TimeoutError, socket.timeout, OSError):
+            reason = (
+                "download_deadline_exceeded"
+                if time.monotonic() >= deadline
+                else "github_transport_unavailable"
+            )
+            raise CollectionError(reason) from None
+        finally:
+            self.redirect_handler.deadline = None
+        self._save_cache(key, raw, etag)
+        return raw
+
+    def _read_attachment(self, request, deadline):
+        chunks, size = [], 0
+        with self.opener.open(request, timeout=_remaining(deadline)) as response:
+            while True:
+                remaining = _remaining(deadline)
+                sock = getattr(getattr(getattr(response, "fp", None), "raw", None), "_sock", None)
+                if sock is not None:
+                    sock.settimeout(remaining)
+                allowance = min(
+                    self.max_download_bytes - size, self.max_total_bytes - self.downloaded_bytes
+                )
+                chunk = getattr(response, "read1", response.read)(min(65536, allowance + 1))
+                if not chunk:
+                    break
+                size += len(chunk)
+                self.downloaded_bytes += len(chunk)
+                if size > self.max_download_bytes:
+                    raise CollectionError("source_byte_limit_exceeded")
+                if self.downloaded_bytes > self.max_total_bytes:
+                    self.stop_reason = "download_budget_exhausted"
+                    raise CollectionError(self.stop_reason)
+                chunks.append(chunk)
+            _remaining(deadline)
+            return b"".join(chunks), response.headers.get("ETag")
+
     def graphql(self, query: str, variables: dict) -> dict:
         if not query.lstrip().startswith("query ") or re.search(r"\bmutation\b", query):
             raise CollectionError("github_write_forbidden")
-        raw = self._request(
+        result = self._json_request(
             "/graphql", body=json.dumps({"query": query, "variables": variables}).encode()
         )
-        try:
-            result = json.loads(raw)
-        except (ValueError, UnicodeError):
-            raise CollectionError("github_json_invalid") from None
         if not isinstance(result, dict) or result.get("errors"):
             raise CollectionError("github_graphql_unavailable")
         return result
@@ -293,7 +425,10 @@ class _Collector:
         self.counts: dict[str, int] = {}
         self.gaps = 0
         self.inventory: dict[str, dict] = {}
-        self.attachments: set[str] = set()
+        self.attachments: dict[str, dict] = {}
+        self.attachment_parents_recorded: dict[str, set] = {}
+        self.attachment_failures: dict[str, str] = {}
+        self.unsupported_attachments: set[str] = set()
         self.progress = progress
         self.prior_attempts: dict[str, set] = {}
         self.family_inventory: dict[str, str] = {}
@@ -323,7 +458,17 @@ class _Collector:
             {"repository": self.repository, "source_id": identity, "access_scope": "repository"},
         )
         self.counts[kind] = self.counts.get(kind, 0) + 1
-        body = row.get("body")
+        self._attachment_links(
+            row.get("body"),
+            {
+                "source_id": f"github:{self.repository}:{kind}:{identity}",
+                "kind": kind,
+                "version": version,
+                "content_sha256": hashlib.sha256(raw).hexdigest(),
+            },
+        )
+
+    def _attachment_links(self, body, parent):
         if isinstance(body, str):
             for match in re.finditer(
                 r"https://(?:github\.com/(?:user-attachments|[^/\s)]+/[^/\s)]+/files)/|(?:user-images|private-user-images)\.githubusercontent\.com/)[^\s)<>\"]+",
@@ -331,13 +476,16 @@ class _Collector:
             ):
                 parsed = urlsplit(match.group())
                 reference = parsed.scheme + "://" + parsed.netloc + parsed.path
-                if reference not in self.attachments:
-                    self.attachments.add(reference)
+                if _public_attachment_url(reference):
+                    parents = self.attachments.setdefault(reference, {})
+                    parents[parent["source_id"]] = parent
+                elif reference not in self.unsupported_attachments:
+                    self.unsupported_attachments.add(reference)
                     self.gap(
                         "github_attachment",
                         reference,
                         "linked_attachment_content_not_collected",
-                        {"parent_source_id": identity},
+                        {"parent_source_id": parent["source_id"]},
                     )
 
     def pages(self, kind, path, *, key=None, immutable=False):
@@ -673,12 +821,50 @@ def collect_github(
     inventories = _collect_inventories(collector)
     # A denied GraphQL API is a visible gap, not an empty discussion set.
     _discussions(collector)
+    _collect_attachments(collector)
     # Reserve progress for every expensive family so Actions cannot starve artifacts.
     _collect_reviews(collector, inventories["pull_request"])
     _collect_runs(collector, inventories["actions_run"])
     _collect_artifacts(collector, inventories["actions_artifact_metadata"])
     _collect_releases(collector, inventories["release"])
+    # Include newly discovered review-body links and additional parent relations.
+    # Already attempted failures are reported without another network attempt.
+    _collect_attachments(collector)
     return _collection_summary(collector)
+
+
+def _collect_attachments(collector):
+    for url, parents in collector.attachments.items():
+        if collector.attachment_parents_recorded.get(url) == set(parents):
+            continue
+        metadata = {
+            "repository": collector.repository,
+            "parent_sources": [parents[key] for key in sorted(parents)],
+            "access_scope": "public_github_attachment",
+            "name": urlsplit(url).path.rsplit("/", 1)[-1],
+        }
+        try:
+            if url in collector.attachment_failures:
+                raise CollectionError(collector.attachment_failures[url])
+            raw = collector.reader.attachment(url)
+            if urlsplit(url).path.lower().endswith(".zip") and not raw.startswith(b"PK"):
+                raise CollectionError("download_zip_invalid")
+            metadata["content_type"] = (
+                "application/zip" if raw.startswith(b"PK") else "application/octet-stream"
+            )
+            collector.sink.add(
+                "github_attachment",
+                f"github:{collector.repository}:attachment:{url}",
+                url,
+                hashlib.sha256(raw).hexdigest(),
+                raw,
+                metadata,
+            )
+            collector.counts["github_attachment"] = collector.counts.get("github_attachment", 0) + 1
+        except CollectionError as error:
+            collector.attachment_failures[url] = str(error)
+            collector.gap("github_attachment", url, str(error), metadata)
+        collector.attachment_parents_recorded[url] = set(parents)
 
 
 def _collect_inventories(collector):
