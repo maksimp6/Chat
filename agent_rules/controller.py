@@ -17,7 +17,7 @@ from threading import RLock
 from types import MappingProxyType
 from typing import Callable, Mapping, Protocol, Any
 
-from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 
 
 RULES = MappingProxyType(

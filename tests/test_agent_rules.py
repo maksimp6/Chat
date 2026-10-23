@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from agent_rules.controller import GuardedTask, TaskScope, load_registry
-from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 
 
 class Trace:
@@ -219,7 +219,7 @@ def test_existing_approval_gate_not_bypassed(task):
 
 
 def test_real_execution_trace_correlation(task):
-    from trace_manager import ExecutionTrace
+    from observability.trace_manager import ExecutionTrace
 
     guard, registry, _ = task
     trace = ExecutionTrace(trace_id="trace-ar")
