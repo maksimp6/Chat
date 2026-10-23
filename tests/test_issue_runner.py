@@ -445,3 +445,42 @@ def test_abrupt_exit_after_response_keeps_atomic_checkpoint(repo, tmp_path):
     assert saved["status"] == "running"
     assert saved["reply"] == "Preserved before termination."
     assert saved["persistence"]["status"] == "not_started"
+
+
+@pytest.mark.parametrize(
+    "output",
+    [
+        [{"type": "output_text", "role": "assistant", "text": "  Ё🧪\n"}],
+        [{"type": "message", "role": "assistant", "content": ["  Ё", "🧪\n"]}],
+    ],
+)
+def test_assistant_text_representations_preserve_exact_text(repo, output):
+    result = _run(repo, FakeClient({"status": "completed", "output": output}))
+
+    assert result["status"] == "no_changes"
+    assert result["reply"] == "  Ё🧪\n"
+    assert result["reply_sha256"] == hashlib.sha256("  Ё🧪\n".encode("utf-8")).hexdigest()
+    assert result["assistant_replies"][0]["reply"] == result["reply"]
+
+
+def test_invalid_response_type_fails_without_exporting_raw_error(repo):
+    result = _run(repo, FakeClient(["private-provider-body"]))
+
+    assert result["status"] == "failed"
+    assert result["error"] == "TypeError"
+    assert result["reply_state"] == "unknown"
+    assert result["assistant_replies"] == []
+    assert "private-provider-body" not in json.dumps(result)
+
+
+def test_malformed_response_id_is_not_exported_or_attributed(repo):
+    result = _run(
+        repo,
+        FakeClient({**_message("Public reply."), "id": "ghp_private-value-not-a-response-id"}),
+    )
+
+    assert result["reply"] == "Public reply."
+    assert result["response_id"] is None
+    assert result["response_ids"] == []
+    assert result["assistant_replies"][0]["response_id"] is None
+    assert "ghp_private-value" not in json.dumps(result)
