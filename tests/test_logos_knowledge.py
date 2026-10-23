@@ -352,6 +352,9 @@ def test_substantive_or_provenance_changes_invalidate_content(packet_file, provi
         elif change == "checkout":
             packet["checkout_sha"] = "c" * 40
             packet["case"]["head_sha"] = "c" * 40
+            next(source for source in packet["sources"] if source["kind"] == "pull_request")[
+                "head_sha"
+            ] = "c" * 40
         else:
             packet["sources"][0]["redactions"] += 1
         packet["manifest"] = context._manifest(packet["owner_context"], packet["sources"])
