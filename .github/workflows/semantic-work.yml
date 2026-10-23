@@ -10,7 +10,7 @@ on:
       mode:
         description: "BM25 search, bounded model answer, or Vector Store upload/search"
         type: choice
-        options: [search, query, red, vector-store]
+        options: [search, query, red, vector-store, repository]
         required: true
         default: "search"
       corpus:
@@ -52,8 +52,88 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  repository-corpus:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'repository' && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.run_attempt == '1'
+    name: Archive repository evidence and update existing RAG without generation
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      actions: read
+      discussions: read
+    steps:
+      - name: Require the requested RAG upload scope
+        env:
+          ALLOW_WRITE: ${{ inputs.allow_vector_store_write }}
+          ALLOW_MODEL: ${{ inputs.allow_model_call }}
+          APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
+        run: |
+          set -euo pipefail
+          test "$ALLOW_WRITE" = true
+          test "$ALLOW_MODEL" = false
+          test -n "$APPROVAL_REFERENCE"
+      - name: Checkout collector and complete Git history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Fetch all available repository and PR refs
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          gaps = []
+          commands = [
+            ("remote-refs", ["git", "fetch", "--quiet", "origin", "+refs/heads/*:refs/remotes/origin/*", "+refs/tags/*:refs/tags/*", "+refs/pull/*/head:refs/rag/pull/*"]),
+            ("git-lfs", ["git", "lfs", "fetch", "--all", "origin"]),
+          ]
+          for source, command in commands:
+            try:
+              result = subprocess.run(command, timeout=600, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+              if result.returncode:
+                gaps.append({"source": source, "reason": "fetch_failed"})
+            except (OSError, subprocess.TimeoutExpired):
+              gaps.append({"source": source, "reason": "fetch_unavailable_or_timeout"})
+          (Path(os.environ["RUNNER_TEMP"]) / "repository-fetch-status.json").write_text(json.dumps(gaps))
+          PY
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Collect, redact, upload, and verify direct retrieval
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+          YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
+          RAG_QUERY: ${{ inputs.query }}
+        run: |
+          set -euo pipefail
+          python -m scripts.repository_rag \
+            --git-root "$GITHUB_WORKSPACE" \
+            --repository "$GITHUB_REPOSITORY" \
+            --archive-dir "$RUNNER_TEMP/repository-rag" \
+            --receipt "$RUNNER_TEMP/repository-rag-receipt.json" \
+            --fetch-status "$RUNNER_TEMP/repository-fetch-status.json" \
+            --upload --query "$RAG_QUERY"
+      - name: Preserve receipt and visible omissions
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: repository-rag-receipt-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/repository-rag-receipt.json
+            ${{ runner.temp }}/repository-rag/gaps.json
+            ${{ runner.temp }}/repository-fetch-status.json
+          if-no-files-found: warn
+          retention-days: 90
+      # Raw originals and HTTP cache are private to this run. Never publish them
+      # as public-repository artifacts or caches. The receipt states this limit.
+
   semantic:
-    if: github.event_name == 'workflow_dispatch' && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.run_attempt == '1'
+    if: github.event_name == 'workflow_dispatch' && inputs.mode != 'repository' && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.run_attempt == '1'
     name: Semantic answer over corpus
     runs-on: ubuntu-latest
     timeout-minutes: 10
