@@ -1,5 +1,11 @@
 # Native Logos: quality and complete case context
 
+Owner update, 23 October 2026: the requested replacement configuration is the
+[Pro 5.1 async profile](logos-pro51-async-profile.md), with a requested
+32768-token output budget and no silent downgrade. That artifact is prepared,
+not activated; its transport and model limitations are explicit. The existing
+Responses runtime below remains unchanged until a separately reviewed integration.
+
 Canonical task: #1413. Implementation: PR #1435, `feat/semantic-pipeline`.
 Accepted owner direction, 22 October 2026:
 
