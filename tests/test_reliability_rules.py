@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 RATCHET_BASELINE = {
-    "C901": 69,
+    "C901": 68,
     "PLR0915": 16,
     "PLR0912": 43,
     "PLR0911": 19,

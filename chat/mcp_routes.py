@@ -53,7 +53,7 @@ mcp_bp = Blueprint("mcp", __name__)
 skill_registry = SkillRegistry()
 
 
-def _tool_call_parts(tool_call):
+def _tool_call_parts(tool_call: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
     name = tool_call.get("name") or tool_call.get("function", {}).get("name")
     if name and "<|" in name:
         name = name.split("<|", 1)[0].strip()
@@ -89,25 +89,49 @@ def _normalize_requested_skills(data, params):
 
 
 class LogosClient(YandexResponsesClient):
-    def ask_with_mcp(self, message, model_key, conversation_id=None, params=None, trace=None):
+    def ask_with_mcp(
+        self,
+        message,
+        model_key,
+        conversation_id=None,
+        params=None,
+        trace=None,
+        *,
+        execution_policy=None,
+    ):
+        policy_kwargs = (
+            {"execution_policy": execution_policy} if execution_policy is not None else {}
+        )
+
+        def needs_approval(call: dict[str, Any]) -> bool:
+            if execution_policy is not None:
+                name, _ = _tool_call_parts(call)
+                definition = registry.get_universal_definition(name) if name else None
+                if definition is None or not execution_policy.allows_tool(definition):
+                    return False
+            return _tool_call_needs_approval(call)
+
         response = super().ask_with_mcp(
             message=message,
             model_key=model_key,
             conversation_id=conversation_id,
             params=params,
             trace=trace,
+            **policy_kwargs,
         )
 
         calls = extract_function_calls(response)
         if calls:
-            approval_required = any(_tool_call_needs_approval(call) for call in calls)
+            approval_required = any(needs_approval(call) for call in calls)
 
             if not approval_required:
                 tool_servers = mcp_storage.list_servers()
                 base_params = dict(params or {})
 
                 def execute_tool(call):
-                    result = self._execute_single_tool(call, tool_servers, trace=trace)
+                    result = self._execute_single_tool(
+                        call, tool_servers, trace=trace, **policy_kwargs
+                    )
                     if result.get("error"):
                         return {"error": result["error"], "tool": result.get("name")}
                     return result.get("result")
@@ -122,6 +146,7 @@ class LogosClient(YandexResponsesClient):
                         conversation_id=conversation_id,
                         params=continuation_params,
                         trace=trace,
+                        **policy_kwargs,
                     )
 
                 response = run_tool_loop(
@@ -129,9 +154,7 @@ class LogosClient(YandexResponsesClient):
                     execute_tool,
                     continue_request,
                     max_rounds=base_params.get("max_rounds", 16),
-                    should_pause=lambda batch: any(
-                        _tool_call_needs_approval(call) for call in batch
-                    ),
+                    should_pause=lambda batch: any(needs_approval(call) for call in batch),
                 )
 
         if trace is not None:

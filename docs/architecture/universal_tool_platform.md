@@ -80,6 +80,36 @@ read_only=false and requires_approval=true. Existing legacy execution through
 registry.execute remains backward compatible until the caller migrates to the
 UniversalToolExecutor.
 
+The headless Issue worker uses the trusted `issue-review-v1` profile. Its
+`ReadOnlyToolPolicy` is a Python call argument, separate from model-visible
+parameters and issue text. The adapter offers only allowlisted local filesystem
+read tools, omits hosted/MCP tools and carries the same policy across every
+continuation. The executor denies other tool calls before approval and execution,
+including unadvertised tool names and calls claiming approval. The ordinary
+interactive client keeps its existing tool profile unless its caller supplies a
+scoped policy. An Issue task cannot enable an edit profile through its body.
+
+The worker requires an explicit `ALICE_MEMORY_PATH` outside its checkout before
+application initialization, including calls using an injected client. It rejects
+an active runtime context, whose private store would otherwise take
+precedence over that environment setting. The headless worker stays separate
+from runtime-scoped execution. Reads are limited to tracked files of that checkout;
+known credential file names, environment
+files and key/store suffixes are excluded. The provider's actual root must match
+the authorized root. Recursive grep/glob and host system inspection are not offered
+by this profile. File reads, AST outline, hashes, file metadata and directory
+metadata remain available. These rules do not prove that every tracked source is
+free of accidentally committed secrets, and directory metadata is not a secret
+redaction service. Native Issue self-repair is disabled by this profile; a future
+write stage needs a separate trusted admission rather than an issue-text switch.
+
+`run_command` requires approval outside review mode. Approved child processes get
+a minimal explicit environment rather than provider keys or other inherited
+application credentials. An approved shell command still has the host process's
+filesystem and network privileges; its working directory is not a sandbox.
+ToolRegistry chooses the callable signature before invoking it and never retries
+an effectful function after an internal `TypeError`.
+
 ## Remote Android execution
 
 A tool may declare:

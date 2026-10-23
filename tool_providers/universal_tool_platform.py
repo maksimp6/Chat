@@ -99,6 +99,27 @@ class UniversalToolResult:
         }
 
 
+@dataclass(frozen=True)
+class ReadOnlyToolPolicy:
+    """Trusted per-invocation allowlist, supplied outside model-controlled data."""
+
+    allowed_tools: frozenset[str]
+    name: str = "read-only"
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "allowed_tools", frozenset(self.allowed_tools))
+
+    def allows_tool(self, definition: UniversalToolDefinition) -> bool:
+        return (
+            definition.name in self.allowed_tools
+            and definition.read_only
+            and str(definition.executor.get("type") or "local") == "local"
+        )
+
+    def __call__(self, definition: UniversalToolDefinition, call: UniversalToolCall) -> bool:
+        return self.allows_tool(definition)
+
+
 def _type_matches(value: Any, expected: str) -> bool:
     if expected == "object":
         return isinstance(value, Mapping)
@@ -552,6 +573,7 @@ class UniversalToolExecutor:
 
 
 __all__ = [
+    "ReadOnlyToolPolicy",
     "UniversalToolCall",
     "UniversalToolDefinition",
     "UniversalToolExecutor",

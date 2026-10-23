@@ -100,7 +100,7 @@ def test_responses_optional_null_executes_native_defaults(tools, http_url, name)
     original_arguments = arguments.copy()
     assert not validate_json_schema(arguments, advertised(registry, name))
 
-    result = execute(executor, name, arguments)
+    result = execute(executor, name, arguments, approved=name == "run_command")
 
     assert result["success"], result
     assert arguments == original_arguments
