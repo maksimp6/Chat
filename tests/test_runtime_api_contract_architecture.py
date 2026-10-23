@@ -1,11 +1,11 @@
 import ast
 from pathlib import Path
 
-from api_contracts import CONTRACTS
+from api.contracts import CONTRACTS
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RUNTIME_API = ROOT / "runtime_api.py"
+RUNTIME_API = ROOT / "runtime" / "api.py"
 
 
 def _runtime_route_functions():

@@ -1,6 +1,6 @@
 import unittest
 
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 class ExecutionTraceCompatibilityTests(unittest.TestCase):

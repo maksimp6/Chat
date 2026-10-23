@@ -5,7 +5,7 @@ const REFRESH_COOLDOWN_SECONDS = 60;
 const MAX_JWKS_BYTES = 16 * 1024;
 
 /**
- * Resource-server side of the central Alice IdP: verifies its EdDSA access tokens
+ * Resource-server side of the central Logos IdP: verifies its EdDSA access tokens
  * against the published key set. Fails closed on any error.
  */
 export function createIdpAuth(options = {}) {

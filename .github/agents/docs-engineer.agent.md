@@ -1,6 +1,6 @@
 ---
 name: Docs Engineer
-description: Maintains concise, accurate Alice Pro documentation, runbooks, integration notes, and agent instructions.
+description: Maintains concise, accurate Logos documentation, runbooks, integration notes, and agent instructions.
 target: github-copilot
 model: gpt-5.4-nano
 user-invocable: true

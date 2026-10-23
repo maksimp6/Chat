@@ -1,6 +1,6 @@
 # Reliability rules
 
-Alice runs tools, spends money and changes cloud infrastructure on the user's
+Logos runs tools, spends money and changes cloud infrastructure on the user's
 behalf, so its code follows flight-software discipline: NASA/JPL "Power of
 Ten" adapted to Python and browser JavaScript, plus an explicit idempotency
 contract. `tests/test_reliability_rules.py` enforces the mechanical rules as a
@@ -68,6 +68,19 @@ and compares each rule's violation count with `RATCHET_BASELINE`.
 - Fixing violations also fails the test until you lower the baseline to the
   new count in the same change, so the improvement is locked in.
 - Rules at zero stay at zero.
+
+## Exception handling outside Python
+
+`scripts/check_exception_handling.py` ratchets `try {` blocks and silent catch
+blocks (empty, or only comments) in project-owned JavaScript, `.mjs`, Java and
+Kotlin, using `scripts/exception_handling_baseline.json`. The same rules apply:
+new handlers and silent catches fail, and fixes must lower the baseline.
+Python is covered by the ruff rules BLE001, S110, S112 and E722 above.
+Vendored code (`static/eruda.js`) and `tests/` are excluded.
+
+A handler that reports the error should stay, but a catch that only hides the
+failure is a defect. Narrow exceptions only at real external boundaries, and
+let the error propagate to a caller that can report it.
 
 ## Static types
 

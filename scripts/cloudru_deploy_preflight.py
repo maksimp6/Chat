@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
-"""Validate Alice deployment inputs without rendering or sending secret values.
+"""Validate Logos deployment inputs without rendering or sending secret values.
 
-No cloud API calls. --check-db additionally performs a read-only PostgreSQL probe.
+No cloud API calls. --check-db verifies an existing native journal with its writer lock.
 This is a configuration check, not a provisioner or a deployment approval gate.
 """
 
 from __future__ import annotations
 
 import argparse
-import ipaddress
 import json
 import os
 import re
-import ssl
 from pathlib import Path
-from urllib.parse import parse_qsl, unquote, urlsplit
+from urllib.parse import urlsplit
 from uuid import UUID
 
 
@@ -52,59 +50,41 @@ def https_origin(value: object) -> bool:
         return False
 
 
-def database_parameters(dsn: str, database: dict) -> tuple[dict, list[str]]:
-    """Support one explicit libpq URI; reject query overrides and duplicates."""
-    errors: list[str] = []
-    try:
-        if (
-            not filled(dsn)
-            or not dsn.startswith(("postgres://", "postgresql://"))
-            or re.search(r"%(?![0-9A-Fa-f]{2})", dsn)
-            or "\x00" in dsn
-            or re.search(r"%00", dsn, re.IGNORECASE)
-        ):
-            return {}, ["ALICE_DATABASE_URL: invalid URI"]
-        uri = urlsplit(dsn)
-        pairs = parse_qsl(uri.query, keep_blank_values=True, strict_parsing=True, errors="strict")
-        params = dict(pairs)
-        if (
-            uri.scheme not in {"postgres", "postgresql"}
-            or uri.fragment
-            or not uri.password
-            or not filled(unquote(uri.password, errors="strict"))
-            or uri.hostname != database.get("host")
-            or (uri.port or 5432) != database.get("port")
-            or unquote(uri.path, errors="strict") != "/" + str(database.get("name"))
-            or unquote(uri.username or "", errors="strict") != database.get("user")
-        ):
-            errors.append("ALICE_DATABASE_URL: explicit endpoint/database/role/password required")
-        allowed = {
-            "sslmode",
-            "sslrootcert",
-            "connect_timeout",
-            "application_name",
-            "ssl_min_protocol_version",
-            "gssencmode",
-            "channel_binding",
-        }
-        if len(params) != len(pairs) or set(params) - allowed:
-            errors.append("ALICE_DATABASE_URL: duplicate or unsupported query options")
-        if params.get("sslmode") != "verify-full":
-            errors.append("ALICE_DATABASE_URL: sslmode=verify-full required")
-        ca = params.get("sslrootcert", "")
-        if not filled(ca) or not Path(ca).is_absolute():
-            errors.append("ALICE_DATABASE_URL: absolute sslrootcert file required")
-        if params.get("ssl_min_protocol_version") not in {"TLSv1.2", "TLSv1.3"}:
-            errors.append("ALICE_DATABASE_URL: explicit TLS minimum required")
-        if params.get("gssencmode") != "disable" or params.get("channel_binding") != "require":
-            errors.append(
-                "ALICE_DATABASE_URL: require TLS SCRAM channel binding; disable GSS negotiation"
-            )
-        if params.get("connect_timeout") not in {str(n) for n in range(2, 11)}:
-            errors.append("ALICE_DATABASE_URL: connect_timeout must be 2..10 seconds")
-        return params, errors
-    except (TypeError, ValueError, UnicodeError):
-        return {}, ["ALICE_DATABASE_URL: invalid URI"]
+# Module.Class of the native store implemented in the repository (kristall/store.py).
+NATIVE_ENGINE = "kristall.Kristall"
+
+
+def database_parameters(path: str, database: dict) -> tuple[dict, list[str]]:
+    """Validate native storage scope without opening any database or network."""
+    errors = []
+    allowed = {
+        "engine",
+        "path",
+        "data_root",
+        "writer_processes",
+        "persistence_evidence",
+        "restore_evidence",
+    }
+    if set(database) != allowed or database.get("engine") != NATIVE_ENGINE:
+        errors.append("database: native Kristall schema required")
+    if type(database.get("writer_processes")) is not int or database.get("writer_processes") != 1:
+        errors.append("database: exactly one writer process required")
+    if (
+        not filled(path)
+        or "\x00" in path
+        or not Path(path).is_absolute()
+        or ".." in Path(path).parts
+    ):
+        errors.append("ALICE_MEMORY_PATH: absolute canonical path required")
+    root = database.get("data_root")
+    if not filled(root) or not Path(root).is_absolute() or ".." in Path(root).parts:
+        errors.append("database.data_root: absolute persistent root required")
+    elif path != database.get("path") or Path(root) not in Path(path).parents:
+        errors.append("ALICE_MEMORY_PATH: must match journal inside persistent data_root")
+    for field in ("persistence_evidence", "restore_evidence"):
+        if not filled(database.get(field)):
+            errors.append("database." + field + ": explicit evidence required")
+    return {"path": path, "data_root": root}, errors
 
 
 def validate(config: object, env: dict, *, workflow: bool = False) -> list[str]:
@@ -124,7 +104,7 @@ def validate(config: object, env: dict, *, workflow: bool = False) -> list[str]:
     if (
         set(config) != allowed
         or type(config.get("schema_version")) is not int
-        or config.get("schema_version") != 1
+        or config.get("schema_version") != 2
     ):
         errors.append("deployment config: unexpected schema")
     if not uuid_ok(config.get("project_id")):
@@ -155,49 +135,20 @@ def validate(config: object, env: dict, *, workflow: bool = False) -> list[str]:
         )
     ):
         errors.append(
-            "container: expected initial Alice profile (8080, 0.5 CPU, 1024Mi, scale 0..1)"
+            "container: expected initial Logos profile (8080, 0.5 CPU, 1024Mi, scale 0..1)"
         )
     database = config.get("database")
     if not isinstance(database, dict):
         return errors + ["database: object required"]
-    if set(database) != {"host", "port", "name", "user", "allowed_client_cidrs", "egress_evidence"}:
-        errors.append("database: unexpected schema")
-    if not filled(database.get("host")) or not re.fullmatch(
-        r"[a-zA-Z0-9.-]+", database.get("host", "")
-    ):
-        errors.append("database.host: explicit DNS name or IPv4 required")
-    if type(database.get("port")) is not int or database.get("port") != 5432:
-        errors.append("database.port: expected 5432")
-    if database.get("name") != "alice" or database.get("user") != "alice_app":
-        errors.append("database: expected dedicated alice database and alice_app role")
-    networks = database.get("allowed_client_cidrs")
-    if not isinstance(networks, list) or not networks:
-        errors.append("database.allowed_client_cidrs: verified egress CIDRs required")
-    else:
-        try:
-            parsed = [ipaddress.ip_network(n, strict=True) for n in networks if isinstance(n, str)]
-            # This starter profile permits only narrow, globally routable ranges.
-            if len(parsed) != len(networks) or any(
-                n.prefixlen < (24 if n.version == 4 else 120)
-                or not n.network_address.is_global
-                or not n.broadcast_address.is_global
-                or n.is_multicast
-                for n in parsed
-            ):
-                raise ValueError
-        except (ValueError, TypeError):
-            errors.append(
-                "database.allowed_client_cidrs: narrow public ranges required; no all-internet rule"
-            )
-    if not filled(database.get("egress_evidence")):
-        errors.append("database.egress_evidence: provider guarantee/reference required")
+    if env.get("ALICE_DATABASE_URL"):
+        errors.append("ALICE_DATABASE_URL: retired setting; native Kristall required")
 
     required = (
         "ALICE_SHORT_TOKEN",
         "ALICE_PROVIDER_CREDENTIAL_KEY",
         "ALICE_GITHUB_CLIENT_ID",
         "ALICE_GITHUB_CLIENT_SECRET",
-        "ALICE_DATABASE_URL",
+        "ALICE_MEMORY_PATH",
     )
     for name in required:
         if not filled(env.get(name)):
@@ -211,7 +162,7 @@ def validate(config: object, env: dict, *, workflow: bool = False) -> list[str]:
         != str(config.get("public_origin")) + "/auth/github/callback"
     ):
         errors.append("ALICE_GITHUB_REDIRECT_URI: must match public origin callback")
-    _, db_errors = database_parameters(env.get("ALICE_DATABASE_URL", ""), database)
+    _, db_errors = database_parameters(env.get("ALICE_MEMORY_PATH", ""), database)
     errors.extend(db_errors)
     if workflow:
         if not uuid_ok(config.get("workflow_application_id")):
@@ -230,41 +181,22 @@ def validate(config: object, env: dict, *, workflow: bool = False) -> list[str]:
     return errors
 
 
-def probe_database(dsn: str, database: dict) -> str | None:
-    """Return a static error only; never expose libpq/server exception text."""
+def probe_database(path: str, database: dict) -> str | None:
+    """Verify an existing native journal under its exclusive writer lock."""
     try:
-        params, errors = database_parameters(dsn, database)
+        _, errors = database_parameters(path, database)
         if errors:
-            return "database probe: invalid TLS configuration"
-        ssl.create_default_context(cafile=params["sslrootcert"])
-        import psycopg
+            return "database probe: invalid native storage configuration"
+        journal = Path(path)
+        root = Path(database["data_root"]).resolve()
+        if not journal.is_file() or journal.is_symlink() or root not in journal.resolve().parents:
+            return "database probe: existing private journal required"
+        from kristall import Kristall
 
-        with psycopg.connect(
-            dsn,
-            connect_timeout=5,
-            application_name="alice-preflight",
-            options="-c default_transaction_read_only=on -c statement_timeout=5000 -c lock_timeout=2000",
-        ) as conn:
-            row = conn.execute(
-                "SELECT current_database(), current_user, s.ssl, s.version, "
-                "r.rolsuper, r.rolcreatedb, r.rolcreaterole, r.rolreplication, r.rolbypassrls, "
-                "EXISTS (SELECT 1 FROM pg_roles p WHERE p.oid <> r.oid "
-                "AND p.rolname <> 'pg_database_owner' "
-                "AND pg_has_role(current_user, p.oid, 'MEMBER')) "
-                "FROM pg_stat_ssl s JOIN pg_roles r ON r.rolname = current_user "
-                "WHERE s.pid = pg_backend_pid()"
-            ).fetchone()
-            if not row or row[:2] != (database["name"], database["user"]):
-                return "database probe: unexpected database or role"
-            if (
-                row[2] is not True
-                or row[3] not in {"TLSv1.2", "TLSv1.3"}
-                or any(row[4:9])
-                or row[9] is not False
-            ):
-                return "database probe: TLS or role policy failed"
+        with Kristall(journal) as store:
+            store.info()
     except Exception:  # noqa: BLE001 - secret-safe CLI error boundary
-        return "database probe failed; verify CA, network, credentials and server policy in a protected session"
+        return "database probe failed; verify journal integrity and exclusive writer ownership"
     return None
 
 
@@ -275,7 +207,9 @@ def main(argv: list[str] | None = None) -> int:
         "--workflow", action="store_true", help="also require existing EDS target/env"
     )
     parser.add_argument(
-        "--check-db", action="store_true", help="connect and run read-only TLS/role checks"
+        "--check-db",
+        action="store_true",
+        help="verify an existing native journal; no network, source replacement or repair",
     )
     args = parser.parse_args(argv)
     try:
@@ -285,7 +219,7 @@ def main(argv: list[str] | None = None) -> int:
         errors = ["configuration could not be read or validated"]
     probed = False
     if not errors and args.check_db:
-        error = probe_database(os.environ["ALICE_DATABASE_URL"], config["database"])
+        error = probe_database(os.environ["ALICE_MEMORY_PATH"], config["database"])
         if error:
             errors.append(error)
         else:
