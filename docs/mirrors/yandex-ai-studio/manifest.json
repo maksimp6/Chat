@@ -4685,6 +4685,13 @@
   ],
   "verification": {
     "source_bytes_preserved": true,
-    "lfs_remote_upload": "pending"
+    "lfs_remote_upload": "verified",
+    "verified_files": 777,
+    "verified_bytes": 5854023,
+    "verified_source_head": "85dbfce93ef3f747cc8f2698869c789e57fd8d5f",
+    "github_actions_run_id": 40015702473,
+    "github_actions_job_id": 120627088293,
+    "verification_method": "upload all manifest OIDs, fetch every file into an empty independent LFS storage, verify size and SHA-256",
+    "evidence_url": "https://github.com/maksimp6/Chat/actions/runs/40015702473"
   }
 }
