@@ -129,6 +129,16 @@ jobs:
             --body-file "$RUNNER_TEMP/body.txt" \
             --out "$RUNNER_TEMP/result.json"
 
+      - name: Preserve response evidence
+        id: evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: logos-response-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/result.json
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Guard the diff
         run: |
           set -euo pipefail
@@ -194,29 +204,53 @@ jobs:
           WORKFLOW_STATUS: ${{ job.status }}
           PR_URL: ${{ steps.open-pr.outputs.url }}
           APP_TOKEN_OUTCOME: ${{ steps.app-token.outcome }}
+          EVIDENCE_URL: ${{ steps.evidence.outputs.artifact-url }}
+          EVIDENCE_OUTCOME: ${{ steps.evidence.outcome }}
         run: |
           set -euo pipefail
           python -I - "$RUNNER_TEMP/result.json" > "$RUNNER_TEMP/report.md" <<'PY'
-          import json, os, sys
+          import hashlib, json, os, sys
           from pathlib import Path
 
           try:
               r = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
               if not isinstance(r, dict) or not isinstance(r.get("status"), str):
                   raise ValueError("Invalid result")
-              if r["status"] not in {"changed", "no_changes", "needs_approval", "failed"}:
+              if r["status"] not in {"changed", "no_changes", "needs_approval", "failed", "running"}:
                   raise ValueError("Invalid result status")
               if not isinstance(r.get("pending_tools", []), list):
                   raise ValueError("Invalid pending tools")
+              if r["status"] == "running":
+                  r.update(status="failed", interrupted=True)
           except (OSError, ValueError):
               r = {"status": "failed", "summary": "No valid result.json was produced. See the workflow logs."}
           b = r.get("billing") or {}
           if not isinstance(b, dict):
               b = {}
+          reply = r.get("reply")
+          reply_state = "unknown"
+          if isinstance(reply, str) and r.get("reply_state") in {"available", "empty"}:
+              reply_state = "available" if reply else "empty"
+          substantive_reply = reply_state == "available" and bool(reply.strip())
+          evidence_url = os.environ.get("EVIDENCE_URL", "")
+          evidence_saved = os.environ.get("EVIDENCE_OUTCOME") == "success" and bool(evidence_url)
           lines = [f"Logos ({r.get('model', 'unknown')}) finished with status **{r['status']}**.\n",
-                   f"Workflow before reporting: **{os.environ['WORKFLOW_STATUS']}**.\n"]
+                   f"Workflow before reporting: **{os.environ['WORKFLOW_STATUS']}**.\n",
+                   "File status is not a review verdict or owner acceptance.\n",
+                   f"Assistant reply: **{reply_state}**.\n"]
+          if r.get("interrupted"):
+              lines.append("Execution was interrupted; this is the last saved response checkpoint.\n")
           if r.get("summary"):
-              lines.append(str(r["summary"]) + "\n")
+              lines.append("Reply preview (up to 4000 characters):\n" + str(r["summary"])[:4000] + "\n")
+          if reply_state != "unknown":
+              digest = hashlib.sha256(reply.encode("utf-8")).hexdigest()
+              lines.append(f"Full reply: {len(reply)} characters; SHA-256 `{digest}`.\n")
+          lines.append(f"Provider response: `{r.get('response_id') or 'unknown'}`; "
+                       f"provider status: `{r.get('provider_status') or 'unknown'}`.\n")
+          if evidence_saved:
+              lines.append("Full result (including the unabridged reply): " + evidence_url + "\n")
+          else:
+              lines.append("Response artifact was not confirmed. Delivery is incomplete.\n")
           if r.get("pending_tools"):
               lines.append("Stopped: these tools need a maintainer's approval: " + ", ".join(map(str, r["pending_tools"])) + "\n")
           if os.environ.get("APP_TOKEN_OUTCOME") == "failure":
@@ -231,7 +265,9 @@ jobs:
           # Escape every mention, including tool names, so reports never re-trigger Logos.
           print("\n".join(lines).replace("@", "@\u200b"))
           Path(os.environ["RUNNER_TEMP"], "report-status.txt").write_text(
-              "failed" if r["status"] == "failed" else "ok", encoding="utf-8")
+              "failed" if (r["status"] == "failed" or not evidence_saved or
+                           (not substantive_reply and r["status"] != "needs_approval"))
+              else "ok", encoding="utf-8")
           PY
           cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"
           test -n "$GH_TOKEN" || { echo "::error::No publishing token: the report is available in the job summary only."; exit 1; }

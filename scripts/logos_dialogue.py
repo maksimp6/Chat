@@ -402,11 +402,44 @@ def run_dialogue(
     return result
 
 
+def _stored_reply(result: dict[str, Any], response: dict[str, Any]) -> None:
+    """Export explicit assistant text, never reasoning or arbitrary diagnostic text."""
+    parts: list[str] = []
+    output = response.get("output")
+    for item in output if isinstance(output, list) else []:
+        if not isinstance(item, dict) or item.get("role") not in (None, "assistant"):
+            continue
+        if item.get("type") == "output_text" and isinstance(item.get("text"), str):
+            parts.append(item["text"])
+        elif item.get("type") == "message":
+            content = item.get("content")
+            for part in content if isinstance(content, list) else []:
+                if isinstance(part, str):
+                    parts.append(part)
+                elif (
+                    isinstance(part, dict)
+                    and part.get("type") in {"output_text", "text"}
+                    and isinstance(part.get("text"), str)
+                ):
+                    parts.append(part["text"])
+    if not parts and isinstance(response.get("output_text"), str):
+        parts.append(response["output_text"])
+    if parts:
+        reply = "".join(parts)
+        result.update(
+            reply=reply,
+            reply_state="available" if reply else "empty",
+            reply_chars=len(reply),
+            reply_sha256=hashlib.sha256(reply.encode("utf-8")).hexdigest(),
+        )
+
+
 def inspect_response(
     response_id: str, *, client_factory: Callable[[], Any] | None = None
 ) -> dict[str, Any]:
     """Read one stored provider response without starting or continuing a generation."""
     result = _new_result()
+    result["reply_state"] = "unknown"
     result["retrieval_requests"] = 0
     invocation = None
     trace = None
@@ -439,6 +472,7 @@ def inspect_response(
         stored_id = data.get("id") if isinstance(data, dict) else None
         if not isinstance(stored_id, str) or str(uuid.UUID(stored_id)) != response_id:
             raise ValueError("Stored response ID does not match the requested response")
+        _stored_reply(result, data)
         trace.add_response(data, step_index=1, kind="retrieved_response")
         _provider_diagnostics(result, data)
         result["status"] = "retrieved"

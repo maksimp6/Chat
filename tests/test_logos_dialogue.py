@@ -379,6 +379,135 @@ def test_inspect_stored_failure_exposes_machine_diagnostics_without_provider_mes
     assert private_message not in json.dumps(result)
 
 
+@pytest.mark.parametrize("provider_status", ["completed", "incomplete"])
+def test_inspect_exports_full_assistant_reply_before_persistence(
+    stored_response_transport, monkeypatch, provider_status
+):
+    response_id = "541186dc-6749-4466-830d-511f762830e8"
+    reply = "  Ёж🙂\n" + "Полный ответ. " * 500 + "\t\n"
+    client, calls = stored_response_transport(
+        {
+            "id": response_id,
+            "status": provider_status,
+            "output": [
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": reply}],
+                }
+            ],
+        }
+    )
+    original = dialogue.persist_invocation_trace
+    persisted = []
+
+    def observe_persistence(*args):
+        persisted.append(args)
+        return original(*args)
+
+    monkeypatch.setattr(dialogue, "persist_invocation_trace", observe_persistence)
+    result = dialogue.inspect_response(response_id, client_factory=lambda: client)
+
+    assert result["status"] == "retrieved"
+    assert result["provider_status"] == provider_status
+    assert result["reply"] == reply
+    assert result["reply_state"] == "available"
+    assert result["reply_chars"] == len(reply)
+    assert result["reply_sha256"] == hashlib.sha256(reply.encode("utf-8")).hexdigest()
+    assert result["generation_requests"] == 0
+    assert len(calls) == len(persisted) == 1
+
+
+@pytest.mark.parametrize(
+    ("fields", "expected", "state"),
+    [
+        ({"output_text": ""}, "", "empty"),
+        ({"output_text": "\t\n"}, "\t\n", "available"),
+        ({"output_text": "Top-level Ё"}, "Top-level Ё", "available"),
+        ({"output": [{"type": "output_text", "text": "Direct"}]}, "Direct", "available"),
+        (
+            {"output": [{"type": "message", "content": [{"type": "text", "text": ""}]}]},
+            "",
+            "empty",
+        ),
+        ({}, "", "unknown"),
+        ({"output": []}, "", "unknown"),
+        ({"output": None, "output_text": 42}, "", "unknown"),
+        ({"output": [{"type": "function_call", "name": "read_file"}]}, "", "unknown"),
+    ],
+)
+def test_inspect_distinguishes_explicit_text_from_missing_text(
+    stored_response_transport, fields, expected, state
+):
+    response_id = "541186dc-6749-4466-830d-511f762830e8"
+    client, _ = stored_response_transport({"id": response_id, "status": "completed", **fields})
+
+    result = dialogue.inspect_response(response_id, client_factory=lambda: client)
+
+    assert result["reply"] == expected and result["reply_state"] == state
+    if state == "unknown":
+        assert "reply_chars" not in result and "reply_sha256" not in result
+    else:
+        assert result["reply_chars"] == len(expected)
+        assert result["reply_sha256"] == hashlib.sha256(expected.encode("utf-8")).hexdigest()
+
+
+def test_inspect_excludes_reasoning_other_roles_and_diagnostic_text(stored_response_transport):
+    response_id = "541186dc-6749-4466-830d-511f762830e8"
+    private = "PRIVATE-CONTENT-NOT-ASSISTANT-OUTPUT"
+    client, _ = stored_response_transport(
+        {
+            "id": response_id,
+            "status": "completed",
+            "text": private,
+            "error": {"message": private},
+            "output": [
+                {"type": "reasoning", "content": [{"type": "text", "text": private}]},
+                {"type": "message", "role": "tool", "content": [private]},
+                {"type": "output_text", "role": "user", "text": private},
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [
+                        {"type": "reasoning_text", "text": private},
+                        {"type": "output_text", "text": "Первая"},
+                        " часть.\n",
+                        {"type": "text", "text": "Вторая. "},
+                    ],
+                },
+            ],
+        }
+    )
+
+    result = dialogue.inspect_response(response_id, client_factory=lambda: client)
+
+    assert result["reply"] == "Первая часть.\nВторая. "
+    assert private not in json.dumps(result)
+
+
+def test_inspect_retains_reply_when_trace_persistence_fails(stored_response_transport, monkeypatch):
+    from storage.memory_db import DatabaseError
+
+    response_id = "541186dc-6749-4466-830d-511f762830e8"
+    reply = " Полный ответ после отказа хранилища.\n"
+    client, calls = stored_response_transport(
+        {"id": response_id, "status": "completed", "output_text": reply}
+    )
+
+    def fail_persistence(*args):
+        raise DatabaseError("private database details")
+
+    monkeypatch.setattr(dialogue, "persist_invocation_trace", fail_persistence)
+    result = dialogue.inspect_response(response_id, client_factory=lambda: client)
+
+    assert result["status"] == "failed" and result["persistence"]["status"] == "failed"
+    assert result["reply"] == reply and result["reply_state"] == "available"
+    assert result["response_ids"] == [response_id]
+    assert result["reply_sha256"] == hashlib.sha256(reply.encode("utf-8")).hexdigest()
+    assert result["generation_requests"] == 0 and len(calls) == 1
+    assert "private database" not in json.dumps(result)
+
+
 @pytest.mark.parametrize("response_id", ["../../responses?secret=private", None])
 def test_inspect_rejects_invalid_uuid_before_initializing_client(response_id):
     result = dialogue.inspect_response(
@@ -393,7 +522,9 @@ def test_inspect_rejects_invalid_uuid_before_initializing_client(response_id):
 
 @pytest.mark.parametrize("stored_id", ["00000000-0000-4000-8000-000000000001", None, 123])
 def test_inspect_rejects_a_different_stored_response(stored_response_transport, stored_id):
-    client, calls = stored_response_transport({"id": stored_id, "status": "completed"})
+    client, calls = stored_response_transport(
+        {"id": stored_id, "status": "completed", "output_text": "Wrong response content"}
+    )
 
     result = dialogue.inspect_response(
         "541186dc-6749-4466-830d-511f762830e8", client_factory=lambda: client
@@ -401,21 +532,27 @@ def test_inspect_rejects_a_different_stored_response(stored_response_transport, 
 
     assert result["status"] == "failed" and result["error"] == "ValueError"
     assert result["generation_requests"] == 0 and len(calls) == 1
+    assert result["reply_state"] == "unknown" and result["reply"] == ""
+    assert "Wrong response content" not in json.dumps(result)
 
 
-def test_inspect_http_error_reports_status_without_provider_body(stored_response_transport):
+@pytest.mark.parametrize("status_code", [401, 404])
+def test_inspect_http_error_reports_status_without_provider_body(
+    stored_response_transport, status_code
+):
     private_message = "Bearer private-test-credential"
     client, calls = stored_response_transport(
         {"error": {"code": "unauthenticated", "message": private_message}},
-        status_code=401,
+        status_code=status_code,
     )
 
     result = dialogue.inspect_response(
         "541186dc-6749-4466-830d-511f762830e8", client_factory=lambda: client
     )
 
-    assert result["status"] == "failed" and result["http_status"] == 401
+    assert result["status"] == "failed" and result["http_status"] == status_code
     assert result["generation_requests"] == 0 and len(calls) == 1
+    assert result["reply_state"] == "unknown" and result["reply"] == ""
     assert private_message not in json.dumps(result)
 
 

@@ -72,6 +72,8 @@ if tool == "gh":
         "WORKFLOW_STATUS": "success",
         "APP_TOKEN_OUTCOME": "success",
         "PR_URL": "",
+        "EVIDENCE_URL": "https://github.com/example/repo/actions/runs/99/artifacts/123",
+        "EVIDENCE_OUTCOME": "success",
     }
 
 
@@ -85,6 +87,8 @@ def _result(tmp_path, **overrides):
         "status": "no_changes",
         "model": "logos-runtime",
         "summary": "Ask @logos again",
+        "reply": "Ask @logos again",
+        "reply_state": "available",
         "billing": {"total_cost": 0.12, "currency": "RUB", "cost_status": "calculated"},
         "trace_id": "t1",
         "pending_tools": ["delete_path"],
@@ -412,3 +416,72 @@ def test_comment_api_failure_does_not_lose_summary(tmp_path):
     result = _run_step("Report result", tmp_path, env)
     assert result.returncode != 0
     assert (tmp_path / "report.md").read_text() in (tmp_path / "summary.md").read_text()
+
+
+def test_response_artifact_runs_before_publishing_even_after_model_failure():
+    step = STEPS["Preserve response evidence"]
+    assert step["if"] == "always()"
+    assert step["with"]["path"] == "${{ runner.temp }}/result.json"
+    assert step["with"]["if-no-files-found"] == "error"
+    assert step["with"]["retention-days"] == 90
+    assert "github.run_attempt" in step["with"]["name"]
+    names = list(STEPS)
+    assert names.index("Run Alice") < names.index("Preserve response evidence")
+    assert names.index("Preserve response evidence") < names.index("Open pull request")
+    assert names.index("Preserve response evidence") < names.index("Report result")
+
+
+def test_long_response_survives_publisher_failure_with_verifiable_artifact(tmp_path):
+    import hashlib
+
+    env = _mock_tools(tmp_path)
+    env["MOCK_GH_FAILURE"] = "issue comment"
+    reply = "Полный ответ Ё🙂 " * 800 + " END  \n"
+    _result(tmp_path, reply=reply, summary=reply[:4000], response_id="saved-response")
+    original = (tmp_path / "result.json").read_bytes()
+    result = _run_step("Report result", tmp_path, env)
+    assert result.returncode != 0
+    assert (tmp_path / "result.json").read_bytes() == original
+    report = (tmp_path / "report.md").read_text()
+    assert env["EVIDENCE_URL"] in report
+    assert hashlib.sha256(reply.encode()).hexdigest() in report
+    assert f"{len(reply)} characters" in report
+    assert "saved-response" in report
+    assert "File status is not a review verdict" in report
+    assert report in (tmp_path / "summary.md").read_text()
+
+
+@pytest.mark.parametrize("reply,state", [(None, "unknown"), ("", "empty"), ("  \n", "available")])
+def test_no_changes_without_substantive_reply_is_not_success(tmp_path, reply, state):
+    env = _mock_tools(tmp_path)
+    _result(tmp_path, reply=reply, reply_state=state, summary="")
+    result = _run_step("Report result", tmp_path, env)
+    assert result.returncode != 0
+    assert f"Assistant reply: **{state}**" in (tmp_path / "comment.md").read_text()
+    assert (tmp_path / "report-status.txt").read_text() == "failed"
+
+
+def test_unconfirmed_artifact_cannot_report_delivery_success(tmp_path):
+    env = _mock_tools(tmp_path)
+    env.update(EVIDENCE_URL="", EVIDENCE_OUTCOME="failure")
+    _result(tmp_path)
+    result = _run_step("Report result", tmp_path, env)
+    assert result.returncode != 0
+    assert "Delivery is incomplete" in (tmp_path / "comment.md").read_text()
+
+
+def test_interrupted_checkpoint_keeps_reply_metadata_and_reports_failure(tmp_path):
+    import hashlib
+
+    env = _mock_tools(tmp_path)
+    reply = "Полученный до обрыва ответ. Ё🙂  \n"
+    _result(tmp_path, status="running", reply=reply, summary=reply, response_id="saved-response")
+    result = _run_step("Report result", tmp_path, env)
+    assert result.returncode != 0
+    report = (tmp_path / "comment.md").read_text()
+    assert "Execution was interrupted" in report
+    assert "**failed**" in report
+    assert "saved-response" in report and reply in report
+    assert hashlib.sha256(reply.encode()).hexdigest() in report
+    assert env["EVIDENCE_URL"] in report
+    assert json.loads((tmp_path / "result.json").read_text())["status"] == "running"

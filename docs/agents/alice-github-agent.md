@@ -76,6 +76,28 @@ model run or fast check prevents PR creation; the final report cannot commit or
 push files. Its inline renderer uses isolated Python so workspace startup code
 cannot run with the publishing token. PRs explicitly target `develop`.
 
+Before diff checks and publication, an `always()` step uploads only
+`result.json` as `logos-response-<run_id>-<attempt>`, with a 90-day retention
+request. The result contains the full assistant-facing reply, its character
+count and UTF-8 SHA-256, provider response identity and availability state.
+The issue comment contains a bounded preview and an artifact link; it never
+claims that `no_changes` is a review verdict or owner acceptance. A missing
+artifact or missing/empty final reply fails reporting. A tool-approval pause
+remains an explicit `needs_approval`, not an accepted review.
+
+The worker checkpoints the response before persisting its invocation. A
+persistence error must retain the available reply and report failure separately.
+The artifact does not include the temporary credential store or raw tool trace.
+Artifacts are subject to GitHub retention and deletion; archive needed evidence
+before expiry. Artifact upload and a successful comment API call still do not
+prove that the owner read or accepted the answer.
+
+For an existing response, `scripts.logos_dialogue --response-id <id> --out <path>`
+performs one GET and exports available assistant text without another generation
+or tool execution. This requires an existing authorized provider credential;
+an unavailable response remains unknown and must not be replaced with a new
+generation presented as the old answer. The exported text excludes reasoning.
+
 Optional repository variable `ALICE_AGENT_MODEL` selects the model key from
 `config.py` (default `logos-runtime`).
 
