@@ -80,8 +80,7 @@ def _run_git(args: list, cfg: dict = None, repo_name: str = None, is_read: bool 
         return {"success": False, "error": f"Каталог не найден: {repo_path}"}
 
     is_bare = _is_bare_repo(repo_path)
-    # Linked worktrees store Git metadata in a .git file; Git validates its target.
-    if not is_bare and not os.path.exists(os.path.join(repo_path, ".git")):
+    if not is_bare and not os.path.isdir(os.path.join(repo_path, ".git")):
         if not (args and args[0] == "init"):
             return {"success": False, "error": f"В каталоге {repo_path} нет .git"}
 
@@ -90,7 +89,7 @@ def _run_git(args: list, cfg: dict = None, repo_name: str = None, is_read: bool 
         if is_bare
         else os.path.join(repo_path, ".git", "index.lock")
     )
-    if not is_read and os.path.exists(lock_file):
+    if os.path.exists(lock_file):
         try:
             if time.time() - os.path.getmtime(lock_file) > 2.0:
                 os.remove(lock_file)
