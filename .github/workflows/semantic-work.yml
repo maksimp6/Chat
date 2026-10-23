@@ -126,6 +126,7 @@ jobs:
           path: |
             ${{ runner.temp }}/repository-rag-receipt.json
             ${{ runner.temp }}/repository-rag/gaps.json
+            ${{ runner.temp }}/repository-rag/upload-checkpoint.json
             ${{ runner.temp }}/repository-fetch-status.json
           if-no-files-found: warn
           retention-days: 90
