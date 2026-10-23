@@ -2,11 +2,10 @@ import json
 import runpy
 import sqlite3
 from datetime import datetime, timezone
-from pathlib import Path
 
 import archiver
 import sdk
-from scripts import send_logs
+import send_logs
 import yc_logging
 
 
@@ -167,7 +166,6 @@ def test_sdk_main_example_runs_with_fake_http(monkeypatch, capsys):
 
 def test_send_logs_collects_files_and_handles_transport(monkeypatch, tmp_path, capsys):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(send_logs, "LOGS_DIR", tmp_path / "execution_logs")
     assert send_logs.collect_logs() == []
     assert "not found" in capsys.readouterr().out
 
@@ -208,11 +206,7 @@ def test_send_logs_collects_files_and_handles_transport(monkeypatch, tmp_path, c
 def test_send_logs_main_entrypoint(monkeypatch, tmp_path, capsys):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(send_logs.requests, "post", lambda *args, **kwargs: _FakeResponse({}))
-    scripts = tmp_path / "scripts"
-    scripts.mkdir()
-    source = scripts / "send_logs.py"
-    source.write_text(Path(send_logs.__file__).read_text(), encoding="utf-8")
-    runpy.run_path(str(source), run_name="__main__")
+    runpy.run_path(send_logs.__file__, run_name="__main__")
     assert "No logs to send" in capsys.readouterr().out
 
 

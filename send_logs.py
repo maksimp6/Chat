@@ -2,20 +2,17 @@ import requests
 import json
 import os
 from datetime import datetime
-from pathlib import Path
-
-LOGS_DIR = Path(__file__).resolve().parents[1] / "execution_logs"
 
 
 def collect_logs():
     logs = []
-    if not LOGS_DIR.is_dir():
+    if not os.path.exists("execution_logs"):
         print("Directory execution_logs/ not found")
         return logs
-    for filename in os.listdir(LOGS_DIR):
+    for filename in os.listdir("execution_logs"):
         if filename.endswith(".json"):
             try:
-                with open(LOGS_DIR / filename, "r") as f:
+                with open(f"execution_logs/{filename}", "r") as f:
                     logs.append(json.load(f))
             except Exception as e:
                 print(f"Error reading {filename}: {e}")

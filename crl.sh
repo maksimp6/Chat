@@ -1,9 +1,3 @@
-#!/usr/bin/env bash
-
-# Resolve project paths independently of the caller's working directory.
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-cd -- "$SCRIPT_DIR/.." || exit 1
-
 # 1. Получаем ID первого диалога (более надежный парсинг)
 CONV_ID=$(curl -s http://localhost:5000/api/conversations | grep -o '"id": *"[^"]*"' | head -1 | cut -d'"' -f4)
 

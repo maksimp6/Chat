@@ -73,15 +73,3 @@ from invocation.trace import create_invocation_trace
 
 `browser_adapters.py` и `browser_capabilities.py` перенесены в пакет `browser/`.
 Тесты и архитектурная документация используют новые package imports.
-
-## Служебные утилиты (2026-10-14)
-
-Девять shell helpers и `send_logs.py` перенесены из корня в `scripts/`.
-В корне остаётся только startup shell entrypoint `start.sh`. Старые пути не
-сохраняются через stubs или дубли. Команды и назначение — в
-[справочнике scripts](../../scripts/README.md).
-
-[Полная инвентаризация оставшихся root Python-файлов](root-file-inventory.md)
-показывает ответственность каждого файла и границы следующих переносов.
-Guardrail запрещает возвращать перенесённые helpers и добавлять shell helpers
-в корень. Следующие доменные переносы выполняются отдельными связными PR.
