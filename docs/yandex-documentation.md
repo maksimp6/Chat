@@ -17,4 +17,5 @@
 Прежний адрес `https://yandex.cloud/ru/docs/ai-studio/` перенаправляет на
 `https://aistudio.yandex.ru/ru/docs/`. Для AI Studio используйте актуальный адрес.
 
-Это каталог внешних источников. Архивы документации и объекты Git LFS не добавляются.
+Исторический снимок исходников AI Studio доступен отдельно:
+[документация в Git LFS](mirrors/yandex-ai-studio/README.md).
