@@ -379,6 +379,79 @@ def test_inspect_stored_failure_exposes_machine_diagnostics_without_provider_mes
     assert private_message not in json.dumps(result)
 
 
+@pytest.mark.parametrize("pending", [False, True])
+def test_dialogue_nonnull_provider_error_is_not_completed_or_approval(repo, pending):
+    class Client:
+        def create_conversation(self, trace):
+            return {"id": "offline-conversation"}
+
+        def ask_with_mcp(self, **kwargs):
+            response = native_response(1, read=pending)
+            response["error"] = {"code": "server_error", "message": "private-body"}
+            return response
+
+    result = run_prepared_dialogue("Review", repo_root=repo, client_factory=Client)
+    assert result["status"] == "failed"
+    assert result["error"] == "ProviderResponseError"
+    assert result["provider_error_present"] is True
+    assert "private-body" not in json.dumps(result)
+
+
+def test_dialogue_preserves_exact_unicode_reply_and_provider_echo(repo, tmp_path):
+    reply = "  Логос 🧪\n" * 1000 + " \n"
+    out = tmp_path / "result.json"
+
+    class Client:
+        def create_conversation(self, trace):
+            return {"id": "offline-conversation"}
+
+        def ask_with_mcp(self, **kwargs):
+            response = {
+                "id": "63a39a54-527a-44c4-af15-4946468e6e87",
+                "status": "completed",
+                "model": "test-model",
+                "temperature": 0.3,
+                "truncation": "disabled",
+                "reasoning": {"effort": "high"},
+                "output": [
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{"type": "output_text", "text": reply}],
+                    }
+                ],
+            }
+            kwargs["params"]["on_provider_response"](response)
+            checkpoint = json.loads(out.read_text(encoding="utf-8"))
+            assert checkpoint["reply"] == reply
+            assert checkpoint["reply_sha256"] == hashlib.sha256(reply.encode("utf-8")).hexdigest()
+            return response
+
+    result = run_prepared_dialogue(
+        "Review", repo_root=repo, client_factory=Client, checkpoint_file=out
+    )
+    assert result["status"] == "completed"
+    assert result["reply"] == reply
+    assert result["capability_receipt"]["provider_echo"]["temperature"] == 0.3
+    assert result["provider_echo"]["reasoning"] == {"effort": "high"}
+
+
+def test_provider_echo_does_not_export_secret_model_or_invalid_settings():
+    result = {}
+    dialogue._provider_diagnostics(
+        result,
+        {
+            "model": "ghp_synthetic-private-token",
+            "max_output_tokens": True,
+            "max_tool_calls": -1,
+            "temperature": float("nan"),
+            "reasoning": {"effort": "private\nvalue"},
+            "truncation": "private\nvalue",
+        },
+    )
+    assert "provider_echo" not in result
+
+
 @pytest.mark.parametrize("provider_status", ["completed", "incomplete"])
 def test_inspect_exports_full_assistant_reply_before_persistence(
     stored_response_transport, monkeypatch, provider_status

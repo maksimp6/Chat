@@ -18,40 +18,18 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from agent_runtime.provider_receipt import (
+    assistant_text as _assistant_reply,
+    capture_provider_diagnostics,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MODEL = "logos-runtime"
 TOOL_CATEGORIES = ["filesystem"]
 MAX_SUMMARY_CHARS = 4000
 
 
-def _assistant_reply(response: dict[str, Any]) -> tuple[str, str]:
-    """Read only assistant-facing text, preserving explicit empty text and whitespace."""
-    parts = []
-    output = response.get("output")
-    for item in output if isinstance(output, list) else []:
-        if not isinstance(item, dict) or item.get("role") not in (None, "assistant"):
-            continue
-        if item.get("type") == "output_text" and isinstance(item.get("text"), str):
-            parts.append(item["text"])
-        if item.get("type") != "message":
-            continue
-        content = item.get("content")
-        for part in content if isinstance(content, list) else []:
-            if isinstance(part, str):
-                parts.append(part)
-            elif (
-                isinstance(part, dict)
-                and part.get("type") in {"output_text", "text"}
-                and isinstance(part.get("text"), str)
-            ):
-                parts.append(part["text"])
-    if not parts and isinstance(response.get("output_text"), str):
-        parts.append(response["output_text"])
-    reply = "".join(parts)
-    return reply, ("available" if reply else "empty") if parts else "unknown"
-
-
-def _capture_response(result: dict[str, Any], response: dict[str, Any]) -> None:
+def _capture_provider_state(result: dict[str, Any], response: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(response, dict):
         raise TypeError("Invalid provider response")
     response_id = response.get("id")
@@ -66,12 +44,24 @@ def _capture_response(result: dict[str, Any], response: dict[str, Any]) -> None:
             result["response_id"] = response_id
             if response_id not in result["response_ids"]:
                 result["response_ids"].append(response_id)
-    state = response.get("status")
-    result["provider_status"] = (
-        state
-        if state in {"completed", "failed", "incomplete", "in_progress", "queued", "cancelled"}
-        else "unknown"
+    capture_provider_diagnostics(result, response)
+    diagnostic_keys = (
+        "provider_status",
+        "provider_reason",
+        "provider_error_present",
+        "provider_error_code",
+        "provider_error_type",
+        "provider_echo",
     )
+    diagnostics = {key: result[key] for key in diagnostic_keys if key in result}
+    receipt = {"response_id": result["response_id"], **diagnostics}
+    if receipt not in result["provider_responses"]:
+        result["provider_responses"].append(receipt)
+    return diagnostics
+
+
+def _capture_response(result: dict[str, Any], response: dict[str, Any]) -> None:
+    diagnostics = _capture_provider_state(result, response)
     reply, reply_state = _assistant_reply(response)
     result.update(reply=reply, reply_state=reply_state, summary=reply.strip()[:MAX_SUMMARY_CHARS])
     result["reply_chars"] = len(reply) if reply_state != "unknown" else None
@@ -81,6 +71,7 @@ def _capture_response(result: dict[str, Any], response: dict[str, Any]) -> None:
     if reply_state != "unknown":
         receipt = {
             "response_id": result["response_id"],
+            **diagnostics,
             **{key: result[key] for key in ("reply", "reply_state", "reply_chars", "reply_sha256")},
         }
         if receipt not in result["assistant_replies"]:
@@ -163,6 +154,21 @@ def _persist_result(
 
     try:
         finalized = trace.finalize()
+        responses = finalized.get("responses") or []
+        raw = responses[-1].get("raw") if responses and isinstance(responses[-1], dict) else None
+        if isinstance(raw, dict):
+            # Failed polls raise before the response callback. Recover their machine
+            # state without overwriting exact checkpoint text with sanitized trace text.
+            previous_id = result.get("response_id")
+            _capture_provider_state(result, raw)
+            if result["response_id"] != previous_id:
+                result.update(
+                    reply="", reply_state="unknown", reply_chars=None, reply_sha256=None, summary=""
+                )
+            if result["provider_error_present"]:
+                result.update(status="failed", error="ProviderResponseError")
+            elif raw.get("status") not in (None, "completed"):
+                result.update(status="failed", error="IncompleteResponse")
         result["trace_id"] = finalized.get("trace_id")
         result["billing"] = _billing_summary(finalized.get("billing") or {})
         result["persistence"] = {"status": "writing", "stage": "trace"}
@@ -242,12 +248,14 @@ def run_issue_task(
         "session_id": invocation.session_id,
         "status": "running",
         "provider_status": "unknown",
+        "provider_error_present": False,
         "reply": "",
         "reply_state": "unknown",
         "reply_chars": None,
         "reply_sha256": None,
         "response_ids": [],
         "assistant_replies": [],
+        "provider_responses": [],
         "changed_files": [],
         "persistence": {"status": "not_started"},
     }
@@ -279,7 +287,9 @@ def run_issue_task(
             result["pending_tools"] = sorted(
                 {call.get("name") or (call.get("function") or {}).get("name") for call in pending}
             )
-        if response.get("status") not in (None, "completed"):
+        if result["provider_error_present"]:
+            result.update(status="failed", error="ProviderResponseError")
+        elif response.get("status") not in (None, "completed"):
             result.update(status="failed", error="IncompleteResponse")
         elif not pending and not result["reply"].strip():
             result.update(status="failed", error="MissingAssistantReply")

@@ -209,7 +209,7 @@ jobs:
         run: |
           set -euo pipefail
           python -I - "$RUNNER_TEMP/result.json" > "$RUNNER_TEMP/report.md" <<'PY'
-          import hashlib, json, os, sys
+          import hashlib, json, os, re, sys
           from pathlib import Path
 
           try:
@@ -222,6 +222,9 @@ jobs:
                   raise ValueError("Invalid pending tools")
               if r["status"] == "running":
                   r.update(status="failed", interrupted=True)
+              if (r.get("provider_error_present") is True or
+                      r.get("provider_status") in {"failed", "incomplete", "cancelled", "in_progress", "queued"}):
+                  r["status"] = "failed"
           except (OSError, ValueError):
               r = {"status": "failed", "summary": "No valid result.json was produced. See the workflow logs."}
           b = r.get("billing") or {}
@@ -247,6 +250,14 @@ jobs:
               lines.append(f"Full reply: {len(reply)} characters; SHA-256 `{digest}`.\n")
           lines.append(f"Provider response: `{r.get('response_id') or 'unknown'}`; "
                        f"provider status: `{r.get('provider_status') or 'unknown'}`.\n")
+          # Treat result.json as untrusted; export machine tokens, never raw error bodies.
+          for key in ("provider_reason", "provider_error_code", "provider_error_type"):
+              value = r.get(key)
+              if (isinstance(value, str) and re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]{0,63}", value)
+                      and not value.startswith(("ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_", "sk-"))):
+                  lines.append(f"{key}: `{value}`.\n")
+          if r.get("provider_error_present") is True:
+              lines.append("Provider returned a non-null error; the task did not complete.\n")
           if evidence_saved:
               lines.append("Full result (including the unabridged reply): " + evidence_url + "\n")
           else:

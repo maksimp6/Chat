@@ -386,6 +386,43 @@ def test_failed_model_result_is_reported_then_fails(tmp_path):
     assert (tmp_path / "report.md").read_text() in (tmp_path / "summary.md").read_text()
 
 
+def test_report_preserves_refusal_machine_reason_without_treating_it_as_review(tmp_path):
+    env = _mock_tools(tmp_path)
+    _result(
+        tmp_path,
+        status="failed",
+        provider_status="incomplete",
+        provider_reason="content_filter",
+        provider_error_present=False,
+        summary="Refusal",
+        reply="Refusal",
+    )
+    run = _run_step("Report result", tmp_path, env)
+    assert run.returncode != 0
+    report = (tmp_path / "comment.md").read_text()
+    assert "provider_reason: `content_filter`" in report
+    assert "**failed**" in report
+    assert report in (tmp_path / "summary.md").read_text()
+
+
+def test_report_rejects_nonnull_provider_error_even_with_success_worker_status(tmp_path):
+    env = _mock_tools(tmp_path)
+    _result(
+        tmp_path,
+        provider_error_present=True,
+        provider_error_code="server_error",
+        provider_error_type="ghp_synthetic-secret",
+        provider_reason="private\nerror",
+    )
+    run = _run_step("Report result", tmp_path, env)
+    assert run.returncode != 0
+    report = (tmp_path / "comment.md").read_text()
+    assert "provider_error_code: `server_error`" in report
+    assert "non-null error" in report
+    assert "ghp_synthetic-secret" not in report
+    assert "private\nerror" not in report
+
+
 def test_failed_pull_request_still_gets_a_final_report(tmp_path):
     env = _mock_tools(tmp_path)
     env["MOCK_GH_FAILURE"] = "pr create"

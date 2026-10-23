@@ -310,6 +310,100 @@ def test_provider_failure_or_partial_reply_is_not_success(repo, status):
     assert result["file_status"] == "no_changes"
 
 
+def test_refusal_reason_is_checkpointed_and_bound_to_the_response(repo, tmp_path, monkeypatch):
+    from invocation import manager
+
+    monkeypatch.setattr(manager, "persist_invocation_trace", lambda *args: False)
+    response = {
+        **_message("Я не могу обсуждать эту тему."),
+        "id": "63a39a54-527a-44c4-af15-4946468e6e87",
+        "status": "incomplete",
+        "incomplete_details": {"reason": "content_filter", "message": "private-error-body"},
+        "error": None,
+        "model": "gpt://test-project/test-model/latest",
+        "max_output_tokens": 4096,
+        "temperature": 0.3,
+    }
+    out = tmp_path / "result.json"
+    result = issue_runner.run_issue_task(
+        7,
+        "Review",
+        "Read",
+        repo_root=repo,
+        client_factory=lambda: FakeClient(response),
+        checkpoint_file=out,
+    )
+    saved = json.loads(out.read_text(encoding="utf-8"))
+    assert saved == result
+    assert result["status"] == "failed"
+    assert result["provider_reason"] == "content_filter"
+    assert result["provider_error_present"] is False
+    assert result["provider_echo"]["temperature"] == 0.3
+    assert result["provider_echo"]["max_output_tokens"] == 4096
+    assert result["provider_responses"][0]["response_id"] == response["id"]
+    assert result["assistant_replies"][0]["provider_reason"] == "content_filter"
+    assert "private-error-body" not in out.read_text(encoding="utf-8")
+
+
+def test_completed_response_with_nonnull_error_does_not_pass(repo):
+    response = {
+        **_message("Partial answer"),
+        "status": "completed",
+        "error": {"code": "server_error", "type": "provider_error", "message": "private body"},
+    }
+    result = _run(repo, FakeClient(response))
+    assert result["status"] == "failed"
+    assert result["error"] == "ProviderResponseError"
+    assert result["provider_error_code"] == "server_error"
+    assert result["provider_error_type"] == "provider_error"
+    assert "private body" not in json.dumps(result)
+
+
+def test_new_response_cannot_inherit_previous_refusal_or_echo(repo):
+    class Responses(FakeClient):
+        def ask_with_mcp(self, **kwargs):
+            kwargs["params"]["on_provider_response"](
+                {
+                    **_message("Refused"),
+                    "id": "63a39a54-527a-44c4-af15-4946468e6e87",
+                    "status": "incomplete",
+                    "incomplete_details": {"reason": "content_filter"},
+                    "model": "test-model",
+                    "error": {"code": "server_error"},
+                }
+            )
+            return {
+                **_message("Recovered"),
+                "status": "completed",
+                "id": "63a39a54-527a-44c4-af15-4946468e6e88",
+            }
+
+    result = _run(repo, Responses(None))
+    assert result["status"] == "no_changes"
+    assert not {"provider_reason", "provider_echo", "provider_error_code"} & result.keys()
+    assert result["provider_error_present"] is False
+    assert result["provider_responses"][0]["provider_reason"] == "content_filter"
+    assert "provider_reason" not in result["provider_responses"][-1]
+    assert result["assistant_replies"][0]["reply"] == "Refused"
+
+
+@pytest.mark.parametrize("value", ["private\nmessage", "ghp_private-test-token", "sk-private"])
+def test_provider_diagnostics_do_not_export_raw_or_secret_like_tokens(repo, value):
+    result = _run(
+        repo,
+        FakeClient(
+            {
+                **_message("Reply"),
+                "status": "incomplete",
+                "incomplete_details": {"reason": value},
+                "error": {"code": value, "type": value},
+            }
+        ),
+    )
+    assert not {"provider_reason", "provider_error_code", "provider_error_type"} & result.keys()
+    assert value not in json.dumps(result)
+
+
 def test_checkpoint_survives_poll_failure_without_new_request(repo, tmp_path):
     response_id = "63a39a54-527a-44c4-af15-4946468e6e87"
     out = tmp_path / "result.json"
@@ -337,6 +431,89 @@ def test_checkpoint_survives_poll_failure_without_new_request(repo, tmp_path):
     assert result["response_ids"] == [response_id]
     assert result["reply_state"] == "unknown"
     assert "secret-bearing" not in out.read_text(encoding="utf-8")
+
+
+def test_terminal_poll_failure_recovers_reason_from_trace_without_new_request(repo, tmp_path):
+    response_id = "63a39a54-527a-44c4-af15-4946468e6e87"
+    out = tmp_path / "result.json"
+
+    class FailedPoll(FakeClient):
+        def ask_with_mcp(self, **kwargs):
+            kwargs["params"]["on_provider_response"]({"id": response_id, "status": "queued"})
+            kwargs["trace"].add_response(
+                {
+                    "id": response_id,
+                    "status": "failed",
+                    "error": {
+                        "code": "server_error",
+                        "reason": "synthetic_limit",
+                        "message": "private-poll-error",
+                    },
+                },
+                step_index=1,
+            )
+            raise RuntimeError("private-poll-error")
+
+    result = issue_runner.run_issue_task(
+        7,
+        "Review",
+        "Read",
+        repo_root=repo,
+        client_factory=lambda: FailedPoll(None),
+        checkpoint_file=out,
+    )
+    assert result["status"] == "failed"
+    assert result["provider_status"] == "failed"
+    assert result["provider_reason"] == "synthetic_limit"
+    assert result["provider_error_code"] == "server_error"
+    assert result["provider_responses"][-1]["response_id"] == response_id
+    assert result["provider_responses"][-1]["provider_error_present"] is True
+    assert "private-poll-error" not in out.read_text(encoding="utf-8")
+
+
+def test_trace_metadata_recovery_cannot_truncate_exact_checkpoint_reply(repo):
+    response_id = "63a39a54-527a-44c4-af15-4946468e6e87"
+    reply = "  Полный ответ 🧪\n" * 1000
+
+    class SanitizedTrace(FakeClient):
+        def ask_with_mcp(self, **kwargs):
+            kwargs["trace"].add_response(
+                {**_message("<truncated>"), "id": response_id, "status": "completed"}, step_index=1
+            )
+            return {**_message(reply), "id": response_id, "status": "completed"}
+
+    result = _run(repo, SanitizedTrace(None))
+    assert result["reply"] == reply
+    assert result["reply_sha256"] == hashlib.sha256(reply.encode("utf-8")).hexdigest()
+
+
+def test_new_failed_poll_identity_cannot_relabel_previous_reply(repo):
+    first_id = "63a39a54-527a-44c4-af15-4946468e6e87"
+    latest_id = "63a39a54-527a-44c4-af15-4946468e6e88"
+
+    class NewPoll(FakeClient):
+        def ask_with_mcp(self, **kwargs):
+            kwargs["params"]["on_provider_response"](
+                {**_message("First observation"), "id": first_id, "status": "completed"}
+            )
+            kwargs["trace"].add_response(
+                {
+                    "id": latest_id,
+                    "status": "incomplete",
+                    "incomplete_details": {"reason": "max_output_tokens"},
+                },
+                step_index=2,
+            )
+            raise RuntimeError("poll-failure")
+
+    result = _run(repo, NewPoll(None))
+    assert result["status"] == "failed"
+    assert result["error"] == "IncompleteResponse"
+    assert result["response_id"] == latest_id
+    assert result["provider_reason"] == "max_output_tokens"
+    assert result["reply"] == "" and result["reply_state"] == "unknown"
+    assert result["assistant_replies"][0]["response_id"] == first_id
+    assert result["assistant_replies"][0]["reply"] == "First observation"
 
 
 def test_receipt_excludes_reasoning_tool_and_user_output(repo):
