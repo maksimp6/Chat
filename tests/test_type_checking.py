@@ -152,6 +152,7 @@ STRICT_CLEAN_FILES = {
     "identity/user_identity.py",
     "economy/treasury_identity.py",
     "yandex_client_modules/api_logger.py",
+    "yandex_client_modules/request_receipt.py",
 }
 
 ERROR_LINE = re.compile(r"^(?P<path>[^:]+\.py):\d+(?::\d+)?: error: .*\[(?P<code>[a-z-]+)\]$")
