@@ -154,7 +154,7 @@ function selectConv(id, updateHistory) {
   });
   if (conv) {
     if (typeof window.changeModel === "function") {
-      window.changeModel(conv.model || "aliceai-llm", true);
+      window.changeModel(conv.model || "logos-runtime", true);
     }
   }
   if (typeof window.loadServerConvSettings === "function") {
@@ -193,7 +193,7 @@ function deleteConv(id) {
         chatbox.appendChild(empty);
       }
       if (typeof window.changeModel === "function") {
-        window.changeModel("aliceai-llm", true);
+        window.changeModel("logos-runtime", true);
       }
     }
   }

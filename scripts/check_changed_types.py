@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Changed-code typing policy for Alice Pro.
+"""Changed-code typing policy for Logos.
 
 The repository-wide semantic authority remains mypy --strict. This lightweight
 checker gives immediate diagnostics for annotation debt introduced in new code.

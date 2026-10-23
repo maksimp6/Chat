@@ -65,7 +65,7 @@ exec_res = tool_config["func"](arguments, {})
 
 Для повышения стабильности при параллельных запросах активирован режим Write-Ahead Logging (WAL) в SQLite.
 
-### Изменения в `db.py` и `mcp_storage.py`
+### Изменения в `db.py` и `mcp_server/storage.py`
 
 В функции `_get_conn()` добавлены следующие настройки:
 
