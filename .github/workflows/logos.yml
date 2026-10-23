@@ -31,7 +31,10 @@ concurrency:
 jobs:
   alice:
     name: Logos works on the issue
+    # Court decision #1413 D0: native generation stays closed until the owner sets
+    # the repository variable LOGOS_GENERATION_ALLOWED to true.
     if: |
+      vars.LOGOS_GENERATION_ALLOWED == 'true' &&
       !github.event.issue.pull_request && (
         (github.event_name == 'issue_comment' &&
           contains(github.event.comment.body, '@logos') &&
@@ -47,6 +50,7 @@ jobs:
       contents: read
     env:
       ISSUE_NUMBER: ${{ github.event.issue.number }}
+      LOGOS_GENERATION_ALLOWED: ${{ vars.LOGOS_GENERATION_ALLOWED }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

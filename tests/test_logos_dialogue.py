@@ -26,6 +26,12 @@ def no_network(monkeypatch):
     monkeypatch.setattr(requests.Session, "request", reject)
 
 
+@pytest.fixture(autouse=True)
+def owner_permitted_generation(monkeypatch):
+    # These tests model a permitted run; the closed default is in test_logos_generation_gate.py.
+    monkeypatch.setenv("LOGOS_GENERATION_ALLOWED", "true")
+
+
 @pytest.fixture
 def repo(tmp_path, monkeypatch):
     root = tmp_path / "repo"

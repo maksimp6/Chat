@@ -459,9 +459,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--context-file", type=Path)
     parser.add_argument("--knowledge-file", type=Path)
     args = parser.parse_args(argv)
+    from agent_runtime.generation_gate import GENERATION_BLOCKED, generation_allowed
+
     try:
         if args.response_id is not None:
             result = inspect_response(args.response_id)
+        elif not generation_allowed():
+            # Reading a stored response stays available; a new generation needs owner permission.
+            result = _new_result()
+            result.update(status="blocked", error=GENERATION_BLOCKED)
         else:
             if args.context_file is None or args.knowledge_file is None:
                 raise ValueError("Native dialogue requires full context and prepared RAG")

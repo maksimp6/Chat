@@ -322,6 +322,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
 
+    from agent_runtime.generation_gate import GENERATION_BLOCKED, generation_allowed
+
+    if not generation_allowed():
+        # Closed by default: no credential, client or model request without owner permission.
+        blocked = {"status": "blocked", "error": GENERATION_BLOCKED, "changed_files": []}
+        args.out.write_text(json.dumps(blocked, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(json.dumps({"status": blocked["status"], "changed_files": []}))
+        return 1
+
     result = run_issue_task(
         args.issue,
         args.title_file.read_text(encoding="utf-8").strip(),

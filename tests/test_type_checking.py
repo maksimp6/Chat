@@ -125,6 +125,7 @@ STRICT_CLEAN_FILES = {
     "rdc_connection/__init__.py",
     "agent_runtime/reasoning_plan.py",
     "agent_runtime/responses_tool_loop.py",
+    "agent_runtime/generation_gate.py",
     "runtime/__init__.py",
     "runtime/conversation_agents.py",
     "runtime/loader.py",
