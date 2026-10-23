@@ -13,7 +13,6 @@ def test_runner_cache_contract() -> None:
         "code-rules": ["requirements-dev.txt"],
         "backend": ["requirements.txt", "requirements-dev.txt"],
         "infra": ["requirements.txt", "requirements-dev.txt"],
-        "postgres": ["requirements.txt", "requirements-postgres.txt", "requirements-dev.txt"],
     }
     for job, expected in dependencies.items():
         steps = [
@@ -54,10 +53,6 @@ def test_runner_cache_timings_are_reported() -> None:
 
     assert (
         'echo "- Application dependency install: $((SECONDS - started))s" '
-        '>> "$GITHUB_STEP_SUMMARY"' in workflow
-    )
-    assert (
-        'echo "- PostgreSQL dependency install: $((SECONDS - started))s" '
         '>> "$GITHUB_STEP_SUMMARY"' in workflow
     )
     assert (

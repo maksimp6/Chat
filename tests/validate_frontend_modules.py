@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strict static policy validator for Alice Pro frontend JavaScript."""
+"""Strict static policy validator for Logos frontend JavaScript."""
 
 from __future__ import annotations
 

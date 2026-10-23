@@ -9,7 +9,7 @@ from agent_context import (
     TaskScope,
     record_context_cache_lookup,
 )
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 def _scope(*, head="head-1", skills=("github-ci-diagnosis", "github-pr-readiness")):
@@ -89,7 +89,7 @@ def _packet(scope=None, evidence=None):
             ),
         ),
         changed_files=(
-            "provider_credentials.py",
+            "provider_accounts/credentials.py",
             "tests/test_provider_credentials_secret_management.py",
         ),
         owner="Test Engineer",
@@ -131,7 +131,7 @@ def test_task_packet_contains_canonical_handoff_fields():
 
     assert payload["scope"]["work_item"] == "PR#548"
     assert payload["changed_files"] == [
-        "provider_credentials.py",
+        "provider_accounts/credentials.py",
         "tests/test_provider_credentials_secret_management.py",
     ]
     assert payload["owner"] == "Test Engineer"
