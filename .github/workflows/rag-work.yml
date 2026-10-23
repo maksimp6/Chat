@@ -75,7 +75,9 @@ jobs:
           fi
 
   logos:
-    if: github.event_name == 'workflow_dispatch' && (inputs.mode == 'logos' || inputs.mode == 'logos-response' || inputs.mode == 'logos-tools')
+    # Court decision #1413 D0: a new generation needs LOGOS_GENERATION_ALLOWED=true;
+    # reading a saved response and the offline tool audit stay available.
+    if: github.event_name == 'workflow_dispatch' && ((inputs.mode == 'logos' && vars.LOGOS_GENERATION_ALLOWED == 'true') || inputs.mode == 'logos-response' || inputs.mode == 'logos-tools')
     name: Run Logos or inspect runtime tools and saved responses
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -146,6 +148,7 @@ jobs:
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
           GITHUB_TOKEN: ${{ github.token }}
           LOGOS_MODE: ${{ inputs.mode }}
+          LOGOS_GENERATION_ALLOWED: ${{ vars.LOGOS_GENERATION_ALLOWED }}
         run: |
           set -euo pipefail
           ALICE_PROVIDER_CREDENTIAL_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"

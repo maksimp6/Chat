@@ -25,7 +25,7 @@ MYPY_ERROR_BASELINE = {
     "misc": 1,
     "no-any-return": 36,
     "no-redef": 1,
-    "no-untyped-call": 301,
+    "no-untyped-call": 300,
     "no-untyped-def": 325,
     "operator": 10,
     "return": 1,
@@ -38,6 +38,7 @@ MYPY_ERROR_BASELINE = {
 
 # Files with zero strict errors. Errors here fail outright.
 STRICT_CLEAN_FILES = {
+    "agent_runtime/provider_receipt.py",
     "forge/__init__.py",
     "forge/binding.py",
     "printing3d/store.py",
@@ -124,6 +125,7 @@ STRICT_CLEAN_FILES = {
     "rdc_connection/__init__.py",
     "agent_runtime/reasoning_plan.py",
     "agent_runtime/responses_tool_loop.py",
+    "agent_runtime/generation_gate.py",
     "runtime/__init__.py",
     "runtime/conversation_agents.py",
     "runtime/loader.py",
