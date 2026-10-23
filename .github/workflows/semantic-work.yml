@@ -158,7 +158,7 @@ jobs:
           RAG_MODE: ${{ inputs.mode }}
         run: |
           set -euo pipefail
-          operation=(--upload)
+          operation=(--upload --github-passes 3)
           if [ "$RAG_MODE" = repository-check ]; then
             operation=(--provider-check)
           elif [ "$RAG_MODE" = repository-resume ]; then
@@ -181,6 +181,7 @@ jobs:
             ${{ runner.temp }}/repository-rag/gaps.json
             ${{ runner.temp }}/repository-rag/upload-checkpoint.json
             ${{ runner.temp }}/repository-rag/index-checkpoint.json
+            ${{ runner.temp }}/repository-rag/github-collection-passes.json
             ${{ runner.temp }}/repository-fetch-status.json
           if-no-files-found: warn
           retention-days: 90

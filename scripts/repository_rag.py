@@ -722,13 +722,107 @@ def _arguments(argv: list[str] | None):
         "--query", default="Как устроено исполнение инструментов UniversalToolExecutor?"
     )
     parser.add_argument("--github-max-requests", type=int, default=1500)
+    parser.add_argument("--github-passes", type=int, choices=(1, 2, 3), default=1)
     parser.add_argument("--fetch-status", type=Path)
     return parser.parse_args(argv)
 
 
+def _github_progress(reader, repository):
+    from scripts.repository_corpus_github import _Progress
+
+    return _Progress(reader.cache_dir, repository).families
+
+
+def _github_stop(reader, new_sources, before, after):
+    reasons = {
+        "github_http_401": "observed_access_failure",
+        "github_rate_limit": "observed_rate_limit",
+        "download_budget_exhausted": "configured_limit",
+    }
+    if reader.stop_reason in reasons:
+        return reader.stop_reason, reasons[reader.stop_reason]
+    previous_ids = {
+        name: state.get("last_id") for name, state in before.items() if isinstance(state, dict)
+    }
+    current_ids = {
+        name: state.get("last_id") for name, state in after.items() if isinstance(state, dict)
+    }
+    if not new_sources and previous_ids == current_ids:
+        return "no_collection_progress", "no_progress"
+    return None, None
+
+
+def _github_pass(args, archive, reader, number):
+    from scripts.repository_corpus_github import collect_github
+
+    before = _github_progress(reader, args.repository)
+    source_count, gap_count = len(archive.entries), len(archive.gaps)
+    started_at = datetime.now(timezone.utc).isoformat()
+    collection = collect_github(args.repository, reader.token, archive, reader=reader)
+    after = _github_progress(reader, args.repository)
+    new_sources = len(archive.entries) - source_count
+    stop_reason, stop_kind = _github_stop(reader, new_sources, before, after)
+    return {
+        "pass": number,
+        "started_at": started_at,
+        "finished_at": datetime.now(timezone.utc).isoformat(),
+        "collection": collection,
+        "new_source_versions": new_sources,
+        "progress_before": before,
+        "progress_after": after,
+        "reader_stop_reason": reader.stop_reason,
+        "stop_reason": stop_reason,
+        "stop_kind": stop_kind,
+        "gaps": archive.gaps[gap_count:],
+    }
+
+
+def _collect_github_passes(args, archive, result):
+    from scripts.repository_corpus_github import MAX_TOTAL_BYTES, GitHubReader
+
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("CODEX_GITHUB_TOKEN", "")
+    state = {
+        "requested": args.github_passes,
+        "completed": 0,
+        "max_requests_per_pass": args.github_max_requests,
+        "max_total_download_bytes": MAX_TOTAL_BYTES,
+        "downloaded_bytes": 0,
+        "status": "collecting",
+        "terminal_reason": None,
+        "terminal_kind": None,
+        "passes": [],
+    }
+    result["github_collection_passes"] = state
+    for number in range(1, args.github_passes + 1):
+        reader = GitHubReader(
+            args.repository,
+            token,
+            archive.cache_dir,
+            max_requests=args.github_max_requests,
+            max_total_bytes=MAX_TOTAL_BYTES - state["downloaded_bytes"],
+        )
+        record = _github_pass(args, archive, reader, number)
+        state["passes"].append(record)
+        state["completed"] = number
+        state["downloaded_bytes"] += reader.downloaded_bytes
+        result["github_collection"] = record["collection"]
+        reason, kind = record["stop_reason"], record["stop_kind"]
+        if state["downloaded_bytes"] >= MAX_TOTAL_BYTES:
+            reason, kind = "download_budget_exhausted", "configured_limit"
+        if reason or number == args.github_passes:
+            state.update(
+                status="stopped",
+                terminal_reason=reason or "pass_limit_reached",
+                terminal_kind=kind or "configured_limit",
+            )
+        archive.checkpoint()
+        atomic(archive.directory / "github-collection-passes.json", canonical(state))
+        if reason:
+            break
+
+
 def _collect(args, archive: CorpusArchive, result: dict) -> None:
     if not args.upload_only:
-        archive.gaps = []
         if args.fetch_status and args.fetch_status.exists():
             for row in json.loads(args.fetch_status.read_bytes()):
                 archive.gap("git_fetch", row["source"], row["reason"])
@@ -736,14 +830,7 @@ def _collect(args, archive: CorpusArchive, result: dict) -> None:
 
         collect_git(args.git_root, archive)
         if not args.skip_github:
-            from scripts.repository_corpus_github import collect_github
-
-            result["github_collection"] = collect_github(
-                args.repository,
-                os.environ.get("GITHUB_TOKEN") or os.environ.get("CODEX_GITHUB_TOKEN", ""),
-                archive,
-                max_requests=args.github_max_requests,
-            )
+            _collect_github_passes(args, archive, result)
         else:
             archive.gap("github", args.repository, "github_collection_not_run")
 

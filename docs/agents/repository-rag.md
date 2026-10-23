@@ -43,6 +43,17 @@ Available local HTTP cache supports continuation without duplicating completed
 immutable reads. The API is not a transactionally frozen repository snapshot:
 updates during collection remain possible and capture times are recorded.
 
+`--github-passes` accepts 1–3 passes and defaults to one locally. Hosted repository
+collection selects three, sharing the same private archive, credential-scoped
+cache, progress cursor and cumulative 2 GiB download allowance. Git is collected
+once; provider upload happens once after the passes. Each pass retains its timing,
+source-version delta, cursor snapshots and gaps in `github-collection-passes.json`.
+An actual authentication/rate-limit response or exhausted download allowance stops
+later passes. So does no new source version combined with no cursor advancement;
+empty review inventories can still advance the cursor. The per-pass request
+limit is a configured bound, not an external failure. Earlier gaps remain visible
+as observations, and exhausting the pass limit never proves corpus completeness.
+
 Raw originals live in a private local content-addressed directory. They are not
 uploaded as GitHub artifacts/caches. The sanitized view preserves actor/action
 structure while masking recognized credentials and pseudonymizing email
