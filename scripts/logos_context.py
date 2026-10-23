@@ -23,6 +23,8 @@ from typing import Any
 from scripts.semantic_pipeline import _redact_repository_text, _repository_path_is_sensitive
 
 SCHEMA_VERSION = 1
+CONTENT_VIEW_VERSION = 1
+REDACTION_POLICY_VERSION = "recognizable-repository-credentials-v1"
 DEFAULT_REPOSITORY = "maksimp6/Chat"
 REQUIRED_FILES = (
     "AGENTS.md",
@@ -466,6 +468,27 @@ def render_context(packet: dict[str, Any]) -> str:
         + "\n\nProject snapshot and source manifest:\n"
         + _canonical_json(packet)
     )
+
+
+def knowledge_content(packet: dict[str, Any]) -> dict[str, Any]:
+    """Separate reusable source content from the provenance of one collection.
+
+    The original sealed packet remains the audit record. Its collection time and
+    digest do not change the sources, and must not force another paid upload.
+    Source revisions, hashes, redactions and every captured text remain in this
+    derivative view; no field is removed recursively from untrusted evidence.
+    """
+    validate_context(packet)
+    return {
+        "content_view_version": CONTENT_VIEW_VERSION,
+        "redaction_policy_version": REDACTION_POLICY_VERSION,
+        "collection_provenance": "retained_in_original_context_packet_and_knowledge_receipt",
+        "snapshot": {
+            key: value
+            for key, value in packet.items()
+            if key not in {"captured_at", "packet_sha256"}
+        },
+    }
 
 
 def main(argv: list[str] | None = None) -> int:

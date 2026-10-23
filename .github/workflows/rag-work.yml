@@ -135,6 +135,8 @@ jobs:
         run: |
           python -m scripts.logos_knowledge \
             --context-file "$RUNNER_TEMP/logos-context.json" \
+            --cache-owner "$GITHUB_REPOSITORY_OWNER" \
+            --cache-access-scope "repository:$GITHUB_REPOSITORY" \
             --out "$RUNNER_TEMP/logos-knowledge.json"
 
       - name: Audit native Logos tools
