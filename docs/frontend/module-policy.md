@@ -1,6 +1,6 @@
 # Frontend module source policy
 
-Alice Pro frontend JavaScript is treated as a set of modules with explicit runtime contracts. Source is validated before module execution.
+Logos frontend JavaScript is treated as a set of modules with explicit runtime contracts. Source is validated before module execution.
 
 ## Mandatory checks
 
