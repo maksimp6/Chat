@@ -1,6 +1,6 @@
 # Recovery Procedures
 
-Alice Platform provides automated recovery from common failure scenarios. This document explains how to recover from service failures, data loss, and configuration errors.
+Keel Platform provides automated recovery from common failure scenarios. This document explains how to recover from service failures, data loss, and configuration errors.
 
 ## Recovery Types
 
@@ -36,7 +36,7 @@ services:
 Each service has health checks that verify it's running:
 
 ```bash
-python -m alice_platform health production
+python -m keel health production
 ```
 
 Health checks use:
@@ -53,7 +53,7 @@ If health check fails, the service is marked unhealthy and recovery is triggered
 View available snapshots for a storage volume:
 
 ```bash
-python -m alice_platform recovery list-snapshots --storage chrome-state --lane production
+python -m keel recovery list-snapshots --storage chrome-state --lane production
 ```
 
 Output:
@@ -69,7 +69,7 @@ Available snapshots for chrome-state:
 Restore storage to a specific point in time:
 
 ```bash
-python -m alice_platform recovery restore \
+python -m keel recovery restore \
   --storage chrome-state \
   --snapshot 2024-10-02 \
   --lane production \
@@ -91,10 +91,10 @@ This:
 **Recovery**:
 ```bash
 # Find the most recent snapshot before data loss
-python -m alice_platform recovery list-snapshots --storage chrome-state
+python -m keel recovery list-snapshots --storage chrome-state
 
 # Restore to known-good state
-python -m alice_platform recovery restore \
+python -m keel recovery restore \
   --storage chrome-state \
   --snapshot 2024-10-04 \
   --lane production
@@ -107,7 +107,7 @@ python -m alice_platform recovery restore \
 When a configuration change causes failures, rollback to the previous version:
 
 ```bash
-python -m alice_platform recovery rollback-config \
+python -m keel recovery rollback-config \
   --to-commit abc1234 \
   --lane production \
   --approve
@@ -144,7 +144,7 @@ git show abc1234:config/alice/platform.yaml
 git log --oneline config/alice/ | head -5
 
 # Rollback to last known good
-python -m alice_platform recovery rollback-config \
+python -m keel recovery rollback-config \
   --to-commit abc1234 \
   --approve
 
@@ -157,7 +157,7 @@ git diff abc1234 HEAD config/alice/
 ### Check Service Status
 
 ```bash
-python -m alice_platform status production
+python -m keel status production
 
 # Output:
 # oauth: RUNNING (healthy, 1 replica)
@@ -168,7 +168,7 @@ python -m alice_platform status production
 ### View Service Logs
 
 ```bash
-python -m alice_platform logs chrome --lane production --tail 50
+python -m keel logs chrome --lane production --tail 50
 ```
 
 Output:
@@ -181,7 +181,7 @@ Output:
 ### Storage Diagnostics
 
 ```bash
-python -m alice_platform status storage --lane production
+python -m keel status storage --lane production
 
 # Output:
 # chrome-state: 8.5 Gi / 10 Gi (85% full)
@@ -196,9 +196,9 @@ python -m alice_platform status storage --lane production
 
 If a service cannot recover even with restarts:
 
-1. **Verify configuration**: `python -m alice_platform validate`
-2. **Check health**: `python -m alice_platform health <lane>`
-3. **View logs**: `python -m alice_platform logs <service>`
+1. **Verify configuration**: `python -m keel validate`
+2. **Check health**: `python -m keel health <lane>`
+3. **View logs**: `python -m keel logs <service>`
 4. **If recent change**: Rollback config
 5. **If data corruption**: Restore storage from snapshot
 6. **If still broken**: Escalate to operations team

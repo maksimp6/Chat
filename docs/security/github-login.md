@@ -1,6 +1,6 @@
 # Sign in with GitHub
 
-Alice Pro can sign users in with a GitHub account (`identity/github_oauth.py`).
+Logos can sign users in with a GitHub account (`identity/github_oauth.py`).
 It is off until a GitHub OAuth App is configured.
 
 ## Flow
@@ -10,7 +10,7 @@ It is off until a GitHub OAuth App is configured.
 2. `GET /auth/github/callback` checks `state`, exchanges the code, reads the
    account id and login from `GET https://api.github.com/user` (scope
    `read:user`), and discards the GitHub access token.
-3. The GitHub account is linked to an Alice user in `github_accounts`:
+3. The GitHub account is linked to a Logos user in `github_accounts`:
    a returning account signs in as the same user; a new account is linked to
    the browser's current anonymous user (its history is kept) or to a new user.
    A user already backed by GitHub never gains a second GitHub account. The

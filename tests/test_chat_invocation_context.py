@@ -2,9 +2,9 @@
 
 from unittest.mock import patch
 
-import mcp_routes
+import chat.mcp_routes as mcp_routes
 from app import app
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 def test_chat_uses_invocation_context_identifiers():
@@ -28,7 +28,7 @@ def test_chat_uses_invocation_context_identifiers():
             return None
 
     with (
-        patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
+        patch.object(mcp_routes, "LogosClient", lambda _config: FakeClient()),
         patch.object(mcp_routes, "get_conv_settings", return_value={}),
         patch.object(mcp_routes, "add_message"),
     ):
@@ -39,7 +39,7 @@ def test_chat_uses_invocation_context_identifiers():
                 json={
                     "conversation_id": "conv-context-test",
                     "message": "hello",
-                    "model": "aliceai-llm",
+                    "model": "logos-runtime",
                     "params": {},
                 },
             )
@@ -73,7 +73,7 @@ def test_chat_context_is_fresh_for_each_request():
             return None
 
     with (
-        patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
+        patch.object(mcp_routes, "LogosClient", lambda _config: FakeClient()),
         patch.object(mcp_routes, "get_conv_settings", return_value={}),
         patch.object(mcp_routes, "add_message"),
     ):
@@ -85,7 +85,7 @@ def test_chat_context_is_fresh_for_each_request():
                     json={
                         "conversation_id": "same-conversation",
                         "message": message,
-                        "model": "aliceai-llm",
+                        "model": "logos-runtime",
                         "params": {},
                     },
                 )

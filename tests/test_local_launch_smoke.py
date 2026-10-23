@@ -34,7 +34,7 @@ class _Session:
         return self.response
 
 
-def test_build_runtime_env_isolated_sqlite_and_valid_credential_key(monkeypatch, tmp_path):
+def test_build_runtime_env_isolated_memory_and_valid_credential_key(monkeypatch, tmp_path):
     monkeypatch.setenv("ALICE_DATABASE_URL", "postgresql://should-not-survive")
     monkeypatch.delenv("ALICE_PROVIDER_CREDENTIAL_KEY", raising=False)
 
@@ -44,7 +44,7 @@ def test_build_runtime_env_isolated_sqlite_and_valid_credential_key(monkeypatch,
     assert env["HOST"] == "127.0.0.1"
     assert env["PORT"] == "8765"
     assert env["FLASK_DEBUG"] == "0"
-    assert env["ALICE_DB_PATH"] == str(db_path)
+    assert env["ALICE_MEMORY_PATH"] == str(db_path)
     assert env["ALICE_REQUIRE_SHORT_TOKEN"] == "0"
     assert env["ALICE_PROVIDER_CREDENTIALS_TOKEN"] == ""
     assert "ALICE_DATABASE_URL" not in env
@@ -158,6 +158,9 @@ def test_trace_persistence_rejects_wrong_invocation():
 
 
 def test_partial_provider_input_fails_without_printing_secret(monkeypatch, capsys):
+    # Inspect the old input validator with synthetic data only; production live
+    # admission remains held and has dedicated tests in test_logos_launch_hold.
+    monkeypatch.setattr(smoke, "enforce_native_launch_hold", lambda: None)
     secret = "launch-smoke-secret-marker"
     monkeypatch.setenv("ALICE_LAUNCH_SMOKE_YANDEX_API_KEY", secret)
     monkeypatch.delenv("ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID", raising=False)

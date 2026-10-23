@@ -6,8 +6,9 @@ yet start a model; handlers are plain Python functions registered by task kind.
 
 ## Pieces
 
-- `agent_shell/store.py`: SQLite store of tasks and their events. A task is claimed
-  atomically, so several runners can share one file.
+- `agent_shell/store.py`: native Kristall store of tasks and their events (SQLite is
+  retired). A task is claimed atomically; runners in one process share one writer, and a
+  second process is refused by the writer lock.
 - `agent_shell/runner.py`: runs one queued task through a handler. An unknown kind fails
   without running anything. A failure stores only a fixed code (`task_failed`,
   `unknown_kind`, `invalid_result`, `interrupted`, plus `invalid_payload`, `agent_failed`,
@@ -15,12 +16,12 @@ yet start a model; handlers are plain Python functions registered by task kind.
   that touched a secret cannot leak it.
 - `agent_shell/handlers.py`: built-in task kinds. The first, `cloudru_status`, is read-only
   and reuses `scripts/cloudru_check.py`.
-- `alice_task`: runs Alice headlessly (`alice_agent_runner.run_issue_task`) on a task text:
-  `{"issue": 7, "title": "...", "body": "...", "model": "aliceai-llm"}` (model optional).
-  Alice only has her sandboxed filesystem tools and never commits, pushes or runs commands.
-  If she stops at an approval-gated tool the task fails with `needs_approval` (never
+- `alice_task`: runs Logos headlessly (`issue_runner.run_issue_task`) on a task text:
+  `{"issue": 7, "title": "...", "body": "...", "model": "logos-runtime"}` (model optional).
+  Logos only has its sandboxed filesystem tools and never commits, pushes or runs commands.
+  If it stops at an approval-gated tool the task fails with `needs_approval` (never
   auto-approved) and an agent failure ends as `agent_failed`; the result is kept either
-  way. It needs her Yandex credentials (`YANDEX_API_KEY`, `YANDEX_PROJECT_ID`).
+  way. It needs its Yandex credentials (`YANDEX_API_KEY`, `YANDEX_PROJECT_ID`).
 - Approval gate: a task added with `--needs-approval` is `blocked` and is never picked
   until the owner runs `approve`. Use it for anything that deploys or touches secrets.
 

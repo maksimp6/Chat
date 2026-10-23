@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+"""Alice Pro spool-centering rings v0.2 for PETG spool holder v0.1.
+
+Units mm. 2 identical adapter rings are required, one from each side.
+They are removable slip bearings; spool opening diameter must be measured.
+Does not modify the existing axle, frame or stands.
+
+To regenerate: python spool_centering_adapters_v02.py --bore-mm 55
+Optional: --all-presets includes 36/52/55 mm nominal bore previews.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+from pathlib import Path
+
+import cadquery as cq
+import trimesh
+
+AXLE_DIAMETER_MM = 25.0
+SLIDING_CLEARANCE_ON_DIAMETER_MM = 1.0
+BORE_UNDERSIZE_ON_DIAMETER_MM = 0.50
+BODY_INSERTION_MM = 14.0
+FLANGE_HEIGHT_MM = 2.4
+FLANGE_OVERHANG_RADIAL_MM = 2.5
+PRINT_BED_MM = 180
+
+
+def generate(nominal_bore_mm: float, output_dir: Path) -> dict:
+    """Make two separate equal bushings (only one STL, print twice).
+
+    Bushing has 26-mm round bearing bore on a D-profile shaft of nominal
+    diameter 25 mm. It is free to slide/rotate, but the outer rim bears on
+    the spool hub. Full cylindrical rim has 0.5 mm diametral clearance.
+    """
+    if not 34 <= nominal_bore_mm <= 60:
+        raise ValueError("Spool core bore must be between 34 and 60 mm")
+    inner_d = AXLE_DIAMETER_MM + SLIDING_CLEARANCE_ON_DIAMETER_MM
+    outer_d = nominal_bore_mm - BORE_UNDERSIZE_ON_DIAMETER_MM
+    flange_d = nominal_bore_mm + 2 * FLANGE_OVERHANG_RADIAL_MM
+    if outer_d - inner_d < 6:
+        raise ValueError("Insufficient thickness between axle and spool bore")
+    body = (
+        cq.Workplane("XY")
+        .circle(outer_d / 2)
+        .circle(inner_d / 2)
+        .extrude(BODY_INSERTION_MM)
+        .translate((0, 0, FLANGE_HEIGHT_MM))
+    )
+    flange = (
+        cq.Workplane("XY")
+        .circle(flange_d / 2)
+        .circle(inner_d / 2)
+        .extrude(FLANGE_HEIGHT_MM)
+    )
+    adapter = flange.union(body).clean()
+
+    # Lightweight pockets away from the bearing bore and OD support ring.
+    # Each pocket is accessible from the top, has the flange as floor,
+    # and is separated by radial load-bearing spokes.
+    min_r = inner_d / 2 + 2.6
+    max_r = outer_d / 2 - 2.6
+    windows = 0
+    if max_r - min_r >= 3.0:
+        count = 8
+        window_angle = math.radians(27)
+        for k in range(count):
+            phi = 2 * math.pi * k / count
+            # Curved annular sector with a solid inner & outer ring.
+            samples = 7
+            angles = [phi - window_angle / 2 + i * window_angle / samples
+                      for i in range(samples + 1)]
+            pts = [(min_r * math.cos(a), min_r * math.sin(a))
+                   for a in angles]
+            pts += [(max_r * math.cos(a), max_r * math.sin(a))
+                    for a in reversed(angles)]
+            pocket = (
+                cq.Workplane("XY").polyline(pts).close()
+                .extrude(BODY_INSERTION_MM + 0.2)
+                .translate((0, 0, FLANGE_HEIGHT_MM))
+            )
+            adapter = adapter.cut(pocket)
+            windows += 1
+        adapter = adapter.clean()
+
+    # Tiny edge chamfer on insertion end; preserves flange seating face.
+    # Shape generated in this orientation can print without supports.
+    output_dir.mkdir(parents=True, exist_ok=True)
+    label = str(int(nominal_bore_mm)) if nominal_bore_mm.is_integer() else str(nominal_bore_mm).replace('.', 'p')
+    filename = f"ring_for_spool_bore_{label}mm_PRINT_2.stl"
+    target = output_dir / filename
+    cq.exporters.export(adapter, str(target), tolerance=0.08, angularTolerance=0.16)
+    mesh = trimesh.load_mesh(target, process=True)
+    dims = (mesh.bounds[1] - mesh.bounds[0]).tolist()
+    return {
+        "file": filename,
+        "spool_bore_nominal_mm": nominal_bore_mm,
+        "ring_body_od_mm": round(outer_d, 2),
+        "bearing_id_mm": round(inner_d, 2),
+        "flange_od_mm": round(flange_d, 2),
+        "total_height_mm": BODY_INSERTION_MM + FLANGE_HEIGHT_MM,
+        "qty_to_print": 2,
+        "weight_estimate_pair_g_petg_at_1p27gcm3": round(mesh.volume / 1000 * 1.27 * 2, 1),
+        "watertight": bool(mesh.is_watertight),
+        "winding_consistent": bool(mesh.is_winding_consistent),
+        "connected_components": len(mesh.split(only_watertight=False)),
+        "fits_build_volume": all(x <= PRINT_BED_MM for x in dims),
+        "touches_build_plate": bool(abs(mesh.bounds[0,2]) < 0.1),
+        "pocket_count": windows,
+        "dimensions_mm": [round(x, 2) for x in dims],
+        "sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--bore-mm", type=float, default=55.0)
+    parser.add_argument("--all-presets", action="store_true")
+    parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parent)
+    args = parser.parse_args()
+    bore_values = [36.0, 52.0, 55.0] if args.all_presets else [args.bore_mm]
+    measurements = [generate(d, args.output_dir) for d in bore_values]
+    assert all(x['watertight'] and x['winding_consistent'] and
+               x['connected_components']==1 and x['fits_build_volume'] and
+               x['touches_build_plate'] for x in measurements), 'Geometry verification failed'
+    manifest = {
+        'title': 'Alice Pro Spool Holder - Centered Hub v0.2',
+        'status': 'CAD verified, physical fit and functional rotation untested',
+        'target': 'Bambu Lab A1 mini, PETG, external 1kg spool, no AMS',
+        'parts_reused_from_v0.1': ['base_frame.stl', 'upright_A_print_twice.stl', 'axle_D_section.stl'],
+        'parts_added': 'Choose ONE bore diameter, print 2 identical rings',
+        'original_axle_diameter_mm': AXLE_DIAMETER_MM,
+        'measuring_instruction': 'Measure exact free diameter of spool center hole; not outside diameter',
+        'checks': measurements,
+        'safety': [
+            'Verify the spool hole measurement before printing adapters',
+            'Do not force adapters into reel or onto axle; test a ring first',
+            'Axle must rotate or spool must turn freely under light tension',
+            'Inspect for binding with a full 1kg reel before loading printer',
+            'Keep reel outside the travel volume of A1 mini, clear of wires',
+            '3D printer print/slicer profile not yet validated; do not start remotely',
+        ],
+    }
+    (args.output_dir / 'manifest_v02.json').write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n')
+    print(json.dumps(measurements, indent=2, ensure_ascii=False))
+
+
+if __name__ == '__main__':
+    main()

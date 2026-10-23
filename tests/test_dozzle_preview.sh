@@ -20,8 +20,14 @@ grep -Fq 'clear_dozzle_data "$workdir/dozzle"' "$script"
 
 # Preview application state must survive application-container recreation.
 grep -Fq 'local data_dir="${workdir}/data"' "$script"
-grep -Fq -- '-e ALICE_DB_PATH=/app/data/alice_pro.db' "$script"
+grep -Fq -- '-e ALICE_MEMORY_PATH=/app/data/alice.memory' "$script"
 grep -Fq -- '-v "$data_dir:/app/data" \' "$script"
+
+# Runtime launch must not retain a retired SQL storage selector.
+if grep -Eq 'ALICE_DB_PATH=|ALICE_DATABASE_URL=' "$script"; then
+  echo "Preview runtime must use only the native journal path" >&2
+  exit 1
+fi
 
 # The Dozzle container must use only its own data directory.
 grep -Fq -- '-v "$dozzle_data:/data" \' "$script"

@@ -60,7 +60,7 @@ def termux_tts_speak(args: dict, cfg: dict) -> dict:
 
 
 def termux_notification(args: dict, cfg: dict) -> dict:
-    title = args.get("title", "Alice Pro")
+    title = args.get("title", "Logos")
     content = args.get("content", "")
     return _run_termux_cmd(["termux-notification", "--title", title, "--content", content])
 

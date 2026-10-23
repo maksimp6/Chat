@@ -1,6 +1,6 @@
 # Role-based GitHub agent office
 
-Alice Pro treats repository roles as the stable contract and execution mechanisms as replaceable infrastructure.
+Logos treats repository roles as the stable contract and execution mechanisms as replaceable infrastructure.
 
 ## Layers
 
@@ -53,7 +53,7 @@ the analogy does not require a separate human or agent for every checkpoint.
 | Issuing permission to prepare the workplace and admit workers | Authorized coordinator verifies permissions and stage prerequisites, including an isolated branch for file changes. | Do not invent a permanent role or require a separate issuer on every routine task. |
 | Admitting worker | Before execution, the dispatching owner checks the actual backend/tool profile and stage-specific evidence against the intended task. | Contract and contract-review use issue criteria; accepted-contract evidence is required from implementation onward. |
 | Responsible leader and work producer | Name one implementation owner; for complex or risky work, name a coordinating lead and explicit handoffs. | The lead is conditional; a reviewer cannot silently become the implementation owner. |
-| Observer and crew | Specialists work within their assigned scope; Operations Observer watches coordination signals under its own read-mostly policy. | The statutory electrical observer has a specific crew-safety purpose and is **not** Alice's Operations Observer. |
+| Observer and crew | Specialists work within their assigned scope; Operations Observer watches coordination signals under its own read-mostly policy. | The statutory electrical observer has a specific crew-safety purpose and is **not** Logos's Operations Observer. |
 
 Apply these checkpoints in the canonical issue and its current task handoff.
 Issues #634/#637 own TaskPacket implementation; #685/#686 own profile metadata
@@ -66,7 +66,7 @@ machine or changing workflow permissions.
    budget, approval boundary, and explicit pause conditions. A small routine
    task needs a compact record, not a new sign-off ceremony. Link accepted
    contract provenance when the stage reaches implementation or later.
-2. **Prepare and admit.** For a write stage, check the current `master`/PR head
+2. **Prepare and admit.** For a write stage, check the current `develop`/PR head
    and isolated branch. For read-only observation or review, check the relevant
    issue/PR and head when one exists. Check the role/backend, selected profile
    and skill versions, actual callable tools, inputs, and required approval.
@@ -124,7 +124,7 @@ Prefer deterministic tools first. Optional model assistance must have a concrete
 Roles describe responsibility; repository skills describe repeatable procedures.
 Canonical skills live under `.agents/skills/<name>/SKILL.md`.
 
-Alice exposes a compact skill catalog and loads the full body only for skills selected
+Logos exposes a compact skill catalog and loads the full body only for skills selected
 for one invocation. The selected skill name, source and content version are recorded in
 Execution Trace, while the full skill prompt is not copied into the trace.
 
