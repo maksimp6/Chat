@@ -111,6 +111,13 @@ Mode `repository-check` inspects existing provider files and attachment statuses
 without source collection, provider writes or generation. It does not assert that
 candidate pack contents have been verified. Failure receipts retain the HTTP
 method, sanitized API route and safe provider error code.
+Optional `verify_available=true` adds direct retrieval checks to this read-only
+mode. It downloads only bounded, completed repository packs returned by search,
+checks their hashes and source identities, and verifies exact source fragments
+plus an absent-marker control. Repository searches explicitly disable query
+rewriting. Failed or pending packs remain outside that
+verified subset. A successful subset check does not establish full indexing,
+complete provenance pairs, raw-original recovery or semantic entailment.
 Read-only checks may run while the serialized writer is active. Mode
 `repository-resume` accepts a prior successful check's `resume_run_id`, restores
 its exact receipt from this repository, and verifies every saved pack and source

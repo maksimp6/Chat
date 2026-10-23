@@ -14,6 +14,7 @@ import io
 import json
 import os
 import re
+import sys
 import time
 import zipfile
 from collections import Counter
@@ -30,6 +31,29 @@ MAX_SOURCE_BYTES = 128 * 1024 * 1024
 PACK_BYTES = 4 * 1024 * 1024
 INDEX_MAX_IN_FLIGHT = 8
 INDEX_TIMEOUT_SECONDS = 2 * 60 * 60
+INDEX_DIAGNOSTIC_LIMIT = 32
+INDEX_TERMINAL_STATES = {"failed", "cancelled", "expired"}
+INDEX_ERROR_CODES = {
+    "server_error",
+    "unsupported_file",
+    "invalid_file",
+    "CANCELLED",
+    "UNKNOWN",
+    "INVALID_ARGUMENT",
+    "DEADLINE_EXCEEDED",
+    "NOT_FOUND",
+    "ALREADY_EXISTS",
+    "PERMISSION_DENIED",
+    "RESOURCE_EXHAUSTED",
+    "FAILED_PRECONDITION",
+    "ABORTED",
+    "OUT_OF_RANGE",
+    "UNIMPLEMENTED",
+    "INTERNAL",
+    "UNAVAILABLE",
+    "DATA_LOSS",
+    "UNAUTHENTICATED",
+}
 EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])")
 PACK_HEADER = "<!-- repository-rag-pack-v1 "
 JSON_SECRET = re.compile(
@@ -374,7 +398,9 @@ def _validate_store(store_id: str, project: str, key: str) -> str:
     return store_path
 
 
-def _read_pack(archive, item, prefix, project, key):
+def _read_pack(
+    archive, item, prefix, project, key, *, max_response_bytes=semantic.MAX_VECTOR_FILE_BYTES
+):
     if not isinstance(item, dict):
         raise ValueError("vector_store_file_record_invalid")
     filename = item.get("filename", "")
@@ -385,12 +411,14 @@ def _read_pack(archive, item, prefix, project, key):
     file_id = item.get("id")
     if not isinstance(file_id, str) or not file_id:
         raise ValueError("vector_store_file_id_invalid")
+    if type(max_response_bytes) is not int or max_response_bytes < 1:
+        raise ValueError("pack_download_limit_invalid")
     raw = semantic.yandex_api_request(
         "GET",
         "/files/" + quote(file_id, safe="") + "/content",
         project,
         key,
-        max_response_bytes=semantic.MAX_VECTOR_FILE_BYTES,
+        max_response_bytes=min(max_response_bytes, semantic.MAX_VECTOR_FILE_BYTES),
     )
     if filename != prefix + digest(raw) + ".md":
         raise ValueError("existing_pack_hash_mismatch")
@@ -488,6 +516,60 @@ def _index_rows(store_path, project, key):
     return {semantic._attached_file_id(item): item for item in rows}
 
 
+def _safe_index_error_code(error):
+    if not isinstance(error, dict):
+        return None
+    code = error.get("code")
+    if type(code) is int and 0 < code < 17:
+        code = semantic._provider_error_code({"code": code})
+    return code if isinstance(code, str) and code in INDEX_ERROR_CODES else None
+
+
+def _read_attachment_error(file_id, store_path, project, key, remaining):
+    if not remaining[0]:
+        return None, "read_limit_reached"
+    remaining[0] -= 1
+    try:
+        detail = semantic.yandex_json_request(
+            "GET", store_path + "/files/" + quote(file_id, safe=""), project, key
+        )
+    except semantic.YandexHTTPError as error:
+        return None, f"http_{error.status}"
+    except (OSError, ValueError):
+        return None, "unavailable"
+    if semantic._attached_file_id(detail) != file_id:
+        return None, "identity_mismatch"
+    return detail.get("last_error"), "read"
+
+
+def _attachment_states(rows, store_path, project, key):
+    states, remaining = [], [INDEX_DIAGNOSTIC_LIMIT]
+    for item in rows:
+        file_id = semantic._attached_file_id(item)
+        if file_id is None:
+            raise ValueError("vector_store_file_id_invalid")
+        state = {"file_id": file_id, "status": item.get("status")}
+        if state["status"] in INDEX_TERMINAL_STATES:
+            error = item.get("last_error")
+            if not isinstance(error, dict) or error.get("code") is None:
+                error, lookup = _read_attachment_error(file_id, store_path, project, key, remaining)
+                state["last_error_lookup"] = lookup
+            code = _safe_index_error_code(error)
+            if code is not None:
+                state["last_error"] = {"code": code}
+            else:
+                state["last_error_diagnostic"] = (
+                    "not_reported" if error is None else "unrecognized_code"
+                )
+        states.append(state)
+    return states
+
+
+def _diagnose_index_targets(by_id, target_ids, store_path, project, key):
+    rows = [item for file_id, item in by_id.items() if file_id in target_ids]
+    return {item["file_id"]: item for item in _attachment_states(rows, store_path, project, key)}
+
+
 def _attach_pending(store_path, pending, capacity, project, key):
     submitted = set()
     for item in pending[:capacity]:
@@ -521,6 +603,9 @@ def _index_progress(target_ids, by_id, submitted, checkpoint_path):
         "submitted": len(target_ids & submitted),
         "completed": sum(state == "completed" for state in states.values()),
         "in_progress": sum(state == "in_progress" for state in states.values()),
+        "terminal_errors": [
+            by_id[item] for item in sorted(target_ids) if states[item] in INDEX_TERMINAL_STATES
+        ],
     }
     if checkpoint_path:
         atomic(
@@ -544,12 +629,13 @@ def _attach_and_wait(store_path, selected, attached_ids, project, key, *, checkp
     next_report = 0.0
     while True:
         by_id = _index_rows(store_path, project, key)
+        by_id.update(_diagnose_index_targets(by_id, target_ids, store_path, project, key))
         submitted.update(by_id)
         states, progress = _index_progress(target_ids, by_id, submitted, checkpoint_path)
         if progress != previous_progress or time.monotonic() >= next_report:
             print(json.dumps({"indexing_progress": progress}), flush=True)
             previous_progress, next_report = progress, time.monotonic() + 60
-        if any(state in {"failed", "cancelled", "expired"} for state in states.values()):
+        if any(state in INDEX_TERMINAL_STATES for state in states.values()):
             raise ValueError("vector_store_index_failed")
         if all(state == "completed" for state in states.values()):
             return
@@ -626,11 +712,12 @@ def provider_inventory(repository: str, store_id: str, project: str, key: str) -
         ),
         "store_attachment_count": len(attached),
         "candidate_pack_files": candidates,
-        "attachments": [
-            {"file_id": semantic._attached_file_id(item), "status": item.get("status")}
-            for item in attached
-            if semantic._attached_file_id(item) in ids
-        ],
+        "attachments": _attachment_states(
+            [item for item in attached if semantic._attached_file_id(item) in ids],
+            store_path,
+            project,
+            key,
+        ),
         "generation_requests": 0,
     }
 
@@ -670,9 +757,11 @@ def _snippet_candidates(archive, document_hashes, file_id, snippet):
 
 def verify_search(archive: CorpusArchive, upload: dict, query: str, project: str, key: str) -> dict:
     """Search without generation; bind returned text to indexed file and document."""
+    from scripts.repository_rag_verify import direct_search
+
     packs = {item["file_id"]: set(item["documents"]) for item in upload["packs"]}
     matches = []
-    for item in semantic.vector_store_search(upload["store_id"], query, project, key):
+    for item in direct_search(upload["store_id"], query, project, key, sys.modules[__name__]):
         file_id = item.get("file_id")
         if file_id not in packs:
             continue
@@ -690,7 +779,7 @@ def verify_search(archive: CorpusArchive, upload: dict, query: str, project: str
                         {"file_id": file_id, "attribution": "ambiguous", "candidates": candidates}
                     )
     marker = "REPOSITORY_RAG_ABSENT_" + os.urandom(16).hex()
-    absent = semantic.vector_store_search(upload["store_id"], marker, project, key)
+    absent = direct_search(upload["store_id"], marker, project, key, sys.modules[__name__])
     fabricated = any(
         marker in text for item in absent for text in semantic._vector_result_texts(item)
     )
@@ -716,6 +805,7 @@ def _arguments(argv: list[str] | None):
     parser.add_argument("--upload", action="store_true")
     parser.add_argument("--upload-only", action="store_true")
     parser.add_argument("--provider-check", action="store_true")
+    parser.add_argument("--verify-available", action="store_true")
     parser.add_argument("--resume-receipt", type=Path)
     parser.add_argument("--store-id", default=DEFAULT_STORE_ID)
     parser.add_argument(
@@ -724,7 +814,10 @@ def _arguments(argv: list[str] | None):
     parser.add_argument("--github-max-requests", type=int, default=1500)
     parser.add_argument("--github-passes", type=int, choices=(1, 2, 3), default=1)
     parser.add_argument("--fetch-status", type=Path)
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.verify_available and not args.provider_check:
+        parser.error("--verify-available requires --provider-check")
+    return args
 
 
 def _github_progress(reader, repository):
@@ -846,6 +939,19 @@ def _run(args, archive: CorpusArchive, result: dict) -> None:
             args.repository, args.store_id, project, key
         )
         result["status"] = "provider_inspected"
+        if args.verify_available:
+            from scripts.repository_rag_verify import verify_available
+
+            result["available_retrieval"] = verify_available(
+                archive,
+                result["provider_inventory"],
+                args.query,
+                project,
+                key,
+                sys.modules[__name__],
+            )
+            if result["available_retrieval"]["status"] != "verified_fragments":
+                result["status"] = "retrieval_verification_failed"
         return
     if args.resume_receipt:
         from scripts.repository_rag_resume import resume_from_receipt

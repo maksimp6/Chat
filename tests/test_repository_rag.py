@@ -7,6 +7,7 @@ import zipfile
 import pytest
 
 from scripts import repository_rag as rag
+from scripts import repository_rag_verify as verify
 
 
 def archive(tmp_path):
@@ -366,8 +367,8 @@ def test_repeated_historical_quote_keeps_ambiguous_sources(tmp_path, monkeypatch
         "packs": [{"file_id": "file", "documents": list(rag.prepared_documents(a))}],
     }
     monkeypatch.setattr(
-        rag.semantic,
-        "vector_store_search",
+        verify,
+        "direct_search",
         lambda _s, query, *_a: (
             []
             if query.startswith("REPOSITORY_RAG_ABSENT_")
@@ -423,8 +424,8 @@ def test_search_verifies_body_quote_and_rejects_wrong_file_or_header_only(tmp_pa
     quote = "checks permissions before execution of tools."
     hits = [{"file_id": "file", "content": [{"type": "text", "text": quote}]}]
     monkeypatch.setattr(
-        rag.semantic,
-        "vector_store_search",
+        verify,
+        "direct_search",
         lambda _s, query, *_a: [] if query.startswith("REPOSITORY_RAG_ABSENT_") else hits,
     )
     result = rag.verify_search(a, upload, "tool permissions", "project", "key")

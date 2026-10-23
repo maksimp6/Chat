@@ -46,6 +46,11 @@ on:
         description: "Prior successful repository-check run whose saved file manifest is resumed"
         required: false
         default: ""
+      verify_available:
+        description: "Verify direct retrieval from completed repository packs without generation"
+        type: boolean
+        required: false
+        default: false
   push:
     branches: [feat/semantic-pipeline]
 
@@ -156,11 +161,15 @@ jobs:
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
           RAG_QUERY: ${{ inputs.query }}
           RAG_MODE: ${{ inputs.mode }}
+          RAG_VERIFY_AVAILABLE: ${{ inputs.verify_available }}
         run: |
           set -euo pipefail
           operation=(--upload --github-passes 3)
           if [ "$RAG_MODE" = repository-check ]; then
             operation=(--provider-check)
+            if [ "$RAG_VERIFY_AVAILABLE" = true ]; then
+              operation+=(--verify-available)
+            fi
           elif [ "$RAG_MODE" = repository-resume ]; then
             operation=(--resume-receipt "$RUNNER_TEMP/repository-rag-resume/repository-rag-receipt.json")
           fi
