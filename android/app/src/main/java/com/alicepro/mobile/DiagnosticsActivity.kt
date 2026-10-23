@@ -18,9 +18,6 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
-import com.alicepro.mobile.rootagent.RootAgentClient
-import com.alicepro.mobile.rootagent.RootAgentService
-import com.alicepro.mobile.rootagent.RootAgentTokenStore
 
 class DiagnosticsActivity : AppCompatActivity() {
     private lateinit var list: ListView
@@ -122,12 +119,9 @@ class DiagnosticsActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
         }
         rootAgentRow.addView(Button(this).apply {
-            text = "RootAgent: проверить"
-            setOnClickListener { checkRootAgent() }
-        }, LinearLayout.LayoutParams(0, -2, 1f))
-        rootAgentRow.addView(Button(this).apply {
-            text = "RootAgent: остановить"
-            setOnClickListener { RootAgentService.stop(this@DiagnosticsActivity) }
+            text = "RootAgent: панель"
+            isAllCaps = false
+            setOnClickListener { startActivity(Intent(this@DiagnosticsActivity, RootAgentDiagnosticsActivity::class.java)) }
         }, LinearLayout.LayoutParams(0, -2, 1f))
         root.addView(rootAgentRow)
 
@@ -209,7 +203,7 @@ class DiagnosticsActivity : AppCompatActivity() {
 
     private fun copyText(text: String) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("Alice Pro diagnostics", text))
+        clipboard.setPrimaryClip(ClipData.newPlainText("Logos diagnostics", text))
         AppLogger.debug("DiagnosticsActivity", "Diagnostic data copied", mapOf("chars" to text.length.toString()))
     }
 
@@ -231,41 +225,6 @@ class DiagnosticsActivity : AppCompatActivity() {
             .show()
     }
 
-    /** Starts the RootAgent service and runs the in-app loopback self-check (#650). */
-    private fun checkRootAgent() {
-        RootAgentService.start(this)
-        Thread {
-            val report = try {
-                val token = RootAgentTokenStore(applicationContext).loadOrCreate()
-                Thread.sleep(ROOT_AGENT_STARTUP_MS)
-                RootAgentClient(RootAgentService.PORT) { token }.selfCheck()
-            } catch (error: Exception) {
-                AppLogger.error("DiagnosticsActivity", "RootAgent self-check failed", error)
-                RootAgentClient.Report(healthy = false, root = null, error = "self_check_failed")
-            }
-            val message = "API: " + (if (report.healthy) "работает" else "недоступен") +
-                "\nRoot: " + when (report.root) {
-                    true -> "есть (uid 0)"
-                    false -> "нет"
-                    null -> "неизвестно"
-                } + (report.error?.let { "\nОшибка: $it" } ?: "")
-            AppLogger.info(
-                "DiagnosticsActivity",
-                "RootAgent self-check",
-                mapOf("healthy" to report.healthy.toString(), "root" to report.root.toString()),
-            )
-            runOnUiThread {
-                if (!isFinishing) {
-                    AlertDialog.Builder(this)
-                        .setTitle("RootAgent")
-                        .setMessage(message)
-                        .setPositiveButton("Закрыть", null)
-                        .show()
-                }
-            }
-        }.start()
-    }
-
     private fun spinnerListener(onSelected: () -> Unit) =
         object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(
@@ -278,7 +237,4 @@ class DiagnosticsActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = onSelected()
         }
 
-    private companion object {
-        const val ROOT_AGENT_STARTUP_MS = 700L
-    }
 }

@@ -1,6 +1,6 @@
 # Agent Gateway
 
-The Agent Gateway is the provider-neutral lifecycle boundary for Alice Pro agents.
+The Agent Gateway is the provider-neutral lifecycle boundary for Logos agents.
 
 It provides immutable agent descriptors, capability routing, preferred-agent fallback, user authorization and explicit approval for protected agents, timeouts, bounded retries, per-agent rate limits, circuit breaking, normalized invocation results, and optional ExecutionTrace lifecycle events.
 

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://alice.local/schema/integration-catalog-v1.json",
-  "title": "Alice integration catalog",
+  "$id": "https://logos.local/schema/integration-catalog-v1.json",
+  "title": "Logos integration catalog",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "as_of", "stale_after_days", "integrations"],
