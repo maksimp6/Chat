@@ -1,4 +1,4 @@
-"""The 3D-printing domain must not depend on Alice Pro host modules."""
+"""The 3D-printing domain must not depend on Logos host modules."""
 
 import ast
 import sys

@@ -25,8 +25,8 @@ MYPY_ERROR_BASELINE = {
     "misc": 1,
     "no-any-return": 36,
     "no-redef": 1,
-    "no-untyped-call": 302,
-    "no-untyped-def": 326,
+    "no-untyped-call": 299,
+    "no-untyped-def": 324,
     "operator": 10,
     "return": 1,
     "return-value": 6,
@@ -39,6 +39,7 @@ MYPY_ERROR_BASELINE = {
 # Files with zero strict errors. Errors here fail outright.
 STRICT_CLEAN_FILES = {
     "steel/guardian/admission.py",
+    "agent_runtime/provider_receipt.py",
     "forge/__init__.py",
     "forge/binding.py",
     "printing3d/store.py",
@@ -77,6 +78,7 @@ STRICT_CLEAN_FILES = {
     "agent_office/__init__.py",
     "agent_office/dispatch_model.py",
     "agent_office/task_state.py",
+    "agent_office/simulation.py",
     "agent_retrieval/__init__.py",
     "agent_retrieval/models.py",
     "agent_shell/__init__.py",
@@ -124,6 +126,8 @@ STRICT_CLEAN_FILES = {
     "rdc_connection/__init__.py",
     "agent_runtime/reasoning_plan.py",
     "agent_runtime/responses_tool_loop.py",
+    "agent_runtime/logos_launch_hold.py",
+    "agent_runtime/generation_gate.py",
     "runtime/__init__.py",
     "runtime/conversation_agents.py",
     "runtime/loader.py",
@@ -149,6 +153,7 @@ STRICT_CLEAN_FILES = {
     "identity/user_identity.py",
     "economy/treasury_identity.py",
     "yandex_client_modules/api_logger.py",
+    "yandex_client_modules/request_receipt.py",
 }
 
 ERROR_LINE = re.compile(r"^(?P<path>[^:]+\.py):\d+(?::\d+)?: error: .*\[(?P<code>[a-z-]+)\]$")

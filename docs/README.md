@@ -1,6 +1,6 @@
-# Alice Pro Documentation
+# Logos Documentation
 
-Это центральная точка входа для документации по проекту Alice Pro. Используйте оглавление ниже для навигации по разделам.
+Это центральная точка входа для документации по проекту Logos. Используйте оглавление ниже для навигации по разделам.
 
 ## Разделы документации
 
@@ -17,7 +17,7 @@
 - [Agent shell: стартовый каркас](agents/agent-shell.md) — хранилище задач, исполнитель и первая read-only задача для запуска агентов в своём контейнере
 - [Production deployment](production-deployment.md) — VPS production runbook; наличие runbook не заменяет post-deploy verification
 - [Cloud.ru Container Apps](cloudru-container-apps.md) — v2 baseline serverless deployment runbook; client contract синхронизирован с `master`, live Cloud.ru rollout пока не подтверждён
-- [Alice Platform](platform/architecture.md) — deployment system с config-driven reconciliation
+- [Keel Platform](platform/architecture.md) — deployment system с config-driven reconciliation
   - [Архитектура](platform/architecture.md) — сервисы, lanes, валидация
   - [Домены](platform/domains.md) — конфигурация маршрутизации
   - [Хранилище](platform/storage.md) — persistent storage и backup
@@ -27,19 +27,21 @@
 - [API](api/overview.md) — описание доступных API-интерфейсов
 - [MCP](mcp/overview.md) — работа с MCP-серверами и инструментами
 - [3D Printing Business](printing3d.md) — shipped-контур заказов, P&L, финансирования и AI-first оценки
-- [ChatGPT Apps SDK](mcp/chatgpt_apps.md) — подключение Alice Pro к ChatGPT через MCP
+- [ChatGPT Apps SDK](mcp/chatgpt_apps.md) — подключение Logos к ChatGPT через MCP
 - [Сообщество ботов](integrations/chatgpt-bot-community.md) — интеграция ChatGPT, MCP и A2A-ботов
-- [Work Map: trips.db](integrations/work-map-trips.md) — ручной прототип обработки `trips.db` и границы будущей интеграции; в Alice Pro не реализовано
-- [Конспекты внешней документации](notes/README.md) — переработанные знания и выводы для Alice Pro
+- [Work Map: trips.db](integrations/work-map-trips.md) — ручной прототип обработки `trips.db` и границы будущей интеграции; в Logos не реализовано
+- [Конспекты внешней документации](notes/README.md) — переработанные знания и выводы для Logos
 - [Markdown-зеркала](mirrors/README.md) — близкие к источнику локальные копии внешней документации
 - [Markdown-зеркало Cloud.ru](integrations/cloudru-docs-mirror.md) — спецификация crawler/fetch pipeline и manifest для Cloud.ru
-- [Агенты Alice](agents/overview.md) — runtime-агенты и адаптеры приложения (чат, голос, CLI, инструменты)
-- [Роли разработки в репозитории](agents/role-based-agent-office.md) — GitHub-роли (Team Lead, Backend, Docs Engineer и др.), не часть runtime Alice
+- [Агенты Logos](agents/overview.md) — runtime-агенты и адаптеры приложения (чат, голос, CLI, инструменты)
+- [Роли разработки в репозитории](agents/role-based-agent-office.md) — GitHub-роли (Team Lead, Backend, Docs Engineer и др.), не часть runtime Logos
 - [Фронтенд](frontend/overview.md) — структура пользовательского интерфейса
+- [Пробелы пользовательских сценариев](frontend/capability-gaps-2026-10-11.md) — код и локальный UI на 2026-10-11, приоритеты и критерии приёмки
+- [Повторно применимые уроки и навыки](lessons/README.md) — источники, границы истории и каталог процедур
 - [Бэкенд](backend/overview.md) — архитектура серверной части
 - [База данных](database/overview.md) — модели данных и схема БД
 - [Безопасность](security/overview.md) — меры защиты и безопасность системы
-- [Cloud.ru Secret Management](security/cloudru-secret-management.md) — адаптер и границы прав для секретов Alice Pro
+- [Cloud.ru Secret Management](security/cloudru-secret-management.md) — адаптер и границы прав для секретов Logos
 - [Журнал изменений](changelog.md) — история релизов и изменений
 - [Синхронизация с bare-репозиторием](bare_sync.md) — процесс зеркалирования изменений в `local_bare`
 - [Работа с памятью](memory/overview.md) — управление данными в оперативной памяти

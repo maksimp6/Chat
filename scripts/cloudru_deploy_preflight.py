@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate Alice deployment inputs without rendering or sending secret values.
+"""Validate Logos deployment inputs without rendering or sending secret values.
 
 No cloud API calls. --check-db verifies an existing native journal with its writer lock.
 This is a configuration check, not a provisioner or a deployment approval gate.
@@ -50,6 +50,10 @@ def https_origin(value: object) -> bool:
         return False
 
 
+# Module.Class of the native store implemented in the repository (kristall/store.py).
+NATIVE_ENGINE = "kristall.Kristall"
+
+
 def database_parameters(path: str, database: dict) -> tuple[dict, list[str]]:
     """Validate native storage scope without opening any database or network."""
     errors = []
@@ -61,8 +65,8 @@ def database_parameters(path: str, database: dict) -> tuple[dict, list[str]]:
         "persistence_evidence",
         "restore_evidence",
     }
-    if set(database) != allowed or database.get("engine") != "memory_engine.MemoryStore":
-        errors.append("database: native MemoryStore schema required")
+    if set(database) != allowed or database.get("engine") != NATIVE_ENGINE:
+        errors.append("database: native Kristall schema required")
     if type(database.get("writer_processes")) is not int or database.get("writer_processes") != 1:
         errors.append("database: exactly one writer process required")
     if (
@@ -131,13 +135,13 @@ def validate(config: object, env: dict, *, workflow: bool = False) -> list[str]:
         )
     ):
         errors.append(
-            "container: expected initial Alice profile (8080, 0.5 CPU, 1024Mi, scale 0..1)"
+            "container: expected initial Logos profile (8080, 0.5 CPU, 1024Mi, scale 0..1)"
         )
     database = config.get("database")
     if not isinstance(database, dict):
         return errors + ["database: object required"]
     if env.get("ALICE_DATABASE_URL"):
-        errors.append("ALICE_DATABASE_URL: retired setting; native MemoryStore required")
+        errors.append("ALICE_DATABASE_URL: retired setting; native Kristall required")
 
     required = (
         "ALICE_SHORT_TOKEN",

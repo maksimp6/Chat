@@ -1,14 +1,14 @@
 # Work Map: trips.db workflow
 
-- **Status**: documented; not implemented in Alice Pro
+- **Status**: documented; not implemented in Logos
 - **Issue**: #470
 - **Privacy level**: location-sensitive data; user-explicit control required
 
 ## Overview
 
-The Work Map generator processes user-selected `trips.db` (SQLite) databases to visualize travel patterns and generate route summaries. The current implementation is a **manual prototype** verified through standalone analysis. Alice Pro does not yet integrate this as a shipped capability.
+The Work Map generator processes user-selected `trips.db` (SQLite) databases to visualize travel patterns and generate route summaries. The current implementation is a **manual prototype** verified through standalone analysis. Logos does not yet integrate this as a shipped capability.
 
-This document describes the verified workflow, its design principles, and the boundaries for a future Alice Pro integration.
+This document describes the verified workflow, its design principles, and the boundaries for a future Logos integration.
 
 ## Scope
 
@@ -20,7 +20,7 @@ This document describes the verified workflow, its design principles, and the bo
 - Soft-deleted trip filtering
 - Synthetic test fixtures only
 
-**Future (if integrated into Alice Pro):**
+**Future (if integrated into Logos):**
 
 - File selection and upload through user UI
 - Sandboxed processing and temporary file cleanup
@@ -99,9 +99,9 @@ Generate route summary (JSON/map)
 User review and decision to share/publish
 ```
 
-### Future Alice Pro integration (design, not shipped)
+### Future Logos integration (design, not shipped)
 
-When Alice Pro integrates Work Map generation, the workflow should follow:
+When Logos integrates Work Map generation, the workflow should follow:
 
 1. **File selection**: User chooses `trips.db` from their device or cloud storage (via the user artifact storage capability, see #340)
 2. **Snapshot creation**: Create isolated, temporary copy in runtime-scoped storage
@@ -111,7 +111,7 @@ When Alice Pro integrates Work Map generation, the workflow should follow:
 6. **Cleanup**: Delete temporary files; retain only user-approved output
 
 Reading a user-supplied `trips.db` snapshot is a file-format and integration
-concern. It is not Alice runtime persistence and does not conflict with the
+concern. It is not Logos runtime persistence and does not conflict with the
 file-native runtime state in #776.
 
 Ownership of the pieces a future integration touches:

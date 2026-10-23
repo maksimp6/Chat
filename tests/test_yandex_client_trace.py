@@ -66,7 +66,7 @@ class TestExecutionTraceResponses(unittest.TestCase):
         trace.add_response(
             {
                 "id": "resp-1",
-                "model": "aliceai-llm",
+                "model": "logos-runtime",
                 "status": "completed",
                 "usage": {"input_tokens": 1000, "output_tokens": 100, "total_tokens": 1100},
             },
@@ -75,7 +75,7 @@ class TestExecutionTraceResponses(unittest.TestCase):
         trace.add_response(
             {
                 "id": "resp-2",
-                "model": "aliceai-llm",
+                "model": "logos-runtime",
                 "status": "completed",
                 "usage": {"input_tokens": 500, "output_tokens": 50, "total_tokens": 550},
             },
@@ -99,7 +99,7 @@ class TestExecutionTraceResponses(unittest.TestCase):
         trace.add_response(
             {
                 "id": "resp-cache",
-                "model": "aliceai-llm-flash",
+                "model": "logos-runtime-flash",
                 "status": "completed",
                 "usage": {
                     "input_tokens": 1000,
@@ -138,7 +138,7 @@ class TestExecutionTraceResponses(unittest.TestCase):
         trace.add_response(
             {
                 "id": "resp-persist",
-                "model": "aliceai-llm",
+                "model": "logos-runtime",
                 "status": "completed",
                 "usage": {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
             },

@@ -16,11 +16,11 @@
   }
 
   function loadEruda() {
-    if (window.__ALICE_ERUDA_INITIALIZED__) return;
+    if (window.__LOGOS_ERUDA_INITIALIZED__) return;
     if (window.eruda && typeof window.eruda.init === "function") {
       try {
         window.eruda.init();
-        window.__ALICE_ERUDA_INITIALIZED__ = true;
+        window.__LOGOS_ERUDA_INITIALIZED__ = true;
         window.dispatchEvent(new CustomEvent("alice:eruda-ready"));
         showIfRequested();
       } catch (error) {
@@ -29,11 +29,11 @@
       return;
     }
 
-    var existing = document.getElementById("alice-eruda-loader");
+    var existing = document.getElementById("logos-eruda-loader");
     if (existing) return;
 
     var script = document.createElement("script");
-    script.id = "alice-eruda-loader";
+    script.id = "logos-eruda-loader";
     script.async = true;
     script.src =
       (window.__ALICE_STATIC_BASE || "/static") +

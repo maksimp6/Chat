@@ -1,0 +1,28 @@
+{
+  "status": "MODEL_JUDGMENT_COMPLETED",
+  "pr": 1422,
+  "head": "46d32e0920135c569a68f897002ebd96c7d69029",
+  "develop_head": "d6f5cafbfcb337006444177d8f15400ab4ddb274",
+  "run_id": "39385308582",
+  "response_id": "7422e104-0a05-4c7b-96ae-a57fb99ace37",
+  "model": "yandexgpt-lite/latest",
+  "evidence_sha256": "314ffcc85a9233add571a703b7755d493ac2a44aee5aec20364520f60e9226ba",
+  "usage": {
+    "input_tokens": 11127,
+    "input_tokens_details": {
+      "cached_tokens": 0,
+      "valid": true,
+      "tool_tokens": 0
+    },
+    "output_tokens": 414,
+    "output_tokens_details": {
+      "reasoning_tokens": 0,
+      "valid": true
+    },
+    "total_tokens": 11541,
+    "valid": true
+  },
+  "provider_confirmed_cost": "unknown",
+  "merge_approval": false,
+  "judgment": "**ФАКТЫ:**\n- Создан PR для проведения суда-разбора этого же PR в раннере после добавления YANDEX_API_KEY и YANDEX_PROJECT_ID.\n- Правила взяты из AGENTS.md.\n- Модель выполняет ограниченный вызов YandexGPT Lite Responses API.\n- Лимиты: один запрос, без retries, <=60000 символов входа / 1500 выходных токенов, 90 секунд запрос / 4 минуты job.\n- Точная стоимость и денежный hard cap неизвестны.\n- Секреты не изменялись и не выводятся.\n- Проверено локально на дереве 53aa32e7b272fdc4f98b6561a52f3924113a6132.\n\n**НОРМА (точная цитата):**\n- «Use the smallest independent change that satisfies an issue or subtask».\n- «Never push or rewrite master directly, never push directly to develop from an agent task branch, and never commit secrets».\n\n**НАРУШЕНИЯ:**\n- В PR добавлены новые файлы и внесены изменения в существующие файлы, что может нарушать правило о создании PR для наименьшего независимого изменения.\n- В PR используются секреты (YANDEX_API_KEY и YANDEX_PROJECT_ID), что может нарушать правило о том, что секреты не должны изменяться и выводиться.\n\n**КТО ПОСТРАДАЛ:**\n- Реальный вред не доказан, но нарушение правил может привести к некорректной работе системы или нарушению безопасности.\n\n**ЧТО НЕ ДОКАЗАНО:**\n- Точная стоимость и денежный hard cap не подтверждены.\n\n**ВЕРДИКТ:**\n- Нарушение правил о создании PR для наименьшего независимого изменения и использовании секретов.\n\n**ИСПРАВЛЕНИЕ:**\n- Удалить добавленные файлы или изменить их так, чтобы они соответствовали правилу о наименьшем независимом изменении.\n- Не использовать секреты в PR."
+}

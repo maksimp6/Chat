@@ -1,6 +1,6 @@
-# Alice Platform Architecture
+# Keel Platform Architecture
 
-Alice Platform is a configuration-driven deployment system that uses three layers:
+Keel Platform is a configuration-driven deployment system that uses three layers:
 
 1. **Documentation** (docs/platform/) — explains rules and principles
 2. **Configuration** (config/alice/) — contains desired state facts (YAML)
@@ -13,7 +13,7 @@ This document explains the platform structure and principles.
 The platform manages three core services:
 
 ### OAuth
-- **Purpose**: OAuth 2.0 identity provider for Alice
+- **Purpose**: OAuth 2.0 identity provider for Logos
 - **Configuration**: `platform.yaml`, `domains.yaml`, `secrets.yaml`
 - **Deployment**: `production.yaml`, `test.yaml`
 - **Domain**: `oauth.maxxxpavlov.online` (production), test lane equivalent
@@ -21,7 +21,7 @@ The platform manages three core services:
 - **Sign-in method**: `github` (production), `passphrase` (test)
 
 ### Chrome Worker
-- **Purpose**: Browser automation and control for Alice Chat
+- **Purpose**: Browser automation and control for Logos Chat
 - **Configuration**: `platform.yaml`, `domains.yaml`, `storage.yaml`
 - **Persistent storage**: `/chrome-state` volume
 - **Domain**: `chrome.maxxxpavlov.online` (production), test lane equivalent

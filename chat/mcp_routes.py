@@ -3,6 +3,7 @@
 from flask import Blueprint, request, jsonify
 import logging
 import json as _json
+from typing import Any
 from yandex_client_modules.client import YandexResponsesClient
 from core.config import Config, calculate_full_cost
 from observability.trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
@@ -68,7 +69,7 @@ def _tool_call_parts(tool_call):
     return name, arguments
 
 
-def _tool_call_needs_approval(tool_call):
+def _tool_call_needs_approval(tool_call: dict[str, Any]) -> bool:
     name, arguments = _tool_call_parts(tool_call)
     tool_config = registry.get_tool_meta(name) if name else None
     return bool(tool_config and tool_call_requires_approval(tool_config, arguments))
@@ -87,7 +88,7 @@ def _normalize_requested_skills(data, params):
     return [item.strip() for item in raw if item.strip()]
 
 
-class AliceClient(YandexResponsesClient):
+class LogosClient(YandexResponsesClient):
     def ask_with_mcp(self, message, model_key, conversation_id=None, params=None, trace=None):
         response = super().ask_with_mcp(
             message=message,
@@ -115,7 +116,7 @@ class AliceClient(YandexResponsesClient):
                     continuation_params = dict(base_params)
                     continuation_params["input"] = input_items
                     continuation_params["background"] = base_params.get("background", True)
-                    return super(AliceClient, self).ask_with_mcp(
+                    return super(LogosClient, self).ask_with_mcp(
                         message="",
                         model_key=model_key,
                         conversation_id=conversation_id,
@@ -127,7 +128,10 @@ class AliceClient(YandexResponsesClient):
                     response,
                     execute_tool,
                     continue_request,
-                    max_rounds=16,
+                    max_rounds=base_params.get("max_rounds", 16),
+                    should_pause=lambda batch: any(
+                        _tool_call_needs_approval(call) for call in batch
+                    ),
                 )
 
         if trace is not None:
@@ -156,7 +160,7 @@ def chat():
     conv_id = None
     session_id = None
     message = None
-    model_key = "aliceai-llm"
+    model_key = "logos-runtime"
     partial_output = None
     error_message = None
     selected_skill_metadata = []
@@ -169,7 +173,7 @@ def chat():
         params = dict(data.get("params") or {})
         role = data.get("role") or params.pop("role", None)
         requested_skills = _normalize_requested_skills(data, params)
-        model_key = data.get("model") or params.get("model", "aliceai-llm")
+        model_key = data.get("model") or params.get("model", "logos-runtime")
 
         if not conv_id or not message:
             return jsonify({"error": "conversation_id и message обязательны"}), 400
@@ -240,7 +244,7 @@ def chat():
             invocation.conversation_id,
             message,
         )
-        client = AliceClient(Config)
+        client = LogosClient(Config)
 
         response = client.ask_with_mcp(
             message=message,
@@ -571,12 +575,12 @@ def conversations():
 
     if request.method == "POST":
         data = request.get_json(silent=True) or {}
-        client = AliceClient(Config)
+        client = LogosClient(Config)
         creation_trace = ExecutionTrace()
         creation_trace.set_request(
             {
                 "operation": "create_conversation",
-                "model": data.get("model", "aliceai-llm"),
+                "model": data.get("model", "logos-runtime"),
             }
         )
         try:
@@ -599,7 +603,7 @@ def conversations():
                 }
             ), 502
         title = data.get("title") or "Новый чат"
-        model = data.get("model", "aliceai-llm")
+        model = data.get("model", "logos-runtime")
         create_conversation(conv_id, title, model)
         if owner_id:
             set_owner(conv_id, owner_id)
@@ -639,7 +643,7 @@ def execute_approved():
         conv_id = data.get("conversation_id")
         func_name = data.get("name")
         arguments = data.get("arguments", {})
-        model_key = data.get("model", "aliceai-llm")
+        model_key = data.get("model", "logos-runtime")
 
         tool_config = registry.get_tool_meta(func_name)
         if not tool_config:
@@ -672,7 +676,7 @@ def execute_approved():
             } else 400
 
         execution_data = exec_res.get("data")
-        client = AliceClient(Config)
+        client = LogosClient(Config)
         prompt = (
             f"Пользователь подтвердил действие '{func_name}' с параметрами {arguments}.\n"
             f"Результат: {execution_data}.\nДай краткий ответ о завершении."

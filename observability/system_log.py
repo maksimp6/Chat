@@ -127,6 +127,6 @@ def configure(level: int | str | None = None, *, directory: Path | None = None) 
 
 
 def get_logger(name: str = "") -> logging.Logger:
-    """Return a child of the ``alice`` logger (configures handlers on first use)."""
+    """Return a child of the ``ROOT_LOGGER_NAME`` logger (configures handlers on first use)."""
     configure()
     return logging.getLogger(f"{ROOT_LOGGER_NAME}.{name}" if name else ROOT_LOGGER_NAME)

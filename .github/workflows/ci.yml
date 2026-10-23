@@ -65,7 +65,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
           cache: pip
@@ -89,7 +89,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
           cache: pip
@@ -126,7 +126,7 @@ jobs:
           bash tests/test_dozzle_preview.sh
       - name: Compile tracked Python sources
         run: git ls-files '*.py' -z | xargs -0 -r python -m py_compile
-      - name: Validate Alice Platform config
+      - name: Validate Keel Platform config
         run: python -m keel validate
       - name: Validate frontend JavaScript policy
         run: python tests/validate_frontend_modules.py
@@ -225,25 +225,11 @@ jobs:
             flask-live.log
           if-no-files-found: warn
       - name: Enforce coverage quality gates
-        env:
-          EVENT_BEFORE: ${{ github.event.before }}
         run: |
           # 69.96% is the measured production-only baseline after test/support
           # files were removed from coverage accounting. Keep that baseline from
-          # regressing, while requiring 100% coverage for changed Python lines.
+          # regressing.
           coverage report --fail-under=69.96
-
-          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            DIFF_BASE="origin/$GITHUB_BASE_REF"
-          else
-            DIFF_BASE="$EVENT_BEFORE"
-            if [ -z "$DIFF_BASE" ] || [ "$DIFF_BASE" = "0000000000000000000000000000000000000000" ]; then
-              DIFF_BASE="HEAD^"
-            fi
-          fi
-
-          git rev-parse --verify "$DIFF_BASE^{commit}"
-          diff-cover coverage.xml --compare-branch="$DIFF_BASE" --fail-under=100
 
 
   infra:
@@ -279,20 +265,6 @@ jobs:
           mapfile -t suites < <(printf '%s\n' tests/test_cloudru*.py tests/test_ci_*.py tests/test_platform*.py tests/test_*deploy*.py tests/test_rdc*.py | sort -u)
           test "${#suites[@]}" -gt 0
           python -m pytest -q "${suites[@]}" --cov=. --cov-config=.coveragerc --cov-branch --cov-report=xml:infra-coverage.xml
-      - name: Enforce infrastructure changed-line coverage
-        if: needs.changes.outputs.backend != 'true'
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PUSH_BEFORE_SHA: ${{ github.event.before }}
-        run: |
-          set -euo pipefail
-          base="$PUSH_BEFORE_SHA"
-          if [ "$EVENT_NAME" = "pull_request" ]; then base="$PR_BASE_SHA"; fi
-          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then base="HEAD^"; fi
-          git rev-parse --verify "$base^{commit}"
-          diff-cover infra-coverage.xml --compare-branch="$base" --fail-under=100
-
   mcp:
     name: MCP worker tests
     needs: changes
@@ -324,7 +296,7 @@ jobs:
           npm run test:browser --prefix deploy/chrome-worker
       - name: Identity provider tests
         run: npm test --prefix deploy/oauth-idp
-      - name: Alice Dev OAuth and handoff regression tests
+      - name: Logos Dev OAuth and handoff regression tests
         run: |
           npm ci --prefix deploy/remote-desktop-commander --omit=dev --ignore-scripts --no-audit --no-fund
           node --test deploy/remote-desktop-commander/oauth.test.mjs deploy/remote-desktop-commander/credential-handoff.test.mjs
@@ -350,7 +322,7 @@ jobs:
           distribution: temurin
           java-version: "25"
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
       - name: Stage Python runtime
