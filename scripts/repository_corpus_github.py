@@ -483,7 +483,7 @@ class _Collector:
             ):
                 parsed = urlsplit(match.group())
                 reference = parsed.scheme + "://" + parsed.netloc + parsed.path
-                if _public_attachment_url(reference):
+                if _public_attachment_url(match.group()):
                     parents = self.attachments.setdefault(reference, {})
                     parents[parent["source_id"]] = parent
                 elif reference not in self.unsupported_attachments:

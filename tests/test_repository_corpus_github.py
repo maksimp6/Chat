@@ -446,6 +446,30 @@ def test_public_image_attachment_rejects_other_forms(tmp_path, url):
     assert reader.opener.calls == []
 
 
+@pytest.mark.parametrize("suffix", ["?download=private-value", "#private-value"])
+def test_discovered_attachment_rejects_query_and_fragment_without_leaking_them(tmp_path, suffix):
+    url = "https://github.com/user-attachments/files/33870426/evidence.zip"
+
+    class AttachmentReader(Reader):
+        def attachment(self, found_url):
+            pytest.fail("unsupported attachment must not be downloaded")
+
+    reader = AttachmentReader(
+        {
+            "/repos/owner/repo/issues?state=all&sort=created&direction=asc&per_page=100&page=1": [
+                {"id": 1, "body": url + suffix}
+            ]
+        }
+    )
+    sink = Sink(tmp_path)
+    collect_github("owner/repo", "", sink, reader=reader)
+    gaps = [row for row in sink.gaps if row["kind"] == "github_attachment"]
+    assert len(gaps) == 1
+    assert gaps[0]["source_id"] == url
+    assert gaps[0]["reason"] == "linked_attachment_content_not_collected"
+    assert "private-value" not in repr(gaps)
+
+
 def test_attachments_precede_reviews_and_keep_every_parent(tmp_path):
     url = "https://github.com/user-attachments/files/33870426/Logos-AI-Studio-Court-2026-10-23-public.zip"
 
