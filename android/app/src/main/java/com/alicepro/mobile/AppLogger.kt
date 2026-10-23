@@ -124,7 +124,7 @@ object AppLogger {
 
     fun createShareIntent(context: Context): Intent {
         val exportDir = File(context.cacheDir, LOG_DIR).apply { mkdirs() }
-        val export = File(exportDir, "alice-pro-diagnostics-${System.currentTimeMillis()}.log")
+        val export = File(exportDir, "logos-diagnostics-${System.currentTimeMillis()}.log")
         export.bufferedWriter().use { writer ->
             readEntries().forEach { entry ->
                 writer.appendLine(toJson(entry).toString())
@@ -138,10 +138,10 @@ object AppLogger {
         )
         return Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, "Alice Pro diagnostics")
+            putExtra(Intent.EXTRA_SUBJECT, "Logos diagnostics")
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            clipData = ClipData.newRawUri("Alice Pro diagnostics", uri)
+            clipData = ClipData.newRawUri("Logos diagnostics", uri)
         }
     }
 

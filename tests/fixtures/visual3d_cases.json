@@ -1,0 +1,303 @@
+[
+  {
+    "id": "spool_spindle_shells",
+    "image": "oem_spindle_v03.png",
+    "image_sha256": "e533fa6111c84930fccd55904937763319b0d14412c4359623d546f8cc03df7b",
+    "crop": [
+      100,
+      195,
+      566,
+      447
+    ],
+    "source_kind": "cad_render",
+    "annotation_status": "provisional",
+    "objects": [
+      {
+        "label": "spool_spindle_shell",
+        "bbox": [
+          0.05,
+          0.14,
+          0.54,
+          0.81
+        ]
+      },
+      {
+        "label": "spool_spindle_shell",
+        "bbox": [
+          0.46,
+          0.34,
+          0.96,
+          0.92
+        ]
+      }
+    ],
+    "forbidden_labels": [
+      "cutting_spindle",
+      "electric_motor",
+      "milling_tool",
+      "filament_spool"
+    ],
+    "forbidden_claims": [
+      "assembled",
+      "cutting_operation",
+      "motor_500w",
+      "er11_collet",
+      "physically_printed",
+      "safe_to_operate"
+    ]
+  },
+  {
+    "id": "filament_spool_holder",
+    "image": "desk_spool_v01.png",
+    "image_sha256": "072e0c4400915c9e61eb32c5b91bdb9078689afe18a887a0fac2fc3eb28569d6",
+    "crop": [
+      260,
+      180,
+      665,
+      580
+    ],
+    "source_kind": "cad_render",
+    "annotation_status": "provisional",
+    "objects": [
+      {
+        "label": "filament_spool_holder",
+        "bbox": [
+          0.095,
+          0.1,
+          0.92,
+          0.95
+        ]
+      }
+    ],
+    "forbidden_labels": [
+      "cutting_spindle",
+      "cnc_mill",
+      "electric_motor",
+      "drill_press"
+    ],
+    "forbidden_claims": [
+      "cutting_operation",
+      "motor_500w",
+      "physically_printed",
+      "safe_to_operate"
+    ]
+  },
+  {
+    "id": "spool_centering_adapters",
+    "image": "desk_spool_v02.png",
+    "image_sha256": "21fca161d268dafe73ae44f6c8d38be9addd54e1f11861bb59434a456578dc95",
+    "crop": [
+      110,
+      255,
+      830,
+      525
+    ],
+    "source_kind": "cad_render",
+    "annotation_status": "provisional",
+    "objects": [
+      {
+        "label": "centering_adapter",
+        "bbox": [
+          0.048,
+          0.105,
+          0.255,
+          0.455
+        ]
+      },
+      {
+        "label": "centering_adapter",
+        "bbox": [
+          0.31,
+          0.102,
+          0.603,
+          0.7
+        ]
+      },
+      {
+        "label": "centering_adapter",
+        "bbox": [
+          0.65,
+          0.305,
+          0.948,
+          0.94
+        ]
+      }
+    ],
+    "forbidden_labels": [
+      "filament_spool",
+      "cutting_spindle",
+      "electric_motor",
+      "bearing"
+    ],
+    "forbidden_claims": [
+      "physically_printed",
+      "material_verified",
+      "dimensions_measured"
+    ]
+  },
+  {
+    "id": "phone_stand_geometry",
+    "image": "phone_stand.png",
+    "image_sha256": "06e3b699e75b7199ea05749dd596f2810cb1b839bebdc9d3dfdcf4f71fba9f3d",
+    "crop": [
+      240,
+      165,
+      635,
+      608
+    ],
+    "source_kind": "cad_render",
+    "annotation_status": "provisional",
+    "objects": [
+      {
+        "label": "phone_stand",
+        "bbox": [
+          0.058,
+          0.072,
+          0.885,
+          0.946
+        ]
+      }
+    ],
+    "forbidden_labels": [
+      "cutting_spindle",
+      "electric_motor",
+      "filament_spool",
+      "spool_spindle_shell"
+    ],
+    "forbidden_claims": [
+      "physically_printed",
+      "safe_to_operate"
+    ]
+  },
+  {
+    "id": "test_tube_holder_geometry",
+    "image": "test_tube_holder.png",
+    "image_sha256": "36c5d2056af68374fa73c50f465c3900f8e2f9831e71f44ef547b6131b3f00c1",
+    "crop": [
+      285,
+      195,
+      645,
+      580
+    ],
+    "source_kind": "cad_render",
+    "annotation_status": "provisional",
+    "objects": [
+      {
+        "label": "test_tube_holder",
+        "bbox": [
+          0.085,
+          0.077,
+          0.929,
+          0.95
+        ]
+      }
+    ],
+    "forbidden_labels": [
+      "cutting_spindle",
+      "electric_motor",
+      "filament_spool"
+    ],
+    "forbidden_claims": [
+      "physically_printed",
+      "medical_grade",
+      "material_verified"
+    ]
+  },
+  {
+    "id": "sauce_stand_geometry",
+    "image": "sauce_stand.png",
+    "image_sha256": "7315a068136820a981fce9024270cfdf248eaaa903d855cb5890dd9f845ce78c",
+    "crop": [
+      100,
+      195,
+      830,
+      565
+    ],
+    "source_kind": "cad_render",
+    "annotation_status": "provisional",
+    "objects": [
+      {
+        "label": "sauce_stand",
+        "bbox": [
+          0.014,
+          0.038,
+          0.993,
+          0.961
+        ]
+      }
+    ],
+    "forbidden_labels": [
+      "centering_adapter",
+      "cutting_spindle",
+      "electric_motor"
+    ],
+    "forbidden_claims": [
+      "food_safe",
+      "physically_printed",
+      "material_verified"
+    ]
+  },
+  {
+    "id": "blank_control",
+    "image": "oem_spindle_v03.png",
+    "image_sha256": "e533fa6111c84930fccd55904937763319b0d14412c4359623d546f8cc03df7b",
+    "crop": [
+      610,
+      160,
+      885,
+      270
+    ],
+    "source_kind": "cad_render",
+    "annotation_status": "provisional",
+    "objects": [],
+    "forbidden_labels": [
+      "spool_spindle_shell",
+      "cutting_spindle",
+      "centering_adapter",
+      "electric_motor",
+      "filament_spool"
+    ],
+    "forbidden_claims": [
+      "cutting_operation",
+      "motor_500w",
+      "assembled",
+      "physically_printed"
+    ]
+  },
+  {
+    "id": "spindle_retaining_ring",
+    "image": "oem_spindle_v03.png",
+    "image_sha256": "e533fa6111c84930fccd55904937763319b0d14412c4359623d546f8cc03df7b",
+    "crop": [
+      570,
+      390,
+      765,
+      535
+    ],
+    "source_kind": "cad_render",
+    "annotation_status": "provisional",
+    "objects": [
+      {
+        "label": "retaining_ring",
+        "bbox": [
+          0.119,
+          0.048,
+          0.827,
+          0.608
+        ]
+      }
+    ],
+    "forbidden_labels": [
+      "cutting_spindle",
+      "electric_motor",
+      "centering_adapter",
+      "filament_spool"
+    ],
+    "forbidden_claims": [
+      "assembled",
+      "physically_printed",
+      "safe_to_operate"
+    ],
+    "notes": "Separate C-shaped retaining ring from the spindle-cover assembly"
+  }
+]

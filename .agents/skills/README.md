@@ -1,6 +1,11 @@
-# Alice Pro Agent Skills
+# Logos Agent Skills
 
 This directory is the canonical repository skill tree.
+
+For trigger-based navigation, reusable engineering lessons and their source/coverage
+limits, see [the project lessons index](../../docs/lessons/README.md).
+The additional documentation packages do not change role allowlists or permissions;
+their role-scoped runtime integration is a separate change.
 
 A **role** owns responsibility. A **skill** defines a reusable procedure. A
 **tool/MCP capability** performs an action. A **provider/model** is the replaceable
@@ -36,5 +41,5 @@ Keep procedure text provider-neutral. Reference repository scripts instead of co
 large shell recipes. A skill never weakens authentication, authorization, approval,
 branch protection or production policy.
 
-Alice exposes metadata from the catalog first and loads the full body only for skills
+Logos exposes metadata from the catalog first and loads the full body only for skills
 selected for one invocation. Do not automatically install remote/unreviewed skills.

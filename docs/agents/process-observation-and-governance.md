@@ -1,6 +1,6 @@
 # Process observation and governance
 
-Alice Pro separates normal engineering coordination from cross-agent observation and
+Logos separates normal engineering coordination from cross-agent observation and
 process improvement.
 
 The goal is not to create a second manager for every task. Most work should still flow
