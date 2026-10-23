@@ -733,7 +733,7 @@ def _github_progress(reader, repository):
     return _Progress(reader.cache_dir, repository).families
 
 
-def _github_stop(reader, new_sources, before, after):
+def _github_stop(reader, new_sources, before, after, window_progress=False):
     reasons = {
         "github_http_401": "observed_access_failure",
         "github_rate_limit": "observed_rate_limit",
@@ -747,21 +747,24 @@ def _github_stop(reader, new_sources, before, after):
     current_ids = {
         name: state.get("last_id") for name, state in after.items() if isinstance(state, dict)
     }
-    if not new_sources and previous_ids == current_ids:
+    if not new_sources and previous_ids == current_ids and not window_progress:
         return "no_collection_progress", "no_progress"
     return None, None
 
 
-def _github_pass(args, archive, reader, number):
+def _github_pass(args, archive, reader, number, epoch):
     from scripts.repository_corpus_github import collect_github
 
     before = _github_progress(reader, args.repository)
     source_count, gap_count = len(archive.entries), len(archive.gaps)
     started_at = datetime.now(timezone.utc).isoformat()
-    collection = collect_github(args.repository, reader.token, archive, reader=reader)
+    collection = collect_github(args.repository, reader.token, archive, reader=reader, epoch=epoch)
     after = _github_progress(reader, args.repository)
     new_sources = len(archive.entries) - source_count
-    stop_reason, stop_kind = _github_stop(reader, new_sources, before, after)
+    windows = collection.get("inventories", {}).get("actions_run:/actions/runs", {})
+    stop_reason, stop_kind = _github_stop(
+        reader, new_sources, before, after, windows.get("frontier_advanced_this_pass") is True
+    )
     return {
         "pass": number,
         "started_at": started_at,
@@ -782,6 +785,7 @@ def _collect_github_passes(args, archive, result):
 
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("CODEX_GITHUB_TOKEN", "")
     state = {
+        "epoch": datetime.now(timezone.utc).isoformat(),
         "requested": args.github_passes,
         "completed": 0,
         "max_requests_per_pass": args.github_max_requests,
@@ -801,7 +805,7 @@ def _collect_github_passes(args, archive, result):
             max_requests=args.github_max_requests,
             max_total_bytes=MAX_TOTAL_BYTES - state["downloaded_bytes"],
         )
-        record = _github_pass(args, archive, reader, number)
+        record = _github_pass(args, archive, reader, number, state["epoch"])
         state["passes"].append(record)
         state["completed"] = number
         state["downloaded_bytes"] += reader.downloaded_bytes

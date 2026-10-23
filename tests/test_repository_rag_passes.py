@@ -68,16 +68,17 @@ def test_three_passes_collect_git_once_upload_once_and_keep_all_evidence(tmp_pat
     args = arguments(tmp_path, "--github-passes", "3", "--upload")
     archive = rag.CorpusArchive(args.archive_dir, args.repository)
     archive.gap("prior", "old", "historical_gap")
-    calls, caches = [], []
+    calls, caches, epochs = [], [], []
 
     def collect_git(root, sink):
         calls.append("git")
         add_source(sink, "git")
 
-    def collect_github(repository, token, sink, *, reader):
+    def collect_github(repository, token, sink, *, reader, epoch):
         number = len(caches) + 1
         calls.append("github")
         caches.append(reader.cache_dir)
+        epochs.append(epoch)
         assert token == "test-token"
         assert sink is archive
         add_source(sink, f"pass-{number}")
@@ -99,7 +100,9 @@ def test_three_passes_collect_git_once_upload_once_and_keep_all_evidence(tmp_pat
     rag._run(args, archive, result)
     assert calls == ["git", "github", "github", "github", "upload"]
     assert len(set(caches)) == 1
+    assert len(set(epochs)) == 1
     state = result["github_collection_passes"]
+    assert state["epoch"] == epochs[0]
     assert state["completed"] == 3
     assert state["terminal_reason"] == "pass_limit_reached"
     assert state["terminal_kind"] == "configured_limit"
@@ -141,7 +144,7 @@ def test_observed_global_limits_stop_but_endpoint_denial_does_not(
         lambda request: urllib.error.HTTPError(request.full_url, http_status, "", headers, None)
     )
 
-    def collect(repository, token, sink, *, reader):
+    def collect(repository, token, sink, *, reader, epoch):
         attempts.append(reader)
         reader.opener = opener
         add_source(sink, str(len(attempts)))
@@ -166,7 +169,7 @@ def test_request_budget_can_continue_and_immutable_cache_is_reused(tmp_path, mon
     opener = Opener(lambda request: b'{"id":1}')
     readers = []
 
-    def collect(repository, token, sink, *, reader):
+    def collect(repository, token, sink, *, reader, epoch):
         readers.append(reader)
         reader.opener = opener
         assert reader.json("/repos/owner/repo/common", immutable=True) == {"id": 1}
@@ -200,7 +203,7 @@ def test_download_allowance_is_shared_across_passes_and_stops_when_exhausted(tmp
     opener = Opener(lambda request: b'{"id":1}')
     monkeypatch.setattr(github, "MAX_TOTAL_BYTES", 12)
 
-    def collect(repository, token, sink, *, reader):
+    def collect(repository, token, sink, *, reader, epoch):
         readers.append(reader)
         reader.opener = opener
         add_source(sink, str(len(readers)))
@@ -227,7 +230,7 @@ def test_repeated_sources_without_cursor_advancement_stop_as_no_progress(tmp_pat
     archive = rag.CorpusArchive(args.archive_dir, args.repository)
     add_source(archive, "unchanged")
 
-    def collect(repository, token, sink, *, reader):
+    def collect(repository, token, sink, *, reader, epoch):
         add_source(sink, "unchanged")
         sink.gap("issue", "1", "still_unavailable")
         return summary(reader)
@@ -249,7 +252,7 @@ def test_empty_review_cursor_advancement_is_progress_but_inventory_hash_churn_is
     archive = rag.CorpusArchive(args.archive_dir, args.repository)
     calls = []
 
-    def collect(repository, token, sink, *, reader):
+    def collect(repository, token, sink, *, reader, epoch):
         calls.append(reader)
         progress = github._Progress(reader.cache_dir, repository)
         progress.advance("reviews", 10, f"inventory-{len(calls)}")

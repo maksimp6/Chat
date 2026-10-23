@@ -43,6 +43,21 @@ Available local HTTP cache supports continuation without duplicating completed
 immutable reads. The API is not a transactionally frozen repository snapshot:
 updates during collection remain possible and capture times are recorded.
 
+Actions run inventory uses inclusive UTC-second `created` windows from repository
+creation to a fixed cutoff immediately before the collection's starting second.
+A reported count of 1000 or more splits the interval into disjoint children;
+smaller leaves exhaust pagination and reconcile IDs, creation times and counts.
+A saturated single second, changed counts, invalid rows and unfinished windows
+remain explicit gaps. Window evidence is separate from the observed run-ID count;
+it does not establish an atomic snapshot of mutable run records.
+
+The private credential-scoped cache retains the epoch, pending intervals and
+hash-verified observation pages. Later passes continue unfinished intervals and
+reuse completed leaves within that epoch. An unfinished epoch resumes with its
+saved cutoff; a completed traversal refreshes for a new collection epoch.
+Corrupt state or pages are rejected and visibly recollected. Missing repository
+creation time permits only an explicitly unverified unfiltered fallback.
+
 `--github-passes` accepts 1–3 passes and defaults to one locally. Hosted repository
 collection selects three, sharing the same private archive, credential-scoped
 cache, progress cursor and cumulative 2 GiB download allowance. Git is collected
@@ -50,7 +65,9 @@ once; provider upload happens once after the passes. Each pass retains its timin
 source-version delta, cursor snapshots and gaps in `github-collection-passes.json`.
 An actual authentication/rate-limit response or exhausted download allowance stops
 later passes. So does no new source version combined with no cursor advancement;
-empty review inventories can still advance the cursor. The per-pass request
+empty review inventories can still advance the cursor, and splitting or completing
+Actions windows advances the inventory frontier even before source rows appear.
+Repeated failed attempts and timestamp changes alone are not progress. The per-pass request
 limit is a configured bound, not an external failure. Earlier gaps remain visible
 as observations, and exhausting the pass limit never proves corpus completeness.
 
@@ -105,8 +122,12 @@ It uploads only the receipt and omissions, never private raw originals. Hosted
 raw evidence lasts only for that runner; this is not a durable archive or a
 replacement for the separate Git LFS preservation requirement.
 
-GitHub currently reports roughly 40,000 runs and 8,399 artifacts. A request budget
-cannot cover every payload in one execution. `indexed_partial` is an honest
+The observed unfiltered Actions API stopped at a declared 40,000 runs and returned
+HTTP 422 on page 401. An older-time query reported another 2,500 runs; 40,000 is
+not a complete inventory count. The separate artifact inventory reconciled
+8,432 records, declaring 22,265,233,692 bytes before downloads. A configured
+request/download budget cannot cover every payload in one execution and is not
+evidence that the remaining sources are unavailable. `indexed_partial` is an honest
 intermediate result, never completion of D1. The private local archive/cache is
 the resumable path. Hosted invocations may repeat source reads because their raw
 cache is deliberately not published. External saved provider responses and

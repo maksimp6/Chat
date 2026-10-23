@@ -15,6 +15,7 @@ import socket
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -802,6 +803,7 @@ def collect_github(
     max_total_bytes: int = MAX_TOTAL_BYTES,
     max_download_bytes: int = MAX_DOWNLOAD_BYTES,
     max_pages: int = MAX_PAGES,
+    epoch: str | None = None,
 ) -> dict:
     """Collect accessible evidence; report outstanding sources without generation.
 
@@ -824,6 +826,9 @@ def collect_github(
     progress_dir = getattr(reader, "cache_dir", Path(sink.cache_dir) / "github" / scope)
     collector = _Collector(
         repository, reader, sink, max_pages, _Progress(Path(progress_dir), repository)
+    )
+    collector.epoch = (
+        epoch or getattr(sink, "captured_at", None) or datetime.now(timezone.utc).isoformat()
     )
     inventories = _collect_inventories(collector)
     # A denied GraphQL API is a visible gap, not an empty discussion set.
@@ -892,7 +897,12 @@ def _collect_inventories(collector):
         ("release", "/releases", None),
     )
     for kind, path, key in specs:
-        rows = collector.pages(kind, path, key=key)
+        if kind == "actions_run":
+            from scripts.repository_corpus_actions import collect_actions_runs
+
+            rows = collect_actions_runs(collector, repository_metadata, collector.epoch)
+        else:
+            rows = collector.pages(kind, path, key=key)
         inventories[kind] = rows
         for row in rows:
             collector.record(kind, row)
