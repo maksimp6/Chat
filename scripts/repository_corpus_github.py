@@ -932,6 +932,9 @@ def _collect_reviews(collector, rows):
         reviews = collector.pages("pull_request_review", f"/pulls/{number}/reviews")
         for review in reviews:
             collector.record("pull_request_review", {**review, "pull_request_number": number})
+        if getattr(reader, "stop_reason", None):
+            collector.deferred("pull_request_reviews", pulls[index:])
+            break
         collector.advance("pull_request_reviews", pull)
 
 
@@ -976,6 +979,9 @@ def _collect_runs(collector, rows):
                     {"attempt": attempt, "last_attempt": attempts},
                 )
                 break
+        if getattr(reader, "stop_reason", None):
+            collector.deferred("actions_run_details", runs[index:])
+            break
         collector.advance("actions_run_details", run)
 
 
@@ -993,6 +999,9 @@ def _collect_artifacts(collector, rows):
             )
             break
         collector.download("actions_artifact", f"/actions/artifacts/{artifact['id']}/zip", artifact)
+        if getattr(reader, "stop_reason", None):
+            collector.deferred("actions_artifact", artifacts[index:])
+            break
         collector.advance("actions_artifact", artifact)
 
 
@@ -1009,6 +1018,9 @@ def _collect_releases(collector, rows):
             collector.download(
                 "release_asset", f"/releases/assets/{asset['id']}", asset, immutable=False
             )
+        if getattr(reader, "stop_reason", None):
+            collector.deferred("release_assets", releases[index:])
+            break
         collector.advance("release_assets", release)
 
 

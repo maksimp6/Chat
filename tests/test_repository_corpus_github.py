@@ -253,7 +253,7 @@ def test_budget_records_all_remaining_run_ids(tmp_path):
     remaining = next(
         row for row in sink.gaps if row["source_id"] == "actions_run_details:remaining"
     )
-    assert remaining["metadata"]["source_ids"] == [11, 12]
+    assert remaining["metadata"]["source_ids"] == [10, 11, 12]
     assert remaining["reason"] == "request_budget_exhausted"
 
 
