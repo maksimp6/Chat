@@ -43,6 +43,11 @@ from collections import Counter
 from datetime import datetime, timezone
 from urllib.parse import quote, urlencode
 
+if __package__ in {None, ""}:
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from agent_runtime.logos_launch_hold import NativeLogosLaunchBlocked, enforce_native_launch_hold
+
 REPO = os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat")
 API = f"https://api.github.com/repos/{REPO}"
 LABEL_SOURCE = "rag-source"
@@ -391,6 +396,7 @@ def yandex_call(
     instructions: str | None = None,
 ) -> dict:
     """One bounded sync call; fixed destination, no retries, no redirects."""
+    enforce_native_launch_hold()
     response_schema = response_schema or MODEL_RESPONSE_SCHEMA
     instructions = instructions or INSTRUCTIONS
     payload = {
@@ -2271,6 +2277,8 @@ def _write_vector_store_demo_report(rendered: str, model_result: dict | None) ->
 
 def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
     """Upload a task/repository snapshot, retrieve it, and optionally ask YandexGPT once."""
+    if getattr(args, "allow_model_call", False):
+        enforce_native_launch_hold()
     existing_store_id = _validate_vector_store_demo_args(args)
     key = os.environ.get("YANDEX_API_KEY", "")
     project = os.environ.get("YANDEX_PROJECT_ID", "")
@@ -2429,6 +2437,8 @@ def _model_result(args: argparse.Namespace, query: str, candidates: list[dict]) 
 
 def _run(args: argparse.Namespace) -> int:
     """Run retrieval, validation and publication once, with no paid retries."""
+    if args.allow_model_call and args.mode in {"query", "red", "vector-store"}:
+        enforce_native_launch_hold()
     if args.mode == "vector-store-inspect":
         if args.publish_issue is not None or args.allow_model_call or args.allow_vector_store_write:
             raise ValueError("vector_store_inspection_must_be_read_only")
@@ -2528,6 +2538,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return selftest() if args.selftest else _run(args)
+    except NativeLogosLaunchBlocked as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     except (TypeError, ValueError):
         print("FAIL-CLOSED: CONTRACT_VIOLATION; report not published", file=sys.stderr)
         return 1

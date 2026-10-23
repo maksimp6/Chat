@@ -18,6 +18,11 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from agent_runtime.logos_launch_hold import (
+    NativeLogosLaunchBlocked,
+    enforce_native_launch_hold,
+    hold_receipt,
+)
 from agent_runtime.provider_receipt import (
     assistant_text as _assistant_reply,
     capture_provider_diagnostics,
@@ -207,6 +212,18 @@ def _persist_result(
     _write_result(checkpoint_file, result)
 
 
+def _default_client_factory() -> Callable[[], Any]:
+    from core.config import Config
+    from chat.mcp_routes import LogosClient
+
+    seed_provider_credential()
+
+    def client_factory() -> Any:
+        return LogosClient(Config)
+
+    return client_factory
+
+
 def run_issue_task(
     issue_number: int,
     title: str,
@@ -217,6 +234,19 @@ def run_issue_task(
     repo_root: Path = ROOT,
     checkpoint_file: Path | None = None,
 ) -> Dict[str, Any]:
+    try:
+        enforce_native_launch_hold()
+    except NativeLogosLaunchBlocked:
+        return {
+            "issue": issue_number,
+            "model": model_key,
+            "status": "failed",
+            "error": "NativeLogosLaunchBlocked",
+            "launch_hold": hold_receipt(),
+            "generation_requests": 0,
+            "changed_files": [],
+            "pending_tools": [],
+        }
     import app  # noqa: F401  -- initializes the database schema and blueprints
     from invocation.manager import (
         create_invocation,
@@ -225,14 +255,7 @@ def run_issue_task(
     from invocation.trace import create_invocation_trace
     from agent_runtime.responses_tool_loop import extract_function_calls
 
-    if client_factory is None:
-        from core.config import Config
-        from chat.mcp_routes import LogosClient
-
-        seed_provider_credential()
-
-        def client_factory():
-            return LogosClient(Config)
+    client_factory = client_factory or _default_client_factory()
 
     rules = (repo_root / "AGENTS.md").read_text(encoding="utf-8")
     before = set(changed_files(repo_root))

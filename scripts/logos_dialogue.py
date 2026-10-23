@@ -18,6 +18,11 @@ from agent_runtime.provider_receipt import (
     provider_token as _provider_token,
 )
 from agent_runtime.responses_tool_loop import extract_function_calls
+from agent_runtime.logos_launch_hold import (
+    NativeLogosLaunchBlocked,
+    enforce_native_launch_hold,
+    hold_receipt,
+)
 from invocation.manager import (
     create_invocation,
     fail_invocation,
@@ -108,6 +113,7 @@ def _provider_echo(result: dict[str, Any], response: dict[str, Any]) -> None:
 
 
 def _ask(client, prompt: str, trace, result: dict[str, Any], params: dict) -> None:
+    enforce_native_launch_hold()
     conversation_id = client.create_conversation(trace)["id"]
     result["conversation_id"] = conversation_id
     response = client.ask_with_mcp(
@@ -307,6 +313,7 @@ def run_dialogue(
     invocation = None
     trace = None
     try:
+        enforce_native_launch_hold()
         if not question.strip():
             raise ValueError("The question must not be empty")
         if not isinstance(context_packet, dict) or not isinstance(knowledge_receipt, dict):
@@ -360,6 +367,8 @@ def run_dialogue(
         _ask(client, prompt, trace, result, params)
     except RUNTIME_ERRORS as exc:
         result.update(status="failed", error=type(exc).__name__)
+        if isinstance(exc, NativeLogosLaunchBlocked):
+            result["launch_hold"] = hold_receipt()
         if trace is not None:
             trace.record_error("logos_dialogue", "Dialogue failed", error_type=type(exc).__name__)
     if trace is not None and invocation is not None:

@@ -10,6 +10,9 @@ import agent_runtime.issue_runner as issue_runner
 
 @pytest.fixture
 def repo(tmp_path, monkeypatch):
+    # Exercise the historical worker with offline fake transports only. The
+    # production hold itself is covered separately without this substitution.
+    monkeypatch.setattr(issue_runner, "enforce_native_launch_hold", lambda: None)
     import storage.db as db
 
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
