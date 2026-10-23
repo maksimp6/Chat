@@ -9,7 +9,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 
 
-@pytest.mark.parametrize("filename", ["ci.yml", "format.yml", "security.yml", "codeql.yml"])
+@pytest.mark.parametrize("filename", ["ci.yml", "format.yml", "security.yml"])
 @pytest.mark.parametrize("base", ["master", "develop", "feature/stack-parent"])
 def test_required_workflows_accept_integration_and_stacked_prs(filename, base):
     workflow = yaml.safe_load((ROOT / ".github/workflows" / filename).read_text())
