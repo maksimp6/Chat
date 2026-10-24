@@ -1,0 +1,102 @@
+{
+  "ALICE_ACME_EMAIL": {
+    "read_by": "deploy/preview/server.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "ALICE_ENVIRONMENT_API_TOKEN": {
+    "read_by": "deploy/preview/environment_lifecycle.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "ALICE_ENVIRONMENT_HOST_URL": {
+    "read_by": "deploy/preview/environment_lifecycle.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "ALICE_GITHUB_REDIRECT_URI": {
+    "read_by": "deploy/production/server.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "ALICE_RDC_ARCHIVE": {
+    "read_by": "deploy/remote-desktop-commander/server.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "ALICE_RDC_DEV_VENV": {
+    "read_by": "deploy/remote-desktop-commander/dev-bootstrap.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "ALICE_RDC_MODE": {
+    "read_by": "deploy/remote-desktop-commander/entrypoint.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "ALICE_RDC_NPM_CACHE": {
+    "read_by": "deploy/remote-desktop-commander/dev-bootstrap.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "ALICE_RDC_ROOT": {
+    "read_by": "deploy/remote-desktop-commander/server.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "ALICE_SHORT_TOKEN": {
+    "read_by": "deploy/production/server.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "CC": {
+    "read_by": "scripts/build_c17_server.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "CLOUDRU_PROJECT_ID": {
+    "read_by": "scripts/codex_cloudru_env.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "CLOUD_CLI_CACHE_DIR": {
+    "read_by": "scripts/install_cloud_cli.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "CLOUD_CLI_INSTALL_DIR": {
+    "read_by": "scripts/install_cloud_cli.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "CODEX_GITHUB_TOKEN": {
+    "read_by": "scripts/codex_agent_credentials.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "CODEX_GPG_PRIVATE_KEY": {
+    "read_by": "scripts/codex_agent_credentials.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "CODEX_SSH_KNOWN_HOSTS": {
+    "read_by": "scripts/codex_agent_credentials.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "CODEX_SSH_PRIVATE_KEY": {
+    "read_by": "scripts/codex_agent_credentials.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "GH_ARCH": {
+    "read_by": "scripts/codex_setup.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "GITHUB_TOKEN": {
+    "read_by": "scripts/codex_agent_credentials.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "HOME": {
+    "read_by": "scripts/install_cloud_cli.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "PREVIEW_BRANCH": {
+    "read_by": "deploy/preview/environment_lifecycle.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "PREVIEW_COMMIT": {
+    "read_by": "deploy/preview/environment_lifecycle.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "PREVIEW_SERVER_BASE_DIR": {
+    "read_by": "deploy/production/server.sh",
+    "description": "External shell input; purpose to be documented."
+  },
+  "XDG_STATE_HOME": {
+    "read_by": "scripts/codex_cloudru_env.sh",
+    "description": "External shell input; purpose to be documented."
+  }
+}

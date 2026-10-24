@@ -8,6 +8,8 @@ import re
 
 READ_RE = re.compile(r"\$(?:\{([A-Z][A-Z0-9_]*)[^}]*\}|([A-Z][A-Z0-9_]*))")
 ASSIGN_RE = re.compile(r"^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)=")
+# Bash-maintained variables are not environment inputs.
+BASH_BUILTINS = {"BASH_SOURCE", "BASH_LINENO", "BASH_VERSION", "FUNCNAME", "LINENO", "PIPESTATUS"}
 
 
 def discover_external_shell_env(text: str) -> set[str]:
@@ -19,7 +21,7 @@ def discover_external_shell_env(text: str) -> set[str]:
     reads: set[str] = set()
     for first, second in READ_RE.findall(text):
         name = first or second
-        if name not in assigned:
+        if name not in assigned and name not in BASH_BUILTINS:
             reads.add(name)
     return reads
 
