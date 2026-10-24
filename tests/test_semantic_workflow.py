@@ -20,7 +20,7 @@ def workflow():
 def test_workflow_requires_owner_first_attempt_and_explicit_budget():
     data = workflow()
     events = data.get("on", data.get(True))
-    assert set(events) == {"workflow_dispatch", "push"}
+    assert set(events) == {"workflow_dispatch"}
     assert events["workflow_dispatch"]["inputs"]["allow_model_call"]["default"] is False
     assert events["workflow_dispatch"]["inputs"]["allow_vector_store_write"]["default"] is False
     assert events["workflow_dispatch"]["inputs"]["mode"]["default"] == "search"

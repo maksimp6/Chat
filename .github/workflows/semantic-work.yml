@@ -51,8 +51,6 @@ on:
         type: boolean
         required: false
         default: false
-  push:
-    branches: [feat/semantic-pipeline]
 
 permissions: {}
 

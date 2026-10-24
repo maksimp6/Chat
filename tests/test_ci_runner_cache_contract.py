@@ -27,18 +27,14 @@ def test_runner_cache_contract() -> None:
             or config.get("python-version-file") == ".python-version"
         )
 
-    npm_dependencies = {
-        "backend": ["package.json"],
-    }
-    for job, expected in npm_dependencies.items():
-        steps = [
-            s for s in jobs[job]["steps"] if s.get("uses", "").startswith("actions/setup-node@")
-        ]
-        assert len(steps) == 1
-        config = steps[0]["with"]
-        assert config["node-version"] == "22.22.2"
-        assert config["cache"] == "npm"
-        assert config["cache-dependency-path"].splitlines() == expected
+    backend_node = [
+        s for s in jobs["backend"]["steps"] if s.get("uses", "").startswith("actions/setup-node@")
+    ]
+    assert len(backend_node) == 1
+    config = backend_node[0]["with"]
+    assert config["node-version"] == "22.22.2"
+    assert "cache" not in config
+    assert "npm install" not in source
 
     assert "cache: gradle" not in source
     assert "gradle/actions/setup-gradle@" not in source

@@ -260,7 +260,8 @@ def attach_narration(result: dict[str, Any], temporary: Path, environ: dict[str,
     """Keep one visible step; carry text/audio in reconstructable result log chunks."""
     try:
         temporary.mkdir(parents=True, exist_ok=True)
-        source = temporary / "narration-source.json"
+        attempt = Path(tempfile.mkdtemp(prefix="narration-", dir=temporary))
+        source = attempt / "source.json"
         original_digest = hashlib.sha256(
             json.dumps(result, ensure_ascii=False).encode()
         ).hexdigest()
@@ -272,7 +273,7 @@ def attach_narration(result: dict[str, Any], temporary: Path, environ: dict[str,
                 ):
                     source_result["reply"] = source_result["reply"].replace(value, "<redacted>")
         source.write_text(json.dumps(source_result, ensure_ascii=False), encoding="utf-8")
-        output = temporary / "narration"
+        output = attempt / "output"
         python = temporary / "logos-venv/bin/python"
         command = [
             str(python) if python.is_file() else sys.executable,
@@ -297,15 +298,28 @@ def attach_narration(result: dict[str, Any], temporary: Path, environ: dict[str,
         }
         if "--synthesize" in command and environ.get("YANDEX_API_KEY"):
             child_env["YANDEX_API_KEY"] = environ["YANDEX_API_KEY"]
-        subprocess.run(
+        completed = subprocess.run(
             command, cwd=ROOT, env=child_env, check=False, capture_output=True, timeout=110
         )
         receipt = json.loads((output / "receipt.json").read_text(encoding="utf-8"))
+        if not isinstance(receipt, dict):
+            raise TypeError("Invalid narration receipt")
+        if receipt.get("source_sha256") != hashlib.sha256(source.read_bytes()).hexdigest():
+            raise ValueError("Narration receipt belongs to another result")
+        if completed.returncode != 0 and receipt.get("status") != "failed":
+            raise ValueError("Narration process failed without a failure receipt")
         receipt["runner_result_sha256"] = original_digest
         if invalid_limit:
             receipt["audio_status"] = "invalid_limit"
         story = output / "story.txt"
         receipt["text"] = story.read_text(encoding="utf-8") if story.exists() else ""
+        if receipt.get("status") != "failed" and (
+            not receipt["text"]
+            or len(receipt["text"]) > 2500
+            or receipt.get("text_sha256")
+            != hashlib.sha256(receipt["text"].encode("utf-8")).hexdigest()
+        ):
+            raise ValueError("Narration text checksum mismatch")
         for part in receipt["parts"]:
             # Generated filenames only; never follow a model-supplied path.
             if not re.fullmatch(r"speech-[0-9]{3}\.ogg", part["file"]):

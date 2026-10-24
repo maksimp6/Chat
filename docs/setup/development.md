@@ -7,10 +7,9 @@
 
 ```bash
 python -m pip install -r requirements-dev.txt
-npm install --ignore-scripts --no-audit --no-fund --package-lock=false
 ```
 
-Node.js нужен для JavaScript-проверок. JDK и Android SDK нужны для прямой
+Node.js нужен для запуска JavaScript-тестов (`node tests/*.js`). JDK и Android SDK нужны для прямой
 сборки браузер-контроллера; она не включает Flask backend. Команды и границы
 описаны в [Android README](../../android/README.md), workflow —
 [android-direct.yml](../../.github/workflows/android-direct.yml).

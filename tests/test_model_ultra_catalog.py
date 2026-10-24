@@ -30,11 +30,28 @@ def fresh_profiles_cache():
     model_profiles.ultra_profiles.cache_clear()
 
 
-def test_catalog_covers_every_registry_model_exactly(fresh_profiles_cache):
+def test_catalog_covers_every_yandex_registry_model_exactly(fresh_profiles_cache):
     profiles = model_profiles.ultra_profiles()
 
     assert len(profiles) == 14
-    assert set(profiles) == set(ALL_MODELS)
+    assert set(profiles) == {
+        key for key, info in ALL_MODELS.items() if info.get("provider", "yandex") == "yandex"
+    }
+
+
+def test_foreign_provider_does_not_invalidate_yandex_profiles(monkeypatch, fresh_profiles_cache):
+    monkeypatch.setitem(ALL_MODELS, "foreign-model", {"provider": "other"})
+    profiles = model_profiles.ultra_profiles()
+    assert len(profiles) == 14
+    annotated = model_profiles.annotate_catalog(
+        {"text": {"claude-opus-5-5": {"provider": "anthropic"}}, "voice": {}}
+    )
+    assert "ultra_profile" not in annotated["text"]["claude-opus-5-5"]
+
+
+def test_new_yandex_model_still_requires_a_profile(monkeypatch, fresh_profiles_cache):
+    monkeypatch.setitem(ALL_MODELS, "new-yandex-model", {"provider": "yandex"})
+    assert model_profiles.ultra_profiles() == {}
 
 
 def test_only_retired_models_are_unavailable_in_the_registry():

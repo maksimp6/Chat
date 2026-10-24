@@ -72,7 +72,6 @@ Run its focused tests, then the repository checks:
 python -m compileall -q .
 python tests/validate_runtime_modules.py
 pytest -q
-bash scripts/format.sh check
 git diff --check
 ```
 

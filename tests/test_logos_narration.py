@@ -273,3 +273,57 @@ def test_one_step_audio_bytes_survive_result_log_delivery(tmp_path, monkeypatch,
     delivered = json.loads(base64.b64decode("".join(chunks)))
     assert base64.b64decode(delivered["narration"]["parts"][0]["audio_base64"]) == audio
     assert "Narration audio: ready" in (tmp_path / "summary").read_text()
+
+
+def test_real_repeated_process_never_reuses_previous_story(tmp_path):
+    from scripts.logos_once import attach_narration
+
+    environment = {**os.environ, "LOGOS_TTS_ALLOWED": "false"}
+    first = {"status": "completed", "reply": "Первый ответ"}
+    second = {"status": "failed", "reply": "Второй ответ"}
+    attach_narration(first, tmp_path, environment)
+    attach_narration(second, tmp_path, environment)
+    assert first["narration"]["status"] == second["narration"]["status"] == "text_ready"
+    assert "Второй ответ" in second["narration"]["text"]
+    assert "Первый ответ" not in second["narration"]["text"]
+    assert "ошибкой" in second["narration"]["text"]
+    assert first["narration"]["source_sha256"] != second["narration"]["source_sha256"]
+    assert len(list(tmp_path.glob("narration-*/output/receipt.json"))) == 2
+
+
+@pytest.mark.parametrize("failure", ["wrong_source", "changed_story", "exit_code"])
+def test_process_receipt_cannot_claim_success_for_wrong_data(tmp_path, monkeypatch, failure):
+    from scripts import logos_once
+
+    def child(command, **kwargs):
+        narration.main(command[3:])
+        output = Path(command[command.index("--out") + 1])
+        receipt = output / "receipt.json"
+        if failure == "wrong_source":
+            data = json.loads(receipt.read_text())
+            data["source_sha256"] = "0" * 64
+            receipt.write_text(json.dumps(data))
+        elif failure == "changed_story":
+            (output / "story.txt").write_text("Старый или подменённый рассказ")
+        return SimpleNamespace(returncode=9 if failure == "exit_code" else 0)
+
+    monkeypatch.setattr(logos_once.subprocess, "run", child)
+    result = {"status": "completed", "reply": "Текущий ответ"}
+    logos_once.attach_narration(result, tmp_path, {**os.environ, "LOGOS_TTS_ALLOWED": "false"})
+    assert result["status"] == "completed" and result["reply"] == "Текущий ответ"
+    assert result["narration"]["status"] == "failed"
+    assert result["narration"]["error_type"] == "ValueError"
+
+
+def test_failed_process_cannot_read_legacy_audio_directory(tmp_path, monkeypatch):
+    from scripts import logos_once
+
+    old = tmp_path / "narration"
+    old.mkdir()
+    (old / "receipt.json").write_text('{"status":"audio_ready","parts":[]}')
+    (old / "story.txt").write_text("Старый ответ")
+    monkeypatch.setattr(logos_once.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=1))
+    result = {"status": "failed", "reply": "Новый ответ"}
+    logos_once.attach_narration(result, tmp_path, {**os.environ, "LOGOS_TTS_ALLOWED": "false"})
+    assert result["narration"]["status"] == "failed"
+    assert "text" not in result["narration"]

@@ -1,8 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: [master, develop]
   pull_request:
   workflow_dispatch:
     inputs:
@@ -18,6 +16,9 @@ concurrency:
 
 permissions:
   contents: read
+
+env:
+  OUT: ${{ github.workspace }}/.ci-out/ci
 
 jobs:
   changes:
@@ -275,8 +276,6 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22.22.2"
-          cache: npm
-          cache-dependency-path: package.json
       - name: Install dependencies
         id: policy_step_04
         continue-on-error: true
@@ -284,7 +283,6 @@ jobs:
         run: |
           started=$SECONDS
           pip install -r requirements.txt -r requirements-dev.txt
-          npm install --ignore-scripts --no-audit --no-fund --package-lock=false
           echo "- Application dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
       - name: Verify Logos narration and delivery offline
         id: narration_tests

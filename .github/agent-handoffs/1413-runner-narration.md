@@ -110,3 +110,36 @@ Duration-reporting Python, граница 30s и policy не менялись.
 Дополнительно локально проверен настоящий корректный OggOpus (синтетический
 тон FFmpeg, не SpeechKit): emit_result → log recovery → byte identity →
 ffprobe codec=opus → полное FFmpeg decode. Живой TTS и прослушивание NOT_RUN.
+
+## Проверка возражения владельца: повторный запуск
+
+Владелец справедливо оспорил доказательство пользовательского результата.
+На прежнем HEAD fa4e4b131d7bc10d5625f5a6e1e3a8b15ae00d1d реальным вызовом
+attach_narration дважды в одном RUNNER_TEMP воспроизведён дефект:
+первый result completed/«Первый ответ», второй failed/«Второй ответ» →
+второй narration=text_ready, old_reply_reused=true, new_reply_present=false.
+Причина: общий output directory, игнорирование returncode и отсутствие
+проверки source_sha256. Наличие такой ошибки означает недостаточность прежних
+проверок, независимо от их числа. Исполнитель дефекта/исправления — ChatGPT.
+
+Теперь каждый запуск имеет отдельный tempfile-каталог; source hash и text
+hash сверяются; ненулевой child exit не принимается как успешный рассказ.
+Частичный failure receipt сохраняется как failure. Реальный повтор дал
+old_reply_reused=false, new_reply_present=true, failure_explained=true,
+source_hashes_differ=true, separate_outputs=2. Новые негативные контроли
+покрывают чужую квитанцию, изменённый текст, exit9 и старый legacy directory.
+Живой SpeechKit и открытие/прослушивание на Android по-прежнему NOT_RUN.
+
+Base синхронизирован с develop bef7fcc3921bbe48278ee1f8d447e1b15beb0d76.
+Конфликт CI с уже слитым Claude PR разрешён с сохранением его global OUT;
+backend использует ранее проверенный экспорт RUNNER_TEMP через GITHUB_ENV.
+Сторонняя OAuth-реализация не переделывалась. Новых агентов, платных вызовов,
+секретов или разрешений не создано. Итоговые RED/GREEN и CI — в PR #1588.
+
+Отрицательный контроль выполнен на отдельном checkout прежнего fa4e4b1:
+тот же новый test_real_repeated_process_never_reuses_previous_story получил
+FAIL — второй рассказ содержал «Первый ответ». На исправленном коде тот же
+тест PASS реальными subprocess-вызовами; выбранная выборка — 265 passed.
+Окончательный base после синхронизации:
+e4c1efe0d38e3d31f8a21e7890154422fa0408de. Слияние этого develop в рабочую
+ветку не является merge PR в develop. CI нового HEAD проверяется отдельно.
