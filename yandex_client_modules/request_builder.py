@@ -107,8 +107,11 @@ def build_response_payload(
 def _clean_mcp_tool(tool):
     if not isinstance(tool, dict) or tool.get("type") != "mcp":
         return None
-    cid = tool.get("connector_id", "")
-    url = tool.get("server_url", "").strip()
+    cid = str(tool.get("connector_id") or "")
+    url = str(tool.get("server_url") or "").strip()
+    # The server credential is sent to the endpoint, so it may only go to an https URL.
+    if url and not url.lower().startswith("https://"):
+        return None
     if not url and not cid.startswith("connector_"):
         return None
     cleaned = {"type": "mcp", "server_label": tool.get("server_label", "mcp_server")}
@@ -118,12 +121,11 @@ def _clean_mcp_tool(tool):
         cleaned["connector_id"] = cid
     if tool.get("server_description"):
         cleaned["server_description"] = tool["server_description"]
-    if tool.get("require_approval"):
-        cleaned["require_approval"] = tool["require_approval"]
+    # Approval can only be tightened here: "never" would skip the owner's approval gate.
+    if tool.get("require_approval") == "always":
+        cleaned["require_approval"] = "always"
     if tool.get("authorization"):
         cleaned["authorization"] = tool["authorization"]
-    if tool.get("headers"):
-        cleaned["headers"] = tool["headers"]
     return cleaned
 
 

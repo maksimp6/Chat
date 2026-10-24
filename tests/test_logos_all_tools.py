@@ -139,7 +139,7 @@ def batch_transport(monkeypatch, *responses):
         return next(pending)
 
     monkeypatch.setattr(YandexResponsesClient, "ask_with_mcp", transport)
-    monkeypatch.setattr(mcp_routes.mcp_storage, "list_servers", list)
+    monkeypatch.setattr(mcp_routes.mcp_storage, "list_servers", lambda **_owner: [])
     return sent
 
 
@@ -400,7 +400,7 @@ def test_web_chat_defaults_to_every_registered_category(monkeypatch):
     import yandex_client_modules.mcp_mixin as mcp_mixin
 
     requested = []
-    monkeypatch.setattr(mcp_mixin.mcp_storage, "list_servers", lambda: [])
+    monkeypatch.setattr(mcp_mixin.mcp_storage, "list_servers", lambda **_owner: [])
     monkeypatch.setattr(mcp_mixin, "get_conv_settings", lambda conversation_id: None)
     monkeypatch.setattr(
         mcp_mixin.registry,

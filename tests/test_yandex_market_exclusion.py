@@ -18,7 +18,7 @@ class CapturingLogosClient(mcp_mixin.YandexMcpMixin):
 
 
 def _capture_web_tools(monkeypatch, settings=None, params=None):
-    monkeypatch.setattr(mcp_mixin.mcp_storage, "list_servers", lambda: [])
+    monkeypatch.setattr(mcp_mixin.mcp_storage, "list_servers", lambda **_owner: [])
     monkeypatch.setattr(mcp_mixin, "get_conv_settings", lambda conversation_id: settings)
     monkeypatch.setattr(mcp_mixin.registry, "get_tools_by_category", lambda category: [])
 

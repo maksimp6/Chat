@@ -22,7 +22,7 @@ def test_default_local_tool_categories_include_3d(monkeypatch):
 
     categories = []
 
-    monkeypatch.setattr(mcp_mixin.mcp_storage, "list_servers", lambda: [])
+    monkeypatch.setattr(mcp_mixin.mcp_storage, "list_servers", lambda **_owner: [])
     monkeypatch.setattr(mcp_mixin, "get_conv_settings", lambda conversation_id: None)
 
     def get_tools(category):
@@ -65,7 +65,7 @@ def test_explicit_tool_categories_still_override_defaults(monkeypatch):
 
     categories = []
 
-    monkeypatch.setattr(mcp_mixin.mcp_storage, "list_servers", lambda: [])
+    monkeypatch.setattr(mcp_mixin.mcp_storage, "list_servers", lambda **_owner: [])
     monkeypatch.setattr(mcp_mixin, "get_conv_settings", lambda conversation_id: None)
     monkeypatch.setattr(
         mcp_mixin.registry,

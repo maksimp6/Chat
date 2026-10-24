@@ -20,7 +20,7 @@ class CapturingClient(YandexMcpMixin):
 def _prepare(monkeypatch, conversation_settings=None):
     import yandex_client_modules.mcp_mixin as mcp_mixin
 
-    monkeypatch.setattr(mcp_mixin.mcp_storage, "list_servers", lambda: [])
+    monkeypatch.setattr(mcp_mixin.mcp_storage, "list_servers", lambda **_owner: [])
     monkeypatch.setattr(
         mcp_mixin,
         "get_conv_settings",

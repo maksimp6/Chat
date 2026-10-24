@@ -278,13 +278,19 @@ def configure_transport(monkeypatch, responses):
     monkeypatch.setattr(
         mcp_mixin, "get_conv_settings", lambda _: {"active_tool_categories": ["filesystem"]}
     )
+    monkeypatch.setattr(mcp_mixin, "get_owner", lambda _: "owner-a")
+    monkeypatch.setattr(mcp_routes, "get_owner", lambda _: "owner-a")
     monkeypatch.setattr(
-        mcp_mixin.mcp_storage, "list_servers", lambda: [{"server_url": "https://remote.invalid/"}]
+        mcp_mixin.mcp_storage,
+        "list_servers",
+        lambda **_owner: [{"server_url": "https://remote.invalid/"}],
     )
     monkeypatch.setattr(
         mcp_mixin.mcp_storage,
         "get_enabled_servers_for_conv",
-        lambda _: [{"server_url": "https://remote.invalid/", "server_label": "remote"}],
+        lambda _conversation_id, **_owner: [
+            {"server_url": "https://remote.invalid/", "server_label": "remote"}
+        ],
     )
 
     def ask(self, message, model, conversation, params, **kwargs):

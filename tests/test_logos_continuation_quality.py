@@ -107,7 +107,7 @@ def test_later_approval_stops_entire_batch_without_executing_any_pending_tool(mo
         return next(responses)
 
     monkeypatch.setattr(YandexResponsesClient, "ask_with_mcp", transport)
-    monkeypatch.setattr(mcp_routes.mcp_storage, "list_servers", list)
+    monkeypatch.setattr(mcp_routes.mcp_storage, "list_servers", lambda **_owner: [])
     monkeypatch.setattr(
         LogosClient,
         "_execute_single_tool",

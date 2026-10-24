@@ -28,7 +28,7 @@ def test_continuation_after_a_non_approval_tool_call_reissues_the_request(monkey
         lambda response: [{"name": "inspect"}] if response["id"] == "resp-1" else [],
     )
     monkeypatch.setattr(mcp_routes, "_tool_call_needs_approval", lambda call: False)
-    monkeypatch.setattr(mcp_routes, "mcp_storage", SimpleNamespace(list_servers=lambda: []))
+    monkeypatch.setattr(mcp_routes, "mcp_storage", SimpleNamespace(list_servers=lambda **_owner: []))
     monkeypatch.setattr(
         LogosClient,
         "_execute_single_tool",

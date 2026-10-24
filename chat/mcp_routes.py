@@ -4,6 +4,7 @@ from flask import Blueprint, request, jsonify
 import hashlib
 import hmac
 import logging
+import os
 import json as _json
 import secrets
 from typing import Any
@@ -51,6 +52,7 @@ from tool_providers.universal_tool_platform import (
 from conversations.ownership import (
     init_conversation_ownership_table,
     set_owner,
+    get_owner,
     check_access,
     list_owned_conversations,
     get_owned_conversation,
@@ -99,7 +101,21 @@ def _tool_call_needs_approval(tool_call: dict[str, Any]) -> bool:
     return bool(tool_config and tool_call_requires_approval(tool_config, arguments))
 
 
-_APPROVAL_KEY = secrets.token_bytes(32)
+def _approval_key() -> bytes:
+    """HMAC key for approval tokens. Set LOGOS_APPROVAL_SECRET so tokens survive restarts and
+    work across workers; without it a per-process key is used and tokens die with the process."""
+    configured = os.environ.get("LOGOS_APPROVAL_SECRET", "").encode("utf-8")
+    if configured:
+        if len(configured) < 32:
+            raise RuntimeError("LOGOS_APPROVAL_SECRET must be at least 32 bytes")
+        return configured
+    logger.warning(
+        "LOGOS_APPROVAL_SECRET is not set; approval tokens are valid in this process only"
+    )
+    return secrets.token_bytes(32)
+
+
+_APPROVAL_KEY = _approval_key()
 
 
 def _approval_token(owner_id, conversation_id, name, arguments) -> str:
@@ -129,6 +145,39 @@ def _normalize_requested_skills(data, params):
     if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
         raise SkillRegistryError("skills must be a string or a list of strings")
     return [item.strip() for item in raw if item.strip()]
+
+
+# Generation and transport settings the browser may choose for a request. The server owns the
+# request shape: the input, the tool list, the tool categories and the tool configuration come
+# from the conversation and the registry, never from the request body.
+_CLIENT_PARAM_KEYS = frozenset(
+    {
+        "approval_mode",
+        "background",
+        "instructions",
+        "max_output_tokens",
+        "max_rounds",
+        "max_tool_calls",
+        "parallel_tool_calls",
+        "poll_timeout",
+        "prompt_cache_key",
+        "reasoning",
+        "reasoning_effort",
+        "request_timeout",
+        "service_tier",
+        "store",
+        "stream",
+        "temperature",
+        "text",
+        "tool_choice",
+        "top_p",
+        "truncation",
+    }
+)
+
+
+def _client_params(raw: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in raw.items() if key in _CLIENT_PARAM_KEYS}
 
 
 class LogosClient(YandexResponsesClient):
@@ -213,7 +262,8 @@ class LogosClient(YandexResponsesClient):
             approval_required = not deny_unapproved and any(needs_approval(call) for call in calls)
 
             if not approval_required:
-                tool_servers = mcp_storage.list_servers()
+                owner_id = get_owner(conversation_id) if conversation_id else None
+                tool_servers = mcp_storage.list_servers(owner_id=owner_id or "")
                 base_params = dict(params or {})
                 refused = []
 
@@ -297,10 +347,12 @@ def chat():
         conv_id = data.get("conversation_id")
         session_id = data.get("session_id") or conv_id
         message = data.get("message")
-        params = dict(data.get("params") or {})
+        raw_params = data.get("params")
+        params = dict(raw_params) if isinstance(raw_params, dict) else {}
         role = data.get("role") or params.pop("role", None)
         requested_skills = _normalize_requested_skills(data, params)
         model_key = data.get("model") or params.get("model", "logos-runtime")
+        params = _client_params(params)
 
         if not conv_id or not message:
             return jsonify({"error": "conversation_id и message обязательны"}), 400
@@ -660,6 +712,16 @@ def list_tool_categories():
     return jsonify({"categories": registry.get_available_categories()})
 
 
+def _tool_category_selection(value: Any) -> list[str] | None:
+    """Registered category names only, so a saved selection always maps to real tools."""
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        return None
+    known = registry.get_available_categories()
+    if any(item not in known for item in value):
+        return None
+    return list(dict.fromkeys(value))
+
+
 @mcp_bp.route("/api/conversations/<conv_id>/tools", methods=["GET", "PUT"])
 def conv_tools(conv_id):
     owner_id = get_current_owner_id(required=False)
@@ -667,7 +729,11 @@ def conv_tools(conv_id):
         return jsonify({"error": "conversation_not_found"}), 404
     if request.method == "PUT":
         data = request.get_json(silent=True) or {}
-        categories = data.get("active_tool_categories", [])
+        if not isinstance(data, dict):
+            return jsonify({"error": "JSON object is required"}), 400
+        categories = _tool_category_selection(data.get("active_tool_categories", []))
+        if categories is None:
+            return jsonify({"error": "invalid_tool_categories"}), 400
         settings = get_conv_settings(conv_id) or {}
         settings["active_tool_categories"] = categories
         save_conv_settings(conv_id, settings)
@@ -683,14 +749,6 @@ def conv_tools(conv_id):
 # MCP servers hold credentials, so only an authenticated owner may read or change them.
 # Stored credentials never go back to the browser: an empty value on update means "unchanged".
 _MCP_SECRET_FIELDS = ("authorization", "headers")
-
-
-def _mcp_owner_denied():
-    try:
-        get_current_owner_id()
-    except TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
-    return None
 
 
 def _without_secrets(record):
@@ -712,33 +770,43 @@ def _update_payload():
 
 @mcp_bp.route("/api/mcp-servers", methods=["GET", "POST"])
 def handle_mcp_servers():
-    denied = _mcp_owner_denied()
-    if denied:
-        return denied
+    try:
+        owner_id = get_current_owner_id()
+    except TreasuryIdentityError as exc:
+        return jsonify({"error": str(exc)}), 401
     if request.method == "POST":
         data = _update_payload() or {}
-        sid = mcp_storage.create_server(data)
+        try:
+            sid = mcp_storage.create_server(owner_id, data)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         return jsonify({"status": "ok", "id": sid}), 201
-    return jsonify({"data": [_without_secrets(srv) for srv in mcp_storage.list_servers()]})
+    servers = mcp_storage.list_servers(owner_id=owner_id)
+    return jsonify({"data": [_without_secrets(srv) for srv in servers]})
 
 
 @mcp_bp.route("/api/mcp-servers/<server_id>", methods=["GET", "PUT", "DELETE"])
 def handle_mcp_server_item(server_id):
-    denied = _mcp_owner_denied()
-    if denied:
-        return denied
+    try:
+        owner_id = get_current_owner_id()
+    except TreasuryIdentityError as exc:
+        return jsonify({"error": str(exc)}), 401
     if request.method == "DELETE":
-        mcp_storage.delete_server(server_id)
+        mcp_storage.delete_server(server_id, owner_id)
         return jsonify({"status": "deleted"})
     if request.method == "PUT":
         data = _update_payload()
         if data is None:
             return jsonify({"error": "JSON object is required"}), 400
-        if not mcp_storage.update_server(server_id, data):
+        try:
+            updated = mcp_storage.update_server(server_id, owner_id, data)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        if not updated:
             return jsonify({"error": "Сервер не найден"}), 404
         return jsonify({"status": "updated"})
 
-    srv = mcp_storage.get_server(server_id)
+    srv = mcp_storage.get_server(server_id, owner_id=owner_id)
     if not srv:
         return jsonify({"error": "Сервер не найден"}), 404
     return jsonify(_without_secrets(srv))
@@ -790,9 +858,12 @@ def conversations():
             ), 502
         title = normalize_conversation_title(data.get("title"))
         model = data.get("model", "logos-runtime")
-        create_conversation(conv_id, title, model)
-        if owner_id:
+        try:
+            # Claim the conversation before its local row exists, so no row is ever unowned.
             set_owner(conv_id, owner_id)
+        except PermissionError:
+            return jsonify({"error": "conversation_id_conflict"}), 409
+        create_conversation(conv_id, title, model)
         creation_trace.add_event(
             "conversation_local_persisted",
             {

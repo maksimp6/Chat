@@ -302,7 +302,7 @@ def tool_registry(monkeypatch):
         )
     for module in (provider, routes, mixin):
         monkeypatch.setattr(module, "registry", registry)
-    monkeypatch.setattr(routes.mcp_storage, "list_servers", list)
+    monkeypatch.setattr(routes.mcp_storage, "list_servers", lambda **_owner: [])
     return executed
 
 

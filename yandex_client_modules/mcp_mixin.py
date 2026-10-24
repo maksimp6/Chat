@@ -2,6 +2,7 @@ import json
 import time
 from typing import Any
 
+from conversations.ownership import get_owner
 from observability.trace_manager import ExecutionTrace
 from tool_providers.registry import registry
 import mcp_server.storage as mcp_storage
@@ -139,11 +140,15 @@ class YandexMcpMixin:
         import time as _t
 
         mcp_tools = []
-        all_servers = mcp_storage.list_servers()
+        # MCP servers belong to an owner, and the conversation's owner is the only one whose
+        # servers (and their credentials) this request may use.
+        owner_id = get_owner(conversation_id) if conversation_id else None
         enabled_servers = []
-        if conversation_id:
+        if owner_id:
             try:
-                enabled_servers = mcp_storage.get_enabled_servers_for_conv(conversation_id)
+                enabled_servers = mcp_storage.get_enabled_servers_for_conv(
+                    conversation_id, owner_id=owner_id
+                )
             except Exception:
                 enabled_servers = []
 
@@ -266,7 +271,9 @@ class YandexMcpMixin:
         if local_tools:
             tools.extend(local_tools)
 
+        # The server owns the tool list: a caller's "tools" entry never reaches the provider.
         ask_params = dict(params)
+        ask_params.pop("tools", None)
         if tools or execution_policy is not None:
             ask_params["tools"] = tools
 
