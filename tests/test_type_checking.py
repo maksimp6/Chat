@@ -38,6 +38,7 @@ MYPY_ERROR_BASELINE = {
 
 # Files with zero strict errors. Errors here fail outright.
 STRICT_CLEAN_FILES = {
+    "steel/guardian/admission.py",
     "agent_runtime/provider_receipt.py",
     "forge/__init__.py",
     "forge/binding.py",
@@ -133,6 +134,7 @@ STRICT_CLEAN_FILES = {
     "plugin_system/manager.py",
     "economy/pricing_registry.py",
     "printing3d/__init__.py",
+    "printing3d/shape_benchmarks.py",
     "provider_accounts/key_rotation.py",
     "repository_index/__init__.py",
     "repository_index/provenance.py",
@@ -163,6 +165,10 @@ STRICT_CLEAN_FILES = {
     "observability/system_log.py",
     "observability/trace_timing.py",
     "tool_providers/__init__.py",
+    "tools/android/rdc_actions.py",
+    "user_identity.py",
+    "treasury_identity.py",
+    "yandex_api_logger.py",
     "identity/user_identity.py",
     "economy/treasury_identity.py",
     "yandex_client_modules/api_logger.py",
