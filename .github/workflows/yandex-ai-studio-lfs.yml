@@ -1,9 +1,7 @@
 name: Publish admitted Russian AI Studio LFS snapshot
 
 on:
-  push:
-    branches: [docs/yandex-documentation-links]
-    paths: [.github/workflows/yandex-ai-studio-lfs.yml]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -16,8 +14,10 @@ jobs:
   publish:
     if: >-
       github.repository == 'maksimp6/Chat' &&
-      github.ref == 'refs/heads/docs/yandex-documentation-links' &&
-      github.event.head_commit.message == 'docs: upload admitted Russian AI Studio files to LFS'
+      github.event_name == 'workflow_dispatch' &&
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner &&
+      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/docs/yandex-documentation-links')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
