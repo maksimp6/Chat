@@ -303,7 +303,10 @@ class PrintWorkflow:
         payload = json.dumps(payload_data, sort_keys=True, separators=(",", ":")).encode()
         signature = hmac.new(key, payload, hashlib.sha256).hexdigest()
         signed = grant.get("signature")
-        if not isinstance(signed, str) or not hmac.compare_digest(signature, signed):
+        # Compare bytes: compare_digest rejects non-ASCII str, which would raise TypeError instead of a refusal.
+        if not isinstance(signed, str) or not hmac.compare_digest(
+            signature.encode("ascii"), signed.encode("utf-8", "replace")
+        ):
             raise PrintGateError("invalid start approval signature")
         expiry = grant.get("expires_at")
         if not isinstance(expiry, int) or not time.time() < expiry:
