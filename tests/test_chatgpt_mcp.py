@@ -4,7 +4,7 @@ import subprocess
 import pytest
 from flask import Flask
 
-import chatgpt_mcp
+import mcp_server as chatgpt_mcp
 import mcp_server
 from invocation.context import InvocationContext
 from invocation.trace import create_invocation_trace
@@ -58,13 +58,6 @@ def test_tools_list_is_deterministic_and_read_only(client):
     assert body["result"]["ttlMs"] > 0
     assert all("inputSchema" in tool for tool in tools)
     assert all("securitySchemes" in tool for tool in tools)
-
-
-def test_chatgpt_mcp_compatibility_shim_reexports_package_api():
-    assert chatgpt_mcp.chatgpt_mcp_bp is mcp_server.chatgpt_mcp_bp
-    assert chatgpt_mcp.mcp_runtime_dispatcher is mcp_server.mcp_runtime_dispatcher
-    assert chatgpt_mcp.registry is mcp_server.registry
-    assert chatgpt_mcp.DEFAULT_PROTOCOL_VERSION == mcp_server.DEFAULT_PROTOCOL_VERSION
 
 
 def test_every_registered_tool_is_exposed_through_mcp(client):
@@ -259,7 +252,7 @@ def test_project_read_tools_are_exposed_and_read_only(client):
 def test_project_tools_execute_through_mcp(client):
     cases = [
         ("alice_list_project_files", {"path": "."}),
-        ("alice_read_project_file", {"path": "chatgpt_mcp.py", "length": 1024}),
+        ("alice_read_project_file", {"path": "app.py", "length": 1024}),
         ("alice_search_project", {"query": "UniversalToolExecutor", "file_pattern": "*.py"}),
     ]
     for name, arguments in cases:
@@ -397,13 +390,13 @@ def test_mcp_requires_auth_when_not_configured(monkeypatch):
 
 
 def test_mcp_conversation_tools_are_owner_scoped(client, monkeypatch, tmp_path):
-    import db
+    import storage.db as db
 
     monkeypatch.setenv("ALICE_MCP_USER_ID", "user-a")
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
     db.init_db()
 
-    from conversation_ownership import init_conversation_ownership_table, set_owner
+    from conversations.ownership import init_conversation_ownership_table, set_owner
 
     init_conversation_ownership_table()
     db.create_conversation("conversation-a", "A", "model")
@@ -489,7 +482,7 @@ def test_mcp_initialize_handshake_is_supported(client):
 
 
 def test_mcp_tool_call_is_persisted_in_execution_trace(monkeypatch, tmp_path):
-    import db
+    import storage.db as db
 
     monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
     monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "trace-token")

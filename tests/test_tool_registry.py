@@ -1,6 +1,6 @@
 import unittest
 
-from tool_registry import ToolRegistry
+from tool_providers.registry import ToolRegistry
 
 
 class ToolRegistryCategoryTests(unittest.TestCase):

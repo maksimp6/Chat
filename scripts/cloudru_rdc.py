@@ -31,7 +31,7 @@ from scripts.cloudru_browser_probe import (  # noqa: E402
     build_image,
     probe_error_details,
 )
-from storage import StorageObjectNotFound  # noqa: E402
+from storage.contracts import StorageObjectNotFound  # noqa: E402
 
 DESCRIPTION = "Alice persistent RDC + Chromium; issue 409"
 VOLUME = "rdc-state"

@@ -1,6 +1,6 @@
 # API Contracts
 
-Alice Pro treats every API boundary as an explicit contract.
+Logos treats every API boundary as an explicit contract.
 
 ## Rule
 

@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping
 
-from .orchestration import BrowserDagResult, BrowserRoleDag, BrowserRoleTask
-from .semantic import (
+from browser.orchestration import BrowserDagResult, BrowserRoleDag, BrowserRoleTask
+from browser.semantic import (
     Evidence,
     MergedEvidence,
     SemanticDiff,

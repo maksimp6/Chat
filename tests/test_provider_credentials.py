@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from provider_credentials import (
+from provider_accounts.credentials import (
     ExpiredCredentialError,
     NoActiveCredentialError,
     get_active_key,
@@ -73,7 +73,7 @@ def test_issue_window_is_12_hours():
 
 
 def test_fingerprint_is_stable_and_non_secret():
-    from provider_credentials import fingerprint_key
+    from provider_accounts.credentials import fingerprint_key
 
     secret = "sk-provider-secret"
     fingerprint = fingerprint_key(secret)
@@ -82,8 +82,8 @@ def test_fingerprint_is_stable_and_non_secret():
 
 
 def test_provider_credentials_are_isolated():
-    import db
-    from provider_credentials import replace_active_credential, get_active_credential
+    import storage.db as db
+    from provider_accounts.credentials import replace_active_credential, get_active_credential
 
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
     store = db.get_store()
@@ -106,7 +106,7 @@ def test_provider_credentials_are_isolated():
 
 
 def test_create_schema_migrates_legacy_global_index():
-    from memory_engine import MemoryStore, StoreError
+    from kristall import Kristall, KristallError
     from tempfile import TemporaryDirectory
     from pathlib import Path
 
@@ -114,15 +114,15 @@ def test_create_schema_migrates_legacy_global_index():
         path = Path(root) / "legacy.db"
         evidence = b"SQLite format 3\0legacy evidence"
         path.write_bytes(evidence)
-        with pytest.raises(StoreError):
-            MemoryStore(path)
+        with pytest.raises(KristallError):
+            Kristall(path)
         assert path.read_bytes() == evidence
 
 
 def test_provider_health_metadata_has_no_secret():
-    import db
+    import storage.db as db
     from cryptography.fernet import Fernet
-    from provider_credentials import (
+    from provider_accounts.credentials import (
         record_health_check,
         replace_active_credential,
         list_provider_credentials,
@@ -147,8 +147,8 @@ def test_provider_health_metadata_has_no_secret():
 
 
 def test_manual_provider_credential_does_not_fabricate_remote_key_id():
-    import db
-    from provider_credentials import replace_active_credential, list_provider_credentials
+    import storage.db as db
+    from provider_accounts.credentials import replace_active_credential, list_provider_credentials
 
     credential = replace_active_credential(
         db.get_store(), "manual-secret", "", lambda value: "cipher", "cloudru"
@@ -161,7 +161,7 @@ def test_manual_provider_credential_does_not_fabricate_remote_key_id():
 
 def test_provider_credentials_update_returns_provider_auth_error(monkeypatch):
     from flask import Flask
-    import provider_credentials_routes as routes
+    import provider_accounts.credentials_routes as routes
 
     class FakeClient:
         def validate_key(self, api_key):
@@ -186,7 +186,7 @@ def test_provider_credentials_update_returns_provider_auth_error(monkeypatch):
 
 
 def test_provider_credentials_update_rejects_admin_auth_before_provider_validation(monkeypatch):
-    import provider_credentials_routes as routes
+    import provider_accounts.credentials_routes as routes
 
     monkeypatch.setenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "expected-token")
     app = __import__("flask").Flask(__name__)
@@ -207,7 +207,7 @@ def test_provider_credentials_update_rejects_admin_auth_before_provider_validati
 
 def test_provider_credentials_update_accepts_yandex_static_key_without_remote_probe(monkeypatch):
     from flask import Flask
-    import provider_credentials_routes as routes
+    import provider_accounts.credentials_routes as routes
 
     calls = []
 
@@ -247,7 +247,7 @@ def test_provider_credentials_update_accepts_yandex_static_key_without_remote_pr
 
 def test_provider_credentials_update_logs_storage_error_and_returns_detail(monkeypatch, caplog):
     from flask import Flask
-    import provider_credentials_routes as routes
+    import provider_accounts.credentials_routes as routes
 
     class FakeClient:
         def validate_key(self, api_key):

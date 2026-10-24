@@ -1,21 +1,88 @@
 import time
+import copy
 
 import os
+import math
 import requests
+from typing import Any, Callable
 
-from trace_manager import ExecutionTrace
-from db import get_store
-from provider_credentials import resolve_client_credential
+from observability.trace_manager import ExecutionTrace
+from storage.db import get_store
+from provider_accounts.credentials import resolve_client_credential
 
 try:
-    from credential_crypto import decrypt_secret, encrypt_secret
+    from secret_store.credential_crypto import decrypt_secret, encrypt_secret
 except ImportError:  # pragma: no cover
     decrypt_secret = None
     encrypt_secret = None
-from yandex_request_utils import sanitize_for_log as _sanitize_for_log
-from yandex_request_builder import build_response_payload
+from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
+from yandex_client_modules.request_builder import build_response_payload
+from yandex_client_modules.request_receipt import build_request_manifest
 from yandex_client_modules.errors import YandexClientError
-from provider_quotas import ProviderQuotaExceeded, record_usage, reserve_request
+from provider_accounts.quotas import ProviderQuotaExceeded, record_usage, reserve_request
+
+
+def _transport_timeout(params: dict[str, Any], key: str, default: float, maximum: float) -> float:
+    """Validate local transport limits without sending them as provider fields."""
+    value = params.get(key, default)
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+        or not 0 < value <= maximum
+    ):
+        raise ValueError(f"{key} must be a finite number in (0, {maximum}]")
+    return value
+
+
+def _capture_request_input(
+    execution_trace: Any,
+    payload: dict[str, Any],
+    step: int | None,
+    callback: Callable[[dict[str, Any]], Any] | None,
+) -> None:
+    traced = isinstance(execution_trace, ExecutionTrace)
+    if not traced and callback is None:
+        return
+    manifest = build_request_manifest(payload)
+    correlation_id = (
+        execution_trace.get_step_correlation_id(step) if traced and step is not None else None
+    )
+    if traced:
+        execution_trace.add_event(
+            "api_request_manifest",
+            {
+                "method": "POST",
+                "step": step,
+                "correlation_id": correlation_id,
+                "manifest": manifest,
+            },
+        )
+    if callback is not None:
+        callback(
+            {
+                "schema_version": 1,
+                "capture_stage": "assembled_payload_before_post",
+                "trace_id": execution_trace.trace_id if traced else None,
+                "step": step,
+                "correlation_id": correlation_id,
+                "manifest": copy.deepcopy(manifest),
+                # This trusted local writer receives a protected original,
+                # never an event/export or the tools definitions/headers.
+                "data": copy.deepcopy(
+                    {
+                        name: payload[name]
+                        for name in (
+                            "input",
+                            "instructions",
+                            "conversation",
+                            "previous_response_id",
+                        )
+                        if name in payload
+                    }
+                ),
+            }
+        )
 
 
 def _resolve_quota_user_id(execution_trace=None):
@@ -24,7 +91,7 @@ def _resolve_quota_user_id(execution_trace=None):
         if user_id:
             return str(user_id).strip()
     try:
-        from treasury_identity import get_current_owner_id
+        from economy.treasury_identity import get_current_owner_id
 
         return get_current_owner_id(required=False)
     except Exception:
@@ -105,6 +172,14 @@ class YandexRequestMixin:
         trace_step=None,
     ):
         params = params or {}
+        request_timeout = _transport_timeout(params, "request_timeout", 90, 900)
+        poll_timeout = _transport_timeout(params, "poll_timeout", 180, 7200)
+        on_provider_response = params.get("on_provider_response")
+        if on_provider_response is not None and not callable(on_provider_response):
+            raise ValueError("on_provider_response must be callable or None")
+        on_provider_input = params.get("on_provider_input")
+        if on_provider_input is not None and not callable(on_provider_input):
+            raise ValueError("on_provider_input must be callable or None")
         is_background = params.get("background", True)
         is_stream = params.get("stream", False)
         if is_background:
@@ -151,13 +226,15 @@ class YandexRequestMixin:
             yandex_conv_id=yandex_conv_id,
         )
 
+        trace_step_number = trace_step
+        if isinstance(execution_trace, ExecutionTrace) and trace_step_number is None:
+            trace_step_number = len(execution_trace.trace.get("api_requests", [])) + 1
+
+        self._log_request("POST", self.responses_url, json=payload)
+        _capture_request_input(execution_trace, payload, trace_step_number, on_provider_input)
         request_start_timestamp = time.time()
         request_start_perf = time.perf_counter()
-        trace_step_number = trace_step
-
         if execution_trace and isinstance(execution_trace, ExecutionTrace):
-            if trace_step_number is None:
-                trace_step_number = len(execution_trace.trace.get("api_requests", [])) + 1
             execution_trace.add_api_request(
                 _sanitize_for_log(payload),
                 step_index=trace_step_number,
@@ -175,11 +252,10 @@ class YandexRequestMixin:
                 },
             )
 
-        self._log_request("POST", self.responses_url, json=payload)
         resp = None
         try:
             resp = self._log_response(
-                self.session.post(self.responses_url, json=payload, timeout=90)
+                self.session.post(self.responses_url, json=payload, timeout=request_timeout)
             )
             resp.raise_for_status()
         except requests.RequestException as e:
@@ -252,14 +328,23 @@ class YandexRequestMixin:
                     "status": data.get("status"),
                 },
             )
+        if on_provider_response is not None:
+            on_provider_response(data)
         task_id = data.get("id")
-        if not is_background:
-            status = data.get("status")
-            if status in ("completed", "incomplete"):
-                _record_quota_usage(execution_trace, quota_reservation, data)
-                return data
-            if status in ("failed", "cancelled"):
-                raise YandexClientError(f"Task status: {status}")
-        result = self._wait(task_id, execution_trace=execution_trace, trace_step=trace_step_number)
+        status = data.get("status")
+        if status in ("completed", "incomplete"):
+            _record_quota_usage(execution_trace, quota_reservation, data)
+            return data
+        if status in ("failed", "cancelled"):
+            raise YandexClientError(f"Task status: {status}")
+        wait_params = {"timeout": poll_timeout} if "poll_timeout" in params else {}
+        result = self._wait(
+            task_id,
+            execution_trace=execution_trace,
+            trace_step=trace_step_number,
+            **wait_params,
+        )
+        if on_provider_response is not None:
+            on_provider_response(result)
         _record_quota_usage(execution_trace, quota_reservation, result)
         return result

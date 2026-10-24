@@ -1,4 +1,4 @@
-"""Isolated native MemoryStore writers for serial and xdist application tests."""
+"""Isolated native Kristall writers for serial and xdist application tests."""
 
 from __future__ import annotations
 import os
@@ -19,9 +19,9 @@ def isolate_selected_database(monkeypatch, tmp_path):
 def pytest_sessionstart(session):
     worker = getattr(session.config, "workerinput", {}) or {}
     name = worker.get("workerid", "serial")
-    directory = tempfile.TemporaryDirectory(prefix="alice-memory-" + name + "-")
-    session.config._alice_memory_directory = directory
-    session.config._alice_original_memory_path = os.environ.get("ALICE_MEMORY_PATH")
+    directory = tempfile.TemporaryDirectory(prefix="logos-memory-" + name + "-")
+    session.config._logos_memory_directory = directory
+    session.config._logos_original_memory_path = os.environ.get("ALICE_MEMORY_PATH")
     os.environ["ALICE_MEMORY_PATH"] = str(Path(directory.name) / "alice.memory")
 
 
@@ -29,10 +29,10 @@ def pytest_sessionfinish(session):
     from agent_memory.client import close_memory_clients
 
     close_memory_clients()
-    directory = getattr(session.config, "_alice_memory_directory", None)
+    directory = getattr(session.config, "_logos_memory_directory", None)
     if directory is None:
         return
-    original = session.config._alice_original_memory_path
+    original = session.config._logos_original_memory_path
     if original is None:
         os.environ.pop("ALICE_MEMORY_PATH", None)
     else:

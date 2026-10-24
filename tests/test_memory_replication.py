@@ -6,8 +6,8 @@ import os
 
 import pytest
 
-from memory_engine.replication import ReplicaSink, ReplicationError
-from memory_engine.store import MemoryStore, StoreError
+from kristall.replication import ReplicaSink, ReplicationError
+from kristall.store import Kristall as MemoryStore, KristallError as StoreError
 
 KEY = b"k" * 32
 

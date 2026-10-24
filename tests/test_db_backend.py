@@ -1,11 +1,11 @@
-"""Alice's single native storage boundary, including fresh-process recovery."""
+"""Logos's single native storage boundary, including fresh-process recovery."""
 
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
-import db
+import storage.db as db
 from agent_memory.client import close_memory_clients
 
 
@@ -23,7 +23,7 @@ def test_native_chat_and_settings_survive_fresh_process(tmp_path, monkeypatch):
     db.set_config("feature", {"enabled": True})
     db.set_yandex_conversation("chat", "provider-chat")
     close_memory_clients()
-    code = "import json,db; print(json.dumps([db.get_conversations(),db.get_messages('chat'),db.get_conv_settings('chat'),db.get_config('feature'),db.get_yandex_conversation('chat')]))"
+    code = "import json,storage.db as db; print(json.dumps([db.get_conversations(),db.get_messages('chat'),db.get_conv_settings('chat'),db.get_config('feature'),db.get_yandex_conversation('chat')]))"
     result = subprocess.run(
         [sys.executable, "-c", code],
         check=True,

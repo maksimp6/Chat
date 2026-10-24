@@ -180,13 +180,13 @@ def test_alice_task_runs_the_issue_agent_and_keeps_its_summary(store):
         role="docs-engineer",
         title="t",
         kind="alice_task",
-        payload={**PAYLOAD, "model": "aliceai-llm"},
+        payload={**PAYLOAD, "model": "logos-runtime"},
     )
     run_next(store, {"alice_task": handler})
     task = store.get(task_id)
     assert task["status"] == "done"
     assert task["result"]["changed_files"] == ["README.md"]
-    assert calls == [(7, "Fix typo", "The README has a typo.", "aliceai-llm")]
+    assert calls == [(7, "Fix typo", "The README has a typo.", "logos-runtime")]
 
 
 def test_alice_task_fails_with_a_fixed_code_and_keeps_the_result(store):
@@ -295,7 +295,7 @@ def test_cli_uses_the_built_in_handlers_by_default_and_runs_as_a_module(
 
 
 def test_default_alice_task_uses_the_real_runner_and_its_default_model(store, monkeypatch):
-    import alice_agent_runner
+    import agent_runtime.issue_runner as issue_runner
 
     calls = []
 
@@ -303,10 +303,10 @@ def test_default_alice_task_uses_the_real_runner_and_its_default_model(store, mo
         calls.append(model)
         return {"status": "changed", "changed_files": []}
 
-    monkeypatch.setattr(alice_agent_runner, "run_issue_task", fake)
+    monkeypatch.setattr(issue_runner, "run_issue_task", fake)
     handler = builtin.default_handlers()["alice_task"]
     assert handler(PAYLOAD)["status"] == "changed"
-    assert calls == [alice_agent_runner.DEFAULT_MODEL]
+    assert calls == [issue_runner.DEFAULT_MODEL]
 
 
 def test_a_failure_result_that_is_not_json_is_dropped_but_the_code_is_kept(store):
