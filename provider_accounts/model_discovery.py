@@ -100,9 +100,11 @@ class ModelDiscovery:
         raw_id = raw_id.strip()
         model_id = raw_id
         if raw_id.startswith("gpt://"):
-            parts = raw_id.rstrip("/").split("/")
-            if len(parts) >= 2:
-                model_id = parts[-2]
+            # Provider IDs can omit a version: gpt://folder/model[/latest].
+            parts = raw_id[len("gpt://"):].split("/")
+            if len(parts) < 2 or not parts[0].strip() or not parts[1].strip():
+                return None
+            model_id = parts[1]
         elif "/" in raw_id:
             model_id = raw_id.rstrip("/").split("/")[-1]
         model_id = model_id.strip()

@@ -18,12 +18,20 @@
     var Storage = window.SettingsStorage;
     var currentConvId = typeof window.currentConvId !== "undefined" ? window.currentConvId : null;
     var s = Storage.load(currentConvId) || {};
+    if (
+      s.model_profile != null &&
+      s.model_profile !== "" &&
+      s.model_profile !== "custom" &&
+      s.model_profile !== "optima"
+    ) {
+      throw new Error("Неизвестный профиль модели. Выберите профиль в настройках.");
+    }
+    var isOptima = s.model_profile === "optima";
 
     var params = {
       temperature: typeof s.temperature === "number" ? s.temperature : 0.7,
       top_p: typeof s.top_p === "number" ? s.top_p : 1.0,
-      max_output_tokens: parseInt(s.max_output_tokens, 10) || 2000,
-      truncation: s.truncation || "disabled",
+      truncation: isOptima ? "disabled" : s.truncation || "disabled",
       store: s.store !== false,
       background: s.background !== false,
       stream: s.stream === true,
@@ -33,7 +41,21 @@
       max_tool_calls: parseInt(s.max_tool_calls, 10) || 10,
     };
 
-    if (s.reasoning_effort && s.reasoning_effort !== "disabled") {
+    if (isOptima) {
+      // Keep the preset explicit even if the selected model changed. The server
+      // validates compatibility; it must never silently fall back to custom.
+      params.model_profile = "optima";
+      var optimaLimit = Number(s.optima_max_output_tokens == null ? 0 : s.optima_max_output_tokens);
+      if (!Number.isSafeInteger(optimaLimit) || optimaLimit < 0) {
+        throw new Error("Лимит токенов Optima должен быть целым числом от 0.");
+      }
+      if (optimaLimit > 0) params.max_output_tokens = optimaLimit;
+    } else {
+      params.max_output_tokens = parseInt(s.max_output_tokens, 10) || 2000;
+    }
+
+    // Reasoning for Optima is chosen server-side for the specific model.
+    if (!isOptima && s.reasoning_effort && s.reasoning_effort !== "disabled") {
       params.reasoning_effort = s.reasoning_effort;
     }
 

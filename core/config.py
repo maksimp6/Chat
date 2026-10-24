@@ -60,7 +60,7 @@ PORT = 8080
 TEXT_MODELS = {
     "logos-runtime": {
         "name": "Logos Runtime",
-        "upstream": "logosai-llm",
+        "upstream": "aliceai-llm",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.50,
@@ -97,7 +97,7 @@ TEXT_MODELS = {
     },
     "logos-runtime-flash": {
         "name": "Logos Runtime Flash",
-        "upstream": "logosai-llm-flash",
+        "upstream": "aliceai-llm-flash",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.10,
@@ -215,10 +215,12 @@ class Config:
     PORT = PORT
 
 
-# Keys renamed in #1316. Stored conversations and older clients may still send them.
+# Keep both stored aliases and provider IDs mapped to the Logos registry names.
 LEGACY_MODEL_KEYS = {
     "logosai-llm": "logos-runtime",
     "logosai-llm-flash": "logos-runtime-flash",
+    "aliceai-llm": "logos-runtime",
+    "aliceai-llm-flash": "logos-runtime-flash",
 }
 
 
@@ -227,6 +229,9 @@ def canonical_model_key(model_key: str) -> str:
 
 
 def registry_key_for_upstream(upstream_id: str) -> str | None:
+    canonical = canonical_model_key(upstream_id)
+    if canonical != upstream_id and canonical in TEXT_MODELS:
+        return canonical
     for key, info in TEXT_MODELS.items():
         if info.get("upstream") == upstream_id:
             return key
@@ -238,7 +243,7 @@ def get_model_info(model_key):
 
 
 # The registry key is ours; the upstream id is the name Yandex knows the model by.
-# Keys that are not in the registry (including legacy stored keys) pass through unchanged.
+# Known stored aliases resolve through the registry; unknown keys pass through unchanged.
 def upstream_model_id(model_key: str) -> str:
     info = ALL_MODELS.get(canonical_model_key(model_key)) or {}
     return str(info.get("upstream", model_key))

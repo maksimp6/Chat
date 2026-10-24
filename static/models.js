@@ -97,6 +97,12 @@ function renderModelModal() {
       ultra.title = (m.ultra_profile.blockers || []).join(", ");
       div.appendChild(ultra);
     }
+    if (m.optima_profile && m.optima_profile.status === "available" && !unavailable) {
+      var optima = document.createElement("div");
+      optima.className = "model-option-optima";
+      optima.textContent = "Optima · сбалансированный профиль";
+      div.appendChild(optima);
+    }
     div.addEventListener("click", function () {
       if (unavailable) return;
       var creatingNewChat = window.isCreatingNewChat === true;

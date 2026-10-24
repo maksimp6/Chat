@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "catalog_id": "logos-optima-2026-10-25",
+  "checked_on": "2026-10-25",
+  "description": "Optima is a Logos opt-in balanced preset, not a Yandex model or service tier.",
+  "policy": {
+    "activation": "explicit_selection",
+    "model_fallback": null,
+    "automatic_post_retries": 0,
+    "context_truncation": "disabled",
+    "output_limit": "explicit_caller_limit_or_provider_default",
+    "sampling_and_tools": "preserve_caller_configuration",
+    "reasoning": "medium_only_for_documented_depth_control_otherwise_provider_default",
+    "provider_acceptance": "NOT_RUN"
+  },
+  "sources": {
+    "models": "https://aistudio.yandex.ru/ru/docs/ai-studio/concepts/generation/models",
+    "reasoning": "https://aistudio.yandex.ru/ru/docs/ai-studio/concepts/generation/chain-of-thought"
+  },
+  "profiles": {
+    "logos-runtime": {
+      "profile_id": "optima-logos-runtime",
+      "model_key": "logos-runtime",
+      "transport": "responses",
+      "context_window_tokens": 131072,
+      "stop_and_recheck_on": null,
+      "reasoning_basis": "provider_default",
+      "wire_parameters": {
+        "truncation": "disabled"
+      }
+    },
+    "yandexgpt-5-pro": {
+      "profile_id": "optima-yandexgpt-5-pro",
+      "model_key": "yandexgpt-5-pro",
+      "transport": "responses",
+      "context_window_tokens": 32768,
+      "stop_and_recheck_on": null,
+      "reasoning_basis": "provider_default",
+      "wire_parameters": {
+        "truncation": "disabled"
+      }
+    },
+    "yandexgpt-5-lite": {
+      "profile_id": "optima-yandexgpt-5-lite",
+      "model_key": "yandexgpt-5-lite",
+      "transport": "responses",
+      "context_window_tokens": 32768,
+      "stop_and_recheck_on": "2026-11-15",
+      "reasoning_basis": "provider_default",
+      "wire_parameters": {
+        "truncation": "disabled"
+      }
+    },
+    "logos-runtime-flash": {
+      "profile_id": "optima-logos-runtime-flash",
+      "model_key": "logos-runtime-flash",
+      "transport": "responses",
+      "context_window_tokens": 65536,
+      "stop_and_recheck_on": null,
+      "reasoning_basis": "provider_default",
+      "wire_parameters": {
+        "truncation": "disabled"
+      }
+    },
+    "deepseek-v4.1-flash": {
+      "profile_id": "optima-deepseek-v4.1-flash",
+      "model_key": "deepseek-v4.1-flash",
+      "transport": "responses",
+      "context_window_tokens": 1048576,
+      "stop_and_recheck_on": null,
+      "reasoning_basis": "provider_default",
+      "wire_parameters": {
+        "truncation": "disabled"
+      }
+    },
+    "deepseek-v4-flash": {
+      "profile_id": "optima-deepseek-v4-flash",
+      "model_key": "deepseek-v4-flash",
+      "transport": "responses",
+      "context_window_tokens": 1048576,
+      "stop_and_recheck_on": "2026-11-15",
+      "reasoning_basis": "provider_default",
+      "wire_parameters": {
+        "truncation": "disabled"
+      }
+    },
+    "gpt-oss-120b": {
+      "profile_id": "optima-gpt-oss-120b",
+      "model_key": "gpt-oss-120b",
+      "transport": "responses",
+      "context_window_tokens": 131072,
+      "stop_and_recheck_on": "2026-10-30",
+      "reasoning_basis": "documented_depth_control",
+      "wire_parameters": {
+        "truncation": "disabled",
+        "reasoning": {
+          "effort": "medium"
+        }
+      }
+    },
+    "gpt-oss-20b": {
+      "profile_id": "optima-gpt-oss-20b",
+      "model_key": "gpt-oss-20b",
+      "transport": "responses",
+      "context_window_tokens": 131072,
+      "stop_and_recheck_on": "2026-10-30",
+      "reasoning_basis": "documented_depth_control",
+      "wire_parameters": {
+        "truncation": "disabled",
+        "reasoning": {
+          "effort": "medium"
+        }
+      }
+    },
+    "qwen3.6-35b-a3b": {
+      "profile_id": "optima-qwen3.6-35b-a3b",
+      "model_key": "qwen3.6-35b-a3b",
+      "transport": "responses",
+      "context_window_tokens": 262144,
+      "stop_and_recheck_on": null,
+      "reasoning_basis": "provider_default",
+      "wire_parameters": {
+        "truncation": "disabled"
+      }
+    }
+  }
+}
