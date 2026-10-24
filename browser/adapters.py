@@ -7,6 +7,7 @@ real browser, cloud session, credentials or cookies.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol
 
@@ -16,6 +17,20 @@ from browser.capabilities import (
     sanitize_browser_value,
     validate_browser_action,
 )
+
+# Worker error text can echo page content or request headers, so credentials are redacted and
+# the text is bounded before it reaches a trace, a log or the model.
+_CREDENTIAL_ASSIGNMENT = re.compile(
+    r"(?i)\b(authorization|cookie|token|password|secret|api[_-]?key)\s*[:=]\s*\S+"
+)
+_MAX_ERROR_CHARS = 500
+
+
+def _sanitize_error(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = _CREDENTIAL_ASSIGNMENT.sub(lambda match: match.group(1) + "=<redacted>", str(value))
+    return text[:_MAX_ERROR_CHARS]
 
 
 class BrowserAdapter(Protocol):
@@ -38,7 +53,7 @@ class BrowserAdapterResult:
         return {
             "success": self.success,
             "data": sanitize_browser_value(self.data),
-            "error": self.error,
+            "error": _sanitize_error(self.error),
             "metadata": sanitize_browser_value(dict(self.metadata)),
         }
 
