@@ -4,6 +4,11 @@ set -euo pipefail
 set +x
 umask 077
 action=${1:-start}
+trigger=${LOGOS_DEPLOY_TRIGGER:-}
+if [[ -z $trigger ]]; then
+  if [[ ${GITHUB_ACTIONS:-} == true ]]; then trigger=github_actions; else trigger=manual; fi
+fi
+case "$trigger" in manual|github_actions|local_autoupdate) ;; *) echo 'Invalid deployment trigger' >&2; exit 2 ;; esac
 case "$action" in start|restart|status|stop|deploy) ;; *) echo 'Use start, restart, status, stop or deploy' >&2; exit 2 ;; esac
 app=${LOGOS_APP_DIR:-$HOME/logos-local}
 state=${LOGOS_STATE_DIR:-$HOME/logos-local-state}
@@ -160,8 +165,8 @@ receipt() {
   run=${GITHUB_RUN_ID:-manual}
   [[ $run =~ ^[0-9]+$ || $run == manual ]] || return 2
   [[ $wifi_required == 0 ]] || wifi_check=',"wifi_address_http_and_assets"'
-  printf '{"status":"%s","outcome":"%s","pid":%s,"url":"%s","wifi_address":"%s","app_revision":"%s","target_revision":"%s","run_id":"%s","verified_at":"%s","checks":["process_identity","healthz","html","chat_js","css"%s]}\n' \
-    "$status" "$outcome" "$pid" "$base" "$wifi_address" "$revision" "$target" "$run" "$(date -u +%FT%TZ)" "$wifi_check" >"$state/runner-start.json.tmp" || return 1
+  printf '{"status":"%s","outcome":"%s","trigger":"%s","pid":%s,"url":"%s","wifi_address":"%s","app_revision":"%s","target_revision":"%s","run_id":"%s","verified_at":"%s","checks":["process_identity","healthz","html","chat_js","css"%s]}\n' \
+    "$status" "$outcome" "$trigger" "$pid" "$base" "$wifi_address" "$revision" "$target" "$run" "$(date -u +%FT%TZ)" "$wifi_check" >"$state/runner-start.json.tmp" || return 1
   mv "$state/runner-start.json.tmp" "$state/runner-start.json" || return 1
   cat "$state/runner-start.json"
 }

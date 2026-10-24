@@ -6,6 +6,11 @@ on:
 
 permissions: {}
 
+# Each archive reads every repository ref; retain only the newest pending trigger.
+concurrency:
+  group: redmi9-repository-backup
+  cancel-in-progress: false
+
 jobs:
   backup:
     runs-on: redmi9

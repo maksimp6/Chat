@@ -3,10 +3,19 @@ name: Redmi 9 Android diagnostics
 on:
   push:
     branches: [develop, ops/redmi9-python-runner]
+    paths:
+      - .github/workflows/redmi9-android-diagnostics.yml
+      - scripts/redmi_android_diagnostics.sh
+      - scripts/redmi_publish_diagnostics.sh
+      - scripts/redmi_store_github_token.sh
   workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: redmi9-android-diagnostics
+  cancel-in-progress: false
 
 jobs:
   diagnostics:
@@ -18,7 +27,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for script in redmi_store_github_token.sh redmi_android_diagnostics.sh redmi_publish_diagnostics.sh redmi_repository_backup.sh; do
+          for script in redmi_store_github_token.sh redmi_android_diagnostics.sh redmi_publish_diagnostics.sh; do
             curl --fail --silent --show-error --proto '=https' \
               "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/$script" -o "$GITHUB_WORKSPACE/$script"
           done
@@ -33,4 +42,3 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           bash "$GITHUB_WORKSPACE/redmi_publish_diagnostics.sh"
-          bash "$GITHUB_WORKSPACE/redmi_repository_backup.sh"

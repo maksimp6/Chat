@@ -110,6 +110,8 @@ Open the web interface in a browser. The Android application and APK build tooli
 were removed on 2026-10-24. The backend can still run in Termux.
 Independent device-control launchers are in `scripts/rdc/`; the fallback phone
 agent is in `scripts/device/`.
+The native [Redmi 9 updater](docs/setup/redmi9-auto-update.md) follows `develop`
+independently of the Actions queue and recovers an unhealthy application.
 
 ## Configuration and security
 

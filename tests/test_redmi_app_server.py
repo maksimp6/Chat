@@ -80,6 +80,10 @@ def test_start_reuse_restart_and_no_job_credentials(installation):
     assert (state / "logos.memory").read_bytes() == b"existing-persistent-data"
     assert not any(json.loads((state / "child-env.json").read_text()).values())
     assert json.loads(run("status", env).stdout)["status"] == "ready"
+    assert json.loads(first.stdout)["trigger"] == "manual"
+    auto_env = dict(env, LOGOS_DEPLOY_TRIGGER="local_autoupdate")
+    assert json.loads(run("status", auto_env).stdout)["trigger"] == "local_autoupdate"
+
 
 
 def test_simultaneous_start_does_not_duplicate(installation):
