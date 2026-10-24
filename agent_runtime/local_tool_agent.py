@@ -15,6 +15,9 @@ from tool_providers.universal_tool_platform import UniversalToolCall, UniversalT
 
 logger = logging.getLogger("local_tool_agent")
 
+# Renew well inside the gateway's 30 s job lease so a slow tool is not requeued and run twice.
+_LEASE_RENEW_SECONDS = 10.0
+
 
 def _request(
     method: str,
@@ -115,7 +118,7 @@ class LocalToolAgent:
                     delay = float(response.get("poll_after_seconds", self.poll_interval))
                     self.stop_event.wait(max(0.5, delay))
                     continue
-                self._execute_job(job)
+                self._run_with_lease(job)
             except PermissionError:
                 logger.error("Local agent authorization failed; stopping")
                 return
@@ -125,6 +128,24 @@ class LocalToolAgent:
             except Exception:
                 logger.exception("Unexpected local agent worker error")
                 self.stop_event.wait(self.poll_interval)
+
+    def _run_with_lease(self, job: Mapping[str, Any]) -> None:
+        stop = threading.Event()
+        renewer = threading.Thread(target=self._renew_leases, args=(stop,), daemon=True)
+        renewer.start()
+        try:
+            self._execute_job(job)
+        finally:
+            stop.set()
+            renewer.join(timeout=5)
+
+    def _renew_leases(self, stop: threading.Event) -> None:
+        heartbeat_url = f"{self.gateway_url}/api/local-agents/{self.agent_id}/heartbeat"
+        while not stop.wait(_LEASE_RENEW_SECONDS):
+            try:
+                _request("POST", heartbeat_url, token=self.token, timeout=10)
+            except (ConnectionError, PermissionError, RuntimeError) as exc:
+                logger.warning("Local agent lease renewal failed: %s", exc)
 
     def _execute_job(self, job: Mapping[str, Any]) -> None:
         job_id = str(job.get("id") or "")

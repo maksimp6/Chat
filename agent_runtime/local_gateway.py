@@ -142,6 +142,14 @@ def _recover_expired_jobs(conn, agent_id: str) -> None:
             conn.set(key, {**row, "status": "queued", "claimed_at": None, "lease_until": None})
 
 
+def _renew_running_leases(conn, agent_id: str, now: float) -> None:
+    # A job that is still executing must keep its lease, or the next poll requeues it and a
+    # second agent run repeats any side effect the first one already produced.
+    for key, row in get_store().items(prefix="local-job/").items():
+        if row["agent_id"] == agent_id and row["status"] == "running":
+            conn.set(key, {**row, "lease_until": now + _DEFAULT_LEASE_SECONDS})
+
+
 @local_agent_bp.post("/register")
 def register_local_agent():
     try:
@@ -208,6 +216,7 @@ def local_agent_heartbeat(agent_id: str):
             agent = _require_agent(agent_id)
             row = agent
             tx.set(key, {**row, "status": "online", "last_seen": now, "updated_at": now})
+            _renew_running_leases(tx, agent_id, now)
     except LookupError:
         return jsonify({"error": "agent_not_found"}), 404
     except PermissionError:
