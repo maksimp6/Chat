@@ -113,3 +113,53 @@ def test_failed_completion_does_not_write_success_receipt(tmp_path):
 def test_redirect_cannot_forward_credentials():
     with pytest.raises(runner.APIError, match="Redirect refused"):
         runner.NoRedirect().redirect_request(None, None, 302, "", {}, "https://example.org")
+
+
+def test_next_job_arriving_during_poll_after_worker_finishes(tmp_path, monkeypatch):
+    first_started = threading.Event()
+    release_first = threading.Event()
+    acquired = []
+    workers = []
+    real_thread = threading.Thread
+    listener = SimpleNamespace(state=tmp_path, stop=threading.Event(), broker="https://test.actions.githubusercontent.com/")
+    listener.connect = lambda: None
+    listener.disconnect = lambda: None
+    listener.authorize = lambda: "test-token"
+    listener.parameters = lambda status: "status=" + status
+    class Worker:
+        def __init__(self, parent, job, reference):
+            self.id = job["jobId"]
+            self.cancel = threading.Event()
+            acquired.append(self.id)
+        def run(self):
+            if self.id == "1":
+                first_started.set()
+                assert release_first.wait(2)
+            else:
+                listener.stop.set()
+    class FakeAPI:
+        polls = 0
+        def request(self, url, token, *args, **kwargs):
+            if url.endswith("acquirejob"):
+                return {"jobId": str(self.polls), "steps": []}
+            self.polls += 1
+            if self.polls == 2:
+                assert first_started.wait(2)
+                release_first.set()
+                workers[0].join(2)
+                assert not workers[0].is_alive()
+            if self.polls > 2:
+                listener.stop.set()
+                return None
+            return {"messageType": "RunnerJobRequest", "body": {"runner_request_id": str(self.polls),
+                    "run_service_url": "https://test.actions.githubusercontent.com/"}}
+    def make_thread(*args, **kwargs):
+        thread = real_thread(*args, **kwargs)
+        workers.append(thread)
+        return thread
+    listener.api = FakeAPI()
+    monkeypatch.setattr(runner, "Job", Worker)
+    monkeypatch.setattr(runner.threading, "Thread", make_thread)
+    monkeypatch.setattr(runner.signal, "signal", lambda *args: None)
+    runner.run_listener(listener)
+    assert acquired == ["1", "2"]

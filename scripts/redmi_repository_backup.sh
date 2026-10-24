@@ -49,6 +49,7 @@ backup_main() {
   mv "$receipt.tmp" "$receipt"
   cp "$receipt" "$base/runner-last-success.json.tmp"
   mv "$base/runner-last-success.json.tmp" "$base/runner-last-success.json"
+  sync -f "$base"
   cat "$receipt"
 }
 

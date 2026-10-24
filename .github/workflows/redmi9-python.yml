@@ -21,7 +21,8 @@ jobs:
           assert model == 'Redmi 9', model
           assert platform.machine() == 'aarch64'
           sha = os.environ['GITHUB_SHA']
-          for name in ('scripts/redmi_python_runner.py', 'tests/test_redmi_python_runner.py'):
+          for name in ('scripts/redmi_python_runner.py', 'tests/test_redmi_python_runner.py',
+                       'scripts/redmi_repository_backup.sh', 'tests/test_redmi_repository_backup.py'):
               data = urllib.request.urlopen('https://raw.githubusercontent.com/maksimp6/Chat/' + sha + '/' + name, timeout=30).read()
               path = Path(name)
               path.parent.mkdir(parents=True, exist_ok=True)
@@ -29,7 +30,7 @@ jobs:
           installed = Path.home() / 'github-python-runner/runner.py'
           expected = Path('scripts/redmi_python_runner.py').read_bytes()
           assert installed.read_bytes() == expected, 'Installed source differs from tested commit'
-          subprocess.run(['python', '-m', 'pytest', '-q', 'tests/test_redmi_python_runner.py'], check=True)
+          subprocess.run(['python', '-m', 'pytest', '-q', 'tests/test_redmi_python_runner.py', 'tests/test_redmi_repository_backup.py'], check=True)
           proof = {'device': model, 'engine': 'python-native', 'commit': sha,
                    'runner_sha256': hashlib.sha256(expected).hexdigest(), 'run_id': os.environ['GITHUB_RUN_ID']}
           Path('native-proof.json').write_text(json.dumps(proof))

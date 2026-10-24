@@ -469,6 +469,9 @@ def run_listener(listener):
                     continue
                 if kind not in ("RunnerJobRequest", "JobRequest"):
                     raise RuntimeError("Unsupported broker message " + kind)
+                # A job may finish while the broker's long poll is pending.
+                if thread and not thread.is_alive():
+                    active, thread = None, None
                 if active:
                     raise RuntimeError("Received concurrent job")
                 if body.get("should_acknowledge"):
