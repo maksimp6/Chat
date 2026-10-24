@@ -109,20 +109,17 @@ def resolve_commit(branch: str, commit_sha: Optional[str] = None) -> str:
         raise ValueError("invalid git ref")
     try:
         resolved = _run_git("rev-parse", "--verify", f"{value}^{{commit}}")
-        if commit_sha:
-            branch_resolved = _run_git("rev-parse", "--verify", f"{branch_value}^{{commit}}")
-            check = subprocess.run(
-                ["git", "merge-base", "--is-ancestor", resolved, branch_resolved],
-                cwd=str(_repo_root()),
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=15,
-            )
-            if check.returncode != 0:
-                raise ValueError("commit is not reachable from branch")
+        branch_resolved = (
+            _run_git("rev-parse", "--verify", f"{branch_value}^{{commit}}") if commit_sha else None
+        )
     except ValueError as exc:
         raise ValueError(f"git ref is not available: {value}") from exc
+    if branch_resolved is not None:
+        try:
+            _run_git("merge-base", "--is-ancestor", resolved, branch_resolved)
+        except ValueError as exc:
+            # The commit exists but is not on this branch, so the reason must not be reported as a missing ref.
+            raise ValueError("commit is not reachable from branch") from exc
     if len(resolved) != 40 or any(ch not in "0123456789abcdef" for ch in resolved.lower()):
         raise ValueError("git did not return a commit SHA")
     return resolved
