@@ -26,15 +26,13 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
       MERGE_REQUIRED_CHECKS: >-
+        Platform changes,
+        CI required,
+        Infrastructure tests,
+        MCP worker tests,
         Code rules,
         Application tests,
-        PostgreSQL integration,
-        Android debug APK,
-        Formatting check,
-        Trivy repository scan,
-        Zizmor GitHub Actions audit,
-        CodeQL (python),
-        CodeQL (javascript-typescript)
+        Trivy repository scan
 
     steps:
       - name: Checkout exact PR head

@@ -31,7 +31,7 @@ Evolution IAM bearer token. Токен берётся штатным IAM service
    Certificate Manager и добавить требуемый этим шлюзом CNAME. Cloud.ru описывает
    проверочную запись `<domain> CNAME <gateway-uuid>.apigw.cloud.ru`.
 5. Дождаться validation, проверить DNS авторитетным resolver, TLS chain/SAN,
-   статус домена и каждый URL. Только затем менять рабочий endpoint Алисы.
+   статус домена и каждый URL. Только затем менять рабочий endpoint Logos.
 
 Container Apps не поддерживает собственный домен. DNS направляет custom name
 на API Gateway; Gateway проксирует на Container Apps. Для apex/root домена не

@@ -1,4 +1,4 @@
-# Логи Alice и Evolution
+# Логи Logos и Evolution
 
 `app-event.example.json` — пример **одной stdout JSON-строки** приложения.
 Это схема для будущего logger (#478), а не Container Apps resource payload и не
@@ -15,10 +15,10 @@ access log. Тестировать redaction строками canary, котор
 
 | Поток | Настройка/пример | Область |
 |---|---|---|
-| Alice application | stdout/stderr JSON, event fields в `app-event.example.json` | Логика приложения; текущий Python logger отдельная работа #478 |
+| Logos application | stdout/stderr JSON, event fields в `app-event.example.json` | Логика приложения; текущий Python logger отдельная работа #478 |
 | Container Apps platform | Console/runtime logs и отдельная опция request logging | Запуск/scale и HTTP request metadata; перед включением проверить, какие поля собираются |
 | API Gateway | `x-cloud-log-group: <UUID>` на path/operation OpenAPI | Gateway request logs; UUID создаётся в сервисе Logging, сам extension не задаёт redaction |
-| Cloud audit | Audit logs | Actor и изменения control plane, не содержание Alice request |
+| Cloud audit | Audit logs | Actor и изменения control plane, не содержание Logos request |
 | Workflow Studio / EDS | Job/build output | Pipeline и deploy; вывод может содержать build env и должен быть закрыт/редактирован |
 | AI services | Logaas, Monas, Audaas по соответствующему сервису | Agent logs, metrics и audit; отдельные IAM roles, retention и redaction |
 
@@ -32,7 +32,7 @@ logging, Container Apps request logging, app stdout и audit logs — незав
 Пример `x-cloud-log-group` в
 [`../api-gateway/alice-openapi.example.json`](../api-gateway/alice-openapi.example.json)
 содержит placeholder, который надо заменить существующим Logging group UUID.
-Прежде чем включать request logging для Alice private routes, убедиться, что
+Прежде чем включать request logging для Logos private routes, убедиться, что
 сервис не сохраняет секретные поля; выбирать минимальный набор маршрутов.
 
 Источники: [Container Apps logs](https://cloud.ru/docs/container-apps-evolution/ug/topics/concepts__logging),

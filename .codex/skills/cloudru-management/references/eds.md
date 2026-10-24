@@ -11,7 +11,7 @@ Contents: [install](#установка) · [config and credentials](#конфи
 
 ## Установка
 
-Из корня Alice Pro:
+Из корня Logos:
 
 ```bash
 python scripts/install_eds.py

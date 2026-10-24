@@ -1,6 +1,6 @@
 ---
 name: Android Engineer
-description: Implements Alice Pro Android app, packaging, signing boundaries, system-bar safety, and device-facing integration changes.
+description: Implements Logos Android app, packaging, signing boundaries, system-bar safety, and device-facing integration changes.
 target: github-copilot
 model: gpt-5.4-mini
 user-invocable: true

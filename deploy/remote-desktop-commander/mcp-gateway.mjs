@@ -5,12 +5,16 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { createOAuth } from "./oauth.mjs";
+import { createOAuthStateStore } from "./oauth-state.mjs";
+import { createCredentialHandoff } from "./credential-handoff.mjs";
+import { canonicalPublicOrigin } from "./request-origin.mjs";
 
 const DEFAULT_UPSTREAM = "/opt/desktop-commander/stdio-server.mjs";
 const MAX_BODY = 1024 * 1024;
 const BLOCKED_TOOLS = new Set(["write_pdf"]);
 
-function authorized(request, token) {
+function shortTokenAuthorized(request, token) {
   if (!token) return false;
   const value = request.headers.authorization;
   return typeof value === "string" && value === `Bearer ${token}`;
@@ -33,18 +37,42 @@ async function readJson(request) {
 }
 
 export async function startGateway(options = {}) {
-  const token = options.token ?? process.env.ALICE_RDC_MCP_TOKEN ?? "";
+  const token = options.token ?? process.env.ALICE_SHORT_TOKEN ?? "";
   if (!token) throw new Error("MCP token is required");
+  const configuredPublicUrl = canonicalPublicOrigin(
+    options.publicUrl ?? process.env.ALICE_DEV_PUBLIC_URL ?? "",
+  );
+  const stateFile = options.oauthStateFile ?? process.env.ALICE_DEV_OAUTH_STATE_FILE ?? "/tmp/alice-dev-auth/oauth.json";
+  const ownerId = options.ownerId ?? process.env.ALICE_DEV_OWNER_ID ?? "owner";
+  const oauthStateStore = options.oauthStateStore ?? createOAuthStateStore({
+    stateFile, origin: configuredPublicUrl, ownerId,
+  });
+  if ((options.requireDurability ?? process.env.ALICE_DEV_OAUTH_REQUIRE_DURABILITY === "1") && !oauthStateStore.enabled) {
+    throw new Error("oauth_state_not_configured");
+  }
+  // Recovery must finish before OAuth loads its signing key or any HTTP/MCP
+  // listener is exposed. Restore failure is a startup failure, never fresh DCR.
+  await oauthStateStore.restore();
+  const oauth = options.oauth ?? createOAuth({
+    publicUrl: configuredPublicUrl,
+    shortToken: token,
+    ownerId, stateFile,
+    onPersist: () => oauthStateStore.persist(),
+  });
+  const credentialHandoff = options.credentialHandoff ?? createCredentialHandoff({
+    token,
+    path: options.credentialFile ?? process.env.ALICE_DEV_CREDENTIAL_FILE,
+  });
   const upstream = options.upstream ?? new Client(
-    { name: "alice-rdc-mcp-gateway", version: "0.1.0" },
+    { name: "alice-dev-gateway", version: "0.1.0" },
     { capabilities: {} },
   );
   let transport = options.upstreamTransport;
   if (!transport) {
     transport = new StdioClientTransport({
       command: process.execPath,
-      args: [process.env.ALICE_RDC_MCP_UPSTREAM || DEFAULT_UPSTREAM, "--no-onboarding"],
-      cwd: process.env.ALICE_RDC_MCP_CWD || "/workspace",
+      args: [process.env.ALICE_DEV_UPSTREAM || DEFAULT_UPSTREAM, "--no-onboarding"],
+      cwd: process.env.ALICE_DEV_CWD || "/workspace",
       env: { ...process.env },
       stderr: "pipe",
     });
@@ -54,7 +82,7 @@ export async function startGateway(options = {}) {
 
   const makeServer = () => {
     const server = new Server(
-      { name: "alice-rdc-mcp-gateway", version: "0.1.0" },
+      { name: "alice-dev-gateway", version: "0.1.0" },
       { capabilities: { tools: {} } },
     );
     server.setRequestHandler(ListToolsRequestSchema, async (request) => {
@@ -63,7 +91,7 @@ export async function startGateway(options = {}) {
     });
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (BLOCKED_TOOLS.has(request.params.name)) {
-        throw new Error("tool_not_available_in_lightweight_rdc");
+        throw new Error("tool_not_available_in_alice_dev");
       }
       return upstream.callTool(request.params);
     });
@@ -74,22 +102,46 @@ export async function startGateway(options = {}) {
     response.setHeader("Cache-Control", "no-store");
     response.setHeader("Referrer-Policy", "no-referrer");
     if (request.method === "GET" && request.url === "/healthz") {
-      response.writeHead(200, { "Content-Type": "application/json" })
-        .end('{"status":"ok","mode":"mcp-gateway"}');
+      const ready = oauth.available?.() ?? true;
+      response.writeHead(ready ? 200 : 503, { "Content-Type": "application/json" })
+        .end(JSON.stringify({ status: ready ? "ok" : "oauth_unavailable", mode: "mcp-gateway" }));
       return;
     }
-    if (request.url !== "/mcp" || request.method !== "POST") {
+    let requestUrl;
+    try {
+      requestUrl = new URL(request.url ?? "/", configuredPublicUrl);
+    } catch {
+      request.resume();
+      response.writeHead(400, { "Content-Type": "application/json" })
+        .end('{"status":"invalid_request"}');
+      return;
+    }
+    if (await credentialHandoff.handle(request, response, requestUrl)) return;
+    if (oauth?.enabled && await oauth.handle(request, response, requestUrl)) return;
+    if (requestUrl.pathname !== "/mcp") {
       request.resume();
       response.writeHead(404, { "Content-Type": "application/json" })
         .end('{"status":"not_found"}');
       return;
     }
-    if (!authorized(request, token)) {
+    if (!((oauth?.authorize(request) ?? false) || shortTokenAuthorized(request, token))) {
       request.resume();
       response.writeHead(401, {
         "Content-Type": "application/json",
-        "WWW-Authenticate": 'Bearer realm="alice-rdc-mcp"',
+        "WWW-Authenticate": oauth?.enabled
+          ? oauth.challenge()
+          : 'Bearer realm="alice-dev"',
       }).end('{"status":"unauthorized"}');
+      return;
+    }
+    if (request.method !== "POST") {
+      // This stateless gateway has no standalone SSE stream or DELETE session.
+      // Authentication still runs first so connector probes can discover OAuth.
+      request.resume();
+      response.writeHead(405, {
+        "Content-Type": "application/json",
+        Allow: "POST",
+      }).end(request.method === "HEAD" ? undefined : '{"status":"method_not_allowed"}');
       return;
     }
     try {

@@ -1,12 +1,12 @@
 # SSH Runtime
 
-Alice Pro Runtime executes commands and file operations on remote Linux hosts through the system OpenSSH client.
+Logos Runtime executes commands and file operations on remote Linux hosts through the system OpenSSH client.
 
 ## Identity model
 
-The Runtime does not introduce a second permission system. A configured Alice Pro identity maps to a Linux username, and the SSH process runs as that account. Linux filesystem permissions, groups, sudo policy, capabilities, and service permissions remain authoritative.
+The Runtime does not introduce a second permission system. A configured Logos identity maps to a Linux username, and the SSH process runs as that account. Linux filesystem permissions, groups, sudo policy, capabilities, and service permissions remain authoritative.
 
-Targets are named server-side. The model receives a target name, not arbitrary SSH credentials or an arbitrary host. The Linux user is normally resolved from the trusted Alice identity; the tool does not ask the model to choose a Linux account.
+Targets are named server-side. The model receives a target name, not arbitrary SSH credentials or an arbitrary host. The Linux user is normally resolved from the trusted Logos identity; the tool does not ask the model to choose a Linux account.
 
 Example configuration:
 
@@ -27,7 +27,7 @@ Example configuration:
 
 Set it through ALICE_SSH_TARGETS_JSON. Host-key verification requires known_hosts either per target or through ALICE_SSH_KNOWN_HOSTS.
 
-The Alice Pro application image must provide the OpenSSH client. The remote Linux target must provide the POSIX tools used by Runtime plus GNU coreutils timeout.
+The Logos application image must provide the OpenSSH client. The remote Linux target must provide the POSIX tools used by Runtime plus GNU coreutils timeout.
 
 ## Tools
 

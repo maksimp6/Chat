@@ -401,7 +401,7 @@
         "type": "apiKey",
         "in": "header",
         "name": "Authorization",
-        "description": "Dedicated browser-worker bearer credential; never use an Alice session cookie."
+        "description": "Dedicated browser-worker bearer credential; never use a Logos session cookie."
       }
     }
   }

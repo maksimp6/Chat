@@ -1,6 +1,6 @@
 let currentConvId = null;
 let conversations = [];
-let currentModel = "aliceai-llm";
+let currentModel = "logos-runtime";
 let currentModelType = "text";
 let modelsData = { text: {}, voice: {} };
 let coreInitialized = false;
@@ -54,6 +54,12 @@ window.AliceTheme = {
   },
 };
 
+// Keys renamed in #1316; stored conversations may still carry the old names.
+const LEGACY_MODEL_KEYS = {
+  "aliceai-llm": "logos-runtime",
+  "aliceai-llm-flash": "logos-runtime-flash",
+};
+
 const savedTheme = window.AliceTheme.getStored();
 window.AliceTheme.apply(savedTheme, false);
 
@@ -62,11 +68,12 @@ function fetchWithTimeout(input, init, timeoutMs) {
 }
 
 window.changeModel = function (newModel, skipPatch) {
+  newModel = LEGACY_MODEL_KEYS[newModel] || newModel;
   var textModels = modelsData.text || {};
   var voiceModels = modelsData.voice || {};
   if (!textModels[newModel] && !voiceModels[newModel]) {
-    console.warn("[CORE] Unknown model:", newModel, "-> fallback to aliceai-llm");
-    newModel = "aliceai-llm";
+    console.warn("[CORE] Unknown model:", newModel, "-> fallback to logos-runtime");
+    newModel = "logos-runtime";
   }
   currentModel = newModel;
   currentModelType = voiceModels[currentModel] ? "voice" : "text";
@@ -94,11 +101,11 @@ window.changeModel = function (newModel, skipPatch) {
 function initializeShell() {
   window.AliceTheme.apply(savedTheme, false);
 
-  if (!window.__aliceThemeActionRegistered) {
+  if (!window.__logosThemeActionRegistered) {
     window.AliceCoreAPI.ui.actions.register("theme.cycle", function () {
       window.AliceTheme.cycle();
     });
-    window.__aliceThemeActionRegistered = true;
+    window.__logosThemeActionRegistered = true;
   }
 }
 

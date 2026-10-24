@@ -1,12 +1,13 @@
+from agent_memory.client import close_memory_clients
 import subprocess
 import threading
 from types import SimpleNamespace
 
 import pytest
 
-import db
-import environment_manager
-from environment_manager import (
+import storage.db as db
+import remote_runtime.environments as environment_manager
+from remote_runtime.environments import (
     create_environment,
     delete_environment,
     dispatch_environment_revision,
@@ -15,7 +16,7 @@ from environment_manager import (
     start_environment,
     stop_environment,
 )
-from environment_routes import environment_bp
+from remote_runtime.environment_routes import environment_bp
 from flask import Flask
 
 
@@ -129,17 +130,18 @@ def test_two_branch_environments_are_immutable_and_isolated(tmp_path, monkeypatc
 def test_environment_trace_contains_branch_commit_and_operation(tmp_path, monkeypatch):
     _, _, one_sha, _ = _setup(tmp_path, monkeypatch)
     item = create_environment("feature/one")
-    conn = db.get_conn()
-    event = conn.execute(
-        "SELECT * FROM environment_events WHERE environment_id = ? ORDER BY created_at DESC LIMIT 1",
-        (item["environment_id"],),
-    ).fetchone()
-    conn.close()
+    conn = db.get_store()
+    event = next(
+        row
+        for row in conn.items(prefix="environment/event/").values()
+        if row["environment_id"] == item["environment_id"]
+    )
+    close_memory_clients()
     assert event["operation"] == "CREATE_ENVIRONMENT"
     assert event["status"] == "SUCCESS"
     assert event["trace_id"]
-    assert one_sha in event["trace_json"]
-    assert "feature/one" in event["trace_json"]
+    assert event["trace_json"]["request"]["commit_sha"] == one_sha
+    assert event["trace_json"]["request"]["branch"] == "feature/one"
 
 
 def test_environment_api_exposes_lifecycle_contract(tmp_path, monkeypatch):
@@ -163,13 +165,12 @@ def test_environment_api_exposes_lifecycle_contract(tmp_path, monkeypatch):
 def test_environment_init_recovers_stale_running_state_after_process_restart(tmp_path, monkeypatch):
     _setup(tmp_path, monkeypatch)
     item = create_environment("feature/one")
-    conn = db.get_conn()
-    conn.execute(
-        "UPDATE environments SET status = ?, runtime_pid = ?, runtime_port = ? WHERE environment_id = ?",
-        ("RUNNING", 12345, 54321, item["environment_id"]),
-    )
-    conn.commit()
-    conn.close()
+    conn = db.get_store()
+    key = "environment/record/" + item["environment_id"]
+    with conn.transaction() as tx:
+        record = tx.get(key)
+        tx.set(key, {**record, "status": "RUNNING", "runtime_pid": 12345, "runtime_port": 54321})
+    close_memory_clients()
 
     init_environment_tables()
 

@@ -48,7 +48,7 @@ def test_default_local_tool_categories_include_3d(monkeypatch):
     monkeypatch.setattr(mcp_mixin.registry, "get_tools_by_category", get_tools)
 
     client = CapturingClient()
-    client.ask_with_mcp("check 3d financing", "aliceai-llm")
+    client.ask_with_mcp("check 3d financing", "logos-runtime")
 
     assert "3d" in categories
     assert client.last_params is not None
@@ -76,7 +76,7 @@ def test_explicit_tool_categories_still_override_defaults(monkeypatch):
     client = CapturingClient()
     client.ask_with_mcp(
         "git only",
-        "aliceai-llm",
+        "logos-runtime",
         params={"active_tool_categories": ["git"]},
     )
 
