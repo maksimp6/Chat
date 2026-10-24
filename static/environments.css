@@ -53,7 +53,7 @@
   flex: 1;
   min-width: 0;
   padding: 9px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--control-border);
   border-radius: 8px;
   background: var(--bg-input);
   color: var(--text-main);
@@ -62,7 +62,7 @@
 .logos-pro-app .environments-refresh,
 .logos-pro-app .environment-card-actions button,
 .logos-pro-app .environment-card-actions a {
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--control-border);
   border-radius: 8px;
   padding: 7px 10px;
   background: var(--btn-bg);
@@ -80,7 +80,7 @@
 .logos-pro-app .environment-card {
   padding: 12px;
   margin: 8px 0;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--control-border);
   border-radius: 10px;
 }
 .logos-pro-app .environment-card-main {
@@ -102,10 +102,10 @@
   font-size: 11px;
 }
 .logos-pro-app .environment-status-running {
-  color: #28a745;
+  color: var(--success-text);
 }
 .logos-pro-app .environment-status-failed {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .logos-pro-app .environment-card-actions {
   flex-wrap: wrap;

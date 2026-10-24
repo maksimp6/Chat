@@ -10,13 +10,13 @@
   --bg-sidebar: #ffffff;
   --bg-header: #007aff;
   --bg-input: #ffffff;
-  --bg-bubble-user: #007aff;
+  --bg-bubble-user: #0062cc;
   --bg-bubble-bot: #ffffff;
   --text-main: #1c1c1e;
   --text-header: #ffffff;
   --text-bubble-user: #ffffff;
   --text-bubble-bot: #1c1c1e;
-  --text-secondary: #8e8e93;
+  --text-secondary: #6e6e73;
   --border-color: #e5e5ea;
   --accent: #007aff;
   --btn-bg: #f0f0f5;
@@ -27,6 +27,10 @@
   --accent-strong: #0062cc;
   --danger-strong: #d70015;
   --bg-hover: #e5e5ea;
+  --code-text: #b0124a;
+  --danger-text: #d70015;
+  --accent-soft: rgba(0, 122, 255, 0.12);
+  --success-text: #1a6b2c;
 }
 
 [data-theme="dark"] {
@@ -34,7 +38,7 @@
   --bg-sidebar: #1c1c1e;
   --bg-header: #1c1c1e;
   --bg-input: #2c2c2e;
-  --bg-bubble-user: #0a84ff;
+  --bg-bubble-user: #0062cc;
   --bg-bubble-bot: #2c2c2e;
   --text-main: #f5f5f7;
   --text-header: #f5f5f7;
@@ -51,6 +55,10 @@
   --accent-strong: #0062cc;
   --danger-strong: #d70015;
   --bg-hover: #2c2c2e;
+  --code-text: #ff7aa2;
+  --danger-text: #ff6961;
+  --accent-soft: rgba(10, 132, 255, 0.18);
+  --success-text: #6fd38a;
 }
 
 [data-theme="dim"] {
@@ -58,7 +66,7 @@
   --bg-sidebar: #24292f;
   --bg-header: #30363d;
   --bg-input: #2d333b;
-  --bg-bubble-user: #388bfd;
+  --bg-bubble-user: #0062cc;
   --bg-bubble-bot: #2d333b;
   --text-main: #e6edf3;
   --text-header: #ffffff;
@@ -75,6 +83,10 @@
   --accent-strong: #1f6feb;
   --danger-strong: #d70015;
   --bg-hover: #30363d;
+  --code-text: #ff7aa2;
+  --danger-text: #ff7b72;
+  --accent-soft: rgba(88, 166, 255, 0.14);
+  --success-text: #6fd38a;
 }
 
 [data-theme="high-contrast"] {
@@ -91,7 +103,7 @@
   --text-secondary: #333333;
   --border-color: #000000;
   --accent: #004c99;
-  --btn-bg: #ffffff;
+  --btn-bg: #e6e6e6;
   --code-bg: #ffffff;
   --code-border: #000000;
   --danger: #b00020;
@@ -99,6 +111,10 @@
   --accent-strong: #004c99;
   --danger-strong: #b00020;
   --bg-hover: #e6e6e6;
+  --code-text: #b0124a;
+  --danger-text: #b00020;
+  --accent-soft: rgba(0, 76, 153, 0.14);
+  --success-text: #1a6b2c;
 }
 
 html,
@@ -166,7 +182,7 @@ body {
 
 .logos-pro-app #new-chat-btn {
   flex: 1;
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -206,8 +222,9 @@ body {
   background: var(--btn-bg);
 }
 .logos-pro-app .conv-item.active {
-  background: rgba(10, 132, 255, 0.15);
-  color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text-main);
+  box-shadow: inset 3px 0 0 var(--accent);
   font-weight: 500;
 }
 .logos-pro-app .conv-title {
@@ -351,7 +368,7 @@ body {
 .logos-pro-app .msg.error {
   align-self: flex-start;
   background: var(--bg-bubble-bot);
-  color: var(--danger);
+  color: var(--danger-text);
   border: 1px solid var(--danger);
   border-bottom-left-radius: 4px;
 }
@@ -455,7 +472,7 @@ body {
 }
 
 .logos-pro-app #send-btn {
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #fff;
   border: none;
   border-radius: 50%;
@@ -580,7 +597,7 @@ body {
   padding: 2px 6px;
   font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
   font-size: 14px;
-  color: #e01e5a;
+  color: var(--code-text);
 }
 .logos-pro-app .msg pre code {
   background: none;
@@ -689,7 +706,7 @@ body {
   padding: 2px 6px;
   font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
   font-size: 14px;
-  color: #e01e5a;
+  color: var(--code-text);
 }
 .logos-pro-app .bubble pre code {
   background: none;
@@ -804,7 +821,7 @@ body {
   padding: 11px 14px;
   border: none;
   border-radius: 10px;
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #fff;
   font: inherit;
   font-weight: 600;
@@ -930,8 +947,8 @@ body {
 .logos-pro-app .memory-modal-content {
   padding: 20px;
   border-radius: 8px;
-  background: #1e1e1e;
-  color: #fff;
+  background: var(--bg-sidebar);
+  color: var(--text-main);
   font-family: sans-serif;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
 }
@@ -1137,7 +1154,8 @@ body {
 }
 
 .logos-pro-app .approval-btn {
-  padding: 6px 14px;
+  min-height: 44px;
+  padding: 10px 16px;
   color: #fff;
   border: 0;
   border-radius: 6px;
@@ -1146,7 +1164,7 @@ body {
 }
 
 .logos-pro-app .approval-btn-approve {
-  background: #28a745;
+  background: #1e7e34;
 }
 
 .logos-pro-app .approval-btn-reject {
@@ -1205,8 +1223,8 @@ body {
 }
 
 .logos-pro-app .msg-meta-server {
-  color: var(--accent);
-  font-size: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
   margin-left: 4px;
 }
 
@@ -1407,6 +1425,9 @@ body {
   width: 100%;
   box-sizing: border-box;
   padding: 8px;
+  background: var(--bg-input);
+  color: var(--text-main);
+  border: 1px solid var(--control-border);
 }
 .logos-pro-app .cloudru-iam-confirm {
   display: block;
@@ -1668,19 +1689,19 @@ body {
   font-size: 18px;
 }
 .logos-pro-app #system-status-btn[data-state="ready"] {
-  color: #34c759;
+  color: var(--text-header);
 }
 .logos-pro-app #system-status-btn[data-state="running"],
 .logos-pro-app #system-status-btn[data-state="waiting"] {
-  color: #ffcc00;
+  color: var(--text-header);
 }
 .logos-pro-app #system-status-btn[data-state="degraded"] {
-  color: #ff9500;
+  color: var(--text-header);
 }
 .logos-pro-app #system-status-btn[data-state="blocked"],
 .logos-pro-app #system-status-btn[data-state="revoked"],
 .logos-pro-app #system-status-btn[data-state="error"] {
-  color: #ff3b30;
+  color: var(--text-header);
 }
 
 .logos-pro-app .logos-system-status-panel {
@@ -1822,7 +1843,6 @@ body {
   padding: 1px 8px;
   border-radius: 999px;
   border: 1px solid currentColor;
-  opacity: 0.5;
 }
 .logos-pro-app .execution-surface-stages li[data-status="done"],
 .logos-pro-app .execution-surface-stages li[data-status="active"] {
@@ -1870,4 +1890,18 @@ body {
   color: var(--text-main);
   border-bottom-color: var(--accent);
   font-weight: 600;
+}
+
+/* Высокий контраст: контуры кнопок и ховер диалога (пункт 52) */
+[data-theme="high-contrast"] .logos-btn {
+  border: 2px solid #000;
+}
+[data-theme="high-contrast"] .conv-item:hover {
+  outline: 2px solid #000;
+}
+
+/* Кнопка загрузки файлов получает фокус с клавиатуры (пункт 77) */
+#file-upload:focus-visible + label {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

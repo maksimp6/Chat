@@ -69,8 +69,8 @@ window.fetchVectorStores = function () {
     md.innerHTML = [
       '<div class="file-manager-toolbar">',
       '    <div class="file-manager-toolbar-actions">',
-      '        <label for="file-upload" style="cursor:pointer;padding:8px 16px;background:var(--m-accent,#4a90d9);color:#fff;border-radius:6px;font-size:13px;">Загрузить файлы</label>',
-      '        <input type="file" id="file-upload" style="display:none" multiple>',
+      '        <input type="file" id="file-upload" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none" multiple>',
+      '        <label for="file-upload" style="cursor:pointer;padding:8px 16px;background:#1f6feb;color:#fff;border-radius:6px;font-size:13px;">Загрузить файлы</label>',
       "    </div>",
       "</div>",
       // === Секция Vector Stores ===

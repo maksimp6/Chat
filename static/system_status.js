@@ -28,10 +28,10 @@
   }
 
   function statusIcon(state) {
-    if (state === "error" || state === "revoked" || state === "blocked") return "●";
-    if (state === "degraded") return "●";
+    if (state === "error" || state === "revoked" || state === "blocked") return "✕";
+    if (state === "degraded") return "!";
     if (state === "running" || state === "waiting") return "◐";
-    return "●";
+    return "✓";
   }
 
   function overallState(snapshot) {

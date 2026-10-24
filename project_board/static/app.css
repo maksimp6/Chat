@@ -11,7 +11,7 @@
 p{line-height:1.5}h2{margin:0;font-size:1.14rem}h3{font-size:1rem}.muted{color:var(--sub)}.small{font-size:.82rem}
 label{display:block;margin:12px 0;color:var(--sub);font-size:.9rem}
 input,select,textarea{width:100%;display:block;margin-top:6px;padding:11px;border-radius:9px;
-  border:1px solid var(--edge);background:var(--field);color:var(--fg);font:inherit}
+  border:1px solid #6b7480;background:var(--field);color:var(--fg);font:inherit}
 button{cursor:pointer;border:1px solid var(--edge);color:var(--fg);border-radius:9px;
   background:#434e5c;padding:10px 14px;font:inherit;font-weight:600}
 button:hover,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
