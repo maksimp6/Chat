@@ -33,7 +33,11 @@ def send_logs():
         "logs": logs,
         "timestamp": int(datetime.now().timestamp()),
     }
-    headers = {"Authorization": "Bearer YOUR_API_KEY", "Content-Type": "application/json"}
+    api_key = os.environ.get("YANDEX_API_KEY", "").strip()
+    if not api_key:
+        print("YANDEX_API_KEY is not set; nothing was sent")
+        return
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     try:
         response = requests.post(
             "https://api.yandex-ai-studio.ru/v1/logs", json=data, headers=headers, timeout=30
