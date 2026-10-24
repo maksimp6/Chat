@@ -665,7 +665,7 @@ class Kristall:
         with self._engine._lock:
             self._engine._ensure_open()
             if self._engine._failed or not self._engine._ram_valid:
-                raise StoreError("recovery required")
+                raise KristallError("recovery required")
             commit = self._engine.last_commit
             if commit.sequence == 0:
                 return commit
@@ -679,7 +679,7 @@ class Kristall:
                     os.close(directory)
             except OSError as exc:
                 self._engine._failed = True
-                raise StoreError("durability confirmation failed; recovery required") from exc
+                raise KristallError("durability confirmation failed; recovery required") from exc
             except BaseException:
                 # Cancellation leaves the recovered durability barrier uncertain.
                 # Fence the writer while preserving the original exception.
