@@ -632,10 +632,19 @@ def chat():
         )
 
         try:
+            # The failure can come before the access check (for example a malformed skills field),
+            # so the error path checks the caller itself before it writes to the conversation.
+            error_owner_id = get_current_owner_id(required=False)
+            can_write = bool(
+                conv_id and error_owner_id and check_access(conv_id, error_owner_id)
+            )
             if trace is None:
-                if conv_id:
+                if can_write:
                     invocation = create_invocation(
-                        session_id or conv_id, conv_id, metadata={"model": model_key}
+                        session_id or conv_id,
+                        conv_id,
+                        metadata={"model": model_key},
+                        user_id=error_owner_id,
                     )
                     trace = create_invocation_trace(invocation)
                     trace_token = bind_current_trace(trace)
@@ -695,7 +704,7 @@ def chat():
 
             if invocation is not None:
                 persist_invocation_trace(invocation.invocation_id, trace_data)
-            if conv_id:
+            if can_write:
                 add_message(conv_id, "assistant", reply, trace=trace_data)
             if invocation is not None:
                 fail_invocation(invocation.invocation_id, error={"message": error_message})
