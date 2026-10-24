@@ -101,6 +101,15 @@ def ultra_request_defaults(model_key: str) -> dict[str, Any]:
     return defaults
 
 
+def completion_model_keys() -> set[str]:
+    """Registry keys whose Ultra profile uses the completion API, not Responses."""
+    return {
+        key
+        for key, profile in ultra_profiles().items()
+        if profile.get("transport") == "text_generation_async"
+    }
+
+
 def annotate_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of a model catalog with registry availability and Ultra summaries."""
     profiles = ultra_profiles()

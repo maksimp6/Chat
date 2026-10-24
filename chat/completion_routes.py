@@ -54,8 +54,11 @@ def _completion_options(body: dict, wire_options: dict) -> dict:
     options = dict(wire_options)
     options["stream"] = False
     if "temperature" in body:
+        raw_temperature = body["temperature"]
+        if isinstance(raw_temperature, bool):
+            raise _BadInput("temperature must be a number")
         try:
-            temperature = float(body["temperature"])
+            temperature = float(raw_temperature)
         except (TypeError, ValueError):
             raise _BadInput("temperature must be a number") from None
         if not math.isfinite(temperature) or not 0 <= temperature <= 1:
@@ -78,9 +81,12 @@ def create_completion():
     profile = ultra_profiles().get(MODEL_KEY)
     if profile is None or profile.get("transport") != TRANSPORT:
         return jsonify({"error": "completion_model_unavailable"}), 503
+    wire_options = (profile.get("wire_parameters") or {}).get("completionOptions")
+    if not isinstance(wire_options, dict) or "maxTokens" not in wire_options:
+        return jsonify({"error": "completion_model_unavailable"}), 503
     try:
         messages = _messages_from_body(body)
-        options = _completion_options(body, profile["wire_parameters"]["completionOptions"])
+        options = _completion_options(body, wire_options)
     except _BadInput as exc:
         return jsonify({"error": str(exc)}), 400
 
