@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build, push and run Alice Pro on Cloud.ru Container Apps.
+"""Build, push and run Logos on Cloud.ru Container Apps.
 
 Usage:
   python scripts/cloudru_deploy.py deploy --tag <git-sha> [--env NAME ...]
@@ -198,7 +198,7 @@ def cmd_deploy(args: argparse.Namespace) -> dict:
     registry = CloudRuRegistryClient()
     apps = CloudRuContainerAppsClient()
 
-    with tempfile.TemporaryDirectory(prefix="alice-build-") as build_dir:
+    with tempfile.TemporaryDirectory(prefix="logos-build-") as build_dir:
         _export_commit(args.tag, args.context, build_dir)
         registry.ensure_registry(cfg["registry"])
         image = registry.build_and_push(

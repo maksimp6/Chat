@@ -1,6 +1,6 @@
 import pytest
 
-from memory_db import (
+from storage.memory_db import (
     Column,
     ColumnError,
     ConstraintError,

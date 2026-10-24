@@ -6,7 +6,7 @@ from typing import ClassVar
 
 import pytest
 
-import voice_routes
+import chat.voice_routes as voice_routes
 from app import app
 
 
@@ -155,7 +155,7 @@ def test_speechkit_http_errors_are_raised(monkeypatch, call, label):
         call()
 
 
-class _FakeAliceClient:
+class _FakeLogosClient:
     reply = " Ответ "
     calls: ClassVar[list] = []
 
@@ -171,20 +171,20 @@ class _FakeAliceClient:
 
 
 def test_voice_chat_uses_text_model_and_conversation(monkeypatch):
-    monkeypatch.setattr(voice_routes, "AliceClient", _FakeAliceClient)
-    monkeypatch.setattr(_FakeAliceClient, "calls", [])
-    monkeypatch.setenv("ALICE_VOICE_CHAT_MODEL", "aliceai-llm")
+    monkeypatch.setattr(voice_routes, "LogosClient", _FakeLogosClient)
+    monkeypatch.setattr(_FakeLogosClient, "calls", [])
+    monkeypatch.setenv("ALICE_VOICE_CHAT_MODEL", "logos-runtime")
 
     assert voice_routes._chat("вопрос", "conv-1", "speech-realtime-260528") == "Ответ"
-    call = _FakeAliceClient.calls[0]
-    assert call["model_key"] == "aliceai-llm"
+    call = _FakeLogosClient.calls[0]
+    assert call["model_key"] == "logos-runtime"
     assert call["conversation_id"] == "conv-1"
 
 
 def test_voice_chat_requires_conversation_and_text_reply(monkeypatch):
-    monkeypatch.setattr(voice_routes, "AliceClient", _FakeAliceClient)
+    monkeypatch.setattr(voice_routes, "LogosClient", _FakeLogosClient)
     with pytest.raises(ValueError, match="conversation_id is required"):
-        voice_routes._chat("вопрос", None, "aliceai-llm")
-    monkeypatch.setattr(_FakeAliceClient, "reply", "")
+        voice_routes._chat("вопрос", None, "logos-runtime")
+    monkeypatch.setattr(_FakeLogosClient, "reply", "")
     with pytest.raises(RuntimeError, match="no text response"):
-        voice_routes._chat("вопрос", "conv-1", "aliceai-llm")
+        voice_routes._chat("вопрос", "conv-1", "logos-runtime")

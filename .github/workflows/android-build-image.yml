@@ -1,0 +1,57 @@
+name: Android build image
+
+on:
+  pull_request:
+    paths:
+      - "android/docker/**"
+      - "android/runtime/**"
+      - "android/direct/**"
+      - "android/scripts/build_direct.sh"
+      - "android/scripts/test_direct.sh"
+      - "scripts/fetch_chaquopy_runtime.py"
+      - ".github/workflows/android-build-image.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-build-image-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-image:
+    name: Android build image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build image with pinned, verified inputs
+        run: docker build --tag alice-android-build:ci android/docker
+
+      - name: Build the direct APK inside the image
+        run: |
+          set -euo pipefail
+          started=$SECONDS
+          docker run --rm \
+            -e ALICE_BUILD_NUMBER="${{ github.run_number }}" \
+            -e ALICE_VERSION_NAME="0.2.0-direct-${{ github.sha }}" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            alice-android-build:ci \
+            bash android/scripts/build_direct.sh
+          echo "- Android build image: direct APK build $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
+          test -s android/build/direct/alice-pro-direct.apk
+          sha256sum android/build/direct/alice-pro-direct.apk
+
+      - name: Upload direct debug APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: alice-pro-direct-debug-apk-${{ github.run_number }}
+          path: android/build/direct/alice-pro-direct.apk
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

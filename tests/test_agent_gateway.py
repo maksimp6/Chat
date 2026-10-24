@@ -2,7 +2,7 @@ import json
 import time
 from urllib.error import HTTPError
 import pytest
-from agent_gateway import (
+from agent_runtime.gateway import (
     A2AClient,
     A2AClientConfig,
     A2AProtocolError,
@@ -142,7 +142,7 @@ def test_a2a(monkeypatch):
         captured["auth"] = dict((k.lower(), v) for k, v in req.header_items())
         return R()
 
-    monkeypatch.setattr("agent_gateway.urlopen", fake)
+    monkeypatch.setattr("agent_runtime.gateway.urlopen", fake)
     c = A2AClient(A2AClientConfig("https://agent.example/a2a"), lambda: "token")
     assert c.send_message({"message": {"role": "user", "parts": []}}) == {"ok": True}
     assert captured["auth"]["authorization"] == "Bearer token"
@@ -159,7 +159,7 @@ def test_a2a_bad_id(monkeypatch):
         def read(self):
             return b'{"jsonrpc":"2.0","id":"wrong","result":{}}'
 
-    monkeypatch.setattr("agent_gateway.urlopen", lambda req, timeout: R())
+    monkeypatch.setattr("agent_runtime.gateway.urlopen", lambda req, timeout: R())
     with pytest.raises(A2AProtocolError, match="does not match"):
         A2AClient(A2AClientConfig("https://agent.example/a2a")).send_message(
             {"message": {"role": "user", "parts": []}}
@@ -177,5 +177,5 @@ def test_rest(monkeypatch):
         def read(self):
             return b'{"ok":true}'
 
-    monkeypatch.setattr("agent_gateway.urlopen", lambda req, timeout: R())
+    monkeypatch.setattr("agent_runtime.gateway.urlopen", lambda req, timeout: R())
     assert RESTAgentClient("https://agent.example/run").send({"x": 1}) == {"ok": True}

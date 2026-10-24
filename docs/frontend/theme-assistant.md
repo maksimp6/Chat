@@ -1,6 +1,6 @@
 # AI theme assistant
 
-Alice Pro exposes the set_ui_theme local tool to the model.
+Logos exposes the set_ui_theme local tool to the model.
 
 The tool supports the existing light, dark, dim and high-contrast schemes. It is a mutating UI operation and therefore is registered with requires_approval=true; the existing approval card is the consent gate.
 
