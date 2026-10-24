@@ -102,6 +102,36 @@ def _check_owner(session: VoiceSession) -> None:
         raise PermissionError("conversation access denied")
 
 
+def _wav_pcm(audio: bytes) -> tuple[int, bytes]:
+    """Return the sample rate and PCM samples, found by walking the RIFF chunks.
+
+    A WAV with extra chunks, such as LIST, does not keep its samples at byte 44, so a fixed offset
+    would send header bytes to recognition as speech.
+    """
+    if len(audio) < 12 or audio[:4] != b"RIFF" or audio[8:12] != b"WAVE":
+        raise ValueError("invalid WAV audio")
+    offset = 12
+    fmt = None
+    while offset + 8 <= len(audio):
+        chunk_id = audio[offset : offset + 4]
+        size = int.from_bytes(audio[offset + 4 : offset + 8], "little")
+        body = audio[offset + 8 : offset + 8 + size]
+        if chunk_id == b"fmt ":
+            fmt = body
+        elif chunk_id == b"data":
+            if fmt is None or len(fmt) < 16:
+                raise ValueError("invalid WAV audio")
+            channels = int.from_bytes(fmt[2:4], "little")
+            sample_rate = int.from_bytes(fmt[4:8], "little")
+            bits = int.from_bytes(fmt[14:16], "little")
+            if channels != 1 or bits != 16 or sample_rate not in {8000, 16000, 48000}:
+                raise ValueError("WAV must be mono 16-bit PCM at 8, 16 or 48 kHz")
+            return sample_rate, body
+        # Chunks are padded to an even length.
+        offset += 8 + size + (size & 1)
+    raise ValueError("invalid WAV audio")
+
+
 def _stt(audio: bytes, content_type: str = "application/octet-stream") -> str:
     if not audio:
         raise ValueError("audio is empty")
@@ -110,16 +140,9 @@ def _stt(audio: bytes, content_type: str = "application/octet-stream") -> str:
 
     data: dict[str, str] = {"topic": "general", "lang": "ru-RU"}
     if content_type.startswith("audio/wav") or content_type.startswith("audio/x-wav"):
-        if len(audio) < 44 or audio[:4] != b"RIFF" or audio[8:12] != b"WAVE":
-            raise ValueError("invalid WAV audio")
-        sample_rate = int.from_bytes(audio[24:28], "little")
-        channels = int.from_bytes(audio[22:24], "little")
-        bits = int.from_bytes(audio[34:36], "little")
-        if channels != 1 or bits != 16 or sample_rate not in {8000, 16000, 48000}:
-            raise ValueError("WAV must be mono 16-bit PCM at 8, 16 or 48 kHz")
+        sample_rate, audio = _wav_pcm(audio)
         data["format"] = "lpcm"
         data["sampleRateHertz"] = str(sample_rate)
-        audio = audio[44:]
     folder_id = _folder_id()
     if folder_id:
         data["folderId"] = folder_id
