@@ -163,6 +163,8 @@ def create_order_tool(
     data["source"] = "host"
     raw_quote = arguments.get("quote")
     if raw_quote is not None:
+        if not isinstance(raw_quote, Mapping):
+            raise ValueError("quote must be an object")
         quote_input = _quote_input(raw_quote)
         missing = [key for key in QUOTE_REQUIRED_FIELDS if key not in quote_input]
         if missing:

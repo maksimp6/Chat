@@ -4,7 +4,6 @@ import requests
 
 from observability.trace_manager import ExecutionTrace
 from yandex_client_modules.errors import YandexClientError
-from provider_accounts.quotas import ProviderQuotaExceeded, reserve_request
 
 
 class YandexPollingMixin:
@@ -16,39 +15,8 @@ class YandexPollingMixin:
         while time.time() - start < timeout:
             try:
                 poll_start = time.time()
-                quota_reservation = None
-                if isinstance(execution_trace, ExecutionTrace):
-                    quota_user_id = (execution_trace.trace.get("context") or {}).get("user_id")
-                    try:
-                        quota_reservation = reserve_request(quota_user_id)
-                    except ProviderQuotaExceeded as exc:
-                        execution_trace.add_event(
-                            "provider_quota_denied",
-                            {
-                                "reason": exc.reason,
-                                "user_id": exc.user_id,
-                                "request_type": "poll",
-                                "response_id": task_id,
-                            },
-                        )
-                        execution_trace.record_error(
-                            "provider_quota",
-                            str(exc),
-                            step=trace_step,
-                            error_type=exc.code,
-                        )
-                        raise
-                    if quota_reservation is not None:
-                        execution_trace.add_event(
-                            "provider_quota_reserved",
-                            {
-                                "user_id": quota_reservation.user_id,
-                                "policy": quota_reservation.policy_name,
-                                "request_number": quota_reservation.reserved_request_number,
-                                "request_type": "poll",
-                                "period_reset_at": quota_reservation.period_reset_at,
-                            },
-                        )
+                # Polls read a request that ask() already admitted and counted. Charging
+                # a quota unit per poll could deny the result of a task the provider keeps running.
                 self._log_request("GET", url)
                 resp = self._log_response(self.session.get(url, timeout=15))
                 if resp.status_code == 404:

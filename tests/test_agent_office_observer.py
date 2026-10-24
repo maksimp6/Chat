@@ -599,7 +599,7 @@ def test_paginate_follows_link_headers_and_sends_token():
 
 def test_run_builds_threads_and_publishes_to_tracking_issue():
     open_pr = pr_item(5, hours_ago=3)
-    tracking = issue(99)
+    tracking = issue(99, body=observer.DIGEST_MARKER + "\nprevious digest")
     tracking["labels"] = [{"name": observer.TRACKING_LABEL}]
     fake = FakeGitHub(
         {
@@ -647,6 +647,21 @@ def test_publish_creates_label_and_tracking_issue_on_first_run():
     payload = json.loads(fake.calls[-1][2])
     assert payload["labels"] == [observer.TRACKING_LABEL]
     assert payload["title"] == observer.TRACKING_TITLE
+
+
+def test_foreign_issue_with_tracking_label_is_never_rewritten():
+    foreign = issue(42, body="a human's own issue")
+    foreign["labels"] = [{"name": observer.TRACKING_LABEL}]
+    fake = FakeGitHub(
+        {
+            "GET /repos/o/r/issues?state=open&labels=": [foreign],
+            "POST /repos/o/r/labels": {"name": observer.TRACKING_LABEL},
+            "POST /repos/o/r/issues": {"html_url": "https://github.com/o/r/issues/101"},
+        }
+    )
+    url = observer.publish_digest(GitHub("t", "o/r", opener=fake), "digest")
+    assert url.endswith("/101")
+    assert not [call for call in fake.calls if call[0] == "PATCH"]
 
 
 def test_existing_label_is_fine_but_other_label_errors_surface():

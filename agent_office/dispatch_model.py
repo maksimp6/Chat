@@ -92,6 +92,11 @@ def assert_solution_review_accepted_for_head(
         raise SolutionReviewRequiredError(
             f"solution review outcome is {artifact.outcome}; merge is not permitted"
         )
+    if artifact.reviewer_role not in _ALL_ROLES or artifact.reviewer_role in IMPLEMENTATION_ROLES:
+        raise SolutionReviewRequiredError(
+            f"solution review by {artifact.reviewer_role!r} cannot approve a merge;"
+            " an implementation role cannot review its own change"
+        )
     if artifact.reviewed_head_sha != current_head:
         raise SolutionReviewRequiredError(
             f"solution review was for head SHA {artifact.reviewed_head_sha!r},"

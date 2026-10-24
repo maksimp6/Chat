@@ -19,7 +19,7 @@ import struct
 import threading
 import time
 
-from memory_engine import MemoryStore
+from memory_engine import MemoryStore, StoreError
 
 MAX_REQUEST = 65536
 MAX_RESPONSE = 65536
@@ -52,25 +52,31 @@ def receive(conn: socket.socket) -> dict[str, object]:
     return value
 
 
+def _operate(store: MemoryStore, request: dict[str, object]) -> dict[str, object]:
+    """Run one validated operation; a rejected write is answered, not dropped."""
+    op = request.get("op")
+    key = request.get("key")
+    if op == "info":
+        return {"ok": True, "sequence": store.info().last_commit}
+    if op not in {"get", "set"} or not isinstance(key, str) or not key:
+        return {"ok": False, "error": "invalid operation"}
+    try:
+        if op == "get":
+            return {"ok": True, "value": store.get(key)}
+        with store._engine._lock:
+            store.set(key, request.get("value"))
+            return {"ok": True, "sequence": store.commit()}
+    except StoreError:
+        return {"ok": False, "error": "rejected"}
+
+
 def handle_client(conn: socket.socket, store: MemoryStore, allowed_uid: int) -> None:
     """Bound each peer to one request and a short receive/send deadline."""
     conn.settimeout(2.0)
     if peer_uid(conn) != allowed_uid:
         return
     try:
-        request = receive(conn)
-        op = request.get("op")
-        key = request.get("key")
-        if op == "get" and isinstance(key, str):
-            result = {"ok": True, "value": store.get(key)}
-        elif op == "set" and isinstance(key, str):
-            with store._engine._lock:
-                store.set(key, request.get("value"))
-                result = {"ok": True, "sequence": store.commit()}
-        elif op == "info":
-            result = {"ok": True, "sequence": store.info().last_commit}
-        else:
-            result = {"ok": False, "error": "invalid operation"}
+        result = _operate(store, receive(conn))
         response = (json.dumps(result, separators=(",", ":")) + "\n").encode()
         if len(response) > MAX_RESPONSE:
             return

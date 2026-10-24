@@ -21,6 +21,7 @@ def main(argv=None, handlers=None):
     add.add_argument("--title", required=True)
     add.add_argument("--kind", required=True)
     add.add_argument("--needs-approval", action="store_true")
+    add.add_argument("--payload", default="{}", help="task payload as one JSON object")
     commands.add_parser("list")
     commands.add_parser("run-next")
     commands.add_parser("recover")
@@ -29,11 +30,21 @@ def main(argv=None, handlers=None):
     args = parser.parse_args(argv)
     store = TaskStore(args.db)
     if args.command == "add":
-        print(
-            store.add(
-                role=args.role, title=args.title, kind=args.kind, needs_approval=args.needs_approval
+        try:
+            payload = json.loads(args.payload)
+            if not isinstance(payload, dict):
+                raise TypeError("payload must be a JSON object")
+            task_id = store.add(
+                role=args.role,
+                title=args.title,
+                kind=args.kind,
+                payload=payload,
+                needs_approval=args.needs_approval,
             )
-        )
+        except (TypeError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(task_id)
     elif args.command == "list":
         for task in store.list():
             print(

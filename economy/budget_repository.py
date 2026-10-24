@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import ROUND_CEILING, Decimal
 import json
 import uuid
 from typing import Any
@@ -14,7 +14,7 @@ class BudgetPersistenceError(RuntimeError):
     pass
 
 
-_FIELDS = ("allocated", "spent", "reserved", "won", "loss_today")
+_FIELDS = ("allocated", "spent", "reserved", "won", "loss_today", "carried_spent")
 
 
 def _key(budget_id: str, account_type: str) -> str:
@@ -25,7 +25,13 @@ def _decimal(value: Any) -> Decimal:
     amount = Decimal(str(value))
     if not amount.is_finite() or amount < 0:
         raise ValueError("amount must be finite and non-negative")
-    return amount.quantize(Decimal("0.01"))
+    # Round up, matching BudgetController: sub-cent spend is never dropped.
+    return amount.quantize(Decimal("0.01"), rounding=ROUND_CEILING)
+
+
+def _legacy_carried(row: dict[str, Any]) -> str:
+    """Rows written before carried_spent existed: everything beyond today's loss is carried."""
+    return str(max(Decimal("0"), Decimal(row["spent"]) - Decimal(row["loss_today"])))
 
 
 class BudgetRepository:
@@ -50,6 +56,7 @@ class BudgetRepository:
             if stored is None:
                 tx.set(key, row)
                 stored = row
+        stored.setdefault("carried_spent", _legacy_carried(stored))
         return stored
 
     def apply(
@@ -87,9 +94,11 @@ class BudgetRepository:
             row = tx.get(account_key)
             if row is None:
                 raise BudgetPersistenceError("budget account not found")
+            row.setdefault("carried_spent", _legacy_carried(row))
             balances = {field: Decimal(row[field]) for field in _FIELDS}
             if row["loss_period"] != now.date().isoformat():
                 balances["loss_today"] = Decimal("0")
+                balances["carried_spent"] = balances["spent"]
                 row["locked_until"] = None
             _mutate(row, balances, operation_type, amount, now)
             if (
@@ -158,7 +167,18 @@ def _admit(
         row["limits"]["max_single_operation"]
     ):
         raise BudgetPersistenceError("single-operation limit exceeded")
-    if operation in {"SPEND", "SETTLE"}:
+    # Same exposure rules as BudgetController._check_limits: reservations count
+    # as committed loss, so the persisted ledger never admits what memory denies.
+    if operation in {"RESERVE", "SPEND"}:
+        if balances["spent"] + balances["reserved"] + amount > Decimal(
+            row["limits"]["max_total_loss"]
+        ):
+            raise BudgetPersistenceError("total-loss limit exceeded")
+        if balances["loss_today"] + balances["reserved"] + amount > Decimal(
+            row["limits"]["max_daily_loss"]
+        ):
+            raise BudgetPersistenceError("daily-loss limit exceeded")
+    elif operation == "SETTLE":
         if balances["spent"] + amount > Decimal(row["limits"]["max_total_loss"]):
             raise BudgetPersistenceError("total-loss limit exceeded")
         if balances["loss_today"] + amount > Decimal(row["limits"]["max_daily_loss"]):
@@ -189,7 +209,10 @@ def _mutate(
     elif operation == "REFUND":
         if amount > balances["spent"]:
             raise BudgetPersistenceError("cannot refund more than spent")
+        # Earlier-period spend is returned first and never frees today's loss headroom.
+        from_carried = min(amount, balances["carried_spent"])
+        balances["carried_spent"] -= from_carried
         balances["spent"] -= amount
-        balances["loss_today"] = max(Decimal("0"), balances["loss_today"] - amount)
+        balances["loss_today"] = max(Decimal("0"), balances["loss_today"] - (amount - from_carried))
     else:
         raise BudgetPersistenceError("unsupported budget operation")

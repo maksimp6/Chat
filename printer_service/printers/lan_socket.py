@@ -33,7 +33,7 @@ def connect_lan_impl(
         raise ValueError("invalid port")
     if not isinstance(interface, str) or not interface or len(interface) > 15:
         raise ValueError("invalid interface")
-    if not interface.replace("_", "").replace("-", "").isalnum():
+    if not interface.isascii() or not interface.replace("_", "").replace("-", "").isalnum():
         raise ValueError("invalid interface")
     if not 0 < timeout <= 15:
         raise ValueError("invalid timeout")

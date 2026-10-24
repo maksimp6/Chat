@@ -1,14 +1,9 @@
 """Explicit transport selection; no fallback across network trust boundaries."""
 
-from enum import Enum
+from printer_service.printers.gateway import Transport
 from printer_service.printers.models import PrinterIdentity
 from printer_service.printers.lan import probe
 from printer_service.printers.cloud_api import DisabledCloudApi
-
-
-class Transport(str, Enum):
-    LAN = "lan"
-    CLOUD_API = "cloud_api"
 
 
 def identify(mode: Transport, *, host: str | None = None) -> PrinterIdentity:

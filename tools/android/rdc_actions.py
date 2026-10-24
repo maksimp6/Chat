@@ -8,7 +8,21 @@ import re
 import subprocess
 import sys
 
-ADB_ENV = dict(env_snapshot())
+# adb needs only its own locations and terminal basics; other secrets stay out of its env.
+ADB_ENV_NAMES = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "USER",
+        "LANG",
+        "LC_ALL",
+        "TMPDIR",
+        "ANDROID_HOME",
+        "ANDROID_SDK_ROOT",
+        "ADB_VENDOR_KEYS",
+    }
+)
+ADB_ENV = {name: value for name, value in env_snapshot().items() if name in ADB_ENV_NAMES}
 ADB_ENV.setdefault("TMPDIR", str(Path.home() / ".cache" / "tmp"))
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 

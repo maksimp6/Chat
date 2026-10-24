@@ -763,6 +763,9 @@ class MemoryStore:
                 raise StoreError("direct mutation during transaction is forbidden")
             _validate_name(name)
             _validate_value_shape(value)
+            # Full JSON validation at staging time: a value that cannot be committed
+            # must never sit in _pending, where it would fail every later commit.
+            _validate_value(value)
             self._pending[name] = deepcopy(value)
 
     def commit(self) -> int:

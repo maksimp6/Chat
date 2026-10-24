@@ -451,8 +451,8 @@ def _record_dispatch(
 
 
 def _is_backend_acknowledgement(agent: str, body: str | None, kind: str) -> bool:
-    """Require visible backend evidence after an eligible trigger."""
-    return kind in {"commented", "reviewed"}
+    """Require visible backend evidence after an eligible trigger: a non-empty comment or review."""
+    return kind in {"commented", "reviewed"} and bool((body or "").strip())
 
 
 def _acknowledge_backend_dispatch(thread: Thread, agent: str, at: datetime) -> None:
@@ -923,7 +923,12 @@ def ensure_tracking_label(gh: GitHub) -> None:
 def publish_digest(gh: GitHub, digest: str) -> str:
     """Rewrite the tracking issue with the digest, creating it on first run."""
     existing = gh.get(gh.repo_path(f"/issues?state=open&labels={TRACKING_LABEL}&per_page=10")) or []
-    existing = [issue for issue in existing if "pull_request" not in issue]
+    # Only an issue this observer wrote may be rewritten; a human-labelled issue is not ours.
+    existing = [
+        issue
+        for issue in existing
+        if "pull_request" not in issue and DIGEST_MARKER in (issue.get("body") or "")
+    ]
     if existing:
         number = existing[0]["number"]
         issue = gh.request("PATCH", gh.repo_path(f"/issues/{number}"), {"body": digest})[0]

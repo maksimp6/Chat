@@ -11,7 +11,7 @@ from core.env import env_snapshot
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_CEILING, Decimal, InvalidOperation as DecimalInvalidOperation
 from enum import Enum
 import threading
 import uuid
@@ -61,11 +61,12 @@ class DemoConversionDenied(BudgetError):
 def _money(value: Any) -> Decimal:
     try:
         amount = Decimal(str(value))
-    except (InvalidOperation, ValueError, TypeError) as exc:
+        if not amount.is_finite() or amount < 0:
+            raise InvalidOperation("amount must be a finite non-negative decimal")
+        # Round up so a sub-cent cost is never silently dropped from the ledger.
+        return amount.quantize(Decimal("0.01"), rounding=ROUND_CEILING)
+    except (DecimalInvalidOperation, ValueError, TypeError) as exc:
         raise InvalidOperation("amount must be a valid decimal") from exc
-    if amount < 0:
-        raise InvalidOperation("amount must be non-negative")
-    return amount.quantize(Decimal("0.01"))
 
 
 @dataclass(frozen=True)
@@ -94,6 +95,9 @@ class BudgetAccount:
         default_factory=lambda: BudgetLimits(Decimal("0"), Decimal("0"), Decimal("0"))
     )
     locked_until: Optional[datetime] = None
+    # Part of ``spent`` that predates the current loss period. Refunds consume it
+    # first, so returning earlier spend cannot free up today's daily-loss headroom.
+    carried_spent: Optional[Decimal] = None
 
     def __post_init__(self) -> None:
         self.allocated = _money(self.allocated)
@@ -103,6 +107,10 @@ class BudgetAccount:
         self.loss_today = _money(self.loss_today)
         self.loss_period = self.loss_period or datetime.now(timezone.utc).date().isoformat()
         self.currency = self.currency.upper()
+        if self.carried_spent is None:
+            self.carried_spent = max(Decimal("0.00"), self.spent - self.loss_today)
+        else:
+            self.carried_spent = _money(self.carried_spent)
 
     @property
     def available(self) -> Decimal:
@@ -159,7 +167,14 @@ class BudgetController:
         if self._repository is not None:
             for account in self.accounts.values():
                 stored = self._repository.configure(self.budget_id, account)
-                for field_name in ("allocated", "spent", "reserved", "won", "loss_today"):
+                for field_name in (
+                    "allocated",
+                    "spent",
+                    "reserved",
+                    "won",
+                    "loss_today",
+                    "carried_spent",
+                ):
                     setattr(account, field_name, Decimal(stored[field_name]))
                 account.loss_period = stored["loss_period"]
                 account.locked_until = (
@@ -204,7 +219,8 @@ class BudgetController:
                 },
             }
 
-    def allocate(self, account_type: AccountType, amount: Any, *, actor: str) -> Dict[str, Any]:
+    def _allocate(self, account_type: AccountType, amount: Any, *, actor: str) -> Dict[str, Any]:
+        # Private: money enters only through request_replenishment's policy check.
         with self._lock:
             self._require_actor(actor)
             account = self.account(account_type)
@@ -245,7 +261,7 @@ class BudgetController:
                     actor=requested_by,
                 )
                 raise AuthorizationRequired("policy denied replenishment")
-            return self.allocate(account_type, amount, actor="policy-approved:" + requested_by)
+            return self._allocate(account_type, amount, actor="policy-approved:" + requested_by)
 
     def reserve(self, amount: Any, *, account_type: Optional[AccountType] = None) -> Dict[str, Any]:
         with self._lock:
@@ -397,10 +413,13 @@ class BudgetController:
             amount = _money(amount)
             if amount > account.spent:
                 raise InvalidOperation("cannot refund more than spent")
+            self._roll_loss_period(account)
             self._persist("REFUND", account_type, amount)
             before = account.available
+            from_carried = min(amount, account.carried_spent)
+            account.carried_spent -= from_carried
             account.spent -= amount
-            account.loss_today = max(Decimal("0.00"), account.loss_today - amount)
+            account.loss_today = max(Decimal("0.00"), account.loss_today - (amount - from_carried))
             self._emit(
                 "refund",
                 account_type=account_type.value,
@@ -489,6 +508,7 @@ class BudgetController:
         if account.loss_period != today:
             account.loss_period = today
             account.loss_today = Decimal("0.00")
+            account.carried_spent = account.spent
             account.locked_until = None
             self._emit(
                 "loss_period_reset",

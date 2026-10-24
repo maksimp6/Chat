@@ -37,7 +37,7 @@ def run_next(store, handlers):
     except TaskFailed as exc:
         known = exc.code in SAFE_CODES
         try:
-            json.dumps(exc.result)
+            json.dumps(exc.result, allow_nan=False)
         except (TypeError, ValueError):
             exc.result = None
         store.fail(task_id, exc.code if known else "task_failed", exc.result if known else None)
@@ -46,7 +46,7 @@ def run_next(store, handlers):
         store.fail(task_id, "task_failed")
         return store.get(task_id)
     try:
-        json.dumps(result)
+        json.dumps(result, allow_nan=False)
     except (TypeError, ValueError):
         store.fail(task_id, "invalid_result")
         return store.get(task_id)

@@ -54,6 +54,8 @@ def probe(host: str, timeout: float = 3.0) -> PrinterIdentity:
         if not 6 <= length <= 65535:
             raise PrinterProtocolError("invalid response length")
         response = decode_probe(header + _recv_exact(sock, length - 4))
+        # Read the peer while the socket is open; the context manager closes it on exit.
+        peer_ip = sock.getpeername()[0]
     login = response.get("login")
     if not isinstance(login, dict) or login.get("command") != "detect":
         raise PrinterProtocolError("not a detect response")
@@ -61,7 +63,7 @@ def probe(host: str, timeout: float = 3.0) -> PrinterIdentity:
     if not code:
         raise PrinterProtocolError("missing model")
     return PrinterIdentity(
-        host=sock.getpeername()[0],
+        host=peer_ip,
         model_code=code,
         model=MODEL_CODES.get(code, "Unknown Bambu Lab model"),
         firmware=str(login.get("version", "")),
