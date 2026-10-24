@@ -193,14 +193,22 @@ def send_sms(args: dict, cfg: dict = None) -> dict:
 
 
 def take_photo(args: dict, cfg: dict = None) -> dict:
-    """Сделать фото с камеры смартфона (0 = задняя, 1 = передняя)."""
+    """Сделать фото с камеры смартфона (0 = задняя, 1 = передняя).
+
+    The photo is written only to the Logos photo directory: a caller supplies a file name, never
+    a directory, so a call cannot write over arbitrary files on the device.
+    """
     camera_id = str(args.get("camera_id", "0"))
-    out_file = args.get("output_path")
-    if not out_file:
-        return {"error": "Параметр 'output_path' обязателен"}
-    out_dir = os.path.dirname(out_file)
-    if out_dir:
-        os.makedirs(out_dir, exist_ok=True)
+    if camera_id not in {"0", "1"}:
+        return {"error": "Параметр 'camera_id' должен быть 0 или 1"}
+    name = os.path.basename(str(args.get("output_path") or "").strip())
+    if not name or name in {".", ".."}:
+        return {"error": "Параметр 'output_path' обязателен и задаёт имя файла"}
+    photo_dir = (cfg or {}).get("photo_dir") or os.path.join(
+        os.path.expanduser("~"), "logos_photos"
+    )
+    os.makedirs(photo_dir, exist_ok=True)
+    out_file = os.path.join(photo_dir, name)
     return _run_termux_cmd(["termux-camera-photo", "-c", camera_id, out_file], timeout=25)
 
 
@@ -391,7 +399,10 @@ TOOL_REGISTRY = {
                     "type": "integer",
                     "description": "0 для задней камеры, 1 для фронтальной",
                 },
-                "output_path": {"type": "string", "description": "Путь для сохранения файла фото"},
+                "output_path": {
+                    "type": "string",
+                    "description": "Имя файла фото; фото сохраняется в каталоге фото Logos",
+                },
             },
             "required": [],
         },
