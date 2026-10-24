@@ -1,7 +1,6 @@
 """Agent shell: task store, runner gates, safe errors, and the first read-only task."""
 
 import json
-import sqlite3
 import threading
 
 import pytest
@@ -14,7 +13,7 @@ from agent_shell.store import TaskStore
 
 @pytest.fixture
 def store(tmp_path):
-    return TaskStore(tmp_path / "shell.sqlite3")
+    return TaskStore(tmp_path / "shell.memory")
 
 
 def ok_handler(payload):
@@ -89,7 +88,7 @@ def test_approving_an_unknown_or_non_blocked_task_is_refused(store):
 
 
 def test_two_runners_never_claim_the_same_task(tmp_path):
-    path = tmp_path / "shell.sqlite3"
+    path = tmp_path / "shell.memory"
     TaskStore(path).add(role="infra-engineer", title="t", kind="echo")
     claimed = []
     barrier = threading.Barrier(4)
@@ -124,7 +123,7 @@ def test_fields_are_validated_and_stored_as_data_not_executed(store):
         store.add(role="infra-engineer", title="x" * 300, kind="echo")
     task_id = store.add(role="infra-engineer", title="'; DROP TABLE tasks; --", kind="echo")
     assert store.get(task_id)["title"] == "'; DROP TABLE tasks; --"
-    assert sqlite3.connect(store.path).execute("select count(*) from tasks").fetchone()[0] == 1
+    assert len(store.list()) == 1
 
 
 def test_first_task_reads_cloudru_status_through_the_read_only_check():
@@ -142,7 +141,7 @@ def test_first_task_reads_cloudru_status_through_the_read_only_check():
 
 
 def test_cli_adds_runs_and_shows_a_task(tmp_path, capsys):
-    db = str(tmp_path / "shell.sqlite3")
+    db = str(tmp_path / "shell.memory")
     handlers = {"echo": ok_handler}
     assert (
         cli.main(
@@ -181,13 +180,13 @@ def test_alice_task_runs_the_issue_agent_and_keeps_its_summary(store):
         role="docs-engineer",
         title="t",
         kind="alice_task",
-        payload={**PAYLOAD, "model": "aliceai-llm"},
+        payload={**PAYLOAD, "model": "logos-runtime"},
     )
     run_next(store, {"alice_task": handler})
     task = store.get(task_id)
     assert task["status"] == "done"
     assert task["result"]["changed_files"] == ["README.md"]
-    assert calls == [(7, "Fix typo", "The README has a typo.", "aliceai-llm")]
+    assert calls == [(7, "Fix typo", "The README has a typo.", "logos-runtime")]
 
 
 def test_alice_task_fails_with_a_fixed_code_and_keeps_the_result(store):
@@ -242,7 +241,7 @@ def test_only_allow_listed_failure_codes_are_stored(store):
 
 
 def test_cli_lists_approves_recovers_and_reports_an_empty_queue(tmp_path, capsys):
-    db = str(tmp_path / "shell.sqlite3")
+    db = str(tmp_path / "shell.memory")
     handlers = {"echo": ok_handler}
     assert cli.main(["--db", db, "run-next"], handlers=handlers) == 0
     assert capsys.readouterr().out.strip() == "no queued task"
@@ -278,7 +277,7 @@ def test_cli_uses_the_built_in_handlers_by_default_and_runs_as_a_module(
     import sys
     import types
 
-    db = str(tmp_path / "shell.sqlite3")
+    db = str(tmp_path / "shell.memory")
     fake = types.ModuleType("scripts.cloudru_check")
     fake.run = lambda names, **kwargs: {"names": names}
     monkeypatch.setitem(sys.modules, "scripts.cloudru_check", fake)
@@ -296,7 +295,7 @@ def test_cli_uses_the_built_in_handlers_by_default_and_runs_as_a_module(
 
 
 def test_default_alice_task_uses_the_real_runner_and_its_default_model(store, monkeypatch):
-    import alice_agent_runner
+    import agent_runtime.issue_runner as issue_runner
 
     calls = []
 
@@ -304,10 +303,10 @@ def test_default_alice_task_uses_the_real_runner_and_its_default_model(store, mo
         calls.append(model)
         return {"status": "changed", "changed_files": []}
 
-    monkeypatch.setattr(alice_agent_runner, "run_issue_task", fake)
+    monkeypatch.setattr(issue_runner, "run_issue_task", fake)
     handler = builtin.default_handlers()["alice_task"]
     assert handler(PAYLOAD)["status"] == "changed"
-    assert calls == [alice_agent_runner.DEFAULT_MODEL]
+    assert calls == [issue_runner.DEFAULT_MODEL]
 
 
 def test_a_failure_result_that_is_not_json_is_dropped_but_the_code_is_kept(store):

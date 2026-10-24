@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "profile_id": "logos-pro51-async",
+  "selection": {
+    "requested_by": "owner",
+    "requested_on": "2026-10-23",
+    "canonical_issue": "https://github.com/maksimp6/Chat/issues/1413",
+    "replaces_profile": "native Logos DeepSeek Responses profile",
+    "status": "prepared_not_activated"
+  },
+  "request": {
+    "method": "POST",
+    "url": "https://ai.api.cloud.yandex.net/foundationModels/v1/completionAsync",
+    "headers": {
+      "Content-Type": "application/json",
+      "Authorization": "Api-Key ${YANDEX_API_KEY}",
+      "x-folder-id": "${YANDEX_PROJECT_ID}"
+    },
+    "body": {
+      "modelUri": "gpt://${YANDEX_PROJECT_ID}/yandexgpt-5.1",
+      "completionOptions": {
+        "stream": false,
+        "temperature": 0.3,
+        "maxTokens": "32768"
+      },
+      "messages": [
+        {
+          "role": "system",
+          "text": "Ты — Логос, помощник владельца проекта. Отвечай по существу на языке вопроса. Сопоставляй утверждения с предоставленными материалами, отделяй доказанные факты от гипотез и неизвестного. Не выдумывай источники, прочитанные файлы или выполненные действия. В этом режиме инструменты недоступны. Если материалов недостаточно, явно укажи это."
+        },
+        {
+          "role": "user",
+          "text": "${CASE_INPUT}"
+        }
+      ]
+    }
+  },
+  "operation": {
+    "method": "GET",
+    "url_template": "https://operation.api.cloud.yandex.net/operations/{operation_id}",
+    "headers": {
+      "Authorization": "Api-Key ${YANDEX_API_KEY}"
+    },
+    "id_field": "id",
+    "done_field": "done",
+    "response_field": "response",
+    "error_field": "error",
+    "text_path": "response.alternatives[*].message.text",
+    "required_alternative_status": "ALTERNATIVE_STATUS_FINAL",
+    "poll_interval_seconds": 5,
+    "save_operation_id_before_polling": true
+  },
+  "capabilities": {
+    "documented_context_window_tokens": 32768,
+    "requested_output_tokens": 32768,
+    "provider_output_ceiling": null,
+    "output_ceiling_verified": false,
+    "output_limit_basis": "owner_maximum_request_within_documented_context_window_not_verified_output_ceiling",
+    "reasoning": "not_supported_per_published_pro_5_1_release",
+    "tools": false,
+    "hosted_file_search": false,
+    "hosted_web_search": false,
+    "mcp": false,
+    "code_interpreter": false
+  },
+  "execution_contract": {
+    "automatic_generation": false,
+    "requires_explicit_run_scope_and_budget": true,
+    "generation_requests_per_approved_task": 1,
+    "automatic_post_retries": 0,
+    "model_fallback": null,
+    "output_limit_fallback": null,
+    "input_overflow": "fail_without_truncation",
+    "resume_after_timeout": "poll_saved_operation_id_without_new_post",
+    "runtime_adapter_status": "not_implemented_for_this_profile"
+  },
+  "verification": {
+    "provider_acceptance": "NOT_RUN",
+    "quality_acceptance": "NOT_RUN",
+    "measured_savings": null
+  },
+  "documentation": {
+    "async_api": "https://aistudio.yandex.ru/ru/docs/ai-studio/text-generation/api-ref/TextGenerationAsync/completion",
+    "async_guide": "https://aistudio.yandex.ru/ru/docs/ai-studio/operations/generation/async-request",
+    "models": "https://aistudio.yandex.ru/ru/docs/ai-studio/concepts/generation/models",
+    "model_reasoning_limitation": "https://aistudio.yandex.ru/ru/docs/ai-studio/release-notes/",
+    "pricing": "https://aistudio.yandex.ru/ru/docs/ai-studio/pricing"
+  }
+}

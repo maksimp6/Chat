@@ -2,7 +2,7 @@
 
 ## Cloud.ru
 
-Разместите Alice Pro как Flask-приложение за HTTPS reverse proxy.
+Разместите Logos как Flask-приложение за HTTPS reverse proxy.
 
 Минимальные переменные:
 
