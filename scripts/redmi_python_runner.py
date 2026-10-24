@@ -279,17 +279,24 @@ def github_context(job):
         github["token"] = token
     return github
 
-def decode_env(value, github):
-    """Only the ephemeral job token is supported as an environment expression."""
+def job_secrets(job):
+    return {str(k).upper(): str(v.get("value", ""))
+            for k, v in job.get("variables", {}).items() if v.get("isSecret") is True}
+
+def decode_env(value, github, secrets=None):
+    """Resolve explicit token/secret names only; never evaluate arbitrary expressions."""
     if isinstance(value, dict) and "expr" in value:
-        if value["expr"].strip() != "github.token" or not github.get("token"):
-            raise ValueError("Unsupported environment expression")
-        return github["token"]
+        expression = value["expr"].strip()
+        if expression == "github.token" and github.get("token"):
+            return github["token"]
+        if re.fullmatch(r"secrets\.[A-Za-z_][A-Za-z0-9_]*", expression):
+            return (secrets or {}).get(expression.split(".", 1)[1].upper(), "")
+        raise ValueError("Unsupported environment expression")
     if isinstance(value, dict) and "map" in value:
-        return {decode(x.get("key", x.get("Key"))): decode_env(x.get("value", x.get("Value")), github)
+        return {decode(x.get("key", x.get("Key"))): decode_env(x.get("value", x.get("Value")), github, secrets)
                 for x in value["map"]}
     if isinstance(value, dict) and "type" not in value and "t" not in value:
-        return {k: decode_env(v, github) for k, v in value.items()}
+        return {k: decode_env(v, github, secrets) for k, v in value.items()}
     return decode(value)
 
 def validate_job(job, repository):
@@ -328,7 +335,7 @@ def validate_job(job, repository):
             raise ValueError("Unsupported step condition")
         if decode(step.get("continueOnError", False)):
             raise ValueError("continue-on-error is unsupported")
-        env = decode_env(step.get("environment", {}), github)
+        env = decode_env(step.get("environment", {}), github, job_secrets(job))
         if not isinstance(env, dict) or not all(isinstance(v, (str, int, float, bool)) for v in env.values()):
             raise ValueError("Only literal environment values are supported")
     return github
@@ -448,7 +455,7 @@ class Job:
                 if isinstance(github.get(key), (str, int)):
                     env["GITHUB_" + key.upper()] = str(github[key])
             for block in self.message.get("environmentVariables", []):
-                env.update({k: str(v) for k, v in decode_env(block, github).items()})
+                env.update({k: str(v) for k, v in decode_env(block, github, job_secrets(self.message)).items()})
             result = 0
             for number, step in enumerate(self.message["steps"], 1):
                 condition = step.get("condition", "success()")
@@ -463,7 +470,7 @@ class Job:
                         raise ValueError("Working directory leaves job workspace")
                     target.mkdir(mode=0o700, parents=True, exist_ok=True)
                     step_env = dict(env)
-                    step_env.update({k: str(v) for k, v in decode_env(step.get("environment", {}), github).items()})
+                    step_env.update({k: str(v) for k, v in decode_env(step.get("environment", {}), github, job_secrets(self.message)).items()})
                     limit = min(900, max(1, float(decode(step.get("timeoutInMinutes")) or 5) * 60))
                     code, text_output = execute_script(inputs["script"], inputs.get("shell", "bash"), target, step_env, self.cancel, limit)
                     text_output = self.api.mask(text_output)

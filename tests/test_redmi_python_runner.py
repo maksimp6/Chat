@@ -136,9 +136,32 @@ def test_other_env_expressions_rejected_before_execution(tmp_path):
     marker = tmp_path / "must-not-run"
     payload = message(f"touch {marker}")
     payload["steps"][0]["environment"] = {"map": [
-        {"Key": "X", "Value": {"type": 3, "expr": "secrets.UNKNOWN"}}]}
+        {"Key": "X", "Value": {"type": 3, "expr": "secrets.UNKNOWN || 'fallback'"}}]}
     assert execute_job(tmp_path, payload)[0][1]["conclusion"] == "failed"
     assert not marker.exists()
+
+
+def test_explicit_named_secret_is_masked_and_not_implicitly_exported(tmp_path):
+    payload = message('test -z "${UNREFERENCED-}"; printf "%s" "$YANDEX_IAM_TOKEN"')
+    payload["variables"] = {
+        "YANDEX_IAM_TOKEN": {"value": "synthetic-iam-secret", "isSecret": True},
+        "UNREFERENCED": {"value": "other-synthetic-secret", "isSecret": True},
+    }
+    payload["steps"][0]["environment"] = {"map": [
+        {"Key": "YANDEX_IAM_TOKEN", "Value": {"type": 3, "expr": "secrets.YANDEX_IAM_TOKEN"}}]}
+    (_, result), receipt = execute_job(tmp_path, payload)
+    assert result["conclusion"] == "succeeded"
+    assert receipt["steps"][0]["output"] == "***"
+    assert "synthetic-iam-secret" not in json.dumps(receipt)
+
+
+def test_missing_secret_and_nonsecret_variable_resolve_empty(tmp_path):
+    payload = message('test -z "$MISSING"; test -z "$PUBLIC"')
+    payload["variables"] = {"PUBLIC": {"value": "ordinary-variable", "isSecret": False}}
+    payload["steps"][0]["environment"] = {"map": [
+        {"Key": key, "Value": {"type": 3, "expr": "secrets." + key}}
+        for key in ("MISSING", "PUBLIC")]}
+    assert execute_job(tmp_path, payload)[0][1]["conclusion"] == "succeeded"
 
 
 @pytest.mark.parametrize("reject_metadata", [False, True])
