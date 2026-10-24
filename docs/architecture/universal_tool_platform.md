@@ -80,6 +80,30 @@ read_only=false and requires_approval=true. Existing legacy execution through
 registry.execute remains backward compatible until the caller migrates to the
 UniversalToolExecutor.
 
+## What the model is offered
+
+The Responses adapter offers a tool only when it can actually run there:
+
+- its `supported_transports` include `responses_api` (MCP-only bridge tools
+  stay on MCP);
+- every executable named in `metadata.requires_executables` is on PATH. Termux:API
+  tools declare their Android helper, so an Ubuntu runner or server does not
+  offer them; calling one anyway returns an explicit "helper not found" error.
+
+Strict function schemas cannot express a free-form object such as
+`{"type": "object"}`: closing it would only admit `{}`. Such objects stay open and
+their tool is advertised with `strict: false`; the executor still validates the
+original schema.
+
+Approval is decided per call. `params["approval_mode"]` selects the behavior for
+a batch that contains gated calls:
+
+- `pause` (default, interactive chat): return the batch to the human approver;
+  nothing in it runs.
+- `deny` (unattended native runs): run the other calls, let the executor refuse
+  each unapproved gated call, and continue; the model receives
+  `{"executed": false, ...}` for it. Nothing is ever auto-approved.
+
 ## Remote Android execution
 
 A tool may declare:

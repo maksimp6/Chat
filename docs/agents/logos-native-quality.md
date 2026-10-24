@@ -52,6 +52,15 @@ Every registered local category is available through the existing executor and
 its existing approval rules. Availability in the request is not proof of every
 external dependency or tool's successful execution.
 
+The run has no approver, so it uses `approval_mode=deny`: one approval-gated call
+no longer stops its whole batch. The other calls execute, each gated call is
+refused by the executor (never auto-approved) and the model is told it was not
+executed; the result lists such tools in `approval_refused_tools`. Tools the
+runner cannot execute are not offered: MCP-only bridge tools and Termux:API tools
+without their Android helper. Git tools without an explicit repository use this
+checkout. Partner and 3D tools still require a trusted owner identity, which an
+unattended run does not have; they fail closed with that reason.
+
 ## Context and continuation
 
 Before the first model response, load full AGENTS.md, the applicable admission
