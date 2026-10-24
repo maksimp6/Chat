@@ -21,7 +21,6 @@ deploy/cloudru/**/*.key
 deploy/cloudru/**/*.dump
 
 # Android/build caches
-android/.gradle
 android/build
 android/app/build
 

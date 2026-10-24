@@ -213,12 +213,11 @@ pytest -q
 pytest -q tests/test_responses_tool_loop.py test_partial_output.py tests/test_tool_execution_contract.py
 ```
 
-Для Android CI-эквивалент выглядит так:
+Для прямой SDK-сборки браузер-контроллера Android:
 
 ```bash
-cd android
-python scripts/stage_python.py
-gradle --no-daemon -PaliceBuildNumber=<run> -PaliceCommitHash=<sha> :app:testDebugUnitTest :app:assembleDebug
+bash android/scripts/test_direct.sh
+bash android/scripts/build_direct.sh
 ```
 
 Основной GitHub Actions pipeline дополнительно выполняет:
@@ -229,7 +228,11 @@ gradle --no-daemon -PaliceBuildNumber=<run> -PaliceCommitHash=<sha> :app:testDeb
 - полный PostgreSQL suite с `pytest --durations=30 -q`;
 - PostgreSQL backup/restore verification;
 - Android unit tests, debug APK build, verification и artifact upload;
-- dependency cache для pip/npm/Gradle и timing telemetry в GitHub Step Summary.
+- dependency cache для pip/npm и timing telemetry в GitHub Step Summary.
+
+Прямая SDK-сборка не упаковывает Flask и не запускает прежние JVM/instrumentation
+тесты embedded-backend приложения. Старый release-packager удалён; публикация
+релиза блокируется до проверки равноценной сборки и подписи.
 
 Destructive PostgreSQL isolation в тестах разрешён только для disposable test databases. Для него одновременно обязательны:
 

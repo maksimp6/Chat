@@ -51,3 +51,23 @@ tests are not weakened here. The policy wiring test accepts the single-step EXIT
 trap, with positive/negative real-shell and exact 30-second boundary controls;
 the owner's duration norm is unchanged. Exact final CI/head/pre_push evidence is
 reported in the PR. Live execution and owner acceptance remain separate.
+
+## Owner follow-up: remove the obsolete build system (#1423)
+
+Owner request: «удали gradle». Continue in the same PR #1577 rather than create
+a duplicate. Remove the four legacy build configuration files, the release
+integration, dependency updater and obsolete build commands. Keep the ban test
+unchanged and verify real tracked-file and executable-reference negative controls.
+
+The direct SDK APK is only a browser controller, not the retained full
+embedded-backend application. Therefore the retired release workflow fails
+explicitly before signing credentials/publication; it does not publish the direct
+controller as a substitute. Android source and signing-secret values are preserved.
+Direct-build shell contracts are checked; a real APK/device acceptance is not
+claimed because this checkout has no Android SDK. #1423 remains open for those
+acceptance criteria.
+
+Related tests now use current direct-build paths and the actual six-field CI
+platform schema; this changes no runtime routing or SQL policy. The one-step
+runner and the owner's duration policy remain unchanged. Final focused validation,
+exact tree, pre_push and current-head CI are recorded in the PR.

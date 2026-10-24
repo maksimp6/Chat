@@ -10,9 +10,10 @@ python -m pip install -r requirements-dev.txt
 npm install --ignore-scripts --no-audit --no-fund --package-lock=false
 ```
 
-Node.js нужен для JavaScript-проверок, а Android SDK и Gradle — только для
-Android-сборки. Актуальные команды CI находятся в
-[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml).
+Node.js нужен для JavaScript-проверок. JDK и Android SDK нужны для прямой
+сборки браузер-контроллера; она не включает Flask backend. Команды и границы
+описаны в [Android README](../../android/README.md), workflow —
+[android-direct.yml](../../.github/workflows/android-direct.yml).
 
 ## Backend
 
@@ -60,7 +61,7 @@ checkout и доступное Python-окружение. Путь workspace ф�
   invocation, инструменты, trace и billing.
 - [Логирование](../backend/logging.md) и
   [Execution Trace](../architecture/execution_trace.md) — диагностика запросов.
-- [Android](../../android/README.md) — подготовка Python-кода и debug-сборка.
+- [Android](../../android/README.md) — прямая SDK-сборка и сохранённые legacy-исходники.
 
 Проверки и правила изменений описаны в [AGENTS.md](../../AGENTS.md) и
 [CONTRIBUTING.md](../../CONTRIBUTING.md).

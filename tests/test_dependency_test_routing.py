@@ -4,8 +4,7 @@ import pytest
 
 from scripts.ci_platform_changes import classify
 
-
-ALL = {"web", "backend", "android", "infra", "mcp"}
+ALL = {"web", "backend", "android", "infra", "database", "mcp"}
 WEB = {"web", "backend", "android", "mcp"}
 
 
@@ -16,7 +15,7 @@ WEB = {"web", "backend", "android", "mcp"}
         ("requirements-dev.txt", ALL),
         ("requirements-deploy.txt", {"infra"}),
         ("android/requirements.txt", {"android"}),
-        ("android/app/build.gradle.kts", {"android"}),
+        ("android/scripts/build_direct.sh", {"android"}),
         ("package.json", WEB),
         ("package-lock.json", WEB),
         ("deploy/chrome-worker/package.json", {"infra", "mcp"}),

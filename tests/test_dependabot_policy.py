@@ -18,7 +18,7 @@ def test_config_is_version_2_with_unique_ecosystems():
     assert CONFIG["version"] == 2
     ecosystems = [update["package-ecosystem"] for update in UPDATES]
     assert len(ecosystems) == len(set(ecosystems))
-    assert set(ecosystems) == {"pip", "gradle", "github-actions", "docker", "npm"}
+    assert set(ecosystems) == {"pip", "github-actions", "docker", "npm"}
 
 
 @pytest.mark.parametrize("update", UPDATES, ids=lambda update: update["package-ecosystem"])

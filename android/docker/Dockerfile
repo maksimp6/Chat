@@ -1,4 +1,4 @@
-# Android build image for the Gradle-free debug APK (android/scripts/build_direct.sh).
+# Android build image for the direct SDK debug APK (android/scripts/build_direct.sh).
 # Every external input is pinned: the base image by digest, and every download by
 # SHA-256 (checked with sha256sum -c at build time). Nothing is taken from "latest".
 

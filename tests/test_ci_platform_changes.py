@@ -7,8 +7,7 @@ import yaml
 
 from scripts import ci_platform_changes as routing
 
-
-ALL = {"web", "backend", "android", "infra", "mcp"}
+ALL = {"web", "backend", "android", "infra", "database", "mcp"}
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -38,7 +37,7 @@ ROOT = Path(__file__).resolve().parents[1]
         ([".github/workflows/ci.yml"], ALL),
         (["requirements.txt"], ALL),
         # Manifests that Dependabot PRs touch (docs/development/dependency-updates.md).
-        (["android/build.gradle.kts"], {"android"}),
+        (["android/scripts/build_direct.sh"], {"android"}),
         ([".github/workflows/security.yml"], {"infra"}),
         (["deploy/chrome-worker/package-lock.json"], {"infra", "mcp"}),
         (["deploy/remote-desktop-commander/Dockerfile.mcp"], {"infra", "mcp"}),
@@ -55,7 +54,7 @@ def test_classification_covers_real_platform_inputs(paths, expected):
 
 
 def test_routing_unions_all_changed_paths():
-    plan = routing.classify(["android/app/build.gradle.kts", "cloud/cloudru/client.py"])
+    plan = routing.classify(["android/scripts/build_direct.sh", "cloud/cloudru/client.py"])
     assert {name for name, value in plan.items() if value} == {"android", "infra"}
 
 
