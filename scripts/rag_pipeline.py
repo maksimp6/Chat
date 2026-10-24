@@ -33,7 +33,6 @@ from collections import Counter
 if __package__ in {None, ""}:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from api.yandex_transport import yandex_urlopen
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat")
 API = f"https://api.github.com/repos/{REPO}"
@@ -230,6 +229,8 @@ class BM25Index:
 
 
 def yandex_embeddings(texts: list[str]) -> list[list[float]] | None:
+    from api.yandex_transport import yandex_urlopen
+
     key = os.environ.get("YANDEX_API_KEY")
     project = os.environ.get("YANDEX_PROJECT_ID")
     if not key or not project:

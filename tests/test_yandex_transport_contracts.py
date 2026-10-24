@@ -5,6 +5,8 @@ from __future__ import annotations
 import ast
 import io
 import json
+import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import Mock
 from urllib.request import Request
@@ -306,6 +308,28 @@ def test_mixed_github_provider_helper_cannot_bypass_using_wrong_flag(monkeypatch
     with pytest.raises(ContractViolation):
         request(PROVIDER, "synthetic", {"model": 42, "input": "hello"}, provider=False)
     raw.assert_not_called()
+
+
+def test_runner_offline_imports_do_not_require_provider_dependencies():
+    code = "import scripts.q14_ai_review, scripts.q14_observer, scripts.semantic_pipeline, scripts.rag_pipeline, scripts.pr_court"
+    subprocess.run(
+        [sys.executable, "-S", "-c", code], cwd=ROOT, check=True, capture_output=True, timeout=10
+    )
+
+
+def test_android_staging_preserves_the_actual_contract_catalog(tmp_path, monkeypatch):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "stage_yandex_contracts", ROOT / "android/scripts/stage_python.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(module, "DEST", tmp_path)
+    module.stage_api_contracts()
+    assert (tmp_path / "contracts/yandex/catalog.json").read_bytes() == (
+        ROOT / "contracts/yandex/catalog.json"
+    ).read_bytes()
 
 
 def test_main_client_rejects_before_quota_trace_and_socket(monkeypatch):

@@ -31,11 +31,6 @@ class YandexRequestBlocked(ContractViolation):
     """An outbound request was rejected before transport invocation."""
 
 
-def is_yandex_api_url(url: str) -> bool:
-    host = urlsplit(url).hostname or ""
-    return host.endswith(".api.cloud.yandex.net") or host == "api.yandex-ai-studio.ru"
-
-
 @lru_cache(maxsize=1)
 def _routes() -> tuple[tuple[str, str, re.Pattern[str], str], ...]:
     routes = []

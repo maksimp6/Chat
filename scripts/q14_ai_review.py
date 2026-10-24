@@ -12,8 +12,6 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from api.yandex_transport import yandex_connection_request
-
 from scripts.q14_simulation import BASELINE_HEAD, CASES, run_cases
 
 HOST = "ai.api.cloud.yandex.net"
@@ -114,6 +112,8 @@ def make_transport(key: str, project: str) -> Transport:
     """Fixed HTTPS destination, bounded read, no redirects and no retries."""
 
     def send(method: str, path: str, payload: JsonObject | None) -> JsonObject:
+        from api.yandex_transport import yandex_connection_request
+
         if (method, path) not in {("GET", "/v1/models"), ("POST", "/v1/responses")}:
             raise ValueError("provider_route_not_allowed")
         connection = http.client.HTTPSConnection(HOST, timeout=90)

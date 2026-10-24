@@ -46,8 +46,6 @@ from urllib.parse import quote, urlencode
 if __package__ in {None, ""}:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from api.yandex_transport import yandex_connection_request
-
 from agent_runtime.logos_launch_hold import NativeLogosLaunchBlocked, enforce_native_launch_hold
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat")
@@ -398,6 +396,8 @@ def yandex_call(
     instructions: str | None = None,
 ) -> dict:
     """One bounded sync call; fixed destination, no retries, no redirects."""
+    from api.yandex_transport import yandex_connection_request
+
     enforce_native_launch_hold()
     response_schema = response_schema or MODEL_RESPONSE_SCHEMA
     instructions = instructions or INSTRUCTIONS
@@ -1244,6 +1244,8 @@ def yandex_api_request(
     max_response_bytes: int = MAX_VECTOR_RESPONSE_BYTES,
 ) -> bytes:
     """Make one fixed-host Yandex Files/Vector Stores request without retry or redirect."""
+    from api.yandex_transport import yandex_connection_request
+
     conn = http.client.HTTPSConnection(HOST, timeout=90)
     headers = {
         "Authorization": f"Api-Key {key}",

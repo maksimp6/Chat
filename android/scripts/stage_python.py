@@ -48,11 +48,20 @@ def stage_web_assets() -> None:
             shutil.copytree(source, target, dirs_exist_ok=True)
 
 
+def stage_api_contracts() -> None:
+    """The provider registry is required data, not a Python module or web asset."""
+    relative = Path("contracts/yandex/catalog.json")
+    target = DEST / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ROOT / relative, target)
+
+
 def main() -> None:
     DEST.mkdir(parents=True, exist_ok=True)
     clean_staged_backend()
     stage_python_files()
     stage_web_assets()
+    stage_api_contracts()
     print(f"Staged Logos runtime into {DEST}")
 
 

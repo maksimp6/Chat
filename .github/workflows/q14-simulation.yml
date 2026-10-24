@@ -169,6 +169,11 @@ jobs:
         if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         with:
           python-version: "3.14"
+      - name: Install Yandex API contract validator
+        id: yandex_contract_dependencies
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
+        run: python -m pip install -r contracts/yandex/requirements.txt
       - name: Record exact checkout
         id: policy_step_03
         continue-on-error: true

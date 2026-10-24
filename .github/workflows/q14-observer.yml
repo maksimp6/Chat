@@ -45,6 +45,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Install Yandex API contract validator
+        id: yandex_contract_dependencies
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
+        run: python -m pip install -r contracts/yandex/requirements.txt
       - name: Test observer boundaries and original scenarios without credentials
         id: policy_step_02
         continue-on-error: true

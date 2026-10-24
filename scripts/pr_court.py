@@ -9,8 +9,7 @@ import os
 import urllib.error
 import urllib.request
 from pathlib import Path
-
-from api.yandex_transport import is_yandex_api_url, yandex_urlopen
+from urllib.parse import urlsplit
 
 from scripts.pr_court_evidence import validate_judgment
 
@@ -28,10 +27,15 @@ def request(url: str, token: str, body: dict | None = None, *, provider=False):
     req = urllib.request.Request(
         url, data=json.dumps(body).encode() if body is not None else None, headers=headers
     )
+    host = urlsplit(url).hostname or ""
+    is_provider = (
+        provider or host.endswith(".api.cloud.yandex.net") or host == "api.yandex-ai-studio.ru"
+    )
+    if is_provider:
+        from api.yandex_transport import yandex_urlopen
+
     with (
-        yandex_urlopen(req, timeout=90)
-        if provider or is_yandex_api_url(url)
-        else urllib.request.urlopen(req, timeout=30)
+        yandex_urlopen(req, timeout=90) if is_provider else urllib.request.urlopen(req, timeout=30)
     ) as response:
         return json.load(response)
 
