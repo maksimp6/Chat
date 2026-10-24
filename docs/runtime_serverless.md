@@ -1,6 +1,6 @@
 # Reusable AI sessions
 
-Alice Pro exposes immutable built-in session profiles that can be cloned into
+Logos exposes immutable built-in session profiles that can be cloned into
 independent persisted sessions.
 
 ## Built-in profiles

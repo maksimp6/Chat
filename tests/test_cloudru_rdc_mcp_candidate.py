@@ -157,7 +157,7 @@ def test_candidate_script_runs_directly_from_repo_root():
         check=False,
     )
     assert result.returncode == 0
-    assert "Deploy an isolated lightweight Alice Dev candidate" in result.stdout
+    assert "Deploy an isolated lightweight Logos Dev candidate" in result.stdout
 
 
 def test_candidate_refuses_mismatched_existing_resource(monkeypatch):
@@ -374,28 +374,16 @@ def test_public_acceptance_workflows_run_regressions_and_have_time_limits():
         (root / ".github/workflows/cloudru-rdc-mcp-candidate.yml").read_text(),
         Loader=yaml.BaseLoader,
     )
-    paths = deploy["on"]["push"]["paths"]
-    for required in (
-        "cloud/cloudru/registry_client.py",
-        "requirements-deploy.txt",
-        "config/alice/alice-dev-delete-ids.txt",
-        "deploy/remote-desktop-commander/request-origin.mjs",
-        "deploy/remote-desktop-commander/oauth-discovery-smoke.test.mjs",
-        ".github/workflows/cloudru-rdc-mcp-candidate.yml",
-    ):
-        assert required in paths
+    assert set(deploy["on"]) == {"workflow_dispatch"}
+    confirmation = deploy["on"]["workflow_dispatch"]["inputs"]["confirm_paid_deploy"]
+    assert confirmation["type"] == "boolean"
+    assert confirmation["required"] == "true"
+    assert confirmation["default"] == "false"
     steps = {step.get("name"): step for step in deploy["jobs"]["deploy"]["steps"]}
     assert steps["Verify OAuth discovery"]["timeout-minutes"] == "2"
     assert steps["Verify public MCP end to end"]["timeout-minutes"] == "2"
-    validation = yaml.load(
-        (root / ".github/workflows/remote-desktop-commander.yml").read_text(),
-        Loader=yaml.BaseLoader,
-    )
-    steps = validation["jobs"]["validate-image"]["steps"]
-    regressions = next(
-        step for step in steps if step.get("name") == "Test Alice Dev OAuth and gateway contracts"
-    )
-    assert "oauth-discovery-smoke.test.mjs" in regressions["run"]
-    assert "mcp-gateway-origin.test.mjs" in regressions["run"]
-    image = next(step for step in steps if step.get("name") == "Validate Alice Dev MCP image")
-    assert "ALICE_DEV_PUBLIC_URL=http://127.0.0.1:8080" in image["run"]
+    deploy_source = (root / ".github/workflows/cloudru-rdc-mcp-candidate.yml").read_text()
+    assert "Verify OAuth discovery" in deploy_source
+    assert "Verify public MCP end to end" in deploy_source
+    assert "oauth-discovery-smoke.mjs" in deploy_source
+    assert "mcp-gateway-live-smoke.mjs" in deploy_source

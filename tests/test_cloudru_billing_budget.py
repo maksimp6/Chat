@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 
 import cloud.tools as cloud_tools
-from budget_controller import (
+from economy.budget_controller import (
     BudgetLimitExceeded,
     CloudBudgetGuard,
     CloudBudgetLimits,

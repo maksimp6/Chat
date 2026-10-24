@@ -1,0 +1,102 @@
+name: Publish admitted Russian AI Studio LFS snapshot
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: yandex-ai-studio-lfs-snapshot
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.repository == 'maksimp6/Chat' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner &&
+      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/docs/yandex-documentation-links')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          lfs: false
+
+      - name: Restore exact upstream source bytes recorded in manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --connect-timeout 15 --max-time 300 \
+            --output "$RUNNER_TEMP/source.tar.gz" \
+            https://codeload.github.com/yandex-cloud/docs/tar.gz/fddbac0226d030d57d089b730f92abd02e583df2
+          python - <<'PY'
+          import hashlib, json, os, pathlib, tarfile
+          root = pathlib.Path('docs/mirrors/yandex-ai-studio')
+          manifest = json.loads((root / 'manifest.json').read_text())
+          source = pathlib.Path(os.environ['RUNNER_TEMP']) / 'source.tar.gz'
+          digest = hashlib.file_digest(source.open('rb'), 'sha256').hexdigest()
+          assert digest == manifest['source_download_sha256'], 'Upstream archive digest mismatch'
+          prefix = 'docs-' + manifest['source_revision'] + '/'
+          expected = {prefix + e['source_path']: e for e in manifest['files']}
+          found = set()
+          with tarfile.open(source, 'r|gz') as archive:
+              for member in archive:
+                  if member.name not in expected:
+                      continue
+                  entry = expected[member.name]
+                  destination = pathlib.PurePosixPath(entry['path'])
+                  assert not destination.is_absolute() and '..' not in destination.parts
+                  assert destination.parts[0] == 'source' and member.isfile()
+                  assert 0 <= member.size == entry['bytes'] <= 16 * 1024 * 1024
+                  assert member.name not in found, 'Duplicate upstream member'
+                  data = archive.extractfile(member).read()
+                  assert hashlib.sha256(data).hexdigest() == entry['sha256'], entry['path']
+                  (root / destination).parent.mkdir(parents=True, exist_ok=True)
+                  (root / destination).write_bytes(data)
+                  found.add(member.name)
+          assert found == expected.keys(), 'Missing upstream files'
+          assert not any(e['source_path'].startswith('en/') for e in manifest['files'])
+          print(f"SOURCE_BYTES_VERIFIED files={len(found)} bytes={manifest['total_bytes']}")
+          PY
+
+      - name: Upload LFS objects and independently download them
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GIT_TERMINAL_PROMPT: "0"
+        run: |
+          set -euo pipefail
+          git lfs install --local
+          git add docs/mirrors/yandex-ai-studio/source
+          git diff --cached --exit-code
+          git lfs fsck
+          auth_header="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          echo "::add-mask::$auth_header"
+          python - <<'PY' > "$RUNNER_TEMP/admitted-lfs-oids"
+          import json, pathlib
+          manifest = json.loads(pathlib.Path('docs/mirrors/yandex-ai-studio/manifest.json').read_text())
+          print('\n'.join(entry['sha256'] for entry in manifest['files']))
+          PY
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" \
+            lfs push --object-id origin --stdin < "$RUNNER_TEMP/admitted-lfs-oids"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" \
+            -c lfs.storage="$RUNNER_TEMP/independent-lfs" \
+            lfs fetch --include="docs/mirrors/yandex-ai-studio/source/**" --exclude="" origin "$GITHUB_SHA"
+          python - <<'PY'
+          import hashlib, json, os, pathlib
+          manifest = json.loads(pathlib.Path('docs/mirrors/yandex-ai-studio/manifest.json').read_text())
+          cache = pathlib.Path(os.environ['RUNNER_TEMP']) / 'independent-lfs' / 'objects'
+          for entry in manifest['files']:
+              oid = entry['sha256']
+              data = (cache / oid[:2] / oid[2:4] / oid).read_bytes()
+              assert len(data) == entry['bytes'], entry['path']
+              assert hashlib.sha256(data).hexdigest() == oid, entry['path']
+          message = f"LFS_REMOTE_DOWNLOAD_VERIFIED files={len(manifest['files'])} bytes={manifest['total_bytes']} head={os.environ['GITHUB_SHA']}"
+          print(message)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write(message + '\n')
+          PY
