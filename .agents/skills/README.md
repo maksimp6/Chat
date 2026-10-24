@@ -1,4 +1,4 @@
-# Alice Pro Agent Skills
+# Logos Agent Skills
 
 This directory is the canonical repository skill tree.
 
@@ -36,5 +36,5 @@ Keep procedure text provider-neutral. Reference repository scripts instead of co
 large shell recipes. A skill never weakens authentication, authorization, approval,
 branch protection or production policy.
 
-Alice exposes metadata from the catalog first and loads the full body only for skills
+Logos exposes metadata from the catalog first and loads the full body only for skills
 selected for one invocation. Do not automatically install remote/unreviewed skills.

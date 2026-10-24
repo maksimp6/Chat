@@ -23,7 +23,7 @@ curl -s -X POST http://localhost:5000/api/chat \
     \"conversation_id\": \"$CONV_ID\",
     \"message\": \"Сделай git status и кратко объясни результат\",
     \"params\": {
-      \"model\": \"aliceai-llm\",
+      \"model\": \"logos-runtime\",
       \"temperature\": 0.7
     }
   }" | python3 -m json.tool

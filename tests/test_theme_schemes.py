@@ -87,7 +87,7 @@ def test_ai_theme_tool_requires_approval_and_returns_safe_frontend_action():
         "previous_theme": "light",
     }
 
-    from tool_registry import registry
+    from tool_providers.registry import registry
 
     metadata = registry.get_tool_meta("set_ui_theme")
     assert metadata["requires_approval"] is True

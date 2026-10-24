@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only fail-closed merge readiness check for Alice Pro pull requests."""
+"""Read-only fail-closed merge readiness check for Logos pull requests."""
 
 from __future__ import annotations
 

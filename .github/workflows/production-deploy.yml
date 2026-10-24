@@ -31,7 +31,7 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.ref }}
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
           cache: pip
@@ -42,7 +42,7 @@ jobs:
         run: bash scripts/check_code_rules.sh
 
   deploy:
-    name: Deploy Alice Pro production
+    name: Deploy Logos production
     needs: code-rules
     environment: production
     runs-on: ubuntu-latest

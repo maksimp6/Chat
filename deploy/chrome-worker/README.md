@@ -45,7 +45,7 @@ An authenticated owner may call `POST /browser/v1/takeover/start`. The worker wa
 
 The human types passwords and second-factor codes directly into Chrome's framebuffer. Those values do not pass through the worker JSON API, MCP messages, Execution Trace, or GitHub Actions. The initial takeover URL carries an ephemeral random grant; after the first page load it is also held in an HttpOnly, Secure, SameSite=Strict cookie for noVNC assets. Raw VNC, websockify and Chrome DevTools ports remain private.
 
-Closing or expiring takeover removes remote human access but does not close Chrome. Playwright MCP can continue using the same cookies, localStorage and authenticated profile. Worker shutdown closes Chrome first, checkpoints the profile, then stops the private display services.
+Closing or expiring takeover removes remote human access and destroys any open noVNC websocket, but does not close Chrome. Playwright MCP can continue using the same cookies, localStorage and authenticated profile. While a grant is active, or a noVNC websocket is still connected, the in-container idle sleep is deferred so Chrome cannot close under the human. Worker shutdown closes Chrome first, checkpoints the profile, then stops the private display services.
 
 ## Run and check
 
@@ -80,7 +80,7 @@ The short token is compared in memory, is never written into OAuth state, and
 never leaves the worker. A successful check completes the authorization-code
 flow with PKCE S256 and rotating refresh tokens.
 
-No GitHub OAuth application, callback registration, Alice deployment, or custom
+No GitHub OAuth application, callback registration, Logos deployment, or custom
 DNS is required for this temporary owner-authentication path. ChatGPT connects
 to `<BROWSER_PUBLIC_URL>/browser/v1/mcp` and enters the short token when the
 authorization page opens.
@@ -145,7 +145,20 @@ fixed CPU/memory pairs; Chrome measured about 340 MiB idle and 800 MiB on a heav
 page, so this is the economical size. The service scales from zero: Cloud.ru
 stops the replica after 15 minutes without requests (the profile is saved on
 SIGTERM) and starts it on the next request, so the first call after idle waits
-for a cold start. The container is found by its fixed
+for a cold start.
+
+Inside the container, Chrome also sleeps on its own. After
+`BROWSER_IDLE_SLEEP_MS` without browser operations the worker closes bound MCP
+sessions, closes Chrome and checkpoints the persistent profile; the next MCP or
+REST browser call wakes it again. Production sets `BROWSER_IDLE_SLEEP_MS=300000`
+(5 minutes), which is shorter than the platform's 15-minute scale-to-zero, so
+Chrome can sleep while the replica stays up. The value is in milliseconds; the
+minimum accepted value is 1000 (1 second) and an invalid or smaller value stops
+the worker at startup. Running operations and active human takeover, including
+a connected noVNC websocket, defer the sleep. The replica still scales to zero
+only after the platform idle timeout.
+
+The container is found by its fixed
 name; an existing one is checkpointed, stopped and updated in place, two
 containers with that name stop the run, and a new one is created only when none
 exists. On first install the provider assigns the origin, and `BROWSER_PUBLIC_URL`

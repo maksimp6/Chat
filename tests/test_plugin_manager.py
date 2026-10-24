@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from plugin_manager import PluginError, PluginManager
+from plugin_system.manager import PluginError, PluginManager
 
 
 def write_plugin(root, plugin_id="demo", **overrides):

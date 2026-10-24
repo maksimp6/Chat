@@ -1,7 +1,7 @@
 import unittest
 
-from yandex_client import _sanitize_for_log
-from yandex_request_utils import sanitize_for_log
+from yandex_client_modules.client import _sanitize_for_log
+from yandex_client_modules.request_utils import sanitize_for_log
 
 
 class YandexRequestUtilsTests(unittest.TestCase):

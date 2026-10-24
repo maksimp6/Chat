@@ -12,7 +12,7 @@ PASS=0
 FAIL=0
 
 echo "╔══════════════════════════════════════════════════════════╗"
-echo "║       Тестирование API Alice Pro                         ║"
+echo "║       Тестирование API Logos                             ║"
 echo "╚══════════════════════════════════════════════════════════╝"
 echo "Дата: $(date)"
 echo "URL: $BASE_URL"
@@ -42,7 +42,7 @@ fi
 
 # Тест 3: Создание диалога
 echo -n "Тест 3: POST /api/conversations ... "
-RESP=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/conversations" -H "Content-Type: application/json" -d '{"model":"aliceai-llm"}')
+RESP=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/conversations" -H "Content-Type: application/json" -d '{"model":"logos-runtime"}')
 STATUS=$(echo "$RESP" | tail -1)
 BODY=$(echo "$RESP" | head -1)
 if [ "$STATUS" = "200" ]; then
@@ -58,7 +58,7 @@ fi
 # Тест 4: Отправка сообщения
 if [ -n "$CONV_ID" ]; then
   echo -n "Тест 4: POST /api/chat ... "
-  RESP=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/chat" -H "Content-Type: application/json" -d "{\"message\":\"Привет\",\"conversation_id\":\"$CONV_ID\",\"model\":\"aliceai-llm\"}")
+  RESP=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/chat" -H "Content-Type: application/json" -d "{\"message\":\"Привет\",\"conversation_id\":\"$CONV_ID\",\"model\":\"logos-runtime\"}")
   STATUS=$(echo "$RESP" | tail -1)
   if [ "$STATUS" = "200" ]; then
     echo "✅ PASS ($STATUS)"

@@ -2,7 +2,7 @@
 
 CI debug APKs normally use a temporary Gradle debug key. Such APKs cannot reliably update an installation signed by another CI run.
 
-Alice Pro can use a repository-managed debug keystore so that successive debug APKs are signed by the same key and can update one another, provided the application ID remains unchanged.
+Logos can use a repository-managed debug keystore so that successive debug APKs are signed by the same key and can update one another, provided the application ID remains unchanged.
 
 ## Required GitHub Actions secrets
 

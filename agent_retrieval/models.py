@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Mapping
 
-from trace_security import sanitize_trace_value
+from observability.trace_security import sanitize_trace_value
 
 
 MAX_RESULTS = 12
