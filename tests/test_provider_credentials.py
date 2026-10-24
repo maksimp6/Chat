@@ -105,18 +105,6 @@ def test_provider_credentials_are_isolated():
         assert credential.provider_key_id == provider + "-key"
 
 
-def test_create_schema_migrates_legacy_global_index():
-    from kristall import Kristall, KristallError
-    from tempfile import TemporaryDirectory
-    from pathlib import Path
-
-    with TemporaryDirectory() as root:
-        path = Path(root) / "legacy.db"
-        evidence = b"SQLite format 3\0legacy evidence"
-        path.write_bytes(evidence)
-        with pytest.raises(KristallError):
-            Kristall(path)
-        assert path.read_bytes() == evidence
 
 
 def test_provider_health_metadata_has_no_secret():

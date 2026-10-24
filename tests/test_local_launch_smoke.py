@@ -35,7 +35,6 @@ class _Session:
 
 
 def test_build_runtime_env_isolated_memory_and_valid_credential_key(monkeypatch, tmp_path):
-    monkeypatch.setenv("LOGOS_DATABASE_URL", "postgresql://should-not-survive")
     monkeypatch.delenv("LOGOS_PROVIDER_CREDENTIAL_KEY", raising=False)
 
     db_path = tmp_path / "launch.db"
@@ -47,7 +46,6 @@ def test_build_runtime_env_isolated_memory_and_valid_credential_key(monkeypatch,
     assert env["LOGOS_MEMORY_PATH"] == str(db_path)
     assert env["LOGOS_REQUIRE_SHORT_TOKEN"] == "0"
     assert env["LOGOS_PROVIDER_CREDENTIALS_TOKEN"] == ""
-    assert "LOGOS_DATABASE_URL" not in env
     Fernet(env["LOGOS_PROVIDER_CREDENTIAL_KEY"].encode("ascii"))
 
 

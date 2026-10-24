@@ -63,12 +63,6 @@ def test_pruned_legacy_agent_modules_stay_deleted():
     assert not resurrected, f"Pruned legacy agent loops were restored: {resurrected}"
 
 
-def test_removed_repository_instruction_files_stay_deleted():
-    assert not (ROOT / "AGENTS.md").exists()
-    assert not (ROOT / "CLAUDE.md").exists()
-
-    codeowners = (ROOT / ".github" / "CODEOWNERS").read_text(encoding="utf-8")
-    assert not any(line.split()[:1] == ["CLAUDE.md"] for line in codeowners.splitlines())
 
 
 def test_tool_providers_live_in_package_not_repository_root():

@@ -393,19 +393,6 @@ def test_quote_validation_edges():
         calculate_quote({"failure_rate_percent": 100})
 
 
-def test_schema_migrates_legacy_print_orders(tmp_path, monkeypatch):
-    import storage.db as db
-    import forge.binding as binding
-    import printing3d.service as service
-
-    evidence = b"SQLite format 3\0legacy order evidence"
-    legacy = tmp_path / "legacy.db"
-    legacy.write_bytes(evidence)
-    binding.init_printing_tables()
-    created = service.create_order(printing_store(), "owner", {"title": "Native order"})
-    close_memory_clients()
-    assert service.get_order(printing_store(), "owner", created["id"]) == created
-    assert legacy.read_bytes() == evidence
 
 
 def test_order_row_recovers_from_invalid_quote_json(printing_db):

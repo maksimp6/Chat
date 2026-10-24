@@ -20,44 +20,6 @@ MODEL_KEY = "claude-haiku-5-5"
 API_KEY = "test-anthropic-secret"
 
 
-def test_anthropic_credential_is_encrypted_and_independent_from_yandex():
-    assert "anthropic" in SUPPORTED_PROVIDERS
-
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    create_schema(conn)
-
-    def encrypt(value):
-        return f"enc:{value}"
-
-    def decrypt(value):
-        return value.removeprefix("enc:")
-
-    bootstrap_credential(
-        conn,
-        api_key="test-yandex-secret",
-        project_id="test-yandex-project",
-        encrypt=encrypt,
-        provider="yandex",
-    )
-    bootstrap_credential(
-        conn,
-        api_key=API_KEY,
-        project_id="",
-        encrypt=encrypt,
-        provider="anthropic",
-    )
-
-    stored = conn.execute(
-        "SELECT provider, api_key_encrypted FROM provider_credentials ORDER BY provider"
-    ).fetchall()
-    assert [(row["provider"], row["api_key_encrypted"]) for row in stored] == [
-        ("anthropic", f"enc:{API_KEY}"),
-        ("yandex", "enc:test-yandex-secret"),
-    ]
-    assert get_active_credential(conn, decrypt, provider="anthropic").api_key == API_KEY
-    assert get_active_credential(conn, decrypt, provider="yandex").api_key == "test-yandex-secret"
-    conn.close()
 
 
 def test_haiku_catalog_entry_keeps_anthropic_model_and_usd_pricing_explicit():

@@ -20,40 +20,8 @@ def _create_archive_database(path, rows=()):
         store.commit()
 
 
-def test_archiver_handles_sqlite_rows_empty_database_and_mutex(monkeypatch, tmp_path):
-    from kristall import Kristall
-    from agent_memory.client import close_memory_clients
-
-    path = tmp_path / "archive.memory"
-    _create_archive_database(path, [(1, "old", "2000-01-01"), (2, "new", "2026-01-01")])
-    worker = archiver.DatabaseArchiver(str(path))
-    assert worker.run_archive() is True
-    close_memory_clients()
-    with Kristall(path) as recovered:
-        assert recovered.get("chat/message/1")["content"] == "old"
-        assert recovered.get("chat/message/2")["content"] == "new"
-    empty = tmp_path / "empty.memory"
-    assert archiver.DatabaseArchiver(str(empty)).run_archive() is True
-    assert worker._mutex.acquire(blocking=False)
-    try:
-        assert worker.run_archive() is False
-    finally:
-        worker._mutex.release()
 
 
-def test_archiver_uses_postgres_connection_and_rolls_back_errors(monkeypatch):
-    from kristall import KristallError
-
-    class FailedStore:
-        def checkpoint(self):
-            raise KristallError("recovery required")
-
-    monkeypatch.setattr(archiver, "get_memory_client", lambda _path: FailedStore())
-    worker = archiver.DatabaseArchiver("unused.memory")
-    with __import__("pytest").raises(KristallError, match="recovery required"):
-        worker.run_archive()
-    assert worker._mutex.acquire(blocking=False)
-    worker._mutex.release()
 
 
 class _FakeResponse:

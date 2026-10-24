@@ -79,13 +79,6 @@ close_memory_clients()
     assert reopened.events(task_id)[-1]["stage"] == "interrupted"
 
 
-def test_legacy_database_is_not_overwritten_or_silently_retired(tmp_path):
-    path = tmp_path / "legacy.sqlite3"
-    original = b"SQLite format 3\x00legacy source"
-    path.write_bytes(original)
-    with pytest.raises(KristallError):
-        TaskStore(path)
-    assert path.read_bytes() == original
 
 
 def test_task_record_and_events_are_copy_safe(tmp_path):

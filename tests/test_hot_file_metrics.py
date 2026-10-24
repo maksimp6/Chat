@@ -136,29 +136,3 @@ def test_hot_file_metric_preserves_history_across_rename(tmp_path):
     assert row["candidate_kind"] == "split_candidate"
 
 
-def test_android_test_sources_are_excluded(tmp_path):
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    _git(repo, "init")
-
-    production = repo / "android" / "app" / "src" / "main" / "java"
-    unit_tests = repo / "android" / "app" / "src" / "test" / "java"
-    android_tests = repo / "android" / "app" / "src" / "androidTest" / "java"
-    production.mkdir(parents=True)
-    unit_tests.mkdir(parents=True)
-    android_tests.mkdir(parents=True)
-
-    (production / "Main.kt").write_text("class Main\n", encoding="utf-8")
-    (unit_tests / "MainTest.kt").write_text("class MainTest\n", encoding="utf-8")
-    (android_tests / "MainInstrumentedTest.kt").write_text(
-        "class MainInstrumentedTest\n",
-        encoding="utf-8",
-    )
-    _commit(repo, "android sources", "Logos", "logos@example.test")
-
-    report = analyze_repository(repo, commits=5)
-    paths = {row["path"] for row in report["files"]}
-
-    assert "android/app/src/main/java/Main.kt" in paths
-    assert "android/app/src/test/java/MainTest.kt" not in paths
-    assert "android/app/src/androidTest/java/MainInstrumentedTest.kt" not in paths

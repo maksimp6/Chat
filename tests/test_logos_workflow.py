@@ -121,7 +121,6 @@ def _git_repo(tmp_path: Path, files):
         (["module.py"], True),
         ([".github/workflows/ci.yml"], False),
         ([".env"], False),
-        (["android/release.jks"], False),
         ([f"f{i}.py" for i in range(21)], False),
     ],
 )

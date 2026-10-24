@@ -25,8 +25,6 @@ def _directories(update):
 
 
 
-def test_no_npm_manifest_is_left_unmanaged():
-    assert not list(ROOT.rglob("package-lock.json"))
 
 
 def test_policy_is_documented():

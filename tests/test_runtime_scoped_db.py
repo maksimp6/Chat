@@ -30,7 +30,6 @@ def test_runtime_database_scope_is_private_and_context_is_restored(tmp_path):
 
 @pytest.mark.parametrize("fail_runtime", [False, True])
 def test_host_scope_restored_after_runtime_error(tmp_path, monkeypatch, fail_runtime):
-    monkeypatch.setenv("LOGOS_DATABASE_URL", "postgresql://unused.invalid/retired")
     host = db.get_store()
     root = tmp_path / "runtime"
 
