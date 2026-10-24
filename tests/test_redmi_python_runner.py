@@ -119,7 +119,7 @@ def test_redirect_cannot_forward_credentials():
 
 def test_ephemeral_token_only_in_explicit_env_and_masked(tmp_path):
     payload = message('printf "%s\\n" "$GH_TOKEN"; printf "%s" "x-access-token:$GH_TOKEN" | base64')
-    payload["contextData"]["github"]["token"] = "ephemeral-test-secret"
+    payload["variables"] = {"system.github.token": {"value": "ephemeral-test-secret", "isSecret": True}}
     payload["steps"][0]["environment"] = {"map": [
         {"Key": "GH_TOKEN", "Value": {"type": 3, "expr": "github.token"}}]}
     (_, result), receipt = execute_job(tmp_path, payload)

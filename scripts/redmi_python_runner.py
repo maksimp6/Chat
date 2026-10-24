@@ -271,6 +271,14 @@ def decode(value):
         return {}
     return {k: decode(v) for k, v in value.items()}
 
+def github_context(job):
+    github = decode(job.get("contextData", {}).get("github", {}))
+    # Official ExecutionContext initializes github.token from this secret variable.
+    token = job.get("variables", {}).get("system.github.token", {}).get("value")
+    if token:
+        github["token"] = token
+    return github
+
 def decode_env(value, github):
     """Only the ephemeral job token is supported as an environment expression."""
     if isinstance(value, dict) and "expr" in value:
@@ -285,7 +293,7 @@ def decode_env(value, github):
     return decode(value)
 
 def validate_job(job, repository):
-    github = decode(job.get("contextData", {}).get("github", {}))
+    github = github_context(job)
     if github.get("repository") != repository:
         raise ValueError("Job repository is not authorized")
     event_name = github.get("event_name")
@@ -384,7 +392,7 @@ class Job:
         for item in message.get("variables", {}).values():
             if item.get("isSecret"):
                 self.api.secrets.append(str(item.get("value", "")))
-        github = decode(message.get("contextData", {}).get("github", {}))
+        github = github_context(message)
         if github.get("token"):
             self.api.secrets.append(github["token"])
         self.results_url = message.get("variables", {}).get("system.github.results_endpoint", {}).get("value")

@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import stat
 import subprocess
+import sys
 import tarfile
 
 import pytest
@@ -23,7 +24,8 @@ def android(tmp_path):
     traces.mkdir()
     def command(name, body):
         path = bindir / name
-        path.write_text(body)
+        path.write_text(body.replace("#!/usr/bin/env bash", "#!" + shutil.which("bash"))
+                       .replace("#!/usr/bin/env python3", "#!" + sys.executable))
         path.chmod(0o700)
     # Replace only Android commands/trace destinations inside this test fixture.
     command("su", "#!/usr/bin/env python3\nimport os,sys\n"
@@ -49,6 +51,8 @@ def android(tmp_path):
                ANDROID_DIAGNOSTICS_HOME=str(base), GITHUB_ACTIONS="true", GITHUB_RUN_ID="1234",
                GITHUB_RUN_ATTEMPT="1", GITHUB_SHA="a" * 40, GITHUB_REPOSITORY="maksimp6/Chat",
                GITHUB_WORKSPACE=str(workspace), GH_TOKEN="fixture-ephemeral-token")
+    # Never let an invalid Android shebang fall through PATH to the real su.
+    assert subprocess.check_output([str(bindir / "su"), "-c", "printf fixture-only"], env=env) == b"fixture-only"
     (base / "keys").mkdir(parents=True)
     subprocess.run(["age-keygen", "-o", str(base / "keys/archive.agekey")], check=True, capture_output=True)
     return base, env
@@ -116,7 +120,7 @@ def test_github_token_installed_only_after_authenticated_api(tmp_path, reject_au
         "curl": '#!/usr/bin/env bash\ncat >/dev/null\n[[ ${FAKE_AUTH_FAILURE:-0} == 0 ]] || exit 22\nwhile (( $# )); do if [[ $1 == -o ]]; then shift; output=$1; fi; shift; done\nprintf \'{"repositories":[{"full_name":"maksimp6/Chat"}]}\' >"$output"\n',
     }.items():
         path = bindir / name
-        path.write_text(body)
+        path.write_text(body.replace("#!/usr/bin/env bash", "#!" + shutil.which("bash")))
         path.chmod(0o700)
     env = dict(os.environ, HOME=str(tmp_path / "home"), PATH=str(bindir) + os.pathsep + os.environ["PATH"],
                GITHUB_ACTIONS="true", GITHUB_REPOSITORY="maksimp6/Chat", GITHUB_RUN_ID="1234",
