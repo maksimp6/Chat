@@ -1,5 +1,7 @@
 """REST API for branch-aware application environments."""
 
+from functools import wraps
+
 from flask import Blueprint, Response, current_app, jsonify, request
 
 from remote_runtime.environments import (
@@ -29,12 +31,27 @@ def _owner():
         return None
 
 
+def _authenticated(view):
+    """Every environment request names an owner. Without one the request is refused, never
+    treated as an unrestricted caller."""
+
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if _owner() is None:
+            return jsonify({"error": "authenticated owner identity is required"}), 401
+        return view(*args, **kwargs)
+
+    return wrapper
+
+
 @environment_bp.get("")
+@_authenticated
 def environments_list():
     return jsonify({"environments": list_environments(_owner())})
 
 
 @environment_bp.post("")
+@_authenticated
 def environments_create():
     data = request.get_json(silent=True) or {}
     branch = str(data.get("branch") or "").strip()
@@ -48,15 +65,16 @@ def environments_create():
 
 
 @environment_bp.get("/<environment_id>")
+@_authenticated
 def environments_get(environment_id):
     item = _get(environment_id)
-    owner = _owner()
-    if not item or (owner and item.get("owner_id") not in (None, owner)):
+    if not item or item.get("owner_id") != _owner():
         return jsonify({"error": "environment_not_found"}), 404
     return jsonify(item)
 
 
 @environment_bp.post("/<environment_id>/start")
+@_authenticated
 def environments_start(environment_id):
     try:
         return jsonify(start_environment(environment_id, _owner()))
@@ -69,6 +87,7 @@ def environments_start(environment_id):
 
 
 @environment_bp.post("/<environment_id>/stop")
+@_authenticated
 def environments_stop(environment_id):
     try:
         return jsonify(stop_environment(environment_id, _owner()))
@@ -79,6 +98,7 @@ def environments_stop(environment_id):
 
 
 @environment_bp.post("/<environment_id>/restart")
+@_authenticated
 def environments_restart(environment_id):
     try:
         return jsonify(restart_environment(environment_id, _owner()))
@@ -91,6 +111,7 @@ def environments_restart(environment_id):
 
 
 @environment_bp.delete("/<environment_id>")
+@_authenticated
 def environments_delete(environment_id):
     try:
         return jsonify(delete_environment(environment_id, _owner()))
@@ -194,5 +215,6 @@ def _proxy(environment_id, subpath=""):
     "/environments/<environment_id>/<path:subpath>",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 )
+@_authenticated
 def environment_gateway(environment_id, subpath):
     return _proxy(environment_id, subpath)

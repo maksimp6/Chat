@@ -156,7 +156,9 @@ def _get(environment_id: str) -> Optional[Dict[str, Any]]:
 
 
 def _owned(case: Dict[str, Any], owner_id: Optional[str]) -> bool:
-    return not owner_id or not case.get("owner_id") or case.get("owner_id") == owner_id
+    # None is an in-process system call. A named owner sees only the records it owns, so a record
+    # without an owner is not visible to any owner.
+    return owner_id is None or case.get("owner_id") == owner_id
 
 
 def _require(environment_id: str, owner_id: Optional[str] = None) -> Dict[str, Any]:
@@ -536,6 +538,10 @@ def authorize_environment_runtime(
     owner_id: Optional[str],
 ) -> None:
     """Authorize gateway access without exposing another owner's environment."""
+    item = _get(environment_id)
+    # A named owner must own the environment exactly; an ownerless record is not theirs.
+    if owner_id is not None and (item is None or item.get("owner_id") != owner_id):
+        raise RuntimeOwnerViolation(environment_id)
     try:
         _RUNTIME_DISPATCHER.authorize(environment_id, owner_id)
         return
@@ -543,11 +549,8 @@ def authorize_environment_runtime(
         # Stopped environments intentionally have no dispatcher context.  Keep
         # owner checks centralized here so the gateway can distinguish a
         # stopped owned environment (503) from a missing/cross-owner one (404).
-        item = _get(environment_id)
         if not item:
             raise
-        if owner_id and item.get("owner_id") not in (None, owner_id):
-            raise RuntimeOwnerViolation(environment_id) from None
 
 
 def dispatch_environment_operation(
@@ -636,7 +639,7 @@ def list_environments(owner_id: Optional[str] = None) -> list[Dict[str, Any]]:
     rows = [
         row
         for row in get_store().items(prefix="environment/record/").values()
-        if not owner_id or not row["owner_id"] or row["owner_id"] == owner_id
+        if owner_id is None or row["owner_id"] == owner_id
     ]
     # Owner ids of other environments are not part of the listing.
     return [
