@@ -1,10 +1,10 @@
-# Memory DB v1 durability and migration contract
+# Kristall v1 durability and migration contract
 
 Status: implementation contract for issue #776.
 
 ## Purpose
 
-Memory DB is the durable file-native storage engine for Alice. Alice depends on this API; the engine must not depend on Alice application code. Application and agents must never parse journal/checkpoint files directly.
+Kristall is the durable file-native storage engine for Logos. Logos depends on this API; the engine must not depend on Logos application code. Application and agents must never parse journal/checkpoint files directly.
 
 The working source of truth lives under a runtime-specific data root. Remote object/cloud storage is backup, not the live filesystem.
 
@@ -12,7 +12,7 @@ The append-only file is the only authoritative live database file.
 
 ## Single-file layout
 
-Memory DB v1 has one authoritative append-only file per runtime:
+Kristall v1 has one authoritative append-only file per runtime:
 
 ```text
 /data/alice/alice.memory
@@ -26,7 +26,7 @@ The only auxiliary file permitted is a short-lived `alice.memory.tmp` during com
 
 ## Synchronous write contract
 
-Memory DB v1 has one authoritative writer and one database write barrier.
+Kristall v1 has one authoritative writer and one database write barrier.
 
 A mutating operation is:
 
@@ -103,7 +103,7 @@ For migration v1 to v2:
 1. v1 remains authoritative at sequence N;
 2. create a consistent snapshot at N;
 3. build v2 candidate from that snapshot;
-4. Alice continues writing to v1;
+4. Logos continues writing to v1;
 5. v2 replays ordered events N+1 onward and catches up;
 6. run v2 in shadow verification while v1 remains authoritative;
 7. compare logical reads/results and integrity;
@@ -112,15 +112,15 @@ For migration v1 to v2:
 10. atomically switch CURRENT from v1 to v2;
 11. release the barrier.
 
-The heavy migration must not require Alice downtime. Only the final barrier is allowed to pause state mutations.
+The heavy migration must not require Logos downtime. Only the final barrier is allowed to pause state mutations.
 
-After DB cutover, the existing Alice runtime must first operate successfully against the new DB format/API. Application/runtime rollout happens afterward. The old generation remains immutable rollback evidence for the documented observation period.
+After DB cutover, the existing Logos runtime must first operate successfully against the new DB format/API. Application/runtime rollout happens afterward. The old generation remains immutable rollback evidence for the documented observation period.
 
 No partial migration is acceptable. A single unverified source record fails the migration.
 
 ## Release order
 
-`DB candidate -> catch-up -> shadow verify -> DB cutover -> old Alice on new DB -> new Alice -> observation -> retire old generation`.
+`DB candidate -> catch-up -> shadow verify -> DB cutover -> old Logos on new DB -> new Logos -> observation -> retire old generation`.
 
 Do not combine a storage-format switch and application-runtime switch into one unobservable event.
 
@@ -141,13 +141,13 @@ Tests must cover at least:
 - migration rejects one missing, unexpected, corrupt, conflicting or unverified record;
 - migration catch-up includes writes created while conversion is running;
 - cutover uses the same write barrier as ordinary commits;
-- old Alice runtime can operate against the newly activated storage generation;
+- old Logos runtime can operate against the newly activated storage generation;
 - backup restore reconstructs equivalent logical state.
 
 Fault tests must include forced process termination at storage stage boundaries. Numeric RPO/RTO/checkpoint thresholds are documented only after measured evidence.
 
 ## Container invariant
 
-The same Alice image digest contains runtime, Memory DB engine, tests/self-check, recovery, migration and backup/restore tooling. Persistent data is not an image layer.
+The same Logos image digest contains runtime, Kristall engine, tests/self-check, recovery, migration and backup/restore tooling. Persistent data is not an image layer.
 
 CI tests the digest that is later deployed; production must not rebuild a different artifact after validation.

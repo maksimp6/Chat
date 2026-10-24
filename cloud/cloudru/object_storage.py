@@ -19,7 +19,7 @@ from urllib.parse import quote, urlsplit
 
 import requests
 
-from storage import (
+from storage.contracts import (
     StorageCredentialsMissing,
     StorageError,
     StorageObject,

@@ -1,4 +1,4 @@
-import db
+import storage.db as db
 
 
 def setup_function():

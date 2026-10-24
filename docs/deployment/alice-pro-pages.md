@@ -1,4 +1,4 @@
-# Alice Pro: подготовка GitHub Pages
+# Logos: подготовка GitHub Pages
 
 Статус: **подготовлено для review; сайт не опубликован**. Пользователь утвердил
 `https://maxxxpavlov.online/` как адрес страницы проекта и Draft PR в `develop`.
@@ -9,7 +9,7 @@ Merge, включение Pages, подключение домена и DNS эт
 
 Каталог `website/` независим от приложения: HTML, CSS, SVG-иконка, robots.txt,
 sitemap.xml и `.nojekyll`, без JavaScript, сборщика, внешних шрифтов, аналитики
-или API. GitHub Pages не запускает Python backend Alice Pro.
+или API. GitHub Pages не запускает Python backend Logos.
 
 Canonical, Open Graph URL, sitemap и ссылка Sitemap в robots.txt согласованы с
 `https://maxxxpavlov.online/`. Подготовительный noindex снят в исходниках для
@@ -83,9 +83,9 @@ bash scripts/pre_push.sh
 Сверено с develop `9d658587871007a041f1981c084a80d2de6d78bd`:
 
 - `README.md`: описание, shipped/roadmap, debug Android, MIT.
-- `yandex_client.py` и `yandex_client_modules/`: Responses API.
+- `yandex_client_modules/client.py` и `yandex_client_modules/`: Responses API.
 - `universal_tool_platform.py`: UniversalToolExecutor, контекст и вызовы.
-- `trace_manager.py`: ExecutionTrace, запросы, инструменты, время, ошибки, billing.
+- `observability/trace_manager.py`: ExecutionTrace, запросы, инструменты, время, ошибки, billing.
 - `android/app/src/main/java/com/alicepro/mobile/MainActivity.kt`: WebView.
 
 Страница не заявляет production-ready, публичный deployment, стабильный Android

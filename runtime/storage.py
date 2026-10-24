@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Mapping
 
-from .dispatcher import RuntimeDispatcher
+from runtime.dispatcher import RuntimeDispatcher
 
 TraceSink = Callable[[str, Mapping[str, Any]], None]
 

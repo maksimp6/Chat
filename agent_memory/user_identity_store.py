@@ -1,10 +1,10 @@
-"""Typed durable aggregate for Alice user identity state."""
+"""Typed durable aggregate for Logos user identity state."""
 
 from __future__ import annotations
 
 from typing import Mapping, TypedDict
 
-from memory_engine.store import MemoryStore
+from kristall.store import Kristall
 
 IDENTITY_KEY = "user_identity:v1"
 IDENTITY_SCHEMA = 1
@@ -33,7 +33,7 @@ class IdentityState(TypedDict):
 
 
 class UserIdentityStore:
-    def __init__(self, db: MemoryStore) -> None:
+    def __init__(self, db: Kristall) -> None:
         self.db = db
 
     @staticmethod
