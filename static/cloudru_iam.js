@@ -71,6 +71,7 @@
     );
     box.appendChild(confirmWrap);
     var submit = document.createElement("button");
+    submit.id = "cloudru-iam-submit";
     submit.textContent = "Выпустить ключ";
     submit.className = "logos-btn btn-primary";
     submit.addEventListener("click", submitWizard);
@@ -103,6 +104,9 @@
     var token = value("cloudru-iam-admin-token");
     var headers = { "Content-Type": "application/json" };
     if (token) headers.Authorization = "Bearer " + token;
+    // A second click would issue a second key; keep the button off until the request ends.
+    var submitBtn = document.getElementById("cloudru-iam-submit");
+    if (submitBtn) submitBtn.disabled = true;
     try {
       var response = await window.LogosDispatcher.request("/api/cloudru/iam/api-keys", {
         method: "POST",
@@ -129,12 +133,25 @@
         "\n\nSecret больше не показывается через Cloud.ru после закрытия окна.";
     } catch (error) {
       output.textContent = "Ошибка: " + error.message;
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
     }
   }
 
   window.LogosCoreAPI.ui.actions.register("cloudru-iam.close", function (payload) {
     var modal = payload.element.closest(".modal");
-    if (modal) window.LogosCoreAPI.ui.modal.close(modal);
+    if (!modal) return;
+    // The issued secret, the admin token and the form must not outlive the dialog.
+    modal.querySelectorAll("input").forEach(function (input) {
+      input.value = "";
+      input.checked = false;
+    });
+    var output = document.getElementById("cloudru-iam-output");
+    if (output) {
+      output.textContent = "";
+      output.classList.remove("visible");
+    }
+    window.LogosCoreAPI.ui.modal.close(modal);
   });
 
   document.addEventListener("DOMContentLoaded", build);

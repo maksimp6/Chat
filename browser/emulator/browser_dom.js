@@ -218,6 +218,8 @@ class ElementShim extends EventTargetShim {
   }
 
   click() {
+    // A disabled control receives no click, as in a browser.
+    if (this.disabled) return;
     this.dispatchEvent({
       type: "click",
       target: this,
