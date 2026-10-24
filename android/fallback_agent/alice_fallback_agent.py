@@ -1,7 +1,7 @@
 """Phone-side agent for the self-hosted fallback control server (#1178).
 
 Runs on the Redmi 9 (Termux Python, standard library only). It connects
-*outbound* to the owner's HTTPS ingress in front of deploy/fallback-control,
+*outbound* to the owner's HTTPS ingress in front of the fallback control server,
 long-polls for commands, runs only registered handlers and acknowledges each
 command. No inbound port, vendor tunnel or RDC is involved.
 

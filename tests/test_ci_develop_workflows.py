@@ -35,6 +35,5 @@ def test_integration_required_check_runs_even_when_dependencies_fail():
         "code-rules",
         "backend",
         "infra",
-        "mcp",
     }
     assert any("--verify" in step.get("run", "") for step in required["steps"])

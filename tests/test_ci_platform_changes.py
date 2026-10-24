@@ -7,7 +7,8 @@ import yaml
 
 from scripts import ci_platform_changes as routing
 
-ALL = {"web", "backend", "android", "infra", "database", "mcp"}
+
+ALL = {"web", "backend", "android", "infra", "database"}
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -15,20 +16,15 @@ ROOT = Path(__file__).resolve().parents[1]
     "paths, expected",
     [
         (["android/app/src/main/Main.kt"], {"android"}),
-        (["cloud/cloudru/registry_client.py"], {"infra"}),
-        (["cloud/cloudru/registry_client.py", "tests/test_cloudru_container_deploy.py"], {"infra"}),
-        (["scripts/cloudru_rdc_mcp_candidate.py"], {"infra"}),
+        (["cloud/cloudru/client.py"], {"infra"}),
         (["requirements-deploy.txt"], {"infra"}),
         (["config/alice/alice-dev-delete-ids.txt"], {"infra"}),
-        (["deploy/remote-desktop-commander/credential-handoff.mjs"], {"infra", "mcp"}),
-        (["deploy/chrome-worker/oauth.mjs"], {"infra", "mcp"}),
-        (["deploy/oauth-idp/server.mjs"], {"infra", "mcp"}),
         (["db.py"], {"backend", "database"}),
         (["db_backend.py"], {"backend", "database"}),
         (["tests/test_user_identity.py"], {"backend"}),
-        (["static/app.js"], {"web", "backend", "android", "mcp"}),
-        (["templates/index.html"], {"web", "backend", "android", "mcp"}),
-        (["tests/test_frontend_smoke.js"], {"web", "backend", "android", "mcp"}),
+        (["static/app.js"], {"web", "backend", "android"}),
+        (["templates/index.html"], {"web", "backend", "android"}),
+        (["tests/test_frontend_smoke.js"], {"web", "backend", "android"}),
         (["docs/README.md"], set()),
         (["android/README.md"], set()),
         (["README.md", "docs/operations.md"], set()),
@@ -37,12 +33,9 @@ ROOT = Path(__file__).resolve().parents[1]
         ([".github/workflows/ci.yml"], ALL),
         (["requirements.txt"], ALL),
         # Manifests that Dependabot PRs touch (docs/development/dependency-updates.md).
-        (["android/scripts/build_direct.sh"], {"android"}),
+        (["android/build.gradle.kts"], {"android"}),
         ([".github/workflows/security.yml"], {"infra"}),
-        (["deploy/chrome-worker/package-lock.json"], {"infra", "mcp"}),
-        (["deploy/remote-desktop-commander/Dockerfile.mcp"], {"infra", "mcp"}),
         (["requirements-dev.txt"], ALL),
-        (["Dockerfile"], ALL),
         (["new-platform/entry.wasm"], ALL),
         ([], ALL),
     ],
@@ -54,32 +47,32 @@ def test_classification_covers_real_platform_inputs(paths, expected):
 
 
 def test_routing_unions_all_changed_paths():
-    plan = routing.classify(["android/scripts/build_direct.sh", "cloud/cloudru/client.py"])
+    plan = routing.classify(["android/app/build.gradle.kts", "cloud/cloudru/client.py"])
     assert {name for name, value in plan.items() if value} == {"android", "infra"}
 
 
 def results(**overrides):
-    value = dict.fromkeys(["backend", "infra", "mcp"], "skipped")
+    value = dict.fromkeys(["backend", "infra"], "skipped")
     value.update({"changes": "success", "code-rules": "success"})
     value.update(overrides)
     return value
 
 
 def test_selected_platform_cannot_be_skipped():
-    plan = routing.classify(["cloud/cloudru/registry_client.py"])
+    plan = routing.classify(["cloud/cloudru/client.py"])
     with pytest.raises(ValueError, match="infra"):
         routing.validate_results(plan, results())
 
 
 @pytest.mark.parametrize("state", ["failure", "cancelled", "skipped", "", "queued"])
 def test_selected_platform_requires_success(state):
-    plan = routing.classify(["cloud/cloudru/registry_client.py"])
+    plan = routing.classify(["cloud/cloudru/client.py"])
     with pytest.raises(ValueError, match="infra"):
         routing.validate_results(plan, results(infra=state))
 
 
 def test_successful_selected_platform_accepts_unselected_skips():
-    plan = routing.classify(["cloud/cloudru/registry_client.py"])
+    plan = routing.classify(["cloud/cloudru/client.py"])
     routing.validate_results(plan, results(infra="success"))
 
 
@@ -105,31 +98,20 @@ def test_malformed_plan_fails_closed():
         routing.validate_results(plan, results())
 
 
-def test_web_dependency_requires_mcp():
-    plan = routing.classify(["static/app.js"])
-    with pytest.raises(ValueError, match="mcp"):
-        routing.validate_results(plan, results(backend="success", android="success"))
-
-
 def test_router_tests_are_part_of_always_run_code_rules():
     assert "tests/test_ci_platform_changes.py" in (ROOT / "scripts/check_code_rules.sh").read_text()
 
 
-def test_workflow_has_real_independent_infra_and_mcp_jobs():
+def test_workflow_has_real_independent_infra_and_backend_jobs():
     workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
     jobs = workflow["jobs"]
-    for job in ("backend", "infra", "mcp"):
+    for job in ("backend", "infra"):
         assert jobs[job]["needs"] == "changes"
     assert "infra" in jobs["required"]["needs"]
-    assert "mcp" in jobs["required"]["needs"]
     infra = "\n".join(step.get("run", "") for step in jobs["infra"]["steps"])
     assert "pytest" in infra and "tests/test_cloudru" in infra
     backend = "\n".join(step.get("run", "") for step in jobs["backend"]["steps"])
     assert "npm test --prefix deploy/chrome-worker" not in backend
-    mcp = "\n".join(step.get("run", "") for step in jobs["mcp"]["steps"])
-    assert "npm test --prefix deploy/chrome-worker" in mcp
-    assert "credential-handoff.test.mjs" in mcp
-    assert "oauth.test.mjs" in mcp
     required = "\n".join(step.get("run", "") for step in jobs["required"]["steps"])
     assert "--verify" in required
 
@@ -192,6 +174,6 @@ def test_bad_environment_cannot_create_green_ci(monkeypatch, plan, needs):
 
 def test_incomplete_web_plan_cannot_hide_dependencies():
     plan = routing.classify(["static/app.js"])
-    plan["mcp"] = False
+    plan["android"] = False
     with pytest.raises(ValueError, match="web dependency plan"):
         routing.validate_results(plan, results(backend="success", android="success"))

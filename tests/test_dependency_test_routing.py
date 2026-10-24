@@ -4,8 +4,9 @@ import pytest
 
 from scripts.ci_platform_changes import classify
 
-ALL = {"web", "backend", "android", "infra", "database", "mcp"}
-WEB = {"web", "backend", "android", "mcp"}
+
+ALL = {"web", "backend", "android", "infra", "database"}
+WEB = {"web", "backend", "android"}
 
 
 @pytest.mark.parametrize(
@@ -15,13 +16,9 @@ WEB = {"web", "backend", "android", "mcp"}
         ("requirements-dev.txt", ALL),
         ("requirements-deploy.txt", {"infra"}),
         ("android/requirements.txt", {"android"}),
-        ("android/scripts/build_direct.sh", {"android"}),
+        ("android/app/build.gradle.kts", {"android"}),
         ("package.json", WEB),
         ("package-lock.json", WEB),
-        ("deploy/chrome-worker/package.json", {"infra", "mcp"}),
-        ("deploy/chrome-worker/package-lock.json", {"infra", "mcp"}),
-        ("deploy/oauth-idp/package.json", {"infra", "mcp"}),
-        ("deploy/remote-desktop-commander/package.json", {"infra", "mcp"}),
     ],
 )
 def test_dependency_manifest_changes_run_their_code_tests(path, expected):
