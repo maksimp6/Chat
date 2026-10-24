@@ -1,17 +1,21 @@
 # Android release signing
 
-Logos keeps debug and release signing separate.
+Logos keeps debug and release signing separate. The former release packager has
+been removed under #1423; the tag workflow currently refuses publication before
+accessing signing credentials. The direct debug browser controller is not a
+replacement for the full embedded-backend application.
 
 ## GitHub Actions secrets
 
-Configure these repository secrets before running `Android release APK`:
+These existing secret names are reserved for a future verified release packager;
+this removal does not read, create, replace or delete their values:
 
 - `ALICE_RELEASE_KEYSTORE_BASE64`: base64-encoded release keystore.
 - `ALICE_RELEASE_KEY_ALIAS`: key alias.
 - `ALICE_RELEASE_STORE_PASSWORD`: keystore password.
 - `ALICE_RELEASE_KEY_PASSWORD`: private-key password.
 
-The keystore is materialized under the GitHub runner's temporary directory only for the release job and removed in an unconditional cleanup step. It is never committed to Git and must not be placed in an issue, pull request, log, trace, or chat message.
+A future release packager must materialize the keystore only under the runner temporary directory and remove it unconditionally. It must never be committed to Git or placed in an issue, pull request, log, trace, or chat message.
 
 ## Generate the keystore once
 
@@ -47,17 +51,16 @@ On macOS, use `base64 < alice-pro-release.keystore | tr -d '\\n'` instead.
 
 The canonical `Release` workflow runs for semantic version tags matching `vMAJOR.MINOR.PATCH`.
 
-It:
+Currently it fails with an explicit packaging-unavailable message. It neither
+loads a keystore nor creates a GitHub Release.
 
-1. materializes the keystore from the protected GitHub secret;
-2. builds `assembleRelease` with the release signing configuration;
-3. verifies the resulting APK with `apksigner`;
-4. checks that the APK signer is the certificate from the configured release keystore;
-5. checks the package name, tag-derived `versionName`, and run-derived `versionCode`;
-6. publishes the APK, SHA-256 checksum, and release metadata;
-7. deletes the temporary keystore even when an earlier step fails.
+Before publication is re-enabled, a replacement must:
 
-Debug CI continues to use the standard Android debug signing configuration.
+1. package the required application features, without substituting the direct controller;
+2. verify the APK with apksigner and match its certificate to the approved release key;
+3. verify application ID, versionCode/versionName and source/digest metadata;
+4. pass device-level verification and owner acceptance;
+5. publish only that verified artifact and clean temporary signing material on failure.
 
 ## Recovery
 

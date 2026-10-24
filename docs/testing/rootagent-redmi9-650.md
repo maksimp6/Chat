@@ -43,9 +43,9 @@ The instrumentation runner checks the actual model/device and exact APK version 
 First identify the built artifact's source SHA, versionCode, versionName, signing certificate and SHA-256. Verify installed metadata matches before running. A short SHA in versionName is not full commit provenance: retain the full artifact-build SHA separately. Set the exact version name below; do not guess it.
 
 ```sh
-# Build on an authorized builder; do not install automatically.
-gradle --no-daemon -PaliceCommitHash=<full-sha> -PaliceBuildNumber=<build-number> \
-  :app:assembleDebug :app:assembleDebugAndroidTest
+# The former embedded-backend packager is retired. These tests require a
+# separately built and verified matching app/instrumentation pair. The direct
+# browser controller is not that pair. No current build command is available.
 
 # Existing explicit Redmi 9 ADB transport only. Run each test separately.
 adb -s <existing-redmi9-transport> shell am instrument -w \

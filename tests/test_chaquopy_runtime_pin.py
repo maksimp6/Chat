@@ -59,6 +59,25 @@ def test_mismatched_download_is_rejected_and_not_kept(tmp_path):
     assert not list(tmp_path.glob("*.partial"))
 
 
+def test_committed_runtime_files_match_their_pins():
+    runtime_dir = ROOT / "android" / "runtime"
+    assert set(fetcher.verify_local(runtime_dir)) == set(fetcher.load_pins())
+
+
+def test_verify_only_rejects_missing_and_tampered_files(tmp_path):
+    with pytest.raises(fetcher.RuntimeVerificationError, match="missing"):
+        fetcher.verify_local(tmp_path)
+    name = next(iter(fetcher.load_pins()))
+    (tmp_path / name).write_bytes(b"tampered bytes")
+    with pytest.raises(fetcher.RuntimeVerificationError, match="does not match pinned"):
+        fetcher.verify_local(tmp_path)
+
+
+def test_verify_only_cli_fails_without_downloading(tmp_path, capsys):
+    assert fetcher.run(["--verify-only", str(tmp_path)]) == 1
+    assert "missing" in capsys.readouterr().err
+
+
 def test_malformed_pin_is_rejected(tmp_path):
     pin = tmp_path / "pins.sha256"
     pin.write_text("not-a-digest  target.zip\n", encoding="utf-8")

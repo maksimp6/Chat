@@ -77,6 +77,17 @@ def test_embedded_finalizer_runs_in_bash(tmp_path, elapsed_seconds, expected):
 @pytest.mark.parametrize("filename,name,job", JOBS, ids=[f"{f}:{n}" for f, n, _ in JOBS])
 def test_every_job_has_a_finalizer(filename, name, job):
     steps = job["steps"]
+    if filename == "logos-once.yml":
+        # The owner requested one visible step. Its EXIT trap is exercised with
+        # real Bash failures and the same duration boundary in test_logos_once.
+        assert name == "logos" and len(steps) == 1
+        step = steps[0]
+        assert step["name"] == "logos" and "if" not in step
+        assert "continue-on-error" not in step
+        assert "trap finish EXIT" in step["run"]
+        assert "execution_exit=" in step["run"]
+        assert "Policy PASS does not mean VERIFIED." in step["run"]
+        return
     clock, finalizer = steps[0], steps[-1]
     assert clock["id"] == "job_policy_clock"
     assert "time.monotonic_ns()" in clock["run"]
