@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic local launch smoke for the Alice Pro P0 baseline.
+"""Deterministic local launch smoke for the Logos P0 baseline.
 
 Offline mode proves the local Flask/UI/session/restart path without external
 provider credentials. Full mode additionally configures Yandex through the
@@ -28,6 +28,11 @@ import requests
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(ROOT))
+
+from agent_runtime.logos_launch_hold import NativeLogosLaunchBlocked, enforce_native_launch_hold
+
 DEFAULT_PORT = 8765
 REQUEST_TIMEOUT = 20.0
 STARTUP_TIMEOUT = 45.0
@@ -107,7 +112,7 @@ def _request_json(
             timeout=REQUEST_TIMEOUT,
         )
     except requests.RequestException as exc:
-        raise SmokeFailure(f"{method} {path} could not reach Alice") from exc
+        raise SmokeFailure(f"{method} {path} could not reach Logos") from exc
 
     data = _json_response(response)
     if response.status_code not in expected:
@@ -128,7 +133,7 @@ def _root_ok(session: requests.Session, base_url: str) -> None:
     try:
         response = session.get(f"{base_url}/", timeout=REQUEST_TIMEOUT)
     except requests.RequestException as exc:
-        raise SmokeFailure("GET / could not reach Alice") from exc
+        raise SmokeFailure("GET / could not reach Logos") from exc
     if response.status_code != 200:
         raise SmokeFailure(f"GET / returned HTTP {response.status_code}")
     if "text/html" not in response.headers.get("content-type", "").lower():
@@ -145,13 +150,13 @@ def _wait_ready(
     deadline = time.monotonic() + STARTUP_TIMEOUT
     while time.monotonic() < deadline:
         if process.poll() is not None:
-            raise SmokeFailure(f"Alice exited during startup with code {process.returncode}")
+            raise SmokeFailure(f"Logos exited during startup with code {process.returncode}")
         try:
             _health_ok(session, base_url)
             return
         except SmokeFailure:
             time.sleep(0.5)
-    raise SmokeFailure("Alice did not become healthy before the startup timeout")
+    raise SmokeFailure("Logos did not become healthy before the startup timeout")
 
 
 def _start_server(
@@ -259,7 +264,7 @@ def _create_conversation(session: requests.Session, base_url: str) -> str:
         "POST",
         base_url,
         "/api/conversations",
-        payload={"title": "Alice launch smoke", "model": "aliceai-llm"},
+        payload={"title": "Logos launch smoke", "model": "logos-runtime"},
         expected=(200, 201),
     )
     conversation_id = str(payload.get("id") or "").strip() if isinstance(payload, dict) else ""
@@ -284,7 +289,7 @@ def _send_live_chat(
             "conversation_id": conversation_id,
             "session_id": session_id,
             "message": "Reply with one short sentence confirming this launch smoke request.",
-            "model": "aliceai-llm",
+            "model": "logos-runtime",
         },
     )
     if not isinstance(payload, dict):
@@ -354,7 +359,13 @@ def _build_runtime_env(*, db_path: Path, port: int) -> dict[str, str]:
     return env
 
 
+def _admit_smoke_mode(*, offline: bool) -> None:
+    if not offline:
+        enforce_native_launch_hold()
+
+
 def run_smoke(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
+    _admit_smoke_mode(offline=args.offline)
     git = _git_state(require_master=args.require_master)
     api_key, project_id = _provider_inputs()
     provider_ready = bool(api_key and project_id)
@@ -425,7 +436,7 @@ def run_smoke(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         server.stop()
         server = None
         if not db_path.exists() or db_path.stat().st_size <= 0:
-            raise SmokeFailure("Native MemoryStore journal was not persisted")
+            raise SmokeFailure("Native Kristall journal was not persisted")
 
         server = _start_server(
             env=runtime_env,
@@ -533,6 +544,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         exit_code, result = run_smoke(args)
+    except NativeLogosLaunchBlocked as exc:
+        print(json.dumps({"status": "BLOCKED", "reason": str(exc)}, ensure_ascii=False))
+        return 1
     except SmokeFailure as exc:
         print(
             json.dumps(

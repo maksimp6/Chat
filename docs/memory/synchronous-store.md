@@ -1,15 +1,15 @@
-# Synchronous Memory DB: functional core and Alice task adapter
+# Synchronous Kristall: functional core and Logos task adapter
 
 The accepted owner contracts are [#1045](https://github.com/maksimp6/Chat/issues/1045)
 and [#1046](https://github.com/maksimp6/Chat/issues/1046), within
 [#776](https://github.com/maksimp6/Chat/issues/776). This focused implementation
-contains one library copy, relevant tests, and an Alice consumer. Packaging,
+contains one library copy, relevant tests, and a Logos consumer. Packaging,
 PyPI, transport schemas, mirroring and build-performance work stay separate.
 
 ## Public contract
 
 `Store[ValueT]` has one name/value API: `get(name)`, `set(name, value)`, and
-`commit() -> int`. `MemoryStore` implements it. Names are nonempty strings;
+`commit() -> int`. `Kristall` implements it. Names are nonempty strings;
 missing names return `None`. JSON `null` is therefore indistinguishable from
 missing through this API. Values are finite JSON scalars, lists and string-keyed
 dictionaries. Tuples, non-string dictionary keys, nonfinite floats and arbitrary
@@ -23,9 +23,9 @@ Staging belongs to the client instance, not individual threads; concurrent
 read-modify-write consumers must use `transaction()`.
 
 ```python
-from memory_engine import MemoryStore
+from kristall import Kristall
 
-with MemoryStore("alice.memory") as store:
+with Kristall("alice.memory") as store:
     store.set("settings/theme", "gray")
     assert store.commit() == 1
     with store.transaction() as tx:
@@ -69,10 +69,10 @@ idle target; staging and existing committed data prevent restore. Backup targets
 must be private to their owner. This is local backup evidence, not remote storage
 replication. Historical SQL backups are untouched.
 
-## Alice integration
+## Logos integration
 
 `agent_memory.client` owns the application writer registry and explicit shutdown.
-Canonical path aliases share one `MemoryStore`; the library has no Alice imports
+Canonical path aliases share one `Kristall`; the library has no Logos imports
 or global database owner. Stop consumers before `close_memory_clients()`.
 
 `agent_shell.TaskStore` uses a typed, versioned task aggregate through this adapter.
@@ -98,21 +98,21 @@ verified import before rollout; this change does not authorize deployment.
 ## Verification and remaining scope
 
 Independent core tests run with only pytest and the standard library, outside
-Alice's conftest and requirements. Strict mypy checks the library. Regression
+the Logos conftest and requirements. Strict mypy checks the library. Regression
 coverage includes fresh-process reopen, SIGKILL before append/after fsync/after
 ACK, failed fsync without publication, invalid values, corruption, transactions,
-writer ownership, backup and isolated restore. Alice tests cover task behavior,
+writer ownership, backup and isolated restore. Logos tests cover task behavior,
 concurrent runners, failed durable claim, and fresh-process interrupted-task
-recovery. The dedicated Memory DB workflow runs core verification independently.
+recovery. The dedicated Kristall workflow runs core verification independently.
 
-Alice now uses the native MemoryStore writer for chat/messages/settings/config,
+Logos now uses the native Kristall writer for chat/messages/settings/config,
 identity and ownership, sessions, agent memory, invocation/Trace, MCP selection,
 local-agent jobs, environments, provider metadata/encrypted credentials, quotas,
 Treasury and business workflows. Records are separate native names; mutations
 use the shared write barrier. SQL drivers, connection adapters, SQL migrations,
 SQL query tool and PostgreSQL CI/deployment dependencies are retired.
 
-The Alice client adds detached prefix iteration and atomic deletion for these
+The Logos client adds detached prefix iteration and atomic deletion for these
 repositories. `items()` rejects incomplete RAM state; delete on a fenced writer
 fails even for a missing name. The application owns shared-writer shutdown;
 stopping a preview runtime releases only that runtime's writer before removal.

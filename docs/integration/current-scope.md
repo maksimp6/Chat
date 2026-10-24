@@ -78,6 +78,6 @@ git diff --check
 
 Run frontend validation for frontend changes and the prescribed Android unit
 test and debug assembly for Android or shared release changes. Schema changes
-must validate both SQLite and PostgreSQL. Security-sensitive changes require
+must validate the native Kristall journal (SQLite and PostgreSQL are retired; see `docs/database.md`). Security-sensitive changes require
 authorization, isolation, cleanup, and secret-redaction regression coverage.
 

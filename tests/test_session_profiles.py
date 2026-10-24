@@ -1,6 +1,6 @@
 import pytest
 
-from session_profiles import clone_profile, get_profile, list_profiles, session_profile
+from sessions.profiles import clone_profile, get_profile, list_profiles, session_profile
 
 
 def test_builtin_profiles_are_available():
@@ -21,7 +21,7 @@ def test_missing_profile_returns_none():
 
 @pytest.fixture
 def runtime_db(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
     from agent_memory.client import close_memory_clients
 
     path = tmp_path / "runtime.db"

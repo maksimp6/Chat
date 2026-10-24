@@ -1,7 +1,7 @@
-"""Fail-closed red contract for the SQL-free Alice Pro runtime.
+"""Fail-closed red contract for the SQL-free Logos runtime.
 
-This intentionally fails until runtime and CI have been migrated to MemoryStore.
-Keep the accepted memory_engine journal/snapshot implementation in scope.
+This intentionally fails until runtime and CI have been migrated to Kristall.
+Keep the accepted kristall journal/snapshot implementation in scope.
 """
 
 import ast
@@ -16,12 +16,12 @@ RUNTIME = (
     "db.py",
     "db_backend.py",
     "memory_db.py",
-    "mcp_storage.py",
+    "mcp_server/storage.py",
     "storage.py",
     "runtime/storage.py",
     "agent_memory/client.py",
-    "conversation_ownership.py",
-    "user_identity.py",
+    "conversations/ownership.py",
+    "identity/user_identity.py",
     "agent_memory/repository.py",
     "agent_shell/store.py",
 )
@@ -76,15 +76,15 @@ def test_ci_has_no_postgresql_job_or_required_dependency():
 
 
 def test_new_memory_store_is_the_only_accepted_engine():
-    source = (ROOT / "memory_engine/store.py").read_text(encoding="utf-8")
-    assert "class MemoryStore:" in source
+    source = (ROOT / "kristall/store.py").read_text(encoding="utf-8")
+    assert "class Kristall:" in source
     assert "class _JournalStore:" in source
     assert "import sqlite3" not in source
     assert "import psycopg" not in source
 
 
 def test_runtime_has_no_sql_connection_boundary():
-    import db
+    import storage.db as db
 
     assert not hasattr(db, "get_conn")
     assert not hasattr(db.get_store(), "execute")
@@ -104,3 +104,46 @@ def test_runtime_has_no_sql_connection_boundary():
         ):
             offenders.append(relative)
     assert not offenders, offenders
+
+
+DATABASE_DOC = ROOT / "docs/database.md"
+CLOUDRU_SERVICES = ROOT / "deploy/cloudru/services.md"
+CLOUDRU_IDENTITIES = ROOT / "deploy/cloudru/identities-and-secrets.md"
+
+
+def _only_line(text, needle):
+    matches = [line for line in text.splitlines() if needle in line]
+    assert len(matches) == 1, (needle, matches)
+    return matches[0]
+
+
+def test_database_doc_describes_only_the_native_store():
+    text = DATABASE_DOC.read_text(encoding="utf-8")
+    assert "## One writer per journal" in text
+    assert "`kristall.Kristall`" in text
+    assert "`ALICE_DATABASE_URL` is retired" in text
+    for deployment in ("Local development", "Termux", "Shared or cloud deployment"):
+        assert deployment in text
+    for banned in (
+        "## Default: SQLite",
+        "## Optional: PostgreSQL",
+        "postgresql://",
+        "docker-compose.postgres.yml",
+    ):
+        assert banned not in text
+
+
+def test_cloudru_services_retire_external_postgresql_requirements():
+    text = CLOUDRU_SERVICES.read_text(encoding="utf-8")
+    assert "retired" in _only_line(text, "| Внешний PostgreSQL").lower()
+    assert "retired" in _only_line(text, "external PostgreSQL connection").lower()
+
+
+def test_cloudru_identities_retire_postgresql_secrets_without_renaming_paths():
+    text = CLOUDRU_IDENTITIES.read_text(encoding="utf-8")
+    assert "retired" in _only_line(text, "| PostgreSQL role password").lower()
+    assert "retired" in _only_line(text, "`alice/runtime/postgres-dsn`").lower()
+    assert "retired" in _only_line(text, "`alice/backup/postgres-role-password`").lower()
+    assert "retired" in _only_line(text, "sslrootcert").lower()
+    assert "`alice/runtime/postgres-dsn`" in text
+    assert "`alice/backup/postgres-role-password`" in text
