@@ -61,7 +61,7 @@ def _run(repo, client, body="Please add a docstring."):
     )
 
 
-def test_edits_are_reported_with_summary_and_billing(repo):
+def test_unexpected_edits_fail_read_only_task_with_summary_and_billing(repo):
     client = FakeClient(
         _message("Added a docstring."),
         edit=lambda: (repo / "module.py").write_text('"""Doc."""\n', encoding="utf-8"),
@@ -69,7 +69,8 @@ def test_edits_are_reported_with_summary_and_billing(repo):
 
     result = _run(repo, client)
 
-    assert result["status"] == "changed"
+    assert result["status"] == "failed"
+    assert result["error"] == "ReadOnlyScopeViolation"
     assert result["changed_files"] == ["module.py"]
     assert result["summary"] == "Added a docstring."
     assert result["trace_id"]
@@ -78,9 +79,9 @@ def test_edits_are_reported_with_summary_and_billing(repo):
     from invocation.manager import get_invocation
 
     invocation = get_invocation(result["invocation_id"])
-    assert invocation["status"] == "completed"
+    assert invocation["status"] == "failed"
     assert invocation["trace"]["trace_id"] == result["trace_id"]
-    assert invocation["result"]["status"] == "changed"
+    assert invocation["error"]["type"] == "ReadOnlyScopeViolation"
 
 
 def test_only_filesystem_tools_are_offered_and_issue_is_task_data(repo):

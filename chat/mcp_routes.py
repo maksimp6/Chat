@@ -53,7 +53,7 @@ mcp_bp = Blueprint("mcp", __name__)
 skill_registry = SkillRegistry()
 
 
-def _tool_call_parts(tool_call):
+def _tool_call_parts(tool_call: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
     name = tool_call.get("name") or tool_call.get("function", {}).get("name")
     if name and "<|" in name:
         name = name.split("<|", 1)[0].strip()
@@ -105,6 +105,7 @@ class LogosClient(YandexResponsesClient):
             conversation_id=conversation_id,
             params=params,
             trace=trace,
+            **policy_kwargs,
         )
 
         calls = extract_function_calls(response)
@@ -123,7 +124,9 @@ class LogosClient(YandexResponsesClient):
                 refused = []
 
                 def execute_tool(call):
-                    result = self._execute_single_tool(call, tool_servers, trace=trace)
+                    result = self._execute_single_tool(
+                        call, tool_servers, trace=trace, **policy_kwargs
+                    )
                     if result.get("error"):
                         output = {"error": result["error"], "tool": result.get("name")}
                         if deny_unapproved and _tool_call_needs_approval(call):
@@ -153,6 +156,7 @@ class LogosClient(YandexResponsesClient):
                         conversation_id=conversation_id,
                         params=continuation_params,
                         trace=trace,
+                        **policy_kwargs,
                     )
 
                 response = run_tool_loop(

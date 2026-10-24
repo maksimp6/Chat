@@ -1,5 +1,6 @@
 import json
 import time
+from typing import Any
 
 from observability.trace_manager import ExecutionTrace
 from tool_providers.registry import registry
@@ -8,11 +9,15 @@ from storage.db import get_conv_settings
 
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_client_modules.api_logger import api_logger
-from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_providers.universal_tool_platform import (
+    ReadOnlyToolPolicy,
+    UniversalToolCall,
+    UniversalToolExecutor,
+)
 
 
 class YandexMcpMixin:
-    def _execute_single_tool(self, tc, all_servers, trace=None):
+    def _execute_single_tool(self, tc, all_servers, trace=None, *, execution_policy=None):
         import time as _t
 
         name = tc.get("name") or tc.get("function", {}).get("name")
@@ -33,8 +38,10 @@ class YandexMcpMixin:
 
         trace_id = trace.trace_id if isinstance(trace, ExecutionTrace) else None
         user_id = None
+        invocation_id = None
         if isinstance(trace, ExecutionTrace):
             user_id = (trace.trace.get("context") or {}).get("user_id")
+            invocation_id = (trace.trace.get("context") or {}).get("invocation_id")
 
         call = UniversalToolCall(
             tool_name=name,
@@ -42,6 +49,7 @@ class YandexMcpMixin:
             call_id=call_id,
             transport="responses_api",
             trace_id=trace_id,
+            invocation_id=invocation_id,
             user_id=user_id,
             metadata={"source": "yandex_responses", "server_count": len(all_servers or [])},
         )
@@ -49,9 +57,9 @@ class YandexMcpMixin:
         try:
             executor = UniversalToolExecutor(registry)
             if isinstance(trace, ExecutionTrace):
-                universal_result = executor.execute_with_trace(call, trace)
+                universal_result = executor.execute_with_trace(call, trace, policy=execution_policy)
             else:
-                universal_result = executor.execute(call)
+                universal_result = executor.execute(call, policy=execution_policy)
 
             if universal_result.get("success"):
                 result = universal_result.get("data")
@@ -106,9 +114,17 @@ class YandexMcpMixin:
             "timing": timing,
         }
 
-    def ask_with_mcp(self, message, model_key, conversation_id=None, params=None, trace=None):
+    def ask_with_mcp(
+        self,
+        message: Any,
+        model_key: Any,
+        conversation_id: Any = None,
+        params: Any = None,
+        trace: Any = None,
+        *,
+        execution_policy: ReadOnlyToolPolicy | None = None,
+    ) -> Any:
         params = params or {}
-        step_timings = []
         import time as _t
 
         mcp_tools = []
@@ -120,7 +136,7 @@ class YandexMcpMixin:
             except Exception:
                 enabled_servers = []
 
-        for s in enabled_servers:
+        for s in enabled_servers if execution_policy is None else []:
             if s.get("server_url") or (s.get("connector_id") or "").startswith("connector_"):
                 mcp_tools.append(
                     {
@@ -212,14 +228,23 @@ class YandexMcpMixin:
         if code_cfg.get("enabled"):
             hosted_tools.append({"type": "code_interpreter", "container": {"type": "auto"}})
 
-        tools = mcp_tools + hosted_tools
+        tools = mcp_tools + hosted_tools if execution_policy is None else []
 
-        local_tools = []
+        local_tools: list[dict[str, Any]] = []
         for category in active_cats:
             try:
                 category_tools = registry.get_tools_by_category(category)
                 if category_tools:
-                    local_tools.extend(category_tools)
+                    local_tools.extend(
+                        tool
+                        for tool in category_tools
+                        if execution_policy is None
+                        or (
+                            (definition := registry.get_universal_definition(tool["name"]))
+                            is not None
+                            and execution_policy.allows_tool(definition)
+                        )
+                    )
             except Exception as e:
                 api_logger.error(f"[TOOLS] Ошибка категории {category}: {e}")
 
@@ -227,7 +252,7 @@ class YandexMcpMixin:
             tools.extend(local_tools)
 
         ask_params = dict(params)
-        if tools:
+        if tools or execution_policy is not None:
             ask_params["tools"] = tools
 
         if trace is not None and isinstance(trace, ExecutionTrace):

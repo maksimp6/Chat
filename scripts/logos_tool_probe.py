@@ -254,11 +254,14 @@ if __name__ == "__main__":
                 and data["size_bytes"] == text_file.stat().st_size
             ),
         )
+        command_marker = fixture / "unapproved-command-ran.txt"
         command = shlex.join(
             [
                 sys.executable,
                 "-c",
-                "from pathlib import Path; print(Path("
+                "from pathlib import Path; Path("
+                + repr(rel(command_marker))
+                + ").write_text('unexpected command execution'); print(Path("
                 + repr(rel(text_file))
                 + ").read_text().splitlines()[0])",
             ]
@@ -270,6 +273,10 @@ if __name__ == "__main__":
                 data["returncode"] == 0 and data["stdout"] == "alpha" and data["stderr"] == ""
             ),
         )
+        check(not command_marker.exists())
+        check(report["tools"]["run_command"]["s"] == "blocked")
+        check(report["tools"]["run_command"]["phase"] == "approval_required")
+        report["command_execution"] = "not_run; approval_required; fixture_effect_absent"
         probe(
             "get_system_info",
             {},
@@ -367,6 +374,10 @@ if __name__ == "__main__":
                 "accepted": result["success"],
                 "phase": result.get("metadata", {}).get("phase", "execution"),
             }
+            if name == "run_command":
+                check(not command_marker.exists())
+                check(report["defaults"][name]["s"] == "blocked")
+                check(result.get("metadata", {}).get("phase") == "approval_required")
         if options.external:
             probe(
                 "http_fetch",

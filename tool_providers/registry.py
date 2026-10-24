@@ -8,6 +8,7 @@ contract for every registered tool.
 from __future__ import annotations
 
 import copy
+import inspect
 import logging
 import shutil
 from typing import Any, Mapping, Optional
@@ -351,14 +352,13 @@ class ToolRegistry:
             cfg["_universal_context"] = dict(context)
 
         try:
-            return func(arguments, cfg)
-        except TypeError:
+            signature = inspect.signature(func)
             try:
+                signature.bind(arguments, cfg)
+            except TypeError:
+                signature.bind(arguments)
                 return func(arguments)
-            except Exception as e:
-                if context and "_universal_context" in cfg:
-                    raise
-                return {"error": str(e)}
+            return func(arguments, cfg)
         except Exception as e:
             # UniversalToolExecutor must classify real tool exceptions by phase
             # instead of receiving a legacy error mapping that hides the cause.
