@@ -1,6 +1,6 @@
-# Alice identity provider
+# Logos identity provider
 
-One OAuth 2.1 authorization server for every Alice service. The owner signs in
+One OAuth 2.1 authorization server for every Logos service. The owner signs in
 with GitHub **here, once**; services such as the Chrome MCP worker only verify
 the access tokens it issues. GitHub is configured with a single callback URL,
 `<IDP_PUBLIC_URL>/github/callback`, for all services, now and later.

@@ -23,28 +23,29 @@ function goodReply(url) {
 test("complete discovery verifies the challenge and both metadata documents", async () => {
   const calls = [];
   const result = await verifyOAuthDiscovery(ORIGIN, { fetch: async (url, init) => {
-    calls.push(new URL(url).pathname);
+    calls.push(`${init.method ?? "GET"} ${new URL(url).pathname}`);
     assert.equal(init.redirect, "manual");
     assert.ok(init.signal);
     return goodReply(url);
   } });
   assert.equal(result.status, "OAUTH_DISCOVERY_OK");
-  assert.deepEqual(calls, ["/healthz", "/mcp", RESOURCE_PATH, "/.well-known/oauth-authorization-server/oauth"]);
+  assert.deepEqual(calls, ["GET /mcp", "HEAD /mcp", "POST /mcp", "GET /healthz", `GET ${RESOURCE_PATH}`, "GET /.well-known/oauth-authorization-server/oauth"]);
 });
 
 for (const status of [502, 503, 504]) {
-  test(`cold-start ${status} retries without relaxing the required 401`, async () => {
-    let cold = true;
-    let tries = 0;
-    await verifyOAuthDiscovery(ORIGIN, { retryDelayMs: 0, fetch: async (url) => {
-      if (url.endsWith("/mcp")) {
-        tries += 1;
-        if (cold) { cold = false; return new Response(null, { status }); }
-      }
-      return goodReply(url);
-    } });
-    assert.equal(tries, 3); // MCP request twice, protected resource path once.
-  });
+  for (const method of ["GET", "HEAD", "POST"]) {
+    test(`cold-start ${status} on ${method} retries without relaxing 401`, async () => {
+      let tries = 0;
+      await verifyOAuthDiscovery(ORIGIN, { retryDelayMs: 0, fetch: async (url, init) => {
+        if (new URL(url).pathname === "/mcp" && init.method === method) {
+          tries += 1;
+          if (tries === 1) return new Response(null, { status });
+        }
+        return goodReply(url);
+      } });
+      assert.equal(tries, 2);
+    });
+  }
 }
 
 for (const status of [200, 403, 404]) {
@@ -54,7 +55,7 @@ for (const status of [200, 403, 404]) {
       calls += 1;
       return url.endsWith("/mcp") ? new Response(null, { status }) : goodReply(url);
     } }), /unexpected_http_status/);
-    assert.equal(calls, 2);
+    assert.equal(calls, 1);
   });
 }
 
@@ -66,12 +67,12 @@ test("missing or foreign resource metadata is not followed", async () => {
       return url.endsWith("/mcp") ? new Response(null, { status: 401,
         headers: { "www-authenticate": challenge } }) : goodReply(url);
     } }), /invalid_resource_metadata_challenge/);
-    assert.equal(calls, 2);
+    assert.equal(calls, 1);
   }
 });
 
 test("a health 200 without the gateway contract does not pass", async () => {
-  await assert.rejects(verifyOAuthDiscovery(ORIGIN, { fetch: async () => asJson({ status: "ok" }) }), /invalid_health/);
+  await assert.rejects(verifyOAuthDiscovery(ORIGIN, { fetch: async (url) => url.endsWith("/healthz") ? asJson({ status: "ok" }) : goodReply(url) }), /invalid_health/);
 });
 
 test("a hanging HTTP server is interrupted by the total deadline", async (t) => {
@@ -98,7 +99,13 @@ test("bad metadata fails without logging response content", async () => {
 });
 
 test("a hanging JSON response body shares the HTTP deadline", async (t) => {
-  const server = createServer((_request, response) => {
+  let local;
+  const server = createServer((request, response) => {
+    if (request.url === "/mcp") {
+      response.writeHead(401, { "www-authenticate": `Bearer resource_metadata="${local}${RESOURCE_PATH}"` });
+      response.end();
+      return;
+    }
     response.writeHead(200, { "content-type": "application/json" });
     response.write("{");
   }).listen(0, "127.0.0.1");
@@ -107,7 +114,19 @@ test("a hanging JSON response body shares the HTTP deadline", async (t) => {
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
   });
-  await assert.rejects(verifyOAuthDiscovery(`http://127.0.0.1:${server.address().port}`, {
-    timeoutMs: 80, requestTimeoutMs: 20, retryDelayMs: 1,
+  local = `http://127.0.0.1:${server.address().port}`;
+  await assert.rejects(verifyOAuthDiscovery(local, {
+    timeoutMs: 120, requestTimeoutMs: 20, retryDelayMs: 1,
   }), /deadline_exceeded/);
 });
+
+for (const method of ["GET", "HEAD"]) {
+  test(`POST-only success cannot hide broken ${method} discovery`, async () => {
+    await assert.rejects(verifyOAuthDiscovery(ORIGIN, { fetch: async (url, init) => {
+      if (new URL(url).pathname === "/mcp" && init.method === method) {
+        return new Response(null, { status: 404 });
+      }
+      return goodReply(url);
+    } }), /unexpected_http_status/);
+  });
+}

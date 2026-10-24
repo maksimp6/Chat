@@ -1,4 +1,4 @@
-"""RFC 9457 Problem Details responses for the Alice API.
+"""RFC 9457 Problem Details responses for the Logos API.
 
 Every error body carries ``type``, ``title`` and ``status``, plus the legacy
 ``error`` code as an extension member so existing clients keep working.
