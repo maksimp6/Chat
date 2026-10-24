@@ -6,7 +6,7 @@ from typing import Any, Mapping, Optional
 
 from flask import request
 
-from .protocol import OAUTH_SCOPE, _jsonrpc_error, _public_base_url
+from mcp_server.protocol import OAUTH_SCOPE, _jsonrpc_error, _public_base_url
 
 
 def _permission_error_message(exc: PermissionError) -> str:

@@ -18,15 +18,16 @@ Owner определяется:
 
 ## Tools
 
-| Tool | Режим | Approval | Назначение |
-|---|---|---|---|
-| `printing3d.quote` | read-only, low risk | нет | Расчёт себестоимости и цены заказа |
-| `printing3d.order.create` | write, medium risk | да | Сохранить согласованный заказ |
-| `printing3d.finance.assess` | read-only, low risk | нет | AI-first оценка покупки/кредита |
-| `printing3d.finance.status` | read-only, low risk | нет | Сохранённый finance plan и фактическая окупаемость |
-| `printing3d.finance.plan.set` | write, medium risk | да | Сохранить принятые условия финансирования |
-| `printing3d.treasury.summary` | read-only, low risk | нет | Фактический P&L 3D-направления |
-| `printing3d.orders.list` | read-only, low risk | нет | Owner-scoped очередь заказов |
+| Tool                          | Режим               | Approval | Назначение                                           |
+| ----------------------------- | ------------------- | -------- | ---------------------------------------------------- |
+| `printing3d.plate.inspect`    | read-only, low risk | нет      | Проверить один файл A1 mini .gcode.3mf перед печатью |
+| `printing3d.quote`            | read-only, low risk | нет      | Расчёт себестоимости и цены заказа                   |
+| `printing3d.order.create`     | write, medium risk  | да       | Сохранить согласованный заказ                        |
+| `printing3d.finance.assess`   | read-only, low risk | нет      | AI-first оценка покупки/кредита                      |
+| `printing3d.finance.status`   | read-only, low risk | нет      | Сохранённый finance plan и фактическая окупаемость   |
+| `printing3d.finance.plan.set` | write, medium risk  | да       | Сохранить принятые условия финансирования            |
+| `printing3d.treasury.summary` | read-only, low risk | нет      | Фактический P&L 3D-направления                       |
+| `printing3d.orders.list`      | read-only, low risk | нет      | Owner-scoped очередь заказов                         |
 
 ## `printing3d.quote` и `printing3d.order.create`
 
@@ -38,7 +39,7 @@ Owner определяется:
   `status=needs_input` и `missing_fields`, а не цену, посчитанную от нуля.
 - Остальные параметры (мощность, электричество, амортизация, упаковка, брак,
   комиссия, маржа) имеют значения по умолчанию сервиса; использованные
-  умолчания перечислены в `assumed_defaults`, чтобы Alice могла их назвать.
+  умолчания перечислены в `assumed_defaults`, чтобы Logos мог их назвать.
 - `printing3d.order.create` сохраняет заказ только через approval, со статусом
   `lead`, `quote` (по умолчанию) или `accepted` и `source=alice`. Цена
   пересчитывается на сервере из `quote`; неполный `quote` отклоняется.
@@ -94,7 +95,7 @@ Hosted Yandex `web_search` теперь opt-out:
   на каждом turn;
 - `file_search` и `code_interpreter` не становятся включёнными по умолчанию.
 
-Это позволяет Alice сначала самой добывать публичные цены/условия, а затем
+Это позволяет Logos сначала самому добывать публичные цены/условия, а затем
 передавать найденные значения в `printing3d.finance.assess`.
 
 ## Browser approval после #562
@@ -115,3 +116,10 @@ Browser capability использует action-level approval:
 
 - [3D Printing Business](../printing3d.md)
 - [3D HTTP API](../api/printing3d.md)
+
+## CAD/editor local tools
+
+Редактируемые сцены и экспорт STL предоставляет новый [локальный 3D Model Editor](model-editor.md)
+(инструменты `model.create`, `model.addcube`, `model.addcylinder`, `model.edit`,
+`model.inspect`, `model.export`). Они используют категорию `3d`, но не запускают
+печать. Принтер и слайсер — отдельная стадия #1096.

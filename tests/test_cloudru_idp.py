@@ -1,4 +1,4 @@
-"""Alice IdP deployment: lane separation, secrets per lane, ownership and ingress gates."""
+"""Logos IdP deployment: lane separation, secrets per lane, ownership and ingress gates."""
 
 import json
 from types import SimpleNamespace
