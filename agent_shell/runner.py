@@ -50,5 +50,10 @@ def run_next(store, handlers):
     except (TypeError, ValueError):
         store.fail(task_id, "invalid_result")
         return store.get(task_id)
-    store.finish(task_id, result)
+    try:
+        store.finish(task_id, result)
+    except Exception:
+        # The result was not recorded, so the claimed task is failed instead of left without an outcome.
+        store.fail(task_id, "store_failed")
+        raise
     return store.get(task_id)
