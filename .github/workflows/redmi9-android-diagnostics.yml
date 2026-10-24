@@ -1,0 +1,36 @@
+name: Redmi 9 Android diagnostics
+
+on:
+  push:
+    branches: [develop, ops/redmi9-python-runner]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  diagnostics:
+    runs-on: redmi9
+    timeout-minutes: 15
+    steps:
+      - name: Receive GitHub token in runner and store on Redmi 9
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for script in redmi_store_github_token.sh redmi_android_diagnostics.sh redmi_publish_diagnostics.sh redmi_repository_backup.sh; do
+            curl --fail --silent --show-error --proto '=https' \
+              "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/$script" -o "$GITHUB_WORKSPACE/$script"
+          done
+          bash "$GITHUB_WORKSPACE/redmi_store_github_token.sh"
+      - name: Capture Android profile and logs in native Termux
+        shell: bash
+        run: |
+          bash "$GITHUB_WORKSPACE/redmi_android_diagnostics.sh"
+      - name: Publish encrypted archive to LFS and verify remote download
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bash "$GITHUB_WORKSPACE/redmi_publish_diagnostics.sh"
+          bash "$GITHUB_WORKSPACE/redmi_repository_backup.sh"
