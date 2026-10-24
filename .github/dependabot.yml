@@ -40,19 +40,3 @@ updates:
     groups:
       actions-minor-patch:
         update-types: [minor, patch]
-
-  - package-ecosystem: npm
-    directories:
-      - "/"
-    target-branch: develop
-    schedule:
-      interval: monthly
-    cooldown:
-      default-days: 7
-    open-pull-requests-limit: 3
-    labels: [dependencies, javascript]
-    commit-message:
-      prefix: "chore(deps)"
-    groups:
-      npm-minor-patch:
-        update-types: [minor, patch]

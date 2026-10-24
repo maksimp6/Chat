@@ -24,9 +24,9 @@ There are no compatibility copies at the old root paths; update external shortcu
 
 | Command | Purpose |
 | --- | --- |
-| `bash scripts/format.sh write` | Apply pinned Python and frontend formatters |
-| `bash scripts/format.sh check` | Verify formatting |
-| `bash scripts/pre_push.sh` | Required clean-worktree formatting gate |
+| `bash scripts/format.sh write` | Optional: apply the pinned Python formatter (ruff) |
+| `bash scripts/format.sh check` | Optional: verify Python formatting with ruff |
+| `bash scripts/pre_push.sh` | Required clean-worktree and whitespace gate |
 | `bash scripts/check_code_rules.sh` | Naming, placement, reliability and type ratchets |
 | `python scripts/local_launch_smoke.py` | Local-launch smoke check |
 

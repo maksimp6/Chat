@@ -18,7 +18,7 @@ def test_config_is_version_2_with_unique_ecosystems():
     assert CONFIG["version"] == 2
     ecosystems = [update["package-ecosystem"] for update in UPDATES]
     assert len(ecosystems) == len(set(ecosystems))
-    assert set(ecosystems) == {"pip", "github-actions", "npm"}
+    assert set(ecosystems) == {"pip", "github-actions"}
 
 
 @pytest.mark.parametrize("update", UPDATES, ids=lambda update: update["package-ecosystem"])
@@ -58,20 +58,8 @@ def test_updates_are_batched_with_cooldown_and_limits(update):
     assert "dependencies" in update["labels"]
 
 
-def test_every_npm_lockfile_is_covered():
-    by_ecosystem = {update["package-ecosystem"]: update for update in UPDATES}
-    npm_dirs = {d.strip("/") for d in _directories(by_ecosystem["npm"])}
-    skipped = {"node_modules", "android", ".git"}
-
-    def owners(pattern):
-        found = set()
-        for path in ROOT.rglob(pattern):
-            relative = path.relative_to(ROOT)
-            if not skipped.intersection(relative.parts):
-                found.add("" if relative.parent == Path(".") else relative.parent.as_posix())
-        return found
-
-    assert owners("package-lock.json") <= npm_dirs
+def test_no_npm_manifest_is_left_unmanaged():
+    assert not list(ROOT.rglob("package-lock.json"))
 
 
 def test_policy_is_documented():
