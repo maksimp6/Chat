@@ -433,8 +433,26 @@ def treasury_top_up():
         return jsonify({"error": str(exc)}), 400
 
 
+def _ssh_admin_denied():
+    """SSH runtime settings are one deployment-wide configuration: reading or changing them
+    needs the SSH administrator token (X-SSH-Admin-Token against LOGOS_SSH_ADMIN_TOKEN)."""
+    expected = env_get("LOGOS_SSH_ADMIN_TOKEN", "").strip()
+    supplied = request.headers.get("X-SSH-Admin-Token", "").strip()
+    # Compare bytes: compare_digest rejects non-ASCII str, which would be a 500, not a refusal.
+    if not (
+        expected
+        and supplied
+        and hmac.compare_digest(expected.encode("utf-8"), supplied.encode("utf-8"))
+    ):
+        return jsonify({"error": "ssh runtime admin authorization required"}), 401
+    return None
+
+
 @app.route("/api/ssh-runtime/settings", methods=["GET"])
 def get_ssh_runtime_settings():
+    denied = _ssh_admin_denied()
+    if denied:
+        return denied
     try:
         return jsonify(public_settings())
     except TreasuryIdentityError as exc:
@@ -446,6 +464,9 @@ def get_ssh_runtime_settings():
 
 @app.route("/api/ssh-runtime/settings", methods=["PUT"])
 def put_ssh_runtime_settings():
+    denied = _ssh_admin_denied()
+    if denied:
+        return denied
     try:
         data = request.get_json(silent=True) or {}
         if not isinstance(data, dict):
