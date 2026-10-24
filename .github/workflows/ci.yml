@@ -122,6 +122,12 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
           npm install --ignore-scripts --no-audit --no-fund --package-lock=false
           echo "- Application dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
+      - name: Install video codec test tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version
+          ffprobe -version
       - name: Generate hot-file modularity report
         run: |
           python scripts/hot_file_metrics.py \
