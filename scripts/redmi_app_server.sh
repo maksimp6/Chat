@@ -17,6 +17,17 @@ limit=${LOGOS_START_TIMEOUT:-40}
 app=$(cd "$app" && pwd -P)
 state=$(cd "$state" && pwd -P)
 python=$app/.venv/bin/python
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+wifi_required=${LOGOS_REQUIRE_WIFI:-}
+if [[ -z $wifi_required && -f $state/server-network.json ]]; then
+  wifi_required=$("$python" -c 'import json,sys; print(int(json.load(open(sys.argv[1])).get("require_wifi", False)))' "$state/server-network.json")
+fi
+wifi_required=${wifi_required:-0}
+[[ $wifi_required == 0 || $wifi_required == 1 ]] || exit 2
+wifi_address=
+if [[ $wifi_required == 1 && $action != stop ]]; then
+  wifi_address=$("$python" "$script_dir/redmi_wifi_probe.py" --discover)
+fi
 exec 9>"$state/runner-control.lock"
 flock -w 30 9
 base=http://127.0.0.1:$port
@@ -59,6 +70,10 @@ ready() {
     curl --noproxy '*' --fail --silent --max-time 3 "$base/static/$asset" -o "$probe/$asset" || return 1
     [[ -s $probe/$asset ]] && cmp -s "$probe/$asset" "$app/static/$asset" || return 1
   done
+  if [[ $wifi_required == 1 ]]; then
+    "$python" "$script_dir/redmi_wifi_probe.py" --address "$wifi_address" --port "$port" \
+      --assets "$app/static" >"$probe/wifi-proof.json" || return 1
+  fi
   owned "$pid"
 }
 
@@ -86,6 +101,16 @@ start_app() {
   fi
   local revision
   revision=$(git -C "$app" rev-parse HEAD 2>/dev/null || printf unknown)
+  if [[ $wifi_required == 1 ]]; then
+    if ! cmp -s "$script_dir/redmi_app_launcher.py" "$state/start-logos.py"; then
+      [[ -f $state/start-logos.py.before-wifi ]] || cp "$state/start-logos.py" "$state/start-logos.py.before-wifi" || return 1
+      cp "$script_dir/redmi_app_launcher.py" "$state/start-logos.py.next" || return 1
+      chmod 700 "$state/start-logos.py.next" || return 1
+      mv "$state/start-logos.py.next" "$state/start-logos.py" || return 1
+    fi
+    printf '{"bind_host":"0.0.0.0","require_wifi":true}\n' >"$state/server-network.json.next" || return 1
+    mv "$state/server-network.json.next" "$state/server-network.json" || return 1
+  fi
   # The existing launcher supplies native dependencies and legacy ALICE_* names.
   # Bridge the same private files to LOGOS_* before entering that launcher.
   # Secrets stay out of command-line arguments and workflow environment.
@@ -117,6 +142,7 @@ wait_ready() {
     if [[ $SECONDS -ge $deadline ]]; then
       if [[ $outcome == started ]] && owned "$pid"; then kill -TERM "$pid"; fi
       echo 'Application readiness failed; inspect local backend.log' >&2
+      [[ ! -f $probe/wifi-proof.json ]] || cat "$probe/wifi-proof.json" >&2
       return 1
     fi
     sleep 0.3
@@ -129,12 +155,13 @@ process_revision_matches() {
 
 target=
 receipt() {
-  local status=${1:-ready} revision run
+  local status=${1:-ready} revision run wifi_check=
   revision=$(git -C "$app" rev-parse HEAD 2>/dev/null || printf unknown)
   run=${GITHUB_RUN_ID:-manual}
   [[ $run =~ ^[0-9]+$ || $run == manual ]] || return 2
-  printf '{"status":"%s","outcome":"%s","pid":%s,"url":"%s","app_revision":"%s","target_revision":"%s","run_id":"%s","verified_at":"%s","checks":["process_identity","healthz","html","chat_js","css"]}\n' \
-    "$status" "$outcome" "$pid" "$base" "$revision" "$target" "$run" "$(date -u +%FT%TZ)" >"$state/runner-start.json.tmp" || return 1
+  [[ $wifi_required == 0 ]] || wifi_check=',"wifi_address_http_and_assets"'
+  printf '{"status":"%s","outcome":"%s","pid":%s,"url":"%s","wifi_address":"%s","app_revision":"%s","target_revision":"%s","run_id":"%s","verified_at":"%s","checks":["process_identity","healthz","html","chat_js","css"%s]}\n' \
+    "$status" "$outcome" "$pid" "$base" "$wifi_address" "$revision" "$target" "$run" "$(date -u +%FT%TZ)" "$wifi_check" >"$state/runner-start.json.tmp" || return 1
   mv "$state/runner-start.json.tmp" "$state/runner-start.json" || return 1
   cat "$state/runner-start.json"
 }
