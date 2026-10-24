@@ -29,7 +29,16 @@ PROFILES = {
     "PLA": {"nozzle_min": 190, "nozzle_max": 240, "bed_min": 40, "bed_max": 75},
     "PETG": {"nozzle_min": 215, "nozzle_max": 275, "bed_min": 55, "bed_max": 95},
 }
-COMMAND = re.compile(rb"^\s*([GM]\d+)\b")
+# An optional line number may precede the code, and the code may carry leading zeros ("M0112"
+# is M112 to the firmware), so the code is read in its normalized form.
+COMMAND = re.compile(rb"^\s*(?:N\d+\s+)?([GM])0*(\d+)\b")
+
+
+def _command_code(line: bytes) -> bytes | None:
+    label = COMMAND.match(line)
+    if label is None:
+        return None
+    return label.group(1) + str(int(label.group(2))).encode("ascii")
 S_VALUE = re.compile(rb"(?:^|\s)S(-?\d+(?:\.\d+)?)\b")
 E_VALUE = re.compile(rb"(?:^|\s)E([+-]?(?:\d+(?:\.\d*)?|\.\d+))")
 SINGLE_PLATE = re.compile(r"^Metadata/plate_\d+\.gcode$")
@@ -121,10 +130,9 @@ def _configuration(archive: ZipFile, names: dict[str, object]) -> tuple[str, flo
 
 
 def _parse_temperature(command: bytes, material: str) -> tuple[str, float] | None:
-    label = COMMAND.match(command)
-    if label is None:
+    code = _command_code(command)
+    if code is None:
         return None
-    code = label.group(1)
     if code not in (b"M104", b"M109", b"M140", b"M190"):
         return None
     match = S_VALUE.search(command)
@@ -162,10 +170,10 @@ def _scan_line(line: bytes, material: str, temperatures: dict[str, float]) -> tu
     physical = line.split(b";", 1)[0].strip().upper()
     if not physical:
         return 0, 0
-    label = COMMAND.match(physical)
-    if label is not None and label.group(1) in FORBIDDEN_COMMANDS:
+    code = _command_code(physical)
+    if code is not None and code in FORBIDDEN_COMMANDS:
         raise PlateError("G-code contains a prohibited maintenance command")
-    movement = int(label is not None and label.group(1) in (b"G0", b"G1"))
+    movement = int(code in (b"G0", b"G1"))
     extrusion = E_VALUE.search(physical) if movement else None
     positive = int(extrusion is not None and float(extrusion.group(1)) > 0)
     read_temp = _parse_temperature(physical, material)
