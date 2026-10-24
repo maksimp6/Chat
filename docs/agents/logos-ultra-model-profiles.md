@@ -71,11 +71,19 @@ pricing, незаполненная дата проверки ставок и `p
 input/output/cache и отдельных tool/session charges. Receipt различает requested,
 accepted и effective/UNKNOWN; estimate не выдаётся за счёт провайдера.
 
-Ни один production consumer не загружает новый каталог. Утилита ниже не является
-реальным runtime admission boundary. D0, переменная поколения, текущая модель,
-workflow, credentials и разрешения не менялись. Формат envelope нельзя отправлять
-в API целиком. Запуск и заполнение неизвестных capability/limit требуют отдельной
-проверки; текущие blockers запрещают объявлять эти артефакты исполнимыми.
+Каталог загружает модуль `core/model_profiles.py`, и только для отображения: `/api/models`
+добавляет каждой модели сводку `ultra_profile` (статус, окно контекста, число блокеров,
+без wire-шаблонов и стоимости), а выбор модели показывает строку Ultra. Снятые модели
+(`available: false` в реестре) видны, но недоступны для выбора. Если каталог не
+покрывает реестр ровно или повреждён, сводки не показываются (fail closed), модели
+остаются доступными по прежним правилам.
+
+Путь запроса к провайдеру профили не использует. Значения по умолчанию, D0, переменная
+поколения, текущая модель, workflow, credentials и разрешения не менялись. Утилита
+`validate_ultra_profiles.py` остаётся офлайн-валидатором, а не runtime admission gate.
+Формат envelope нельзя отправлять в API целиком. Запуск и заполнение неизвестных
+capability/limit требуют отдельной проверки; текущие blockers запрещают объявлять
+эти артефакты исполнимыми.
 
 ## Offline-проверка
 
@@ -83,6 +91,8 @@ workflow, credentials и разрешения не менялись. Форма�
 python3 scripts/validate_ultra_profiles.py
 python3 scripts/validate_ultra_profiles.py --model gpt-oss-120b
 python3 -m unittest discover -s tests -p test_ultra_profiles.py -v
+python3 -m pytest -q tests/test_model_ultra_catalog.py
+node --test tests/test_model_ultra_ui.js
 ```
 
 Утилита разбирает literals из `core/config.py` через AST: не импортирует этот
