@@ -143,8 +143,25 @@ def validate_browser_action(action: BrowserAction) -> list[str]:
     return errors
 
 
+# Usage counters contain "token" but are not credentials, and the budget reads them after redaction.
+_TOKEN_COUNTER_KEYS = frozenset(
+    {
+        "consumed_tokens",
+        "total_tokens",
+        "token_usage",
+        "input_tokens",
+        "output_tokens",
+        "reasoning_tokens",
+        "cached_tokens",
+        "tool_tokens",
+    }
+)
+
+
 def _sensitive_key(key: str) -> bool:
     lowered = key.lower().replace("-", "_")
+    if lowered in _TOKEN_COUNTER_KEYS:
+        return False
     return any(part in lowered for part in _SENSITIVE_KEY_PARTS)
 
 
