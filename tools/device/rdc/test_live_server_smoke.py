@@ -3,6 +3,7 @@
 Never outputs bearer tokens, Android serials, focus details or UI text.
 The only real-device action is the user-requested, bounded WAKEUP via Live Server.
 """
+
 import json
 import os
 from pathlib import Path
@@ -28,9 +29,15 @@ source = (
 )
 log = open(BASE / "probe-live-server.log", "w")
 os.chmod(BASE / "probe-live-server.log", 0o600)
-process = subprocess.Popen([sys.executable, "-c", source], stdin=subprocess.DEVNULL,
-                           stdout=log, stderr=log, start_new_session=True)
+process = subprocess.Popen(
+    [sys.executable, "-c", source],
+    stdin=subprocess.DEVNULL,
+    stdout=log,
+    stderr=log,
+    start_new_session=True,
+)
 log.close()
+
 
 def fetch(path, method="GET", payload=None, authenticated=True, timeout=18):
     data = json.dumps(payload).encode() if payload is not None else None
@@ -38,8 +45,7 @@ def fetch(path, method="GET", payload=None, authenticated=True, timeout=18):
     if authenticated:
         headers["Authorization"] = "Bearer " + TOKEN
     req = urllib.request.Request(
-        f"http://127.0.0.1:{port}" + path,
-        data=data, headers=headers, method=method
+        f"http://127.0.0.1:{port}" + path, data=data, headers=headers, method=method
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout) as response:
@@ -54,6 +60,7 @@ def fetch(path, method="GET", payload=None, authenticated=True, timeout=18):
         data = {}
     return code, data
 
+
 results = {}
 try:
     for _ in range(30):
@@ -64,7 +71,7 @@ try:
             if code == 200:
                 break
         except OSError:
-            time.sleep(.1)
+            time.sleep(0.1)
     else:
         raise RuntimeError("candidate not listening")
     results["health"] = code
@@ -73,13 +80,15 @@ try:
     results["status"] = status
     results["bound_target"] = body.get("target") == "Redmi_9"
     results["focus_available"] = isinstance(body.get("focus"), str) and bool(body.get("focus"))
-    results["invalid_action"] = fetch("/action","POST",{"command":"arbitrary_shell"})[0]
-    results["no_token_action"] = fetch("/action","POST",{"command":"wake"},authenticated=False)[0]
+    results["invalid_action"] = fetch("/action", "POST", {"command": "arbitrary_shell"})[0]
+    results["no_token_action"] = fetch("/action", "POST", {"command": "wake"}, authenticated=False)[
+        0
+    ]
     # First candidate Live Server-only action; deliberately does not unlock PIN.
-    wake_status, wake_body = fetch("/action","POST",{"command":"wake"},timeout=18)
+    wake_status, wake_body = fetch("/action", "POST", {"command": "wake"}, timeout=18)
     results["wake"] = wake_status
     results["wake_submitted"] = wake_body.get("submitted") is True
-    sem_status, sem_body = fetch("/screen/semantics",timeout=25)
+    sem_status, sem_body = fetch("/screen/semantics", timeout=25)
     results["semantics"] = sem_status
     if sem_status == 200:
         results["semantic_nodes"] = sem_body.get("count")

@@ -1,5 +1,21 @@
-"""Public Memory DB API: client-owned name/value storage and commits."""
+"""Synchronous Memory DB with client-owned explicit name/value commits."""
 
-from .store import Commit, MemoryStore, StoreError
+from .store import (
+    Commit,
+    DatabaseInfo,
+    DatabaseInfoContract,
+    MemoryStore,
+    Store,
+    StoreError,
+    Transaction,
+)
 
-__all__ = ["Commit", "MemoryStore", "StoreError"]
+__all__ = [
+    "Commit",
+    "DatabaseInfo",
+    "DatabaseInfoContract",
+    "MemoryStore",
+    "Store",
+    "StoreError",
+    "Transaction",
+]

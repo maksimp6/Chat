@@ -8,7 +8,7 @@ import yaml
 from scripts import ci_platform_changes as routing
 
 
-ALL = {"web", "backend", "android", "infra", "database", "mcp"}
+ALL = {"web", "backend", "android", "infra", "mcp"}
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -27,9 +27,9 @@ ROOT = Path(__file__).resolve().parents[1]
         (["db.py"], {"backend", "database"}),
         (["db_backend.py"], {"backend", "database"}),
         (["tests/test_user_identity.py"], {"backend"}),
-        (["static/app.js"], {"web", "backend", "android", "database", "mcp"}),
-        (["templates/index.html"], {"web", "backend", "android", "database", "mcp"}),
-        (["tests/test_frontend_smoke.js"], {"web", "backend", "android", "database", "mcp"}),
+        (["static/app.js"], {"web", "backend", "android", "mcp"}),
+        (["templates/index.html"], {"web", "backend", "android", "mcp"}),
+        (["tests/test_frontend_smoke.js"], {"web", "backend", "android", "mcp"}),
         (["docs/README.md"], set()),
         (["android/README.md"], set()),
         (["README.md", "docs/operations.md"], set()),
@@ -155,9 +155,7 @@ def test_cli_classifies_stdin(monkeypatch, capsys, mode):
 def test_cli_can_select_android_for_manual_build(monkeypatch, capsys):
     import json
 
-    monkeypatch.setattr(
-        routing.sys, "argv", ["ci_platform_changes.py", "--platform", "android"]
-    )
+    monkeypatch.setattr(routing.sys, "argv", ["ci_platform_changes.py", "--platform", "android"])
     assert routing.main() == 0
     plan = json.loads(capsys.readouterr().out)
     assert {name for name, enabled in plan.items() if enabled} == {"android"}

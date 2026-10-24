@@ -3,6 +3,7 @@
 This module validates artifact metadata only. It cannot connect to a printer,
 upload files, or start a physical print. The transport is a separate capability.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -60,7 +61,9 @@ def validate_job(path: Path, *, printer_model: str, approved_profile: str) -> Ap
             names = [info.filename for info in infos]
             if len(set(names)) != len(names):
                 raise InvalidPrintJob("duplicate archive members")
-            if any(name.startswith("/") or "\\" in name or ".." in Path(name).parts for name in names):
+            if any(
+                name.startswith("/") or "\\" in name or ".." in Path(name).parts for name in names
+            ):
                 raise InvalidPrintJob("unsafe archive path")
             if "[Content_Types].xml" not in names:
                 raise InvalidPrintJob("missing 3MF manifest")

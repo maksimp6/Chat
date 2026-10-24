@@ -82,7 +82,7 @@ def test_interrupted_commit_blocks_retry_until_verified_reopen(
     tmp_path, monkeypatch, mode, phase, interruption
 ):
     path = tmp_path / "state.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("saved", 1)
         store.commit()
         original_append = store._engine._append_frame
@@ -115,25 +115,25 @@ def test_interrupted_commit_blocks_retry_until_verified_reopen(
                         tx.set("new", 2)
         if phase == "after_apply":
             assert store.info().last_commit is None
-            with pytest.raises(StoreError, match="RAM publication"):
+            with pytest.raises(KristallError, match="RAM publication"):
                 store.last_commit
-            with pytest.raises(StoreError, match="RAM publication"):
+            with pytest.raises(KristallError, match="RAM publication"):
                 store.get("saved")
         else:
             assert store.last_commit.sequence == 1
             assert store.get("saved") == 1
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             store.set("later", 3)
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             store.commit()
     # A complete unacknowledged frame may survive; never append with stale metadata.
-    with MemoryStore(path) as recovered:
+    with Kristall(path) as recovered:
         assert recovered.get("saved") == 1
         assert recovered.get("new") == 2
         assert recovered.last_commit.sequence == 2
         recovered.set("later", 3)
         assert recovered.commit() == 3
-    with MemoryStore(path) as reopened:
+    with Kristall(path) as reopened:
         assert reopened.get("saved") == 1
         assert reopened.get("new") == 2
         assert reopened.get("later") == 3

@@ -3,6 +3,7 @@
 The writer must acknowledge only after its durable barrier. This module never
 falls back to process-local MemoryDatabase or SQL.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,7 +13,9 @@ import re
 from typing import Callable, Protocol
 from uuid import uuid4
 
-_SECRET = re.compile(r"(?i)(bearer\s+)[^\s,;]+|((?:api[_-]?key|token|password|secret)\s*[:=]\s*)[^\s,;]+")
+_SECRET = re.compile(
+    r"(?i)(bearer\s+)[^\s,;]+|((?:api[_-]?key|token|password|secret)\s*[:=]\s*)[^\s,;]+"
+)
 MAX_EVENT_BYTES = 64 * 1024
 
 
@@ -41,8 +44,9 @@ class MemoryLogAdapter:
     def __init__(self, writer: DurableLogWriter):
         self._writer = writer
 
-    def append(self, *, trace_id: str, source: str, level: str, message: str,
-               event_id: str | None = None) -> LogEvent:
+    def append(
+        self, *, trace_id: str, source: str, level: str, message: str, event_id: str | None = None
+    ) -> LogEvent:
         if not trace_id or not source:
             raise ValueError("trace_id and source are required")
         event = LogEvent(

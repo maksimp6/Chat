@@ -1,4 +1,5 @@
 """Offline tests for A1 mini delivery contract."""
+
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,12 +16,15 @@ class DeliveryContractTests(unittest.TestCase):
                 archive.writestr("[Content_Types].xml", "<Types/>")
                 archive.writestr("Metadata/plate_1.gcode", "; test only")
             job = validate_job(path, printer_model="A1 mini", approved_profile="PLA-0.4")
+
             class FakeTransport:
                 def stage(self, value):
                     self.job = value
                     return "staged.gcode.3mf"
+
                 def verify(self, name, size):
                     return name == "staged.gcode.3mf" and size == path.stat().st_size
+
             self.assertEqual(stage_only(job, FakeTransport()), "staged.gcode.3mf")
 
     def test_rejects_unsliced_and_wrong_model(self):

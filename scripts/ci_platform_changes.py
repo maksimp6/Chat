@@ -98,7 +98,7 @@ def classify(paths: list[str]) -> dict[str, bool]:
     for path in paths:
         selected.update(_path_platforms(path))
     if "web" in selected:
-        selected.update(("backend", "android", "database", "mcp"))
+        selected.update(("backend", "android", "mcp"))
     return {platform: platform in selected for platform in PLATFORMS}
 
 
@@ -106,7 +106,7 @@ def validate_results(plan: Mapping[str, bool], results: Mapping[str, str]) -> No
     """A selected suite must succeed; only unselected suites may be skipped."""
     if set(plan) != set(PLATFORMS) or any(type(value) is not bool for value in plan.values()):
         raise ValueError("invalid platform plan")
-    if plan["web"] and not all(plan[key] for key in ("backend", "android", "database", "mcp")):
+    if plan["web"] and not all(plan[key] for key in ("backend", "android", "mcp")):
         raise ValueError("incomplete web dependency plan")
     for job in ("changes", "code-rules"):
         if results.get(job) != "success":

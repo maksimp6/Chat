@@ -456,7 +456,7 @@ class _JournalStore:
         import tempfile
 
         destination.parent.mkdir(parents=True, exist_ok=True)
-        fd, temp_name = tempfile.mkstemp(prefix=".alice-copy-", dir=destination.parent)
+        fd, temp_name = tempfile.mkstemp(prefix=".kristall-copy-", dir=destination.parent)
         temporary = Path(temp_name)
         try:
             # Build and fsync the copy before publishing the destination path.
@@ -538,7 +538,9 @@ class _JournalStore:
             publication_started = False
             try:
                 self._verify_checkpoint_source()
-                fd, temp_name = tempfile.mkstemp(prefix=".alice-checkpoint-", dir=self.path.parent)
+                fd, temp_name = tempfile.mkstemp(
+                    prefix=".kristall-checkpoint-", dir=self.path.parent
+                )
                 temporary = Path(temp_name)
                 with os.fdopen(fd, "wb") as stream:
                     if stream.write(frame) != len(frame):
@@ -663,7 +665,7 @@ class Kristall:
         with self._engine._lock:
             self._engine._ensure_open()
             if self._engine._failed or not self._engine._ram_valid:
-                raise StoreError("recovery required")
+                raise KristallError("recovery required")
             commit = self._engine.last_commit
             if commit.sequence == 0:
                 return commit
@@ -677,7 +679,7 @@ class Kristall:
                     os.close(directory)
             except OSError as exc:
                 self._engine._failed = True
-                raise StoreError("durability confirmation failed; recovery required") from exc
+                raise KristallError("durability confirmation failed; recovery required") from exc
             except BaseException:
                 # Cancellation leaves the recovered durability barrier uncertain.
                 # Fence the writer while preserving the original exception.
