@@ -56,7 +56,10 @@ def _bearer_token() -> Optional[str]:
 def _require_bootstrap() -> None:
     expected = os.getenv("LOGOS_LOCAL_AGENT_BOOTSTRAP_TOKEN", "").strip()
     token = _bearer_token()
-    if not expected or not token or not secrets.compare_digest(token, expected):
+    # Compare bytes: compare_digest rejects non-ASCII str, which would be a 500 instead of a refusal.
+    if not expected or not token or not secrets.compare_digest(
+        token.encode("utf-8"), expected.encode("utf-8")
+    ):
         raise PermissionError("local-agent registration is not authorized")
 
 

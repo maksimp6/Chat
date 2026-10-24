@@ -2,8 +2,8 @@
 
 from flask import Blueprint, jsonify, request
 
+from identity.deployment_admin import deployment_admin_denied
 from plugin_system.manager import PluginError, plugin_manager
-from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 
 plugin_bp = Blueprint("plugins", __name__, url_prefix="/api/plugins")
 
@@ -12,13 +12,11 @@ def _error(exc: Exception):
     return jsonify({"error": str(exc)}), 400
 
 
+# Plugins are installed and enabled for the whole deployment, so enabling one is an
+# administrator action, not something an anonymous user identity may do.
 @plugin_bp.before_request
-def require_plugin_identity():
-    try:
-        get_current_owner_id()
-    except TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
-    return None
+def require_plugin_administrator():
+    return deployment_admin_denied()
 
 
 @plugin_bp.get("")

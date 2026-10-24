@@ -21,7 +21,12 @@ provider_quota_bp = Blueprint(
 def _admin_ok() -> bool:
     expected = os.getenv("LOGOS_QUOTA_ADMIN_TOKEN", "").strip()
     supplied = request.headers.get("X-Provider-Quota-Admin-Token", "").strip()
-    return bool(expected and supplied and secrets.compare_digest(expected, supplied))
+    # Compare bytes: compare_digest rejects non-ASCII str, which would be a 500 instead of a refusal.
+    return bool(
+        expected
+        and supplied
+        and secrets.compare_digest(expected.encode("utf-8"), supplied.encode("utf-8"))
+    )
 
 
 @provider_quota_bp.get("/me")
@@ -66,7 +71,8 @@ def quota_policy_update(policy_name: str):
             enabled=values["enabled"],
         )
         return jsonify({"status": "ok", "policy": values})
-    except ValueError as exc:
+    except (TypeError, ValueError) as exc:
+        # int(None) raises TypeError; a missing or null number is a bad request, not a 500.
         return jsonify({"error": str(exc)}), 400
 
 
