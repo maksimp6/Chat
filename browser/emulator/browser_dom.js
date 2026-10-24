@@ -16,8 +16,13 @@ class EventTargetShim {
   dispatchEvent(event) {
     event.target ||= this;
     event.currentTarget = this;
+    event.stopPropagation ||= function () {
+      this.propagationStopped = true;
+    };
     for (const handler of [...(this._listeners[event.type] || [])]) handler.call(this, event);
-    if (event.bubbles && this.parentNode) this.parentNode.dispatchEvent(event);
+    if (event.bubbles && !event.propagationStopped && this.parentNode) {
+      this.parentNode.dispatchEvent(event);
+    }
     return true;
   }
 }
@@ -345,6 +350,19 @@ class WindowShim extends EventTargetShim {
       origin: "http://localhost",
       pathname: "/",
       hash: "",
+      toString() {
+        return this.href;
+      },
+    };
+    this.history = {
+      state: null,
+      pushState: (state, title, url) => {
+        this.history.state = state;
+        if (url !== undefined) this.location.href = new URL(String(url), this.location.href).href;
+      },
+      replaceState: (state) => {
+        this.history.state = state;
+      },
     };
     this.localStorage = new StorageShim();
     this.sessionStorage = new StorageShim();
@@ -379,6 +397,7 @@ class BrowserShim {
       CustomEvent: CustomEventShim,
       localStorage: this.window.localStorage,
       sessionStorage: this.window.sessionStorage,
+      URL,
       URLSearchParams,
       AbortController,
       performance: globalThis.performance,
