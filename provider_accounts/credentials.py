@@ -7,7 +7,7 @@ non-secret provider metadata/fingerprints.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import hashlib
 import threading
@@ -41,7 +41,8 @@ class ExpiredCredentialError(CredentialError):
 
 @dataclass(frozen=True)
 class ProviderCredential:
-    api_key: str
+    # Excluded from repr: a credential object that reaches a log or a traceback must not print the key.
+    api_key: str = field(repr=False)
     project_id: str = ""
     provider: str = YANDEX
     id: Optional[int] = None
@@ -151,6 +152,12 @@ def bootstrap_credential(
         if existing is not None:
             if decrypt is None:
                 raise NoActiveCredentialError("provider credential already bootstrapped")
+            current = tx.get("provider/credential/" + str(existing)) or {}
+            if current.get("fingerprint") != fingerprint_key(api_key):
+                # The key given here would be dropped silently; changing the key is a rotation.
+                raise CredentialError(
+                    "a different provider credential is already active; rotate it instead"
+                )
         else:
             _publish_credential(
                 tx,
@@ -300,6 +307,8 @@ def record_health_check(
         if identity is not None:
             key = "provider/credential/" + str(identity)
             row = tx.get(key)
+            if row is None:
+                return
             tx.set(
                 key,
                 {
@@ -443,7 +452,8 @@ def _publish_credential(
     if old_id is not None:
         old_key = "provider/credential/" + str(old_id)
         old = tx.get(old_key)
-        tx.set(old_key, {**old, "status": ROTATING})
+        if old is not None:
+            tx.set(old_key, {**old, "status": ROTATING})
     identity = int(tx.get("provider/next-id") or 0) + 1
     tx.set("provider/next-id", identity)
     tx.set(

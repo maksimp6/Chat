@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+import threading
 import time
 import uuid
 from typing import Any
@@ -25,6 +26,12 @@ from tool_providers.registry import registry
 
 ENDPOINT = "https://api.anthropic.com/v1/messages"
 MAX_BYTES = 2 * 1024 * 1024
+# Conversation histories kept in this process; the oldest is dropped first.
+_MAX_HISTORIES = 256
+# The official CLI is asked for a token at most this often; a 401 forgets the cached one at once.
+_TOKEN_TTL_SECONDS = 240
+_token_cache: dict[str, Any] = {"token": None, "expires_at": 0.0}
+_token_lock = threading.Lock()
 
 
 class ClaudeOAuthError(RuntimeError):
@@ -79,7 +86,7 @@ def _cli_json(
         raise ClaudeOAuthError("Claude Console OAuth credentials unavailable") from None
 
 
-def resolve_access_token() -> str:
+def _fetch_access_token() -> str:
     """Capture the official CLI's token privately; no shell or API-key fallback."""
     binary = shutil.which("ant")
     if not binary:
@@ -115,6 +122,21 @@ def resolve_access_token() -> str:
     if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_.~-]{8,8192}", token):
         raise ClaudeOAuthError("Claude Console OAuth inference authorization required")
     return token
+
+
+def resolve_access_token() -> str:
+    with _token_lock:
+        if _token_cache["token"] and time.monotonic() < _token_cache["expires_at"]:
+            return _token_cache["token"]
+    token = _fetch_access_token()
+    with _token_lock:
+        _token_cache.update(token=token, expires_at=time.monotonic() + _TOKEN_TTL_SECONDS)
+    return token
+
+
+def forget_access_token() -> None:
+    with _token_lock:
+        _token_cache.update(token=None, expires_at=0.0)
 
 
 def normalize_response(data: Any) -> dict[str, Any]:
@@ -282,7 +304,10 @@ class ClaudeOAuthTransport:
             raise ClaudeOAuthError("Choose one Claude sampling parameter")
         if params.get("stream"):
             raise ClaudeOAuthError("Claude OAuth streaming is not implemented")
-        for config in (params.get("tools_config") or {}).values():
+        tools_config = params.get("tools_config") or {}
+        if not isinstance(tools_config, dict):
+            raise ClaudeOAuthError("Invalid Claude tools_config")
+        for config in tools_config.values():
             if isinstance(config, dict) and config.get("enabled"):
                 raise ClaudeOAuthError("Claude hosted tools are not implemented")
         tools = params.get("tools") or []
@@ -326,6 +351,8 @@ class ClaudeOAuthTransport:
                     allow_redirects=False,
                 ) as response,
             ):
+                if response.status_code == 401:
+                    forget_access_token()
                 if response.status_code != 200:
                     raise ClaudeOAuthError(f"Claude API HTTP {response.status_code}")
                 raw = bytearray()
@@ -345,6 +372,8 @@ class ClaudeOAuthTransport:
             raise ClaudeOAuthError("Claude API transport or response failed") from None
         if normalized["status"] == "completed":
             self._histories[key] = messages + [{"role": "assistant", "content": data["content"]}]
+            while len(self._histories) > _MAX_HISTORIES:
+                self._histories.pop(next(iter(self._histories)))
         if trace is not None:
             trace.add_response(normalized, step_index=step, start_timestamp=started)
         if callable(params.get("on_provider_response")):
@@ -366,7 +395,8 @@ class ClaudeOAuthTransport:
         categories = params.get("active_tool_categories")
         if categories is None:
             categories = list(registry.get_available_categories())
-        tools = list(params.get("tools") or [])
+        # Tool schemas come from the registry only; a client cannot add definitions of its own.
+        tools: list[dict[str, Any]] = []
         for category in categories:
             for tool in registry.get_tools_by_category(category):
                 definition = registry.get_universal_definition(tool["name"])

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import subprocess
 from typing import Any
@@ -71,6 +72,14 @@ def _limit_local_output(value: str | bytes | None, max_bytes: int = 1048576) -> 
     return raw[:budget].decode("utf-8", errors="ignore") + suffix
 
 
+_COMMAND_ENV_NAMES = ("PATH", "HOME", "LANG", "LC_ALL", "TERM", "TMPDIR", "USER", "LOGNAME", "SHELL")
+
+
+def _command_environment() -> dict[str, str]:
+    """Only what a shell needs. The backend's own environment holds provider and deployment secrets."""
+    return {name: os.environ[name] for name in _COMMAND_ENV_NAMES if name in os.environ}
+
+
 def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
     """Execute a shell command on the host running the Logos backend."""
     command = str(args.get("command") or "").strip()
@@ -79,7 +88,7 @@ def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
 
     raw_timeout = args.get("timeout_seconds")
     timeout = 30.0 if raw_timeout is None else float(raw_timeout)
-    if timeout < 1 or timeout > 300:
+    if not math.isfinite(timeout) or timeout < 1 or timeout > 300:
         raise ValueError("timeout_seconds must be between 1 and 300")
 
     raw_cwd = args.get("cwd")
@@ -106,6 +115,7 @@ def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
             capture_output=True,
             text=True,
             cwd=cwd,
+            env=_command_environment(),
             timeout=timeout,
         )
     except subprocess.TimeoutExpired as exc:
