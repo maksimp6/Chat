@@ -127,6 +127,12 @@ the cheapest backend/model that can reliably perform that role.
 
 ### Cost-control policy
 
+- For native Logos in PR #1435, the owner's quality-first direction takes
+  precedence over economy defaults: use the strongest available compatible
+  profile, full applicable initial context and tools, with explicit requested
+  parameters and no silent downgrade. Follow `docs/agents/logos-native-quality.md`.
+  Budget limits work volume, not the quality of an accepted unit of work.
+
 - Choose the cheapest sufficient tool, backend, and model. Prefer deterministic connectors, search, or page reads when they suffice; a static fetch is not a substitute for required interactive browser verification.
 - Before a new paid tool or agent run, require owner-approved task scope and budget; wallet balance is not spending permission. An expensive-model escalation, increased paid concurrency, or larger budget requires explicit owner approval unless already covered by that approval. Do not ask again for every safe step within the approved scope.
 - Pass supported step, call, and time limits as actual tool arguments. For a small browser diagnosis, default to at most 10 steps and 120 seconds when supported. Size longer workflows upfront within approval; these defaults are not spending authorization.
@@ -135,6 +141,7 @@ the cheapest backend/model that can reliably perform that role.
 - Keep one primary owner per objective and do not pay multiple agents to redo the same work. Across work you coordinate, default to one paid browser or agent run at a time; do not claim account-wide enforcement without verified shared coordination.
 - Reuse evidence only while the relevant commit, inputs, environment, and authorized account remain valid. Reuse suitable sessions, traces, and artifacts rather than repeating an up-to-date paid check merely for reassurance.
 - Do not enable automatic wallet reloads, recurring paid monitors, or other continuing spend without explicit owner approval.
+- For external Remote Desktop Commander work, follow `docs/operations/rdc-call-budget.md`: set a task call cap, reuse valid evidence, request screenshots only on demand, and collect the existing PID/call_id with bounded delayed reads. Stop repeated deterministic failures (including Android shell EACCES); diagnose the cause before another attempt. Python orchestration uses `rdc_connection.usage_control.RdcTask` around already-authorized, traced callbacks. This helper does not authorize device actions or enforce an account-wide quota.
 - Cost saving must never remove required security checks, deterministic regression tests, protected exact-head CI, or required real-scenario verification. Save money by removing redundant work, not required evidence.
 - Report the outcome, blockers, and provider-confirmed spend separately from estimates; mark unavailable cost data as unknown, not zero. Include separately billed model/tool charges when known. Do not hard-code provider prices into policy; obtain current pricing when a concrete budget decision depends on it.
 
