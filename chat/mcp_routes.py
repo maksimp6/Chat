@@ -146,8 +146,15 @@ def _approval_mac(nonce, owner_id, conversation_id, name, arguments) -> str:
 def _approval_token(owner_id, conversation_id, name, arguments) -> str:
     """Sign a proposed tool call so the approval endpoint only runs calls the server proposed."""
     nonce = secrets.token_urlsafe(16)
-    with get_store().transaction() as tx:
-        tx.set(_APPROVAL_PREFIX + nonce, {"expires_at": int(time.time()) + _APPROVAL_TTL_SECONDS})
+    store = get_store()
+    now = int(time.time())
+    with store.transaction() as tx:
+        # A token that was never approved stays stored after it expires. Removing expired records
+        # here keeps the store bounded by the TTL instead of growing with every proposal.
+        for key, record in store.items(prefix=_APPROVAL_PREFIX).items():
+            if record["expires_at"] < now:
+                tx.delete(key)
+        tx.set(_APPROVAL_PREFIX + nonce, {"expires_at": now + _APPROVAL_TTL_SECONDS})
     return nonce + "." + _approval_mac(nonce, owner_id, conversation_id, name, arguments)
 
 
