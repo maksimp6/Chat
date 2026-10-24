@@ -1,9 +1,11 @@
 {
   "try_blocks": {
+    "android/app/src/androidTest/java/com/alicepro/mobile/rootagent/RootAgentHardwareTest.kt": 6,
     "android/app/src/main/java/com/alicepro/mobile/AppLogger.kt": 1,
     "android/app/src/main/java/com/alicepro/mobile/MainActivity.kt": 4,
     "android/app/src/main/java/com/alicepro/mobile/RootAgentDiagnosticsActivity.kt": 1,
     "android/app/src/main/java/com/alicepro/mobile/UpdateManager.kt": 6,
+    "android/app/src/main/java/com/alicepro/mobile/rootagent/PngScreenshotValidator.kt": 1,
     "android/app/src/main/java/com/alicepro/mobile/rootagent/RootAgentClient.kt": 4,
     "android/app/src/main/java/com/alicepro/mobile/rootagent/RootAgentServer.kt": 5,
     "android/app/src/main/java/com/alicepro/mobile/rootagent/RootAgentService.kt": 1,
@@ -14,6 +16,7 @@
     "android/app/src/test/java/com/alicepro/mobile/rootagent/LoopbackHttpConnectionTest.kt": 1,
     "android/app/src/test/java/com/alicepro/mobile/rootagent/RootAgentCancellationTest.kt": 1,
     "android/app/src/test/java/com/alicepro/mobile/rootagent/RootAgentClientTest.kt": 8,
+    "android/app/src/test/java/com/alicepro/mobile/rootagent/RootAgentFaultTest.kt": 1,
     "android/direct/src/com/alicepro/mobile/BrowserActivity.java": 7,
     "browser/emulator/server.js": 1,
     "browser/emulator/session.js": 2,

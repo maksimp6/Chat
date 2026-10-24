@@ -18,7 +18,7 @@ class RootAgentServerTest {
     private var treeDump = RootShellResult(
         0, "<?xml version='1.0' ?><hierarchy rotation=\"0\"><node text=\"a\\\"b\" /></hierarchy>\n", false, false,
     )
-    private var shotDump = RootShellResult(0, "iVBORw0KGgoB\n", false, false)
+    private var shotDump = RootShellResult(0, "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==\n", false, false)
     private var rootCalls = 0
     private var treeCalls = 0
     private var screenshotCalls = 0
@@ -215,7 +215,7 @@ class RootAgentServerTest {
         statusDump = RootShellResult(0, "isKeyguardShowing=false\n", false, false)
         val ok = get("/v1/screen/capture")
         assertEquals(200, status(ok))
-        assertTrue(ok, ok.endsWith("{\"format\":\"png\",\"png_base64\":\"iVBORw0KGgoB\"}"))
+        assertTrue(ok, ok.endsWith("{\"format\":\"png\",\"png_base64\":\"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==\"}"))
         shotDump = RootShellResult(1, "secret", false, false)
         val failed = get("/v1/screen/capture")
         assertEquals(502, status(failed))
@@ -228,7 +228,7 @@ class RootAgentServerTest {
     @Test
     fun screenContentIsRefusedWhileLockedOrUnknown() {
         treeDump = RootShellResult(0, "<?xml ?><hierarchy><node text=\"secret\"/></hierarchy>", false, false)
-        shotDump = RootShellResult(0, "iVBORw0KGgoB\n", false, false)
+        shotDump = RootShellResult(0, "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==\n", false, false)
         val lockedOrUnknown = listOf(
             RootShellResult(0, "isKeyguardShowing=true\n", false, false),
             RootShellResult(null, "", timedOut = true, truncated = false),
