@@ -41,33 +41,39 @@
     }
     if (typeof value !== "object") return value;
 
+    // `seen` holds only the ancestors of this value, so a shared reference is copied
+    // in full and only a true cycle is marked.
     if (seen.has(value)) return "[Circular]";
     seen.add(value);
+    try {
+      if (Array.isArray(value)) {
+        return value.slice(0, 128).map(function (item) {
+          return redact(item, depth + 1, seen);
+        });
+      }
 
-    if (Array.isArray(value)) {
-      return value.slice(0, 128).map(function (item) {
-        return redact(item, depth + 1, seen);
-      });
+      var result = {};
+      Object.keys(value)
+        .slice(0, 128)
+        .forEach(function (key) {
+          if (SENSITIVE_KEY_RE.test(key)) {
+            result[key] = "[REDACTED]";
+            return;
+          }
+          result[key] = redact(value[key], depth + 1, seen);
+        });
+      return result;
+    } finally {
+      seen.delete(value);
     }
-
-    var result = {};
-    Object.keys(value)
-      .slice(0, 128)
-      .forEach(function (key) {
-        if (SENSITIVE_KEY_RE.test(key)) {
-          result[key] = "[REDACTED]";
-          return;
-        }
-        result[key] = redact(value[key], depth + 1, seen);
-      });
-    return result;
   }
 
   function redactString(value) {
     var text = String(value || "").slice(0, MAX_STRING_LENGTH);
     text = text.replace(/(bearer\s+)[a-z0-9._~+/=-]+/gi, "$1[REDACTED]");
+    // Also matches JSON-style pairs such as "api_key": "value".
     text = text.replace(
-      /((?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)\s*[:=]\s*)[^\s,;]+/gi,
+      /((?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)["']?\s*[:=]\s*["']?)[^\s,;"']+/gi,
       "$1[REDACTED]",
     );
     return text;
@@ -229,7 +235,8 @@
     var key = String(type) + ":" + String(id);
     revoked.add(key);
 
-    if (type === "module") {
+    // An unknown module can still be revoked; there is no status record to update.
+    if (type === "module" && (SYSTEM_MODULES[String(id)] || modules.has(String(id)))) {
       setStatus(String(id), "revoked", "Доступ отозван", {
         reason: typeof reason === "string" ? reason : "revoked",
         revocable: true,

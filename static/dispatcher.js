@@ -45,8 +45,11 @@
     activeRequests += 1;
     setNetworkStatus("running", "Сетевой запрос выполняется");
 
-    return fetch(input, requestInit)
-      .then(function (response) {
+    // Release the slot once, first: a throw while reporting the response must not
+    // release it again, and the error handler must not run for a success path.
+    return fetch(input, requestInit).then(
+      function (response) {
+        activeRequests = Math.max(activeRequests - 1, 0);
         if (trace) {
           trace.event("response", {
             path: requestPath(input),
@@ -55,22 +58,22 @@
           });
           trace.end(response.ok ? "completed" : "http_error");
         }
-        activeRequests = Math.max(activeRequests - 1, 0);
         setNetworkStatus(
           response.ok ? (activeRequests ? "running" : "ready") : "degraded",
           response.ok ? "Соединение активно" : "HTTP " + response.status,
         );
         return response;
-      })
-      .catch(function (error) {
+      },
+      function (error) {
+        activeRequests = Math.max(activeRequests - 1, 0);
         if (trace) {
           trace.error(error);
           trace.end("error");
         }
-        activeRequests = Math.max(activeRequests - 1, 0);
         setNetworkStatus("error", "Сетевой запрос завершился ошибкой");
         throw error;
-      });
+      },
+    );
   }
 
   function dispatch(action, payload) {

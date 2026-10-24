@@ -330,10 +330,16 @@ function addMessage(
   copyBtn.title = "Копировать";
 
   copyBtn.addEventListener("click", function () {
-    navigator.clipboard.writeText(text).then(() => {
-      copyBtn.textContent = "✅";
-      window.LogosCoreAPI.scheduler.defer(() => (copyBtn.textContent = "📋"), 2000);
-    });
+    // A denied or missing clipboard must show a result, not an unhandled rejection.
+    Promise.resolve()
+      .then(() => navigator.clipboard.writeText(text))
+      .then(
+        () => (copyBtn.textContent = "✅"),
+        () => (copyBtn.textContent = "⚠️"),
+      )
+      .then(() => {
+        window.LogosCoreAPI.scheduler.defer(() => (copyBtn.textContent = "📋"), 2000);
+      });
   });
   msg.appendChild(copyBtn);
 

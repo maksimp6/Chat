@@ -40,7 +40,7 @@ function deferredBoot({ conversation = "c1" } = {}) {
   return { document, context, pending };
 }
 
-function instantBoot({ conversation = "c1", responses = [] } = {}) {
+function instantBoot({ conversation = "c1", responses = [], extra = {} } = {}) {
   const queue = [...responses];
   const dispatcher = {
     request: () => {
@@ -54,6 +54,7 @@ function instantBoot({ conversation = "c1", responses = [] } = {}) {
     LogosDispatcher: dispatcher,
     currentConvId: conversation,
     currentModel: "logos-runtime",
+    ...extra,
   });
   return { document, context };
 }
@@ -122,4 +123,18 @@ test("opening the model picker for a new chat sets the modal's open state", asyn
   assert.equal(modal.classList.contains("visible"), true);
   assert.equal(modal.hidden, false);
   assert.equal(modal.getAttribute("aria-hidden"), "false");
+});
+
+test("a denied clipboard shows a failure on the copy button instead of an unhandled rejection", async () => {
+  const { document, context } = instantBoot({
+    extra: {
+      navigator: { clipboard: { writeText: () => Promise.reject(new Error("denied")) } },
+      AbortSignal,
+    },
+  });
+  context.addMessage("ответ", "bot", false, 0);
+  document.querySelector(".copy-btn").click();
+  await settle();
+
+  assert.equal(document.querySelector(".copy-btn").textContent, "⚠️");
 });

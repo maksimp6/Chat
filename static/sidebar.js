@@ -106,6 +106,7 @@ function renderSidebar() {
     var delBtn = document.createElement("button");
     delBtn.className = "logos-btn delete-btn";
     delBtn.textContent = "×";
+    delBtn.setAttribute("aria-label", "Удалить диалог");
     delBtn.addEventListener("click", function (e) {
       e.stopPropagation();
       if (confirm("Удалить этот диалог?")) {
@@ -134,6 +135,8 @@ function renderSidebar() {
     });
     link.addEventListener("click", function (e) {
       e.preventDefault();
+      // The second click of a double-click (rename) must not select and reload the conversation again.
+      if (e.detail > 1) return;
       selectConv(conv.id);
     });
     list.appendChild(div);

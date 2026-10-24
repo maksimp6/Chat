@@ -77,6 +77,19 @@ test("selecting a conversation loads its history", () => {
   assert.equal(context.currentConvId, "c1");
 });
 
+test("the second click of a double-click does not select the conversation again", () => {
+  const { document, loaded } = boot({ conversations: CONVERSATIONS, currentConvId: "c2" });
+  const link = document.querySelectorAll(".conv-link")[0];
+  link.dispatchEvent({ type: "click", bubbles: true, detail: 1, preventDefault() {} });
+  link.dispatchEvent({ type: "click", bubbles: true, detail: 2, preventDefault() {} });
+  assert.deepEqual(loaded, ["c1"]);
+});
+
+test("the delete button names the conversation it deletes", () => {
+  const { document } = boot({ conversations: CONVERSATIONS, currentConvId: "c2" });
+  assert.equal(document.querySelector(".delete-btn").getAttribute("aria-label"), "Удалить диалог");
+});
+
 test("deleting the current conversation removes it and selects the next one", async () => {
   const { document, context, requests, loaded } = boot({
     conversations: [...CONVERSATIONS],
