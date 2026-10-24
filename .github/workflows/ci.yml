@@ -249,6 +249,7 @@ jobs:
           import time
           print(f"started_ns={time.monotonic_ns()}")
           PYCODE
+          printf 'OUT=%s/ci-out/ci\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout
         id: policy_step_01
         continue-on-error: true
@@ -283,6 +284,12 @@ jobs:
           started=$SECONDS
           pip install -r requirements.txt -r requirements-dev.txt
           echo "- Application dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify Logos narration and delivery offline
+        id: narration_tests
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
+        run: |
+          python -m pytest -q tests/test_logos_narration.py tests/test_logos_narration_receive.py tests/test_logos_once.py tests/test_logos_workflow.py
       - name: Install video codec test tools
         id: policy_step_05
         continue-on-error: true

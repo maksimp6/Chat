@@ -244,8 +244,93 @@ def emit_result(
                 text += rendered
             else:
                 text += "Full reply exceeds the summary limit; exact JSON is in LOGOS_RESULT_PART log chunks.\n"
+        narration = result.get("narration")
+        if isinstance(narration, dict):
+            text += "\nNarration audio: " + html.escape(
+                str(narration.get("audio_status", "unknown"))
+            )
+            text += ". Audio bytes, if present, are in LOGOS_RESULT_PART; playback not verified.\n"
+            if isinstance(narration.get("text"), str):
+                text += "<pre>" + html.escape(narration["text"][:2500]) + "</pre>\n"
         with summary.open("a", encoding="utf-8") as output:
             output.write(text)
+
+
+def attach_narration(result: dict[str, Any], temporary: Path, environ: dict[str, str]) -> None:
+    """Keep one visible step; carry text/audio in reconstructable result log chunks."""
+    try:
+        temporary.mkdir(parents=True, exist_ok=True)
+        attempt = Path(tempfile.mkdtemp(prefix="narration-", dir=temporary))
+        source = attempt / "source.json"
+        original_digest = hashlib.sha256(
+            json.dumps(result, ensure_ascii=False).encode()
+        ).hexdigest()
+        source_result = dict(result)
+        if isinstance(source_result.get("reply"), str):
+            for key, value in environ.items():
+                if value and re.search(
+                    r"TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY", key, re.IGNORECASE
+                ):
+                    source_result["reply"] = source_result["reply"].replace(value, "<redacted>")
+        source.write_text(json.dumps(source_result, ensure_ascii=False), encoding="utf-8")
+        output = attempt / "output"
+        python = temporary / "logos-venv/bin/python"
+        command = [
+            str(python) if python.is_file() else sys.executable,
+            "-m",
+            "scripts.logos_narration",
+            "--result",
+            str(source),
+            "--out",
+            str(output),
+        ]
+        invalid_limit = False
+        if environ.get("LOGOS_TTS_ALLOWED") == "true":
+            limit = environ.get("LOGOS_TTS_MAX_CHARS", "")
+            if re.fullmatch(r"[0-9]{3,4}", limit) and 500 <= int(limit) <= 2500:
+                command.extend(["--synthesize", "--max-chars", limit])
+            else:
+                invalid_limit = True
+        child_env = {
+            key: value
+            for key, value in environ.items()
+            if not re.search(r"TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY", key, re.IGNORECASE)
+        }
+        if "--synthesize" in command and environ.get("YANDEX_API_KEY"):
+            child_env["YANDEX_API_KEY"] = environ["YANDEX_API_KEY"]
+        completed = subprocess.run(
+            command, cwd=ROOT, env=child_env, check=False, capture_output=True, timeout=110
+        )
+        receipt = json.loads((output / "receipt.json").read_text(encoding="utf-8"))
+        if not isinstance(receipt, dict):
+            raise TypeError("Invalid narration receipt")
+        if receipt.get("source_sha256") != hashlib.sha256(source.read_bytes()).hexdigest():
+            raise ValueError("Narration receipt belongs to another result")
+        if completed.returncode != 0 and receipt.get("status") != "failed":
+            raise ValueError("Narration process failed without a failure receipt")
+        receipt["runner_result_sha256"] = original_digest
+        if invalid_limit:
+            receipt["audio_status"] = "invalid_limit"
+        story = output / "story.txt"
+        receipt["text"] = story.read_text(encoding="utf-8") if story.exists() else ""
+        if receipt.get("status") != "failed" and (
+            not receipt["text"]
+            or len(receipt["text"]) > 2500
+            or receipt.get("text_sha256")
+            != hashlib.sha256(receipt["text"].encode("utf-8")).hexdigest()
+        ):
+            raise ValueError("Narration text checksum mismatch")
+        for part in receipt["parts"]:
+            # Generated filenames only; never follow a model-supplied path.
+            if not re.fullmatch(r"speech-[0-9]{3}\.ogg", part["file"]):
+                raise ValueError("Invalid narration part")
+            data = (output / part["file"]).read_bytes()
+            if len(data) > 2 * 1024 * 1024 or hashlib.sha256(data).hexdigest() != part["sha256"]:
+                raise ValueError("Invalid narration audio")
+            part["audio_base64"] = base64.b64encode(data).decode("ascii")
+        result["narration"] = receipt
+    except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError) as exc:
+        result["narration"] = {"status": "failed", "error_type": type(exc).__name__}
 
 
 def main() -> int:
@@ -253,6 +338,7 @@ def main() -> int:
     sys.path.insert(0, str(ROOT))
     temporary = Path(os.environ["RUNNER_TEMP"]) / "logos-once"
     result, exit_code = run_native(ROOT, temporary, dict(os.environ))
+    attach_narration(result, temporary, dict(os.environ))
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     emit_result(result, Path(summary) if summary else None)
     return exit_code

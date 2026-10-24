@@ -228,6 +228,43 @@ jobs:
               --title "Logos: issue #$ISSUE_NUMBER" --body-file "$RUNNER_TEMP/pr.md")"
             printf 'url=%s\n' "$url" >> "$GITHUB_OUTPUT"
           fi
+      - name: Build Logos narration
+        id: narration
+        if: always()
+        continue-on-error: true
+        env:
+          LOGOS_TTS_ALLOWED: ${{ vars.LOGOS_TTS_ALLOWED }}
+          LOGOS_TTS_MAX_CHARS: ${{ vars.LOGOS_TTS_MAX_CHARS }}
+          YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+        run: |
+          set -euo pipefail
+          args=(--result "$RUNNER_TEMP/result.json" --out "$RUNNER_TEMP/logos-narration")
+          if [ "$LOGOS_TTS_ALLOWED" = 'true' ]; then
+            # Both settings are explicit owner opt-in; no default continuing spend.
+            if [[ "$LOGOS_TTS_MAX_CHARS" =~ ^[0-9]{3,4}$ ]]; then
+              args+=(--synthesize --max-chars "$LOGOS_TTS_MAX_CHARS")
+            else
+              echo "status=invalid_limit" >> "$GITHUB_OUTPUT"
+              python -m scripts.logos_narration "${args[@]}"
+              exit 0
+            fi
+          fi
+          if python -m scripts.logos_narration "${args[@]}"; then
+            echo "status=receipt_saved" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=failed" >> "$GITHUB_OUTPUT"
+            echo 'Narration failed; inspect its receipt. The Logos result is unchanged.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Preserve Logos narration
+        id: narration-artifact
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: logos-narration-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/logos-narration/
+          if-no-files-found: error
+          retention-days: 90
       - name: Report result
         id: policy_step_10
         continue-on-error: true
@@ -240,6 +277,9 @@ jobs:
           APP_TOKEN_OUTCOME: ${{ steps.app-token.outcome }}
           EVIDENCE_URL: ${{ steps.evidence.outputs.artifact-url }}
           EVIDENCE_OUTCOME: ${{ steps.evidence.outcome }}
+          NARRATION_URL: ${{ steps.narration-artifact.outputs.artifact-url }}
+          NARRATION_OUTCOME: ${{ steps.narration-artifact.outcome }}
+          NARRATION_STATUS: ${{ steps.narration.outputs.status }}
         run: |
           set -euo pipefail
           python -I - "$RUNNER_TEMP/result.json" > "$RUNNER_TEMP/report.md" <<'PY'
@@ -296,6 +336,10 @@ jobs:
               lines.append("Full result (including the unabridged reply): " + evidence_url + "\n")
           else:
               lines.append("Response artifact was not confirmed. Delivery is incomplete.\n")
+          if os.environ.get("NARRATION_OUTCOME") == "success" and os.environ.get("NARRATION_URL"):
+              lines.append("Logos narration (" + os.environ.get("NARRATION_STATUS", "unknown")
+                           + "; read receipt.json for audio status; playback not verified): "
+                           + os.environ["NARRATION_URL"] + "\n")
           if r.get("pending_tools"):
               lines.append("Stopped: these tools need a maintainer's approval: " + ", ".join(map(str, r["pending_tools"])) + "\n")
           if os.environ.get("APP_TOKEN_OUTCOME") == "failure":

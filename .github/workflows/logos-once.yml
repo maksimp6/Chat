@@ -44,6 +44,8 @@ jobs:
           LOGOS_CASE_ISSUE: ${{ inputs.case_issue }}
           LOGOS_CASE_PR: ${{ inputs.case_pr }}
           LOGOS_GENERATION_ALLOWED: ${{ vars.LOGOS_GENERATION_ALLOWED }}
+          LOGOS_TTS_ALLOWED: ${{ vars.LOGOS_TTS_ALLOWED }}
+          LOGOS_TTS_MAX_CHARS: ${{ vars.LOGOS_TTS_MAX_CHARS }}
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
         run: |

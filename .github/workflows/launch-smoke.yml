@@ -13,10 +13,6 @@ on:
 permissions:
   contents: read
 
-# Выходные файлы пишем только в RUNNER_TEMP, вне рабочей копии репозитория.
-env:
-  EVIDENCE_DIR: ${{ runner.temp }}/ci-out/launch-smoke
-
 concurrency:
   group: launch-smoke-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
@@ -35,6 +31,7 @@ jobs:
           import time
           print(f"started_ns={time.monotonic_ns()}")
           PYCODE
+          printf 'EVIDENCE_DIR=%s/ci-out/launch-smoke\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout
         id: policy_step_01
         continue-on-error: true
@@ -147,6 +144,7 @@ jobs:
           import time
           print(f"started_ns={time.monotonic_ns()}")
           PYCODE
+          printf 'EVIDENCE_DIR=%s/ci-out/launch-smoke\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Enforce native Logos court hold
         id: policy_step_02
         continue-on-error: true
