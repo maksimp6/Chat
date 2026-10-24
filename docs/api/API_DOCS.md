@@ -41,7 +41,7 @@ curl -X POST http://localhost:8080/api/vision \
 ### 3. Embeddings API (Векторные представления)
 
 **Эндпоинт:** `POST /api/embeddings`
-**Описание:** Векторные представления текста через Yandex `textEmbedding`. Нужен владелец: без него ответ 401.
+**Описание:** Векторные представления текста через Yandex `textEmbedding`. Авторизация не требуется; запросы тратят серверный `YANDEX_API_KEY`.
 **Параметры:**
 
 - `text` (string): один текст. Ответ содержит `embedding`.
@@ -59,7 +59,7 @@ curl -X POST http://localhost:8080/api/embeddings \
   -d '{"texts":["Привет мир"],"mode":"doc"}'
 ```
 
-Коды ответа: 400 — неверный запрос, 401 — нет владельца, 503 — не заданы `YANDEX_API_KEY` или `YANDEX_PROJECT_ID`, 502 — сбой Yandex.
+Коды ответа: 400 — неверный запрос, 503 — не заданы `YANDEX_API_KEY` или `YANDEX_PROJECT_ID`, 502 — сбой Yandex, 504 — превышен общий лимит времени. В ответах 502 и 504 есть `completed` (сколько текстов уже обработано) и `tokens_spent`.
 
 ### 4. TTS API (Синтез речи)
 
