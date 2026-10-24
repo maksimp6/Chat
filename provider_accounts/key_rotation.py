@@ -158,5 +158,10 @@ def rotate_active_key(
     )
     # Native promotion already passed the synchronous durability barrier.
     if old_provider_key_id:
-        provider.revoke_key(old_provider_key_id)
+        try:
+            provider.revoke_key(old_provider_key_id)
+        except Exception:
+            # The new key is promoted and durable, so a failed revoke must not fail the rotation.
+            # The superseded id is logged so it can be revoked by hand.
+            logger.exception("Could not revoke the superseded provider key %s", old_provider_key_id)
     return provider_key_id, issued_at, expires_at
