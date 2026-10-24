@@ -226,7 +226,7 @@ def request_approval(case_id: str) -> dict[str, Any]:
 
 def approve_case(case_id: str) -> dict[str, Any]:
     case = _require_case(case_id)
-    if case["status"] != "READY_FOR_APPROVAL":
+    if case["status"] != "READY_FOR_APPROVAL" or not case["documents"]:
         raise ValueError("case is not ready for approval")
     case["user_approved"] = True
     case["approval_at"] = _now()
@@ -235,7 +235,7 @@ def approve_case(case_id: str) -> dict[str, Any]:
 
 def submit_case(case_id: str) -> dict[str, Any]:
     case = _require_case(case_id)
-    if case["status"] != "READY_FOR_APPROVAL":
+    if case["status"] != "READY_FOR_APPROVAL" or not case["documents"]:
         raise ValueError("case is not ready for submission")
     if not case.get("user_approved"):
         raise PermissionError("explicit user approval is required before submission")
