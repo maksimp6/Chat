@@ -1,4 +1,4 @@
-# Evolution services для Алисы
+# Evolution services для Logos
 
 Сверено с официальной документацией 2026-09-28. Это целевая архитектура и
 операторские конфиги, не созданные облачные ресурсы. Preview/GA, доступность,
@@ -6,20 +6,20 @@
 
 | Сервис | Как использовать | Готовность / граница |
 |---|---|---|
-| Container Apps | Alice HTTP runtime | Пример и preflight в этом каталоге; custom domain не поддерживается самим Container Apps |
-| Внешний PostgreSQL | Пользователи, история, настройки | TLS verify-full, проверенный egress/firewall, отдельная app role и проверенный restore обязательны |
+| Container Apps | Logos HTTP runtime | Пример и preflight в этом каталоге; custom domain не поддерживается самим Container Apps |
+| Внешний PostgreSQL (retired) | Пользователи, история, настройки хранятся в нативном Kristall journal (`ALICE_MEMORY_PATH`) | PostgreSQL provisioning, SQL backups и SQL driver installation retired; TLS verify-full и app role не требуются. Постоянный путь, один writer и проверенный restore — см. `README.md`, раздел Native storage transition |
 | Cloud DNS | Зона и CNAME пользовательского поддомена на API Gateway | Примеры запросов в `dns/`; до делегации сохранить и проверить все существующие записи |
 | API Gateway | Публичный domain, маршрутизация к Container Apps, API-client policy, rate limits и request logs | OpenAPI starter в `api-gateway/`; он покрывает только health/chat/MCP и требует реальных IDs, полного route map и end-to-end тестов |
 | Workflow Studio / EDS | Сборка и публикация утверждённого source | EDS CLI v0.4.0 проверен; EDS product key отсутствует в runner. `eds wf app create` сразу запускает deploy; branch не закрепляет SHA |
 | IAM users / service accounts | Люди в консоли и service identity для control-plane/API | Присваивать org/project/service roles по минимуму; IAM Key ID+Secret обменивается на короткоживущий IAM Bearer token |
-| Gateway API keys | Auth для выделенных machine-to-machine callers | Не класть общий ключ в Alice frontend; Gateway IAM/API-key policy не заменяет Alice GitHub login, owner check или MCP OAuth |
+| Gateway API keys | Auth для выделенных machine-to-machine callers | Не класть общий ключ в Logos frontend; Gateway IAM/API-key policy не заменяет Logos GitHub login, owner check или MCP OAuth |
 | Secret Management | Хранить версии deploy/runtime DB, OAuth, model и S3 секретов | Adapter/pipeline read path #477 не реализован; `REPLACE_FROM_SECRET_STORE` в примере не является native reference |
 | Certificate Manager | TLS certificate для Gateway custom hostname | Хранить приватный ключ в сервисе; проверить domain, выдачу/renewal и binding. DB CA — отдельная задача |
-| Key Management | Ключевые операции для зашифрованных PostgreSQL backups в Object Storage | #479/#447; verify decrypt/restore с той же версией ключа. Не включать plaintext fallback |
+| Key Management | Ключевые операции для зашифрованных backup нативного Kristall journal в Object Storage (PostgreSQL backups retired) | #479/#447; verify decrypt/restore с той же версией ключа. Не включать plaintext fallback |
 | Container Apps logs / Cloud Logging | Runtime stdout/stderr, platform/request logs | JSON stdout идёт отдельной задачей #478; request logs включать после проверки чувствительных полей |
 | Cloud audit logs | Кто менял control-plane ресурсы и когда | Это отдельный поток от приложения, HTTP request и EDS job logs |
-| Foundation Models + Guardrails | Возможная отдельная будущая оценка AI сервисов Evolution | Не являются текущим AI backend Алисы: inference сейчас идёт только через Yandex Cloud / Yandex AI Studio; не включать в текущий runtime |
-| AI Agents / EvoClaw / AI Workflows | Изолированный пилот агентов, MCP servers и AI workflows | Самостоятельные сервисы Evolution; не переключать Alice runtime и не обходить `UniversalToolExecutor`/approvals |
+| Foundation Models + Guardrails | Возможная отдельная будущая оценка AI сервисов Evolution | Не являются текущим AI backend Logos: inference сейчас идёт только через Yandex Cloud / Yandex AI Studio; не включать в текущий runtime |
+| AI Agents / EvoClaw / AI Workflows | Изолированный пилот агентов, MCP servers и AI workflows | Самостоятельные сервисы Evolution; не переключать Logos runtime и не обходить `UniversalToolExecutor`/approvals |
 | Agents Space | Песочница на базе EvoClaw | Оплата pay-as-you-go: текущая документация указывает baseline 2 vCPU/4 GB за 3.84 ₽/час на работающего агента, плюс model/storage/egress |
 | Distributed Train | Трекинг ML экспериментов и отдельно — обучение | Бесплатный tracking preview не означает бесплатные GPU compute/jobs |
 | Artifact Registry | OCI images по digest и private NPM/PyPI packages | Хранение, egress, lifecycle и статус каждого формата/кэширования считать отдельно |
@@ -30,8 +30,10 @@
 
 1. Завершить Container Apps API/pipeline и runtime secret adapter; зафиксировать
    image digest, source SHA, переменные и CA до публикации.
-2. Проверить external PostgreSQL connection с verify-full, узкой сетевой политикой,
-   non-superuser ролью и restore drill.
+2. Retired: проверка external PostgreSQL connection (verify-full, узкая сетевая
+   политика, non-superuser роль) больше не нужна. Вместо неё проверить нативный
+   Kristall journal: постоянный `ALICE_MEMORY_PATH`, один writer, `--check-db` и
+   restore drill для backup (см. `README.md`, раздел Native storage transition).
 3. Настроить least-privilege IAM/service identities; вести инвентарь ID, scope,
    назначения и rotation даты без самих secret values. Типы ключей перечислены в
    [`identities-and-secrets.md`](identities-and-secrets.md).

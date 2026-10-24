@@ -1,6 +1,6 @@
 import importlib
 
-import config
+import core.config as config
 
 
 def reload_config():
@@ -27,7 +27,7 @@ def test_provider_configuration_contains_no_api_key(monkeypatch):
 
 def test_model_catalog_contains_only_verified_yandex_models():
     assert "alice-lite" not in config.TEXT_MODELS
-    assert "aliceai-llm" in config.TEXT_MODELS
+    assert "logos-runtime" in config.TEXT_MODELS
     assert "yandexgpt-5.1" in config.TEXT_MODELS
     assert "yandexgpt-5-lite" in config.TEXT_MODELS
     assert "qwen3-235b-a22b-fp8" in config.TEXT_MODELS

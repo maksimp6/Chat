@@ -63,7 +63,7 @@ const modelRuntime = modelShim.load(
   ["static/core_api.js", "static/ui_runtime.js", "static/models.js"],
   {
     modelsData: { text: {}, voice: {} },
-    currentModel: "aliceai-llm",
+    currentModel: "logos-runtime",
     conversations: [],
   },
 );

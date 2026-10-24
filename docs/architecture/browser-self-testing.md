@@ -18,7 +18,7 @@ Supported steps are:
 Every run returns a structured report with successful steps or the first
 detected failure. Known blocked cases include missing fixtures, missing
 selectors, unsupported screenshots, invalid input and failed assertions. This
-lets Alice attach deterministic self-test evidence before she reports a browser
+lets Logos attach deterministic self-test evidence before it reports a browser
 workflow as complete.
 
 The runner is intentionally a local-emulator component. It does not implement

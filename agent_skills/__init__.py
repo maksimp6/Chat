@@ -1,6 +1,6 @@
 """Reusable Agent Skill discovery and runtime helpers."""
 
-from .registry import (
+from agent_skills.registry import (
     Skill,
     SkillFormatError,
     SkillNotFoundError,

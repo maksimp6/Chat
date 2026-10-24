@@ -9,9 +9,9 @@ from typing import Any
 import requests
 
 from cloud.base import CloudProviderError
-from cloudru_iam import CloudRuIamClient, CloudRuIamError
-from trace_manager import get_current_trace
-from trace_security import sanitize_trace_value
+from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
+from observability.trace_manager import get_current_trace
+from observability.trace_security import sanitize_trace_value
 
 
 DEFAULT_ENDPOINTS = {

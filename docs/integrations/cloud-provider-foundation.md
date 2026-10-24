@@ -1,6 +1,6 @@
 # Cloud provider foundation (issue #417)
 
-Alice Pro now exposes a provider-neutral cloud tool surface backed by a Cloud.ru implementation.
+Logos now exposes a provider-neutral cloud tool surface backed by a Cloud.ru implementation.
 
 ## Architecture
 
