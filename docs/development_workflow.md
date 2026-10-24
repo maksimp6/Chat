@@ -1,36 +1,48 @@
-# Рабочий процесс разработки Alice Pro
+# Рабочий процесс разработки Logos
 
-Этот документ фиксирует воспроизводимый цикл для изменений в Chat/Alice Pro.
+Этот документ фиксирует воспроизводимый цикл для изменений в Chat/Logos.
 
 ## 1. Типовой цикл
 
 ```text
 Issue
   ↓
-рабочая ветка от master
+рабочая ветка от develop (или канонического stack parent)
   ↓
 небольшое изменение
   ↓
 локальная проверка
   ↓
-PR
+PR в develop (или stack parent)
   ↓
 GitHub Actions / CI
   ↓
 review
   ↓
-merge в master
+защищённая интеграция в develop
+  ↓
+отдельный promotion PR develop → master
+  ↓
+exact-head CI / review / readiness для текущего master
+  ↓
+защищённый merge в master после разрешения владельца
   ↓
 проверка результата
 ```
 
 Рекомендуемый формат ветки: `issue-<номер>-<краткое-имя>`.
 
+Базовая ветка feature PR — `develop`; прямой hotfix в `master` требует явно
+зафиксированного исключения в задаче. Подробности: [интеграция develop](development/develop-integration.md).
+Запуск CI не доказывает принудительную защиту ветки. Актуальная проверка и план
+устранения расхождений находятся в [матрице защиты](development/branch-policy-alignment.md).
+Отключённый ruleset не разрешает обход правил работы или merge без разрешения.
+
 Одна ветка и один PR должны решать одну независимую часть задачи. Крупную issue следует разбивать на последовательные PR, чтобы каждый шаг можно было отдельно проверить и откатить.
 
 ## 2. Совместная работа человека и AI-разработчика
 
-Работа над Alice Pro организуется как сотрудничество владельца продукта и AI-разработчика.
+Работа над Logos организуется как сотрудничество владельца продукта и AI-разработчика.
 
 ### Роли
 
@@ -262,7 +274,7 @@ PR должен содержать:
 - **CI** подтверждает техническую проверку.
 - **Комментарии** фиксируют решения и изменения направления.
 - **Документация** хранит устойчивые правила проекта.
-- **Execution Trace** служит техническим подтверждением поведения Alice Pro.
+- **Execution Trace** служит техническим подтверждением поведения Logos.
 
 ## 8.1 API-контракты
 
@@ -308,12 +320,7 @@ python scripts/merge_readiness.py \
   --required-check "Code rules" \
   --required-check "Application tests" \
   --required-check "PostgreSQL integration" \
-  --required-check "Android debug APK" \
-  --required-check "Auto-format repository" \
   --required-check "Trivy repository scan" \
-  --required-check "Zizmor GitHub Actions audit" \
-  --required-check "CodeQL (python)" \
-  --required-check "CodeQL (javascript-typescript)" \
   --pretty
 ```
 
@@ -361,12 +368,7 @@ Workflow `Merge readiness snapshot` запускается для non-draft PR �
 - `Code rules`;
 - `Application tests`;
 - `PostgreSQL integration`;
-- `Android debug APK`;
-- `Auto-format repository`;
-- `Trivy repository scan`;
-- `Zizmor GitHub Actions audit`;
-- `CodeQL (python)`;
-- `CodeQL (javascript-typescript)`.
+- `Trivy repository scan`.
 
 `Platform changes` и `CI required` должны завершиться именно `success`.
 Их `skipped` или `neutral` не являются доказательством успешного планирования
@@ -394,6 +396,8 @@ Snapshot относится только к состоянию, которое �
 
 - обычное продвижение `master` само по себе не создаёт новый snapshot run для старого PR head;
 - resolve/unresolve review thread сам по себе не является workflow trigger;
+- после закрытия threads повторите существующую failed PR job через проверенный
+  [путь восстановления](development/branch-policy-alignment.md#recover-readiness-after-resolving-threads);
 - snapshot не обновляет ветку и не заменяет strict up-to-date policy ruleset;
 - snapshot сейчас информационный и не является самостоятельной заменой защищённого merge gate.
 

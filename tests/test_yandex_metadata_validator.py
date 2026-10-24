@@ -1,6 +1,6 @@
 import unittest
 
-from yandex_metadata_validator import MetadataValidationError, validate_metadata
+from yandex_client_modules.metadata_validator import MetadataValidationError, validate_metadata
 
 
 class YandexMetadataValidatorTests(unittest.TestCase):

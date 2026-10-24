@@ -1,4 +1,4 @@
-// Central OAuth 2.1 authorization server for Alice services. The owner signs in
+// Central OAuth 2.1 authorization server for Logos services. The owner signs in
 // with GitHub here once; services (the Chrome MCP worker and others) only verify
 // the EdDSA access tokens this server issues. GitHub therefore needs exactly one
 // callback URL, ever.

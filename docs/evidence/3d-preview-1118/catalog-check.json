@@ -1,0 +1,317 @@
+[
+  {
+    "path": "printing3d/assets/desk_spool_v01/parts/axle_D_section.stl",
+    "status": "VERIFIED",
+    "source_sha256": "0518998a2f416eae925dca52c1b1542d67df6ac22ac82bf948f0d825eabcc12d",
+    "png_sha256": "9712b62f17dda809f2524cfae710c92b946289be11c28859289004b92a8c7612",
+    "triangles": 804,
+    "bounds": [
+      [
+        -78.0,
+        -16.999433517456055,
+        0.0
+      ],
+      [
+        78.0,
+        16.999433517456055,
+        26.47093963623047
+      ]
+    ],
+    "units": "STL units unspecified",
+    "seconds": 0.255
+  },
+  {
+    "path": "printing3d/assets/desk_spool_v01/parts/base_frame.stl",
+    "status": "VERIFIED",
+    "source_sha256": "01794175c431e85af2e8acfb6a022e91651cbd419c11be8004da866e06a85c76",
+    "png_sha256": "2e0fa28bde379b0cc82d975cbbea351a74b650b79b83fe8ddf985a6f831d8779",
+    "triangles": 124,
+    "bounds": [
+      [
+        -79.0,
+        -68.0,
+        0.0
+      ],
+      [
+        79.0,
+        68.0,
+        9.0
+      ]
+    ],
+    "units": "STL units unspecified",
+    "seconds": 0.231
+  },
+  {
+    "path": "printing3d/assets/desk_spool_v01/parts/upright_A_print_twice.stl",
+    "status": "VERIFIED",
+    "source_sha256": "04fae68183e27b688d2ca0561f1e0142722196d62a7c3f728fa4b4ff3ceefad0",
+    "png_sha256": "f1317076013a8b9038b0acb758eeaaf440c12f7487e2f5c3b4e9f0fb26c6e778",
+    "triangles": 216,
+    "bounds": [
+      [
+        -75.5,
+        -55.0,
+        0.0
+      ],
+      [
+        75.5,
+        55.0,
+        12.0
+      ]
+    ],
+    "units": "STL units unspecified",
+    "seconds": 0.224
+  },
+  {
+    "path": "printing3d/assets/desk_spool_v02/adapters/ring_for_spool_bore_36mm_PRINT_2.stl",
+    "status": "VERIFIED",
+    "source_sha256": "e6e69ae39ed5203e979d55a536358b2960f6a0d1756042d2a19bd010af70f815",
+    "png_sha256": "9c0fffe34bcf171fe1e70b78346001767b23f4f6450f10cd46cfbacbbdd22270",
+    "triangles": 948,
+    "bounds": [
+      [
+        -20.483793258666992,
+        -20.495946884155273,
+        0.0
+      ],
+      [
+        20.5,
+        20.495946884155273,
+        16.399999618530273
+      ]
+    ],
+    "units": "STL units unspecified",
+    "seconds": 0.271
+  },
+  {
+    "path": "printing3d/assets/desk_spool_v02/adapters/ring_for_spool_bore_52mm_PRINT_2.stl",
+    "status": "VERIFIED",
+    "source_sha256": "6370624ef30b2b1d8d1cb199aa76527aee2e4f9bb48c8cd663d03b3576629d65",
+    "png_sha256": "42e49276b939c47817c82ae733acc891fbd23785a4ecad7fb5eef619cbe2492d",
+    "triangles": 1460,
+    "bounds": [
+      [
+        -28.477468490600586,
+        -28.494365692138672,
+        0.0
+      ],
+      [
+        28.5,
+        28.494365692138672,
+        16.399999618530273
+      ]
+    ],
+    "units": "STL units unspecified",
+    "seconds": 0.298
+  },
+  {
+    "path": "printing3d/assets/desk_spool_v02/adapters/ring_for_spool_bore_55mm_PRINT_2.stl",
+    "status": "VERIFIED",
+    "source_sha256": "9c393891a16fd4a2aa8ec47cc94b896d7d90724bd01f7997ed21e05d1dc28b9c",
+    "png_sha256": "55c046b90883d581702920ebf40a0b2d63f29aa34d488e052a33dc6d63d517a5",
+    "triangles": 1460,
+    "bounds": [
+      [
+        -29.976282119750977,
+        -29.994070053100586,
+        0.0
+      ],
+      [
+        30.0,
+        29.994070053100586,
+        16.399999618530273
+      ]
+    ],
+    "units": "STL units unspecified",
+    "seconds": 0.289
+  },
+  {
+    "path": "printing3d/assets/oem_spindle_v03/gauges/fit_gauge_stock_spindle_18mm_HALF.stl",
+    "status": "VERIFIED",
+    "source_sha256": "16cb7bb7135b26e6e6254dec2a59e676d5dbd3e4f5d792a8afc35ccb36783e90",
+    "png_sha256": "b520935153cc5cf9d3e207520039d552ec5aa47a97287386e5cad6670e45182e",
+    "triangles": 364,
+    "bounds": [
+      [
+        -4.2961511084738113e-13,
+        -14.399999618530273,
+        0.0
+      ],
+      [
+        14.391227722167969,
+        14.399999618530273,
+        5.0
+      ]
+    ],
+    "units": "STL units unspecified",
+    "seconds": 0.237
+  },
+  {
+    "path": "printing3d/assets/oem_spindle_v03/gauges/fit_gauge_stock_spindle_20mm_HALF.stl",
+    "status": "VERIFIED",
+    "source_sha256": "d9c13226ad2436e4a295257e77034da4555c9530bf1881ab7869751895309112",
+    "png_sha256": "f6aa10db8b9a5efd973aa64c31f018f6cd7a42c1da70b4a32e9fd7e05a636e65",
+    "triangles": 364,
+    "bounds": [
+      [
+        -3.5609336253338356e-14,
+        -15.399999618530273,
+        0.0
+      ],
+      [
+        15.390618324279785,
+        15.399999618530273,
+        5.0
+      ]
+    ],
+    "units": "STL units unspecified",
+    "seconds": 0.235
+  },
+  {
+    "path": "printing3d/assets/oem_spindle_v03/gauges/fit_gauge_stock_spindle_22mm_HALF.stl",
+    "status": "VERIFIED",
+    "source_sha256": "e1e464f9f87983f542ffe8bbd7c4d3ff8092b84fe57749127a1dc4f681eab042",
+    "png_sha256": "ef555f1615b89642ee137eacfdf6c09652a58bcf3396823d42d4bfd275106f29",
+    "triangles": 364,
+    "bounds": [
+      [
+        -1.3553469056706152e-13,
+        -16.399999618530273,
+        0.0
+      ],
+      [
+        16.3900089263916,
+        16.399999618530273,
+        5.0
+      ]
+    ],
+    "units": "STL units unspecified",
+    "seconds": 0.232
+  },
+  {
+    "path": "printing3d/assets/oem_spindle_v03/gauges/fit_gauge_stock_spindle_24mm_HALF.stl",
+    "status": "VERIFIED",
+    "source_sha256": "09708605a6898f8e75514b483f4479f1588debf39439fc2cc6f26136696d0e33",
+    "png_sha256": "aab4f67eed6397141e976563af100471910ad0d7dbef6b7590f07972396662ba",
+    "triangles": 364,
+    "bounds": [
+      [
+        -4.0559190121053357e-13,
+        -17.399999618530273,
+        0.0
+      ],
+      [
+        17.389400482177734,
+        17.399999618530273,
+        5.0
+      ]
+    ],
+    "units": "STL units unspecified",
+    "seconds": 0.243
+  },
+  {
+    "path": "printing3d/assets/oem_spindle_v03/parts/a1mini_oem_wide_hub_END_RETAINER.stl",
+    "status": "VERIFIED",
+    "source_sha256": "af1cf4643f9c9277642b5c7357cb64db53db772bc13ee1220733b5aae10e3888",
+    "png_sha256": "bfa851a18be8196a07fd031028ead7f82608617bdb095b00f0739f224477e7df",
+    "triangles": 668,
+    "bounds": [
+      [
+        -29.981725692749023,
+        -30.0,
+        0.0
+      ],
+      [
+        29.108871459960938,
+        30.0,
+        3.950000047683716
+      ]
+    ],
+    "units": "STL units unspecified",
+    "seconds": 0.269
+  },
+  {
+    "path": "printing3d/assets/oem_spindle_v03/parts/a1mini_oem_wide_hub_HALF_A.stl",
+    "status": "VERIFIED",
+    "source_sha256": "617e40eb88b46712f1a91cde02d8545c9709945a77b83863cf757289d399058b",
+    "png_sha256": "3b6ad2667dcd171fe24eea26c63128be5836f2472c015d9536d5ae5de00ee8cf",
+    "triangles": 2524,
+    "bounds": [
+      [
+        -41.0,
+        -30.0,
+        0.0
+      ],
+      [
+        41.0,
+        30.0,
+        29.25
+      ]
+    ],
+    "units": "STL units unspecified",
+    "seconds": 0.342
+  },
+  {
+    "path": "printing3d/assets/oem_spindle_v03/parts/a1mini_oem_wide_hub_HALF_B.stl",
+    "status": "VERIFIED",
+    "source_sha256": "f69cec6a98cde018afbd5c53399d4b76744d5c367f048472de44f2727d24f6f1",
+    "png_sha256": "7b891d9be808b561fd40f8b5dc1b16018572876b1acbcbb5555526f54b6836f7",
+    "triangles": 2524,
+    "bounds": [
+      [
+        -41.0,
+        -30.0,
+        0.0
+      ],
+      [
+        41.0,
+        30.0,
+        29.25
+      ]
+    ],
+    "units": "STL units unspecified",
+    "seconds": 0.334
+  },
+  {
+    "path": "printing3d/assets/oem_spindle_v03/parts/alignment_pin_PRINT_4.stl",
+    "status": "VERIFIED",
+    "source_sha256": "449ec86150e60facbd28e57c61f678989e1fbfc1ad22c886620e31fcb384650e",
+    "png_sha256": "3409bffa19e6be1c906945f7eff69fb74ba82e1a418fbf092bc16a626b6031af",
+    "triangles": 986,
+    "bounds": [
+      [
+        -1.7999999523162842,
+        -1.798903465270996,
+        0.0
+      ],
+      [
+        1.7999999523162842,
+        1.798903465270996,
+        8.25
+      ]
+    ],
+    "units": "STL units unspecified",
+    "seconds": 0.324
+  },
+  {
+    "path": "printing3d/assets/parametric/test_tube_holder.3mf",
+    "status": "VERIFIED",
+    "source_sha256": "76f82a5aca96b44e96334278a903a188235ed4d9e96f1f0f88be3d899d3681c4",
+    "png_sha256": "3176e565a8f84d67ecb63058254b9ce8a362c88570a70c3c72f5f93a940280b7",
+    "triangles": 958,
+    "bounds": [
+      [
+        -20.0,
+        -20.0,
+        0.0
+      ],
+      [
+        20.0,
+        20.0,
+        42.9900016784668
+      ]
+    ],
+    "units": "mm",
+    "seconds": 0.285
+  }
+]

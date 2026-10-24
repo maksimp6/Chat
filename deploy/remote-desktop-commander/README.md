@@ -16,7 +16,7 @@ RDC and headless Chromium run together in this one container. The persistent
 browser profile lives in `state/.config/chromium`; it is private session data,
 not a CI artifact. The browser's control endpoint listens only on
 `127.0.0.1:9222` inside the container; no host port is published. This does not
-add a graphical desktop, automatic site login, or register an Alice browser adapter.
+add a graphical desktop, automatic site login, or register a Logos browser adapter.
 
 Chromium starts before RDC, with a 30-second readiness budget. Startup fails
 if Chromium cannot run with its namespace sandbox; no `--no-sandbox` fallback
@@ -55,20 +55,18 @@ ask it to read or return credentials. `state/` is owner-only on the host.
 
 ## Deployment
 
-After protected merge, run **Remote Desktop Commander deployment** on `master`:
-`preflight`, then `install`, then `status`. The repository owner can also post an
-exact `/rdc preflight`, `/rdc install` or `/rdc status` comment on canonical issue
-#409. This route checks the OWNER association and repository-owner login, accepts
-only these three complete comments, and checks out the event's exact master SHA;
-PR code and other users' comments cannot reach the deployment job. It uses the existing production
-`PREVIEW_SSH_*` secrets with strict host-key checking. Installation changes only
-this service and its dedicated directories; it does not run preview/production
-scripts or restart Traefik. Repeating installation keeps state and workspace.
-CI builds the real image and renders a synthetic page twice with the same profile
-volume, without starting RDC's OAuth flow. Installation checks browser readiness
-on the actual host before reporting success and restores the previous image and
-Compose configuration if that check fails. This proves Node and Chromium can run,
-not that the device is paired or online.
+The former SSH/Compose deployment lane (the **Remote Desktop Commander
+deployment** workflow, `PREVIEW_SSH_*` secrets and the `/rdc preflight|install|status`
+comments on #409) is retired and no longer exists on `master`
+([#861](https://github.com/maksimp6/Chat/pull/861)). The persistent Cloud.ru
+service is operated by the workflow described in
+[Permanent Cloud.ru RDC](#permanent-cloudru-rdc).
+
+The **Remote Desktop Commander validation** workflow runs on PRs that touch this
+directory. Within a 15-second budget it runs `pairing-handoff.test.cjs` and
+`desktop-session.test.cjs` and checks `docker compose config`. It does not build
+or start the image ([#1015](https://github.com/maksimp6/Chat/pull/1015)), so it
+does not prove that Node, Chromium or RDC can run.
 No production secrets are available to PR code.
 
 ## Pairing — separate from installation
@@ -161,13 +159,18 @@ and [unsupported volume operations](https://cloud.ru/docs/container-apps-evoluti
 ## Permanent Cloud.ru RDC
 
 The **Cloud.ru persistent Remote Desktop Commander** workflow operates one
-dedicated service: `rdc-<first 12 project UUID hex digits>`. It uses 1 vCPU,
-4 GiB, scale **1–1**, a private digest-pinned image, and disabled auto-deployment.
+dedicated service: `rdc-<first 12 project UUID hex digits>`. It uses 0.2 vCPU,
+512Mi, scale **1–1**, a private digest-pinned image, and disabled auto-deployment
+([#1016](https://github.com/maksimp6/Chat/pull/1016)). Ownership checks reject an
+existing service with any other resource profile.
 Hot instances remain active between HTTP requests and incur continuous compute
 charges; see [scaling](https://cloud.ru/docs/container-apps-evolution/ug/topics/container__scaling).
-It never takes over the separate compatibility-probe record or the Alice app.
+It never takes over the separate compatibility-probe record or the Logos app.
 
-Run `preflight`, then `install` from protected `master`. All lifecycle actions
+Run `preflight`, then `install` from protected `master`. `install` requires the
+workflow input `image`: a prebuilt immutable image digest reference. The workflow
+does not build an image; install is the provider API call plus the readiness wait
+([#1016](https://github.com/maksimp6/Chat/pull/1016)). All lifecycle actions
 require the
 **Object Storage tenant ID from the same project**, supplied as the workflow
 input `storage_tenant_id` or existing variable `CLOUDRU_STORAGE_TENANT_ID`.
@@ -196,8 +199,15 @@ when omitted or explicitly disabled (`false` as a boolean, or the exact strings
 rejected. The mount must also remain writable. This preserves the documented
 [volume access rules](https://cloud.ru/docs/container-apps-evolution/ug/topics/concepts__volumes).
 Existing production IAM signs S3 operations only in the reviewed runner.
-The application receives a managed `/rdc-state` bucket mount; IAM, S3 and SSH
-keys are not passed to RDC. The dedicated bucket name is
+The application receives a managed `/rdc-state` bucket mount; IAM and S3
+credentials are not passed to RDC. A Git SSH key reaches RDC only through
+`POST /rdc/secrets`: alias `rdc.git.ssh`, at most 16 KiB, authorized by a
+short-lived permit in the state bucket that is bound to the request nonce and the
+body SHA-256, and written once as a `0600` file under `/home/node/.alice-secrets`.
+Git inside RDC uses only that key and the pinned GitHub host keys in
+`github_known_hosts` ([#1016](https://github.com/maksimp6/Chat/pull/1016),
+[#1017](https://github.com/maksimp6/Chat/pull/1017)). The workflow actions above
+do not include key delivery; see #891. The dedicated bucket name is
 `alice-rdc-state-<first 12 project UUID hex digits>`. Creation uses the documented
 [S3 API](https://cloud.ru/docs/s3e/ug/topics/api__createbucket); private ACL and an
 exact project/service ownership marker are verified before use. An existing
@@ -273,16 +283,16 @@ durable connectivity. Account confirmation cannot be performed automatically.
 The Commander startup preload observes the official `/device/start` response
 without changing RDC's PKCE or polling. Only `verification_uri_complete` and a
 maximum ten-minute expiry are written to `pairing/handoff.json`. This separate
-directory is mounted read-only into production Alice; RDC's credential directory
-is **not** mounted into Alice. The handoff is removed after authorization or a
+directory is mounted read-only into production Logos; RDC's credential directory
+is **not** mounted into Logos. The handoff is removed after authorization or a
 terminal provider error and cleared on process startup.
 
 After both deployments use this revision, visit `/<short-token>/rdc` while the
-server is waiting for authorization. Alice returns a 303 redirect to the exact
+server is waiting for authorization. Logos returns a 303 redirect to the exact
 server-generated verification URL. Complete the provider's account confirmation
 there. An expired or absent handoff returns 503; unauthenticated access is denied.
 No new OAuth callback or startup token flag is introduced.
 
-Deployment order: deploy production Alice with this revision, then install RDC
+Deployment order: deploy production Logos with this revision, then install RDC
 with this revision using the existing protected deployment workflows. This code
 does not authorize the device automatically: the account owner must confirm it.

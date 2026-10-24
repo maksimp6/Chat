@@ -1,10 +1,10 @@
-# Memory DB v1 durability and migration contract
+# Kristall v1 durability and migration contract
 
 Status: implementation contract for issue #776.
 
 ## Purpose
 
-Memory DB is the durable file-native storage engine for Alice. Alice depends on this API; the engine must not depend on Alice application code. Application and agents must never parse journal/checkpoint files directly.
+Kristall is the durable file-native storage engine for Logos. Logos depends on this API; the engine must not depend on Logos application code. Application and agents must never parse journal/checkpoint files directly.
 
 The working source of truth lives under a runtime-specific data root. Remote object/cloud storage is backup, not the live filesystem.
 
@@ -12,7 +12,7 @@ The append-only file is the only authoritative live database file.
 
 ## Single-file layout
 
-Memory DB v1 has one authoritative append-only file per runtime:
+Kristall v1 has one authoritative append-only file per runtime:
 
 ```text
 /data/alice/alice.memory
@@ -26,7 +26,7 @@ The only auxiliary file permitted is a short-lived `alice.memory.tmp` during com
 
 ## Synchronous write contract
 
-Memory DB v1 has one authoritative writer and one database write barrier.
+Kristall v1 has one authoritative writer and one database write barrier.
 
 A mutating operation is:
 
@@ -62,11 +62,49 @@ Checksum/integrity failures are never ignored. Suspect data is quarantined and t
 
 ENOSPC/read-only/fsync failures are explicit write failures. They must not publish an in-memory success that cannot be recovered.
 
+### Unknown write outcomes and writer recovery
+
+`FileMemoryDB` fences its writer before starting file I/O. The fence clears only
+when the mutation's file barriers and in-memory publication complete. An open,
+partial/zero write, fsync, close, parent-directory barrier, or interruption failure
+leaves that instance faulted. Compaction uses the same fence, including uncertain
+replace outcomes. Validation/serialization failures before file I/O do not fault
+a healthy writer.
+
+The triggering call reports its original error and does not acknowledge the
+mutation. All later `put`, `delete`, and `compact` calls on that instance raise
+`FileMemoryRecoveryRequired` before changing either database file. This also
+applies to callers already waiting for the write lock. Read methods retain the
+last acknowledged in-memory view; they do not assert that an unacknowledged
+record is absent from the journal. Do not use a faulted instance for backup or
+consumer cutover.
+
+There is no automatic retry, in-place reset, or compaction-based repair. To resume:
+
+1. Stop/drain every caller of the faulted instance and preserve single-writer
+   ownership of the database path. Do not open a competing live writer.
+2. Resolve the underlying storage/capacity/permission fault. Preserve the journal;
+   do not manually append, edit, or restore an older file to hide the failure.
+3. Construct a new `FileMemoryDB` for the same path. Recovery verifies records,
+   truncates only an incomplete final record, and fsyncs the validated file and
+   its parent directory before returning. Any recovery/barrier error prevents
+   admission. A complete invalid record remains fatal and is not silently lost.
+4. Reconcile the failed operation's logical identity against recovered state
+   before retrying it. A complete checksummed record without an ACK may survive;
+   it consumes its recovered sequence and must not be overwritten by sequence
+   reuse. This engine does not implement business-operation idempotency.
+5. Admit callers to the new instance only after recovery succeeds. The old
+   instance stays faulted even after another instance has recovered the path.
+
+This is a single-instance/process ownership contract, not an interprocess lock
+or a proof against power loss or cloud-volume failure. No recovery policy grants
+permission for a production restart, data migration, or backup rollback.
+
 ## Compaction
 
 Compaction acquires the same write lock as ordinary mutations. It writes one checksummed snapshot record containing the current logical state and current sequence to `alice.memory.tmp`, flushes and fsyncs it, atomically replaces `alice.memory`, and fsyncs the parent directory.
 
-Until the atomic replace succeeds, the old authoritative file remains valid. If compaction fails, the old file remains the source of truth.
+Until the atomic replace succeeds, the old authoritative file remains valid. If replacement or its parent barrier reports an uncertain outcome, the path may contain either the old journal or the equivalent compacted snapshot. The writer stays faulted; verified reopen determines the authoritative file instead of assuming the old layout survived.
 
 ## Backup and restore
 
@@ -103,7 +141,7 @@ For migration v1 to v2:
 1. v1 remains authoritative at sequence N;
 2. create a consistent snapshot at N;
 3. build v2 candidate from that snapshot;
-4. Alice continues writing to v1;
+4. Logos continues writing to v1;
 5. v2 replays ordered events N+1 onward and catches up;
 6. run v2 in shadow verification while v1 remains authoritative;
 7. compare logical reads/results and integrity;
@@ -112,15 +150,15 @@ For migration v1 to v2:
 10. atomically switch CURRENT from v1 to v2;
 11. release the barrier.
 
-The heavy migration must not require Alice downtime. Only the final barrier is allowed to pause state mutations.
+The heavy migration must not require Logos downtime. Only the final barrier is allowed to pause state mutations.
 
-After DB cutover, the existing Alice runtime must first operate successfully against the new DB format/API. Application/runtime rollout happens afterward. The old generation remains immutable rollback evidence for the documented observation period.
+After DB cutover, the existing Logos runtime must first operate successfully against the new DB format/API. Application/runtime rollout happens afterward. The old generation remains immutable rollback evidence for the documented observation period.
 
 No partial migration is acceptable. A single unverified source record fails the migration.
 
 ## Release order
 
-`DB candidate -> catch-up -> shadow verify -> DB cutover -> old Alice on new DB -> new Alice -> observation -> retire old generation`.
+`DB candidate -> catch-up -> shadow verify -> DB cutover -> old Logos on new DB -> new Logos -> observation -> retire old generation`.
 
 Do not combine a storage-format switch and application-runtime switch into one unobservable event.
 
@@ -141,13 +179,13 @@ Tests must cover at least:
 - migration rejects one missing, unexpected, corrupt, conflicting or unverified record;
 - migration catch-up includes writes created while conversion is running;
 - cutover uses the same write barrier as ordinary commits;
-- old Alice runtime can operate against the newly activated storage generation;
+- old Logos runtime can operate against the newly activated storage generation;
 - backup restore reconstructs equivalent logical state.
 
 Fault tests must include forced process termination at storage stage boundaries. Numeric RPO/RTO/checkpoint thresholds are documented only after measured evidence.
 
 ## Container invariant
 
-The same Alice image digest contains runtime, Memory DB engine, tests/self-check, recovery, migration and backup/restore tooling. Persistent data is not an image layer.
+The same Logos image digest contains runtime, Kristall engine, tests/self-check, recovery, migration and backup/restore tooling. Persistent data is not an image layer.
 
 CI tests the digest that is later deployed; production must not rebuild a different artifact after validation.
