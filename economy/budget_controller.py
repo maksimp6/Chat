@@ -64,6 +64,9 @@ def _money(value: Any) -> Decimal:
         amount = Decimal(str(value))
         if not amount.is_finite() or amount < 0:
             raise InvalidOperation("amount must be a finite non-negative decimal")
+        # A float's text can carry binary noise ("0.30000000000000004"). Rounding that off first keeps
+        # 0.1 + 0.2 at 0.30, while a real sub-cent cost still rounds up below.
+        amount = amount.quantize(Decimal("0.000000001"))
         # Round up so a sub-cent cost is never silently dropped from the ledger.
         return amount.quantize(Decimal("0.01"), rounding=ROUND_CEILING)
     except (DecimalInvalidOperation, ValueError, TypeError) as exc:
