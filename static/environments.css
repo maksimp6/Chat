@@ -20,14 +20,6 @@
   border-radius: 14px;
   padding: 18px;
 }
-.logos-pro-app .environments-close {
-  float: right;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font-size: 24px;
-  cursor: pointer;
-}
 .logos-pro-app .environments-head,
 .logos-pro-app .environment-card-main,
 .logos-pro-app .environment-card-actions {

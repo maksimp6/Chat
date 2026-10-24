@@ -216,7 +216,7 @@
     var ov = document.createElement("div");
     ov.id = "settings-modal-custom";
     ov.style.cssText =
-      "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;display:flex;align-items:center;justify-content:center;";
+      "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10002;display:flex;align-items:center;justify-content:center;";
 
     var md = document.createElement("div");
     md.style.cssText =
@@ -501,7 +501,8 @@
 
     md.innerHTML = tabsHeader + tabGen + tabOutput + tabRouting + tabAdv + tabTheme + footer;
     ov.appendChild(md);
-    document.body.appendChild(ov);
+    // Внутри .logos-pro-app, чтобы получить стили кнопок и вкладок этого приложения (пункт 25).
+    (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
 
     function closeModal() {
       ov.remove();
@@ -519,18 +520,12 @@
       btn.addEventListener("click", function () {
         md.querySelectorAll(".llm-tab-btn").forEach(function (b) {
           b.classList.remove("active");
-          b.style.fontWeight = "normal";
-          b.style.borderBottom = "none";
-          b.style.color = "var(--m-muted,#666)";
         });
         md.querySelectorAll(".llm-tab-content").forEach(function (c) {
           c.style.display = "none";
         });
 
         btn.classList.add("active");
-        btn.style.fontWeight = "600";
-        btn.style.borderBottom = "2px solid var(--m-accent,#4a90d9)";
-        btn.style.color = "var(--m-text,#222)";
 
         var target = document.getElementById(btn.getAttribute("data-tab"));
         if (target) target.style.display = "block";
