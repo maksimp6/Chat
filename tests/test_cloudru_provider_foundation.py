@@ -5,7 +5,7 @@ import pytest
 from cloud.cloudru.client import CloudRuClient
 from cloud.cloudru.provider import CloudRuProvider
 from cloud.base import CloudProviderError
-from tool_registry import ToolRegistry
+from tool_providers.registry import ToolRegistry
 
 
 class TraceRecorder:

@@ -1,4 +1,4 @@
-"""Docs navigation separates Alice runtime agents from repository roles (#569)."""
+"""Docs navigation separates Logos runtime agents from repository roles (#569)."""
 
 import re
 from pathlib import Path

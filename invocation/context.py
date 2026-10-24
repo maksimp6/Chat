@@ -1,4 +1,4 @@
-"""Immutable request-scoped execution context for Alice Pro invocations."""
+"""Immutable request-scoped execution context for Logos invocations."""
 
 from dataclasses import dataclass, field
 from types import MappingProxyType

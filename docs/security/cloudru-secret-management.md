@@ -1,4 +1,4 @@
-# Cloud.ru Secret Management для секретов Alice Pro
+# Cloud.ru Secret Management для секретов Logos
 
 Статус: первый кодовый этап (issue #477, эпик #440). Адаптер и границы прав
 готовы; перенос реальных production-секретов и выдача прав в Cloud.ru IAM — в
@@ -22,7 +22,7 @@
 ## Модель данных
 
 Секрет в Cloud.ru Secret Management состоит из версий; версия после записи
-неизменяема, и несколько версий могут быть одновременно активны. Alice Pro не
+неизменяема, и несколько версий могут быть одновременно активны. Logos не
 меняет эту модель. Вместо этого приложение хранит локально только **ссылку**:
 какую версию оно сейчас считает действующей для каждого назначения
 (`purpose`).
@@ -76,7 +76,7 @@ token_value = resolve_secret_management_value(db, "alice_short_token")
 - **Администрирование.** Создание секретов, новых версий, отключение старых
   версий и управление правами доступа выполняется существующей
   административной парой `CLOUDRU_IAM_KEY_ID` / `CLOUDRU_IAM_KEY_SECRET`
-  (`cloudru_iam.py`), которая уже используется для ротации provider-ключей
+  (`cloud/cloudru/iam.py`), которая уже используется для ротации provider-ключей
   (`provider_key_rotation.py`) и деплоя (`container_apps_client.py`). Эта пара
   не участвует в чтении секретов на runtime-пути и не должна попадать в
   конфигурацию обычной сессии или модели.
@@ -111,13 +111,13 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
   протокол `cloud.base.CloudProvider` и не регистрируется в
   `cloud/registry.py`, поэтому он структурно недостижим из generic
   cloud-инструментов (`cloud/tools.py`), которые вызывает модель;
-  административный клиент (`cloudru_iam.py`) для чтения payload значений не
+  административный клиент (`cloud/cloudru/iam.py`) для чтения payload значений не
   используется вовсе.
 - вложенные ошибки: если код, вызвавший `resolve_secret_management_value`,
   падает позже с уже полученным значением в области видимости и попадает в
   `ExecutionTrace.record_error(..., exception=...)`, значение секрета не
   должно оказаться в снимке трейса. Общий механизм редактирования локальных
-  переменных в `trace_manager.py` уже редактирует по имени переменной любое
+  переменных в `observability/trace_manager.py` уже редактирует по имени переменной любое
   имя, содержащее `secret`/`token`/`password`/`api_key` — поэтому весь код,
   работающий со значением секрета в этом модуле и в
   `provider_credentials.py`, называет соответствующую локальную переменную
@@ -143,7 +143,7 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
 - Нет отдельного "разрешённого" fallback-пути на чтение/запись в открытом
   виде — при недоступности API вызывающий код получает исключение.
 
-## Подключение секретов Alice Pro (без самих значений)
+## Подключение секретов Logos (без самих значений)
 
 Ниже — процедура подключения по каждому назначению. Реальные значения
 секретов никогда не должны попадать в issue, PR, лог или артефакт CI.
@@ -152,7 +152,7 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
    версию значения (вне репозитория, вручную владельцем).
 2. Убедиться, что runtime-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID` /
    `_SECRET`) имеет только роль просмотра на этот секрет.
-3. Закрепить ссылку в Alice Pro:
+3. Закрепить ссылку в Logos:
    `set_secret_management_ref(db, purpose, secret_id, version_id)`.
 4. Там, где сегодня код читает значение из переменной окружения или из
    `provider_credentials`/`key_manager`, для соответствующего `purpose`
@@ -163,7 +163,7 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
 Назначения (`purpose`), которые эпик #440/#475 планирует перевести на эту
 схему:
 
-- `alice_short_token` — короткий токен доступа (`short_token_auth.py`,
+- `alice_short_token` — короткий токен доступа (`identity/short_token_auth.py`,
   `ALICE_SHORT_TOKEN`);
 - `github_oauth_client_id` / `github_oauth_client_secret` — GitHub OAuth
   (`identity/github_oauth.py`);
@@ -172,8 +172,8 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
   `provider_credentials.py`; Secret Management становится дополнительным
   источником ссылки на закреплённую версию, а не заменяет существующую
   таблицу `provider_credentials`;
-- `alice_database_url` — строка подключения к управляемому PostgreSQL
-  (`ALICE_DATABASE_URL`), см. известное ограничение "App secrets are plain
+- `alice_database_url` — retired: строка подключения к PostgreSQL больше не создаётся и не читается
+  (`ALICE_DATABASE_URL`; хранилище — нативный Kristall journal, см. `docs/database.md`), см. известное ограничение "App secrets are plain
   container env vars" в `docs/cloudru-container-apps.md`.
 
 ## Реальный bootstrap из Container Apps
@@ -197,7 +197,7 @@ limitations") секреты Container Apps — обычные переменн�
    секреты/версии и настраивает права (сегодня это уже так для
    `scripts/cloudru_deploy.py` и ротации provider-ключей).
 4. Реальные значения (`ALICE_SHORT_TOKEN`, OAuth-секреты, provider-ключи,
-   `ALICE_DATABASE_URL`) перестают быть переменными окружения контейнера и
+   `ALICE_DATABASE_URL` — retired, не переносится) перестают быть переменными окружения контейнера и
    становятся версиями в Secret Management; Container Apps перестаёт быть
    местом, где они видны в открытом виде.
 
@@ -207,7 +207,7 @@ limitations") секреты Container Apps — обычные переменн�
 
 ## Связанные материалы
 
-- `docs/security/key_manager.md` — общий менеджер ключей Alice Pro
+- `docs/security/key_manager.md` — общий менеджер ключей Logos
   (внутреннее шифрование, независимо от Cloud.ru).
 - `docs/cloudru-container-apps.md` — деплой и известные ограничения по
   секретам.

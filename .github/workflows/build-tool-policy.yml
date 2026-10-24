@@ -1,0 +1,20 @@
+name: Build tool policy
+
+on:
+  pull_request:
+    branches: [develop]
+  push:
+    branches: [develop, master]
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Build tool contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject forbidden build tooling
+        run: python3 -m unittest discover -s tests -p test_no_gradle_contract.py -v

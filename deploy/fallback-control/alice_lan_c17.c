@@ -1,5 +1,5 @@
 /*
- * alice-lan-c17: self-hosted fallback control server for Alice Pro (#1178).
+ * alice-lan-c17: self-hosted fallback control server for Logos (#1178).
  *
  * A loopback-only HTTP/1.1 command queue. An owner-controlled TLS ingress
  * terminates HTTPS in front of it; the phone agent connects outbound, long-polls
