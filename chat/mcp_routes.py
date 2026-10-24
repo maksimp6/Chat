@@ -831,7 +831,9 @@ def handle_mcp_servers():
     except TreasuryIdentityError as exc:
         return jsonify({"error": str(exc)}), 401
     if request.method == "POST":
-        data = _update_payload() or {}
+        data = _update_payload()
+        if data is None:
+            return jsonify({"error": "JSON object is required"}), 400
         try:
             sid = mcp_storage.create_server(owner_id, data)
         except ValueError as exc:
