@@ -41,7 +41,7 @@ jobs:
         id: policy_step_02
         continue-on-error: true
         if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
           distribution: temurin
           java-version: "25"
@@ -98,7 +98,7 @@ jobs:
         id: policy_step_07
         continue-on-error: true
         if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: alice-pro-direct-apk-${{ github.run_number }}
           path: android/build/direct/alice-pro-direct.apk
