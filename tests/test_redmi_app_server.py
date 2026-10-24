@@ -1,5 +1,6 @@
 """Real subprocess/HTTP tests with an isolated synthetic app; no phone app or models."""
 import json
+import hashlib
 import os
 from pathlib import Path
 import signal
@@ -282,6 +283,32 @@ def test_automatic_deployment_refuses_other_branches(deployment):
     assert result.returncode == 2 and "only this repository develop" in result.stderr
     assert json.loads(run("status", env).stdout)["pid"] == initial["pid"]
     assert (state / "launches").read_text().count("start") == 1
+
+
+@pytest.mark.parametrize("corrupt", [False, True])
+def test_deploy_materializes_verified_lfs_bytes(deployment, corrupt):
+    app, state, env, _, author = deployment
+    initial = json.loads(run("start", env).stdout)
+    previous = git(app, "rev-parse", "HEAD")
+    data = b"actual-lfs-runtime-asset"
+    oid = hashlib.sha256(data).hexdigest()
+    (author / ".gitattributes").write_text("asset.dat filter=lfs diff=lfs merge=lfs -text\n")
+    (author / "asset.dat").write_text(f"version https://git-lfs.github.com/spec/v1\noid sha256:{oid}\nsize {len(data)}\n")
+    git(author, "add", ".gitattributes", "asset.dat")
+    git(author, "commit", "-qm", "publish LFS pointer")
+    git(author, "push", "-q", "origin", "develop")
+    cached = app / ".git/lfs/objects" / oid[:2] / oid[2:4] / oid
+    cached.parent.mkdir(parents=True, exist_ok=True)
+    cached.write_bytes(b"x" * len(data) if corrupt else data)
+    result = run("deploy", env)
+    if corrupt:
+        assert result.returncode != 0
+        assert git(app, "rev-parse", "HEAD") == previous
+        assert json.loads(run("status", env).stdout)["pid"] == initial["pid"]
+    else:
+        assert result.returncode == 0, result.stderr
+        assert (app / "asset.dat").read_bytes() == data
+        assert "Git LFS is not installed" not in result.stderr
 
 
 def test_workflow_deploys_every_develop_push_in_one_serial_shell_step():
