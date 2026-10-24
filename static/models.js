@@ -12,6 +12,20 @@ function initModels() {
 
 document.addEventListener("DOMContentLoaded", initModels);
 
+function formatUltraSummary(summary) {
+  var parts = ["Ultra"];
+  if (summary.status === "blocked_retired") {
+    parts.push("снята");
+    return parts.join(" · ");
+  }
+  if (summary.status === "prepared_not_activated") parts.push("не активирован");
+  if (summary.context_window_tokens) {
+    parts.push("контекст " + summary.context_window_tokens + " ток.");
+  }
+  parts.push("блокеров: " + (summary.blockers || []).length);
+  return parts.join(" · ");
+}
+
 function renderModelModal() {
   var modelList = document.getElementById("model-list");
   var modelModal = document.getElementById("model-modal");
@@ -44,13 +58,20 @@ function renderModelModal() {
   }
   Object.keys(allModels).forEach(function (key) {
     var m = allModels[key];
+    var unavailable = m.available === false;
     var div = document.createElement("button");
     div.type = "button";
-    div.className = "alice-btn model-option" + (key === currentModel ? " active" : "");
+    div.disabled = unavailable;
+    div.className =
+      "alice-btn model-option" +
+      (key === currentModel ? " active" : "") +
+      (unavailable ? " model-option-unavailable" : "");
     var priceText = m.input && m.output ? m.input + " / " + m.output + " \u20bd/1K" : "";
     var badges = "";
     if (modelsData.voice && modelsData.voice[key]) badges += " \uD83C\uDFA4";
     if (m.multimodal) badges += " \uD83D\uDCF7";
+    if (unavailable)
+      badges += " \u00B7 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430";
     var nameWrap = document.createElement("div");
     var name = document.createElement("strong");
     name.textContent = m.name + badges;
@@ -63,7 +84,15 @@ function renderModelModal() {
 
     div.appendChild(nameWrap);
     div.appendChild(price);
+    if (m.ultra_profile) {
+      var ultra = document.createElement("div");
+      ultra.className = "model-option-ultra";
+      ultra.textContent = formatUltraSummary(m.ultra_profile);
+      ultra.title = (m.ultra_profile.blockers || []).join(", ");
+      div.appendChild(ultra);
+    }
     div.addEventListener("click", function () {
+      if (unavailable) return;
       if (typeof window.changeModel === "function") {
         window.changeModel(key);
       }
