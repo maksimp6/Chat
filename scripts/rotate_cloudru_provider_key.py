@@ -69,6 +69,9 @@ def main() -> int:
             from datetime import datetime, timezone
 
             master_expires = datetime.fromisoformat(management["expires_at"].replace("Z", "+00:00"))
+            # A timestamp without an offset is read as UTC; comparing it with an aware time would raise.
+            if master_expires.tzinfo is None:
+                master_expires = master_expires.replace(tzinfo=timezone.utc)
             if master_expires <= datetime.now(timezone.utc):
                 logger.error("Cloud.ru rotation blocked: IAM master key is expired")
                 return 2
@@ -84,7 +87,6 @@ def main() -> int:
             )
             return 2
 
-        pass
         row = next(
             (
                 item
@@ -94,7 +96,6 @@ def main() -> int:
             None,
         )
         if not row or not rotation_needed(row["expires_at"]):
-            pass
             return 0
 
         new_id, issued_at, expires_at = rotate_active_key(
