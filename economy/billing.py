@@ -19,8 +19,13 @@ PROVIDER = "yandex_ai_studio"
 
 
 def extract_cached_tokens(usage: Dict[str, Any]) -> int:
+    # The raw provider usage nests the count in the input details; the normalized usage that the
+    # parser returns carries it at the top level. Both are read, so a cached input is never billed
+    # at the full price.
     details = usage.get("input_token_details") or usage.get("input_tokens_details") or {}
-    value = details.get("cached_tokens", 0) if isinstance(details, dict) else 0
+    value = details.get("cached_tokens") if isinstance(details, dict) else None
+    if value is None:
+        value = usage.get("cached_tokens")
     return int(value or 0)
 
 
