@@ -381,6 +381,7 @@ class BrowserShim {
       sessionStorage: this.window.sessionStorage,
       URLSearchParams,
       AbortController,
+      performance: globalThis.performance,
       setTimeout,
       clearTimeout,
       setInterval,
