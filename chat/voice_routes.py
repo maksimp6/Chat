@@ -41,6 +41,7 @@ class VoiceSession:
     audio: bytearray = field(default_factory=bytearray)
     audio_content_type: str = "application/octet-stream"
     output_audio: bytes | None = None
+    closed: bool = False
     events: queue.Queue = field(default_factory=queue.Queue)
 
 
@@ -90,10 +91,9 @@ def _check_owner(session: VoiceSession) -> None:
     current_owner = get_current_owner_id(required=False)
     if session.owner_id and current_owner != session.owner_id:
         raise PermissionError("voice session access denied")
-    if (
-        session.conversation_id
-        and current_owner
-        and not check_access(session.conversation_id, current_owner)
+    # Without an identity a conversation cannot be proven to belong to the caller, so refuse.
+    if session.conversation_id and (
+        not current_owner or not check_access(session.conversation_id, current_owner)
     ):
         raise PermissionError("conversation access denied")
 
@@ -214,7 +214,7 @@ def create_voice_session():
 
     data = request.get_json(silent=True) or {}
     conversation_id = data.get("conversation_id")
-    if conversation_id and owner_id and not check_access(conversation_id, owner_id):
+    if conversation_id and (not owner_id or not check_access(conversation_id, owner_id)):
         return jsonify({"error": "conversation_not_found"}), 404
 
     session = VoiceSession(
@@ -245,9 +245,10 @@ def append_voice_audio():
         return jsonify({"error": "audio chunk is empty"}), 400
     if len(session.audio) + len(chunk) > _MAX_AUDIO_BYTES:
         return jsonify({"error": "audio exceeds 1 MiB limit"}), 413
-    if session.audio and session.audio_content_type != request.content_type:
+    content_type = request.content_type or "application/octet-stream"
+    if session.audio and session.audio_content_type != content_type:
         return jsonify({"error": "audio content type cannot change within a session"}), 400
-    session.audio_content_type = request.content_type or "application/octet-stream"
+    session.audio_content_type = content_type
     session.audio.extend(chunk)
     return jsonify({"accepted_bytes": len(chunk), "total_bytes": len(session.audio)})
 
@@ -298,12 +299,18 @@ def voice_output():
 @voice_bp.post("/api/voice/close")
 def close_voice_session():
     try:
-        session = _require_session(request.get_json(silent=True).get("session_id", ""))
+        session = _require_session((request.get_json(silent=True) or {}).get("session_id", ""))
         _check_owner(session)
     except KeyError as exc:
         return jsonify({"error": str(exc)}), 404
     except PermissionError as exc:
         return jsonify({"error": str(exc)}), 403
+
+    # A second close must not run the speech and chat pipeline again for the same audio.
+    with _sessions_lock:
+        if session.closed:
+            return jsonify({"status": "processing"})
+        session.closed = True
 
     if not session.audio:
         _emit(session, "error", error={"message": "audio is empty"})
