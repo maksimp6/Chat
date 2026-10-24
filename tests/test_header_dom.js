@@ -73,10 +73,64 @@ async function flush() {
 
   for (const button of buttons) {
     assert.equal(button.parentNode.parentNode, header, button.id + " is not in #header");
-    assert.equal(button.getBoundingClientRect().top, 0, button.id + " wrapped to another line");
+    assert.ok(button.getBoundingClientRect().top >= 0, button.id + " has a negative top position");
+    assert.ok(
+      button.getBoundingClientRect().left >= 0,
+      button.id + " has a negative left position",
+    );
   }
-  assert.equal(new Set(buttons.map((button) => button.getBoundingClientRect().top)).size, 1);
-  assert.equal(new Set(rows.map((row) => row.getBoundingClientRect().top)).size, 1);
+  const secondaryButtons = document
+    .getElementById("header-actions-2")
+    .querySelectorAll(".header-btn");
+  assert.ok(
+    new Set(secondaryButtons.map((button) => button.getBoundingClientRect().top)).size > 1,
+    "secondary-row buttons must wrap within the structural emulator",
+  );
+  assert.equal(new Set(rows.map((row) => row.getBoundingClientRect().top)).size, 2);
+
+  // Structural emulator checks declared wrap at representative CSS viewport widths.
+  // These are not claims about real browser rendering or Android IME behavior.
+  const assertResponsiveLayout = (layout) => {
+    assert.equal(layout.layoutSource, "structural-emulator-not-rendered-browser");
+    assert.equal(
+      layout.horizontalOverflow,
+      false,
+      "horizontal overflow at " + layout.viewportWidth + "px",
+    );
+    assert.ok(layout.secondaryLineCount >= 1);
+    if (layout.viewportWidth <= 440) {
+      assert.ok(
+        layout.secondaryLineCount > 1,
+        "secondary row did not wrap at " + layout.viewportWidth + "px",
+      );
+    }
+  };
+
+  for (const width of [360, 390, 440, 768, 1024]) {
+    const layout = applyHeaderFlexLayout(document, css, width);
+    assert.equal(layout.viewportWidth, width);
+    assertResponsiveLayout(layout);
+  }
+
+  // Negative control: disable wrap only on the secondary row. The same oracle must
+  // detect horizontal overflow at 360px; otherwise the emulator test is a false positive.
+  const noWrapCss = css.replace(
+    ".alice-pro-app #header .header-row-secondary {\n  flex-wrap: wrap;",
+    ".alice-pro-app #header .header-row-secondary {\n  flex-wrap: nowrap;",
+  );
+  assert.notEqual(noWrapCss, css, "negative control must disable secondary-row wrap");
+  const noWrapLayout = applyHeaderFlexLayout(document, noWrapCss, 360);
+  assert.equal(noWrapLayout.secondaryLineCount, 1);
+  assert.equal(noWrapLayout.horizontalOverflow, true, "negative control must detect overflow");
+  assert.throws(
+    () => assertResponsiveLayout(noWrapLayout),
+    /horizontal overflow/,
+    "the responsive-layout acceptance assertion must fail when secondary-row wrap is disabled",
+  );
+
+  // Restore normal modeled geometry for the unrelated DOM interaction checks below.
+  const defaultLayout = applyHeaderFlexLayout(document, css, 360);
+  assert.equal(defaultLayout.horizontalOverflow, false);
 
   const domProbe = document.createElement("div");
   const firstProbeChild = document.createElement("span");

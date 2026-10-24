@@ -13,7 +13,7 @@ import json
 import time
 from typing import Any, Callable, Mapping
 
-from .capabilities import BROWSER_ACTIONS
+from browser.capabilities import BROWSER_ACTIONS
 
 
 READ_ACTIONS = frozenset({"navigate", "inspect", "screenshot", "assert_state"})

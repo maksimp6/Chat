@@ -1,6 +1,6 @@
 import json
 
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 def test_finalize_handles_execution_trace_circular_reference():

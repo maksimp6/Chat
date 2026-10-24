@@ -1,6 +1,6 @@
 # Reliability rules
 
-Alice runs tools, spends money and changes cloud infrastructure on the user's
+Logos runs tools, spends money and changes cloud infrastructure on the user's
 behalf, so its code follows flight-software discipline: NASA/JPL "Power of
 Ten" adapted to Python and browser JavaScript, plus an explicit idempotency
 contract. `tests/test_reliability_rules.py` enforces the mechanical rules as a
@@ -32,31 +32,28 @@ it is not obvious from the name.
 ## Power of Ten, adapted
 
 1. **Simple control flow.** No recursion in production paths; walk nested data
-   with an explicit stack and a depth limit. Cyclomatic complexity stays at or
-   below 10 (`C901`).
+   with an explicit stack and a depth limit.
 2. **Bounded loops.** Every loop over external input, every retry and every
    poll has a fixed upper bound: a maximum attempt count, a deadline or a size
    limit. No `while True` without a bound and an exit.
 3. **Bounded resources.** Caches, queues and buffers have a maximum size.
    Reading external data (HTTP bodies, files, subprocess output) has a byte
    limit.
-4. **Small functions.** A function fits on one screen: at most 50 statements
-   (`PLR0915`), 12 branches (`PLR0912`) and 6 return points (`PLR0911`).
-5. **Check inputs, assert invariants.** Validate at every boundary (HTTP, tool
+4. **Check inputs, assert invariants.** Validate at every boundary (HTTP, tool
    arguments, config, subprocess output) and fail closed with a clear error.
    Internal invariants use explicit checks that raise, not `assert`, which
    `python -O` strips.
-6. **Smallest scope.** No `global` (`PLW0603`), no mutable class-level defaults
+5. **Smallest scope.** No `global` (`PLW0603`), no mutable class-level defaults
    (`RUF012`), no mutable default arguments (`B006`). State lives in objects
    passed explicitly or in `RuntimeContext`.
-7. **Never swallow errors.** No bare `except` (`E722`), no `except: pass` or
+6. **Never swallow errors.** No bare `except` (`E722`), no `except: pass` or
    `continue` (`S110`, `S112`). Catching `Exception` (`BLE001`) is allowed only
    at a boundary that logs it and returns an explicit error result or
    re-raises; chain re-raised errors with `from` (`B904`).
-8. **No dynamic code.** No `eval` or `exec` (`S307`, `S102`).
-9. **Limited indirection.** Prefer plain functions and data over reflection,
+7. **No dynamic code.** No `eval` or `exec` (`S307`, `S102`).
+8. **Limited indirection.** Prefer plain functions and data over reflection,
    monkey-patching and `getattr` dispatch on untrusted strings.
-10. **Zero warnings.** Formatter, linter and these rules pass on every push.
+9. **Zero warnings.** Formatter, linter and these rules pass on every push.
     CI treats a new violation as a failure.
 
 ## Working with the ratchet
@@ -68,6 +65,19 @@ and compares each rule's violation count with `RATCHET_BASELINE`.
 - Fixing violations also fails the test until you lower the baseline to the
   new count in the same change, so the improvement is locked in.
 - Rules at zero stay at zero.
+
+## Exception handling outside Python
+
+`scripts/check_exception_handling.py` ratchets `try {` blocks and silent catch
+blocks (empty, or only comments) in project-owned JavaScript, `.mjs`, Java and
+Kotlin, using `scripts/exception_handling_baseline.json`. The same rules apply:
+new handlers and silent catches fail, and fixes must lower the baseline.
+Python is covered by the ruff rules BLE001, S110, S112 and E722 above.
+Vendored code (`static/eruda.js`) and `tests/` are excluded.
+
+A handler that reports the error should stay, but a catch that only hides the
+failure is a defect. Narrow exceptions only at real external boundaries, and
+let the error propagate to a caller that can report it.
 
 ## Static types
 

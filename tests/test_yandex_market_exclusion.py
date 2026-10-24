@@ -9,10 +9,10 @@ import yandex_client_modules.mcp_mixin as mcp_mixin
 
 
 def _production_blocklist():
-    source = (Path(__file__).resolve().parents[1] / "mcp_routes.py").read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[1] / "chat" / "mcp_routes.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     client = next(
-        item for item in tree.body if isinstance(item, ast.ClassDef) and item.name == "AliceClient"
+        item for item in tree.body if isinstance(item, ast.ClassDef) and item.name == "LogosClient"
     )
     assert any(
         isinstance(base, ast.Name) and base.id == "YandexResponsesClient" for base in client.bases

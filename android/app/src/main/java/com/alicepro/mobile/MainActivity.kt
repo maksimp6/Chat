@@ -171,7 +171,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         AlertDialog.Builder(this)
-            .setTitle("Connect Alice Pro")
+            .setTitle("Connect Logos")
             .setMessage("Enter the Yandex AI Studio API key. It is stored in this app's private preferences and is not bundled into the APK.")
             .setView(input)
             .setCancelable(false)
@@ -315,7 +315,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 } else {
                     AppLogger.error("Startup", "Local server did not become ready")
-                    Toast.makeText(this, "Alice Pro server did not start", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "Logos server did not start", Toast.LENGTH_LONG).show()
                 }
             }
         }.start()

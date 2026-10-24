@@ -2,7 +2,7 @@ import pytest
 
 from browser.adapters import BrowserAdapterRegistry, register_browser_tools
 from browser.capabilities import BrowserAction
-from universal_tool_platform import UniversalToolExecutor
+from tool_providers.universal_tool_platform import UniversalToolExecutor
 
 
 class FakeAdapter:

@@ -87,9 +87,9 @@ the immutable source link when available. Existing legacy-index behavior and
 retrieval ordering remain unchanged.
 
 Snapshot classification is shared by both consumers through `snapshot_revision()`.
-The validator lives in `repository_index/provenance.py`; the builder implementation lives in
-`repository_index/builder.py`. `scripts/build_ai_index.py` is only the compatible direct-script
-entrypoint, so production retrieval does not import the CLI builder.
+The validator lives in `repository_index/provenance.py`; the builder and compatible
+direct-script entrypoint live in `scripts/build_ai_index.py`. Production retrieval
+uses the shared provenance validator without importing the CLI builder.
 Any snapshot-only field, including a null field or nested file/symbol source
 metadata, selects strict validation. An absent/null/unsupported schema, source
 kind, commit, repository or parser label cannot downgrade a snapshot to legacy.
@@ -129,3 +129,26 @@ even when a particular requested blob happens to be present. This prevents an
 implicit network fetch on Git versions that do not honor the lazy-fetch
 suppression environment variable. Use a complete authorized local repository;
 this command does not repair or expand the clone automatically.
+
+## Reproducible local benchmark
+
+```sh
+python scripts/bench_ai_index.py --iterations 20 > /tmp/alice-index-benchmark.json
+python -m pytest -q tests/test_ai_index_benchmark.py
+```
+
+The benchmark creates and removes its own fixed eight-file Git repository. It
+compares a full snapshot build, reuse at the same revision, reuse after one
+changed/added/deleted file, and repeated impact queries on the existing index.
+Before reporting measurements it requires full/incremental equivalence,
+deterministic queries, commit-bound provenance and unchanged inputs. Synthetic
+Python source is parsed, never executed. No repository argument, network access,
+model request or modification of the application checkout is involved.
+
+JSON records fixed fixture content and commit hashes, parser/schema versions,
+parsed/reused/deleted counters, serialized index/query sizes, and minimum/median/
+maximum milliseconds for 1–100 iterations. Build timings include local Git calls;
+fixture setup and JSON report serialization are outside the timing window. Query
+timing includes its equality check. Builds reuse the operating system's file
+cache; "full" means no AST reuse, not a cold disk. A small synthetic fixture does
+not establish whole-repository latency, a universal speedup or a CI/SLA threshold.

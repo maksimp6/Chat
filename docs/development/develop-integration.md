@@ -12,13 +12,12 @@ protected `master`. Open a promotion PR only when the branches have an actual di
 | CI | All, including develop and stack parents | master | None | No event filter; jobs use the platform classifier |
 | Format | All; same-repository heads only | None | None | None |
 | Security checks | All, including develop and stack parents | master | None | None |
-| CodeQL | All, including develop and stack parents | master | None | None |
 | Local launch smoke | All | None | None | None |
 | Remote Desktop Commander validation | All | None | None | RDC sources and its workflow |
 | Merge readiness snapshot | Non-draft PRs into master | None | None | None |
 | Host-managed preview validation | All; job requires ALICE_HOST_PREVIEW_ENABLED | All branches | None | None |
 
-Security and CodeQL previously filtered PRs to `master`. Removing that PR filter
+Security previously filtered PRs to `master`. Removing that PR filter
 lets develop and stacked PRs receive the same scans without changing the jobs,
 permissions, schedules or master push triggers. No merge-group checks are provided;
 do not enable a merge queue on the assumption that these workflows support it.
@@ -29,7 +28,7 @@ rejects failure/cancellation/missing results, and permits a skipped suite only w
 the classifier did not select it. Documentation-only changes skip platform suites
 but still run code rules and the aggregate; workflow changes select infrastructure
 tests. Unknown or shared dependency paths conservatively select broader suites.
-The separate Security and CodeQL workflows still run for documentation-only PRs.
+The separate Security workflow still runs for documentation-only PRs.
 
 Format produces a correction artifact when formatting changes are necessary; its
 success alone is not proof of a clean tree. Run `bash scripts/pre_push.sh` in the
@@ -40,8 +39,8 @@ new head. The application suite also runs `bash scripts/format.sh check` when se
 
 1. Create an isolated feature branch from the intended current base and open a PR
    into develop. Keep it draft while implementation and checks change.
-2. Verify the exact head's `CI required`, formatting result, security and both
-   CodeQL languages. Record run links, expected skipped jobs and unresolved findings.
+2. Verify the exact head's `CI required`, formatting result and security checks.
+   Record run links, expected skipped jobs and unresolved findings.
 3. Resolve review conversations and follow the maintainer policy in `AGENTS.md`.
    A green aggregate is evidence of selected tests, not permission to bypass reviews.
 4. Open the actual develop-to-master diff as a promotion PR. Synchronize with current
