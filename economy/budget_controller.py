@@ -18,6 +18,7 @@ import uuid
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
 from cloud.base import CloudProviderError
+from core.restrictions import restrictions_lifted
 
 if TYPE_CHECKING:
     from economy.budget_repository import BudgetRepository
@@ -491,6 +492,8 @@ class BudgetController:
 
     def _check_limits(self, account: BudgetAccount, amount: Decimal) -> None:
         self._roll_loss_period(account)
+        if restrictions_lifted():
+            return
         if amount > account.limits.max_single_operation:
             raise BudgetLimitExceeded("single-operation limit exceeded")
         # Outstanding reservations are committed exposure: count them so that
@@ -537,6 +540,8 @@ class BudgetController:
 
     def _ensure_not_locked(self, account: BudgetAccount) -> None:
         self._roll_loss_period(account)
+        if restrictions_lifted():
+            return
         if account.locked_until is not None and self._now() < account.locked_until:
             raise BudgetLimitExceeded("budget is in cooldown")
         if account.locked_until is not None and self._now() >= account.locked_until:
@@ -714,7 +719,7 @@ class CloudBudgetGuard:
 
     def enforce(self, operation: str) -> Dict[str, Any]:
         result = self.status()
-        if result["status"] == CloudSpendStatus.BLOCK.value:
+        if result["status"] == CloudSpendStatus.BLOCK.value and not restrictions_lifted():
             raise BudgetLimitExceeded(
                 f"cloud monthly budget exhausted: {result['spent']} of "
                 f"{result['limit']} {result['currency']}; '{operation}' blocked"

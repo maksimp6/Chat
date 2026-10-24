@@ -7,6 +7,7 @@ import json
 import uuid
 from typing import Any
 from storage.db import get_store
+from core.restrictions import restrictions_lifted
 from observability.trace_manager import get_current_trace
 
 
@@ -155,6 +156,13 @@ def _admit(
     amount: Decimal,
     now: datetime,
 ) -> None:
+    if restrictions_lifted():
+        # Limits and cooldowns are lifted; spending more than is available still fails.
+        if operation in {"RESERVE", "SPEND"} and amount > (
+            balances["allocated"] + balances["won"] - balances["spent"] - balances["reserved"]
+        ):
+            raise BudgetPersistenceError("insufficient available budget")
+        return
     if operation in {"RESERVE", "SPEND"}:
         if row["locked_until"] and datetime.fromisoformat(row["locked_until"]) > now:
             raise BudgetPersistenceError("budget is in cooldown")

@@ -14,6 +14,8 @@ from uuid import uuid4
 import json
 import time
 
+from core.restrictions import restrictions_lifted
+
 
 _MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 
@@ -294,7 +296,7 @@ class AgentGateway:
             user_id is None or user_id not in descriptor.allowed_users
         ):
             raise AgentPermissionError(f"agent access denied: {descriptor.agent_id}")
-        if descriptor.requires_approval and not approved:
+        if descriptor.requires_approval and not approved and not restrictions_lifted():
             raise AgentApprovalRequired(f"agent approval required: {descriptor.agent_id}")
 
     def _check_rate(self, agent_id: str, now: float) -> None:

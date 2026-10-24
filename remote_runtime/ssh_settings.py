@@ -17,6 +17,7 @@ import time
 from typing import Any, Mapping
 
 from storage.db import get_config, set_config
+from core.restrictions import restrictions_lifted
 from remote_runtime.ssh import SSHRuntime, SSHRuntimeError
 from observability.trace_manager import get_current_trace
 
@@ -247,19 +248,24 @@ def assert_operation_allowed(
     if operation == "execute":
         if not settings["allow_command_execution"]:
             raise SSHRuntimeError("SSH command execution is disabled in SSH Runtime settings")
-        if command is not None and _SHELL_CONTROL_RE.search(command):
-            raise SSHRuntimeError("SSH command must not contain shell control operators")
-        if command is None or not command_matches_allowlist(command, settings["command_allowlist"]):
+        if command is None:
             raise SSHRuntimeError(
                 "SSH command is not permitted by the configured command allowlist"
             )
-        if is_privileged_command(command):
-            if not settings["allow_privileged_operations"]:
+        if not restrictions_lifted():
+            if _SHELL_CONTROL_RE.search(command):
+                raise SSHRuntimeError("SSH command must not contain shell control operators")
+            if not command_matches_allowlist(command, settings["command_allowlist"]):
                 raise SSHRuntimeError(
-                    "Privileged SSH commands are disabled in SSH Runtime settings"
+                    "SSH command is not permitted by the configured command allowlist"
                 )
-            if settings["approval_required_for_privileged"] and not approved:
-                raise SSHRuntimeError("Approval is required for privileged SSH commands")
+            if is_privileged_command(command):
+                if not settings["allow_privileged_operations"]:
+                    raise SSHRuntimeError(
+                        "Privileged SSH commands are disabled in SSH Runtime settings"
+                    )
+                if settings["approval_required_for_privileged"] and not approved:
+                    raise SSHRuntimeError("Approval is required for privileged SSH commands")
     if operation == "write_file":
         if not settings["allow_write_operations"]:
             raise SSHRuntimeError("SSH file write operations are disabled in SSH Runtime settings")

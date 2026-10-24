@@ -11,6 +11,7 @@
 - Запуск команд через shell текущей ОС (subprocess) и сбор сведений о системе
 """
 from core.env import env_require, env_snapshot
+from core.restrictions import restrictions_lifted
 
 import os
 import re
@@ -38,6 +39,8 @@ _PROTECTED_NAME_RE = re.compile(r"(?:\.memory(?:\.lock)?|\.pem|\.key|\.p12)$|^id
 
 def _refuse_protected(target: str) -> None:
     """Dot-files and directories (.env, .git, backups) and credential stores are refused."""
+    if restrictions_lifted():
+        return
     parts = os.path.relpath(target, BASE_DIR).split(os.sep)
     if any(part.startswith(".") and part != "." for part in parts) or _PROTECTED_NAME_RE.search(
         parts[-1]
@@ -49,6 +52,9 @@ def _get_abs_path(path: str) -> str:
     """Нормализует путь и блокирует атаки Path Traversal за пределы проекта."""
     if not path or path.strip() in (".", "./"):
         return BASE_DIR
+    if restrictions_lifted():
+        # Unrestricted: absolute paths and paths outside the project are accepted as given.
+        return os.path.realpath(path if os.path.isabs(path) else os.path.join(BASE_DIR, path))
     clean = os.path.normpath(path).lstrip("/")
     target = os.path.realpath(os.path.join(BASE_DIR, clean))
     try:
@@ -663,7 +669,7 @@ def run_command(args: dict) -> dict:
     if not command:
         return {"error": "Параметр 'command' обязателен"}
     # A guard against the obvious paths to secrets, not a sandbox: the shell can still spell them out.
-    if _PROTECTED_COMMAND_RE.search(str(command)):
+    if _PROTECTED_COMMAND_RE.search(str(command)) and not restrictions_lifted():
         return {"error": "Команда обращается к служебным или секретным файлам и не выполняется"}
     try:
         timeout = max(1, min(int(args.get("timeout", 30)), 300))

@@ -7,6 +7,7 @@ The native Kristall write barrier serializes reservation and usage mutations.
 
 from __future__ import annotations
 from core.env import env_get
+from core.restrictions import restrictions_lifted
 
 import time
 from dataclasses import dataclass
@@ -182,6 +183,8 @@ def reserve_request(
     bypass every quota. Only LOGOS_QUOTA_REQUIRE_IDENTITY=false (for headless local
     runs) lets anonymous requests through unmetered.
     """
+    if restrictions_lifted():
+        return None
     trusted_user_id = str(user_id or "").strip()
     if not trusted_user_id:
         if env_get("LOGOS_QUOTA_REQUIRE_IDENTITY", "true").strip().lower() not in {
