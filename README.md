@@ -72,7 +72,7 @@ Still experimental or roadmap unless the corresponding issue is complete:
 
 - Python: backend CI uses 3.14; Ruff targets 3.12.
 - Git.
-- For Android builds only: Android SDK API 37 and Gradle 9.5.0. CI runs Gradle with Java 25 and stages the embedded runtime with Python 3.13; the Android module declares JVM toolchain 17.
+- For the direct Android browser controller: JDK 17+, Android SDK platform 35 and build-tools 35.0.0. See [Android scope and build](android/README.md).
 
 ### Backend
 
@@ -92,12 +92,11 @@ Logos stores authoritative runtime data in `kristall.Kristall`; set `ALICE_MEMOR
 ### Android
 
 ```bash
-cd android
-python scripts/stage_python.py
-gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
+bash android/scripts/test_direct.sh
+bash android/scripts/build_direct.sh
 ```
 
-The debug APK is for development/testing. Release signing keys must never be committed.
+This debug APK is the direct SDK browser controller. It does not package the Flask backend or prove feature parity with the retained embedded-backend Android sources. The old release packager is removed; release publication reports an explicit blocker until an equivalent replacement is verified. Release signing keys must never be committed.
 
 ## Configuration and security
 
@@ -123,9 +122,8 @@ Open pull requests against `develop` and keep changes independently testable. Fo
 ```bash
 python -m compileall -q .
 pytest -q
-cd android
-python scripts/stage_python.py
-gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
+bash android/scripts/test_direct.sh
+bash android/scripts/build_direct.sh
 ```
 
 For frontend/runtime work, preserve the progressive-enhancement path and BrowserShim/VM tests. Do not introduce Playwright as a runtime dependency. Browser Emulator/self-testing work is tracked in [#409](https://github.com/maksimp6/Chat/issues/409).

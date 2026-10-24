@@ -8,7 +8,6 @@
 | Экосистема | Каталоги | Частота |
 |------------|----------|---------|
 | pip | `/` (`requirements*.txt`) | еженедельно, понедельник |
-| Gradle | `/android` | еженедельно, понедельник |
 | GitHub Actions | `/` (`.github/workflows`) | еженедельно, понедельник |
 | Docker | `/`, `deploy/chrome-worker`, `deploy/oauth-idp`, `deploy/remote-desktop-commander` | еженедельно, понедельник |
 | npm | `/`, `deploy/chrome-worker`, `deploy/remote-desktop-commander` (каталоги с `package-lock.json`) | ежемесячно |
@@ -19,9 +18,9 @@
   независимо от остальных.
 - Cooldown 7 дней: новая версия предлагается не раньше чем через неделю после
   релиза.
-- `android/requirements.txt` в version updates не входит: версии там согласованы с
-  wheel-репозиторием Chaquopy и проверяются `tests/test_android_requirements.py`.
-  Security updates для него приходят как обычно.
+- `android/requirements.txt` сохранён для прежних исходников embedded-backend, но
+  не используется прямой SDK-сборкой браузер-контроллера. Удалённая экосистема
+  сборки больше не создаёт автоматических PR зависимостей.
 
 ## Целевая ветка
 
@@ -46,7 +45,7 @@ Dependabot PR проходят тот же CI и тот же required check `CI 
 
 | Изменённый манифест | Платформы |
 |---------------------|-----------|
-| `android/**` (Gradle) | Android |
+| `android/**` (исходники и прямая SDK-сборка) | Android |
 | `.github/workflows/*.yml`, кроме `ci.yml` | Infrastructure |
 | `deploy/<worker>/package*.json`, `deploy/<worker>/Dockerfile*` | MCP, Infrastructure |
 | `requirements.txt`, `requirements-dev.txt`, `.github/workflows/ci.yml` | все |
