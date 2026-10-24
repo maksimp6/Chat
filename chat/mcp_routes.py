@@ -349,12 +349,10 @@ class LogosClient(YandexResponsesClient):
         return response
 
 
-def _turn_cost(billing: dict[str, Any], model_key: Any) -> float | None:
-    """The cost recorded on a reply. A turn whose price is unknown has no cost, and is never
-    recorded as free."""
-    if billing.get("cost_status") not in {"calculated", "partial"}:
-        return None
-    if is_claude_model(model_key) and billing.get("unknown_cost_items"):
+def _turn_cost(billing: dict[str, Any]) -> float | None:
+    """The cost recorded on a reply: the calculated total only. A turn with any unpriced item is
+    not posted to the treasury (see settle_billing_to_treasury), so it records no cost either."""
+    if billing.get("cost_status") != "calculated":
         return None
     return float(billing.get("total_cost") or 0)
 
@@ -582,7 +580,7 @@ def chat():
 
         trace_data.setdefault("billing", {})["settlement"] = settlement
         billing = trace_data.get("billing") or {}
-        cost = _turn_cost(billing, model_key)
+        cost = _turn_cost(billing)
 
         persist_invocation_trace(invocation.invocation_id, trace_data)
         add_message(

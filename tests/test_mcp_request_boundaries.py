@@ -123,10 +123,10 @@ def test_approval_token_runs_its_call_once_and_only_within_its_ttl(monkeypatch):
     )
 
 
-def test_a_turn_with_an_unknown_price_records_no_cost_instead_of_zero():
+def test_a_turn_without_a_fully_known_price_records_no_cost():
     unknown = {"cost_status": "unknown", "total_cost": None, "unknown_cost_items": 1}
-    assert mcp_routes._turn_cost(unknown, "yandex-model") is None
+    assert mcp_routes._turn_cost(unknown) is None
     calculated = {"cost_status": "calculated", "total_cost": 0.25, "unknown_cost_items": 0}
-    assert mcp_routes._turn_cost(calculated, "yandex-model") == 0.25
+    assert mcp_routes._turn_cost(calculated) == 0.25
     partial = {"cost_status": "partial", "total_cost": 0.1, "unknown_cost_items": 1}
-    assert mcp_routes._turn_cost(partial, "yandex-model") == 0.1
+    assert mcp_routes._turn_cost(partial) is None
