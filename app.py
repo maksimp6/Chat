@@ -49,7 +49,6 @@ from organization.government import (
 from remote_runtime.environment_routes import environment_bp, environment_gateway_bp
 from remote_runtime.environments import init_environment_tables
 from identity.short_token_auth import install_short_token_auth
-from identity.deployment_admin import deployment_admin_denied, install_deployment_gate
 from rdc_connection.pairing import install_rdc_pairing
 from invocation.problems import problem
 from observability import system_log
@@ -76,7 +75,6 @@ from forge.routes import printing3d_bp
 app = Flask(__name__)
 system_log.configure()
 install_short_token_auth(app)
-install_deployment_gate(app)
 install_rdc_pairing(app)
 
 
@@ -404,11 +402,6 @@ def treasury_account():
 
 @app.route("/api/treasury/top-up", methods=["POST"])
 def treasury_top_up():
-    # A credit creates balance that pays for provider calls, so only the deployment administrator
-    # may mint it. Anyone can read their own balance.
-    denied = deployment_admin_denied()
-    if denied:
-        return denied
     data = request.get_json(silent=True) or {}
     try:
         owner_id = get_current_owner_id()
@@ -422,9 +415,6 @@ def treasury_top_up():
 
 @app.route("/api/ssh-runtime/settings", methods=["GET"])
 def get_ssh_runtime_settings():
-    denied = deployment_admin_denied()
-    if denied:
-        return denied
     try:
         return jsonify(public_settings())
     except TreasuryIdentityError as exc:
@@ -436,9 +426,6 @@ def get_ssh_runtime_settings():
 
 @app.route("/api/ssh-runtime/settings", methods=["PUT"])
 def put_ssh_runtime_settings():
-    denied = deployment_admin_denied()
-    if denied:
-        return denied
     try:
         data = request.get_json(silent=True) or {}
         if not isinstance(data, dict):
@@ -454,9 +441,6 @@ def put_ssh_runtime_settings():
 
 @app.route("/api/ssh-runtime/test", methods=["POST"])
 def test_ssh_runtime_connection():
-    denied = deployment_admin_denied()
-    if denied:
-        return denied
     try:
         owner_id = get_current_owner_id()
         data = request.get_json(silent=True) or {}

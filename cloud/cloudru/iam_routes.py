@@ -11,10 +11,20 @@ from typing import Any
 from flask import Blueprint, jsonify, request
 
 from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
-from identity.deployment_admin import is_local_request
 from secret_store.key_manager import secret_storage_ready, store_secret
 
 cloudru_iam_bp = Blueprint("cloudru_iam", __name__, url_prefix="/api/cloudru/iam")
+
+_LOOPBACK_ADDRESSES = {"127.0.0.1", "::1"}
+_FORWARDING_HEADERS = ("X-Forwarded-For", "X-Real-IP", "Forwarded")
+
+
+def _is_local_request() -> bool:
+    # A reverse proxy makes every request arrive from loopback, so a forwarding header means
+    # the request did not originate on this host.
+    if any(request.headers.get(name) for name in _FORWARDING_HEADERS):
+        return False
+    return (request.remote_addr or "") in _LOOPBACK_ADDRESSES
 
 
 def _enabled() -> bool:
@@ -32,7 +42,7 @@ def _authorized() -> bool:
 
     # Without a token only a request from this host counts. Checking the remote address alone
     # would let every visitor through behind a reverse proxy, which connects from loopback.
-    return is_local_request()
+    return _is_local_request()
 
 
 def _guard():

@@ -5,7 +5,6 @@ import logging
 import re
 from flask import Blueprint, request, jsonify, Response
 from core.config import Config
-from identity.deployment_admin import deployment_admin_denied
 from yandex_client_modules.client import YandexResponsesClient, YandexClientError
 
 logger = logging.getLogger(__name__)
@@ -33,13 +32,6 @@ def _attachment_name(name):
     """A filename that cannot break out of a quoted Content-Disposition header."""
     base = os.path.basename(str(name or "")) or "file"
     return re.sub(r'[\x00-\x1f\x7f"\\]', "_", base)
-
-
-# Files and vector stores are deployment-wide and use the deployment's provider key, so every
-# route here needs the deployment administrator, not just an anonymous user identity.
-@file_bp.before_request
-def _deployment_admin_only():
-    return deployment_admin_denied()
 
 
 @file_bp.route("/api/files", methods=["GET"])

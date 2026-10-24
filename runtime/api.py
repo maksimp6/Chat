@@ -3,19 +3,12 @@
 from flask import Blueprint, jsonify, request
 
 from api.contracts import ContractViolation, validate_api_contract
-from identity.deployment_admin import deployment_admin_denied
 from invocation.api import get_invocation_status, get_invocation_trace
 from invocation.manager import create_invocation
 from sessions.manager import create_session, get_session
 from sessions.profiles import clone_profile, get_profile, list_profiles, session_profile
 
 runtime_bp = Blueprint("runtime", __name__, url_prefix="/api")
-
-
-# Sessions, invocations, and their traces are not tied to a user, so they belong to the deployment.
-@runtime_bp.before_request
-def _deployment_admin_only():
-    return deployment_admin_denied()
 
 
 def _contract_response(name, payload, status=200):

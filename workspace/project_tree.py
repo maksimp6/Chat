@@ -3,8 +3,6 @@
 import os
 from flask import Blueprint, jsonify, request
 
-from identity.deployment_admin import deployment_admin_denied
-
 project_tree_bp = Blueprint("project_tree", __name__)
 PROJECT_ROOT = os.path.realpath(os.getenv("LOGOS_PROJECT_ROOT", os.path.dirname(__file__)))
 MAX_NODES = 2000
@@ -46,12 +44,6 @@ def _tree(path, depth=0, budget=None):
         if is_dir:
             item["children"] = _tree(full, depth + 1, budget)
     return entries
-
-
-# The tree shows the source layout, which belongs to the deployment rather than to a user.
-@project_tree_bp.before_request
-def _deployment_admin_only():
-    return deployment_admin_denied()
 
 
 @project_tree_bp.route("/api/project-tree", methods=["GET"])
