@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from typing import Any
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
 
@@ -305,3 +306,101 @@ def _publish_settlement(
                     "updated_at": now,
                 },
             )
+
+
+def record_printer_downtime(
+    owner_id: str,
+    printer_id: str,
+    state: str,
+    timestamp: float,
+    *,
+    reason: str | None = None,
+    event_id: str | None = None,
+) -> bool:
+    """Commit one trusted observation to canonical shared MemoryStore atomically.
+
+    This is a backend API, not a publicly exposed telemetry endpoint.
+    """
+    if not owner_id or not printer_id or "/" in printer_id:
+        raise ValueError("owner and printer are required")
+    from .downtime import DowntimeTracker
+
+    key = "printing/downtime/" + owner_id + "/" + printer_id
+    with get_store().transaction() as tx:
+        snapshot = tx.get(key)
+        tracker = DowntimeTracker.from_snapshot(snapshot) if snapshot else DowntimeTracker()
+        changed = tracker.observe(state, timestamp, reason=reason, event_id=event_id)
+        if changed:
+            tx.set(key, tracker.snapshot())
+    return changed
+
+
+def get_printer_downtime(
+    owner_id: str, printer_id: str, start: float, end: float
+) -> dict[str, object]:
+    """Read committed downtime intervals for this owner/printer."""
+    if not owner_id or not printer_id or "/" in printer_id:
+        raise ValueError("owner and printer are required")
+    from .downtime import DowntimeTracker
+
+    snapshot = get_store().get("printing/downtime/" + owner_id + "/" + printer_id)
+    tracker = DowntimeTracker.from_snapshot(snapshot) if snapshot else DowntimeTracker()
+    return tracker.summary(start, end)
+
+
+def record_bambu_print_report(
+    owner_id: str,
+    printer_id: str,
+    payload: dict[str, Any],
+    received_at: float,
+    *,
+    event_id: str | None = None,
+) -> bool:
+    """Record authenticated status fetched by an external read-only transport."""
+    from .bambu_telemetry import parse_bambu_report
+
+    return record_printer_downtime(
+        owner_id,
+        printer_id,
+        parse_bambu_report(payload),
+        received_at,
+        event_id=event_id,
+    )
+
+
+def expire_printer_telemetry(
+    owner_id: str,
+    printer_id: str,
+    *,
+    last_seen: float,
+    now: float,
+    timeout: float = 90,
+) -> bool:
+    """Persist telemetry UNKNOWN transition after an observed communications gap."""
+    from .bambu_telemetry import expire_telemetry
+    from .downtime import DowntimeTracker
+
+    if not owner_id or not printer_id or "/" in printer_id:
+        raise ValueError("owner and printer are required")
+    key = "printing/downtime/" + owner_id + "/" + printer_id
+    with get_store().transaction() as tx:
+        snapshot = tx.get(key)
+        tracker = DowntimeTracker.from_snapshot(snapshot) if snapshot else DowntimeTracker()
+        changed = expire_telemetry(tracker, last_seen=last_seen, now=now, timeout=timeout)
+        if changed:
+            tx.set(key, tracker.snapshot())
+    return changed
+
+
+def get_printer_daily_downtime(
+    owner_id: str, printer_id: str, now: datetime, *, days: int = 7
+) -> list[dict[str, Any]]:
+    """Return day-level summaries from the current canonical MemoryStore history."""
+    from .bambu_telemetry import period_summaries
+    from .downtime import DowntimeTracker
+
+    if not owner_id or not printer_id or "/" in printer_id:
+        raise ValueError("owner and printer are required")
+    snapshot = get_store().get("printing/downtime/" + owner_id + "/" + printer_id)
+    tracker = DowntimeTracker.from_snapshot(snapshot) if snapshot else DowntimeTracker()
+    return period_summaries(tracker, now, days=days)
