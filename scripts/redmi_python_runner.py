@@ -434,12 +434,15 @@ def run_listener(listener):
     thread = None
     def shutdown(*_):
         listener.stop.set()
-        if active:
+        if active and thread and thread.is_alive():
             active.cancel.set()
         else:
             raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, shutdown)
     signal.signal(signal.SIGINT, shutdown)
+    def poll_deadline(*_):
+        raise TimeoutError("Broker poll deadline")
+    signal.signal(signal.SIGALRM, poll_deadline)
     lock = (listener.state / "runner.lock").open("a+")
     try:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -454,8 +457,15 @@ def run_listener(listener):
                 active, thread = None, None
             try:
                 query = listener.parameters("Busy" if active else "Online")
-                message = listener.api.request(urllib.parse.urljoin(listener.broker, "message") + "?" + query,
-                                               listener.authorize(), timeout=65)
+                # Busy long polls must end so a completed job can advertise Online.
+                # A socket timeout alone can be extended indefinitely by heartbeat bytes.
+                token = listener.authorize()
+                signal.setitimer(signal.ITIMER_REAL, 5 if active else 70)
+                try:
+                    message = listener.api.request(urllib.parse.urljoin(listener.broker, "message") + "?" + query,
+                                                   token, timeout=65)
+                finally:
+                    signal.setitimer(signal.ITIMER_REAL, 0)
                 errors = 0
                 if not message:
                     continue
@@ -491,6 +501,8 @@ def run_listener(listener):
                 thread = threading.Thread(target=active.run, daemon=False)
                 thread.start()
             except (TimeoutError, urllib.error.URLError) as exc:
+                if isinstance(exc, TimeoutError) and active:
+                    continue
                 errors += 1
                 print("CONNECTION_RETRY", type(exc).__name__, flush=True)
                 listener.stop.wait(min(60, 2 ** min(errors, 6)))

@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import threading
+import time
 from types import SimpleNamespace
 import uuid
 
@@ -115,7 +116,8 @@ def test_redirect_cannot_forward_credentials():
         runner.NoRedirect().redirect_request(None, None, 302, "", {}, "https://example.org")
 
 
-def test_next_job_arriving_during_poll_after_worker_finishes(tmp_path, monkeypatch):
+@pytest.mark.parametrize("heartbeat", [False, True])
+def test_next_job_arriving_during_poll_after_worker_finishes(tmp_path, monkeypatch, heartbeat):
     first_started = threading.Event()
     release_first = threading.Event()
     acquired = []
@@ -141,14 +143,16 @@ def test_next_job_arriving_during_poll_after_worker_finishes(tmp_path, monkeypat
         polls = 0
         def request(self, url, token, *args, **kwargs):
             if url.endswith("acquirejob"):
-                return {"jobId": str(self.polls), "steps": []}
+                return {"jobId": "1" if self.polls == 1 else "2", "steps": []}
             self.polls += 1
             if self.polls == 2:
                 assert first_started.wait(2)
                 release_first.set()
                 workers[0].join(2)
                 assert not workers[0].is_alive()
-            if self.polls > 2:
+                if heartbeat:
+                    time.sleep(0.5)  # No message; only the absolute deadline can wake us.
+            if self.polls > (3 if heartbeat else 2):
                 listener.stop.set()
                 return None
             return {"messageType": "RunnerJobRequest", "body": {"runner_request_id": str(self.polls),
@@ -160,6 +164,15 @@ def test_next_job_arriving_during_poll_after_worker_finishes(tmp_path, monkeypat
     listener.api = FakeAPI()
     monkeypatch.setattr(runner, "Job", Worker)
     monkeypatch.setattr(runner.threading, "Thread", make_thread)
-    monkeypatch.setattr(runner.signal, "signal", lambda *args: None)
-    runner.run_listener(listener)
+    real_signal, real_timer = runner.signal.signal, runner.signal.setitimer
+    original_alarm = runner.signal.getsignal(runner.signal.SIGALRM)
+    monkeypatch.setattr(runner.signal, "signal", lambda sig, handler:
+                        real_signal(sig, handler) if sig == runner.signal.SIGALRM else None)
+    monkeypatch.setattr(runner.signal, "setitimer", lambda kind, seconds:
+                        real_timer(kind, 0.1 if seconds else 0))
+    try:
+        runner.run_listener(listener)
+    finally:
+        real_timer(runner.signal.ITIMER_REAL, 0)
+        real_signal(runner.signal.SIGALRM, original_alarm)
     assert acquired == ["1", "2"]
