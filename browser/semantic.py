@@ -51,6 +51,12 @@ def _normalize_states(value: Any) -> tuple[str, ...]:
     return tuple(sorted({str(item).strip() for item in values if str(item).strip()}))
 
 
+def _node_value(raw: Mapping[str, Any]) -> Any:
+    # "or" would drop a real value of 0 or False in favour of the text field.
+    value = raw.get("value")
+    return raw.get("text") if value is None or value == "" else value
+
+
 @dataclass(frozen=True)
 class SemanticNode:
     node_id: str
@@ -67,7 +73,7 @@ class SemanticNode:
             node_id=node_id,
             role=role,
             name=_bounded_text(raw.get("name") or raw.get("label"), 240),
-            value=_bounded_text(raw.get("value") or raw.get("text"), 320),
+            value=_bounded_text(_node_value(raw), 320),
             states=_normalize_states(raw.get("states")),
         )
 
