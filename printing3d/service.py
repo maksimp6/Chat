@@ -39,6 +39,8 @@ def _decimal(value, name: str, *, minimum: str = "0") -> Decimal:
         number = Decimal(str(value))
     except Exception as exc:
         raise ValueError(f"{name} must be numeric") from exc
+    if not number.is_finite():
+        raise ValueError(f"{name} must be a finite number")
     if number < Decimal(minimum):
         raise ValueError(f"{name} must be >= {minimum}")
     return number

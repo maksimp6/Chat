@@ -28,7 +28,7 @@ def quote():
         return jsonify({"error": "request body must be an object"}), 400
     try:
         return jsonify(service.calculate_quote(payload))
-    except ValueError:
+    except (ArithmeticError, ValueError):
         return jsonify({"error": "invalid quote parameters"}), 400
 
 
@@ -41,7 +41,7 @@ def list_orders():
         return jsonify(
             {"orders": service.list_orders(_store(), owner, status=request.args.get("status"))}
         )
-    except ValueError:
+    except (ArithmeticError, ValueError):
         return jsonify({"error": "invalid order status"}), 400
 
 
@@ -55,7 +55,7 @@ def create_order():
         return jsonify({"error": "request body must be an object"}), 400
     try:
         return jsonify(service.create_order(_store(), owner, payload)), 201
-    except ValueError:
+    except (ArithmeticError, ValueError):
         return jsonify({"error": "invalid order"}), 400
 
 
@@ -82,7 +82,7 @@ def update_order_status(order_id):
         order = service.update_order_status(
             _store(), owner, order_id, str(payload.get("status") or "")
         )
-    except ValueError:
+    except (ArithmeticError, ValueError):
         return jsonify({"error": "invalid order status"}), 400
     if order is None:
         return jsonify({"error": "order not found"}), 404
@@ -107,7 +107,7 @@ def settle_order(order_id):
             actual_revenue=payload.get("actual_revenue"),
             actual_cost=payload.get("actual_cost"),
         )
-    except ValueError:
+    except (ArithmeticError, ValueError):
         return jsonify({"error": "invalid settlement"}), 400
     if order is None:
         return jsonify({"error": "order not found"}), 404
@@ -132,7 +132,7 @@ def set_financing_plan():
         return jsonify({"error": "request body must be an object"}), 400
     try:
         return jsonify(finance.set_financing_plan(_store(), owner, payload))
-    except ValueError:
+    except (ArithmeticError, ValueError):
         return jsonify({"error": "invalid finance plan"}), 400
 
 
@@ -143,5 +143,5 @@ def get_finance_status():
         return _auth_error()
     try:
         return jsonify(finance.get_payback_status(_store(), owner, month=request.args.get("month")))
-    except ValueError:
+    except (ArithmeticError, ValueError):
         return jsonify({"error": "invalid finance status request"}), 400
