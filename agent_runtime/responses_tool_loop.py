@@ -82,6 +82,11 @@ def run_tool_loop(
         continuation_input = list(response.get("output", []) or []) + tool_outputs
         response = continue_request(continuation_input, response)
         rounds += 1
-    if not extract_function_calls(response):
+    # The last continuation can itself request a gated call. That call must reach the approval
+    # check like any other batch, not fail the loop.
+    calls = extract_function_calls(response)
+    if not calls:
+        return response
+    if should_pause is not None and should_pause(calls):
         return response
     raise RuntimeError("Responses API tool loop exceeded max_rounds")
