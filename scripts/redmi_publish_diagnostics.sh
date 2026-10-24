@@ -64,6 +64,7 @@ git -C "$work" push origin "HEAD:refs/heads/$branch"
 
 # Read from GitHub into a fresh LFS store; a local pointer/object is not upload proof.
 GIT_LFS_SKIP_SMUDGE=1 git clone -q --no-checkout --single-branch --branch "$branch" "$remote" "$verify"
+git -C "$verify" lfs install --local >/dev/null
 git -C "$verify" config lfs.storage "$verify/.git/lfs"
 GIT_LFS_SKIP_SMUDGE=1 git -C "$verify" checkout -q --detach "$commit"
 git -C "$verify" lfs fetch --include="$path" --exclude='' origin "$commit"
