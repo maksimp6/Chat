@@ -32,7 +32,17 @@ logger = logging.getLogger("filesystem_mcp")
 
 BASE_DIR = os.path.realpath(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BACKUP_DIR = os.path.join(BASE_DIR, ".safe_backups")
-os.makedirs(BACKUP_DIR, exist_ok=True)
+# Basenames of credential and memory stores that no tool may read or write, whatever their directory.
+_PROTECTED_NAME_RE = re.compile(r"(?:\.memory(?:\.lock)?|\.pem|\.key|\.p12)$|^id_(?:rsa|ed25519|ecdsa)")
+
+
+def _refuse_protected(target: str) -> None:
+    """Dot-files and directories (.env, .git, backups) and credential stores are refused."""
+    parts = os.path.relpath(target, BASE_DIR).split(os.sep)
+    if any(part.startswith(".") and part != "." for part in parts) or _PROTECTED_NAME_RE.search(
+        parts[-1]
+    ):
+        raise PermissionError("Доступ запрещен: служебные и секретные файлы недоступны инструментам")
 
 
 def _get_abs_path(path: str) -> str:
@@ -47,6 +57,7 @@ def _get_abs_path(path: str) -> str:
             raise PermissionError("Доступ запрещен: выход за пределы директории проекта")
     except ValueError:
         raise PermissionError("Доступ запрещен: недопустимый путь к файлу")
+    _refuse_protected(target)
     return target
 
 
@@ -165,6 +176,8 @@ def write_file(args: dict) -> dict:
             try:
                 with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
                     old_content = f.read()
+                # Created on first use: importing this module must not create directories.
+                os.makedirs(BACKUP_DIR, exist_ok=True)
                 backup_file = os.path.join(BACKUP_DIR, f"{os.path.basename(abs_path)}.bak")
                 shutil.copy2(abs_path, backup_file)
             except Exception as be:
@@ -564,7 +577,10 @@ def grep_search(args: dict) -> dict:
     if not query:
         return {"error": "Параметр 'query' обязателен"}
     file_pattern = args.get("file_pattern", "*.py")
-    max_matches = int(args.get("max_matches", 50))
+    try:
+        max_matches = max(1, int(args.get("max_matches", 50)))
+    except (TypeError, ValueError):
+        return {"error": "Параметр 'max_matches' должен быть целым числом"}
     case_sensitive = args.get("case_sensitive", False)
 
     flags = 0 if case_sensitive else re.IGNORECASE

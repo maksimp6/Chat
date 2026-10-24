@@ -61,8 +61,12 @@ def _system_status(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str
     }
 
 
+# One gateway for the process: a gateway built per call would list only its own, empty registry.
+_AGENT_GATEWAY = AgentGateway()
+
+
 def _agents(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
-    gateway = AgentGateway()
+    gateway = _AGENT_GATEWAY
     agents = []
     for agent in gateway.list_agents():
         agents.append(
@@ -79,10 +83,11 @@ def _agents(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
     return {"agents": agents}
 
 
-def _session(arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
+def _session(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
     session_id = str(arguments.get("session_id") or "").strip()
     session = get_session(session_id) if session_id else None
-    if not session:
+    # A session is visible only to the owner it was created for, as in the runtime API.
+    if not session or not user or (session.get("metadata") or {}).get("user_id") != user:
         raise LookupError("Session not found")
     return {
         "session": {
