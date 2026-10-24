@@ -34,6 +34,7 @@
       data-base-path="{{ preview_base_path or '' }}"
       data-static-base="{{ static_root }}"
       data-static-version="{{ static_version }}"
+      data-app-revision="{{ app_revision }}"
     ></script>
     <script
       src="{{ static_root }}/core_api.js?v={{ static_version }}"
@@ -274,6 +275,10 @@
               🌙
             </button>
           </div>
+        </div>
+        <div id="app-version" class="app-version" role="status" aria-live="polite"
+             data-update-state="loaded" title="Версия интерфейса, загруженная этой вкладкой">
+          Версия {{ app_revision[:8] if app_revision != 'unknown' else static_version[:8] }}
         </div>
         <div id="chatbox">
           {% if selected_conversation %}

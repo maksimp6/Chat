@@ -15,13 +15,41 @@
     if (existing) existing.remove();
   }
 
+  var STATUS_LABELS = {
+    lead: "Лид",
+    active: "Активен",
+    negotiating: "Переговоры",
+    paused: "Пауза",
+    completed: "Завершён",
+    archived: "В архиве",
+  };
+
+  var DIRECTION_LABELS = { outbound: "исходящее", inbound: "входящее" };
+
+  function statusLabel(status) {
+    return STATUS_LABELS[status] || status || "";
+  }
+
+  // Превью обрывается по слову, чтобы не резать слово посередине.
+  function preview(text, limit) {
+    if (text.length <= limit) return text;
+    var cut = text.slice(0, limit);
+    var space = cut.lastIndexOf(" ");
+    if (space > limit / 2) cut = cut.slice(0, space);
+    return cut + "…";
+  }
+
+  function emptyLine(text) {
+    return h("div", { style: "font-size:12px;padding:6px 0;opacity:.72;" }, text);
+  }
+
   function openPartnerRelationsModal() {
     closeModal();
 
     var overlay = h("div", { id: "partner-relations-modal", class: "logos-dept-overlay" });
     var card = h("div", { class: "logos-dept-card" });
     var head = h("div", { class: "logos-dept-head" });
-    head.appendChild(h("h3", {}, "Partner Relations"));
+    head.appendChild(h("h3", {}, "Партнёры"));
     var close = h("button", { type: "button", "aria-label": "Закрыть" }, "×");
     close.onclick = closeModal;
     head.appendChild(close);
@@ -44,9 +72,17 @@
     var email = h("input", { type: "email", placeholder: "Email", "aria-label": "Email" });
     var phone = h("input", { placeholder: "Телефон", "aria-label": "Телефон" });
     var create = h("button", { type: "submit" }, "Добавить партнёра");
-    [name, organization, email, phone, create].forEach(function (n) {
-      form.appendChild(n);
-    });
+    function field(title, input) {
+      var wrap = h("label", { style: "display:grid;gap:4px;font-size:12px;" });
+      wrap.appendChild(h("span", {}, title));
+      wrap.appendChild(input);
+      return wrap;
+    }
+    form.appendChild(field("Имя или компания", name));
+    form.appendChild(field("Организация", organization));
+    form.appendChild(field("Email", email));
+    form.appendChild(field("Телефон", phone));
+    form.appendChild(create);
     card.appendChild(form);
 
     var list = h("div", { class: "logos-dept-list" });
@@ -79,7 +115,9 @@
               h(
                 "span",
                 {},
-                [partner.organization, partner.status, partner.email].filter(Boolean).join(" · "),
+                [partner.organization, statusLabel(partner.status), partner.email]
+                  .filter(Boolean)
+                  .join(" · "),
               ),
             );
             row.onclick = function () {
@@ -127,13 +165,13 @@
         style: "margin-top:14px;padding-top:14px;border-top:1px solid rgba(127,127,127,.25);",
       });
       detail.appendChild(
-        h("h4", { style: "margin:0 0 8px;" }, partner.name + " · " + partner.status),
+        h("h4", { style: "margin:0 0 8px;" }, partner.name + " · " + statusLabel(partner.status)),
       );
 
       var status = h("select", { "aria-label": "Статус партнёра" });
       ["lead", "active", "negotiating", "paused", "completed", "archived"].forEach(
         function (value) {
-          var option = h("option", { value: value }, value);
+          var option = h("option", { value: value }, STATUS_LABELS[value]);
           if (value === partner.status) option.selected = true;
           status.appendChild(option);
         },
@@ -169,6 +207,7 @@
           "Контакты (" + (partner.contacts || []).length + ")",
         ),
       );
+      if (!(partner.contacts || []).length) detail.appendChild(emptyLine("Пока пусто."));
       (partner.contacts || []).forEach(function (contact) {
         detail.appendChild(
           h(
@@ -188,16 +227,17 @@
           "Переписка (" + (partner.messages || []).length + ")",
         ),
       );
+      if (!(partner.messages || []).length) detail.appendChild(emptyLine("Пока пусто."));
       (partner.messages || []).forEach(function (message) {
         detail.appendChild(
           h(
             "div",
             { style: "font-size:12px;padding:6px 0;" },
             "[" +
-              message.direction +
+              (DIRECTION_LABELS[message.direction] || message.direction) +
               "] " +
               message.subject +
-              (message.body ? ": " + message.body.slice(0, 160) : ""),
+              (message.body ? ": " + preview(message.body, 160) : ""),
           ),
         );
       });
@@ -209,6 +249,7 @@
           "Follow-up (" + (partner.followups || []).length + ")",
         ),
       );
+      if (!(partner.followups || []).length) detail.appendChild(emptyLine("Пока пусто."));
       (partner.followups || []).forEach(function (followup) {
         var line = h("div", {
           style: "display:flex;gap:8px;align-items:center;font-size:12px;padding:6px 0;",

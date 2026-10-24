@@ -1,7 +1,8 @@
 """Runtime view of the prepared Ultra model profiles.
 
-The catalog only describes the model picker. It never changes a provider request:
-every profile keeps explicit blockers until a separately reviewed adapter, provider
+The catalog describes the model picker. Its only effect on provider requests is
+``ultra_request_defaults``, which fills in unset truncation and reasoning effort.
+Every profile keeps explicit blockers until a separately reviewed adapter, provider
 evidence and an owner-approved run budget exist. Registry entries marked
 ``available: False`` stay listed for accounting but cannot be selected.
 """
@@ -80,9 +81,41 @@ def profile_summary(profile: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def ultra_request_defaults(model_key: str) -> dict[str, Any]:
+    """Return the Ultra defaults for a Responses request that the caller did not set.
+
+    Only ``truncation`` and ``reasoning_effort`` are applied. No output ceiling is set,
+    because the catalog publishes no ``documented_hosted_ceiling_tokens`` for any model.
+    """
+    profile = ultra_profiles().get(model_key)
+    if profile is None or profile.get("transport") != "responses":
+        # Completion-API models (text_generation_async, e.g. yandexgpt-5.1) keep their own wire shape.
+        return {}
+    wire = profile.get("wire_parameters") or {}
+    defaults: dict[str, Any] = {}
+    if wire.get("truncation") == "disabled":
+        defaults["truncation"] = "disabled"
+    effort = (wire.get("reasoning") or {}).get("effort")
+    if effort:
+        defaults["reasoning_effort"] = effort
+    return defaults
+
+
+def completion_model_keys() -> set[str]:
+    """Registry keys whose Ultra profile uses the completion API, not Responses."""
+    return {
+        key
+        for key, profile in ultra_profiles().items()
+        if profile.get("transport") == "text_generation_async"
+    }
+
+
 def annotate_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of a model catalog with registry availability and Ultra summaries."""
     profiles = ultra_profiles()
+    completion_keys = {
+        key for key, profile in profiles.items() if profile.get("transport") == "text_generation_async"
+    }
     annotated = deepcopy(catalog)
     for section in ("text", "voice"):
         for key, entry in (annotated.get(section) or {}).items():
@@ -93,4 +126,10 @@ def annotate_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
             profile = profiles.get(key)
             if profile is not None:
                 entry["ultra_profile"] = profile_summary(profile)
+    # Completion-API models are listed apart; the chat picker only offers Responses models.
+    text = annotated.get("text")
+    if isinstance(text, dict):
+        completion = {key: text.pop(key) for key in list(text) if key in completion_keys}
+        if completion:
+            annotated["completion"] = completion
     return annotated

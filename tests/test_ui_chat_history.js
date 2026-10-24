@@ -9,7 +9,7 @@ const { BrowserShim } = require("../browser/emulator/browser_dom");
 
 const HTML =
   '<div id="chatbox"></div><textarea id="msg-input"></textarea>' +
-  '<button id="send-btn" type="button"></button>' +
+  '<button id="send-btn" type="button"></button><button id="new-chat-btn" type="button"></button>' +
   '<div id="model-modal" class="modal" hidden aria-hidden="true"></div>';
 
 function reply(status, body) {
@@ -32,7 +32,7 @@ function deferredBoot({ conversation = "c1" } = {}) {
       }),
   };
   const shim = new BrowserShim(HTML);
-  const { document, context } = shim.load(["static/core_api.js", "static/chat.js"], {
+  const { document, context } = shim.load(["static/core_api.js", "static/chat.js", "static/sidebar.js"], {
     LogosDispatcher: dispatcher,
     currentConvId: conversation,
     currentModel: "logos-runtime",
@@ -50,7 +50,7 @@ function instantBoot({ conversation = "c1", responses = [], extra = {} } = {}) {
     },
   };
   const shim = new BrowserShim(HTML);
-  const { document, context } = shim.load(["static/core_api.js", "static/chat.js"], {
+  const { document, context } = shim.load(["static/core_api.js", "static/chat.js", "static/sidebar.js"], {
     LogosDispatcher: dispatcher,
     currentConvId: conversation,
     currentModel: "logos-runtime",
@@ -115,8 +115,7 @@ test("usage without an output count shows zero instead of 'undefined'", async ()
 
 test("opening the model picker for a new chat sets the modal's open state", async () => {
   const { document, context } = instantBoot({ conversation: null });
-  document.getElementById("msg-input").value = "привет";
-  document.getElementById("send-btn").click();
+  document.getElementById("new-chat-btn").click();
   await settle();
 
   const modal = document.getElementById("model-modal");

@@ -504,7 +504,7 @@ function loadHistory(convId) {
   const chatbox = document.getElementById("chatbox");
   if (!chatbox) return;
   chatbox.replaceChildren();
-  window.LogosDispatcher.request(`/api/conversations/${convId}/messages`)
+  return window.LogosDispatcher.request(`/api/conversations/${convId}/messages`)
     .then((r) => {
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json();
@@ -556,102 +556,87 @@ function loadHistory(convId) {
 document.addEventListener("DOMContentLoaded", function () {
   const sendBtn = document.getElementById("send-btn");
   const input = document.getElementById("msg-input");
+  const pendingConversations = new Set();
+  let creatingConversation = false;
 
-  function sendMessage() {
+  async function sendMessage() {
     if (!input) return;
-    const text = input.value.trim();
+    const rawText = input.value;
+    const text = rawText.trim();
     if (!text) return;
-    if (!currentConvId) {
-      if (typeof renderModelModal === "function") renderModelModal();
-      const modal = document.getElementById("model-modal");
-      if (modal) window.LogosCoreAPI.ui.modal.open(modal);
-      return;
+    const selectedAtSubmit = currentConvId;
+    if (selectedAtSubmit ? pendingConversations.has(selectedAtSubmit) : creatingConversation) return;
+
+    const turn = { conversationId: selectedAtSubmit, model: currentModel, text: text };
+    const needsConversation = !selectedAtSubmit;
+    if (needsConversation) creatingConversation = true;
+    else pendingConversations.add(turn.conversationId);
+    let typingEl = null;
+    try {
+      // Keep the submitted settings and text even if the user edits the next draft while waiting.
+      const params = typeof window.getResponsesParams === "function" ? window.getResponsesParams() : {};
+      turn.params = JSON.parse(JSON.stringify(params || {}));
+      if (needsConversation) {
+        const createdId = await createConversation(turn.model, { select: false });
+        if (!createdId) return;
+        turn.conversationId = createdId;
+        pendingConversations.add(createdId);
+        // Selecting another chat while creation is pending must not pull the user back.
+        if (currentConvId === selectedAtSubmit) await selectConv(createdId);
+      }
+
+      if (currentConvId === turn.conversationId) {
+        if (input.value === rawText) input.value = "";
+        addMessage(turn.text, "user", false, 0);
+        const chatbox = document.getElementById("chatbox");
+        typingEl = document.createElement("div");
+        typingEl.className = "typing";
+        typingEl.innerHTML = "<span></span><span></span><span></span>";
+        if (chatbox) chatbox.appendChild(typingEl);
+      }
+      const t0 = performance.now();
+      const response = await window.LogosDispatcher.request("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: turn.text,
+          conversation_id: turn.conversationId,
+          model: turn.model,
+          params: turn.params,
+        }),
+      }, { timeoutMs: 300000 });
+      const data = await response.json().catch(() => ({}));
+      const clientTotalMs = Math.round(performance.now() - t0);
+      if (data.title && typeof conversations !== "undefined" && Array.isArray(conversations)) {
+        const conversation = conversations.find((item) => item.id === turn.conversationId);
+        if (conversation) {
+          conversation.title = data.title;
+          localStorage.setItem("conversations", JSON.stringify(conversations));
+          if (typeof renderSidebar === "function") renderSidebar();
+        }
+      }
+      // The backend persists this turn; never paint its late answer into a different conversation.
+      if (currentConvId !== turn.conversationId) return;
+      if (data.requires_approval) {
+        renderApprovalCard(data.tool_call, data.original_message || turn.text);
+      } else if (data.reply) {
+        addMessage(data.reply, "bot", false, data.cost || 0, data.timings,
+          clientTotalMs, data.reasoning, data.usage, data.trace, { id: data.message_id });
+      } else {
+        addMessage("⚠️ Ошибка: " + (data.error || data.detail || data.title || "HTTP " + response.status),
+          "error", false, data.cost || 0, data.timings, clientTotalMs,
+          data.reasoning, data.usage, data.trace);
+      }
+    } catch (error) {
+      if (currentConvId === turn.conversationId) {
+        if (!input.value) input.value = rawText;
+        addMessage("⚠️ Ошибка: " + (error.message || "Сетевой сбой"), "error", false, 0);
+      }
+    } finally {
+      if (typingEl) typingEl.remove();
+      if (turn.conversationId) pendingConversations.delete(turn.conversationId);
+      if (needsConversation) creatingConversation = false;
     }
-
-    input.value = "";
-    addMessage(text, "user", false, 0);
-    const params =
-      typeof window.getResponsesParams === "function" ? window.getResponsesParams() : {};
-    const t0 = performance.now();
-
-    var chatboxEl = document.getElementById("chatbox");
-    var typingEl = document.createElement("div");
-    typingEl.className = "typing";
-    typingEl.innerHTML = "<span></span><span></span><span></span>";
-    if (chatboxEl) chatboxEl.appendChild(typingEl);
-    window.LogosDispatcher.request("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: text,
-        conversation_id: currentConvId,
-        model: currentModel,
-        params: params,
-      }),
-    })
-      .then(async (r) => {
-        const data = await r.json().catch(() => ({}));
-        return { ok: r.ok, status: r.status, data };
-      })
-      .then((result) => {
-        typingEl.remove();
-        const data = result.data || {};
-        const clientTotalMs = Math.round(performance.now() - t0);
-        if (data.title && Array.isArray(conversations)) {
-          var conversation = conversations.find(function (item) {
-            return item.id === currentConvId;
-          });
-          if (conversation) {
-            conversation.title = data.title;
-            localStorage.setItem("conversations", JSON.stringify(conversations));
-            if (typeof renderSidebar === "function") renderSidebar();
-          }
-        }
-        if (data.requires_approval) {
-          renderApprovalCard(data.tool_call, data.original_message || text);
-        } else if (data.reply) {
-          addMessage(
-            data.reply,
-            "bot",
-            false,
-            data.cost || 0,
-            data.timings,
-            clientTotalMs,
-            data.reasoning,
-            data.usage,
-            data.trace,
-            { id: data.message_id },
-          );
-        } else if (data.error) {
-          addMessage(
-            "⚠️ Ошибка: " + data.error,
-            "error",
-            false,
-            data.cost || 0,
-            data.timings,
-            clientTotalMs,
-            data.reasoning,
-            data.usage,
-            data.trace,
-          );
-        } else {
-          addMessage(
-            `⚠️ Ошибка HTTP ${result.status}`,
-            "error",
-            false,
-            0,
-            null,
-            clientTotalMs,
-            null,
-            null,
-            data.trace,
-          );
-        }
-      })
-      .catch((e) => {
-        typingEl.remove();
-        addMessage("⚠️ Ошибка: " + (e.message || "Сетевой сбой"), "error", false, 0);
-      });
   }
 
   if (sendBtn) sendBtn.addEventListener("click", sendMessage);

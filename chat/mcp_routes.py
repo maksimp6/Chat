@@ -12,6 +12,7 @@ from provider_accounts.claude_oauth import (
     is_claude_model,
 )
 from core.config import Config
+from core.model_profiles import completion_model_keys
 from observability.trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
 from invocation.manager import (
     create_invocation,
@@ -281,6 +282,9 @@ def chat():
 
         if not conv_id or not message:
             return jsonify({"error": "conversation_id и message обязательны"}), 400
+        if isinstance(model_key, str) and model_key in completion_model_keys():
+            # These models speak the completion API; sending them through Responses is wrong.
+            return jsonify({"error": "model_uses_completion_api", "endpoint": "/api/completion"}), 400
 
         owner_id = get_current_owner_id(required=False)
         if not check_access(conv_id, owner_id):

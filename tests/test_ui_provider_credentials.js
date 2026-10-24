@@ -92,7 +92,7 @@ test("a failed status load is reported inside the modal", async () => {
   window.openProviderCredentialsModal();
   await settle();
 
-  assert.equal(outputText(document), "Ошибка проверки: HTTP 401");
+  assert.equal(outputText(document), "Ошибка проверки: сервер вернул ошибку 401");
 });
 
 test("submitting without any key shows a field error and sends nothing", async () => {

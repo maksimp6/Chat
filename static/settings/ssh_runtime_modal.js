@@ -30,25 +30,25 @@
         UI.lbl("Общий known_hosts (серверный путь)") +
         UI.inp("set-ssh-known-hosts", "text", "", ' placeholder="/srv/logos/ssh/known_hosts"') +
         "</div>",
+      '<fieldset id="ssh-inactive-restrictions" disabled style="margin-top:10px;border:1px solid var(--m-border,#ddd);border-radius:6px;padding:10px;">',
+      '<legend>Ограничения отключены</legend>',
+      '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:8px;">' +
+        "Список разрешённых команд и ограничения privileged-команд не применяются. Подтверждения операций не запрашиваются. Прежние значения ниже сохраняются без изменений." +
+        "</div>",
       '<div style="margin-top:10px;">' +
-        UI.lbl("Command allowlist (regex, один шаблон на строку)") +
+        UI.lbl("Список разрешённых команд (regex, один шаблон на строку)") +
         UI.ta(
           "set-ssh-command-allowlist",
           "",
           "height:80px;font-family:monospace;font-size:11px;",
         ) +
         "</div>",
-      UI.chk(
-        "set-ssh-allow-privileged",
-        false,
-        "Разрешать privileged-команды (sudo/su/doas/pkexec)",
-        "",
-        "Опасные операции остаются под approval gate.",
-      ),
+      UI.chk("set-ssh-allow-privileged", false, "Разрешать privileged-команды (sudo/su/doas/pkexec)"),
       UI.chk("set-ssh-approval-write", true, "Требовать подтверждение записи файлов"),
       UI.chk("set-ssh-approval-privileged", true, "Требовать подтверждение privileged-команд"),
+      "</fieldset>",
       '<div style="margin-top:10px;">' +
-        UI.lbl("Named targets (JSON)") +
+        UI.lbl("Именованные цели (JSON)") +
         UI.ta("set-ssh-targets", "", "height:180px;font-family:monospace;font-size:11px;") +
         "</div>",
       '<div style="display:flex;gap:8px;align-items:end;margin-top:10px;">',
@@ -71,6 +71,14 @@
     var content = document.createElement("div");
     content.className = "ssh-runtime-body";
     content.innerHTML = tabSsh;
+    // Форма закрыта до ответа GET: иначе значения по умолчанию перезаписали бы сохранённую конфигурацию (пункт 62)
+    var sshControls = content.querySelectorAll("input, textarea, button");
+    function setSshFormLocked(locked) {
+      sshControls.forEach(function (el) {
+        el.disabled = locked;
+      });
+    }
+    setSshFormLocked(true);
 
     var ov = CoreUI.modal.create({
       id: "ssh-runtime-modal-custom",
@@ -81,7 +89,7 @@
     });
     var modalContent = ov.querySelector(".modal-content");
     modalContent.style.cssText =
-      "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;width:94%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
+      "background:var(--m-bg,#fff);border-radius:12px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
     (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 
@@ -123,7 +131,8 @@
           "Последняя проверка: " +
             (last.success ? "успешна" : "ошибка") +
             (last.target ? " · " + last.target : "") +
-            (last.duration_ms != null ? " · " + last.duration_ms + " ms" : ""),
+            (last.duration_ms != null ? " · " + last.duration_ms + " мс" : ""),
+          !last.success,
         );
       } else {
         setSshStatus("Конфигурация загружена.");
@@ -137,7 +146,14 @@
           return data;
         });
       })
-      .then(populateSshSettings)
+      .then(function (data) {
+        // Unlock only after a successful populate, so a failure leaves the form closed.
+        populateSshSettings(data);
+        setSshFormLocked(false);
+        var readOnly = data.read_only === true;
+        document.getElementById("set-ssh-allow-exec").disabled = readOnly;
+        document.getElementById("set-ssh-allow-write").disabled = readOnly;
+      })
       .catch(function (err) {
         setSshStatus(err.message, true);
       });
@@ -158,7 +174,7 @@
       try {
         targets = targetsText ? JSON.parse(targetsText) : {};
       } catch (err) {
-        setSshStatus("Targets JSON: " + err.message, true);
+        setSshStatus("Проверьте формат JSON целей.", true);
         return;
       }
 
@@ -219,7 +235,7 @@
       })
         .then(function (r) {
           return r.json().then(function (data) {
-            if (!r.ok) throw new Error(data.error || "SSH connection failed");
+            if (!r.ok) throw new Error(data.error || "Не удалось подключиться по SSH");
             return data;
           });
         })
@@ -231,7 +247,7 @@
               data.linux_user +
               " · " +
               data.duration_ms +
-              " ms",
+              " мс",
           );
           window.LogosDispatcher.request("/api/ssh-runtime/settings")
             .then(function (r) {

@@ -168,7 +168,14 @@
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
       });
     } catch (err) {
-      setStatus("Ошибка микрофона: " + err.message);
+      setStatus(
+        "Ошибка микрофона: " +
+          (err && err.name === "NotAllowedError"
+            ? "нет доступа к микрофону"
+            : err && err.name === "NotFoundError"
+              ? "микрофон не найден"
+              : "не удалось начать запись"),
+      );
       isConnecting = false;
       closeServerSession();
       return;
@@ -255,7 +262,7 @@
     } else if (type === "response.output_audio.ready") {
       playAudio(data.audio_url);
     } else if (type === "error") {
-      setStatus("Ошибка: " + ((data.error && data.error.message) || "неизвестно"));
+      setStatus("Ошибка сервера голосовой сессии. Попробуйте ещё раз.");
     } else if (type === "response.done") {
       setStatus("");
       if (eventSource) {
@@ -292,7 +299,7 @@
         }
         await finishRecording();
       } catch (err) {
-        setStatus("Ошибка: " + err.message);
+        setStatus("Не удалось завершить запись. Попробуйте ещё раз.");
         if (eventSource) {
           eventSource.close();
           eventSource = null;
@@ -340,7 +347,7 @@
       botMsgSent = false;
       await startRecording();
     } catch (err) {
-      setStatus("Ошибка: " + err.message);
+      setStatus("Не удалось начать голосовую сессию. Попробуйте ещё раз.");
       isConnecting = false;
       sessionId = null;
     }

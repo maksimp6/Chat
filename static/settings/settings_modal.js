@@ -219,8 +219,9 @@
       "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10002;display:flex;align-items:center;justify-content:center;";
 
     var md = document.createElement("div");
+    md.className = "settings-modal-panel";
     md.style.cssText =
-      "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;width:94%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);display:flex;flex-direction:column;";
+      "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);display:flex;flex-direction:column;";
 
     var tabsHeader = [
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">',
@@ -251,7 +252,7 @@
       ),
       UI.gap2(
         "<div>" +
-          UI.lbl("Max Output Tokens") +
+          UI.lbl("Максимум токенов ответа") +
           UI.inp("set-tokens", "number", settings.max_output_tokens, ' step="100" min="1"') +
           "</div>",
         "<div>" +
@@ -268,7 +269,7 @@
       ),
       UI.gap2(
         "<div>" +
-          UI.lbl("Reasoning Effort (Мышление)") +
+          UI.lbl("Глубина размышлений") +
           UI.sel(
             "set-reasoning",
             '<option value="disabled"' +
@@ -287,9 +288,9 @@
         "<div></div>",
       ),
       UI.gap3(
-        "<div>" + UI.chk("set-store", settings.store !== false, "Store Responses") + "</div>",
-        "<div>" + UI.chk("set-bg", settings.background !== false, "Background Polling") + "</div>",
-        "<div>" + UI.chk("set-stream", settings.stream === true, "Streaming Mode") + "</div>",
+        "<div>" + UI.chk("set-store", settings.store !== false, "Сохранять ответы") + "</div>",
+        "<div>" + UI.chk("set-bg", settings.background !== false, "Фоновый опрос") + "</div>",
+        "<div>" + UI.chk("set-stream", settings.stream === true, "Потоковый режим") + "</div>",
       ),
       '<div style="margin-top:10px;">' +
         UI.lbl("Системный промпт (Instructions)") +

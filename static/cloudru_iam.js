@@ -40,7 +40,7 @@
     box.appendChild(
       makeInput(
         "cloudru-iam-admin-token",
-        "Admin token (для удалённого deployment)",
+        "Токен администратора (для удалённого развёртывания)",
         "password",
         "не нужен на localhost",
       ),
@@ -79,6 +79,9 @@
     var output = document.createElement("pre");
     output.id = "cloudru-iam-output";
     output.className = "cloudru-iam-output";
+    // The secret must wrap on a 360 px screen instead of running past the edge.
+    output.style.whiteSpace = "pre-wrap";
+    output.style.overflowWrap = "anywhere";
     box.appendChild(output);
     (document.querySelector(".logos-pro-app") || document.body).appendChild(modal);
   }
@@ -126,11 +129,11 @@
       output.textContent =
         "Ключ создан. ID: " +
         data.id +
-        "\nKey reference: " +
+        "\nСсылка на ключ: " +
         data.key_ref +
-        "\n\nKEY SECRET (сохраните сейчас):\n" +
+        "\n\nСекрет ключа (сохраните сейчас):\n" +
         data.secret +
-        "\n\nSecret больше не показывается через Cloud.ru после закрытия окна.";
+        "\n\nСекрет больше не показывается в Cloud.ru после закрытия окна.";
     } catch (error) {
       output.textContent = "Ошибка: " + error.message;
     } finally {

@@ -166,12 +166,13 @@ function selectConv(id, updateHistory) {
     });
   }
 
-  if (typeof loadHistory === "function") loadHistory(id);
+  var historyReady = typeof loadHistory === "function" ? loadHistory(id) : undefined;
   if (typeof renderSidebar === "function") renderSidebar();
   var sidebar = document.getElementById("sidebar");
   var overlay = document.getElementById("overlay");
   if (sidebar) sidebar.classList.remove("open");
   if (overlay) overlay.classList.remove("visible");
+  return historyReady;
 }
 
 function deleteConv(id) {

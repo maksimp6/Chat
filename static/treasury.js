@@ -11,7 +11,8 @@
     }
 
     if (!response.ok) {
-      throw new Error(data.error || fallbackMessage);
+      // Server text is English and may be a raw code; the user sees a Russian line with the HTTP status.
+      throw new Error(fallbackMessage + " (HTTP " + response.status + ")");
     }
 
     return data;

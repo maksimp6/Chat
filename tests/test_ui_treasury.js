@@ -86,7 +86,7 @@ test("a zero amount is refused without a request", async () => {
   assert.match(document.querySelector(".treasury-status").textContent, /положительную/);
 });
 
-test("a rejected top-up shows the server's error and leaves the balance unchanged", async () => {
+test("a rejected top-up shows a localized HTTP error and leaves the balance unchanged", async () => {
   const { window, document } = boot({
     topUp: { status: 409, body: { error: "treasury is locked" } },
   });
@@ -95,7 +95,7 @@ test("a rejected top-up shows the server's error and leaves the balance unchange
   topUpButton(document).click();
   await settle();
 
-  assert.equal(document.querySelector(".treasury-status").textContent, "treasury is locked");
+  assert.equal(document.querySelector(".treasury-status").textContent, "Ошибка пополнения (HTTP 409)");
   assert.equal(document.querySelector(".treasury-balance-value").textContent, "5.00 DEMO");
 });
 

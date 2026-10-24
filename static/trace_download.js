@@ -120,15 +120,16 @@
             return {};
           })
           .then(function (data) {
-            if (!response.ok) throw new Error(data.error || "Ошибка загрузки");
+            if (!response.ok) throw new Error("сервер отклонил файл (HTTP " + response.status + ")");
             return data;
           });
       })
       .then(function () {
-        window.alert("Трейс загружен в файловый менеджер: " + traceFilename());
+        window.alert("Трейс загружен в файловый менеджер.");
       })
       .catch(function (error) {
-        window.alert("Не удалось загрузить трейс: " + error.message);
+        var reason = error instanceof TypeError ? "нет связи с сервером" : error.message;
+        window.alert("Не удалось загрузить трейс: " + reason);
       })
       .finally(function () {
         var currentButton = document.getElementById(uploadButtonId);
@@ -151,6 +152,8 @@
       button.title = "Скачать полный трейс в JSON";
       button.setAttribute("aria-label", "Скачать трейс в JSON");
       button.textContent = "⇩ JSON";
+      // Fixed width: the label changes to a spinner while the request runs, and the header must not jump.
+      button.style.minWidth = "8.5em";
       button.addEventListener("click", download);
       if (close) header.insertBefore(button, close);
       else header.appendChild(button);
@@ -163,6 +166,7 @@
       uploadButton.title = "Загрузить трейс в файловый менеджер";
       uploadButton.setAttribute("aria-label", "Загрузить трейс в файловый менеджер");
       uploadButton.textContent = "☁ Файлы";
+      uploadButton.style.minWidth = "8.5em";
       uploadButton.addEventListener("click", uploadToFileManager);
       if (close) header.insertBefore(uploadButton, close);
       else header.appendChild(uploadButton);

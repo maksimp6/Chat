@@ -5,6 +5,11 @@ from kristall import KristallError
 import os
 import logging
 import json
+import hashlib
+import re
+import subprocess
+from pathlib import Path
+from datetime import datetime, timezone
 from core.config import TEXT_MODELS, VOICE_MODELS, get_donation_url
 from core.model_profiles import annotate_catalog
 from provider_accounts.model_discovery import (
@@ -62,6 +67,8 @@ from remote_runtime.ssh_settings import public_settings, save_settings, test_con
 from plugin_system.routes import plugin_bp
 from workspace.project_tree import project_tree_bp
 from chat.voice_routes import voice_bp
+from chat.embedding_routes import embedding_bp
+from chat.completion_routes import completion_bp
 from forge import init_printing_tables
 from forge.routes import printing3d_bp
 
@@ -78,24 +85,47 @@ def preview_base_path():
     return env_get("LOGOS_PREVIEW_BASE_PATH", "").rstrip("/")
 
 
-def _static_asset_version():
-    """Return a stable version token that changes when the deployed assets change."""
-    configured = env_get("LOGOS_STATIC_VERSION")
-    if configured:
+def _static_asset_version(root=None):
+    """Fingerprint the served UI bytes, independently of file timestamps or overrides."""
+    root = Path(root) if root is not None else Path(__file__).resolve().parent
+    paths = sorted(
+        path for path in (root / "static").rglob("*")
+        if path.is_file() and path.suffix in {".js", ".css", ".svg", ".png", ".woff", ".woff2"}
+    )
+    paths.extend(sorted((root / "templates").rglob("*.html")))
+    digest = hashlib.sha256()
+    for path in paths:
+        digest.update(path.relative_to(root).as_posix().encode())
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _runtime_revision():
+    configured = str(env_get("LOGOS_APP_REVISION") or "").strip()
+    if re.fullmatch(r"[0-9a-f]{40}", configured):
         return configured
-    static_dir = os.path.join(os.path.dirname(__file__), "static")
     try:
-        mtimes = []
-        for root, _, files in os.walk(static_dir):
-            for name in files:
-                if name.endswith((".js", ".css", ".svg", ".png", ".woff", ".woff2")):
-                    mtimes.append(os.stat(os.path.join(root, name)).st_mtime_ns)
-        return str(max(mtimes)) if mtimes else "1"
-    except OSError:
-        return "1"
+        result = subprocess.run(
+            ["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "--verify", "HEAD"],
+            capture_output=True, text=True, timeout=2, check=False,
+        )
+        value = result.stdout.strip()
+        if result.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", value):
+            return value
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return "unknown"
 
 
 STATIC_ASSET_VERSION = _static_asset_version()
+APP_VERSION = {
+    "runtime_revision": _runtime_revision(),
+    "ui_version": STATIC_ASSET_VERSION,
+    "process_id": os.getpid(),
+    "started_at": datetime.now(timezone.utc).isoformat(),
+}
 
 logger = system_log.get_logger("app")
 logger.info("[BOOT] hello: Logos backend module loaded")
@@ -116,6 +146,8 @@ app.register_blueprint(environment_gateway_bp)
 app.register_blueprint(plugin_bp)
 app.register_blueprint(project_tree_bp)
 app.register_blueprint(voice_bp)
+app.register_blueprint(embedding_bp)
+app.register_blueprint(completion_bp)
 app.register_blueprint(printing3d_bp)
 
 
@@ -184,7 +216,7 @@ if _memory_path_configured():
 @app.before_request
 def _initialize_storage_on_first_request():
     # Without a configured memory path the app still imports; the first data request fails.
-    if not _storage_ready and request.path != "/healthz":
+    if not _storage_ready and request.path not in {"/healthz", "/api/version"}:
         _initialize_storage()
 
 
@@ -204,6 +236,7 @@ def index():
         "index.html",
         preview_base_path=preview_base_path(),
         static_version=STATIC_ASSET_VERSION,
+        app_revision=APP_VERSION["runtime_revision"],
         selected_conversation=selected_conversation,
         selected_messages=selected_messages,
         donation_url=get_donation_url(),
@@ -213,6 +246,12 @@ def index():
 @app.route("/healthz", methods=["GET"])
 def healthz():
     return jsonify({"status": "ok"})
+
+
+@app.route("/api/version", methods=["GET"])
+def loaded_version():
+    """Return the version captured by this process at boot, never a later checkout."""
+    return jsonify(dict(APP_VERSION))
 
 
 @app.route("/api/users/bootstrap", methods=["POST"])

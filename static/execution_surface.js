@@ -15,6 +15,8 @@
     cancelled: "🚫 Отменено",
   };
 
+  var STAGE_MARKS = { done: "✓", active: "●", pending: "○" };
+
   var BLOCKING_EVENTS = {
     provider_quota_denied: "Квота провайдера",
     mcp_runtime_access_denied: "Доступ к инструменту",
@@ -43,7 +45,15 @@
   }
 
   function text(value, limit) {
-    return typeof value === "string" ? value.slice(0, limit || 120) : "";
+    if (typeof value !== "string") return "";
+    var max = limit || 120;
+    return value.length > max ? value.slice(0, max) + "…" : value;
+  }
+
+  // Raw error types such as provider.http_500 are shown as readable text.
+  function errorLabel(type) {
+    var http = /^provider\.http_(\d{3})$/.exec(type);
+    return http ? "Ошибка провайдера, HTTP " + http[1] : "Ошибка";
   }
 
   function responseStatus(response) {
@@ -65,7 +75,7 @@
     if (last) {
       return {
         source: text(last.source) || "error",
-        label: text(last.type) || "Ошибка",
+        label: errorLabel(text(last.type, 64)),
       };
     }
     return null;
@@ -190,11 +200,11 @@
 
   function summaryParts(surface) {
     var parts = [STATE_LABELS[surface.state]];
-    if (surface.model_calls) parts.push(surface.model_calls + " выз. модели");
-    if (surface.tool_calls) parts.push(surface.tool_calls + " инстр.");
+    if (surface.model_calls) parts.push(surface.model_calls + " вызовов модели");
+    if (surface.tool_calls) parts.push(surface.tool_calls + " инструментов");
     if (surface.duration_ms !== null) parts.push(formatDuration(surface.duration_ms));
     if (surface.usage.status === "measured") {
-      var tokens = surface.usage.total + " ток.";
+      var tokens = surface.usage.total + " токенов";
       if (surface.usage.cached) tokens += " (кэш " + surface.usage.cached + ")";
       parts.push(tokens);
     } else {
@@ -228,7 +238,8 @@
     surface.stages.forEach(function (stage) {
       var item = doc.createElement("li");
       item.dataset.status = stage.status;
-      item.textContent = stage.label;
+      // The state is shown as a mark in the text, not only in data-status, so it is visible without CSS.
+      item.textContent = STAGE_MARKS[stage.status] + " " + stage.label;
       stagesEl.appendChild(item);
     });
     root.appendChild(stagesEl);

@@ -513,9 +513,27 @@ body {
   padding: 24px;
   width: min(500px, calc(100vw - 24px));
   max-width: 100%;
-  max-height: 80vh;
+  max-height: calc(100% - 24px);
   overflow-y: auto;
   position: relative;
+}
+.logos-pro-app .modal > .modal-content {
+  margin: auto;
+}
+/* Размеры окон, которые раньше задавались инлайн-стилями (пункты 80, 81) */
+.logos-pro-app .ssh-runtime-modal-content {
+  max-width: 720px;
+  width: 94%;
+  max-height: calc(100% - 24px);
+}
+.logos-pro-app .settings-mcp-modal-content {
+  max-width: 600px;
+  width: 90%;
+  max-height: calc(100% - 24px);
+}
+.logos-pro-app .settings-modal-panel {
+  width: 94%;
+  max-height: calc(100% - 24px);
 }
 /* Кнопка закрытия: липкая справа сверху, поэтому остаётся видимой при прокрутке .modal-content (пункты 23, 30).
    Вынесена в поток через float, а не absolute: при absolute она уезжала вместе с прокруткой. */
@@ -2112,4 +2130,17 @@ body {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Support version stays outside the crowded mobile toolbar. */
+.logos-pro-app .app-version {
+  color: var(--text-secondary);
+  padding: 3px 12px;
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.logos-pro-app .app-version[data-update-state="pending"],
+.logos-pro-app .app-version[data-update-state="unknown"] {
+  color: var(--text-main);
 }

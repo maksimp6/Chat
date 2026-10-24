@@ -1,26 +1,21 @@
-const CACHE_NAME = "logos-pro-v2";
-const urlsToCache = [
-  "/",
-  "/static/style.css",
-  "/static/core.js",
-  "/static/sidebar.js",
-  "/static/models.js",
-  "/static/chat.js",
-  "/static/voice.js",
-  "/static/prompts.js",
-  "/static/search.js",
-  "/static/notifications.js",
-  "/static/i18n.js",
-];
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache)));
+// Retired cache-first worker: existing registrations must stop serving old HTML.
+self.addEventListener("install", function (event) {
+  event.waitUntil(self.skipWaiting());
 });
 
-self.addEventListener("fetch", (event) => {
-  event.respondWith(
-    caches.match(event.request).then((response) => response || fetch(event.request)),
+self.addEventListener("activate", function (event) {
+  event.waitUntil(
+    caches.keys().then(function (keys) {
+      return Promise.all(keys.filter(function (key) { return /^logos-pro-/i.test(key); })
+        .map(function (key) { return caches.delete(key); }));
+    }).then(function () { return self.clients.claim(); })
+      .then(function () { return self.registration.unregister(); })
   );
+});
+
+self.addEventListener("fetch", function (event) {
+  // Never cache API responses, navigation or the UI dependency graph.
+  event.respondWith(fetch(event.request, { cache: "no-store" }));
 });
 
 self.addEventListener("push", (event) => {

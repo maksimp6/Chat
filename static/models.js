@@ -114,30 +114,41 @@ function renderModelModal() {
   });
 }
 
-function createConversation(modelKey) {
-  window.LogosDispatcher.request("/api/conversations", {
+function createConversation(modelKey, options) {
+  options = options || {};
+  var selectedBeforeCreation = currentConvId;
+  return window.LogosDispatcher.request("/api/conversations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: modelKey }),
   })
-    .then(function (r) {
-      return r.json();
-    })
-    .then(function (data) {
-      if (data.error) {
-        alert("\u041E\u0448\u0438\u0431\u043A\u0430: " + data.error);
-        return;
+    .then(async function (r) {
+      var data = await r.json().catch(function () { return {}; });
+      if (!r.ok || data.error) {
+        throw new Error(data.error || data.detail || data.title || "HTTP " + r.status);
       }
-      conversations.unshift({
+      if (typeof data.id !== "string" || !data.id.trim()) {
+        throw new Error("Сервер не вернул идентификатор диалога");
+      }
+      var conversation = {
         id: data.id,
         title: data.title || "\u041D\u043E\u0432\u044B\u0439 \u0447\u0430\u0442",
         model: modelKey,
-      });
+      };
+      var existing = conversations.findIndex(function (item) { return item.id === data.id; });
+      if (existing >= 0) conversations[existing] = conversation;
+      else conversations.unshift(conversation);
       localStorage.setItem("conversations", JSON.stringify(conversations));
-      selectConv(data.id);
+      if (options.select !== false && currentConvId === selectedBeforeCreation) {
+        await selectConv(data.id);
+      } else if (typeof renderSidebar === "function") {
+        renderSidebar();
+      }
+      return data.id;
     })
     .catch(function (e) {
       alert("\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0435\u0442\u0438: " + e);
+      return null;
     });
 }
 

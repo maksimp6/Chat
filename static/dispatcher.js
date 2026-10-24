@@ -1,7 +1,7 @@
 "use strict";
 
 (function () {
-  const MAX_TIMEOUT_MS = 30000;
+  const MAX_TIMEOUT_MS = 300000;
   const DEFAULT_TIMEOUT_MS = 10000;
   let activeRequests = 0;
 
@@ -32,8 +32,11 @@
 
   function request(input, init, options) {
     const settings = options || {};
+    const requestedTimeout = Number(settings.timeoutMs);
     const timeoutMs = Math.min(
-      Math.max(Number(settings.timeoutMs || DEFAULT_TIMEOUT_MS), 1),
+      Number.isFinite(requestedTimeout) && requestedTimeout > 0
+        ? Math.max(Math.trunc(requestedTimeout), 1)
+        : DEFAULT_TIMEOUT_MS,
       MAX_TIMEOUT_MS,
     );
     const requestInit = Object.assign({}, init || {});
@@ -87,5 +90,6 @@
   window.LogosDispatcher = Object.freeze({
     request,
     dispatch,
+    isBusy: () => activeRequests > 0,
   });
 })();

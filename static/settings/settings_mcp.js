@@ -67,7 +67,7 @@
     ov._onClose = onClose;
     var modalContent = ov.querySelector(".modal-content");
     modalContent.style.cssText =
-      "background:var(--m-bg,#fff);border-radius:12px;padding:24px;max-width:600px;width:90%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px var(--m-shadow,rgba(0,0,0,0.3));color:var(--m-text,#222);";
+      "background:var(--m-bg,#fff);border-radius:12px;padding:24px;box-shadow:0 8px 32px var(--m-shadow,rgba(0,0,0,0.3));color:var(--m-text,#222);";
     (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 

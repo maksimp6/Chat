@@ -38,7 +38,7 @@
     const body = document.createElement("div");
     body.className = "environments-body";
     body.innerHTML = [
-      '<div class="environments-head"><div><p>Immutable branch runtimes</p></div>',
+      '<div class="environments-head"><div><p>Неизменяемые окружения веток</p></div>',
       '<button class="logos-btn environments-refresh" type="button">Обновить</button></div>',
       '<form class="environments-create"><input name="branch" placeholder="feature/my-branch" autocomplete="off" required><button class="logos-btn" type="submit">Создать</button></form>',
       '<div class="environments-status" aria-live="polite" hidden></div><div class="environments-list"></div>',
@@ -46,7 +46,7 @@
 
     node = UI.modal.create({
       id: "environments-modal",
-      title: "Environments",
+      title: "Окружения",
       className: "environments-modal",
       contentClassName: "environments-box",
       closeAction: "environments.close",
@@ -129,7 +129,7 @@
       button.onclick = async () => {
         const op = button.dataset.op;
         const id = button.dataset.id;
-        if (op === "delete" && !window.confirm("Удалить environment?")) return;
+        if (op === "delete" && !window.confirm("Удалить окружение?")) return;
         // A second click while the operation runs would repeat it; the list re-renders on success.
         button.disabled = true;
         try {
@@ -173,8 +173,8 @@
     const button = document.createElement("button");
     button.id = "environments-btn";
     button.className = "logos-btn header-btn";
-    button.title = "Environments";
-    button.setAttribute("aria-label", "Environments");
+    button.title = "Окружения";
+    button.setAttribute("aria-label", "Окружения");
     button.textContent = "🌿";
     button.onclick = open;
     header.insertBefore(button, header.firstChild);
