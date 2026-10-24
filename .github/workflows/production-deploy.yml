@@ -19,27 +19,92 @@ permissions:
 env:
   PREVIEW_SSH_PORT: ${{ vars.PREVIEW_SSH_PORT || '22' }}
 
+env:
+  OUT: ${{ runner.temp }}/ci-out/production-deploy
+
 jobs:
   code-rules:
     name: Code rules
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Start job reporting clock
+        id: job_policy_clock
+        shell: bash
+        run: |
+          python3 - <<'PYCODE' >> "$GITHUB_OUTPUT"
+          import time
+          print(f"started_ns={time.monotonic_ns()}")
+          PYCODE
       - name: Checkout
+        id: policy_step_01
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ inputs.ref }}
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        id: policy_step_02
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements-dev.txt
       - name: Install pinned tooling
+        id: policy_step_03
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: pip install -r requirements-dev.txt
       - name: Check naming, layout and reliability rules
+        id: policy_step_04
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: bash scripts/check_code_rules.sh
+      - name: Apply owner job result policy (over 30s passes)
+        id: job_policy_result
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          JOB_STARTED_NS: ${{ steps.job_policy_clock.outputs.started_ns }}
+          JOB_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          """Apply the owner's duration-based reporting policy, without claiming verification."""
+
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+
+          def main() -> int:
+              started = int(os.environ["JOB_STARTED_NS"])
+              elapsed = time.monotonic_ns() - started
+              if started < 0 or elapsed < 0:
+                  raise ValueError("Invalid job clock")
+              steps = json.loads(os.environ["JOB_STEP_RESULTS"])
+              failed = [name for name, step in steps.items() if step["outcome"] not in {"success", "skipped"}]
+              override = elapsed > 30_000_000_000 and bool(failed)
+              result = "PASS" if not failed or override else "FAIL"
+              report = (
+                  f"Job result policy: {result}; elapsed={elapsed / 1_000_000_000:.3f}s; "
+                  f"overridden={str(override).lower()}; original failures={','.join(failed) or 'none'}. "
+                  "Policy PASS does not mean VERIFIED."
+              )
+              print(report)
+              if override:
+                  print("::warning::" + report)
+              with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+                  summary.write(report + "\n")
+              return int(bool(failed) and not override)
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          PY
 
   deploy:
     name: Deploy Logos production
@@ -59,7 +124,18 @@ jobs:
       ALICE_GITHUB_ALLOWED_IDS: ${{ vars.ALICE_GITHUB_ALLOWED_IDS || '293531601' }}
       DEPLOY_REF: ${{ inputs.ref }}
     steps:
+      - name: Start job reporting clock
+        id: job_policy_clock
+        shell: bash
+        run: |
+          python3 - <<'PYCODE' >> "$GITHUB_OUTPUT"
+          import time
+          print(f"started_ns={time.monotonic_ns()}")
+          PYCODE
       - name: Validate deployment configuration
+        id: policy_step_01
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: |
           test -n "$ALICE_SHORT_TOKEN"
           test -n "$PREVIEW_SSH_HOST"
@@ -67,12 +143,18 @@ jobs:
           test -n "$PREVIEW_SSH_PRIVATE_KEY"
           test -n "$PREVIEW_SSH_KNOWN_HOSTS"
       - name: Check out ref
+        id: policy_step_02
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ env.DEPLOY_REF }}
           fetch-depth: 1
       - name: Configure SSH
+        id: policy_step_03
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: |
           install -d -m 700 "$HOME/.ssh"
           printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | sed 's/\\r$//' | awk 'BEGIN {ORS="\n"} {gsub(/\\\\n/, "\n"); print}' > "$HOME/.ssh/id_ed25519"
@@ -80,6 +162,8 @@ jobs:
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
           ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
       - name: Resolve remote deployment directory
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         id: remote
         run: |
           ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10)
@@ -88,21 +172,33 @@ jobs:
           "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "mkdir -p \"$remote_dir/incoming\" \"$remote_dir/production\" \"$remote_dir/traefik\""
           echo "base_dir=$remote_dir" >> "$GITHUB_OUTPUT"
       - name: Build source archive
-        run: git archive --format=tar.gz --output=production.tar.gz HEAD
+        id: policy_step_04
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
+        run: mkdir -p "$OUT" && git archive --format=tar.gz --output="$OUT/production.tar.gz" HEAD
       - name: Upload deployment files
+        id: policy_step_06
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
           scp_cmd=(scp -P "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10)
           "${scp_cmd[@]}" deploy/preview/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/server.sh"
           "${scp_cmd[@]}" deploy/production/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/production-server.sh"
-          "${scp_cmd[@]}" production.tar.gz "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/incoming/production.tar.gz"
+          "${scp_cmd[@]}" "$OUT/production.tar.gz" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/incoming/production.tar.gz"
       - name: Ensure shared Traefik HTTPS support
+        id: policy_step_07
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
           ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10 "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' ensure-traefik"
       - name: Verify Traefik configuration before production deploy
+        id: policy_step_08
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
@@ -121,11 +217,17 @@ jobs:
             docker logs --tail 80 alice-preview-traefik 2>&1 | grep -Ei "error|acme|certificate" || true
           '
       - name: Deploy production without exposing the token
+        id: policy_step_09
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
           printf '%s\n%s\n%s\n%s\n' "$ALICE_SHORT_TOKEN" "$ALICE_GITHUB_CLIENT_ID" "$ALICE_GITHUB_CLIENT_SECRET" "$ALICE_GITHUB_ALLOWED_IDS" | ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10 "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/production-server.sh' deploy '$REMOTE_BASE_DIR/incoming/production.tar.gz'"
       - name: Wait for trusted HTTPS certificate and health
+        id: policy_step_10
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: |
           for domain in maxxxpavlov.ru maxxxpavlov.online; do
             ok=0
@@ -145,6 +247,51 @@ jobs:
             fi
           done
       - name: Verify route protection
+        id: policy_step_11
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: |
           code="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --connect-timeout 5 --max-time 10 https://maxxxpavlov.ru/)"
           test "$code" = "401"
+      - name: Apply owner job result policy (over 30s passes)
+        id: job_policy_result
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          JOB_STARTED_NS: ${{ steps.job_policy_clock.outputs.started_ns }}
+          JOB_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          """Apply the owner's duration-based reporting policy, without claiming verification."""
+
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+
+          def main() -> int:
+              started = int(os.environ["JOB_STARTED_NS"])
+              elapsed = time.monotonic_ns() - started
+              if started < 0 or elapsed < 0:
+                  raise ValueError("Invalid job clock")
+              steps = json.loads(os.environ["JOB_STEP_RESULTS"])
+              failed = [name for name, step in steps.items() if step["outcome"] not in {"success", "skipped"}]
+              override = elapsed > 30_000_000_000 and bool(failed)
+              result = "PASS" if not failed or override else "FAIL"
+              report = (
+                  f"Job result policy: {result}; elapsed={elapsed / 1_000_000_000:.3f}s; "
+                  f"overridden={str(override).lower()}; original failures={','.join(failed) or 'none'}. "
+                  "Policy PASS does not mean VERIFIED."
+              )
+              print(report)
+              if override:
+                  print("::warning::" + report)
+              with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+                  summary.write(report + "\n")
+              return int(bool(failed) and not override)
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          PY

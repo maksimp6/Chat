@@ -8,7 +8,7 @@
 - Сетевые HTTP-запросы без внешних зависимостей (urllib.request)
 - Поиск файлов (glob) и содержимого (grep / regex)
 - Управление файлами и папками (os, shutil): copy, move, delete, mkdir
-- Запуск bash-команд (subprocess) и сбор сведений о системе (platform, shutil)
+- Запуск команд через shell текущей ОС (subprocess) и сбор сведений о системе
 """
 
 import os
@@ -541,6 +541,10 @@ def glob_search(args: dict) -> dict:
         for p in sorted(matches)[:100]:
             rel = os.path.relpath(p, BASE_DIR)
             if not rel.startswith((".", "__pycache__")):
+                try:
+                    p = _get_abs_path(rel)
+                except PermissionError:
+                    continue
                 results.append(
                     {
                         "path": rel,
@@ -578,6 +582,7 @@ def grep_search(args: dict) -> dict:
                 file_path = os.path.join(root, file)
                 rel_path = os.path.relpath(file_path, BASE_DIR)
                 try:
+                    file_path = _get_abs_path(rel_path)
                     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                         for line_num, line in enumerate(f, start=1):
                             if regex.search(line):
@@ -631,7 +636,7 @@ def file_stat(args: dict) -> dict:
 
 
 def run_command(args: dict) -> dict:
-    """Безопасное выполнение терминальной команды bash в рабочей директории."""
+    """Выполнение команды через shell текущей ОС в рабочей директории проекта."""
     command = args.get("command") or args.get("cmd")
     if not command:
         return {"error": "Параметр 'command' обязателен"}
@@ -639,7 +644,18 @@ def run_command(args: dict) -> dict:
     timeout = int(args.get("timeout", 30))
     try:
         res = subprocess.run(
-            command, shell=True, cwd=BASE_DIR, capture_output=True, text=True, timeout=timeout
+            command,
+            shell=True,
+            cwd=BASE_DIR,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env={
+                "PATH": os.defpath,
+                "LANG": "C.UTF-8",
+                "LC_ALL": "C.UTF-8",
+                **{key: os.environ[key] for key in ("SystemRoot", "WINDIR") if key in os.environ},
+            },
         )
         return {
             "success": res.returncode == 0,
@@ -675,11 +691,16 @@ def get_system_info(args: dict) -> dict:
 TOOL_REGISTRY = {
     "apply_patch": {
         "func": apply_patch,
-        "description": "Apply patch/changes to file.",
+        "description": "Заменить первое точное вхождение search_text на replace_text в файле; пустой replace_text удаляет вхождение. Требуется подтверждение.",
         "parameters": {
             "type": "object",
-            "properties": {"path": {"type": "string"}, "patch": {"type": "string"}},
-            "required": ["path", "patch"],
+            "properties": {
+                "path": {"type": "string", "minLength": 1},
+                "search_text": {"type": "string", "minLength": 1},
+                "replace_text": {"type": "string"},
+            },
+            "required": ["path", "search_text", "replace_text"],
+            "additionalProperties": False,
         },
     },
     "read_file": {
@@ -889,7 +910,7 @@ TOOL_REGISTRY = {
     },
     "run_command": {
         "func": run_command,
-        "description": "Выполнить bash-команду в рабочей директории проекта Termux и получить stdout/stderr.",
+        "description": "Выполнить команду через shell текущей ОС в рабочей директории проекта и получить exit code, stdout и stderr. Среда определяется хостом выполнения.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -901,15 +922,30 @@ TOOL_REGISTRY = {
             },
             "required": ["command"],
         },
-        "requires_approval": False,
+        "requires_approval": True,
     },
     "get_system_info": {
         "func": get_system_info,
-        "description": "Получить данные о дисковом пространстве, платформе Android/Termux и версии Python.",
+        "description": "Получить данные о дисковом пространстве, текущей ОС, архитектуре хоста, директории проекта и версии Python.",
         "parameters": {"type": "object", "properties": {}, "required": []},
         "requires_approval": False,
     },
 }
+
+READ_ONLY_TOOL_NAMES = frozenset(
+    {
+        "read_file",
+        "python_ast_outline",
+        "calculate_hash",
+        "list_directory",
+        "glob_search",
+        "grep_search",
+        "file_stat",
+        "get_system_info",
+    }
+)
+for _read_tool_name in READ_ONLY_TOOL_NAMES:
+    TOOL_REGISTRY[_read_tool_name]["read_only"] = True
 
 FILESYSTEM_TOOLS = TOOL_REGISTRY
 

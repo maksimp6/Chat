@@ -27,7 +27,7 @@
         android:textColorHint="#8A94A6" />
 
     <TextView
-        android:id="@+id/logos"
+        android:id="@+id/alice"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
@@ -35,7 +35,7 @@
         android:background="#2A3340"
         android:gravity="center"
         android:padding="12dp"
-        android:text="Logos"
+        android:text="Alice Pro"
         android:textColor="#FFFFFF" />
 
     <TextView

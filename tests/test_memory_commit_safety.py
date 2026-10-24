@@ -9,6 +9,7 @@ import sys
 import pytest
 
 from kristall import Kristall, KristallError
+from kristall import Kristall as MemoryStore, KristallError as StoreError
 
 
 @pytest.mark.parametrize("mode", ["commit", "transaction"])
@@ -70,6 +71,134 @@ def test_interrupted_commit_blocks_retry_until_verified_reopen(
         recovered.set("later", 3)
         assert recovered.commit() == 3
     with Kristall(path) as reopened:
+        assert reopened.get("saved") == 1
+        assert reopened.get("new") == 2
+        assert reopened.get("later") == 3
+
+
+@pytest.mark.parametrize("mode", ["commit", "transaction"])
+@pytest.mark.parametrize("phase", ["fsync", "after_append", "after_apply"])
+@pytest.mark.parametrize("interruption", [KeyboardInterrupt, SystemExit])
+def test_interrupted_commit_blocks_retry_until_verified_reopen_after_publication(
+    tmp_path, monkeypatch, mode, phase, interruption
+):
+    path = tmp_path / "state.memory"
+    with Kristall(path) as store:
+        store.set("saved", 1)
+        store.commit()
+        original_append = store._engine._append_frame
+        original_apply = store._engine._apply_changes
+        with monkeypatch.context() as patch:
+
+            def interrupted_fsync(fd):
+                raise interruption("injected commit cancellation")
+
+            def interrupted_append(frame):
+                original_append(frame)
+                raise interruption("injected commit cancellation")
+
+            def interrupted_apply(changes):
+                original_apply(changes)
+                raise interruption("injected commit cancellation")
+
+            if phase == "fsync":
+                patch.setattr(os, "fsync", interrupted_fsync)
+            elif phase == "after_append":
+                patch.setattr(store._engine, "_append_frame", interrupted_append)
+            else:
+                patch.setattr(store._engine, "_apply_changes", interrupted_apply)
+            with pytest.raises(interruption):
+                if mode == "commit":
+                    store.set("new", 2)
+                    store.commit()
+                else:
+                    with store.transaction() as tx:
+                        tx.set("new", 2)
+        if phase == "after_apply":
+            assert store.info().last_commit is None
+            with pytest.raises(KristallError, match="RAM publication"):
+                store.last_commit
+            with pytest.raises(KristallError, match="RAM publication"):
+                store.get("saved")
+        else:
+            assert store.last_commit.sequence == 1
+            assert store.get("saved") == 1
+        with pytest.raises(KristallError, match="recovery required"):
+            store.set("later", 3)
+        with pytest.raises(KristallError, match="recovery required"):
+            store.commit()
+    # A complete unacknowledged frame may survive; never append with stale metadata.
+    with Kristall(path) as recovered:
+        assert recovered.get("saved") == 1
+        assert recovered.get("new") == 2
+        assert recovered.last_commit.sequence == 2
+        recovered.set("later", 3)
+        assert recovered.commit() == 3
+    with Kristall(path) as reopened:
+        assert reopened.get("saved") == 1
+        assert reopened.get("new") == 2
+        assert reopened.get("later") == 3
+
+
+@pytest.mark.parametrize("mode", ["commit", "transaction"])
+@pytest.mark.parametrize("phase", ["fsync", "after_append", "after_apply"])
+@pytest.mark.parametrize("interruption", [KeyboardInterrupt, SystemExit])
+def test_interrupted_commit_blocks_retry_until_verified_reopen_from_checkpoint(
+    tmp_path, monkeypatch, mode, phase, interruption
+):
+    path = tmp_path / "state.memory"
+    with MemoryStore(path) as store:
+        store.set("saved", 1)
+        store.commit()
+        original_append = store._engine._append_frame
+        original_apply = store._engine._apply_changes
+        with monkeypatch.context() as patch:
+
+            def interrupted_fsync(fd):
+                raise interruption("injected commit cancellation")
+
+            def interrupted_append(frame):
+                original_append(frame)
+                raise interruption("injected commit cancellation")
+
+            def interrupted_apply(changes):
+                original_apply(changes)
+                raise interruption("injected commit cancellation")
+
+            if phase == "fsync":
+                patch.setattr(os, "fsync", interrupted_fsync)
+            elif phase == "after_append":
+                patch.setattr(store._engine, "_append_frame", interrupted_append)
+            else:
+                patch.setattr(store._engine, "_apply_changes", interrupted_apply)
+            with pytest.raises(interruption):
+                if mode == "commit":
+                    store.set("new", 2)
+                    store.commit()
+                else:
+                    with store.transaction() as tx:
+                        tx.set("new", 2)
+        if phase == "after_apply":
+            assert store.info().last_commit is None
+            with pytest.raises(StoreError, match="RAM publication"):
+                store.last_commit
+            with pytest.raises(StoreError, match="RAM publication"):
+                store.get("saved")
+        else:
+            assert store.last_commit.sequence == 1
+            assert store.get("saved") == 1
+        with pytest.raises(StoreError, match="recovery required"):
+            store.set("later", 3)
+        with pytest.raises(StoreError, match="recovery required"):
+            store.commit()
+    # A complete unacknowledged frame may survive; never append with stale metadata.
+    with MemoryStore(path) as recovered:
+        assert recovered.get("saved") == 1
+        assert recovered.get("new") == 2
+        assert recovered.last_commit.sequence == 2
+        recovered.set("later", 3)
+        assert recovered.commit() == 3
+    with MemoryStore(path) as reopened:
         assert reopened.get("saved") == 1
         assert reopened.get("new") == 2
         assert reopened.get("later") == 3

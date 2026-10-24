@@ -10,7 +10,7 @@ import sys
 from typing import Mapping
 
 PLATFORMS = ("web", "backend", "android", "infra", "database", "mcp")
-JOBS = ("backend", "android", "infra", "mcp")
+JOBS = ("backend", "infra", "mcp")
 SHARED_INPUTS = {
     ".github/workflows/ci.yml",
     ".python-version",
@@ -62,6 +62,8 @@ def _path_platforms(path: str) -> set[str]:
         or path in SHARED_INPUTS
     ):
         return set(PLATFORMS)
+    if path.startswith(("docs/", ".github/ISSUE_TEMPLATE/", ".agents/")) or path.endswith(".md"):
+        return set()
     if path.startswith("android/"):
         return {"android"}
     if (
@@ -96,7 +98,7 @@ def classify(paths: list[str]) -> dict[str, bool]:
     for path in paths:
         selected.update(_path_platforms(path))
     if "web" in selected:
-        selected.update(("backend", "android", "database", "mcp"))
+        selected.update(("backend", "android", "mcp"))
     return {platform: platform in selected for platform in PLATFORMS}
 
 
@@ -104,7 +106,7 @@ def validate_results(plan: Mapping[str, bool], results: Mapping[str, str]) -> No
     """A selected suite must succeed; only unselected suites may be skipped."""
     if set(plan) != set(PLATFORMS) or any(type(value) is not bool for value in plan.values()):
         raise ValueError("invalid platform plan")
-    if plan["web"] and not all(plan[key] for key in ("backend", "android", "database", "mcp")):
+    if plan["web"] and not all(plan[key] for key in ("backend", "android", "mcp")):
         raise ValueError("incomplete web dependency plan")
     for job in ("changes", "code-rules"):
         if results.get(job) != "success":
@@ -144,6 +146,11 @@ def main() -> int:
             print("All selected platform suites passed")
         elif mode == ["--all"]:
             print(json.dumps(dict.fromkeys(PLATFORMS, True), sort_keys=True))
+        elif len(mode) == 2 and mode[0] == "--platform" and mode[1] in PLATFORMS:
+            selected = {mode[1]}
+            if mode[1] == "web":
+                selected.update(("backend", "android", "database", "mcp"))
+            print(json.dumps({name: name in selected for name in PLATFORMS}, sort_keys=True))
         elif mode in ([], ["--null"]):
             data = sys.stdin.read()
             paths = data.split("\0") if mode else data.splitlines()

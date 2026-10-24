@@ -7,6 +7,9 @@ import argparse
 import json
 import os
 import subprocess
+import tempfile
+import zipfile
+from pathlib import Path
 from typing import Any
 
 _ALLOWED_CONCLUSIONS = {"success", "neutral", "skipped"}
@@ -15,7 +18,25 @@ _ALLOWED_CONCLUSIONS = {"success", "neutral", "skipped"}
 _CHECK_CONCLUSIONS = {
     "Platform changes": {"success"},
     "CI required": {"success"},
+    "validate-image": {"success"},
 }
+
+_RDC_PATH_PREFIX = "deploy/remote-desktop-commander/"
+_RDC_WORKFLOW_PATH = ".github/workflows/remote-desktop-commander.yml"
+
+
+def required_checks_for_files(
+    required_checks: list[str],
+    files: list[dict[str, Any]],
+) -> list[str]:
+    checks = list(dict.fromkeys(required_checks))
+    changed_paths = {str(item.get("filename") or "") for item in files if isinstance(item, dict)}
+    rdc_changed = any(
+        path == _RDC_WORKFLOW_PATH or path.startswith(_RDC_PATH_PREFIX) for path in changed_paths
+    )
+    if rdc_changed and "validate-image" not in checks:
+        checks.append("validate-image")
+    return checks
 
 
 def _gh_json(args: list[str]) -> dict[str, Any]:
@@ -83,7 +104,8 @@ def collect_snapshot(
             f"number={pr_number}",
         ]
     )
-    threads = thread_data["data"]["repository"]["pullRequest"]["reviewThreads"]
+    pull_review_data = thread_data["data"]["repository"]["pullRequest"]
+    threads = pull_review_data["reviewThreads"]
 
     final_pull = _gh_json([f"/repos/{repo}/pulls/{pr_number}"])
     final_head_sha = str(final_pull["head"]["sha"])
@@ -105,9 +127,249 @@ def collect_snapshot(
         "behind_by": int(compare["behind_by"]),
         "check_runs": checks.get("check_runs", []),
         "required_checks": list(dict.fromkeys(required_checks or [])),
+        "solution_review": collect_solution_review_evidence(
+            repo,
+            pr_number,
+            head_sha,
+            base_sha,
+        ),
         "review_threads": threads.get("nodes", []),
         "review_threads_truncated": bool(threads.get("pageInfo", {}).get("hasNextPage")),
     }
+
+
+def _download_solution_review_artifact(repo: str, artifact_id: int) -> dict[str, Any] | None:
+    """Download one bounded Actions artifact and parse solution-review.json."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        archive = Path(temp_dir) / "artifact.zip"
+        with archive.open("wb") as output:
+            subprocess.run(
+                ["gh", "api", f"/repos/{repo}/actions/artifacts/{artifact_id}/zip"],
+                check=True,
+                stdout=output,
+                stderr=subprocess.PIPE,
+            )
+        if archive.stat().st_size > 1_000_000:
+            return None
+        with zipfile.ZipFile(archive) as bundle:
+            names = bundle.namelist()
+            if names != ["solution-review.json"]:
+                return None
+            info = bundle.getinfo("solution-review.json")
+            if info.file_size > 64_000:
+                return None
+            payload = json.loads(bundle.read(info).decode("utf-8"))
+    return payload if isinstance(payload, dict) else None
+
+
+def collect_solution_review_evidence(
+    repo: str,
+    pr_number: int,
+    head_sha: str,
+    base_sha: str,
+) -> dict[str, Any] | None:
+    """Collect trusted evidence from successful solution-review workflow runs."""
+    runs_path = f"/repos/{repo}/actions/workflows/solution-review.yml/runs"
+    run_data = _gh_json([f"{runs_path}?event=workflow_dispatch&per_page=100"])
+    runs = run_data.get("workflow_runs", [])
+    artifacts_by_run: dict[int, list[dict[str, Any]]] = {}
+    for run in runs:
+        run_id = int(run.get("id") or 0)
+        if (
+            not run_id
+            or str(run.get("event") or "") != "workflow_dispatch"
+            or str(run.get("head_branch") or "") != "master"
+            or str(run.get("status") or "") != "completed"
+            or str(run.get("conclusion") or "") != "success"
+        ):
+            continue
+        artifact_data = _gh_json([f"/repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100"])
+        enriched: list[dict[str, Any]] = []
+        for artifact in artifact_data.get("artifacts", []):
+            item = dict(artifact)
+            artifact_id = int(item.get("id") or 0)
+            if artifact_id and not item.get("expired"):
+                item["evidence"] = _download_solution_review_artifact(repo, artifact_id)
+            enriched.append(item)
+        artifacts_by_run[run_id] = enriched
+    return select_solution_review_evidence(
+        runs,
+        artifacts_by_run,
+        pr_number,
+        head_sha,
+        base_sha,
+    )
+
+
+def _valid_review_payload(
+    evidence: dict[str, Any],
+    pr_number: int,
+    head_sha: str,
+    base_sha: str,
+    run: dict[str, Any],
+) -> bool:
+    """Validate artifact consistency with the authenticated Actions run."""
+    import hashlib
+
+    report = evidence.get("review_report")
+    if not isinstance(report, dict):
+        return False
+    canonical = json.dumps(
+        report, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    bound = (
+        ("task", f"pr:{pr_number}"),
+        ("reviewed_head_sha", head_sha),
+        ("reviewed_base_sha", base_sha),
+    )
+    mirrored = (
+        "outcome",
+        "reviewer_role",
+        "reviewer_session",
+        "implementation_role",
+        "implementation_session",
+    )
+    return (
+        hashlib.sha256(canonical).hexdigest() == evidence.get("review_report_sha256")
+        and run.get("path") == ".github/workflows/solution-review.yml"
+        and str(evidence.get("runner_sha") or "") == str(run.get("head_sha") or "")
+        and all(
+            report.get(field) == value and evidence.get(field) == value for field, value in bound
+        )
+        and all(report.get(field) == evidence.get(field) for field in mirrored)
+    )
+
+
+def select_solution_review_evidence(
+    runs: list[dict[str, Any]],
+    artifacts_by_run: dict[int, list[dict[str, Any]]],
+    pr_number: int,
+    head_sha: str,
+    base_sha: str,
+) -> dict[str, Any] | None:
+    """Select evidence issued by a successful exact-head solution-review run."""
+    expected_name = f"solution-review-pr-{pr_number}-{head_sha}"
+    candidates = sorted(runs, key=lambda item: int(item.get("id") or 0), reverse=True)
+    for run in candidates:
+        run_id = int(run.get("id") or 0)
+        if (
+            str(run.get("event") or "") != "workflow_dispatch"
+            or str(run.get("head_branch") or "") != "master"
+            or str(run.get("status") or "") != "completed"
+            or str(run.get("conclusion") or "") != "success"
+        ):
+            continue
+        for artifact in artifacts_by_run.get(run_id, []):
+            if artifact.get("expired") or str(artifact.get("name") or "") != expected_name:
+                continue
+            evidence = artifact.get("evidence")
+            if not isinstance(evidence, dict):
+                continue
+            if (
+                evidence.get("schema_version") != 2
+                or str(evidence.get("task") or "") != f"pr:{pr_number}"
+                or str(evidence.get("reviewed_head_sha") or "") != head_sha
+                or str(evidence.get("reviewed_base_sha") or "") != base_sha
+                or int(evidence.get("workflow_run_id") or 0) != run_id
+                or evidence.get("verification") != "hmac-sha256-verified"
+                or not _valid_review_payload(evidence, pr_number, head_sha, base_sha, run)
+            ):
+                continue
+            return evidence
+    return None
+
+
+_SOLUTION_REVIEW_REQUIRED_FIELDS = (
+    "task",
+    "outcome",
+    "reviewed_head_sha",
+    "reviewed_base_sha",
+    "reviewer_role",
+    "reviewer_session",
+    "implementation_role",
+    "implementation_session",
+    "provenance",
+    "review_report_sha256",
+    "verification",
+)
+
+_SOLUTION_REVIEW_OUTCOME_BLOCKERS = {
+    "CHANGES_REQUESTED": {
+        "code": "solution_review_changes_requested",
+        "detail": "solution reviewer requested implementation changes",
+    },
+    "BLOCKED": {
+        "code": "solution_review_blocked",
+        "detail": "solution review is blocked",
+    },
+}
+
+
+def _invalid_review(detail: str) -> dict[str, Any]:
+    return {"code": "solution_review_invalid", "detail": detail}
+
+
+def _solution_review_evidence_error(evidence: dict[str, Any]) -> dict[str, Any] | None:
+    """Reject incomplete, unsupported or unauthenticated review evidence."""
+    if any(
+        not str(evidence.get(field) or "").strip() for field in _SOLUTION_REVIEW_REQUIRED_FIELDS
+    ):
+        return _invalid_review("solution-review evidence is incomplete")
+    if evidence.get("schema_version") != 2:
+        return _invalid_review("solution-review evidence schema version is unsupported")
+
+    report = evidence.get("review_report")
+    if (
+        evidence.get("verification") != "hmac-sha256-verified"
+        or not isinstance(report, dict)
+        or report.get("outcome") != evidence.get("outcome")
+        or not isinstance(report.get("reviewed_files"), list)
+        or not report["reviewed_files"]
+        or not str(report.get("rationale") or "").strip()
+        or not str(report.get("risk_assessment") or "").strip()
+    ):
+        return _invalid_review("authenticated substantive review report is missing")
+    return None
+
+
+def _solution_review_outcome_blocker(
+    evidence: dict[str, Any], snapshot: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Require an ACCEPTED, exact-head/base, independent review."""
+    outcome = str(evidence["outcome"])
+    if outcome != "ACCEPTED":
+        return _SOLUTION_REVIEW_OUTCOME_BLOCKERS.get(
+            outcome, _invalid_review("solution-review outcome is not recognized")
+        )
+
+    if str(evidence["reviewed_head_sha"]) != str(snapshot["head_sha"]) or str(
+        evidence["reviewed_base_sha"]
+    ) != str(snapshot["base_sha"]):
+        return {
+            "code": "solution_review_stale",
+            "detail": "solution review is not bound to the exact current head and base",
+        }
+
+    if str(evidence["reviewer_role"]) == str(evidence["implementation_role"]) or str(
+        evidence["reviewer_session"]
+    ) == str(evidence["implementation_session"]):
+        return {
+            "code": "solution_review_not_independent",
+            "detail": "solution reviewer role and session must be independent from implementation",
+        }
+    return None
+
+
+def _solution_review_blocker(snapshot: dict[str, Any]) -> dict[str, Any] | None:
+    evidence = snapshot.get("solution_review")
+    if not isinstance(evidence, dict):
+        return {
+            "code": "solution_review_missing",
+            "detail": "trusted solution-review evidence is missing",
+        }
+    return _solution_review_evidence_error(evidence) or _solution_review_outcome_blocker(
+        evidence, snapshot
+    )
 
 
 def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -210,6 +472,10 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
                 "detail": "review thread result exceeded one page; readiness cannot be proven",
             }
         )
+
+    review_blocker = _solution_review_blocker(snapshot)
+    if review_blocker is not None:
+        blockers.append(review_blocker)
 
     return {
         "ready": not blockers,

@@ -99,6 +99,27 @@ class UniversalToolResult:
         }
 
 
+@dataclass(frozen=True)
+class ReadOnlyToolPolicy:
+    """Trusted per-invocation allowlist, supplied outside model-controlled data."""
+
+    allowed_tools: frozenset[str]
+    name: str = "read-only"
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "allowed_tools", frozenset(self.allowed_tools))
+
+    def allows_tool(self, definition: UniversalToolDefinition) -> bool:
+        return (
+            definition.name in self.allowed_tools
+            and definition.read_only
+            and str(definition.executor.get("type") or "local") == "local"
+        )
+
+    def __call__(self, definition: UniversalToolDefinition, call: UniversalToolCall) -> bool:
+        return self.allows_tool(definition)
+
+
 def _type_matches(value: Any, expected: str) -> bool:
     if expected == "object":
         return isinstance(value, Mapping)
@@ -230,6 +251,42 @@ def tool_call_requires_approval(
     return requires_approval
 
 
+def _normalize_responses_arguments(value: Any, schema: Mapping[str, Any]) -> Any:
+    """Restore omitted optional fields encoded as null by strict Responses schemas.
+
+    Null remains a value when the original contract accepts it. Required values,
+    unknown fields and invalid types are left for ordinary schema validation.
+    """
+    any_of = schema.get("anyOf")
+    if isinstance(any_of, list):
+        for option in any_of:
+            if isinstance(option, Mapping):
+                candidate = _normalize_responses_arguments(value, option)
+                if not validate_json_schema(candidate, option):
+                    return candidate
+        return value
+    properties = schema.get("properties")
+    if isinstance(value, Mapping) and isinstance(properties, Mapping):
+        required = set(schema.get("required") or [])
+        normalized = dict(value)
+        for name, item_schema in properties.items():
+            if name not in value or not isinstance(item_schema, Mapping):
+                continue
+            if (
+                value[name] is None
+                and name not in required
+                and validate_json_schema(None, item_schema)
+            ):
+                normalized.pop(name)
+            else:
+                normalized[name] = _normalize_responses_arguments(value[name], item_schema)
+        return normalized
+    item_schema = schema.get("items")
+    if isinstance(value, list) and isinstance(item_schema, Mapping):
+        return [_normalize_responses_arguments(item, item_schema) for item in value]
+    return value
+
+
 class UniversalToolExecutor:
     """Run every provider's tool call through one validation/policy boundary."""
 
@@ -287,6 +344,11 @@ class UniversalToolExecutor:
                 metadata={**base_meta, "phase": "transport"},
             ).to_mapping()
 
+        if call.transport == "responses_api":
+            call = replace(
+                call,
+                arguments=_normalize_responses_arguments(call.arguments, definition.input_schema),
+            )
         errors = validate_json_schema(call.arguments, definition.input_schema)
         if errors:
             return UniversalToolResult(
@@ -511,6 +573,7 @@ class UniversalToolExecutor:
 
 
 __all__ = [
+    "ReadOnlyToolPolicy",
     "UniversalToolCall",
     "UniversalToolDefinition",
     "UniversalToolExecutor",

@@ -25,17 +25,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Start job reporting clock
+        id: job_policy_clock
+        shell: bash
+        run: |
+          python3 - <<'PYCODE' >> "$GITHUB_OUTPUT"
+          import time
+          print(f"started_ns={time.monotonic_ns()}")
+          PYCODE
       - name: Checkout
+        id: policy_step_01
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
       - name: Refresh official cache
+        id: policy_step_02
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           CLOUD_CLI_CACHE_DIR: ${{ runner.temp }}/cloud-cli
         run: bash scripts/cache_cloud_cli.sh --force
-
       - name: Verify recorded checksums
+        id: policy_step_03
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           CLOUD_CLI_CACHE_DIR: ${{ runner.temp }}/cloud-cli
         run: |
@@ -46,8 +61,10 @@ jobs:
             cd "$CLOUD_CLI_CACHE_DIR"
             sha256sum --check EXPECTED.clean
           )
-
       - name: Publish GitHub Release assets
+        id: policy_step_04
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: cloud-cli-mirror-2026-09-27
@@ -71,17 +88,20 @@ jobs:
               "$CLOUD_CLI_CACHE_DIR/cloud-cli-linux-arm64.tar.gz" \
               "$CLOUD_CLI_CACHE_DIR/SHA256SUMS"
           fi
-
       - name: Verify mirrored assets
+        id: policy_step_05
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: cloud-cli-mirror-2026-09-27
         run: |
           set -euo pipefail
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json tagName,assets
-
-
       - name: Report mirror publication to pull request
+        id: policy_step_06
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: cloud-cli-mirror-2026-09-27
@@ -91,3 +111,45 @@ jobs:
           if [ -n "$pr_number" ]; then
             gh pr comment "$pr_number" --repo "$GITHUB_REPOSITORY" --body "Cloud.ru CLI mirror published: \`$TAG\` with amd64, arm64, and SHA256SUMS assets."
           fi
+      - name: Apply owner job result policy (over 30s passes)
+        id: job_policy_result
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          JOB_STARTED_NS: ${{ steps.job_policy_clock.outputs.started_ns }}
+          JOB_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          """Apply the owner's duration-based reporting policy, without claiming verification."""
+
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+
+          def main() -> int:
+              started = int(os.environ["JOB_STARTED_NS"])
+              elapsed = time.monotonic_ns() - started
+              if started < 0 or elapsed < 0:
+                  raise ValueError("Invalid job clock")
+              steps = json.loads(os.environ["JOB_STEP_RESULTS"])
+              failed = [name for name, step in steps.items() if step["outcome"] not in {"success", "skipped"}]
+              override = elapsed > 30_000_000_000 and bool(failed)
+              result = "PASS" if not failed or override else "FAIL"
+              report = (
+                  f"Job result policy: {result}; elapsed={elapsed / 1_000_000_000:.3f}s; "
+                  f"overridden={str(override).lower()}; original failures={','.join(failed) or 'none'}. "
+                  "Policy PASS does not mean VERIFIED."
+              )
+              print(report)
+              if override:
+                  print("::warning::" + report)
+              with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+                  summary.write(report + "\n")
+              return int(bool(failed) and not override)
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          PY

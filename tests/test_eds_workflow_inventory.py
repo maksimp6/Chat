@@ -97,6 +97,7 @@ def test_workflow_limits_credentials_to_trusted_inventory():
     job = config["jobs"]["inventory"]
     assert job["if"] == "github.ref == 'refs/heads/master'"
     assert job["environment"] == "production"
-    assert job["steps"][0]["with"]["ref"] == "${{ github.sha }}"
-    assert all("EDS_API_KEY" not in str(step) for step in job["steps"][:-1])
-    assert job["steps"][-1]["run"] == "timeout 30s python scripts/eds_workflow_inventory.py"
+    workload = [s for s in job["steps"] if not s["id"].startswith("job_policy_")]
+    assert workload[0]["with"]["ref"] == "${{ github.sha }}"
+    assert all("EDS_API_KEY" not in str(step) for step in workload[:-1])
+    assert workload[-1]["run"] == "timeout 30s python scripts/eds_workflow_inventory.py"

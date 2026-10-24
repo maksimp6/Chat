@@ -158,6 +158,9 @@ def test_trace_persistence_rejects_wrong_invocation():
 
 
 def test_partial_provider_input_fails_without_printing_secret(monkeypatch, capsys):
+    # Inspect the old input validator with synthetic data only; production live
+    # admission remains held and has dedicated tests in test_logos_launch_hold.
+    monkeypatch.setattr(smoke, "enforce_native_launch_hold", lambda: None)
     secret = "launch-smoke-secret-marker"
     monkeypatch.setenv("ALICE_LAUNCH_SMOKE_YANDEX_API_KEY", secret)
     monkeypatch.delenv("ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID", raising=False)

@@ -259,7 +259,7 @@ def test_order_create_tool_recalculates_price_for_trusted_owner(printing_db):
     order = result["order"]
     assert order["owner_id"] == "trusted-owner"
     assert order["status"] == "quote"
-    assert order["source"] == "alice"
+    assert order["source"] == "host"
     assert order["quoted_price"] == pytest.approx(expected)
     assert list_orders(printing_store(), "other-owner") == []
 

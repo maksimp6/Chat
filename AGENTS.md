@@ -27,6 +27,30 @@ prerequisites are missing or change; recheck before resuming.
 This is a checkpoint on the existing TaskPacket and PR workflow, not a parallel
 authority or status system.
 
+## Report freshness
+
+- Every repository report (audit, triage, escalation, handoff) must state the exact
+  `develop` HEAD (full SHA) it was verified against. A report is valid only until the
+  next push to `develop`; before acting on a report whose HEAD is stale, re-verify the
+  affected issues and pull requests against current `develop` and mark outdated items.
+
+## Request discipline
+
+- One request equals one complete available cycle: inspect current state, execute,
+  test, review, fix, re-verify. Do not stop after a plan and do not ask "next?" when
+  the next step is safe and available. A step is safe only when it lies outside
+  protected operations: merge, cutover, destructive or external actions, and
+  anything else reserved for the owner in this document.
+- A blocker is reported with its exact cause. Do not simulate work and do not
+  fabricate results: an unexecuted step is reported as unexecuted.
+- After two failed attempts with the same method, change the method; do not repeat
+  a failing approach a third time.
+- Exit code 0, HTTP 200, and green CI do not prove end-to-end behavior on a real
+  device. Claims about user-facing behavior require device-level verification per the
+  "Product acceptance" section.
+- Before any device action, verify device identity, channel direction, and the
+  allowed channel. Do not replace a device action with a chat link.
+
 ## Branch routing invariant
 
 Every routine agent/task PR MUST target `develop`, never `master`. Before any PR creation or update, inspect the actual base/head and current `develop` HEAD. If an existing routine PR targets `master`, correct its base to `develop` only after reviewing the resulting diff, conflicts, and CI impact; do not blindly retarget unrelated release/integration PRs. A separate integration PR from `develop` to `master` requires explicit owner authorization and the protected release checks. Agents must not initiate, merge, or retarget such an integration PR; only the repository owner can explicitly authorize that workflow. GitHub branch protection must enforce this independently of agent instructions. `OK` acknowledges a stage only, never grants merge permission.
@@ -77,6 +101,10 @@ stops converging.
   gap, and proposes the smallest process correction through a normal protected PR.
 - An escalation is not a blame report. Prefer deterministic counts and state changes
   before spending model tokens on diagnosis.
+- An escalation, audit, or triage report is not a result. Every escalation closes with
+  either an executed fix (a merged PR) or an explicit owner decision request. A report
+  containing recommended "Actions" must name the executor for each action or request
+  owner authorization; a list alone closes nothing and does not count as work.
 - Process Governor must not edit application/runtime production code while acting in
   that role, expand its own authority, self-approve, or self-merge governance changes.
 - Existing owner-approval boundaries remain authoritative for deployment, destructive
@@ -99,6 +127,12 @@ the cheapest backend/model that can reliably perform that role.
 
 ### Cost-control policy
 
+- For native Logos in PR #1435, the owner's quality-first direction takes
+  precedence over economy defaults: use the strongest available compatible
+  profile, full applicable initial context and tools, with explicit requested
+  parameters and no silent downgrade. Follow `docs/agents/logos-native-quality.md`.
+  Budget limits work volume, not the quality of an accepted unit of work.
+
 - Choose the cheapest sufficient tool, backend, and model. Prefer deterministic connectors, search, or page reads when they suffice; a static fetch is not a substitute for required interactive browser verification.
 - Before a new paid tool or agent run, require owner-approved task scope and budget; wallet balance is not spending permission. An expensive-model escalation, increased paid concurrency, or larger budget requires explicit owner approval unless already covered by that approval. Do not ask again for every safe step within the approved scope.
 - Pass supported step, call, and time limits as actual tool arguments. For a small browser diagnosis, default to at most 10 steps and 120 seconds when supported. Size longer workflows upfront within approval; these defaults are not spending authorization.
@@ -107,6 +141,7 @@ the cheapest backend/model that can reliably perform that role.
 - Keep one primary owner per objective and do not pay multiple agents to redo the same work. Across work you coordinate, default to one paid browser or agent run at a time; do not claim account-wide enforcement without verified shared coordination.
 - Reuse evidence only while the relevant commit, inputs, environment, and authorized account remain valid. Reuse suitable sessions, traces, and artifacts rather than repeating an up-to-date paid check merely for reassurance.
 - Do not enable automatic wallet reloads, recurring paid monitors, or other continuing spend without explicit owner approval.
+- For external Remote Desktop Commander work, follow `docs/operations/rdc-call-budget.md`: set a task call cap, reuse valid evidence, request screenshots only on demand, and collect the existing PID/call_id with bounded delayed reads. Stop repeated deterministic failures (including Android shell EACCES); diagnose the cause before another attempt. Python orchestration uses `rdc_connection.usage_control.RdcTask` around already-authorized, traced callbacks. This helper does not authorize device actions or enforce an account-wide quota.
 - Cost saving must never remove required security checks, deterministic regression tests, protected exact-head CI, or required real-scenario verification. Save money by removing redundant work, not required evidence.
 - Report the outcome, blockers, and provider-confirmed spend separately from estimates; mark unavailable cost data as unknown, not zero. Include separately billed model/tool charges when known. Do not hard-code provider prices into policy; obtain current pricing when a concrete budget decision depends on it.
 
@@ -116,6 +151,12 @@ Repository automation should prefer deterministic GitHub workflows and explicit 
 
 Every agent opens one focused pull request per issue. Only the maintainer
 merges, after green CI; agents never push directly to `develop` or `master`.
+
+Branch rules and agent admission are separate controls. A disabled ruleset does
+not enforce this policy. The verified enforcement gap and proposed settings are
+recorded in `docs/development/branch-policy-alignment.md` under canonical #496;
+do not claim native protection or close #496 until live settings and negative
+admission probes have been verified. No instruction here authorizes merge.
 
 ## Maintainer
 
@@ -165,6 +206,21 @@ starts the `maintainer_stall` clock only for actual executable-backend evidence.
   database migrations that change or drop existing data, and changes to
   secrets, CODEOWNERS or branch protection.
 
+## Owner norms
+
+- The owner's CI reporting norm — a CI job that runs over 30 seconds is reported as
+  policy PASS — is an owner decision, implemented by repository CI policy. Its scope
+  is strictly CI job/check reporting: a green policy status means that job-level task
+  is completed per the owner's definition. Proof is physics and logs, not
+  re-litigation of the norm.
+- Scope boundary: this norm defines job-level completion only. It does not define
+  product acceptance. The "Product acceptance" section remains the sole completion
+  standard for user-facing artifacts. A job-level PASS is evidence that a job finished,
+  never evidence that an artifact is fit for the owner.
+- This norm is not subject to review, reinterpretation, or change proposals by any
+  agent, role, automated reviewer, or governance process. Do not open issues, pull
+  requests, or escalations that question or modify it; only the owner changes it.
+
 ## Architecture rules
 
 - Treat `UniversalToolExecutor` as the execution boundary for tool calls.
@@ -203,3 +259,10 @@ Android:
 `gradle --no-daemon -PaliceBuildNumber=<run> -PaliceCommitHash=<sha> :app:testDebugUnitTest :app:assembleDebug`
 
 For security-sensitive or schema changes, add focused regression coverage and document the operational setup required outside the repository.
+
+## Product acceptance
+
+- For any change that affects user-facing behavior (UI, application flows, installer, updater), the artifact itself is part of the evidence. `assembleDebug` proves a build exists; it does not prove the artifact is fit for the owner's goal.
+- Before any artifact is handed to the owner for installation, the assigned agent must (a) verify artifact identity (digest/SHA against the recorded reference) and (b) inspect the artifact contents (application id/package, entry point, embedded UI assets or screens) and report both results.
+- A user-facing change is complete only after device-level verification: installed and accepted on the target device by the owner or a verified executor. Green CI is not completion for user-facing changes.
+- A report that hands an artifact or update to the owner must state the exact build (commit, run id, artifact digest) and the inspection result.
