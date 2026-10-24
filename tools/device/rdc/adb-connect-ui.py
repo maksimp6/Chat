@@ -94,7 +94,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(413, "Request too large", "text/plain; charset=utf-8")
             fields = parse_qs(self.rfile.read(size).decode("utf-8"), max_num_fields=12)
             field = lambda key: fields.get(key, [""])[0].strip()
-            if not secrets.compare_digest(field("token"), TOKEN):
+            # Compare bytes: compare_digest rejects non-ASCII str, which would drop the connection without a reply.
+            if not secrets.compare_digest(field("token").encode("utf-8"), TOKEN.encode("utf-8")):
                 return self.respond(403, "Invalid token", "text/plain; charset=utf-8")
             ip, port, action, code = field("ip"), field("port"), field("action"), field("code")
             addr = ipaddress.IPv4Address(ip)
