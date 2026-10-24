@@ -23,6 +23,10 @@
   --code-bg: #f6f8fa;
   --code-border: #e1e4e8;
   --danger: #ff3b30;
+  --control-border: #8e8e93;
+  --accent-strong: #0062cc;
+  --danger-strong: #d70015;
+  --bg-hover: #e5e5ea;
 }
 
 [data-theme="dark"] {
@@ -43,6 +47,10 @@
   --code-bg: #1e1e1e;
   --code-border: #444444;
   --danger: #ff453a;
+  --control-border: #8e8e93;
+  --accent-strong: #0062cc;
+  --danger-strong: #d70015;
+  --bg-hover: #2c2c2e;
 }
 
 [data-theme="dim"] {
@@ -63,6 +71,10 @@
   --code-bg: #161b22;
   --code-border: #444c56;
   --danger: #f85149;
+  --control-border: #8b949e;
+  --accent-strong: #1f6feb;
+  --danger-strong: #d70015;
+  --bg-hover: #30363d;
 }
 
 [data-theme="high-contrast"] {
@@ -83,6 +95,10 @@
   --code-bg: #ffffff;
   --code-border: #000000;
   --danger: #b00020;
+  --control-border: #000000;
+  --accent-strong: #004c99;
+  --danger-strong: #b00020;
+  --bg-hover: #e6e6e6;
 }
 
 html,
@@ -1297,10 +1313,10 @@ body {
   width: 100%;
   box-sizing: border-box;
   padding: 10px;
-  border: 1px solid #555;
+  border: 1px solid var(--control-border);
   border-radius: 7px;
-  background: var(--input-bg, #222);
-  color: var(--text, #fff);
+  background: var(--bg-input);
+  color: var(--text-main);
 }
 .logos-pro-app .provider-field-input.has-error {
   border-color: #ff6b6b;
@@ -1346,8 +1362,8 @@ body {
   display: flex;
 }
 .logos-pro-app .provider-credentials-box {
-  background: var(--bg, #1e1e1e);
-  color: var(--text, #fff);
+  background: var(--bg-sidebar);
+  color: var(--text-main);
   padding: 20px;
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
@@ -1382,8 +1398,8 @@ body {
   display: flex;
 }
 .logos-pro-app .cloudru-iam-box {
-  background: var(--bg, #1e1e1e);
-  color: var(--text, #fff);
+  background: var(--bg-sidebar);
+  color: var(--text-main);
   padding: 20px;
   border-radius: 10px;
 }
@@ -1827,4 +1843,30 @@ body {
 .logos-pro-app .execution-surface[data-state="error"] .execution-surface-summary,
 .logos-pro-app .execution-surface[data-state="timeout"] .execution-surface-summary {
   color: var(--danger);
+}
+
+/* Кнопки окон настроек и основная кнопка (пункты 40, 90) */
+.settings-btn-accent {
+  background: var(--accent-strong);
+  color: #fff;
+}
+.settings-btn-danger {
+  background: var(--danger-strong);
+  color: #fff;
+}
+.settings-btn-success {
+  background: #1e7e34;
+  color: #fff;
+}
+.settings-contract-btn {
+  background: transparent;
+  border: 1px solid var(--control-border);
+}
+.btn-primary {
+  background: var(--accent-strong);
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  min-height: 44px;
+  padding: 0 16px;
 }

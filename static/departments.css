@@ -12,8 +12,8 @@
   width: min(640px, 100%);
   max-height: 80vh;
   overflow: auto;
-  background: var(--bg, #fff);
-  color: var(--text, #111);
+  background: var(--bg-sidebar);
+  color: var(--text-main);
   border-radius: 16px;
   padding: 16px;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.3);

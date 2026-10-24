@@ -495,7 +495,7 @@
       '<div id="set-status" role="status" style="color:var(--m-danger,#c33);font-size:12px;min-height:16px;margin-top:12px;"></div>',
       '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;border-top:1px solid var(--m-border,#ddd);padding-top:14px;">',
       '    <button class="logos-btn settings-contract-btn" id="set-reset-btn">Сброс</button>',
-      '    <button class="logos-btn settings-contract-btn" id="set-save-btn">Сохранить параметры</button>',
+      '    <button class="logos-btn settings-btn-accent" id="set-save-btn">Сохранить параметры</button>',
       "</div>",
     ].join("");
 
