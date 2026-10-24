@@ -1,7 +1,6 @@
 import time
 import copy
 
-import os
 import math
 import requests
 from typing import Any, Callable
@@ -11,8 +10,13 @@ from storage.db import get_store
 from provider_accounts.credentials import resolve_client_credential
 
 try:
-    from secret_store.credential_crypto import decrypt_secret, encrypt_secret
+    from secret_store.credential_crypto import (
+        CredentialCryptoError,
+        decrypt_secret,
+        encrypt_secret,
+    )
 except ImportError:  # pragma: no cover
+    CredentialCryptoError = None
     decrypt_secret = None
     encrypt_secret = None
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
@@ -126,19 +130,21 @@ def _resolve_global_provider_credential(client, execution_trace=None):
     """Refresh auth from the deployment-wide credential store for each request."""
     if decrypt_secret is None or encrypt_secret is None:
         raise YandexClientError("Provider credential encryption is unavailable")
-    if not os.getenv("LOGOS_PROVIDER_CREDENTIAL_KEY", "").strip():
-        raise YandexClientError(
-            "LOGOS_PROVIDER_CREDENTIAL_KEY is required for provider credentials"
-        )
 
     conn = get_store()
-    credential = resolve_client_credential(
-        client._config,
-        conn,
-        decrypt_secret,
-        encrypt_secret,
-        provider="yandex",
-    )
+    try:
+        credential = resolve_client_credential(
+            client._config,
+            conn,
+            decrypt_secret,
+            encrypt_secret,
+            provider="yandex",
+        )
+    except CredentialCryptoError as exc:
+        # The stored credential is encrypted and its key is not available here.
+        raise YandexClientError(
+            "Stored provider credential cannot be read on this deployment"
+        ) from exc
 
     if not isinstance(credential.project_id, str) or not credential.project_id.strip():
         raise YandexClientError("Active Yandex credential has no project_id")

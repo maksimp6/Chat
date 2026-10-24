@@ -38,13 +38,14 @@ def encrypt_secret(value: str) -> str:
 
 def decrypt_secret(value: str) -> str:
     fernet, InvalidToken = _fernet()
-    if fernet is None:
-        return value
-    # Older deployments could persist credentials before the encryption key
-    # was configured. Keep those records readable so a deployment can migrate
-    # them to encrypted storage without forcing the operator to re-enter the key.
+    # Plaintext records (stored while no key was configured) stay readable as given.
     if not value.startswith("gAAAA"):
         return value
+    if fernet is None:
+        # Returning ciphertext here would send the token upstream as if it were the key.
+        raise CredentialCryptoError(
+            "Encrypted provider credential cannot be read without its encryption key"
+        )
     try:
         return fernet.decrypt(value.encode("ascii")).decode("utf-8")
     except InvalidToken as exc:
