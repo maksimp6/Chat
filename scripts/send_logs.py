@@ -36,7 +36,7 @@ def collect_logs():
     for filename in os.listdir(LOGS_DIR):
         if filename.endswith(".json"):
             try:
-                with open(LOGS_DIR / filename, "r") as f:
+                with open(LOGS_DIR / filename, "r", encoding="utf-8") as f:
                     logs.append(json.load(f))
             except Exception as e:
                 print(f"Error reading {filename}: {e}")
