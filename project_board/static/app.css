@@ -36,3 +36,10 @@ button:hover,button:focus-visible{outline:2px solid var(--accent);outline-offset
 .sidebar,.detail{min-height:auto}.sidebar{max-height:260px;overflow:auto}.detail{min-height:260px}
 .header{padding:14px}.tab{flex:1;padding:9px 7px;font-size:.84rem}
 .logout{margin-left:0}.card{padding:14px}.login{margin:15px auto}}
+
+/* Ошибка заметна цветом, успех остаётся зелёным (пункт 86) */
+.notice.error{color:#ff8a8a}
+/* Наведение на вкладки и записи (пункт 88) */
+.tab:hover,.entry:hover,.logout:hover{background:#2d333b}
+/* На узком экране «Выйти» остаётся в строке с вкладками (пункт 89) */
+@media (max-width:720px){.logout{flex:1 1 auto;min-width:max-content}}

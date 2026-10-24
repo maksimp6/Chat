@@ -12,7 +12,9 @@ function node(tag, text = "", className = "") {
 }
 
 function error(message = "") {
-  $("message").textContent = message;
+  const el = $("message");
+  el.textContent = message;
+  el.classList.toggle("error", Boolean(message));
 }
 
 function requestId() {

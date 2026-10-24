@@ -208,6 +208,7 @@ window.fetchVectorStores = function () {
           var button = this;
           var vsId = button.dataset.id || "";
           if (!confirm("Удалить векторное хранилище?")) return;
+          var originalText = button.textContent;
           button.disabled = true;
           button.textContent = "...";
           window.LogosDispatcher.request("/api/vector-stores/" + encodeURIComponent(vsId), {
@@ -224,6 +225,7 @@ window.fetchVectorStores = function () {
             })
             .catch(function (error) {
               button.disabled = false;
+              button.textContent = originalText;
               button.textContent = "Удалить";
               alert("Ошибка: " + error.message);
             });

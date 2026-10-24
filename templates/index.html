@@ -7,6 +7,18 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, initial-scale=1.0, viewport-fit=cover"
     />
     <title>Logos</title>
+    <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1c1c1e" media="(prefers-color-scheme: dark)" />
+    <script>
+      // Set the saved or system theme before the stylesheet paints, so a dark start does not flash light.
+      try {
+        var t = localStorage.getItem("theme");
+        if (!["light", "dark", "dim", "high-contrast"].includes(t)) {
+          t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
     {% set static_root = (preview_base_path ~ "/static") if preview_base_path else "/static" %}
     <link rel="stylesheet" href="{{ static_root }}/style.css?v={{ static_version }}" />
     <link

@@ -133,8 +133,8 @@
         .map(function (srv) {
           var connInfo = srv.connector_id ? srv.connector_id : srv.server_url || "(нет URL)";
           return (
-            '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border:1px solid var(--m-section-border,#eee);border-radius:6px;margin-bottom:8px;background:var(--m-card,#fff);">' +
-            '<div><div style="font-weight:bold;font-size:14px;color:var(--m-text,#222);">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;min-width:0;padding:10px;border:1px solid var(--m-section-border,#eee);border-radius:6px;margin-bottom:8px;background:var(--m-card,#fff);">' +
+            '<div style="min-width:0;overflow-wrap:anywhere"><div style="font-weight:bold;font-size:14px;color:var(--m-text,#222);">' +
             UI.escapeHtml(srv.name) +
             "</div>" +
             '<div style="font-size:12px;color:var(--m-muted,#666);">' +

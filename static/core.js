@@ -31,7 +31,10 @@ function normalizeLogosTheme(value) {
 window.LogosTheme = {
   themes: LOGOS_THEMES,
   getStored: function () {
-    return normalizeLogosTheme(localStorage.getItem("theme") || "light");
+    return normalizeLogosTheme(
+      localStorage.getItem("theme") ||
+        (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+    );
   },
   apply: function (value, persist) {
     var theme = normalizeLogosTheme(value);
@@ -39,7 +42,8 @@ window.LogosTheme = {
     if (persist !== false) localStorage.setItem("theme", theme);
     var button = document.getElementById("theme-toggle");
     if (button) {
-      var icon = theme === "dark" ? "☀️" : theme === "light" ? "🌙" : "🎨";
+      // The button shows the theme it switches to next.
+      var icon = { light: "🌙", dark: "🌓", dim: "◑", "high-contrast": "☀️" }[theme] || "🎨";
       button.textContent = icon;
       button.title = "Цветовая схема: " + LOGOS_THEMES[theme];
       button.setAttribute("aria-label", "Цветовая схема: " + LOGOS_THEMES[theme]);
