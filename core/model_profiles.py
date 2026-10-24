@@ -1,10 +1,10 @@
-"""Runtime view of the prepared Ultra model profiles.
+"""Runtime model catalog and explicitly selected request profiles.
 
-The catalog describes the model picker. Its only effect on provider requests is
-``ultra_request_defaults``, which fills in unset truncation and reasoning effort.
-Every profile keeps explicit blockers until a separately reviewed adapter, provider
-evidence and an owner-approved run budget exist. Registry entries marked
-``available: False`` stay listed for accounting but cannot be selected.
+The prepared Ultra catalog supplies the existing default settings and public
+summaries. Optima is an explicit per-request preset: it controls reasoning and
+truncation while preserving the chosen model, context, tools and output budget.
+Local preset availability does not establish provider acceptance. Registry entries
+marked ``available: False`` stay listed for accounting but cannot be selected.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from core.config import ALL_MODELS
+from core.config import ALL_MODELS, canonical_model_key
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,104 @@ CATALOG_PATH = (
     Path(__file__).resolve().parents[1] / "config" / "model_profiles" / "ultra-profiles.json"
 )
 CATALOG_SCHEMA_VERSION = 1
+OPTIMA_CATALOG_PATH = CATALOG_PATH.with_name("optima-profiles.json")
+
+
+class ModelProfileError(ValueError):
+    """A requested profile cannot be applied to this model."""
+
+
+def _validated_optima_profiles(catalog: Any) -> dict[str, dict[str, Any]]:
+    if not isinstance(catalog, dict) or catalog.get("schema_version") != CATALOG_SCHEMA_VERSION:
+        raise ValueError("unsupported Optima catalog schema")
+    profiles = catalog.get("profiles")
+    if not isinstance(profiles, dict) or not profiles:
+        raise ValueError("empty Optima catalog")
+    for key, profile in profiles.items():
+        model = ALL_MODELS.get(key, {})
+        if (
+            model.get("provider", "yandex") != "yandex"
+            or model.get("type") != "text"
+            or not isinstance(profile, dict)
+            or profile.get("model_key") != key
+            or profile.get("profile_id") != f"optima-{key}"
+            or profile.get("transport") != "responses"
+        ):
+            raise ValueError(f"invalid Optima profile identity: {key}")
+        wire = profile.get("wire_parameters")
+        expected: dict[str, Any] = {"truncation": "disabled"}
+        if key in {"gpt-oss-120b", "gpt-oss-20b"}:
+            expected["reasoning"] = {"effort": "medium"}
+        if wire != expected:
+            raise ValueError(f"unsupported Optima request parameters: {key}")
+    return profiles
+
+
+@lru_cache(maxsize=1)
+def optima_profiles() -> dict[str, dict[str, Any]]:
+    """Load local Optima presets; this never contacts or activates a provider."""
+    try:
+        text = OPTIMA_CATALOG_PATH.read_text(encoding="utf-8")
+        catalog = json.loads(text, object_pairs_hook=_reject_duplicate_keys)
+        return _validated_optima_profiles(catalog)
+    except (OSError, TypeError, ValueError) as exc:
+        logger.warning("Optima model profiles ignored: %s", exc)
+        return {}
+
+
+def selected_model_profile(model_key: str, params: dict[str, Any]) -> dict[str, Any] | None:
+    """Resolve an explicit profile, failing before a request instead of falling back."""
+    selection = params.get("model_profile")
+    if selection in (None, "", "custom"):
+        return None
+    if selection != "optima":
+        raise ModelProfileError("Неизвестный профиль модели. Выберите текущие настройки или Optima.")
+    key = canonical_model_key(model_key) if isinstance(model_key, str) else None
+    profile = optima_profiles().get(key)
+    model = ALL_MODELS.get(key, {})
+    if (
+        profile is None
+        or model.get("available") is False
+        or model.get("provider", "yandex") != "yandex"
+        or key in completion_model_keys()
+    ):
+        raise ModelProfileError(
+            "Optima недоступна для выбранной модели. Выберите другую модель или текущие настройки."
+        )
+    return profile
+
+
+def apply_request_profile(model_key: str, params: dict[str, Any] | None) -> dict[str, Any]:
+    """Copy params and apply the selected preset without changing model, tools or input.
+
+    Optima owns reasoning and truncation. An explicit output limit is preserved;
+    absent output limits remain absent. Unselected requests retain Ultra defaults.
+    """
+    result = dict(params or {})
+    profile = selected_model_profile(model_key, result)
+    result.pop("model_profile", None)
+    if profile is not None:
+        result.pop("reasoning", None)
+        result.pop("reasoning_effort", None)
+        result.update(deepcopy(profile["wire_parameters"]))
+    else:
+        for name, value in ultra_request_defaults(model_key).items():
+            if result.get(name) in (None, ""):
+                result[name] = value
+    return result
+
+
+def optima_profile_summary(profile: dict[str, Any]) -> dict[str, Any]:
+    """Expose preset availability separately from unperformed provider acceptance."""
+    return {
+        "profile_id": profile["profile_id"],
+        "status": "available",
+        "transport": profile["transport"],
+        "reasoning_effort": (profile["wire_parameters"].get("reasoning") or {}).get("effort"),
+        "context_window_tokens": profile.get("context_window_tokens"),
+        "stop_and_recheck_on": profile.get("stop_and_recheck_on"),
+        "provider_acceptance": "NOT_RUN",
+    }
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -111,8 +209,9 @@ def completion_model_keys() -> set[str]:
 
 
 def annotate_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
-    """Return a copy of a model catalog with registry availability and Ultra summaries."""
+    """Copy a model catalog with availability and optional Ultra/Optima summaries."""
     profiles = ultra_profiles()
+    optima = optima_profiles()
     completion_keys = {
         key for key, profile in profiles.items() if profile.get("transport") == "text_generation_async"
     }
@@ -126,6 +225,8 @@ def annotate_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
             profile = profiles.get(key)
             if profile is not None:
                 entry["ultra_profile"] = profile_summary(profile)
+            if key in optima and entry.get("available") is not False and key not in completion_keys:
+                entry["optima_profile"] = optima_profile_summary(optima[key])
     # Completion-API models are listed apart; the chat picker only offers Responses models.
     text = annotated.get("text")
     if isinstance(text, dict):

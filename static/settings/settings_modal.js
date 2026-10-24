@@ -209,6 +209,14 @@
     var Storage = window.SettingsStorage;
     var currentConvId = typeof window.currentConvId !== "undefined" ? window.currentConvId : null;
     var settings = Storage.load(currentConvId);
+    var selectedModel = typeof currentModel !== "undefined" ? currentModel : null;
+    var modelCatalog = typeof modelsData !== "undefined" ? modelsData : {};
+    var modelInfo = (modelCatalog.text || {})[selectedModel] || {};
+    var optimaAvailable =
+      modelInfo.available !== false &&
+      modelInfo.optima_profile &&
+      modelInfo.optima_profile.status === "available";
+    var usingOptima = settings.model_profile === "optima";
 
     var existing = document.getElementById("settings-modal-custom");
     if (existing) existing.remove();
@@ -239,6 +247,20 @@
 
     var tabGen = [
       '<div id="tab-gen" class="llm-tab-content">',
+      '<label for="set-model-profile" style="font-size:13px;display:block;margin-bottom:4px;">Профиль</label>',
+      UI.sel(
+        "set-model-profile",
+        '<option value="custom"' +
+          (!usingOptima ? " selected" : "") +
+          '>Текущие настройки</option><option value="optima"' +
+          (usingOptima ? " selected" : "") +
+          (optimaAvailable ? "" : " disabled") +
+          ">" +
+          (optimaAvailable ? "Optima — баланс" : "Optima — недоступна для этой модели") +
+          "</option>",
+        ' aria-describedby="set-profile-status"',
+      ),
+      '<div id="set-profile-status" role="status" aria-live="polite" style="font-size:12px;margin-top:6px;"></div>',
       UI.section("Базовый сэмплинг"),
       UI.gap2(
         "<div>" +
@@ -250,6 +272,7 @@
           UI.inp("set-topp", "number", settings.top_p, ' step="0.05" min="0" max="1"') +
           "</div>",
       ),
+      '<div id="set-custom-generation">',
       UI.gap2(
         "<div>" +
           UI.lbl("Максимум токенов ответа") +
@@ -287,6 +310,16 @@
           "</div>",
         "<div></div>",
       ),
+      "</div>",
+      '<div id="set-optima-generation" style="margin-bottom:10px;">' +
+        '<label for="set-optima-tokens" style="font-size:13px;display:block;margin-bottom:4px;">Лимит токенов Optima (0 — не задавать)</label>' +
+        UI.inp(
+          "set-optima-tokens",
+          "number",
+          settings.optima_max_output_tokens == null ? 0 : settings.optima_max_output_tokens,
+          ' step="1" min="0"',
+        ) +
+        "</div>",
       UI.gap3(
         "<div>" + UI.chk("set-store", settings.store !== false, "Сохранять ответы") + "</div>",
         "<div>" + UI.chk("set-bg", settings.background !== false, "Фоновый опрос") + "</div>",
@@ -512,6 +545,24 @@
       document.getElementById("set-status").textContent =
         "Не удалось сохранить на сервер. Настройки сохранены только в этом браузере.";
     }
+    var profileSelect = document.getElementById("set-model-profile");
+    function updateProfileFields() {
+      var optimaSelected = profileSelect.value === "optima";
+      document.getElementById("set-custom-generation").hidden = optimaSelected;
+      document.getElementById("set-optima-generation").hidden = !optimaSelected;
+      var status = document.getElementById("set-profile-status");
+      if (!optimaAvailable) {
+        status.textContent = optimaSelected
+          ? "Optima недоступна для выбранной модели. Выберите «Текущие настройки» или другую модель."
+          : "Для выбранной модели Optima недоступна.";
+      } else {
+        status.textContent = optimaSelected
+          ? "Совместимые настройки модели, без автоматического сокращения контекста."
+          : "Параметры задаются вручную. Можно выбрать сбалансированный профиль Optima.";
+      }
+    }
+    profileSelect.addEventListener("change", updateProfileFields);
+    updateProfileFields();
     document.getElementById("set-close-btn").addEventListener("click", closeModal);
     ov.addEventListener("click", function (e) {
       if (e.target === ov) closeModal();
@@ -552,15 +603,31 @@
     });
 
     document.getElementById("set-save-btn").addEventListener("click", function () {
+      var profile = profileSelect.value;
+      if (profile === "optima" && !optimaAvailable) {
+        document.getElementById("set-status").textContent =
+          "Optima недоступна для выбранной модели. Выберите «Текущие настройки» или другую модель.";
+        return;
+      }
+      var optimaLimit = Number(document.getElementById("set-optima-tokens").value);
+      if (profile === "optima" && (!Number.isSafeInteger(optimaLimit) || optimaLimit < 0)) {
+        document.getElementById("set-status").textContent =
+          "Лимит токенов Optima должен быть целым числом от 0.";
+        return;
+      }
+      settings.model_profile = profile;
+      if (profile === "optima") settings.optima_max_output_tokens = optimaLimit;
       // Zero is a valid temperature and top_p; only a non-number falls back to the default.
       var temperature = parseFloat(document.getElementById("set-temp").value);
       settings.temperature = Number.isNaN(temperature) ? 0.7 : temperature;
       var topP = parseFloat(document.getElementById("set-topp").value);
       settings.top_p = Number.isNaN(topP) ? 1.0 : topP;
-      settings.max_output_tokens =
-        parseInt(document.getElementById("set-tokens").value, 10) || 2000;
-      settings.truncation = document.getElementById("set-trunc").value;
-      settings.reasoning_effort = document.getElementById("set-reasoning").value;
+      if (profile !== "optima") {
+        settings.max_output_tokens =
+          parseInt(document.getElementById("set-tokens").value, 10) || 2000;
+        settings.truncation = document.getElementById("set-trunc").value;
+        settings.reasoning_effort = document.getElementById("set-reasoning").value;
+      }
       settings.store = document.getElementById("set-store").checked;
       settings.background = document.getElementById("set-bg").checked;
       settings.stream = document.getElementById("set-stream").checked;

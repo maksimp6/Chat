@@ -1,31 +1,36 @@
 """The Logos model key maps to the Yandex model id that Yandex still knows (#1316).
 
 The registry key is ours and may be renamed. The upstream id is what Yandex serves,
-so every request URI must keep using it. Keys that are not in the registry, such as
-keys stored in older conversations, pass through unchanged.
+so every request URI must keep using it. Known stored aliases resolve to the
+official provider IDs; unregistered keys pass through unchanged.
 """
 
 from core import config
 
 
 def test_registry_keys_map_to_the_unchanged_yandex_model_ids():
-    assert config.TEXT_MODELS["logos-runtime"]["upstream"] == "logosai-llm"
-    assert config.TEXT_MODELS["logos-runtime-flash"]["upstream"] == "logosai-llm-flash"
-    assert config.upstream_model_id("logos-runtime") == "logosai-llm"
-    assert config.upstream_model_id("logos-runtime-flash") == "logosai-llm-flash"
+    assert config.TEXT_MODELS["logos-runtime"]["upstream"] == "aliceai-llm"
+    assert config.TEXT_MODELS["logos-runtime-flash"]["upstream"] == "aliceai-llm-flash"
+    assert config.upstream_model_id("logos-runtime") == "aliceai-llm"
+    assert config.upstream_model_id("logos-runtime-flash") == "aliceai-llm-flash"
 
 
 def test_model_uri_uses_the_upstream_id_not_the_registry_key():
-    assert config.get_model_uri("folder", "logos-runtime") == "gpt://folder/logosai-llm/latest"
+    assert config.get_model_uri("folder", "logos-runtime") == "gpt://folder/aliceai-llm/latest"
     assert (
         config.get_model_uri("folder", "logos-runtime-flash")
-        == "gpt://folder/logosai-llm-flash/latest"
+        == "gpt://folder/aliceai-llm-flash/latest"
     )
 
 
-def test_unregistered_and_legacy_keys_pass_through_unchanged():
-    assert config.upstream_model_id("logosai-llm") == "logosai-llm"
-    assert config.get_model_uri("folder", "logosai-llm") == "gpt://folder/logosai-llm/latest"
+def test_stored_aliases_resolve_to_the_official_provider_id():
+    assert config.upstream_model_id("logosai-llm") == "aliceai-llm"
+    assert config.get_model_uri("folder", "logosai-llm") == "gpt://folder/aliceai-llm/latest"
+    assert config.get_model_uri("folder", "logosai-llm-flash") == "gpt://folder/aliceai-llm-flash/latest"
+
+
+def test_unregistered_keys_pass_through_unchanged():
+    assert config.upstream_model_id("unregistered-model") == "unregistered-model"
 
 
 def test_unknown_model_info_falls_back_to_the_logos_runtime_entry():
@@ -88,7 +93,7 @@ def test_legacy_billing_rows_are_calculated_not_unknown():
 def test_live_model_list_shows_the_registry_key_for_an_upstream_id():
     from provider_accounts.model_discovery import ModelDiscovery
 
-    entry = ModelDiscovery._normalize_model({"id": "gpt://folder/logosai-llm/latest"})
+    entry = ModelDiscovery._normalize_model({"id": "gpt://folder/aliceai-llm/latest"})
 
     assert entry is not None
     assert entry["id"] == "logos-runtime"

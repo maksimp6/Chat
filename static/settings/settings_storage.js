@@ -2,6 +2,8 @@
   "use strict";
 
   var DEFAULTS = {
+    model_profile: "custom",
+    optima_max_output_tokens: 0,
     temperature: 0.7,
     top_p: 1.0,
     max_output_tokens: 2000,
