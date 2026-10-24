@@ -2,6 +2,7 @@ from core.env import env_get
 from flask import Flask, request, jsonify, render_template
 from werkzeug.exceptions import HTTPException
 from kristall import KristallError
+import hmac
 import os
 import logging
 import json
@@ -361,11 +362,18 @@ from agent_memory.extractor import list_global_memory_facts
 
 
 def _memory_owner_denied():
-    """Global memory is administered by an authenticated owner only."""
-    try:
-        get_current_owner_id()
-    except TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
+    """Global memory is shared by every owner, so administering it needs the memory admin token
+    (X-Memory-Admin-Token against LOGOS_MEMORY_ADMIN_TOKEN), not just an authenticated owner.
+    With no token configured every request is refused."""
+    expected = env_get("LOGOS_MEMORY_ADMIN_TOKEN", "").strip()
+    supplied = request.headers.get("X-Memory-Admin-Token", "").strip()
+    # Compare bytes: compare_digest rejects non-ASCII str, which would be a 500, not a refusal.
+    if not (
+        expected
+        and supplied
+        and hmac.compare_digest(expected.encode("utf-8"), supplied.encode("utf-8"))
+    ):
+        return jsonify({"error": "memory admin authorization required"}), 401
     return None
 
 
