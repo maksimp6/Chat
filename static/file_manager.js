@@ -102,10 +102,20 @@ window.fetchVectorStores = function () {
       return (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + " " + units[i];
     }
 
+    // Resolves with whether the copy worked, so the caller can say so.
     function copyToClipboard(text) {
-      try {
-        navigator.clipboard.writeText(text);
-      } catch (e) {}
+      return Promise.resolve()
+        .then(function () {
+          return navigator.clipboard.writeText(text);
+        })
+        .then(
+          function () {
+            return true;
+          },
+          function () {
+            return false;
+          },
+        );
     }
 
     // === Рендер списка Vector Stores ===
@@ -176,14 +186,14 @@ window.fetchVectorStores = function () {
 
       cont.querySelectorAll(".vs-id-copy").forEach(function (code) {
         code.addEventListener("click", function () {
-          var id = this.dataset.id || "";
-          copyToClipboard(id);
-          var original = this.textContent;
-          this.textContent = "скопировано!";
           var self = this;
-          window.LogosCoreAPI.scheduler.defer(function () {
-            self.textContent = original;
-          }, 1500);
+          var original = this.textContent;
+          copyToClipboard(this.dataset.id || "").then(function (ok) {
+            self.textContent = ok ? "скопировано!" : "не скопировано";
+            window.LogosCoreAPI.scheduler.defer(function () {
+              self.textContent = original;
+            }, 1500);
+          });
         });
       });
 
@@ -264,7 +274,7 @@ window.fetchVectorStores = function () {
         body: JSON.stringify({ name: name }),
       })
         .then(function (r) {
-          return r.json();
+          if (!r.ok) throw new Error("HTTP " + r.status);
         })
         .then(function () {
           document.getElementById("vs-name-input").value = "";
@@ -310,11 +320,14 @@ window.fetchVectorStores = function () {
       confirm.className = "logos-btn file-manager-primary-btn";
       confirm.textContent = "Добавить выбранные файлы";
 
-      panel.appendChild(header);
       panel.appendChild(fileListEl);
       panel.appendChild(confirm);
       (document.querySelector(".logos-pro-app") || document.body).appendChild(bg);
       CoreUI.modal.open(bg);
+
+      function closeAddModal() {
+        CoreUI.modal.close(bg);
+      }
 
       function renderAddFilesState(message, isError) {
         fileListEl.replaceChildren();
@@ -443,13 +456,14 @@ window.fetchVectorStores = function () {
       var codeEl = div.querySelector(".file-id-copy");
       if (codeEl) {
         codeEl.addEventListener("click", function () {
-          copyToClipboard(this.getAttribute("data-id"));
-          var orig = this.textContent;
-          this.textContent = "скопировано!";
           var self = this;
-          window.LogosCoreAPI.scheduler.defer(function () {
-            self.textContent = orig;
-          }, 1500);
+          var orig = this.textContent;
+          copyToClipboard(this.getAttribute("data-id")).then(function (ok) {
+            self.textContent = ok ? "скопировано!" : "не скопировано";
+            window.LogosCoreAPI.scheduler.defer(function () {
+              self.textContent = orig;
+            }, 1500);
+          });
         });
       }
     }
@@ -461,6 +475,7 @@ window.fetchVectorStores = function () {
 
       window.LogosDispatcher.request("/api/files")
         .then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
           return r.json();
         })
         .then(function (data) {
@@ -505,7 +520,7 @@ window.fetchVectorStores = function () {
         .catch(function (e) {
           list.innerHTML =
             '<div style="padding:20px;text-align:center;color:var(--m-danger,#c33);">Ошибка: ' +
-            e.message +
+            UI.escapeHtml(e.message) +
             "</div>";
         });
     }
@@ -560,7 +575,7 @@ window.fetchVectorStores = function () {
                   UI.escapeHtml(file.name) +
                   ' <span style="font-size:11px;">(ошибка)</span></div>',
                 '    <div style="font-size:12px;color:var(--m-muted,#666);">' +
-                  err.message +
+                  UI.escapeHtml(err.message) +
                   "</div>",
                 "</div>",
               ].join("");

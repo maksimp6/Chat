@@ -464,6 +464,7 @@ function unique(nodes) {
 }
 
 function matches(element, selector) {
+  if (/:checked\b/.test(selector) && !element.checked) return false;
   const tag = selector.match(/^[a-zA-Z][\w-]*/);
   if (tag && element.tagName !== tag[0].toUpperCase()) return false;
   const id = selector.match(/#([\w-]+)/);
