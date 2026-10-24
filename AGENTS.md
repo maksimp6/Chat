@@ -152,6 +152,12 @@ Repository automation should prefer deterministic GitHub workflows and explicit 
 Every agent opens one focused pull request per issue. Only the maintainer
 merges, after green CI; agents never push directly to `develop` or `master`.
 
+Branch rules and agent admission are separate controls. A disabled ruleset does
+not enforce this policy. The verified enforcement gap and proposed settings are
+recorded in `docs/development/branch-policy-alignment.md` under canonical #496;
+do not claim native protection or close #496 until live settings and negative
+admission probes have been verified. No instruction here authorizes merge.
+
 ## Maintainer
 
 The maintainer is a **role**, not a model/provider identity. It consumes the
