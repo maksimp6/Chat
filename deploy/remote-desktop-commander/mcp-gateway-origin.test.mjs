@@ -138,6 +138,8 @@ test("authenticated POST still negotiates MCP and invokes the upstream tool", as
   const result = await client.callTool({ name: "get_config", arguments: {} });
   assert.equal(result.content[0].text, "synthetic-config");
   assert.equal(called, 1);
+});
+
 test("durable restore failure prevents upstream and HTTP readiness", async (t) => {
   const opts = await options(t);
   let connected = false;
