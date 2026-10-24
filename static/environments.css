@@ -10,6 +10,11 @@
 .logos-pro-app .environments-modal.visible {
   display: flex;
 }
+/* Окно окружений получает .modal-content (500 px) из фабрики: здесь его ширина перебивается (пункт 74) */
+.logos-pro-app .environments-box.modal-content {
+  width: min(760px, 94vw);
+  max-width: none;
+}
 .logos-pro-app .environments-box {
   width: min(760px, 94vw);
   max-height: 88vh;

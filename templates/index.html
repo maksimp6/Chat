@@ -359,42 +359,42 @@
           <div id="model-list"></div>
         </div>
       </div>
-    </div>
-    <div
-      id="memoryModal"
-      class="modal memory-modal"
-      hidden
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="memoryModalTitle"
-    >
-      <div class="modal-content memory-modal-content">
-        <button
-          id="memoryCloseBtn"
-          class="memory-modal-close logos-btn"
-          type="button"
-          aria-label="Закрыть"
-          data-action="modal.close"
-          data-modal="memoryModal"
-        >
-          &times;
-        </button>
-        <h2 id="memoryModalTitle" class="memory-modal-title">Управление памятью</h2>
-        <div class="memory-config">
-          <label class="memory-config-option"
-            ><input type="checkbox" id="memEnabled" /> Включить память</label
-          ><label class="memory-config-option"
-            >Макс. фактов: <input type="number" id="memLimit" class="memory-limit" min="0" max="100"
-          /></label>
-        </div>
-        <div class="memory-clear">
-          <button id="memoryClearBtn" class="memory-clear-btn logos-btn" type="button">
-            Очистить всю память
+      <div
+        id="memoryModal"
+        class="modal memory-modal"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="memoryModalTitle"
+      >
+        <div class="modal-content memory-modal-content">
+          <button
+            id="memoryCloseBtn"
+            class="memory-modal-close logos-btn"
+            type="button"
+            aria-label="Закрыть"
+            data-action="modal.close"
+            data-modal="memoryModal"
+          >
+            &times;
           </button>
+          <h2 id="memoryModalTitle" class="memory-modal-title">Управление памятью</h2>
+          <div class="memory-config">
+            <label class="memory-config-option"
+              ><input type="checkbox" id="memEnabled" /> Включить память</label
+            ><label class="memory-config-option"
+              >Макс. фактов: <input type="number" id="memLimit" class="memory-limit" min="0" max="100"
+            /></label>
+          </div>
+          <div class="memory-clear">
+            <button id="memoryClearBtn" class="memory-clear-btn logos-btn" type="button">
+              Очистить всю память
+            </button>
+          </div>
+          <p id="memoryStatus" class="memory-status" role="status"></p>
+          <h3 class="memory-facts-title">Факты (<span id="memCount">0</span>)</h3>
+          <div id="memoryFactsList" class="memory-facts-list"></div>
         </div>
-        <p id="memoryStatus" class="memory-status" role="status"></p>
-        <h3 class="memory-facts-title">Факты (<span id="memCount">0</span>)</h3>
-        <div id="memoryFactsList" class="memory-facts-list"></div>
       </div>
     </div>
     <script

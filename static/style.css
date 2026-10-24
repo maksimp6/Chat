@@ -487,8 +487,8 @@ body {
   background: var(--bg-sidebar);
   border-radius: 16px;
   padding: 24px;
-  width: 90%;
-  max-width: 500px;
+  width: min(500px, calc(100vw - 24px));
+  max-width: 100%;
   max-height: 80vh;
   overflow-y: auto;
   position: relative;
@@ -604,13 +604,6 @@ body {
   animation: fadeIn 0.15s ease-out;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .logos-pro-app .modal-content {
-    max-width: 95%;
-    margin: 20px;
-  }
-}
 
 /* Стили для Markdown */
 .logos-pro-app .bubble h1,
@@ -1693,7 +1686,7 @@ body {
 .logos-pro-app .logos-system-status-panel {
   position: fixed;
   inset: 0;
-  z-index: 100010;
+  z-index: 100020;
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;

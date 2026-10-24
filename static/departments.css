@@ -8,6 +8,15 @@
   justify-content: center;
   padding: 16px;
 }
+/* Окно отделов перекрывает .modal (z 1000) и .modal-content (500 px), поэтому правила с большей специфичностью (пункты 33, 34) */
+.logos-pro-app .logos-dept-overlay.modal {
+  z-index: 100500;
+}
+.logos-pro-app .logos-dept-card.modal-content {
+  width: min(640px, 100%);
+  max-width: 640px;
+  padding: 16px;
+}
 .logos-dept-card {
   width: min(640px, 100%);
   max-height: 80vh;
