@@ -205,6 +205,7 @@ async function enhanceCore() {
   if (coreEnhancementStarted) return;
   coreEnhancementStarted = true;
 
+  var historyRequested = false;
   try {
     console.log("[CORE] Загрузка диалогов...");
     var conversationsRes = await fetchWithTimeout(
@@ -238,6 +239,7 @@ async function enhanceCore() {
 
       if (typeof loadHistory === "function") {
         try {
+          historyRequested = true;
           await loadHistory(currentConvId);
         } catch (e) {
           console.error("[CORE] Failed to load history:", e);
@@ -271,6 +273,10 @@ async function enhanceCore() {
       );
     }
     if (!conversations.length) applyConversationCache();
+    // A failed conversation list must not leave the server-rendered placeholder in place.
+    if (currentConvId && !historyRequested && typeof loadHistory === "function") {
+      loadHistory(currentConvId);
+    }
     if (typeof updateUIForModel === "function") updateUIForModel();
     if (typeof updateModelButton === "function") updateModelButton();
   }
