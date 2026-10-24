@@ -3,9 +3,9 @@
 from pathlib import Path
 from typing import Any
 
-from .gcode_audit import audit_passport
-from .model_preflight import verify_inventory_sources
-from .quality_capability import assess_quality
+from printing3d.gcode_audit import audit_passport
+from printing3d.model_preflight import verify_inventory_sources
+from printing3d.quality_capability import assess_quality
 
 
 def prepare_print(
