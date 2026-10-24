@@ -80,8 +80,11 @@ def _validate_time_slots(values: list[dict[str, Any]]) -> list[dict[str, int]]:
     for slot in values:
         if not isinstance(slot, dict):
             raise ValueError("time_slots must contain objects")
-        start = int(slot.get("start"))
-        end = int(slot.get("end"))
+        try:
+            start = int(slot.get("start"))
+            end = int(slot.get("end"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("time slot start and end must be whole hours") from exc
         if not 0 <= start <= 23 or not 0 <= end <= 23 or start == end:
             raise ValueError("time slot hours must be between 0 and 23 and non-equal")
         result.append({"start": start, "end": end})
@@ -109,7 +112,10 @@ def create_api_key():
         time_slots = _validate_time_slots(list(data.get("time_slots") or []))
         timezone_offset = data.get("timezone")
         if timezone_offset is not None:
-            timezone_offset = int(timezone_offset)
+            try:
+                timezone_offset = int(timezone_offset)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("timezone must be a whole number of hours") from exc
             if not -12 <= timezone_offset <= 14:
                 raise ValueError("timezone must be between -12 and 14")
         expires_at = _parse_expiry(data.get("expires_at"))
