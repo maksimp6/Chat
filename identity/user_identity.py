@@ -215,6 +215,29 @@ def lookup_user_token(token: str) -> Optional[str]:
         return found[0] if found is not None else None
 
 
+def revoke_github_user_token(token: str) -> bool:
+    """Stop a signed-in GitHub session's token from working on the server.
+
+    Only accounts that signed in through GitHub are revoked: an anonymous installation has
+    no other way to prove its identity again, so revoking it would lock it out for good.
+    """
+    token = str(token or "").strip()
+    if not token:
+        return False
+    with _locked():
+        store, state = _state()
+        found = _find_user_by_token_hash(state, _hash_auth_token(token))
+        if found is None:
+            return False
+        _user_id, record = found
+        if record["status"] != "github":
+            return False
+        record["auth_token_hash"] = None
+        record["updated_at"] = _now()
+        store.save(state)
+        return True
+
+
 def get_anonymous_user(user_id: str) -> Optional[dict[str, Any]]:
     with _locked():
         _store_object, state = _state()

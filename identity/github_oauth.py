@@ -30,7 +30,12 @@ from flask import Blueprint, jsonify, make_response, redirect, request
 from identity.short_token_auth import COOKIE_NAME as SHORT_TOKEN_COOKIE
 from identity.short_token_auth import _enabled as short_token_required
 from identity.short_token_auth import grant_short_token_session
-from identity.user_identity import get_github_login, lookup_user_token, sign_in_with_github
+from identity.user_identity import (
+    get_github_login,
+    lookup_user_token,
+    revoke_github_user_token,
+    sign_in_with_github,
+)
 
 logger = logging.getLogger("logos_github_auth")
 
@@ -244,6 +249,10 @@ def auth_me():
 
 @github_auth_bp.route("/auth/logout", methods=["POST"])
 def logout():
+    # The cookie is deleted below, and the token it carried is revoked here too, so a copy of
+    # it stops working on the server.
+    presented = request.headers.get("X-Logos-User-Token") or request.cookies.get(USER_TOKEN_COOKIE)
+    revoke_github_user_token(presented)
     response = jsonify({"status": "signed_out"})
     response.delete_cookie(USER_TOKEN_COOKIE, path="/")
     response.delete_cookie(SHORT_TOKEN_COOKIE, path="/")
