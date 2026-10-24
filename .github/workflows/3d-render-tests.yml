@@ -11,13 +11,6 @@ on:
       - scripts/validation/render_preview_contract.py
       - .github/workflows/3d-pr-previews.yml
       - .github/workflows/3d-render-tests.yml
-  push:
-    branches: [master]
-    paths:
-      - scripts/render_3d_worker.py
-      - scripts/render_3d_preview.py
-      - scripts/publish_3d_previews.py
-      - scripts/validation/render_preview_contract.py
 
 permissions:
   contents: read

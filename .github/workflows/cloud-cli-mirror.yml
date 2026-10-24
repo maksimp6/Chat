@@ -1,14 +1,6 @@
 name: Publish Cloud.ru CLI mirror
 
 on:
-  push:
-    branches:
-      - chore/clean-codex-toolchain
-    paths:
-      - scripts/cache_cloud_cli.sh
-      - scripts/install_cloud_cli.sh
-      - scripts/cloud_cli_checksums.txt
-      - .github/workflows/cloud-cli-mirror.yml
   workflow_dispatch:
 
 permissions:

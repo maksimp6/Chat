@@ -10,7 +10,6 @@
 | pip | `/` (`requirements*.txt`) | еженедельно, понедельник |
 | GitHub Actions | `/` (`.github/workflows`) | еженедельно, понедельник |
 | Docker | `/`, `deploy/chrome-worker`, `deploy/oauth-idp`, `deploy/remote-desktop-commander` | еженедельно, понедельник |
-| npm | `/`, `deploy/chrome-worker`, `deploy/remote-desktop-commander` (каталоги с `package-lock.json`) | ежемесячно |
 
 - Minor и patch обновления одной экосистемы приходят одним групповым PR на каталог
   (`*-minor-patch`). Patch-обновления больше не игнорируются, а группируются.
@@ -50,7 +49,6 @@ Dependabot PR проходят тот же CI и тот же required check `CI 
 | `deploy/<worker>/package*.json`, `deploy/<worker>/Dockerfile*` | MCP, Infrastructure |
 | `requirements.txt`, `requirements-dev.txt`, `.github/workflows/ci.yml` | все |
 | корневой `Dockerfile` | все |
-| корневые `package.json`, `package-lock.json` | web и зависящие от него backend, Android, PostgreSQL, MCP |
 
 Общие runtime-зависимости, корневой образ и web-инструменты затрагивают несколько
 платформ, поэтому для них широкий прогон необходим.

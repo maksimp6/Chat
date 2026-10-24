@@ -1,8 +1,4 @@
-"""Regression tests: CI and security checks must run on pushes to develop.
-
-Issue #1237: before this change ci.yml and security.yml ran on push
-only for master, so a direct push to develop executed no checks at all.
-"""
+"""CI and security checks run on pull requests only; pushes do not trigger them."""
 
 from pathlib import Path
 
@@ -20,9 +16,8 @@ def _load(name: str) -> dict:
 
 
 @pytest.mark.parametrize("name", GATED)
-def test_push_triggers_cover_master_and_develop(name):
-    push = _load(name)["on"]["push"]
-    assert set(push["branches"]) == {"master", "develop"}
+def test_push_trigger_is_disabled(name):
+    assert "push" not in _load(name)["on"]
 
 
 @pytest.mark.parametrize("name", GATED)

@@ -28,7 +28,6 @@ java -version 2>&1 | head -1 | grep -q '"25'
 
 python -m pip install --disable-pip-version-check \
   -r requirements.txt -r requirements-dev.txt
-npm install --ignore-scripts --no-audit --no-fund --package-lock=false
 
 export PATH="$BIN_DIR:$PATH"
 

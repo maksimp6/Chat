@@ -152,21 +152,14 @@ Production-баги и блокеры могут временно обрабат
 
 ## 5. Локальная проверка
 
-Канонические formatter entrypoints:
+Форматирование необязательно. Для Python можно запустить pinned ruff:
 
 ```bash
 bash scripts/format.sh write
 bash scripts/format.sh check
 ```
 
-
-Опциональный локальный pre-commit hook использует тот же canonical formatter и не создаёт отдельный набор правил:
-
-```bash
-bash scripts/install_git_hooks.sh
-```
-
-Hook выполняет только `bash scripts/format.sh check`. Если форматирование не проходит, он блокирует commit и показывает команду `bash scripts/format.sh write`. Существующий чужой `.git/hooks/pre-commit` installer не перезаписывает без явного `--force`. Полный pytest из hook не запускается; CI остаётся authoritative.
+Отдельного pre-commit hook и гейта форматирования в pre-push больше нет. Pre-push проверяет только whitespace и чистое рабочее дерево. CI остаётся authoritative.
 
 ### Hot-file modularity report
 
