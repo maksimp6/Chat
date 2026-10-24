@@ -14,7 +14,9 @@ REQUIRED = {
     "Metadata/project_settings.config",
     "Metadata/plate_1.json",
 }
-MOVE = re.compile(r"(?<!\w)([XYZ])([-+]?(?:\d+(?:\.\d*)?|\.\d+))(?=\s|$)")
+# A word is a letter and its number, and the letter may follow a digit ("G1X300") or another word
+# ("X5Y300"), so each axis word is checked wherever it appears.
+MOVE = re.compile(r"(?<![A-Za-z])([XYZ])([-+]?(?:\d+(?:\.\d*)?|\.\d+))(?![\d.])")
 
 
 def _verify_motion_bounds(command: str, bed: list[int]) -> None:
