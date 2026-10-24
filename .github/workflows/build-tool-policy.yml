@@ -3,8 +3,6 @@ name: Build tool policy
 on:
   pull_request:
     branches: [develop]
-  push:
-    branches: [develop, master]
 
 permissions:
   contents: read

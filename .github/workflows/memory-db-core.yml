@@ -9,9 +9,6 @@ on:
       - "tests/test_memory_store.py"
       - "tests/test_memory_standalone_boundary.py"
       - ".github/workflows/memory-db-core.yml"
-  push:
-    branches:
-      - "feature/memory-db-core-only-1045"
 
 permissions:
   contents: read
