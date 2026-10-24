@@ -652,13 +652,23 @@ def file_stat(args: dict) -> dict:
         return {"error": f"Ошибка чтения метаданных: {str(e)}"}
 
 
+_PROTECTED_COMMAND_RE = re.compile(
+    r"\.env|\.git\b|\.safe_backups|\.memory|\.pem\b|\.key\b|\.p12\b|id_(?:rsa|ed25519|ecdsa)"
+)
+
+
 def run_command(args: dict) -> dict:
     """Выполнение команды через shell текущей ОС в рабочей директории проекта."""
     command = args.get("command") or args.get("cmd")
     if not command:
         return {"error": "Параметр 'command' обязателен"}
-
-    timeout = int(args.get("timeout", 30))
+    # A guard against the obvious paths to secrets, not a sandbox: the shell can still spell them out.
+    if _PROTECTED_COMMAND_RE.search(str(command)):
+        return {"error": "Команда обращается к служебным или секретным файлам и не выполняется"}
+    try:
+        timeout = max(1, min(int(args.get("timeout", 30)), 300))
+    except (TypeError, ValueError):
+        return {"error": "Параметр 'timeout' должен быть целым числом"}
     try:
         res = subprocess.run(
             command,
@@ -755,7 +765,7 @@ TOOL_REGISTRY = {
             },
             "required": ["path", "content"],
         },
-        "requires_approval": False,
+        "requires_approval": True,
     },
     "python_ast_outline": {
         "func": python_ast_outline,
@@ -797,7 +807,7 @@ TOOL_REGISTRY = {
             },
             "required": ["source_path", "archive_path"],
         },
-        "requires_approval": False,
+        "requires_approval": True,
     },
     "zip_extract": {
         "func": zip_extract,
@@ -813,7 +823,7 @@ TOOL_REGISTRY = {
             },
             "required": ["archive_path"],
         },
-        "requires_approval": False,
+        "requires_approval": True,
     },
     "http_fetch": {
         "func": http_fetch,
@@ -829,7 +839,7 @@ TOOL_REGISTRY = {
             },
             "required": ["url"],
         },
-        "requires_approval": False,
+        "requires_approval": True,
     },
     "make_directory": {
         "func": make_directory,
@@ -839,7 +849,7 @@ TOOL_REGISTRY = {
             "properties": {"path": {"type": "string", "description": "Путь к создаваемой папке"}},
             "required": ["path"],
         },
-        "requires_approval": False,
+        "requires_approval": True,
     },
     "copy_or_move_file": {
         "func": copy_or_move_file,
@@ -857,7 +867,7 @@ TOOL_REGISTRY = {
             },
             "required": ["src", "dst"],
         },
-        "requires_approval": False,
+        "requires_approval": True,
     },
     "delete_path": {
         "func": delete_path,
@@ -869,7 +879,7 @@ TOOL_REGISTRY = {
             },
             "required": ["path"],
         },
-        "requires_approval": False,
+        "requires_approval": True,
     },
     "list_directory": {
         "func": list_directory,

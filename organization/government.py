@@ -374,7 +374,7 @@ GOVERNMENT_TOOLS = {
     "gov.case.create": _tool(
         _tool_create,
         read_only=False,
-        requires_approval=False,
+        requires_approval=True,
         schema=_schema(
             {
                 "case_type": {"type": "string", "enum": list(CASE_TYPES)},
@@ -404,7 +404,7 @@ GOVERNMENT_TOOLS = {
     "gov.validate_data": _tool(
         _tool_validate,
         read_only=False,
-        requires_approval=False,
+        requires_approval=True,
         schema=_schema(_CASE, ["case_id"]),
         title="Government Validate Data",
         description="Детерминированно проверить данные дела.",
@@ -420,7 +420,7 @@ GOVERNMENT_TOOLS = {
     "gov.prepare_application": _tool(
         _tool_prepare_application,
         read_only=False,
-        requires_approval=False,
+        requires_approval=True,
         schema=_schema(_CASE, ["case_id"]),
         title="Government Prepare Application",
         description="Подготовить заявление Р21001.",
@@ -428,7 +428,7 @@ GOVERNMENT_TOOLS = {
     "gov.prepare_documents": _tool(
         _tool_prepare_documents,
         read_only=False,
-        requires_approval=False,
+        requires_approval=True,
         schema=_schema(_CASE, ["case_id"]),
         title="Government Prepare Documents",
         description="Подготовить документы без отправки.",
@@ -452,7 +452,7 @@ GOVERNMENT_TOOLS = {
     "gov.process_response": _tool(
         _tool_process_response,
         read_only=False,
-        requires_approval=False,
+        requires_approval=True,
         schema=_schema({**_CASE, "response": {"type": "object"}}, ["case_id", "response"]),
         title="Government Process Response",
         description="Сохранить ответ ведомства.",

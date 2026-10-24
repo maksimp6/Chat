@@ -5,6 +5,7 @@ from core.env import env_get
 
 from datetime import datetime
 from typing import Iterable, Optional
+from urllib.parse import quote
 
 import requests
 
@@ -109,7 +110,7 @@ class YandexApiKeyProvider:
 
     def revoke_key(self, provider_key_id: str) -> None:
         response = requests.delete(
-            f"{self.endpoint}/iam/v1/apiKeys/{provider_key_id}",
+            f"{self.endpoint}/iam/v1/apiKeys/{quote(provider_key_id, safe='')}",
             headers=self._headers(),
             timeout=self.timeout,
         )

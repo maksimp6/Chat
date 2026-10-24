@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import inspect
 import logging
+import re
 import shutil
 from typing import Any, Mapping, Optional
 
@@ -345,7 +346,11 @@ class ToolRegistry:
         cfg = {}
         if server_configs:
             for s in server_configs:
-                if s.get("connector_id") in tool_name:
+                connector_id = str(s.get("connector_id") or "")
+                # Whole-word match: connector "git" must not configure "digit_tool".
+                if connector_id and re.search(
+                    rf"(?:^|[._-]){re.escape(connector_id)}(?:$|[._-])", tool_name
+                ):
                     cfg = dict(s.get("config", {}) or {})
                     break
         if context:
@@ -365,7 +370,7 @@ class ToolRegistry:
             if context and "_universal_context" in cfg:
                 raise
             logger.exception(f"[REGISTRY] Ошибка выполнения {tool_name}: {e}")
-            return {"error": str(e)}
+            return {"error": "Ошибка выполнения инструмента"}
 
     def get_tool_meta(self, tool_name: str):
         return self._tools.get(tool_name)

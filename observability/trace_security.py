@@ -31,15 +31,27 @@ SENSITIVE_KEYS: Set[str] = {
 MAX_REPR = 4000
 MAX_DEPTH = 12
 MAX_ITEMS = 50
+# Matches credential words as whole underscore-separated parts, so "input_tokens" is not a secret.
+_SENSITIVE_KEY_RE = re.compile(
+    r"(?:^|_)(?:token|secret|password|passwd|api_?key|authorization|cookie|credentials?|private_?key)(?:_|$)"
+)
 
 _INLINE_SECRET = re.compile(
-    r"(?i)(\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|token|authorization|private[_-]?key|ssh[_-]?private[_-]?key|secret[_-]?key|client[_-]?secret)\b\s*(?:=|:)\s*)((?:bearer\s+)?[^\s;&|]+)"
+    r"(?i)([A-Za-z0-9_.-]*?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|"
+    r"secret|token|authorization|private[_-]?key|ssh[_-]?private[_-]?key|secret[_-]?key|"
+    r"client[_-]?secret)\s*[=:]\s*)((?:bearer\s+)?[^\s;&|]+)"
 )
 _INLINE_CLI_SECRET = re.compile(
     r"(?i)((?:--(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|token|authorization|private[_-]?key|ssh[_-]?private[_-]?key|secret[_-]?key|client[_-]?secret))\s+)([^\s;&|]+)"
 )
 _BEARER_SECRET = re.compile(r"(?i)(\bbearer\s+)([^\s;&|]+)")
 _PRIVATE_KEY_BEGIN = "-----BEGIN "
+
+
+def _is_sensitive_key(key: str) -> bool:
+    """Credential-like keys, including camelCase and prefixed names such as accessKeySecret or YANDEX_API_KEY."""
+    normalized = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", key).lower().replace("-", "_")
+    return bool(_SENSITIVE_KEY_RE.search(normalized))
 
 
 def _redact_private_key_blocks(value: str) -> str:
@@ -100,7 +112,7 @@ def safe_repr(value: Any, depth: int = 0) -> Any:
                 result["<truncated>"] = f"{len(value) - MAX_ITEMS} more items"
                 break
             key_text = str(key)
-            if key_text.lower().replace("-", "_") in SENSITIVE_KEYS:
+            if _is_sensitive_key(key_text):
                 result[key_text] = "<redacted>"
             else:
                 result[key_text] = safe_repr(item, depth + 1)
@@ -133,10 +145,9 @@ def sanitize_trace_value(value: Any, depth: int = 0) -> Any:
         result = {}
         for key, item in list(value.items())[:MAX_ITEMS]:
             key_text = str(key)
-            normalized = key_text.lower().replace("-", "_")
             result[key_text] = (
                 "<redacted>"
-                if normalized in SENSITIVE_KEYS
+                if _is_sensitive_key(key_text)
                 else sanitize_trace_value(item, depth + 1)
             )
         if len(value) > MAX_ITEMS:

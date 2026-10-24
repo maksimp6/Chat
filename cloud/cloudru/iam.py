@@ -11,6 +11,7 @@ from core.env import env_get
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
+from urllib.parse import quote
 
 import requests
 
@@ -303,7 +304,7 @@ class CloudRuIamClient:
         """Reissue a static API key while retaining its resource ID."""
         if not api_key_id.strip():
             raise ValueError("api_key_id is required")
-        path = f"{API_KEYS_PATH}/{api_key_id}/reissue"
+        path = f"{API_KEYS_PATH}/{quote(api_key_id, safe='')}/reissue"
         body = {"expires_at": expires_at} if expires_at else {}
         return self._request("POST", path, json_body=body)
 
@@ -311,7 +312,7 @@ class CloudRuIamClient:
         """Revoke an API key that was issued but never stored, so no live credential is left behind."""
         if not api_key_id.strip():
             raise ValueError("api_key_id is required")
-        return self._request("DELETE", f"{API_KEYS_PATH}/{api_key_id.strip()}")
+        return self._request("DELETE", f"{API_KEYS_PATH}/{quote(api_key_id.strip(), safe='')}")
 
 
 __all__ = ["CloudRuIamError", "CloudRuIamClient"]

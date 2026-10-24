@@ -270,8 +270,8 @@ for _definition in MODEL_EDITOR_TOOLS.values():
     _definition.setdefault("capabilities", ["3d", "model", "local"])
     _definition.setdefault("risk_level", "low")
     _definition.setdefault("read_only", False)
-    # All writes are owner-scoped immutable scene artifacts, not external effects.
-    _definition.setdefault("requires_approval", False)
+    # Writes change the owner's scenes and export files, so they need approval like other writes.
+    _definition.setdefault("requires_approval", not _definition["read_only"])
     _definition.setdefault("executor", {"type": "local"})
     _definition.setdefault("supported_transports", ["responses_api", "local_agent", "mcp"])
 
