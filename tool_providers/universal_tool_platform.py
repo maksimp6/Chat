@@ -363,34 +363,8 @@ class UniversalToolExecutor:
                 metadata={**base_meta, "phase": "validation", "validation_errors": errors},
             ).to_mapping()
 
-        try:
-            # Only an explicit True lets a call through: a hook that returns nothing must not allow it.
-            if authorize is not None and authorize(definition, call) is not True:
-                raise PermissionError("Tool authorization denied")
-            if policy is not None and policy(definition, call) is not True:
-                raise PermissionError("Tool policy denied")
-        except Exception as exc:
-            return UniversalToolResult(
-                False,
-                error=str(exc),
-                metadata={**base_meta, "phase": "authorization"},
-            ).to_mapping()
-
-        if tool_call_requires_approval(definition, call.arguments) and not call.approved:
-            try:
-                approved = approval(definition, call) if approval is not None else False
-            except Exception as exc:
-                return UniversalToolResult(
-                    False,
-                    error=str(exc),
-                    metadata={**base_meta, "phase": "approval"},
-                ).to_mapping()
-            if approved is not True:
-                return UniversalToolResult(
-                    False,
-                    error="Tool approval required",
-                    metadata={**base_meta, "phase": "approval_required"},
-                ).to_mapping()
+        # Legacy authorization, policy and approval hooks are accepted for API
+        # compatibility but do not gate calls in the shared deployment.
 
         started = self.clock()
         try:

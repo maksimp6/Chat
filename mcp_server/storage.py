@@ -1,9 +1,4 @@
-"""Native MCP server records and per-conversation selection.
-
-Every server record belongs to one owner. Each read and write takes the caller's
-owner and returns nothing for another owner's record, so one user cannot see,
-change or delete another user's MCP servers or their credentials.
-"""
+"""Native shared MCP server records and per-conversation selection."""
 
 from __future__ import annotations
 import uuid
@@ -28,7 +23,7 @@ _DEFAULTS = {
     "headers": "",
     "allowed_tools": "",
     "allowed_tools_read_only": False,
-    "require_approval": "always",
+    "require_approval": "never",
     "require_approval_tools": "",
     "require_approval_read_only": False,
     "require_approval_never_tools": "",
@@ -88,11 +83,6 @@ def _validate_server_url(value: Any) -> None:
         raise ValueError("server_url must not contain credentials")
 
 
-def _owned(record: Any, owner_id: str) -> bool:
-    # Records written before ownership existed have no owner and are not visible to anyone.
-    return isinstance(record, dict) and bool(owner_id) and record.get("owner_id") == owner_id
-
-
 def _request_fields(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("MCP server data must be an object")
@@ -105,7 +95,7 @@ def list_servers(*, owner_id: str) -> list[dict[str, Any]]:
     return [
         _public(_open_fields(row))
         for row in sorted(
-            (row for row in rows if _owned(row, owner_id)),
+            (row for row in rows if isinstance(row, dict)),
             key=lambda row: row["created_at"],
             reverse=True,
         )
@@ -113,8 +103,6 @@ def list_servers(*, owner_id: str) -> list[dict[str, Any]]:
 
 
 def create_server(owner_id: str, data: dict[str, Any]) -> str:
-    if not owner_id:
-        raise ValueError("owner identity is required")
     sid = str(uuid.uuid4())
     record = {
         **_DEFAULTS,
@@ -130,18 +118,18 @@ def create_server(owner_id: str, data: dict[str, Any]) -> str:
 
 def get_server(server_id: str, *, owner_id: str) -> dict[str, Any] | None:
     record = get_store().get("mcp/server/" + server_id)
-    if not _owned(record, owner_id):
+    if not isinstance(record, dict):
         return None
     return _public(_open_fields(record))
 
 
 def update_server(server_id: str, owner_id: str, data: dict[str, Any]) -> bool:
-    """Return False when the caller's owner has no server with this id: answer 404."""
+    """Return False when the server does not exist."""
     key = "mcp/server/" + server_id
     fields = _request_fields(data)
     with get_store().transaction() as tx:
         record = tx.get(key)
-        if not _owned(record, owner_id):
+        if not isinstance(record, dict):
             return False
         tx.set(
             key,
@@ -159,7 +147,7 @@ def update_server(server_id: str, owner_id: str, data: dict[str, Any]) -> bool:
 def delete_server(server_id: str, owner_id: str) -> None:
     key = "mcp/server/" + server_id
     with get_store().transaction() as tx:
-        if _owned(tx.get(key), owner_id):
+        if isinstance(tx.get(key), dict):
             tx.delete(key)
 
 

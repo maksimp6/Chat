@@ -42,53 +42,6 @@
     closeMcpManagerModal(modalId ? document.getElementById(modalId) : null);
   });
 
-  function buildMcpTool(srv, approvalOverride) {
-    var UI = window.SettingsUI;
-    var mcp = { type: "mcp", server_label: srv.server_label || srv.name || "mcp_server" };
-
-    if (srv.connector_id) {
-      mcp.connector_id = srv.connector_id;
-    } else if (srv.server_url) {
-      mcp.server_url = srv.server_url;
-    }
-
-    if (srv.server_description) mcp.server_description = srv.server_description;
-    if (srv.authorization) mcp.authorization = srv.authorization;
-
-    if (srv.headers) {
-      try {
-        mcp.headers = JSON.parse(srv.headers);
-      } catch (e) {}
-    }
-    if (srv.defer_loading) mcp.defer_loading = true;
-
-    if (srv.allowed_tools) {
-      mcp.allowed_tools = UI.strToArr(srv.allowed_tools);
-    }
-
-    if (approvalOverride !== undefined && approvalOverride !== null) {
-      mcp.require_approval = approvalOverride ? "always" : "never";
-    } else if (srv.require_approval === "filter") {
-      var ra = {};
-      var ftAlways = UI.strToArr(srv.require_approval_tools);
-      if (ftAlways.length > 0) {
-        var af = { tool_names: ftAlways };
-        if (srv.require_approval_read_only) af.read_only = true;
-        ra.always = af;
-      }
-      var ftNever = UI.strToArr(srv.require_approval_never_tools);
-      if (ftNever.length > 0) {
-        var nf = { tool_names: ftNever };
-        if (srv.require_approval_never_read_only) nf.read_only = true;
-        ra.never = nf;
-      }
-      mcp.require_approval = Object.keys(ra).length > 0 ? ra : "always";
-    } else {
-      mcp.require_approval = srv.require_approval || "always";
-    }
-    return mcp;
-  }
-
   window.openMcpManagerModal = function (onClose) {
     var UI = window.SettingsUI;
     var CoreUI = window.LogosCoreAPI.ui;
@@ -275,47 +228,6 @@
         UI.chk("mcp-ed-allowed-ro", srv.allowed_tools_read_only || false, "Read-only filter") +
         "</div>" +
         '<div style="margin-bottom:8px;">' +
-        UI.lbl("Require Approval") +
-        UI.sel(
-          "mcp-ed-approval",
-          '<option value="always"' +
-            (srv.require_approval === "always" ? " selected" : "") +
-            ">Always</option>" +
-            '<option value="never"' +
-            (srv.require_approval === "never" ? " selected" : "") +
-            ">Never</option>" +
-            '<option value="filter"' +
-            (srv.require_approval === "filter" ? " selected" : "") +
-            ">Filter</option>",
-        ) +
-        "</div>" +
-        '<div id="mcp-ed-filter-ui" style="' +
-        (srv.require_approval === "filter" ? "" : "display:none;") +
-        'margin-bottom:8px;padding-left:12px;border-left:2px solid var(--m-border,#ddd);">' +
-        '<div style="font-size:12px;font-weight:bold;margin:6px 0;color:var(--m-text,#222);">Always:</div>' +
-        UI.lbl("Tools") +
-        UI.inp(
-          "mcp-ed-appr-tools",
-          "text",
-          srv.require_approval_tools || "",
-          ' style="width:100%;"',
-        ) +
-        '<div style="margin:4px 0;">' +
-        UI.chk("mcp-ed-appr-ro", srv.require_approval_read_only || false, "Read-only") +
-        "</div>" +
-        '<div style="font-size:12px;font-weight:bold;margin:8px 0 6px;color:var(--m-text,#222);">Never:</div>' +
-        UI.lbl("Tools") +
-        UI.inp(
-          "mcp-ed-appr-never-tools",
-          "text",
-          srv.require_approval_never_tools || "",
-          ' style="width:100%;"',
-        ) +
-        '<div style="margin:4px 0;">' +
-        UI.chk("mcp-ed-appr-never-ro", srv.require_approval_never_read_only || false, "Read-only") +
-        "</div>" +
-        "</div>" +
-        '<div style="margin-bottom:8px;">' +
         UI.chk("mcp-ed-defer", srv.defer_loading || false, "Defer Loading") +
         "</div>" +
         '<div style="display:flex;gap:8px;margin-top:10px;">' +
@@ -325,11 +237,6 @@
 
       document.getElementById("mcp-mgr-list").insertAdjacentElement("beforebegin", e);
       editorEl = e;
-
-      document.getElementById("mcp-ed-approval").addEventListener("change", function () {
-        document.getElementById("mcp-ed-filter-ui").style.display =
-          this.value === "filter" ? "" : "none";
-      });
 
       document.getElementById("mcp-ed-cancel").addEventListener("click", function () {
         editorEl.remove();
@@ -348,13 +255,7 @@
           headers: document.getElementById("mcp-ed-headers").value.trim(),
           allowed_tools: document.getElementById("mcp-ed-allowed").value.trim(),
           allowed_tools_read_only: document.getElementById("mcp-ed-allowed-ro").checked,
-          require_approval: document.getElementById("mcp-ed-approval").value,
-          require_approval_tools: document.getElementById("mcp-ed-appr-tools").value.trim(),
-          require_approval_read_only: document.getElementById("mcp-ed-appr-ro").checked,
-          require_approval_never_tools: document
-            .getElementById("mcp-ed-appr-never-tools")
-            .value.trim(),
-          require_approval_never_read_only: document.getElementById("mcp-ed-appr-never-ro").checked,
+          require_approval: "never",
           defer_loading: document.getElementById("mcp-ed-defer").checked,
         };
         // An empty secret field keeps the stored value, so it is not sent at all.

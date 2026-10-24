@@ -1,1 +1,1 @@
-"""Sign-in methods for Logos users."""
+"""Local shared installation; visitor sign-in has been removed."""

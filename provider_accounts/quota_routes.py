@@ -1,10 +1,6 @@
 """HTTP API for inspecting and configuring per-user provider quotas."""
 
 from __future__ import annotations
-from core.env import env_get
-
-import secrets
-
 from flask import Blueprint, jsonify, request
 
 from provider_accounts.quotas import assign_user_policy, get_usage, get_user_policy, upsert_policy
@@ -16,17 +12,6 @@ provider_quota_bp = Blueprint(
     __name__,
     url_prefix="/api/provider-quota",
 )
-
-
-def _admin_ok() -> bool:
-    expected = env_get("LOGOS_QUOTA_ADMIN_TOKEN", "").strip()
-    supplied = request.headers.get("X-Provider-Quota-Admin-Token", "").strip()
-    # Compare bytes: compare_digest rejects non-ASCII str, which would be a 500 instead of a refusal.
-    return bool(
-        expected
-        and supplied
-        and secrets.compare_digest(expected.encode("utf-8"), supplied.encode("utf-8"))
-    )
 
 
 def _flag(value) -> bool:
@@ -41,18 +26,13 @@ def _flag(value) -> bool:
 
 @provider_quota_bp.get("/me")
 def quota_me():
-    try:
-        user_id = get_current_owner_id()
-    except Exception as exc:
-        return jsonify({"error": "authenticated_identity_required", "detail": str(exc)}), 401
+    user_id = get_current_owner_id()
 
     return jsonify(get_usage(user_id))
 
 
 @provider_quota_bp.get("/users/<user_id>")
 def quota_user(user_id: str):
-    if not _admin_ok():
-        return jsonify({"error": "provider quota admin authorization required"}), 401
     try:
         return jsonify(get_usage(user_id))
     except ValueError as exc:
@@ -61,8 +41,6 @@ def quota_user(user_id: str):
 
 @provider_quota_bp.put("/policies/<policy_name>")
 def quota_policy_update(policy_name: str):
-    if not _admin_ok():
-        return jsonify({"error": "provider quota admin authorization required"}), 401
 
     data = request.get_json(silent=True) or {}
     try:
@@ -88,8 +66,6 @@ def quota_policy_update(policy_name: str):
 
 @provider_quota_bp.put("/users/<user_id>/policy")
 def quota_assign_policy(user_id: str):
-    if not _admin_ok():
-        return jsonify({"error": "provider quota admin authorization required"}), 401
 
     data = request.get_json(silent=True) or {}
     try:

@@ -4,7 +4,6 @@ import pytest
 from flask import Flask
 
 from rdc_connection.pairing import install_rdc_pairing, verification_url
-from identity.short_token_auth import install_short_token_auth
 
 
 def test_verification_url_expiry_and_origin(tmp_path):
@@ -31,22 +30,20 @@ def test_verification_url_expiry_and_origin(tmp_path):
             verification_url(path, now=100)
 
 
-def test_route_requires_token_and_existing_live_handoff(monkeypatch, tmp_path):
+def test_route_needs_only_existing_live_handoff(monkeypatch, tmp_path):
     monkeypatch.setenv("LOGOS_REQUIRE_SHORT_TOKEN", "1")
     monkeypatch.setenv("LOGOS_SHORT_TOKEN", "test-secret")
     app = Flask(__name__)
-    install_short_token_auth(app)
     install_rdc_pairing(app)
     client = app.test_client()
-    assert client.get("/rdc").status_code == 401
-    assert client.get("/test-secret/rdc").status_code == 503
+    assert client.get("/rdc").status_code == 503
     import time
 
     path = tmp_path / "handoff.json"
     url = "https://mcp.desktopcommander.app/device/verify?code=test"
     path.write_text(json.dumps({"expires_at": time.time() + 60, "verification_uri_complete": url}))
     monkeypatch.setenv("LOGOS_RDC_PAIRING_FILE", str(path))
-    response = client.get("/test-secret/rdc")
+    response = client.get("/rdc")
     assert response.status_code == 303
     assert response.headers["Location"] == url
     assert "test-secret" not in response.headers["Location"]
@@ -54,11 +51,11 @@ def test_route_requires_token_and_existing_live_handoff(monkeypatch, tmp_path):
     assert response.headers["Referrer-Policy"] == "no-referrer"
 
 
-def test_disabled_auth_cannot_publish_pairing(monkeypatch):
+def test_missing_handoff_is_unavailable_without_auth(monkeypatch):
     monkeypatch.delenv("LOGOS_REQUIRE_SHORT_TOKEN", raising=False)
     app = Flask(__name__)
     install_rdc_pairing(app)
-    assert app.test_client().get("/rdc").status_code == 401
+    assert app.test_client().get("/rdc").status_code == 503
 
 
 @pytest.mark.parametrize("expiry", [True, "101", None, 701, 100, float("nan")])

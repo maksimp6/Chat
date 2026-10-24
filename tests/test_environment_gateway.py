@@ -47,6 +47,9 @@ def _app():
                 "runtime_id": current_runtime_id(),
                 "base_path": current_runtime_base_path(),
                 "thread_id": threading.get_ident(),
+                "thread_name": threading.current_thread().name,
+                "data_root": current_runtime_data_root(),
+                "dispatcher_runtime_id": environment_manager._RUNTIME_DISPATCHER.current_context().runtime_id,
             }
         )
 
@@ -85,7 +88,7 @@ def _app():
     return app
 
 
-def test_environment_gateway_runs_request_in_matching_runtime_thread(tmp_path, monkeypatch):
+def test_environment_gateway_runs_request_in_bound_http_worker_thread(tmp_path, monkeypatch):
     repo = _setup_repo(tmp_path)
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "logos.db"))
     monkeypatch.setenv("LOGOS_ENV_REPO_ROOT", str(repo))
@@ -106,8 +109,13 @@ def test_environment_gateway_runs_request_in_matching_runtime_thread(tmp_path, m
         payload = response.get_json()
         assert payload["runtime_id"] == first["environment_id"]
         assert payload["base_path"] == f"/environments/{first['environment_id']}"
-        assert payload["thread_id"] == first["runtime_thread_id"]
+        # HTTP requests run in dedicated per-request workers so a streaming
+        # response cannot block the environment's main operation queue.
         assert payload["thread_id"] != threading.get_ident()
+        assert payload["thread_id"] not in {first["runtime_thread_id"], second["runtime_thread_id"]}
+        assert payload["thread_name"] == f"logos-runtime-http-{first['environment_id'][:8]}"
+        assert payload["data_root"] == str(tmp_path / "runtimes" / first["environment_id"] / "data")
+        assert payload["dispatcher_runtime_id"] == first["environment_id"]
         assert first["runtime_thread_id"] != second["runtime_thread_id"]
     finally:
         stop_environment(first["environment_id"])
@@ -184,13 +192,6 @@ def test_environment_gateway_maps_runtime_failures(monkeypatch, error, status_co
             "runtime_thread_id": 123,
         },
     )
-    monkeypatch.setattr(environment_routes, "_owner", lambda: None)
-    monkeypatch.setattr(
-        environment_routes,
-        "authorize_environment_runtime",
-        lambda _environment_id, _owner_id: None,
-    )
-
     def fail_dispatch(*_args, **_kwargs):
         raise error
 
@@ -246,26 +247,48 @@ def test_environment_gateway_isolates_memory_per_runtime(tmp_path, monkeypatch):
         delete_environment(second["environment_id"])
 
 
-def test_environment_gateway_rejects_cross_owner_before_runtime_dispatch(monkeypatch):
+def test_environment_gateway_dispatches_without_owner_authorization(monkeypatch):
     app = Flask(__name__)
     app.register_blueprint(environment_gateway_bp)
-    monkeypatch.setattr(environment_routes, "_owner", lambda: "logos")
-
-    def reject(_environment_id, _owner_id):
-        raise environment_routes.RuntimeOwnerViolation("runtime-b")
-
-    monkeypatch.setattr(environment_routes, "authorize_environment_runtime", reject)
+    monkeypatch.setattr(
+        environment_routes,
+        "_get",
+        lambda _environment_id: {
+            "environment_id": "runtime-b",
+            "owner_id": "another-owner",
+            "status": "RUNNING",
+            "runtime_thread_id": 123,
+        },
+    )
     calls = []
+
+    class Upstream(list):
+        status_code = 200
+        headers = [("Content-Type", "text/plain")]
 
     def record_dispatch(*args, **kwargs):
         calls.append((args, kwargs))
-        return None
+        return Upstream([b"public runtime"])
 
     monkeypatch.setattr(environment_routes, "dispatch_environment_http", record_dispatch)
     response = app.test_client().get("/environments/runtime-b/runtime-root")
+    assert response.status_code == 200
+    assert response.data == b"public runtime"
+    assert calls[0][0][0] == "runtime-b"
+
+
+def test_environment_gateway_preserves_missing_environment_404(monkeypatch):
+    app = Flask(__name__)
+    app.register_blueprint(environment_gateway_bp)
+    monkeypatch.setattr(environment_routes, "_get", lambda _environment_id: None)
+
+    def unexpected_dispatch(*_args, **_kwargs):
+        raise AssertionError("a missing environment must not dispatch")
+
+    monkeypatch.setattr(environment_routes, "dispatch_environment_http", unexpected_dispatch)
+    response = app.test_client().get("/environments/missing/runtime-root")
     assert response.status_code == 404
     assert response.get_json() == {"error": "environment_not_found"}
-    assert calls == []
 
 
 def test_authorize_environment_runtime_preserves_missing_runtime(monkeypatch):
@@ -279,7 +302,7 @@ def test_authorize_environment_runtime_preserves_missing_runtime(monkeypatch):
         environment_manager.authorize_environment_runtime("missing", "logos")
 
 
-def test_authorize_environment_runtime_rejects_cross_owner_stopped_runtime(monkeypatch):
+def test_authorize_environment_runtime_allows_other_owner_stopped_runtime(monkeypatch):
     def missing_active_context(_environment_id, _owner_id):
         raise environment_manager.RuntimeNotFound("stopped")
 
@@ -294,5 +317,4 @@ def test_authorize_environment_runtime_rejects_cross_owner_stopped_runtime(monke
         lambda _environment_id: {"owner_id": "bob", "status": "STOPPED"},
     )
 
-    with pytest.raises(environment_manager.RuntimeOwnerViolation):
-        environment_manager.authorize_environment_runtime("runtime-b", "logos")
+    assert environment_manager.authorize_environment_runtime("runtime-b", "logos") is None

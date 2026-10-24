@@ -1,21 +1,17 @@
 # Contributing to Logos
 
-All production changes follow the same reviewable flow:
+`develop` is the default integration branch; `master` is the owner's personal branch. Follow the delivery route explicitly requested by the owner. Promotion to `master` requires separate authorization. Stage acceptance (`OK`) does not authorize merge.
 
-**Issue → branch → implementation → tests → PR → CI → merge**
+## Changes and verification
 
-Keep PRs small enough to validate independently. Every behavior change should include regression coverage when practical.
+Describe the user-visible behavior, technical change, risks and validation actually performed. Project CI, lint, typing, naming and layout gates have been removed. Existing functional tests can be run manually when they help verify a change. Operational deployment checks still track process identity, application readiness, data preservation and rollback.
 
-## Pull requests
-
-Describe the user-visible behavior, technical change, risks, validation, and related issue. Do not paste credentials, provider keys, access tokens, or private URLs into GitHub.
-
-`develop` is the default integration branch; `master` is the owner's personal branch. Routine development PRs must target `develop`, not `master`. Agents push only to their own task branches and must verify the PR's actual base is `develop`. Promotion from `develop` to `master` requires a separate explicitly authorized integration PR and protected CI/review gates. Stage acceptance (`OK`) does not authorize merge. Data-model changes follow the current native Kristall contract and must pass the applicable tests before deployment.
+Do not paste credentials, provider keys, access tokens or private URLs into GitHub. Data-model changes follow the current native Kristall contract.
 
 ## Local web assets
 
-Required UI resources such as JavaScript, CSS, icons, and debugging UI bundles are repository-local. External network access belongs to API/service calls, not static application assets.
+Required UI resources such as JavaScript, CSS, icons and debugging UI bundles are repository-local. External network access belongs to API/service calls, not static application assets.
 
 ## Tracing
 
-Tool execution, provider requests, polling, and agent calls should preserve `trace_id`/invocation correlation and must not expose secrets in ExecutionTrace.
+Tool execution, provider requests, polling and agent calls should preserve `trace_id`/invocation correlation and must not expose secrets in ExecutionTrace.

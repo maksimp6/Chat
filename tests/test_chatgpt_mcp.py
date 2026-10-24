@@ -11,7 +11,8 @@ from invocation.trace import create_invocation_trace
 
 
 @pytest.fixture()
-def client(monkeypatch):
+def client(monkeypatch, tmp_path):
+    monkeypatch.setenv("LOGOS_MEMORY_PATH", str(tmp_path / "mcp.memory"))
     monkeypatch.setenv("LOGOS_MCP_ALLOW_ANONYMOUS", "true")
     monkeypatch.delenv("LOGOS_MCP_BEARER_TOKEN", raising=False)
     monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_URL", raising=False)
@@ -96,34 +97,18 @@ def test_protocol_version_defaults_to_latest_when_header_is_absent(client):
     assert response.get_json()["result"]["tools"]
 
 
-def test_mcp_bearer_auth_is_enforced_even_when_anonymous_mode_was_enabled(client, monkeypatch):
+@pytest.mark.parametrize("authorization", [None, "Bearer test-token", "Bearer invalid"])
+def test_mcp_old_auth_configuration_does_not_require_login(client, monkeypatch, authorization):
     monkeypatch.setenv("LOGOS_MCP_BEARER_TOKEN", "test-token")
-    monkeypatch.setenv("LOGOS_MCP_USER_ID", "user-1")
-    response = mcp_request(client, "tools/list")
-    assert response.status_code == 401
-    assert "WWW-Authenticate" in response.headers
-
-    response = mcp_request(
-        client,
-        "tools/list",
-        Authorization="Bearer test-token",
-    )
+    monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_URL", "https://issuer.invalid/introspect")
+    monkeypatch.setenv("LOGOS_MCP_ALLOW_ANONYMOUS", "false")
+    headers = {"Authorization": authorization} if authorization is not None else {}
+    response = mcp_request(client, "tools/list", **headers)
     assert response.status_code == 200
+    assert "WWW-Authenticate" not in response.headers
     assert response.get_json()["result"]["tools"]
-
-
-def test_mcp_unauthorized_challenge_includes_protected_resource_metadata(client, monkeypatch):
-    monkeypatch.setenv("LOGOS_MCP_BEARER_TOKEN", "test-token")
-    monkeypatch.setenv("LOGOS_MCP_USER_ID", "user-1")
-    monkeypatch.setenv("LOGOS_MCP_PUBLIC_URL", "https://logos.example")
-    response = mcp_request(client, "tools/list")
-    assert response.status_code == 401
-    challenge = response.headers["WWW-Authenticate"]
-    assert challenge.startswith("Bearer ")
-    assert (
-        'resource_metadata="https://logos.example/.well-known/oauth-protected-resource"'
-        in challenge
-    )
+    assert all(item["securitySchemes"] == [{"type": "noauth"}]
+               for item in response.get_json()["result"]["tools"])
 
 
 def test_tools_call_returns_structured_content(client):
@@ -150,8 +135,9 @@ def test_tools_call_rejects_malformed_params(client):
     assert response.get_json()["error"]["code"] == -32602
 
 
-def test_runtime_scoped_tool_call_executes_through_dispatcher(client, monkeypatch):
-    monkeypatch.setenv("LOGOS_MCP_USER_ID", "owner-a")
+@pytest.mark.parametrize("caller_owner", ["owner-a", "another-owner"])
+def test_runtime_scoped_tool_call_executes_without_owner_check(client, monkeypatch, caller_owner):
+    monkeypatch.setenv("LOGOS_OWNER_ID", caller_owner)
     runtime_id = "mcp-test-runtime-success"
     chatgpt_mcp.mcp_runtime_dispatcher.register_runtime(runtime_id, owner_id="owner-a")
     try:
@@ -175,7 +161,7 @@ def test_runtime_scoped_tool_call_executes_through_dispatcher(client, monkeypatc
 
 
 def test_runtime_scoped_tool_call_denies_cross_runtime_access(client, monkeypatch):
-    monkeypatch.setenv("LOGOS_MCP_USER_ID", "owner-a")
+    monkeypatch.setenv("LOGOS_OWNER_ID", "owner-a")
     caller = "mcp-test-runtime-a"
     target = "mcp-test-runtime-b"
     chatgpt_mcp.mcp_runtime_dispatcher.register_runtime(caller, owner_id="owner-a")
@@ -206,7 +192,7 @@ def test_runtime_scoped_tool_call_denies_cross_runtime_access(client, monkeypatc
 
 
 def test_runtime_scoped_tool_call_hides_unavailable_runtime(client, monkeypatch):
-    monkeypatch.setenv("LOGOS_MCP_USER_ID", "owner-a")
+    monkeypatch.setenv("LOGOS_OWNER_ID", "owner-a")
     response = mcp_request(
         client,
         "tools/call",
@@ -325,12 +311,12 @@ def test_existing_git_tools_have_expected_mcp_permissions(client):
 
     for name in ("git_add", "git_commit", "git_remote", "git_push", "git_pull", "git_fetch"):
         assert tools[name]["_meta"]["read_only"] is False
-        assert tools[name]["_meta"]["requires_approval"] is True
+        assert tools[name]["_meta"]["requires_approval"] is False
         assert tools[name]["_meta"]["risk_level"] == "high"
         assert "mcp" in tools[name]["_meta"]["capabilities"]
 
 
-def test_existing_git_write_tools_require_approval(client):
+def test_existing_git_write_tools_do_not_require_approval_with_stubbed_handlers(client, monkeypatch):
     cases = [
         ("git_add", {"path": "chatgpt_mcp.py"}),
         ("git_commit", {"message": "test"}),
@@ -339,17 +325,29 @@ def test_existing_git_write_tools_require_approval(client):
         ("git_pull", {}),
         ("git_fetch", {}),
     ]
+    executed = []
+
+    def forbidden_subprocess(*args, **kwargs):
+        raise AssertionError("Git write test must never invoke a subprocess")
+
+    monkeypatch.setattr(subprocess, "run", forbidden_subprocess)
     for name, arguments in cases:
+        def handler(args, cfg, tool_name=name):
+            executed.append((tool_name, args))
+            return {"stubbed": tool_name}
+
+        monkeypatch.setitem(chatgpt_mcp.registry._tools, name, {
+            **chatgpt_mcp.registry._tools[name], "func": handler,
+        })
         response = mcp_request(
             client,
             "tools/call",
             {"name": name, "arguments": arguments},
             name=name,
         )
-        assert response.status_code == 403, response.get_json()
-        body = response.get_json()
-        assert body["error"]["code"] == -32003
-        assert "approval" in body["error"]["message"].lower()
+        assert response.status_code == 200, response.get_json()
+        assert response.get_json()["result"]["structuredContent"] == {"stubbed": name}
+    assert executed == cases
 
 
 def test_project_read_path_traversal_is_rejected_by_filesystem_layer(client):
@@ -372,7 +370,7 @@ def test_project_read_path_traversal_is_rejected_by_filesystem_layer(client):
     assert response.get_json()["error"]["code"] == -32602
 
 
-def test_mcp_requires_auth_when_not_configured(monkeypatch):
+def test_mcp_works_without_auth_configuration(monkeypatch):
     monkeypatch.delenv("LOGOS_MCP_ALLOW_ANONYMOUS", raising=False)
     monkeypatch.delenv("LOGOS_MCP_BEARER_TOKEN", raising=False)
     monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_URL", raising=False)
@@ -385,14 +383,14 @@ def test_mcp_requires_auth_when_not_configured(monkeypatch):
 
     with app.test_client() as test_client:
         response = mcp_request(test_client, "tools/list")
-    assert response.status_code == 401
-    assert "WWW-Authenticate" in response.headers
+    assert response.status_code == 200
+    assert "WWW-Authenticate" not in response.headers
 
 
-def test_mcp_conversation_tools_are_owner_scoped(client, monkeypatch, tmp_path):
+def test_mcp_conversation_tools_expose_shared_local_conversations(client, monkeypatch, tmp_path):
     import storage.db as db
 
-    monkeypatch.setenv("LOGOS_MCP_USER_ID", "user-a")
+    monkeypatch.setenv("LOGOS_OWNER_ID", "user-a")
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "logos.db"))
     db.init_db()
 
@@ -418,7 +416,7 @@ def test_mcp_conversation_tools_are_owner_scoped(client, monkeypatch, tmp_path):
     )
     assert response.status_code == 200
     conversations = response.get_json()["result"]["structuredContent"]["conversations"]
-    assert [item["id"] for item in conversations] == ["conversation-a"]
+    assert {item["id"] for item in conversations} == {"conversation-a", "conversation-b"}
 
     response = mcp_request(
         client,
@@ -441,8 +439,8 @@ def test_mcp_conversation_tools_are_owner_scoped(client, monkeypatch, tmp_path):
         },
         name="logos_get_conversation_messages",
     )
-    assert response.status_code == 404
-    assert response.get_json()["error"]["code"] == -32602
+    assert response.status_code == 200
+    assert response.get_json()["result"]["structuredContent"]["messages"] == []
 
     response = mcp_request(
         client,
@@ -486,7 +484,7 @@ def test_mcp_tool_call_is_persisted_in_execution_trace(monkeypatch, tmp_path):
 
     monkeypatch.delenv("LOGOS_MCP_ALLOW_ANONYMOUS", raising=False)
     monkeypatch.setenv("LOGOS_MCP_BEARER_TOKEN", "trace-token")
-    monkeypatch.setenv("LOGOS_MCP_USER_ID", "trace-user")
+    monkeypatch.setenv("LOGOS_OWNER_ID", "trace-user")
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "logos.db"))
     db.init_db()
 

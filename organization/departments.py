@@ -1,9 +1,7 @@
 """First-class Department registry and API for Logos."""
 
 from __future__ import annotations
-from core.env import env_get
 import json
-import secrets
 import time
 from typing import Any, Mapping, Optional
 from uuid import uuid4
@@ -32,17 +30,6 @@ def _parse(value: Any, default: Any) -> Any:
 
 def init_department_tables() -> None:
     get_store()
-
-
-def _admin_ok() -> bool:
-    expected = env_get("LOGOS_DEPARTMENTS_ADMIN_TOKEN", "").strip()
-    supplied = request.headers.get("X-Department-Admin-Token", "").strip()
-    # compare_digest rejects non-ASCII str; comparing bytes turns a bad header into a refusal, not a 500.
-    return bool(
-        expected
-        and supplied
-        and secrets.compare_digest(expected.encode("utf-8"), supplied.encode("utf-8"))
-    )
 
 
 def _validate_id(value: str) -> str:
@@ -118,8 +105,6 @@ def departments_list():
 
 @departments_bp.post("")
 def departments_create():
-    if not _admin_ok():
-        return jsonify({"error": "department admin authorization required"}), 401
     body = request.get_json(silent=True) or {}
     if not isinstance(body, dict):
         return jsonify({"error": "invalid_department_request"}), 400
@@ -142,8 +127,6 @@ def departments_get(department_id: str):
 
 @departments_bp.put("/<department_id>")
 def departments_update(department_id: str):
-    if not _admin_ok():
-        return jsonify({"error": "department admin authorization required"}), 401
     try:
         body = request.get_json(silent=True) or {}
         if not isinstance(body, dict):
@@ -155,8 +138,6 @@ def departments_update(department_id: str):
 
 @departments_bp.delete("/<department_id>")
 def departments_delete(department_id: str):
-    if not _admin_ok():
-        return jsonify({"error": "department admin authorization required"}), 401
     department = _find_department(department_id)
     if not department:
         return jsonify({"error": "department_not_found"}), 404

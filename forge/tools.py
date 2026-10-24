@@ -29,12 +29,7 @@ ORDER_CREATE_STATUSES = ("lead", "quote", "accepted")
 
 
 def _trusted_owner(cfg: Optional[dict[str, Any]] = None) -> str:
-    context = (cfg or {}).get("_universal_context") if isinstance(cfg, dict) else None
-    call = context.get("call") if isinstance(context, dict) else None
-    user_id = getattr(call, "user_id", None) if call is not None else None
-    if user_id and str(user_id).strip():
-        return str(user_id).strip()
-    return get_current_owner_id(required=True)
+    return get_current_owner_id()
 
 
 PRINT_ARTIFACT_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\.(?:gcode\.)?3mf$")
@@ -51,8 +46,7 @@ def plate_inspect(
     root = env_get("LOGOS_3D_ARTIFACT_ROOT")
     if not root:
         return {"status": "needs_configuration", "missing_fields": ["LOGOS_3D_ARTIFACT_ROOT"]}
-    # Owner identity comes ONLY from authenticated universal context, never
-    # the caller's arguments; hash it to prevent path traversal and PII leaks.
+    # Use the installation's shared artifact namespace.
     owner = _trusted_owner(cfg)
     owner_folder = hashlib.sha256(owner.encode("utf-8")).hexdigest()
     flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW

@@ -4,7 +4,6 @@ from __future__ import annotations
 from core.env import env_get
 
 from datetime import datetime, timedelta, timezone
-import hmac
 import ipaddress
 import logging
 from typing import Any
@@ -21,17 +20,6 @@ def _enabled() -> bool:
     return env_get("CLOUDRU_IAM_WIZARD_ENABLED", "false").strip().lower() == "true"
 
 
-def _authorized() -> bool:
-    # Fail closed: the wizard needs a configured token. A reverse proxy makes every visitor
-    # arrive from loopback, so the remote address cannot tell this host's requests apart.
-    configured = env_get("CLOUDRU_IAM_WIZARD_TOKEN", "").strip()
-    if not configured:
-        return False
-    auth = request.headers.get("Authorization", "")
-    token = auth[7:].strip() if auth.startswith("Bearer ") else ""
-    return bool(token) and hmac.compare_digest(token.encode("utf-8"), configured.encode("utf-8"))
-
-
 def _revoke_unstored_key(client: CloudRuIamClient, key_id: str) -> None:
     """Revoke a freshly issued key whose secret could not be stored. Logs the id only."""
     try:
@@ -43,8 +31,6 @@ def _revoke_unstored_key(client: CloudRuIamClient, key_id: str) -> None:
 def _guard():
     if not _enabled():
         return jsonify({"error": "Cloud.ru IAM wizard is disabled"}), 404
-    if not _authorized():
-        return jsonify({"error": "Cloud.ru IAM wizard authentication required"}), 401
     return None
 
 

@@ -7,7 +7,6 @@
 .header strong{font-size:1.4rem}.eyebrow{font-size:.7rem;letter-spacing:.12em;color:var(--accent);font-weight:700}
 .status{font-size:.78rem;color:var(--sub)}.app{max-width:1140px;margin:0 auto;padding:20px}
 .card{background:var(--panel);border:1px solid var(--edge);border-radius:14px;padding:20px}
-.login{max-width:540px;margin:50px auto}.login h1{margin:0 0 8px;font-size:1.6rem}
 p{line-height:1.5}h2{margin:0;font-size:1.14rem}h3{font-size:1rem}.muted{color:var(--sub)}.small{font-size:.82rem}
 label{display:block;margin:12px 0;color:var(--sub);font-size:.9rem}
 input,select,textarea{width:100%;display:block;margin-top:6px;padding:11px;border-radius:9px;
@@ -16,7 +15,7 @@ button{cursor:pointer;border:1px solid var(--edge);color:var(--fg);border-radius
   background:#434e5c;padding:10px 14px;font:inherit;font-weight:600}
 button:hover,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px}.tab{background:transparent;color:var(--sub)}
-.tab.active{color:var(--fg);border-color:var(--accent);background:#374455}.logout{margin-left:auto;background:transparent}
+.tab.active{color:var(--fg);border-color:var(--accent);background:#374455}
 .columns{display:grid;grid-template-columns:minmax(260px,350px) minmax(0,1fr);gap:15px}
 .sidebar,.detail{min-height:420px}.pane-head{display:flex;align-items:center;justify-content:space-between;gap:7px}
 .pane-head button{font-size:.82rem}.list{display:grid;gap:8px;margin-top:18px}
@@ -35,11 +34,9 @@ button:hover,button:focus-visible{outline:2px solid var(--accent);outline-offset
 @media(max-width:720px){.app{padding:10px}.columns{grid-template-columns:1fr}
 .sidebar,.detail{min-height:auto}.sidebar{max-height:260px;overflow:auto}.detail{min-height:260px}
 .header{padding:14px}.tab{flex:1;padding:9px 7px;font-size:.84rem}
-.logout{margin-left:0}.card{padding:14px}.login{margin:15px auto}}
+.card{padding:14px}}
 
 /* Ошибка заметна цветом, успех остаётся зелёным (пункт 86) */
 .notice.error{color:#ff8a8a}
 /* Наведение на вкладки и записи (пункт 88) */
-.tab:hover,.entry:hover,.logout:hover{background:#2d333b}
-/* На узком экране «Выйти» остаётся в строке с вкладками (пункт 89) */
-@media (max-width:720px){.logout{flex:1 1 auto;min-width:max-content}}
+.tab:hover,.entry:hover{background:#2d333b}

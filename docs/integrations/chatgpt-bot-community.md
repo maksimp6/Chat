@@ -35,10 +35,10 @@ Logos MCP Gateway
 ## Настройка ChatGPT
 
 1. Разверните Logos за HTTPS reverse proxy или другим безопасным публичным HTTPS-транспортом.
-2. Для production настройте OAuth 2.1 через внешний authorization server. Для приватной разработки допускается bearer token или явно включённый anonymous mode.
+2. Выберите подключение без авторизации: endpoint Logos не требует входа или bearer token.
 3. В ChatGPT Developer Mode создайте подключение MCP с URL, оканчивающимся на `/mcp`.
 4. Проверьте `tools/list`, затем вызов read-only инструмента.
-5. Для write/destructive actions используйте отдельный approval/policy flow. Не публикуйте такие действия как безусловно разрешённые MCP tools.
+5. Действия выполняются через общий реестр инструментов Logos без встроенного approval gate.
 
 Официальная документация OpenAI по подключению MCP к ChatGPT: https://developers.openai.com/apps/develop/connect-chatgpt
 

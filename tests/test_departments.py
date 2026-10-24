@@ -42,13 +42,13 @@ def test_department_round_trip():
             db.DB_PATH = old
 
 
-def test_department_admin_is_required_for_mutation():
+def test_department_mutation_without_admin_token():
     old = db.DB_PATH
     with tempfile.TemporaryDirectory() as tmp:
         try:
             client = _app(tmp).test_client()
             response = client.post("/api/departments", json={"name": "X", "type": "general"})
-            assert response.status_code == 401
+            assert response.status_code == 201
         finally:
             db.DB_PATH = old
 

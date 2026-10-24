@@ -29,33 +29,6 @@ from tool_providers.universal_tool_platform import UniversalToolCall, UniversalT
 mcp_runtime_dispatcher = RuntimeDispatcher()
 
 
-def _owner_id_from_invocation(invocation: Mapping[str, Any]) -> Optional[str]:
-    metadata = invocation.get("metadata")
-    if not isinstance(metadata, Mapping):
-        return None
-    value = metadata.get("user_id")
-    return str(value).strip() if value is not None and str(value).strip() else None
-
-
-def _authorize_invocation(invocation: Mapping[str, Any], authenticated_user: Optional[str]) -> None:
-    """Keep private invocation data scoped to the authenticated user.
-
-    Legacy invocations may predate user ownership.  They are therefore only
-    accessible when anonymous/developer access is explicitly enabled.
-    """
-    from mcp_server.auth import _auth_mode
-
-    owner_id = _owner_id_from_invocation(invocation)
-    if owner_id and authenticated_user and owner_id == authenticated_user:
-        return
-    if owner_id is None and _auth_mode() == "anonymous":
-        return
-    if owner_id is None and authenticated_user:
-        raise PermissionError("Invocation has no trusted user ownership")
-    if owner_id != authenticated_user:
-        raise PermissionError("Invocation is not accessible to this user")
-
-
 def _execute_mcp_tool(_runtime_context: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
     return UniversalToolExecutor(registry).execute_with_trace(payload["call"], payload["trace"])
 

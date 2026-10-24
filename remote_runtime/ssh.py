@@ -152,25 +152,11 @@ class SSHRuntime:
         if target is None:
             raise SSHRuntimeError(f"Unknown SSH target: {target_name}")
 
-        mapped_users = dict(target.identity_map)
-        if mapped_users:
-            if not identity_id:
-                raise SSHRuntimeError("Trusted Logos identity is required for this SSH target")
-            mapped = mapped_users.get(str(identity_id))
-            if not mapped:
-                raise SSHRuntimeError(
-                    f"Identity '{identity_id}' has no Linux user mapping on target '{target.name}'"
-                )
-            user = self._validate_linux_user(mapped)
-        elif identity_id:
-            user = self._validate_linux_user(target.default_user or "")
-        else:
-            user = self._validate_linux_user(target.default_user or "")
-
-        if target.allowed_users and user not in target.allowed_users:
-            raise SSHRuntimeError(
-                f"Linux user '{user}' is not allowed on SSH target '{target.name}'"
-            )
+        # The deployment chooses one OS account; Logos identity no longer gates access.
+        configured_user = target.default_user
+        if not configured_user and target.identity_map:
+            configured_user = target.identity_map[0][1]
+        user = self._validate_linux_user(configured_user or "")
         return target, user
 
     @staticmethod

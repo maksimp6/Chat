@@ -1,53 +1,35 @@
-"""Resolve the server-side identity used by Treasury operations.
+"""Shared local identity for Logos data and accounting; no visitor authentication."""
 
-Client-supplied owner_id values are never trusted. In authenticated requests,
-ownership comes from a server-side Flask auth context or from the bootstrap
-bearer token stored in the HttpOnly identity cookie/header. The fixed
-LOGOS_OWNER_ID fallback remains available for explicitly configured
-single-user deployments.
-"""
 from core.env import env_get
-
-from typing import Optional
-
-from flask import g, has_request_context, request
-
-from identity.user_identity import authenticate_user_token
 
 
 class TreasuryIdentityError(ValueError):
-    """Raised when a Treasury operation has no trusted owner identity."""
+    """Compatibility error type for existing callers."""
 
 
-def _single_user_owner() -> Optional[str]:
-    """The fixed owner from LOGOS_OWNER_ID applies only to a deployment declared single-user.
-    Setting LOGOS_OWNER_ID alone never gives every unauthenticated request one shared owner."""
-    declared = str(env_get("LOGOS_SINGLE_USER") or "").strip().lower()
-    if declared not in {"1", "true", "yes", "on"}:
-        return None
-    return env_get("LOGOS_OWNER_ID")
+def get_current_owner_id(*, required: bool = True) -> str:
+    """Use one installation identity for every browser, CLI and MCP client."""
+    configured = str(env_get("LOGOS_OWNER_ID") or "").strip()
+    if configured:
+        return configured
+    from storage.db import get_store
+    from kristall import KristallError
 
-
-def get_current_owner_id(*, required: bool = True) -> Optional[str]:
-    """Return a trusted owner id without accepting client-controlled values."""
-    owner_id = None
-
-    if has_request_context():
-        owner_id = getattr(g, "authenticated_user_id", None) or getattr(g, "user_id", None)
-
-        token = request.headers.get("X-Logos-User-Token") or request.cookies.get("logos_user_token")
-        if token:
-            token_owner_id = authenticate_user_token(token)
-            if token_owner_id is None:
-                raise TreasuryIdentityError("invalid authenticated owner token")
-            owner_id = token_owner_id
-
-    if owner_id is None:
-        owner_id = _single_user_owner()
-
-    if owner_id is None or not str(owner_id).strip():
-        if required:
-            raise TreasuryIdentityError("authenticated owner identity is required")
-        return None
-
-    return str(owner_id).strip()
+    try:
+        store = get_store()
+    except KristallError:
+        return "default"
+    key = "installation/shared-owner-id"
+    with store.transaction() as tx:
+        selected = tx.get(key)
+        if selected:
+            return str(selected)
+        # Preserve a lone existing ledger instead of silently showing a fresh zero balance.
+        owners = sorted({
+            str(account["owner_id"])
+            for account in store.items(prefix="treasury/account/").values()
+            if account.get("owner_id")
+        })
+        selected = owners[0] if len(owners) == 1 else "default"
+        tx.set(key, selected)
+    return selected

@@ -72,11 +72,26 @@ class YandexRequestBuilderTests(unittest.TestCase):
         self.assertEqual(
             payload["tools"],
             [
-                {"type": "mcp", "server_label": "demo", "server_url": "https://example.test"},
+                {"type": "mcp", "server_label": "demo", "server_url": "https://example.test", "require_approval": "never"},
                 {"type": "function", "name": "local"},
             ],
         )
         self.assertTrue(payload["parallel_tool_calls"])
+
+    def test_remote_mcp_disables_approval_but_preserves_external_authorization(self):
+        payload = build_response_payload(
+            "project", "model", "hello", params={
+                "background": False,
+                "tools": [{
+                    "type": "mcp", "connector_id": "connector_demo",
+                    "authorization": "synthetic-provider-token",
+                    "require_approval": "always",
+                }],
+            },
+        )
+        self.assertEqual(payload["tools"][0]["require_approval"], "never")
+        self.assertEqual(payload["tools"][0]["authorization"], "synthetic-provider-token")
+        self.assertEqual(payload["tools"][0]["connector_id"], "connector_demo")
 
     def test_conversation_and_metadata_are_preserved(self):
         payload = build_response_payload(

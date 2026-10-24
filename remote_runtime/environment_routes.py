@@ -1,7 +1,5 @@
 """REST API for branch-aware application environments."""
 
-from functools import wraps
-
 from flask import Blueprint, Response, current_app, jsonify, request
 
 from remote_runtime.environments import (
@@ -13,46 +11,21 @@ from remote_runtime.environments import (
     start_environment,
     stop_environment,
     _get,
-    authorize_environment_runtime,
     dispatch_environment_http,
     register_runtime_operation,
 )
-from runtime import RuntimeNotFound, RuntimeOwnerViolation
-from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
-from identity.short_token_auth import PROXY_AUTH_HEADER, proxy_auth_secret
+from economy.treasury_identity import get_current_owner_id
 
 environment_bp = Blueprint("environments", __name__, url_prefix="/api/environments")
 environment_gateway_bp = Blueprint("environment_gateway", __name__)
 
 
-def _owner():
-    try:
-        return get_current_owner_id(required=False)
-    except TreasuryIdentityError:
-        return None
-
-
-def _authenticated(view):
-    """Every environment request names an owner. Without one the request is refused, never
-    treated as an unrestricted caller."""
-
-    @wraps(view)
-    def wrapper(*args, **kwargs):
-        if _owner() is None:
-            return jsonify({"error": "authenticated owner identity is required"}), 401
-        return view(*args, **kwargs)
-
-    return wrapper
-
-
 @environment_bp.get("")
-@_authenticated
 def environments_list():
-    return jsonify({"environments": list_environments(_owner())})
+    return jsonify({"environments": list_environments()})
 
 
 @environment_bp.post("")
-@_authenticated
 def environments_create():
     data = request.get_json(silent=True) or {}
     branch = str(data.get("branch") or "").strip()
@@ -60,7 +33,7 @@ def environments_create():
     if not branch:
         return jsonify({"error": "branch is required"}), 400
     try:
-        return jsonify(create_environment(branch, commit_sha, _owner())), 201
+        return jsonify(create_environment(branch, commit_sha, get_current_owner_id())), 201
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except GitUnavailable:
@@ -68,19 +41,17 @@ def environments_create():
 
 
 @environment_bp.get("/<environment_id>")
-@_authenticated
 def environments_get(environment_id):
     item = _get(environment_id)
-    if not item or item.get("owner_id") != _owner():
+    if not item:
         return jsonify({"error": "environment_not_found"}), 404
     return jsonify(item)
 
 
 @environment_bp.post("/<environment_id>/start")
-@_authenticated
 def environments_start(environment_id):
     try:
-        return jsonify(start_environment(environment_id, _owner()))
+        return jsonify(start_environment(environment_id))
     except KeyError:
         return jsonify({"error": "environment_not_found"}), 404
     except ValueError as exc:
@@ -90,10 +61,9 @@ def environments_start(environment_id):
 
 
 @environment_bp.post("/<environment_id>/stop")
-@_authenticated
 def environments_stop(environment_id):
     try:
-        return jsonify(stop_environment(environment_id, _owner()))
+        return jsonify(stop_environment(environment_id))
     except KeyError:
         return jsonify({"error": "environment_not_found"}), 404
     except ValueError as exc:
@@ -101,10 +71,9 @@ def environments_stop(environment_id):
 
 
 @environment_bp.post("/<environment_id>/restart")
-@_authenticated
 def environments_restart(environment_id):
     try:
-        return jsonify(restart_environment(environment_id, _owner()))
+        return jsonify(restart_environment(environment_id))
     except KeyError:
         return jsonify({"error": "environment_not_found"}), 404
     except ValueError as exc:
@@ -114,10 +83,9 @@ def environments_restart(environment_id):
 
 
 @environment_bp.delete("/<environment_id>")
-@_authenticated
 def environments_delete(environment_id):
     try:
-        return jsonify(delete_environment(environment_id, _owner()))
+        return jsonify(delete_environment(environment_id))
     except KeyError:
         return jsonify({"error": "environment_not_found"}), 404
     except ValueError as exc:
@@ -158,11 +126,6 @@ register_runtime_operation("http.request", _runtime_http_request)
 
 
 def _proxy(environment_id, subpath=""):
-    try:
-        authorize_environment_runtime(environment_id, _owner())
-    except (RuntimeNotFound, RuntimeOwnerViolation):
-        return jsonify({"error": "environment_not_found"}), 404
-
     item = _get(environment_id)
     if not item:
         return jsonify({"error": "environment_not_found"}), 404
@@ -172,9 +135,8 @@ def _proxy(environment_id, subpath=""):
     headers = [
         (key, value)
         for key, value in request.headers.items()
-        if key.lower() not in {"host", "content-length", "connection", PROXY_AUTH_HEADER.lower()}
+        if key.lower() not in {"host", "content-length", "connection"}
     ]
-    headers.append((PROXY_AUTH_HEADER, proxy_auth_secret()))
     try:
         upstream = dispatch_environment_http(
             environment_id,
@@ -218,6 +180,5 @@ def _proxy(environment_id, subpath=""):
     "/environments/<environment_id>/<path:subpath>",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 )
-@_authenticated
 def environment_gateway(environment_id, subpath):
     return _proxy(environment_id, subpath)

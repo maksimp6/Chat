@@ -34,7 +34,7 @@ def _full_plan(**overrides):
     return plan
 
 
-def test_finance_plan_persists_updates_and_scopes_owner(finance_db):
+def test_finance_plan_persists_updates_and_is_shared(finance_db):
     from printing3d.finance import get_financing_plan, set_financing_plan
 
     created = set_financing_plan(printing_store(), "owner-a", _full_plan())
@@ -45,7 +45,7 @@ def test_finance_plan_persists_updates_and_scopes_owner(finance_db):
     assert created["term_months"] == 10
     assert created["psk_percent"] == pytest.approx(24.5)
     assert created["currency"] == "RUB"
-    assert get_financing_plan(printing_store(), "owner-b") is None
+    assert get_financing_plan(printing_store(), "owner-b") == created
 
     updated = set_financing_plan(
         printing_store(),
@@ -59,8 +59,7 @@ def test_finance_plan_persists_updates_and_scopes_owner(finance_db):
 def test_finance_plan_validation(finance_db):
     from printing3d.finance import set_financing_plan
 
-    with pytest.raises(ValueError, match="owner identity"):
-        set_financing_plan(printing_store(), "", _full_plan())
+    assert set_financing_plan(printing_store(), "", _full_plan())["printer_model"] == "Bambu Lab A1"
     with pytest.raises(ValueError, match="object"):
         set_financing_plan(printing_store(), "owner-a", [])
     with pytest.raises(ValueError, match="printer_model"):
@@ -229,7 +228,7 @@ def test_finance_routes_cover_plan_status_and_errors(finance_client):
     assert invalid_month.get_json()["error"] == "invalid finance status request"
 
 
-def test_finance_routes_require_owner(finance_db, monkeypatch):
+def test_finance_routes_allow_no_owner_configuration(finance_db, monkeypatch):
     monkeypatch.delenv("LOGOS_OWNER_ID", raising=False)
     from app import app
 
@@ -239,11 +238,11 @@ def test_finance_routes_require_owner(finance_db, monkeypatch):
     plan = client.put("/api/3d/finance/plan", json=_full_plan())
     status = client.get("/api/3d/finance/status")
 
-    assert plan.status_code == 401
-    assert status.status_code == 401
+    assert plan.status_code == 200
+    assert status.status_code == 200
 
 
-def test_finance_tools_use_trusted_identity_and_approval_boundary(finance_db, monkeypatch):
+def test_finance_tools_use_shared_identity_and_tool_metadata(finance_db, monkeypatch):
     from printing3d import create_order, settle_order
     import forge.tools as printing_tools
     from tool_providers.registry import ToolRegistry
@@ -253,7 +252,7 @@ def test_finance_tools_use_trusted_identity_and_approval_boundary(finance_db, mo
 
     cfg = {"_universal_context": {"call": Call()}}
     plan = printing_tools.set_financing_plan(_full_plan(), cfg)
-    assert plan["owner_id"] == "trusted-finance-owner"
+    assert plan["owner_id"] == "default"
 
     order = create_order(
         printing_store(),

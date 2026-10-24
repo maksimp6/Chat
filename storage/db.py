@@ -93,7 +93,7 @@ def _update_conversation(conv_id: str, changes: dict[str, Any]) -> None:
 
 
 def update_conversation_title(conv_id: str, title: Any, owner_id: str | None = None) -> None:
-    """Owner authorization is enforced by the route layer."""
+    """Update the title of a shared local conversation."""
     _update_conversation(conv_id, {"title": normalize_conversation_title(title)})
 
 

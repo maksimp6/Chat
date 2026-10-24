@@ -104,8 +104,6 @@ def _row_to_order(row) -> dict:
 
 
 def create_order(store: PrintStore, owner_id: str, data: dict) -> dict:
-    if not owner_id:
-        raise ValueError("owner identity is required")
     if not isinstance(data, dict):
         raise ValueError("order input must be an object")
 
@@ -161,7 +159,7 @@ def create_order(store: PrintStore, owner_id: str, data: dict) -> dict:
 
 def get_order(store: PrintStore, owner_id: str, order_id: str) -> dict | None:
     row = store.get("printing/order/" + order_id)
-    return _row_to_order(row) if row is not None and row["owner_id"] == owner_id else None
+    return _row_to_order(row) if row is not None else None
 
 
 def list_orders(store: PrintStore, owner_id: str, *, status: str | None = None) -> list[dict]:
@@ -170,7 +168,7 @@ def list_orders(store: PrintStore, owner_id: str, *, status: str | None = None) 
     rows = [
         row
         for row in store.items(prefix="printing/order/").values()
-        if row["owner_id"] == owner_id and (not status or row["status"] == status)
+        if not status or row["status"] == status
     ]
     return sorted(rows, key=lambda row: row["created_at"], reverse=True)
 
@@ -185,7 +183,7 @@ def update_order_status(
     key = "printing/order/" + order_id
     with store.transaction() as tx:
         row = tx.get(key)
-        if row is not None and row["owner_id"] == owner_id:
+        if row is not None:
             # The summary counts a settled order only while it is paid and settled. Moving it to any
             # other status would drop its revenue and profit from the totals.
             if row.get("settled_at"):
@@ -301,7 +299,7 @@ def _publish_settlement(
     key = "printing/order/" + order_id
     with store.transaction() as tx:
         current = tx.get(key)
-        if current is None or current["owner_id"] != owner_id:
+        if current is None:
             return None
         if current.get("settled_at"):
             if current["actual_revenue"] != revenue or current["actual_cost"] != cost:

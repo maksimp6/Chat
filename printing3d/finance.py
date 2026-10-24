@@ -73,8 +73,6 @@ def _plan_row(row) -> dict[str, Any]:
 
 
 def set_financing_plan(store: PrintStore, owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
-    if not owner_id:
-        raise ValueError("owner identity is required")
     if not isinstance(data, dict):
         raise ValueError("finance plan must be an object")
 
@@ -132,7 +130,11 @@ def set_financing_plan(store: PrintStore, owner_id: str, data: dict[str, Any]) -
 
 
 def get_financing_plan(store: PrintStore, owner_id: str) -> dict[str, Any] | None:
-    return store.get("printing/finance/" + owner_id)
+    current = store.get("printing/finance/" + owner_id)
+    if current is not None:
+        return current
+    plans = list(store.items(prefix="printing/finance/").values())
+    return max(plans, key=lambda row: row["updated_at"]) if plans else None
 
 
 def _month_profit(store: PrintStore, owner_id: str, currency: str, month: str) -> Decimal:
@@ -224,8 +226,6 @@ def get_payback_status(
 
 def assess_financing(store: PrintStore, owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
     """Assess sparse candidate terms without persisting or choosing a lender."""
-    if not owner_id:
-        raise ValueError("owner identity is required")
     if not isinstance(data, dict):
         raise ValueError("finance assessment must be an object")
 

@@ -2,7 +2,7 @@
 
 from flask import Blueprint, jsonify, request
 
-from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
+from economy.treasury_identity import get_current_owner_id
 
 from forge.binding import printing_store as _store
 from printing3d import finance, service
@@ -11,14 +11,7 @@ printing3d_bp = Blueprint("printing3d", __name__, url_prefix="/api/3d")
 
 
 def _owner_id():
-    try:
-        return get_current_owner_id()
-    except TreasuryIdentityError:
-        return None
-
-
-def _auth_error():
-    return jsonify({"error": "authenticated owner identity is required"}), 401
+    return get_current_owner_id()
 
 
 @printing3d_bp.route("/quote", methods=["POST"])
@@ -35,8 +28,6 @@ def quote():
 @printing3d_bp.route("/orders", methods=["GET"])
 def list_orders():
     owner = _owner_id()
-    if owner is None:
-        return _auth_error()
     try:
         return jsonify(
             {"orders": service.list_orders(_store(), owner, status=request.args.get("status"))}
@@ -48,8 +39,6 @@ def list_orders():
 @printing3d_bp.route("/orders", methods=["POST"])
 def create_order():
     owner = _owner_id()
-    if owner is None:
-        return _auth_error()
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return jsonify({"error": "request body must be an object"}), 400
@@ -62,8 +51,6 @@ def create_order():
 @printing3d_bp.route("/orders/<order_id>", methods=["GET"])
 def get_order(order_id):
     owner = _owner_id()
-    if owner is None:
-        return _auth_error()
     order = service.get_order(_store(), owner, order_id)
     if order is None:
         return jsonify({"error": "order not found"}), 404
@@ -73,8 +60,6 @@ def get_order(order_id):
 @printing3d_bp.route("/orders/<order_id>/status", methods=["PATCH"])
 def update_order_status(order_id):
     owner = _owner_id()
-    if owner is None:
-        return _auth_error()
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return jsonify({"error": "request body must be an object"}), 400
@@ -92,8 +77,6 @@ def update_order_status(order_id):
 @printing3d_bp.route("/orders/<order_id>/settle", methods=["POST"])
 def settle_order(order_id):
     owner = _owner_id()
-    if owner is None:
-        return _auth_error()
     payload = request.get_json(silent=True)
     if payload is None:
         payload = {}
@@ -117,16 +100,12 @@ def settle_order(order_id):
 @printing3d_bp.route("/treasury/summary", methods=["GET"])
 def get_treasury_summary():
     owner = _owner_id()
-    if owner is None:
-        return _auth_error()
     return jsonify(service.get_financial_summary(_store(), owner))
 
 
 @printing3d_bp.route("/finance/plan", methods=["PUT"])
 def set_financing_plan():
     owner = _owner_id()
-    if owner is None:
-        return _auth_error()
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return jsonify({"error": "request body must be an object"}), 400
@@ -139,8 +118,6 @@ def set_financing_plan():
 @printing3d_bp.route("/finance/status", methods=["GET"])
 def get_finance_status():
     owner = _owner_id()
-    if owner is None:
-        return _auth_error()
     try:
         return jsonify(finance.get_payback_status(_store(), owner, month=request.args.get("month")))
     except (ArithmeticError, ValueError):

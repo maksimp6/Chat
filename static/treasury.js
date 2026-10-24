@@ -1,71 +1,13 @@
 (function () {
-  const IDENTITY_STORAGE_KEY = "logos_web_installation_id";
-
-  function getInstallationId() {
-    let installationId = localStorage.getItem(IDENTITY_STORAGE_KEY);
-    if (installationId) return installationId;
-
-    if (window.crypto && typeof window.crypto.randomUUID === "function") {
-      installationId = "web-" + window.crypto.randomUUID().replace(/-/g, "");
-    } else {
-      installationId = "web-" + Date.now().toString(36) + Math.random().toString(36).slice(2);
-    }
-
-    localStorage.setItem(IDENTITY_STORAGE_KEY, installationId);
-    return installationId;
-  }
-
-  async function bootstrapIdentity() {
-    const response = await window.LogosDispatcher.request("/api/users/bootstrap", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      cache: "no-store",
-      body: JSON.stringify({
-        installation_id: getInstallationId(),
-        metadata: { platform: "web" },
-      }),
-    });
-
-    let data = {};
-    try {
-      data = await response.json();
-    } catch (error) {
-      // Keep the original bootstrap failure useful to the caller without
-      // exposing response internals.
-    }
-
-    if (!response.ok) {
-      throw new Error(data.error || "Не удалось создать пользовательскую identity");
-    }
-
-    return data;
-  }
-
   async function requestTreasury(path, options, fallbackMessage) {
     const requestOptions = Object.assign({ credentials: "same-origin" }, options || {});
-    let response = await window.LogosDispatcher.request(path, requestOptions);
+    const response = await window.LogosDispatcher.request(path, requestOptions);
     let data = {};
 
     try {
       data = await response.json();
     } catch (error) {
       data = {};
-    }
-
-    if (
-      response.status === 401 &&
-      (data.error === "authenticated owner identity is required" ||
-        data.error === "invalid authenticated owner token")
-    ) {
-      await bootstrapIdentity();
-
-      response = await window.LogosDispatcher.request(path, requestOptions);
-      try {
-        data = await response.json();
-      } catch (error) {
-        data = {};
-      }
     }
 
     if (!response.ok) {

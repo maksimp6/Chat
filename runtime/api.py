@@ -4,27 +4,13 @@ from flask import Blueprint, jsonify, request
 
 from api.contracts import ContractViolation, validate_api_contract
 from invocation.api import get_invocation_status, get_invocation_trace
-from invocation.manager import get_invocation_owner
 from conversations.ownership import check_access
-from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
+from economy.treasury_identity import get_current_owner_id
 from invocation.manager import create_invocation
 from sessions.manager import create_session, get_session
 from sessions.profiles import clone_profile, get_profile, list_profiles, session_profile
 
 runtime_bp = Blueprint("runtime", __name__, url_prefix="/api")
-
-
-def _caller_owner() -> str | None:
-    try:
-        return get_current_owner_id(required=False)
-    except TreasuryIdentityError:
-        return None
-
-
-def _owns_invocation(invocation_id: str) -> bool:
-    """Invocations and their traces are visible only to the owner they were created for."""
-    owner = _caller_owner()
-    return bool(owner) and get_invocation_owner(invocation_id) == owner
 
 
 def _contract_response(name, payload, status=200):
@@ -85,8 +71,7 @@ def api_create_session():
         data = _request_payload("runtime.session.create.request")
     except ContractViolation as exc:
         return _invalid_request(exc)
-    # The creating owner is recorded with the session, and only that owner can read it back.
-    metadata = {**dict(data.get("metadata") or {}), "user_id": _caller_owner()}
+    metadata = {**dict(data.get("metadata") or {}), "user_id": get_current_owner_id()}
     return _contract_response(
         "runtime.session.response",
         create_session(metadata=metadata),
@@ -97,8 +82,7 @@ def api_create_session():
 @runtime_bp.get("/sessions/<session_id>")
 def api_get_session(session_id):
     session = get_session(session_id)
-    owner = _caller_owner()
-    if not session or not owner or (session.get("metadata") or {}).get("user_id") != owner:
+    if not session:
         return _contract_response("runtime.error.basic", {"error": "session_not_found"}, 404)
     response = dict(session)
     response["profile"] = session_profile(session_id)
@@ -112,16 +96,15 @@ def api_create_invocation(session_id):
     except ContractViolation as exc:
         return _invalid_request(exc)
 
-    owner = _caller_owner()
+    owner = get_current_owner_id()
     session = get_session(session_id)
-    if not owner or not session or (session.get("metadata") or {}).get("user_id") != owner:
+    if not session:
         return _contract_response(
             "runtime.error.message",
             {"error": "session_not_found", "message": "session not found"},
             404,
         )
     conversation_id = str(data.get("conversation_id") or "")
-    # The conversation must belong to the caller: an invocation writes into it and answers from its history.
     if not conversation_id or not check_access(conversation_id, owner):
         return _contract_response("runtime.error.basic", {"error": "conversation_not_found"}, 404)
     try:
@@ -143,8 +126,6 @@ def api_create_invocation(session_id):
 
 @runtime_bp.get("/invocations/<invocation_id>")
 def api_get_invocation(invocation_id):
-    if not _owns_invocation(invocation_id):
-        return _contract_response("runtime.error.basic", {"error": "invocation_not_found"}, 404)
     invocation = get_invocation_status(invocation_id)
     if not invocation:
         return _contract_response("runtime.error.basic", {"error": "invocation_not_found"}, 404)
@@ -153,8 +134,6 @@ def api_get_invocation(invocation_id):
 
 @runtime_bp.get("/invocations/<invocation_id>/status")
 def api_get_invocation_status(invocation_id):
-    if not _owns_invocation(invocation_id):
-        return _contract_response("runtime.error.basic", {"error": "invocation_not_found"}, 404)
     invocation = get_invocation_status(invocation_id)
     if not invocation:
         return _contract_response("runtime.error.basic", {"error": "invocation_not_found"}, 404)
@@ -174,8 +153,6 @@ def api_get_invocation_status(invocation_id):
 
 @runtime_bp.get("/invocations/<invocation_id>/trace")
 def api_get_invocation_trace(invocation_id):
-    if not _owns_invocation(invocation_id):
-        return _contract_response("runtime.error.basic", {"error": "invocation_not_found"}, 404)
     trace = get_invocation_trace(invocation_id)
     if not trace:
         return _contract_response("runtime.error.basic", {"error": "invocation_not_found"}, 404)

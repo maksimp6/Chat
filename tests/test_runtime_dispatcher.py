@@ -8,7 +8,6 @@ from runtime import (
     RuntimeDispatcher,
     RuntimeNotFound,
     RuntimeOperationNotFound,
-    RuntimeOwnerViolation,
     RuntimeScopeViolation,
 )
 
@@ -121,13 +120,12 @@ def test_dispatcher_rejects_cross_runtime_resource_access():
         )
 
 
-def test_dispatcher_rejects_authenticated_owner_mismatch():
+def test_dispatcher_allows_caller_with_different_owner_metadata():
     dispatcher = RuntimeDispatcher()
     dispatcher.register_runtime("runtime-a", owner_id="owner-a")
     dispatcher.register_operation("read", lambda context, payload: payload)
 
-    with pytest.raises(RuntimeScopeViolation, match="owner"):
-        dispatcher.dispatch("runtime-a", "read", caller_owner_id="owner-b")
+    assert dispatcher.dispatch("runtime-a", "read", caller_owner_id="owner-b") == {}
 
 
 def test_dispatcher_rejects_unknown_runtime():
@@ -210,7 +208,7 @@ def test_dispatch_cleanup_tolerates_handler_clearing_thread_binding():
         dispatcher.current_context()
 
 
-def test_runtime_authorization_hides_cross_owner_scope():
+def test_runtime_authorization_resolves_all_registered_owners():
     dispatcher = RuntimeDispatcher()
     dispatcher.register_runtime("runtime-a", owner_id="logos")
     dispatcher.register_runtime("runtime-b", owner_id="bob")
@@ -218,8 +216,7 @@ def test_runtime_authorization_hides_cross_owner_scope():
     assert dispatcher.authorize("runtime-a", "logos").runtime_id == "runtime-a"
     assert dispatcher.authorize("runtime-a", None).runtime_id == "runtime-a"
 
-    with pytest.raises(RuntimeOwnerViolation):
-        dispatcher.authorize("runtime-b", "logos")
+    assert dispatcher.authorize("runtime-b", "logos").runtime_id == "runtime-b"
 
     with pytest.raises(RuntimeNotFound):
         dispatcher.authorize("missing", "logos")

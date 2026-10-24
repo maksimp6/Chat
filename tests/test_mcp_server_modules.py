@@ -2,7 +2,6 @@ import json
 from types import SimpleNamespace
 
 import pytest
-import requests
 from flask import Flask
 
 from mcp_server import auth, protocol, runtime_bridge, tools, transport
@@ -100,159 +99,16 @@ def _patch_runtime_bridge(monkeypatch, *, result=None, exc=None):
     return calls, trace
 
 
-def test_auth_helpers_cover_permission_modes_and_challenge(monkeypatch, mcp_app):
-    assert auth._permission_error_message(PermissionError()) == "Unauthorized"
-    assert (
-        auth._permission_error_message(PermissionError("Traceback (most recent call last): boom"))
-        == "Unauthorized"
-    )
-    assert auth._permission_error_message(PermissionError("nope\nextra")) == "nope"
-
+@pytest.mark.parametrize("authorization", [None, "Bearer wrong", "Bearer тест"])
+def test_mcp_identity_is_shared_and_old_auth_config_is_ignored(monkeypatch, mcp_app, authorization):
+    monkeypatch.setenv("LOGOS_OWNER_ID", "local-owner")
     monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_URL", "https://issuer.example/introspect")
-    monkeypatch.setenv("LOGOS_MCP_BEARER_TOKEN", "token")
-    monkeypatch.setenv("LOGOS_MCP_ALLOW_ANONYMOUS", "true")
-    assert auth._auth_mode() == "introspection"
-
-    monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_URL", raising=False)
-    assert auth._auth_mode() == "bearer"
-
-    monkeypatch.delenv("LOGOS_MCP_BEARER_TOKEN", raising=False)
-    assert auth._auth_mode() == "anonymous"
-
-    monkeypatch.setenv("LOGOS_MCP_PUBLIC_URL", "https://logos.example/")
-    assert (
-        auth._protected_resource_url()
-        == "https://logos.example/.well-known/oauth-protected-resource"
-    )
-    assert auth._www_authenticate().startswith("Bearer ")
-    assert (
-        'resource_metadata="https://logos.example/.well-known/oauth-protected-resource"'
-        in auth._www_authenticate()
-    )
-
-    monkeypatch.delenv("LOGOS_MCP_PUBLIC_URL", raising=False)
-    monkeypatch.setattr(protocol, "PUBLIC_BASE_URL", "")
-    assert auth._www_authenticate() == "Bearer"
-
-    with mcp_app.test_request_context("/mcp"):
-        monkeypatch.setenv("LOGOS_MCP_ALLOW_ANONYMOUS", "true")
-        monkeypatch.setenv("LOGOS_MCP_USER_ID", "anon-user")
-        assert auth._auth_user_from_request() == "anon-user"
-
-    with mcp_app.test_request_context("/mcp", headers={"Authorization": "Bearer   "}):
-        monkeypatch.delenv("LOGOS_MCP_ALLOW_ANONYMOUS", raising=False)
-        with pytest.raises(PermissionError, match="Bearer access token required"):
-            auth._auth_user_from_request()
-
-    with mcp_app.test_request_context("/mcp", headers={"Authorization": "Bearer " + "supplied"}):
-        monkeypatch.setenv("LOGOS_MCP_BEARER_TOKEN", "expected")
-        monkeypatch.delenv("LOGOS_MCP_USER_ID", raising=False)
-        with pytest.raises(PermissionError, match="not fully configured"):
-            auth._auth_user_from_request()
-
-        monkeypatch.setenv("LOGOS_MCP_USER_ID", "user-1")
-        with pytest.raises(PermissionError, match="Invalid bearer token"):
-            auth._auth_user_from_request()
-
-        monkeypatch.setenv("LOGOS_MCP_BEARER_TOKEN", "supplied")
-        assert auth._auth_user_from_request() == "user-1"
-
-        monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_URL", "https://issuer.example/introspect")
-        monkeypatch.setattr(auth, "_introspect_token", lambda token: f"introspected:{token}")
-        assert auth._auth_user_from_request() == "introspected:supplied"
-
-        monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_URL", raising=False)
-        monkeypatch.delenv("LOGOS_MCP_BEARER_TOKEN", raising=False)
-        monkeypatch.delenv("LOGOS_MCP_USER_ID", raising=False)
-        with pytest.raises(PermissionError, match="not configured"):
-            auth._auth_user_from_request()
-
-
-def test_require_auth_wraps_permission_errors(monkeypatch):
-    monkeypatch.setattr(
-        auth, "_auth_user_from_request", lambda: (_ for _ in ()).throw(PermissionError("boom"))
-    )
-    user, error = auth._require_auth("req-1")
-    assert user is None
-    assert error.status_code == 401
-    assert error.headers["WWW-Authenticate"].startswith("Bearer")
-
-
-def test_introspect_token_covers_configuration_scopes_and_subject(monkeypatch):
-    monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_URL", raising=False)
-    with pytest.raises(PermissionError, match="not configured"):
-        auth._introspect_token("token")
-
-    calls = []
-
-    class FakeResponse:
-        def __init__(self, payload):
-            self.payload = payload
-
-        def raise_for_status(self):
-            calls.append("raise_for_status")
-
-        def json(self):
-            return self.payload
-
-    def fake_post(url, **kwargs):
-        calls.append((url, kwargs))
-        payload = fake_post.payloads.pop(0)
-        return FakeResponse(payload)
-
-    audience = "https://logos.example/mcp"
-    fake_post.payloads = [
-        {"active": False},
-        {"active": True, "scope": "other", "sub": "user-1", "aud": audience},
-        {
-            "active": True,
-            "scope": protocol.OAUTH_SCOPE,
-            "sub": "user-2",
-            "aud": "https://other.example/mcp",
-        },
-        {
-            "active": True,
-            "scope": protocol.OAUTH_SCOPE,
-            "sub": "user-3",
-            "aud": [audience, "https://other.example/mcp"],
-        },
-    ]
-
-    monkeypatch.setattr(requests, "post", fake_post)
-    monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_URL", "https://issuer.example/introspect")
-    monkeypatch.delenv("LOGOS_MCP_AUDIENCE", raising=False)
-    with pytest.raises(PermissionError, match="audience is not configured"):
-        auth._introspect_token("token-0")
-    assert calls == []
-    monkeypatch.setenv("LOGOS_MCP_AUDIENCE", audience)
-    monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_CLIENT_ID", "client")
-    monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_CLIENT_SECRET", "secret")
-    monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_TIMEOUT", "7.5")
-    monkeypatch.setattr(auth, "OAUTH_SCOPE", protocol.OAUTH_SCOPE)
-
-    with pytest.raises(PermissionError, match="inactive"):
-        auth._introspect_token("token-1")
-    with pytest.raises(PermissionError, match="required scope"):
-        auth._introspect_token("token-2")
-    with pytest.raises(PermissionError, match="another resource"):
-        auth._introspect_token("token-3")
-    assert auth._introspect_token("token-4") == "user-3"
-
-    request_call = calls[0]
-    assert request_call[0] == "https://issuer.example/introspect"
-    assert request_call[1]["auth"] == ("client", "secret")
-    assert request_call[1]["timeout"] == 7.5
-    assert request_call[1]["data"] == {"token": "token-1"}
-    assert request_call[1]["headers"]["Accept"] == "application/json"
-
-    calls.clear()
-    fake_post.payloads = [
-        {"active": True, "scope": protocol.OAUTH_SCOPE, "sub": "user-5", "aud": audience}
-    ]
-    monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_CLIENT_ID", raising=False)
-    monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_CLIENT_SECRET", raising=False)
-    assert auth._introspect_token("token-5") == "user-5"
-    assert "auth" not in calls[0][1]
+    monkeypatch.setenv("LOGOS_MCP_BEARER_TOKEN", "expected")
+    monkeypatch.setenv("LOGOS_MCP_ALLOW_ANONYMOUS", "false")
+    headers = {"Authorization": authorization} if authorization is not None else {}
+    with mcp_app.test_request_context("/mcp", headers=headers):
+        assert auth._auth_mode() == "anonymous"
+        assert auth._auth_user_from_request() == "local-owner"
 
 
 def test_protocol_helpers_sanitize_payloads_and_version_selection(mcp_app):
@@ -296,23 +152,6 @@ def test_protocol_helpers_sanitize_payloads_and_version_selection(mcp_app):
         assert (
             protocol._request_protocol_version({"params": []}) == protocol.DEFAULT_PROTOCOL_VERSION
         )
-
-
-def test_runtime_bridge_authorization_and_owner_resolution(monkeypatch):
-    assert runtime_bridge._owner_id_from_invocation({"metadata": "bad"}) is None
-    assert (
-        runtime_bridge._owner_id_from_invocation({"metadata": {"user_id": " user-1 "}}) == "user-1"
-    )
-
-    monkeypatch.setattr("mcp_server.auth._auth_mode", lambda: "anonymous")
-    runtime_bridge._authorize_invocation({"metadata": {"user_id": "user-1"}}, "user-1")
-    runtime_bridge._authorize_invocation({"metadata": {}}, None)
-    monkeypatch.setattr("mcp_server.auth._auth_mode", lambda: "bearer")
-    runtime_bridge._authorize_invocation({"metadata": {}}, None)
-    with pytest.raises(PermissionError, match="no trusted user ownership"):
-        runtime_bridge._authorize_invocation({"metadata": {}}, "user-1")
-    with pytest.raises(PermissionError, match="not accessible"):
-        runtime_bridge._authorize_invocation({"metadata": {"user_id": "user-2"}}, "user-1")
 
 
 @pytest.mark.parametrize(
@@ -380,8 +219,8 @@ def test_tools_helpers_cover_lookup_validation_and_wrappers(monkeypatch):
 
     monkeypatch.setattr(
         tools,
-        "AgentGateway",
-        lambda: SimpleNamespace(
+        "_AGENT_GATEWAY",
+        SimpleNamespace(
             list_agents=lambda: [
                 SimpleNamespace(
                     agent_id="agent-1",
@@ -431,17 +270,9 @@ def test_tools_helpers_cover_lookup_validation_and_wrappers(monkeypatch):
             else {"metadata": {"user_id": "user-1"}, "id": invocation_id}
         ),
     )
-    monkeypatch.setattr(
-        tools,
-        "_authorize_invocation",
-        lambda invocation, user: invocation.update({"authorized_as": user}),
-    )
     with pytest.raises(LookupError, match="Invocation not found"):
         tools._invocation({"invocation_id": "missing"}, "user-1")
-    assert (
-        tools._invocation({"invocation_id": "inv-1"}, "user-1")["invocation"]["authorized_as"]
-        == "user-1"
-    )
+    assert tools._invocation({"invocation_id": "inv-1"}, None)["invocation"]["id"] == "inv-1"
 
     monkeypatch.setattr(
         tools,
@@ -460,8 +291,7 @@ def test_tools_helpers_cover_lookup_validation_and_wrappers(monkeypatch):
         "user": "user-1",
     }
 
-    with pytest.raises(PermissionError, match="required"):
-        tools._require_conversation_user(None)
+    assert tools._require_conversation_user(None)
     with pytest.raises(ValueError, match="conversation_id is required"):
         tools._conversation({}, "user-1")
 
@@ -505,7 +335,7 @@ def test_tools_helpers_cover_lookup_validation_and_wrappers(monkeypatch):
 
     monkeypatch.setattr(tools, "_auth_mode", lambda: "bearer")
     schemes = tools._security_schemes()
-    assert schemes == [{"type": "http", "scheme": "bearer"}]
+    assert schemes == [{"type": "noauth"}]
 
     monkeypatch.setattr(
         tools.registry,
@@ -548,15 +378,8 @@ def test_tools_helpers_cover_lookup_validation_and_wrappers(monkeypatch):
 
 
 def test_transport_routes_cover_public_metadata_and_non_post_methods(monkeypatch, mcp_client):
-    monkeypatch.setenv("LOGOS_MCP_OAUTH_ISSUER", "https://issuer.example/")
-    monkeypatch.delenv("LOGOS_MCP_PUBLIC_URL", raising=False)
     response = mcp_client.get("/.well-known/oauth-protected-resource")
-    assert response.status_code == 200
-    assert response.get_json() == {
-        "resource": "http://localhost",
-        "authorization_servers": ["https://issuer.example"],
-        "scopes_supported": [protocol.OAUTH_SCOPE],
-    }
+    assert response.status_code == 404
 
     response = mcp_client.open("/mcp", method="OPTIONS")
     assert response.status_code == 204
@@ -577,7 +400,7 @@ def test_transport_routes_cover_public_metadata_and_non_post_methods(monkeypatch
 
 
 def test_transport_post_covers_protocol_errors_and_helper_methods(monkeypatch, mcp_client):
-    monkeypatch.setattr(transport, "_require_auth", lambda request_id: ("user-1", None))
+    monkeypatch.setattr(transport, "_auth_user_from_request", lambda: "user-1")
 
     response = mcp_client.post("/mcp", data="[]", headers={"Content-Type": "application/json"})
     assert response.status_code == 400
@@ -651,7 +474,7 @@ def test_transport_post_covers_protocol_errors_and_helper_methods(monkeypatch, m
 def test_transport_tools_call_error_mapping(
     monkeypatch, mcp_client, raised, status_code, code, message
 ):
-    monkeypatch.setattr(transport, "_require_auth", lambda request_id: ("user-1", None))
+    monkeypatch.setattr(transport, "_auth_user_from_request", lambda: "user-1")
     monkeypatch.setattr(
         transport,
         "_handle_call",
@@ -669,14 +492,8 @@ def test_transport_tools_call_error_mapping(
     assert body["error"]["message"] == message
 
 
-def test_transport_method_not_found_and_auth_failure(monkeypatch, mcp_client):
-    auth_response = protocol._jsonrpc_error(1, -32001, "denied", status=401)
-    monkeypatch.setattr(transport, "_require_auth", lambda request_id: (None, auth_response))
-
-    response = _mcp_post(mcp_client, "tools/list")
-    assert response.status_code == 401
-
-    monkeypatch.setattr(transport, "_require_auth", lambda request_id: ("user-1", None))
+def test_transport_method_not_found(monkeypatch, mcp_client):
+    monkeypatch.setattr(transport, "_auth_user_from_request", lambda: "user-1")
     response = _mcp_post(mcp_client, "unknown/method")
     assert response.status_code == 404
     assert response.get_json()["error"]["message"] == "Method not found: unknown/method"

@@ -27,7 +27,7 @@ def _ctx(user_id):
     }
 
 
-def test_partner_data_is_isolated_by_trusted_owner(monkeypatch):
+def test_partner_data_is_shared_across_call_identities(monkeypatch):
     old = db.DB_PATH
     with tempfile.TemporaryDirectory() as tmp:
         try:
@@ -41,12 +41,7 @@ def test_partner_data_is_isolated_by_trusted_owner(monkeypatch):
                 get_partner({"partner_id": first["id"]}, _ctx("user-a"))["partner"]["name"]
                 == "Alpha"
             )
-            try:
-                get_partner({"partner_id": first["id"]}, _ctx("user-b"))
-            except ValueError as exc:
-                assert str(exc) == "partner not found"
-            else:
-                raise AssertionError("cross-owner partner access was allowed")
+            assert get_partner({"partner_id": first["id"]}, _ctx("user-b"))["partner"]["name"] == "Alpha"
 
             assert (
                 get_partner({"partner_id": second["id"]}, _ctx("user-b"))["partner"]["name"]
@@ -183,18 +178,18 @@ def test_partner_metadata_is_size_limited():
         create_partner({"name": "Acme", "metadata": {"blob": "x" * 9000}}, _ctx("owner-1"))
 
 
-def test_owners_may_use_the_same_client_chosen_id(monkeypatch):
+def test_shared_client_ids_are_unique(monkeypatch):
     old = db.DB_PATH
     with tempfile.TemporaryDirectory() as tmp:
         try:
             monkeypatch.setattr(db, "DB_PATH", os.path.join(tmp, "partners.db"))
             init_partner_relations_tables()
             create_partner({"id": "shared-id", "name": "Alpha"}, _ctx("owner-a"))
-            create_partner({"id": "shared-id", "name": "Beta"}, _ctx("owner-b"))
-
+            with pytest.raises(ValueError, match="already exists"):
+                create_partner({"id": "shared-id", "name": "Beta"}, _ctx("owner-b"))
             first = get_partner({"partner_id": "shared-id"}, _ctx("owner-a"))["partner"]
             second = get_partner({"partner_id": "shared-id"}, _ctx("owner-b"))["partner"]
-            assert (first["name"], second["name"]) == ("Alpha", "Beta")
+            assert first["name"] == second["name"] == "Alpha"
             with pytest.raises(ValueError, match="already exists"):
                 create_partner({"id": "shared-id", "name": "Again"}, _ctx("owner-a"))
         finally:

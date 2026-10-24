@@ -2,7 +2,6 @@ from core.env import env_get
 from flask import Flask, request, jsonify, render_template
 from werkzeug.exceptions import HTTPException
 from kristall import KristallError
-import hmac
 import os
 import logging
 import json
@@ -24,6 +23,7 @@ from storage.db import (
     add_message,
     save_conv_settings,
     get_conv_settings,
+    get_store,
 )
 from chat.mcp_routes import mcp_bp
 from mcp_server import chatgpt_mcp_bp
@@ -41,11 +41,6 @@ from organization.partner_relations import (
 )
 from economy.treasury import init_treasury_tables, get_account, demo_top_up
 from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
-from identity.user_identity import (
-    InstallationClaimed,
-    init_user_identity_table,
-    register_anonymous_user,
-)
 from organization.departments import departments_bp, init_department_tables
 from organization.government import (
     government_bp,
@@ -54,17 +49,9 @@ from organization.government import (
 )
 from remote_runtime.environment_routes import environment_bp, environment_gateway_bp
 from remote_runtime.environments import init_environment_tables
-from identity.short_token_auth import install_short_token_auth
 from rdc_connection.pairing import install_rdc_pairing
 from invocation.problems import problem
 from observability import system_log
-from identity.github_oauth import (
-    current_github_login,
-    github_auth_bp,
-    github_login_enabled,
-    login_path,
-)
-from identity.user_identity import init_github_accounts_table
 from conversations.ownership import (
     init_conversation_ownership_table,
     check_access,
@@ -80,7 +67,6 @@ from forge.routes import printing3d_bp
 
 app = Flask(__name__)
 system_log.configure()
-install_short_token_auth(app)
 install_rdc_pairing(app)
 
 
@@ -130,7 +116,6 @@ app.register_blueprint(environment_gateway_bp)
 app.register_blueprint(plugin_bp)
 app.register_blueprint(project_tree_bp)
 app.register_blueprint(voice_bp)
-app.register_blueprint(github_auth_bp)
 app.register_blueprint(printing3d_bp)
 
 
@@ -170,8 +155,6 @@ def _initialize_storage() -> None:
     init_local_agent_tables()
     init_treasury_tables()
     init_printing_tables()
-    init_user_identity_table()
-    init_github_accounts_table()
     init_conversation_ownership_table()
     init_department_tables()
     from provider_accounts.quotas import init_quota_tables
@@ -224,9 +207,6 @@ def index():
         selected_conversation=selected_conversation,
         selected_messages=selected_messages,
         donation_url=get_donation_url(),
-        github_login_enabled=github_login_enabled(),
-        github_login_url=login_path(),
-        github_login=current_github_login(),
     )
 
 
@@ -236,44 +216,9 @@ def healthz():
 
 
 @app.route("/api/users/bootstrap", methods=["POST"])
-def bootstrap_anonymous_user():
-    raw_body = request.get_data(cache=True)
-    payload = request.get_json(silent=True)
-    if not raw_body:
-        data = {}
-    elif not isinstance(payload, dict):
-        return jsonify({"error": "request body must be an object"}), 400
-    else:
-        data = payload
-
-    if "metadata" not in data:
-        metadata = {}
-    else:
-        metadata = data["metadata"]
-        if not isinstance(metadata, dict):
-            return jsonify({"error": "metadata must be an object"}), 400
-
-    try:
-        identity = register_anonymous_user(
-            data.get("installation_id"),
-            metadata,
-            presented_token=request.headers.get("X-Logos-User-Token")
-            or request.cookies.get("logos_user_token"),
-        )
-        response = jsonify(identity)
-        response.set_cookie(
-            "logos_user_token",
-            identity["auth_token"],
-            httponly=True,
-            secure=request.is_secure,
-            samesite="Lax",
-            path="/",
-        )
-        return response
-    except InstallationClaimed as exc:
-        return jsonify({"error": str(exc)}), 409
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+def bootstrap_local_user():
+    """Compatibility endpoint for older clients; no registration or token is needed."""
+    return jsonify({"user_id": get_current_owner_id(), "status": "local"})
 
 
 MODEL_DISCOVERY = get_model_discovery()
@@ -361,27 +306,8 @@ from agent_memory.manager import load_memory_config, save_memory_config, clear_g
 from agent_memory.extractor import list_global_memory_facts
 
 
-def _memory_owner_denied():
-    """Global memory is shared by every owner, so administering it needs the memory admin token
-    (X-Memory-Admin-Token against LOGOS_MEMORY_ADMIN_TOKEN), not just an authenticated owner.
-    With no token configured every request is refused."""
-    expected = env_get("LOGOS_MEMORY_ADMIN_TOKEN", "").strip()
-    supplied = request.headers.get("X-Memory-Admin-Token", "").strip()
-    # Compare bytes: compare_digest rejects non-ASCII str, which would be a 500, not a refusal.
-    if not (
-        expected
-        and supplied
-        and hmac.compare_digest(expected.encode("utf-8"), supplied.encode("utf-8"))
-    ):
-        return jsonify({"error": "memory admin authorization required"}), 401
-    return None
-
-
 @app.route("/api/memory/manage", methods=["GET"])
 def api_memory_panel_data():
-    denied = _memory_owner_denied()
-    if denied:
-        return denied
     cfg = load_memory_config()
     facts = list_global_memory_facts()
     return jsonify({"config": cfg, "facts": facts})
@@ -389,9 +315,6 @@ def api_memory_panel_data():
 
 @app.route("/api/memory/config", methods=["PUT"])
 def api_update_memory_config():
-    denied = _memory_owner_denied()
-    if denied:
-        return denied
     data = request.get_json(silent=True) or {}
     try:
         save_memory_config(data)
@@ -402,9 +325,6 @@ def api_update_memory_config():
 
 @app.route("/api/memory/clear", methods=["POST"])
 def api_clear_memory():
-    denied = _memory_owner_denied()
-    if denied:
-        return denied
     category = (request.get_json(silent=True) or {}).get("category")
     if category is not None and not isinstance(category, str):
         return jsonify({"error": "category must be a string"}), 400
@@ -414,10 +334,14 @@ def api_clear_memory():
 
 @app.route("/api/treasury/account", methods=["GET"])
 def treasury_account():
-    try:
-        return jsonify(get_account(get_current_owner_id()))
-    except TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
+    owner_id = str(request.args.get("owner_id") or get_current_owner_id())
+    return jsonify(get_account(owner_id))
+
+
+@app.route("/api/treasury/accounts", methods=["GET"])
+def treasury_accounts():
+    """Keep all pre-existing ledgers discoverable without combining their balances."""
+    return jsonify({"accounts": list(get_store().items(prefix="treasury/account/").values())})
 
 
 @app.route("/api/treasury/top-up", methods=["POST"])
@@ -433,26 +357,8 @@ def treasury_top_up():
         return jsonify({"error": str(exc)}), 400
 
 
-def _ssh_admin_denied():
-    """SSH runtime settings are one deployment-wide configuration: reading or changing them
-    needs the SSH administrator token (X-SSH-Admin-Token against LOGOS_SSH_ADMIN_TOKEN)."""
-    expected = env_get("LOGOS_SSH_ADMIN_TOKEN", "").strip()
-    supplied = request.headers.get("X-SSH-Admin-Token", "").strip()
-    # Compare bytes: compare_digest rejects non-ASCII str, which would be a 500, not a refusal.
-    if not (
-        expected
-        and supplied
-        and hmac.compare_digest(expected.encode("utf-8"), supplied.encode("utf-8"))
-    ):
-        return jsonify({"error": "ssh runtime admin authorization required"}), 401
-    return None
-
-
 @app.route("/api/ssh-runtime/settings", methods=["GET"])
 def get_ssh_runtime_settings():
-    denied = _ssh_admin_denied()
-    if denied:
-        return denied
     try:
         return jsonify(public_settings())
     except TreasuryIdentityError as exc:
@@ -464,9 +370,6 @@ def get_ssh_runtime_settings():
 
 @app.route("/api/ssh-runtime/settings", methods=["PUT"])
 def put_ssh_runtime_settings():
-    denied = _ssh_admin_denied()
-    if denied:
-        return denied
     try:
         data = request.get_json(silent=True) or {}
         if not isinstance(data, dict):

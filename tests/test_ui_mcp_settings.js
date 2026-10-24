@@ -58,6 +58,8 @@ test("saving an unchanged server does not send its stored secrets back", async (
   assert.equal("authorization" in put.body, false);
   assert.equal("headers" in put.body, false);
   assert.equal(put.body.name, "Git");
+  assert.equal(put.body.require_approval, "never");
+  assert.equal("require_approval_tools" in put.body, false);
 });
 
 test("the edit form shows that a secret is saved, without its value", async () => {
@@ -82,4 +84,17 @@ test("a failed delete reports the error instead of refreshing as if it worked", 
 
   assert.equal(alerts.length, 1);
   assert.match(alerts[0], /HTTP 500/);
+});
+
+
+test("MCP editor has no approval controls even for a saved always policy", async () => {
+  const { window, document } = boot();
+  window.openMcpManagerModal();
+  await settle();
+  document.querySelector(".mcp-edit-btn").click();
+  for (const id of ["mcp-ed-approval", "mcp-ed-filter-ui", "mcp-ed-appr-tools", "mcp-ed-appr-ro",
+    "mcp-ed-appr-never-tools", "mcp-ed-appr-never-ro"]) {
+    assert.equal(document.getElementById(id), null);
+  }
+  assert.ok(document.getElementById("mcp-ed-auth"));
 });

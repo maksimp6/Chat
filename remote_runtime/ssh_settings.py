@@ -141,10 +141,6 @@ def validate_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
         raise SSHRuntimeError("At least one SSH target is required when Runtime is enabled")
 
     if result["enabled"]:
-        if result["allow_command_execution"] and not result["command_allowlist"]:
-            raise SSHRuntimeError(
-                "command_allowlist is required when SSH command execution is enabled"
-            )
         try:
             SSHRuntime(targets=result["targets"], known_hosts=result["known_hosts"])
         except SSHRuntimeError:
@@ -269,8 +265,6 @@ def assert_operation_allowed(
     if operation == "write_file":
         if not settings["allow_write_operations"]:
             raise SSHRuntimeError("SSH file write operations are disabled in SSH Runtime settings")
-        if settings["approval_required_for_write"] and not approved:
-            raise SSHRuntimeError("Approval is required for SSH file writes")
     if settings["read_only"] and operation != "read_file":
         raise SSHRuntimeError("SSH Runtime is configured as read-only")
 

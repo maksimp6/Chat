@@ -26,8 +26,6 @@ There are no compatibility copies at the old root paths; update external shortcu
 | --- | --- |
 | `bash scripts/format.sh write` | Optional: apply the pinned Python formatter (ruff) |
 | `bash scripts/format.sh check` | Optional: verify Python formatting with ruff |
-| `bash scripts/pre_push.sh` | Required clean-worktree and whitespace gate |
-| `bash scripts/check_code_rules.sh` | Naming, placement, reliability and type ratchets |
 | `python scripts/local_launch_smoke.py` | Local-launch smoke check |
 
 Other existing scripts retain their current paths. See [repository layout](../docs/architecture/repository-layout.md)

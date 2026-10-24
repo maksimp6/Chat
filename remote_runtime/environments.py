@@ -24,7 +24,7 @@ from storage.db import get_store, init_db as init_runtime_db
 from invocation.context import InvocationContext
 from invocation.trace import create_invocation_trace
 from observability.trace_manager import ExecutionTrace
-from runtime import RuntimeDispatcher, RuntimeLoader, RuntimeNotFound, RuntimeOwnerViolation
+from runtime import RuntimeDispatcher, RuntimeLoader, RuntimeNotFound
 from runtime.request_context import bind_runtime_request
 
 
@@ -167,15 +167,10 @@ def _get(environment_id: str) -> Optional[Dict[str, Any]]:
     return _row_to_dict(row) if row is not None else None
 
 
-def _owned(case: Dict[str, Any], owner_id: Optional[str]) -> bool:
-    # None is an in-process system call. A named owner sees only the records it owns, so a record
-    # without an owner is not visible to any owner.
-    return owner_id is None or case.get("owner_id") == owner_id
-
-
 def _require(environment_id: str, owner_id: Optional[str] = None) -> Dict[str, Any]:
+    del owner_id
     item = _get(environment_id)
-    if not item or not _owned(item, owner_id):
+    if not item:
         raise KeyError("environment_not_found")
     return item
 
@@ -549,18 +544,14 @@ def authorize_environment_runtime(
     environment_id: str,
     owner_id: Optional[str],
 ) -> None:
-    """Authorize gateway access without exposing another owner's environment."""
+    """Resolve an existing environment without an owner authorization gate."""
     item = _get(environment_id)
-    # A named owner must own the environment exactly; an ownerless record is not theirs.
-    if owner_id is not None and (item is None or item.get("owner_id") != owner_id):
-        raise RuntimeOwnerViolation(environment_id)
     try:
         _RUNTIME_DISPATCHER.authorize(environment_id, owner_id)
         return
     except RuntimeNotFound:
-        # Stopped environments intentionally have no dispatcher context.  Keep
-        # owner checks centralized here so the gateway can distinguish a
-        # stopped owned environment (503) from a missing/cross-owner one (404).
+        # Stopped environments intentionally have no dispatcher context. The
+        # gateway distinguishes a stopped environment (503) from a missing one (404).
         if not item:
             raise
 
@@ -647,13 +638,10 @@ def create_environment(
 
 
 def list_environments(owner_id: Optional[str] = None) -> list[Dict[str, Any]]:
+    del owner_id
     init_environment_tables()
-    rows = [
-        row
-        for row in get_store().items(prefix="environment/record/").values()
-        if owner_id is None or row["owner_id"] == owner_id
-    ]
-    # Owner ids of other environments are not part of the listing.
+    rows = list(get_store().items(prefix="environment/record/").values())
+    # Owner ids remain internal metadata rather than part of the listing.
     return [
         {key: value for key, value in _row_to_dict(row).items() if key != "owner_id"}
         for row in sorted(rows, key=lambda row: row["created_at"], reverse=True)

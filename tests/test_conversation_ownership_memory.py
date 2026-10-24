@@ -30,22 +30,23 @@ def test_owner_survives_reopen_without_sql(monkeypatch, tmp_path):
     close_memory_clients(path)
 
 
-def test_owner_cannot_be_reassigned(monkeypatch, tmp_path):
+def test_old_owner_metadata_does_not_block_shared_access(monkeypatch, tmp_path):
     _configure(monkeypatch, tmp_path)
+    db.create_conversation("conversation-a", "Old", "m")
     ownership.set_owner("conversation-a", "user-a")
-    with pytest.raises(PermissionError, match="conversation_not_owned"):
-        ownership.set_owner("conversation-a", "user-b")
+    ownership.set_owner("conversation-a", "user-b")
     assert ownership.get_owner("conversation-a") == "user-a"
+    assert ownership.check_access("conversation-a", "user-b")
+    assert not ownership.check_access("missing", "user-b")
 
 
-def test_scoped_delete_and_missing_delete_are_noops(monkeypatch, tmp_path):
+def test_shared_delete_removes_old_metadata(monkeypatch, tmp_path):
     path = _configure(monkeypatch, tmp_path)
     ownership.set_owner("conversation-a", "user-a")
     before = get_memory_client(path).last_commit.sequence
-    ownership.delete_owner("missing", "user-a")
-    ownership.delete_owner("conversation-a", "user-b")
+    ownership.delete_owner("missing", "user-b")
     assert get_memory_client(path).last_commit.sequence == before
-    ownership.delete_owner("conversation-a", "user-a")
+    ownership.delete_owner("conversation-a", "user-b")
     assert ownership.get_owner("conversation-a") is None
 
 
@@ -73,7 +74,7 @@ def test_invalid_owner_fails_closed(monkeypatch, tmp_path):
         ownership.get_owner("bad")
 
 
-def test_owned_conversations_are_filtered_by_owner(monkeypatch, tmp_path):
+def test_all_conversations_are_shared(monkeypatch, tmp_path):
     _configure(monkeypatch, tmp_path)
     conversations = [
         {"id": "a", "title": "A", "model": "m", "created_at": 1, "updated_at": 3},
@@ -82,8 +83,8 @@ def test_owned_conversations_are_filtered_by_owner(monkeypatch, tmp_path):
     monkeypatch.setattr(ownership, "get_conversations", lambda: conversations)
     ownership.set_owner("a", "owner-a")
     ownership.set_owner("b", "owner-b")
-    assert ownership.list_owned_conversations("owner-a") == [conversations[0]]
-    assert ownership.get_owned_conversation("b", "owner-a") is None
+    assert ownership.list_owned_conversations("owner-a") == conversations
+    assert ownership.get_owned_conversation("b", "owner-a") == conversations[1]
 
 
 def test_runtime_data_root_is_preserved(monkeypatch, tmp_path):

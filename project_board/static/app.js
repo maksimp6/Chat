@@ -1,7 +1,6 @@
 "use strict";
 
-// Never place the owner token in localStorage, cookies, URLs or console output.
-const state = { token: "", threads: [], tasks: [], section: "threads", selected: null };
+const state = { threads: [], tasks: [], section: "threads", selected: null };
 const $ = (id) => document.getElementById(id);
 
 function node(tag, text = "", className = "") {
@@ -26,7 +25,6 @@ async function api(method, path, data) {
     method,
     cache: "no-store",
     headers: {
-      Authorization: "Bearer " + state.token,
       ...(data ? { "Content-Type": "application/json" } : {}),
     },
     ...(data ? { body: JSON.stringify(data) } : {}),
@@ -219,37 +217,6 @@ function selectSection(section) {
   }
 }
 
-$("login-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const entered = $("secret").value;
-  state.token = entered;
-  try {
-    await refresh();
-    $("secret").value = "";
-    $("login").hidden = true;
-    $("board").hidden = false;
-    $("connection").textContent = "Подключено";
-    selectSection("shame");
-  } catch (_) {
-    state.token = "";
-    $("connection").textContent = "Ошибка входа";
-    $("secret").setCustomValidity("Ошибка авторизации");
-    $("secret").reportValidity();
-    $("secret").setCustomValidity("");
-  }
-});
-
-$("logout").addEventListener("click", () => {
-  state.token = "";
-  state.threads = [];
-  state.tasks = [];
-  state.selected = null;
-  $("login").hidden = false;
-  $("board").hidden = true;
-  $("connection").textContent = "Не подключено";
-  $("detail").replaceChildren();
-});
-
 document.querySelectorAll(".tab").forEach((button) => {
   button.addEventListener("click", () => selectSection(button.dataset.section));
 });
@@ -291,4 +258,12 @@ $("create-task").addEventListener("submit", async (e) => {
     e.target.reset();
     error("Задача сохранена");
   } catch (ex) { error(ex.message); }
+});
+
+refresh().then(() => {
+  $("connection").textContent = "Подключено";
+  selectSection("shame");
+}).catch((e) => {
+  $("connection").textContent = "Ошибка подключения";
+  error(e.message);
 });

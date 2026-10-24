@@ -143,104 +143,52 @@ def test_invocation_user_id_flows_into_trace_billing_context(treasury_db):
     assert trace.finalize()["context"]["owner_id"] == "user-4"
 
 
-def test_owner_identity_does_not_accept_client_body(treasury_db, monkeypatch):
+def test_local_identity_is_not_a_visitor_credential(treasury_db, monkeypatch):
     from app import app
+    from economy.treasury_identity import get_current_owner_id
 
-    monkeypatch.delenv("LOGOS_OWNER_ID", raising=False)
-    app.config.update(TESTING=True)
-    with app.test_request_context(
-        "/api/treasury/account?owner_id=attacker",
-        method="GET",
-        json={"owner_id": "attacker"},
-    ):
-        from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
-
-        with pytest.raises(TreasuryIdentityError):
-            get_current_owner_id()
+    monkeypatch.setenv("LOGOS_OWNER_ID", "shared")
+    with app.test_request_context("/api/treasury/account?owner_id=old", json={"owner_id": "old"}):
+        assert get_current_owner_id() == "shared"
 
 
-def test_web_treasury_request_recovers_from_missing_identity(treasury_db):
+def test_web_treasury_opens_without_bootstrap(treasury_db):
     from app import app
+    response = app.test_client().get("/api/treasury/account")
+    assert response.status_code == 200
+    assert response.get_json()["owner_id"]
+    assert "Set-Cookie" not in response.headers
 
-    app.config.update(TESTING=True)
+
+def test_bootstrap_returns_local_id_without_token(treasury_db):
+    from app import app
     client = app.test_client()
-
-    unauthorized = client.get("/api/treasury/account")
-    assert unauthorized.status_code == 401
-    assert unauthorized.get_json()["error"] == "authenticated owner identity is required"
-
-    bootstrap = client.post(
-        "/api/users/bootstrap",
-        json={
-            "installation_id": "web-installation-treasury-recovery-123456",
-            "metadata": {"platform": "web"},
-        },
-    )
-    assert bootstrap.status_code == 200
-
-    account = client.get("/api/treasury/account")
-    assert account.status_code == 200
-    assert account.get_json()["owner_id"] == bootstrap.get_json()["user_id"]
-
-
-def test_bootstrap_authenticates_treasury_owner(treasury_db):
-    from app import app
-
-    app.config.update(TESTING=True)
-    client = app.test_client()
-
-    bootstrap = client.post(
-        "/api/users/bootstrap",
-        json={
-            "installation_id": "android-installation-auth-owner-123456",
-            "metadata": {"platform": "android"},
-        },
-    )
-
+    bootstrap = client.post("/api/users/bootstrap", json={})
     assert bootstrap.status_code == 200
     identity = bootstrap.get_json()
     assert identity["user_id"]
-    assert identity["auth_token"]
-    assert "logos_user_token=" in bootstrap.headers.get("Set-Cookie", "")
-
-    account = client.get("/api/treasury/account")
-    assert account.status_code == 200
-    assert account.get_json()["owner_id"] == identity["user_id"]
+    assert identity["status"] == "local"
+    assert "auth_token" not in identity
+    assert "Set-Cookie" not in bootstrap.headers
+    assert client.get("/api/treasury/account").get_json()["owner_id"] == identity["user_id"]
 
 
-def test_invalid_owner_token_is_rejected(treasury_db, monkeypatch):
+def test_obsolete_owner_token_does_not_block_treasury(treasury_db):
     from app import app
-
-    monkeypatch.delenv("LOGOS_OWNER_ID", raising=False)
-    app.config.update(TESTING=True)
-    client = app.test_client()
-
-    response = client.get(
-        "/api/treasury/account",
-        headers={"X-Logos-User-Token": "not-a-valid-token"},
-    )
-
-    assert response.status_code == 401
-    assert response.get_json()["error"] == "invalid authenticated owner token"
-
-
-def test_authenticated_owner_ignores_client_owner_id(treasury_db):
-    from app import app
-
-    app.config.update(TESTING=True)
-    client = app.test_client()
-
-    bootstrap = client.post(
-        "/api/users/bootstrap",
-        json={"installation_id": "android-installation-owner-spoof-123456", "metadata": {}},
-    )
-    identity = bootstrap.get_json()
-    trusted_owner = identity["user_id"]
-
-    response = client.get(
-        "/api/treasury/account?owner_id=attacker-owner",
-        headers={"X-Logos-User-Token": identity["auth_token"]},
-    )
-
+    response = app.test_client().get("/api/treasury/account", headers={"X-Logos-User-Token": "obsolete"})
     assert response.status_code == 200
-    assert response.get_json()["owner_id"] == trusted_owner
+
+
+def test_existing_ledgers_are_discoverable_and_separately_readable(treasury_db):
+    from app import app
+    from economy.treasury import demo_top_up
+    demo_top_up("old-a", 16)
+    demo_top_up("old-b", 7)
+    client = app.test_client()
+    accounts = client.get("/api/treasury/accounts").get_json()["accounts"]
+    assert {row["owner_id"] for row in accounts} == {"old-a", "old-b"}
+    first = client.get("/api/treasury/account?owner_id=old-a").get_json()
+    second = client.get("/api/treasury/account?owner_id=old-b").get_json()
+    assert first["balance"] == 16
+    assert second["balance"] == 7
+    assert {row["owner_id"] for row in first["ledger"]} == {"old-a"}

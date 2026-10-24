@@ -192,7 +192,7 @@ def test_validation_and_secure_evidence_url(tmp_path):
 @pytest.fixture
 def board_http(tmp_path):
     store = BoardStore(tmp_path / "http.memory")
-    server = create_server(store, TOKEN, port=0)
+    server = create_server(store, port=0)
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
@@ -204,7 +204,7 @@ def board_http(tmp_path):
         store.close()
 
 
-def http(base, method, route, payload=None, token=TOKEN, raw=None):
+def http(base, method, route, payload=None, token=None, raw=None):
     headers = {}
     if token is not None:
         headers["Authorization"] = "Bearer " + token
@@ -223,13 +223,13 @@ def http(base, method, route, payload=None, token=TOKEN, raw=None):
         return exc.code, dict(exc.headers), exc.read()
 
 
-def test_real_http_auth_csp_and_content_limits(board_http):
+def test_real_http_no_auth_csp_and_content_limits(board_http):
     base, _ = board_http
     code, _, body = http(base, "GET", "/healthz", token=None)
     assert code == 200 and b"file-native Memory DB" in body
-    assert http(base, "GET", "/api/threads", token=None)[0] == 401
-    assert http(base, "POST", "/api/threads", {"title": "X"}, token=None)[0] == 401
-    assert http(base, "GET", "/api/threads", token="invalid")[0] == 401
+    assert http(base, "GET", "/api/threads", token=None)[0] == 200
+    assert http(base, "POST", "/api/threads", {"title": "X"}, token=None)[0] == 400
+    assert http(base, "GET", "/api/threads", token="invalid")[0] == 200
     code, headers, html = http(base, "GET", "/", token=None)
     assert code == 200 and b"Logos Board" in html
     assert "default-src 'none'" in headers["Content-Security-Policy"]
@@ -323,16 +323,18 @@ def test_real_http_posts_tasks_replay_and_export(board_http):
     assert status == 200
     assert json.loads(exported)["sequence"] == store.export()["sequence"]
     assert TOKEN.encode() not in exported
-    assert http(base, "GET", "/api/export", token=None)[0] == 401
+    assert http(base, "GET", "/api/export", token=None)[0] == 200
     assert http(base, "GET", "/api/unknown")[0] == 404
 
 
-def test_refuses_public_bind_and_weak_token(tmp_path):
+def test_loopback_bind_does_not_require_token(tmp_path):
     with BoardStore(tmp_path / "db.memory") as store:
         with pytest.raises(ValueError):
             create_server(store, TOKEN, host="0.0.0.0")
-        with pytest.raises(ValueError):
-            create_server(store, "short")
+        server = create_server(store)
+        server.server_close()
+        server = create_server(store, "short")
+        server.server_close()
 
 
 def test_seed_incident_is_durable_and_deduplicated(tmp_path):

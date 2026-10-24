@@ -96,11 +96,6 @@ def create_invocation(
 ) -> InvocationContext:
     session_id = _resolve_request_session_id(session_id, conversation_id)
     session = restore_session(session_id)
-    if session is not None:
-        # A session that belongs to one owner is not reused by another owner.
-        session_owner = (session.get("metadata") or {}).get("user_id")
-        if session_owner and str(session_owner) != str(user_id or "").strip():
-            raise ValueError(f"Session not found: {session_id}")
     if session is None:
         if not create_missing_session:
             raise ValueError(f"Session not found: {session_id}")

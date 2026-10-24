@@ -23,7 +23,7 @@ The repository is actively evolving. This README separates shipped behavior from
 - **Invocation context and execution trace** for provider requests, polling, tool calls, errors, timing, continuations and billing correlation.
 - **Deterministic trace lifecycle**: snapshots are read-only and finalization is idempotent; see [execution trace lifecycle](docs/execution-trace-lifecycle.md).
 - **Agent Gateway and RuntimeDispatcher** for runtime-scoped invocations. The target architecture is one Python process with managed threads/contexts; threads are not a hostile-code security boundary.
-- **Logos GitHub agent**: issue/label-triggered workflow, headless runner, filesystem-only sandboxed tools, draft PR output and CI/review gates. See [Logos GitHub agent](docs/agents/github-agent.md).
+- **Logos agent tooling**: headless runner, tools and draft PR output. See [Logos GitHub agent](docs/agents/github-agent.md).
 - **Compute energy accounting** based on measured CPU time and configured watts/price; if no electricity price is configured, the trace remains unpriced. See [compute energy billing](docs/compute-energy-billing.md).
 - **Treasury and billing controls**, internal usage accounting and demo balances.
 - **3D Printing Business**: quote calculation, owner-scoped orders and settlement, realized P&L, finance/payback tracking and AI-first purchase assessment. See [3D Printing Business](docs/printing3d.md).
@@ -48,9 +48,27 @@ Secrets are sanitized at the trace/log boundary. Provider requests, continuation
 
 ## Current status
 
-As of 2026-10-06, `master` includes Kristall Wave 1 (conversation ownership and user identity migrated to file-native storage), Logos Dev worker as a separate coding worker, ChatGPT OAuth discovery with PKCE, platform-aware CI routing, and capability-only secret delivery. Earlier (2026-09-29): fail-closed merge gate, canonical formatter lifecycle, runner dependency caching and CI timing telemetry, deduplicated Python/frontend test execution, lazy PostgreSQL test reset, async runtime concurrency/cancellation/timeout coverage, Cloud.ru Secret Management hardening, and Container Apps v2 client contract ([changelog](docs/changelog.md)). Copilot review is automatic; maintainers request one final Codex review only after the current head is green and ready to merge.
+As of 2026-10-24, Logos runs as a shared local application with no visitor sign-in.
+The web interface, MCP, project board and administration APIs accept requests without
+cookies, bearer tokens or GitHub login. `LOGOS_OWNER_ID` identifies new accounting/data records; it is not a password.
+Without it, a lone existing ledger is retained as the shared ID, otherwise `default`
+is used. The selected ID is persisted. Existing ledgers can be listed with
+`GET /api/treasury/accounts` and read with `/api/treasury/account?owner_id=...`. Existing conversations, runtime
+sessions, environments and MCP settings are shared across clients.
 
-These are repository capabilities, not evidence that the public production deployment, external MCP connection, or live Cloud.ru Container Apps rollout has been verified. `develop` is the integration branch and the repository default; every PR targets it. A PR must be synchronized with current `develop`, required checks must be green on the exact current head, review threads must be resolved, and merge happens through the protected GitHub path (squash). `master` is the owner's personal branch and is not a PR target.
+Built-in tool/agent approval, filesystem/command restriction, quota and budget gates
+are disabled. Old `LOGOS_REQUIRE_SHORT_TOKEN`, `LOGOS_UNRESTRICTED` and generation
+permission settings do not turn those gates back on. Anyone who can reach the server
+can use its available APIs and tools. Provider API keys and SSH credentials are still
+needed by the external services themselves.
+
+Repository CI acceptance, code-policy and pre-push gates have been removed.
+Functional tests remain available for explicit verification. The phone deployment,
+backup, diagnostics and Yandex key workflows remain; deployment still verifies the
+running process and HTTP readiness and preserves its backup/rollback behavior.
+`develop` is the integration branch; `master` remains the owner's personal branch.
+Repository code changes do not by themselves prove the installed phone version or
+access from a second device.
 
 The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440). Logos Dev worker is implemented as a separate coding worker; legacy cloudru-rdc.yml and production-deploy.yml remain unchanged. Resource-scoped ownership, replacement decision, and accepted cutover criteria are tracked in [#869](https://github.com/maksimp6/Chat/issues/869). Kristall Wave 1 is shipped; further migration of shared state (sessions, runtime events, conversation metadata) remains roadmap. Object Storage migration, durable background workers, and full production cutover remain separate work.
 
@@ -58,7 +76,7 @@ Still experimental or roadmap unless the corresponding issue is complete:
 
 - advanced branch-aware preview/runtime isolation;
 - cloud and local browsing with Browser Emulator/BrowserShim self-testing;
-- per-user provider credentials, quotas and rate limits;
+- per-user provider credentials;
 - Government workflows, Partner Relations and Kwork integration;
 - richer theme/voice assistance;
 - resilient backup/failover providers;
@@ -102,15 +120,13 @@ Use `.env` or a deployment secret manager. Never commit:
 - signing keys/passwords;
 - user passwords or session secrets.
 
-For security-sensitive reports, follow [SECURITY.md](SECURITY.md). Runtime tools must respect approval boundaries and the repository's sandbox rules; do not use browser profiles, cookies or hidden credentials as test fixtures.
+For security-sensitive reports, follow [SECURITY.md](SECURITY.md). Never use real provider credentials or browser profiles as test fixtures.
 
 ## Development workflow
 
-```
-Issue → branch → implementation → tests → PR → CI → review → merge → verification
-```
-
-Open pull requests against `develop` and keep changes independently testable. Follow [CONTRIBUTING.md](CONTRIBUTING.md) and the [sprint workflow](docs/development/sprint-workflow.md). Issues are the canonical source for scope and acceptance; a Discussion is not a substitute for an issue or a passing CI check.
+The owner can request a direct push to `develop`; routine contributions can still
+use branches and pull requests. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Functional checks are run explicitly when needed; there are no mandatory CI gates.
 
 ## Testing
 

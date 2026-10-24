@@ -89,7 +89,7 @@ def test_logos_environment_variables_still_configure_the_client(monkeypatch):
     client = cli.CliClient()
 
     assert client.base_url == "http://env.test"
-    assert client.short_token == "env-token"
+    assert client._url("/api/conversations") == "http://env.test/api/conversations"
     assert client.model == "env-model"
 
 

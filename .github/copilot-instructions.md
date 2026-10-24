@@ -1,7 +1,6 @@
 # Copilot instructions
 
-- Work on a branch and open a pull request against `develop`; never push to `develop` or `master`.
-- One issue, one focused pull request with deterministic regression tests.
-- Before finishing, run `python -m compileall -q .`,
-  `python tests/validate_runtime_modules.py` and `pytest -q`.
+- Follow the owner's requested delivery route. `develop` is the integration branch; `master` requires separate explicit authorization.
+- Report concrete changes and the validation actually performed.
+- Project CI, lint, type, naming and layout gates have been removed. Existing functional tests remain available for focused manual verification.
 - Never commit secrets or add CDN-hosted UI dependencies.

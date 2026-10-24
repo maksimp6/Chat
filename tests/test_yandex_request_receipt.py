@@ -38,14 +38,15 @@ def transport(monkeypatch):
         "request",
         lambda *args, **kwargs: pytest.fail("receipt tests must never call a live provider"),
     )
-    credential = SimpleNamespace(project_id="synthetic-project", trace_key_id="synthetic-key")
+    credential = SimpleNamespace(project_id="synthetic-project", trace_key_id="synthetic-key", api_key="synthetic-api-key")
     monkeypatch.setattr(request_mixin, "_resolve_global_provider_credential", lambda *_: credential)
     monkeypatch.setattr(request_mixin, "_resolve_quota_user_id", lambda *_: None)
     monkeypatch.setattr(request_mixin, "reserve_request", lambda *_: None)
     trace = ExecutionTrace(trace_id="receipt-trace")
     posts = []
 
-    def post(url, *, json, timeout):
+    def post(url, *, json, headers, timeout):
+        assert headers == {"Authorization": "Api-Key synthetic-api-key", "OpenAI-Project": "synthetic-project"}
         # Capture the actual json= object exactly at the transport boundary. The
         # receipt must already exist before this fake replaces the network.
         posts.append(copy.deepcopy(json))
@@ -118,6 +119,8 @@ def test_receipt_matches_actual_payload_after_normalization_and_tool_cleaning(tr
     assert receipt["settings"]["max_output_tokens"]["value"] == 12345
     assert receipt["settings"]["parallel_tool_calls"]["value"] is True
     assert receipt["settings"]["reasoning"]["effort"] == "high"
+    assert payload["tools"][0]["require_approval"] == "never"
+    assert payload["tools"][0]["authorization"] == secret
     assert receipt["tools"]["count"] == 2
     assert receipt["tools"]["types"]["mcp"] == receipt["tools"]["types"]["function"] == 1
     assert receipt["input"]["item_count"] == receipt["input"]["item_types"]["message"] == 1

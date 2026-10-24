@@ -4,7 +4,6 @@ from __future__ import annotations
 from core.env import env_get
 
 from datetime import datetime, timedelta, timezone
-import hmac
 import json
 import logging
 import uuid
@@ -53,9 +52,6 @@ provider_credentials_bp = Blueprint(
 
 @provider_credentials_bp.get("/yandex/issuance-status")
 def yandex_issuance_status():
-    guard = _guard()
-    if guard:
-        return guard
     from provider_accounts.issued_credentials import issuance_status
     return jsonify(issuance_status()), 200, {"Cache-Control": "no-store"}
 
@@ -63,14 +59,8 @@ def yandex_issuance_status():
 @provider_credentials_bp.post("/yandex/issued")
 @traced_operation("yandex.import_issued_key", include_request=False)
 def import_runner_yandex_key():
-    guard = _guard()
-    if guard:
-        return guard
-    # JSON prevents cross-origin form posts to a local unauthenticated deployment.
     if not request.is_json:
         return jsonify({"error": "json_required"}), 415
-    if request.headers.get("Origin") not in (None, request.host_url.rstrip("/")):
-        return jsonify({"error": "origin_rejected"}), 403
     from provider_accounts.issued_credentials import ImportRejected, import_yandex_key
     try:
         result = import_yandex_key(request.get_json(silent=True))
@@ -83,59 +73,6 @@ def import_runner_yandex_key():
         return jsonify({"error": "credential_storage_failed"}), 503
 
 CLOUDRU_DEFAULT_TTL = timedelta(days=1)
-
-
-def _authorized() -> bool:
-    """Authorize provider-credential administration without exposing secrets publicly."""
-    configured = env_get("LOGOS_PROVIDER_CREDENTIALS_TOKEN", "").strip()
-    if configured:
-        auth = request.headers.get("Authorization", "")
-        token = auth[7:].strip() if auth.startswith("Bearer ") else ""
-        return bool(token) and hmac.compare_digest(token.encode("utf-8"), configured.encode("utf-8"))
-
-    # When the application's short-token gate is enabled, its before_request
-    # middleware has already authenticated this request. Reuse that session
-    # rather than introducing a second browser credential.
-    if env_get("LOGOS_REQUIRE_SHORT_TOKEN", "").strip().lower() in {"1", "true", "yes", "on"}:
-        return True
-
-    # Fail closed for remote deployments when no explicit admin token is set.
-    # A reverse proxy on this host makes every request arrive from loopback, so a
-    # forwarding header means the request did not originate locally.
-    if any(request.headers.get(name) for name in ("X-Forwarded-For", "X-Real-IP", "Forwarded")):
-        return False
-    remote = request.remote_addr or ""
-    return remote in {"127.0.0.1", "::1"}
-
-
-def _guard():
-    if not _authorized():
-        logger.warning(
-            "Provider credentials request rejected: admin authentication failed "
-            "method=%s path=%s remote=%s auth_header_present=%s",
-            request.method,
-            request.path,
-            request.remote_addr,
-            bool(request.headers.get("Authorization")),
-        )
-        return jsonify(
-            {
-                "error": "provider_credential_admin_authentication_required",
-                "detail": (
-                    "Request rejected before provider API-key validation. "
-                    "Configure LOGOS_PROVIDER_CREDENTIALS_TOKEN and send "
-                    "Authorization: Bearer <token>, or enable the authenticated "
-                    "short-token session."
-                ),
-            }
-        ), 401
-    logger.info(
-        "Provider credentials admin authentication accepted: method=%s path=%s remote=%s",
-        request.method,
-        request.path,
-        request.remote_addr,
-    )
-    return None
 
 
 def _cloudru_ttl() -> timedelta:
@@ -293,9 +230,6 @@ def _perform_health_check(provider: str) -> dict:
 @provider_credentials_bp.post("/status/check")
 @traced_operation("provider_credentials.status_check")
 def provider_credentials_status_check():
-    guard = _guard()
-    if guard:
-        return guard
     data = request.get_json(silent=True) or {}
     requested = data.get("provider")
     providers = [requested] if requested else [YANDEX, CLOUDRU]
@@ -329,9 +263,6 @@ def provider_credentials_status_check():
 @provider_credentials_bp.get("/status")
 @traced_operation("provider_credentials.status")
 def provider_credentials_status():
-    guard = _guard()
-    if guard:
-        return guard
     return jsonify(
         {
             "providers": [
@@ -345,9 +276,6 @@ def provider_credentials_status():
 @provider_credentials_bp.post("/cloudru/service-accounts")
 @traced_operation("cloudru.service_accounts")
 def cloudru_service_accounts():
-    guard = _guard()
-    if guard:
-        return guard
     payload = request.form.to_dict()
 
     def pick(*names):
@@ -435,9 +363,6 @@ def _revoke_replaced_yandex_key(previous: ProviderCredential) -> None:
 @provider_credentials_bp.post("/cloudru/bootstrap")
 @traced_operation("cloudru.bootstrap")
 def bootstrap_cloudru():
-    guard = _guard()
-    if guard:
-        return guard
 
     payload = request.form.to_dict()
 
@@ -577,9 +502,6 @@ def bootstrap_cloudru():
 @provider_credentials_bp.put("")
 @traced_operation("provider_credentials.update")
 def update_provider_credentials():
-    guard = _guard()
-    if guard:
-        return guard
     try:
         data = request.get_json(silent=False)
     except Exception:

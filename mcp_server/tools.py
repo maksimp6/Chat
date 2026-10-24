@@ -9,10 +9,10 @@ from tool_providers.filesystem import grep_search, list_directory, read_file
 from invocation.api import get_invocation_status, get_invocation_trace
 from sessions.manager import get_session
 from tool_providers.registry import registry
+from tool_providers.universal_tool_platform import tool_call_requires_approval
 
 from mcp_server.auth import _auth_mode
 from mcp_server.protocol import MCP_PATH, SUPPORTED_PROTOCOL_VERSIONS, _server_info
-from mcp_server.runtime_bridge import _authorize_invocation
 
 
 def _tool(
@@ -86,8 +86,7 @@ def _agents(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
 def _session(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
     session_id = str(arguments.get("session_id") or "").strip()
     session = get_session(session_id) if session_id else None
-    # A session is visible only to the owner it was created for, as in the runtime API.
-    if not session or not user or (session.get("metadata") or {}).get("user_id") != user:
+    if not session:
         raise LookupError("Session not found")
     return {
         "session": {
@@ -105,7 +104,6 @@ def _invocation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any
     status = get_invocation_status(invocation_id) if invocation_id else None
     if not status:
         raise LookupError("Invocation not found")
-    _authorize_invocation(status, user)
     return {"invocation": status}
 
 
@@ -114,7 +112,6 @@ def _trace(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
     status = get_invocation_status(invocation_id) if invocation_id else None
     if not status:
         raise LookupError("Invocation not found")
-    _authorize_invocation(status, user)
     trace = get_invocation_trace(invocation_id)
     if trace is None:
         raise LookupError("Invocation trace not found")
@@ -130,9 +127,9 @@ def _bridge_wrapper(handler):
 
 
 def _require_conversation_user(user: Optional[str]) -> str:
-    if not user:
-        raise PermissionError("Authenticated user identity is required")
-    return str(user)
+    from economy.treasury_identity import get_current_owner_id
+
+    return str(user or get_current_owner_id())
 
 
 def _conversations(_arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
@@ -283,14 +280,14 @@ def _register_conversation_tools() -> None:
         (
             "logos_list_conversations",
             "List conversations",
-            "List conversations owned by the authenticated Logos user.",
+            "List conversations in the local Logos application.",
             {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
             _conversations,
         ),
         (
             "logos_get_conversation",
             "Get conversation",
-            "Read one conversation owned by the authenticated Logos user.",
+            "Read one conversation in the local Logos application.",
             {
                 "type": "object",
                 "properties": {"conversation_id": {"type": "string", "minLength": 1}},
@@ -302,7 +299,7 @@ def _register_conversation_tools() -> None:
         (
             "logos_get_conversation_messages",
             "Get conversation messages",
-            "Read messages and persisted ExecutionTrace data for one owned conversation.",
+            "Read messages and persisted ExecutionTrace data for one conversation.",
             {
                 "type": "object",
                 "properties": {"conversation_id": {"type": "string", "minLength": 1}},
@@ -314,7 +311,7 @@ def _register_conversation_tools() -> None:
         (
             "logos_get_execution",
             "Get execution",
-            "Read one authenticated execution through the user-facing execution abstraction.",
+            "Read one local execution through the user-facing execution abstraction.",
             {
                 "type": "object",
                 "properties": {"invocation_id": {"type": "string", "minLength": 1}},
@@ -326,7 +323,7 @@ def _register_conversation_tools() -> None:
         (
             "logos_get_execution_trace",
             "Get execution trace",
-            "Read sanitized ExecutionTrace for one authenticated execution.",
+            "Read sanitized ExecutionTrace for one local execution.",
             {
                 "type": "object",
                 "properties": {"invocation_id": {"type": "string", "minLength": 1}},
@@ -436,10 +433,7 @@ _register_bridge_tools()
 
 
 def _security_schemes() -> list[dict[str, Any]]:
-    mode = _auth_mode()
-    if mode == "anonymous":
-        return [{"type": "noauth"}]
-    return [{"type": "http", "scheme": "bearer"}]
+    return [{"type": "noauth"}]
 
 
 def _tools_list() -> list[dict[str, Any]]:
@@ -461,7 +455,7 @@ def _tools_list() -> list[dict[str, Any]]:
             {
                 "risk_level": definition.get("risk_level"),
                 "read_only": definition.get("read_only"),
-                "requires_approval": definition.get("requires_approval"),
+                "requires_approval": tool_call_requires_approval(definition),
                 "capabilities": definition.get("capabilities") or [],
                 "openai/toolInvocation/invoking": f"{item['title']}…",
                 "openai/toolInvocation/invoked": f"{item['title']}: готово",

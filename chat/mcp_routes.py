@@ -1,13 +1,8 @@
 """Маршруты чата с сохранением полной цепочки выполнения в БД."""
 
 from flask import Blueprint, request, jsonify
-import hashlib
-import hmac
 import logging
-import os
 import json as _json
-import secrets
-import time
 import uuid
 from typing import Any
 from yandex_client_modules.client import YandexResponsesClient
@@ -28,12 +23,11 @@ from invocation.manager import (
 from invocation.trace import create_invocation_trace
 from mcp_server.trace import record_yandex_mcp_activity
 import mcp_server.storage as mcp_storage
-from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
+from economy.treasury_identity import get_current_owner_id
 from tool_providers.registry import registry
 from storage.db import (
     create_conversation,
     get_messages,
-    get_store,
     add_message,
     get_conv_settings,
     save_conv_settings,
@@ -44,22 +38,16 @@ from storage.db import (
 from agent_runtime.partial_output import extract_last_response_text, format_partial_output_message
 from agent_runtime.responses_tool_loop import run_tool_loop, extract_function_calls
 from economy.billing import aggregate_billing, build_ai_billing_item, settle_billing_to_treasury
-from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 from provider_accounts.quotas import ProviderQuotaExceeded
 from agent_skills.registry import SkillRegistry, SkillRegistryError, compose_skill_instructions
 from tool_providers.universal_tool_platform import (
     UniversalToolCall,
     UniversalToolExecutor,
-    tool_call_requires_approval,
 )
 from conversations.ownership import (
-    init_conversation_ownership_table,
     set_owner,
-    get_owner,
     check_access,
     list_owned_conversations,
-    get_owned_conversation,
-    delete_owner,
 )
 
 logger = logging.getLogger("mcp_routes")
@@ -98,83 +86,6 @@ def _tool_call_parts(tool_call: dict[str, Any]) -> tuple[str | None, dict[str, A
     return name, arguments
 
 
-def _tool_call_needs_approval(tool_call: dict[str, Any]) -> bool:
-    name, arguments = _tool_call_parts(tool_call)
-    tool_config = registry.get_tool_meta(name) if name else None
-    return bool(tool_config and tool_call_requires_approval(tool_config, arguments))
-
-
-def _approval_key() -> bytes:
-    """HMAC key for approval tokens. Set LOGOS_APPROVAL_SECRET so tokens survive restarts and
-    work across workers; without it a per-process key is used and tokens die with the process."""
-    configured = os.environ.get("LOGOS_APPROVAL_SECRET", "").encode("utf-8")
-    if configured:
-        if len(configured) < 32:
-            raise RuntimeError("LOGOS_APPROVAL_SECRET must be at least 32 bytes")
-        return configured
-    logger.warning(
-        "LOGOS_APPROVAL_SECRET is not set; approval tokens are valid in this process only"
-    )
-    return secrets.token_bytes(32)
-
-
-_APPROVAL_KEY = _approval_key()
-
-
-# An approval token runs its call once and only within its TTL. The nonce is stored when the call is
-# proposed and removed when the call is approved, so a token that leaks cannot be replayed.
-_APPROVAL_PREFIX = "mcp/approval/"
-_APPROVAL_TTL_SECONDS = 900
-
-
-def _approval_mac(nonce, owner_id, conversation_id, name, arguments) -> str:
-    payload = _json.dumps(
-        {
-            "nonce": nonce,
-            "owner": owner_id or "",
-            "conversation": conversation_id or "",
-            "name": name or "",
-            "arguments": arguments,
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-        default=str,
-    )
-    return hmac.new(_APPROVAL_KEY, payload.encode("utf-8"), hashlib.sha256).hexdigest()
-
-
-def _approval_token(owner_id, conversation_id, name, arguments) -> str:
-    """Sign a proposed tool call so the approval endpoint only runs calls the server proposed."""
-    nonce = secrets.token_urlsafe(16)
-    store = get_store()
-    now = int(time.time())
-    with store.transaction() as tx:
-        # A token that was never approved stays stored after it expires. Removing expired records
-        # here keeps the store bounded by the TTL instead of growing with every proposal.
-        for key, record in store.items(prefix=_APPROVAL_PREFIX).items():
-            if record["expires_at"] < now:
-                tx.delete(key)
-        tx.set(_APPROVAL_PREFIX + nonce, {"expires_at": now + _APPROVAL_TTL_SECONDS})
-    return nonce + "." + _approval_mac(nonce, owner_id, conversation_id, name, arguments)
-
-
-def _consume_approval(token, owner_id, conversation_id, name, arguments) -> bool:
-    """True once for a token this server issued for exactly this call, before it expires."""
-    nonce, separator, mac = str(token or "").partition(".")
-    if not separator or not nonce:
-        return False
-    expected = _approval_mac(nonce, owner_id, conversation_id, name, arguments)
-    if not hmac.compare_digest(mac.encode("utf-8"), expected.encode("utf-8")):
-        return False
-    key = _APPROVAL_PREFIX + nonce
-    with get_store().transaction() as tx:
-        record = tx.get(key)
-        if record is None:
-            return False
-        tx.delete(key)
-    return record["expires_at"] >= time.time()
-
-
 def _normalize_requested_skills(data, params):
     raw = data.get("skills")
     if raw is None:
@@ -193,7 +104,6 @@ def _normalize_requested_skills(data, params):
 # from the conversation and the registry, never from the request body.
 _CLIENT_PARAM_KEYS = frozenset(
     {
-        "approval_mode",
         "background",
         "instructions",
         "max_output_tokens",
@@ -277,14 +187,6 @@ class LogosClient(YandexResponsesClient):
             {"execution_policy": execution_policy} if execution_policy is not None else {}
         )
 
-        def needs_approval(call: dict[str, Any]) -> bool:
-            if execution_policy is not None:
-                name, _ = _tool_call_parts(call)
-                definition = registry.get_universal_definition(name) if name else None
-                if definition is None or not execution_policy.allows_tool(definition):
-                    return False
-            return _tool_call_needs_approval(call)
-
         response = self._ask_provider(
             message=message,
             model_key=model_key,
@@ -294,63 +196,37 @@ class LogosClient(YandexResponsesClient):
             **policy_kwargs,
         )
 
-        calls = extract_function_calls(response)
-        # "pause" (default) hands an approval-gated batch to an interactive approver.
-        # "deny" serves unattended runs: the executor refuses each gated call, the
-        # rest of the batch runs and the model is told what was not executed.
-        deny_unapproved = (params or {}).get("approval_mode") == "deny"
-        if calls:
-            approval_required = not deny_unapproved and any(needs_approval(call) for call in calls)
+        if extract_function_calls(response):
+            tool_servers = mcp_storage.list_servers(owner_id=get_current_owner_id())
+            base_params = dict(params or {})
 
-            if not approval_required:
-                owner_id = get_owner(conversation_id) if conversation_id else None
-                tool_servers = mcp_storage.list_servers(owner_id=owner_id or "")
-                base_params = dict(params or {})
-                refused = []
-
-                def execute_tool(call):
-                    result = self._execute_single_tool(
-                        call, tool_servers, trace=trace, **policy_kwargs
-                    )
-                    if result.get("error"):
-                        output = {"error": result["error"], "tool": result.get("name")}
-                        if deny_unapproved and needs_approval(call):
-                            refused.append(result.get("name"))
-                            output.update(
-                                executed=False,
-                                reason="Owner approval is unavailable in this run; "
-                                "the call was not executed.",
-                            )
-                        return output
-                    return result.get("result")
-
-                def should_pause(batch: list[dict[str, Any]]) -> bool:
-                    gated = [needs_approval(call) for call in batch]
-                    if deny_unapproved:
-                        # After a refusal, a batch of only gated calls makes no progress.
-                        return bool(refused) and all(gated)
-                    return any(gated)
-
-                def continue_request(input_items, previous_response):
-                    continuation_params = dict(base_params)
-                    continuation_params["input"] = input_items
-                    continuation_params["background"] = base_params.get("background", True)
-                    return self._ask_provider(
-                        message="",
-                        model_key=model_key,
-                        conversation_id=conversation_id,
-                        params=continuation_params,
-                        trace=trace,
-                        **policy_kwargs,
-                    )
-
-                response = run_tool_loop(
-                    response,
-                    execute_tool,
-                    continue_request,
-                    max_rounds=_tool_rounds(base_params.get("max_rounds")),
-                    should_pause=should_pause,
+            def execute_tool(call):
+                result = self._execute_single_tool(
+                    call, tool_servers, trace=trace, **policy_kwargs
                 )
+                if result.get("error"):
+                    return {"error": result["error"], "tool": result.get("name")}
+                return result.get("result")
+
+            def continue_request(input_items, previous_response):
+                continuation_params = dict(base_params)
+                continuation_params["input"] = input_items
+                continuation_params["background"] = base_params.get("background", True)
+                return self._ask_provider(
+                    message="",
+                    model_key=model_key,
+                    conversation_id=conversation_id,
+                    params=continuation_params,
+                    trace=trace,
+                    **policy_kwargs,
+                )
+
+            response = run_tool_loop(
+                response,
+                execute_tool,
+                continue_request,
+                max_rounds=_tool_rounds(base_params.get("max_rounds")),
+            )
 
         if trace is not None:
             record_yandex_mcp_activity(trace)
@@ -407,8 +283,7 @@ def chat():
             return jsonify({"error": "conversation_id и message обязательны"}), 400
 
         owner_id = get_current_owner_id(required=False)
-        # The reply, the history and the billing all belong to the caller's conversation.
-        if not owner_id or not check_access(conv_id, owner_id):
+        if not check_access(conv_id, owner_id):
             return jsonify({"error": "conversation_not_found"}), 404
         invocation = create_invocation(
             session_id,
@@ -518,56 +393,6 @@ def chat():
                         },
                     }
                 )
-
-        output = response.get("output", []) if isinstance(response, dict) else []
-        for item in output:
-            calls = []
-            if isinstance(item, dict):
-                if item.get("type") in ("function_call", "tool_call"):
-                    calls.append(item)
-                elif item.get("type") == "message":
-                    calls.extend(
-                        [
-                            p
-                            for p in item.get("content", [])
-                            if isinstance(p, dict)
-                            and p.get("type") in ("function_call", "tool_call")
-                        ]
-                    )
-
-            for tc in calls:
-                func_name, raw_args = _tool_call_parts(tc)
-                tool_config = registry.get_tool_meta(func_name) if func_name else None
-
-                if tool_config and tool_call_requires_approval(tool_config, raw_args):
-                    trace_data = trace.finalize()
-                    persist_invocation_trace(invocation.invocation_id, trace_data)
-                    # The turn ends here; the pending call is tracked by its approval token. Leaving the
-                    # invocation running would keep it "running" for good.
-                    finish_invocation(
-                        invocation.invocation_id,
-                        result={"status": "requires_approval", "tool": func_name},
-                    )
-                    return jsonify(
-                        {
-                            "requires_approval": True,
-                            "tool_call": {
-                                "name": func_name,
-                                "description": tool_config.get("description", func_name),
-                                "arguments": raw_args,
-                                "call_id": tc.get("call_id") or tc.get("id") or func_name,
-                                "approval_token": _approval_token(
-                                    owner_id, invocation.conversation_id, func_name, raw_args
-                                ),
-                            },
-                            "original_message": message,
-                            "invocation_id": invocation.invocation_id,
-                            "session_id": invocation.session_id,
-                            "conversation_id": invocation.conversation_id,
-                            "trace_id": invocation.trace_id,
-                            "trace": trace_data,
-                        }
-                    )
 
         reasoning, reply = client.extract_reasoning_and_text(response)
         if not reply:
@@ -781,7 +606,7 @@ def _tool_category_selection(value: Any) -> list[str] | None:
 @mcp_bp.route("/api/conversations/<conv_id>/tools", methods=["GET", "PUT"])
 def conv_tools(conv_id):
     owner_id = get_current_owner_id(required=False)
-    if not owner_id or not check_access(conv_id, owner_id):
+    if not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
     if request.method == "PUT":
         data = request.get_json(silent=True) or {}
@@ -802,7 +627,7 @@ def conv_tools(conv_id):
     return jsonify({"active_tool_categories": cats})
 
 
-# MCP servers hold credentials, so only an authenticated owner may read or change them.
+# Stored server credentials are not echoed back to the browser.
 # Stored credentials never go back to the browser: an empty value on update means "unchanged".
 _MCP_SECRET_FIELDS = ("authorization", "headers")
 
@@ -826,10 +651,7 @@ def _update_payload():
 
 @mcp_bp.route("/api/mcp-servers", methods=["GET", "POST"])
 def handle_mcp_servers():
-    try:
-        owner_id = get_current_owner_id()
-    except TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
+    owner_id = get_current_owner_id()
     if request.method == "POST":
         data = _update_payload()
         if data is None:
@@ -845,10 +667,7 @@ def handle_mcp_servers():
 
 @mcp_bp.route("/api/mcp-servers/<server_id>", methods=["GET", "PUT", "DELETE"])
 def handle_mcp_server_item(server_id):
-    try:
-        owner_id = get_current_owner_id()
-    except TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
+    owner_id = get_current_owner_id()
     if request.method == "DELETE":
         mcp_storage.delete_server(server_id, owner_id)
         return jsonify({"status": "deleted"})
@@ -872,15 +691,9 @@ def handle_mcp_server_item(server_id):
 
 @mcp_bp.route("/api/conversations", methods=["GET", "POST"])
 def conversations():
-    try:
-        owner_id = get_current_owner_id(required=False)
-    except TreasuryIdentityError as exc:
-        logger.warning("[CONVERSATION] Invalid owner identity: %s", exc)
-        return jsonify({"error": "invalid_owner_identity"}), 401
+    owner_id = get_current_owner_id()
 
     if request.method == "POST":
-        if not owner_id:
-            return jsonify({"error": "conversation_owner_required"}), 401
         data = request.get_json(silent=True) or {}
         if not isinstance(data, dict):
             return jsonify({"error": "JSON object is required"}), 400
@@ -916,11 +729,7 @@ def conversations():
             ), 502
         title = normalize_conversation_title(data.get("title"))
         model = data.get("model", "logos-runtime")
-        try:
-            # Claim the conversation before its local row exists, so no row is ever unowned.
-            set_owner(conv_id, owner_id)
-        except PermissionError:
-            return jsonify({"error": "conversation_id_conflict"}), 409
+        set_owner(conv_id, owner_id)
         create_conversation(conv_id, title, model)
         creation_trace.add_event(
             "conversation_local_persisted",
@@ -938,15 +747,13 @@ def conversations():
             }
         ), 201
 
-    if owner_id:
-        return jsonify({"conversations": list_owned_conversations(owner_id)})
-    return jsonify({"conversations": []})
+    return jsonify({"conversations": list_owned_conversations(owner_id)})
 
 
 @mcp_bp.route("/api/conversations/<conv_id>/messages", methods=["GET"])
 def get_conv_messages(conv_id):
     owner_id = get_current_owner_id(required=False)
-    if not owner_id or not check_access(conv_id, owner_id):
+    if not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
     return jsonify({"messages": get_messages(conv_id)})
 
@@ -965,13 +772,8 @@ def execute_approved():
             return jsonify({"error": f"Неизвестный инструмент: {func_name}"}), 400
 
         owner_id = get_current_owner_id(required=False)
-        if not owner_id or not conv_id or not check_access(str(conv_id), owner_id):
+        if not conv_id or not check_access(str(conv_id), owner_id):
             return jsonify({"error": "conversation_not_found"}), 404
-        # Only a call this server proposed, and has not run yet, may skip the approval gate.
-        if not _consume_approval(
-            data.get("approval_token"), owner_id, conv_id, func_name, arguments
-        ):
-            return jsonify({"error": "approval_token_invalid"}), 403
         tool_arguments = dict(arguments or {})
         if func_name == "set_ui_theme":
             current_theme = str(data.get("current_theme") or "").strip().lower()

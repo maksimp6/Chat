@@ -18,7 +18,7 @@ from flask import Blueprint, Response, jsonify, request, stream_with_context
 from core.config import Config, TEXT_MODELS
 from chat.mcp_routes import LogosClient
 from conversations.ownership import check_access
-from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
+from economy.treasury_identity import get_current_owner_id
 
 
 voice_bp = Blueprint("voice", __name__)
@@ -85,21 +85,6 @@ def _require_session(session_id: str) -> VoiceSession:
     if session is None:
         raise KeyError("voice session not found")
     return session
-
-
-def _check_owner(session: VoiceSession) -> None:
-    try:
-        current_owner = get_current_owner_id(required=False)
-    except TreasuryIdentityError as exc:
-        # A presented token that does not match an account is a refusal, not a server error.
-        raise PermissionError("voice session access denied") from exc
-    if session.owner_id and current_owner != session.owner_id:
-        raise PermissionError("voice session access denied")
-    # Without an identity a conversation cannot be proven to belong to the caller, so refuse.
-    if session.conversation_id and (
-        not current_owner or not check_access(session.conversation_id, current_owner)
-    ):
-        raise PermissionError("conversation access denied")
 
 
 def _wav_pcm(audio: bytes) -> tuple[int, bytes]:
@@ -234,14 +219,11 @@ def _process(session: VoiceSession) -> None:
 
 @voice_bp.post("/api/voice/session")
 def create_voice_session():
-    try:
-        owner_id = get_current_owner_id(required=False)
-    except TreasuryIdentityError:
-        owner_id = None
+    owner_id = get_current_owner_id()
 
     data = request.get_json(silent=True) or {}
     conversation_id = data.get("conversation_id")
-    if conversation_id and (not owner_id or not check_access(conversation_id, owner_id)):
+    if conversation_id and not check_access(conversation_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
 
     session = VoiceSession(
@@ -261,11 +243,8 @@ def create_voice_session():
 def append_voice_audio():
     try:
         session = _require_session(request.args.get("session_id", ""))
-        _check_owner(session)
     except KeyError as exc:
         return jsonify({"error": str(exc)}), 404
-    except PermissionError as exc:
-        return jsonify({"error": str(exc)}), 403
 
     chunk = request.get_data(cache=False)
     if not chunk:
@@ -284,11 +263,8 @@ def append_voice_audio():
 def voice_events():
     try:
         session = _require_session(request.args.get("session_id", ""))
-        _check_owner(session)
     except KeyError as exc:
         return jsonify({"error": str(exc)}), 404
-    except PermissionError as exc:
-        return jsonify({"error": str(exc)}), 403
 
     @stream_with_context
     def stream():
@@ -313,11 +289,8 @@ def voice_events():
 def voice_output():
     try:
         session = _require_session(request.args.get("session_id", ""))
-        _check_owner(session)
     except KeyError as exc:
         return jsonify({"error": str(exc)}), 404
-    except PermissionError as exc:
-        return jsonify({"error": str(exc)}), 403
     if not session.output_audio:
         return jsonify({"error": "voice output is not ready"}), 404
     return Response(session.output_audio, mimetype="audio/ogg")
@@ -327,11 +300,8 @@ def voice_output():
 def close_voice_session():
     try:
         session = _require_session((request.get_json(silent=True) or {}).get("session_id", ""))
-        _check_owner(session)
     except KeyError as exc:
         return jsonify({"error": str(exc)}), 404
-    except PermissionError as exc:
-        return jsonify({"error": str(exc)}), 403
 
     # A second close must not run the speech and chat pipeline again for the same audio.
     with _sessions_lock:

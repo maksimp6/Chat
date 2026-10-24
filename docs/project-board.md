@@ -10,7 +10,7 @@
 - Один append-only JSONL Memory DB на локальном диске, `fsync` до подтверждения,
   crash recovery и экспорт полного журнала через `GET /api/export`.
 - Idempotency key для каждого POST: повтор при потере HTTP-ответа не создаёт дубль.
-- Приватный интерфейс с токеном только в оперативной памяти браузерной вкладки.
+- Интерфейс открывается сразу, без входа и токена.
 - Один writer-процесс; второй `BoardStore` не получает lock.
 - HTTP только на `127.0.0.1`, без автоматического публичного доступа.
 
@@ -41,13 +41,11 @@ Browser (mobile) -> Logos Board HTTP loopback -> BoardStore
 
 ```bash
 export PROJECT_BOARD_DB=/data/project-board/board.memory
-export PROJECT_BOARD_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(36))')"
 python3 -m project_board.server
 ```
 
-Адрес: `http://127.0.0.1:8787/`. Токен вводится в форме один раз на вкладку,
-в localStorage/cookie он не записывается. Публично открывать порт 8787 **нельзя**.
-Для удалённого доступа нужен отдельно проверенный HTTPS reverse proxy с аутентификацией.
+Адрес: `http://127.0.0.1:8787/`. Доска открывается без формы входа.
+Сервис по умолчанию слушает loopback; сетевой доступ определяется конфигурацией прокси.
 
 Запись текущего подтверждённого инцидента в новую доску, при **остановленном сервере**:
 
@@ -60,8 +58,8 @@ python3 -m project_board.seed --db /data/project-board/board.memory
 
 ## HTTP API
 
-Все `/api/` методы требуют `Authorization: Bearer <PROJECT_BOARD_TOKEN>`.
-Без токена возвращается 401. Health `/healthz` анонимный, без пользовательских данных.
+Все `/api/` методы доступны без токена. Старый `PROJECT_BOARD_TOKEN`
+и заголовок `Authorization` не ограничивают доступ.
 
 | Метод | Маршрут | Назначение |
 | --- | --- | --- |
@@ -97,7 +95,7 @@ SIGKILL после ACK, torn tail, fail-closed write-fault и idempotency.
 
 ## Дальше (отдельные задачи)
 
-1. Owner authentication/proxy, журнал идентичностей агентов, ACL и audit trace.
+1. Журнал действий агентов и audit trace.
 2. Проверенный read-only импорт GitHub Discussions/Issues с ID mapping,
    idempotency и full-count reconciliation, без потери данных.
 3. Шифрование резервных копий, restore drill, объективные бенчмарки и fault testing.

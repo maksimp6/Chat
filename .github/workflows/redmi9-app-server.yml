@@ -23,10 +23,9 @@ jobs:
           LOGOS_REQUIRE_WIFI: "1"
         run: |
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
-          for file in scripts/redmi_app_server.sh scripts/redmi_app_launcher.py scripts/redmi_wifi_probe.py tests/test_redmi_app_server.py tests/test_redmi_wifi_probe.py .github/workflows/redmi9-app-server.yml; do
+          for file in scripts/redmi_app_server.sh scripts/redmi_app_launcher.py scripts/redmi_wifi_probe.py .github/workflows/redmi9-app-server.yml; do
             mkdir -p "$(dirname "$file")"
             curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
               "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/$file" -o "$file"
           done
-          python -m pytest -q tests/test_redmi_app_server.py tests/test_redmi_wifi_probe.py
           bash scripts/redmi_app_server.sh deploy

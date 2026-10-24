@@ -1,4 +1,4 @@
-"""Native MCP storage behavior, owner scoping, lifecycle and uncertain-write failures."""
+"""Native MCP storage behavior, shared access, lifecycle and uncertain-write failures."""
 
 import pytest
 import storage.db as db
@@ -8,6 +8,14 @@ from kristall import KristallError
 
 OWNER = "owner-a"
 OTHER = "owner-b"
+
+
+@pytest.fixture(autouse=True)
+def isolated_memory(monkeypatch, tmp_path):
+    close_memory_clients()
+    monkeypatch.setenv("LOGOS_MEMORY_PATH", str(tmp_path / "mcp.memory"))
+    yield
+    close_memory_clients()
 
 
 def _server_data(**overrides):
@@ -44,18 +52,18 @@ def test_server_crud_settings_and_config_round_trip(monkeypatch):
     assert mcp_storage.get_enabled_servers_for_conv("chat", owner_id=OWNER) == []
 
 
-def test_other_owners_cannot_read_change_delete_or_enable_a_server():
+def test_servers_are_shared_across_former_owner_ids():
     mcp_storage.init_db()
     sid = mcp_storage.create_server(OWNER, _server_data())
     try:
-        assert mcp_storage.get_server(sid, owner_id=OTHER) is None
-        assert mcp_storage.list_servers(owner_id=OTHER) == []
-        assert mcp_storage.update_server(sid, OTHER, {"name": "hijack"}) is False
-        mcp_storage.delete_server(sid, OTHER)
+        assert mcp_storage.get_server(sid, owner_id=OTHER)["id"] == sid
+        assert [item["id"] for item in mcp_storage.list_servers(owner_id=OTHER)] == [sid]
+        assert mcp_storage.update_server(sid, OTHER, {"name": "Updated"}) is True
         mcp_storage.save_conv_mcp_settings("other-chat", [sid], {})
-        assert mcp_storage.get_enabled_servers_for_conv("other-chat", owner_id=OTHER) == []
-        assert mcp_storage.get_server_config(sid, owner_id=OTHER) == {}
-        assert mcp_storage.get_server(sid, owner_id=OWNER)["name"] == "Local Git"
+        assert mcp_storage.get_enabled_servers_for_conv("other-chat", owner_id=OTHER)[0]["id"] == sid
+        assert mcp_storage.get_server_config(sid, owner_id=OTHER)["timeout"] == 99
+        mcp_storage.delete_server(sid, OTHER)
+        assert mcp_storage.get_server(sid, owner_id=OWNER) is None
     finally:
         mcp_storage.delete_server(sid, OWNER)
         mcp_storage.save_conv_mcp_settings("other-chat", [], {})
@@ -88,13 +96,13 @@ def test_server_url_must_be_https_without_credentials(server_url):
         mcp_storage.create_server(OWNER, _server_data(server_url=server_url))
 
 
-def test_records_without_an_owner_are_invisible_to_everyone():
+def test_legacy_records_without_an_owner_are_available():
     with db.get_store().transaction() as tx:
         tx.set("mcp/server/legacy", {**mcp_storage._DEFAULTS, "id": "legacy", "created_at": 1})
     try:
-        assert mcp_storage.get_server("legacy", owner_id=OWNER) is None
-        assert mcp_storage.list_servers(owner_id=OWNER) == []
-        assert mcp_storage.list_servers(owner_id="") == []
+        assert mcp_storage.get_server("legacy", owner_id=OWNER)["id"] == "legacy"
+        assert [item["id"] for item in mcp_storage.list_servers(owner_id=OWNER)] == ["legacy"]
+        assert [item["id"] for item in mcp_storage.list_servers(owner_id="")] == ["legacy"]
     finally:
         with db.get_store().transaction() as tx:
             tx.delete("mcp/server/legacy")

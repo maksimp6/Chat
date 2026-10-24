@@ -1,12 +1,10 @@
-"""Secure, persistent gateway for remote Local Tool Agents."""
+"""Persistent gateway for remote Local Tool Agents without application login."""
 
 from __future__ import annotations
-from core.env import env_get
 
-import hashlib
 import json
+import math
 import re
-import secrets
 import time
 from typing import Any, Mapping, Optional
 from uuid import uuid4
@@ -41,28 +39,6 @@ def _parse_json(value: Optional[str], default: Any) -> Any:
         return default
 
 
-def _token_hash(token: str) -> str:
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()
-
-
-def _bearer_token() -> Optional[str]:
-    authorization = request.headers.get("Authorization", "")
-    if not authorization.startswith("Bearer "):
-        return None
-    token = authorization[7:].strip()
-    return token or None
-
-
-def _require_bootstrap() -> None:
-    expected = env_get("LOGOS_LOCAL_AGENT_BOOTSTRAP_TOKEN", "").strip()
-    token = _bearer_token()
-    # Compare bytes: compare_digest rejects non-ASCII str, which would be a 500 instead of a refusal.
-    if not expected or not token or not secrets.compare_digest(
-        token.encode("utf-8"), expected.encode("utf-8")
-    ):
-        raise PermissionError("local-agent registration is not authorized")
-
-
 def _agent_row(agent_id: str) -> dict[str, Any] | None:
     record = get_store().get("local-agent/" + agent_id)
     return dict(record) if record is not None else None
@@ -70,14 +46,10 @@ def _agent_row(agent_id: str) -> dict[str, Any] | None:
 
 def _require_agent(agent_id: str) -> dict[str, Any]:
     if not _AGENT_ID_RE.fullmatch(agent_id):
-        raise PermissionError("invalid agent id")
+        raise LookupError("agent_not_found")
     row = _agent_row(agent_id)
     if row is None:
         raise LookupError("agent_not_found")
-    token = _bearer_token()
-    token_hash = _token_hash(token or "")
-    if not secrets.compare_digest(row["token_hash"], token_hash):
-        raise PermissionError("invalid local-agent token")
     return row
 
 
@@ -130,6 +102,34 @@ def enqueue_local_tool_job(
     return job_id
 
 
+def wait_for_local_tool_job(
+    job_id: str, *, timeout_seconds: float = 30.0
+) -> Any:
+    """Wait within a bounded deadline for a persisted local-agent result."""
+    timeout = float(timeout_seconds)
+    if not math.isfinite(timeout) or timeout < 0 or timeout > 3600:
+        raise ValueError("timeout_seconds must be between 0 and 3600")
+    deadline = time.monotonic() + timeout
+    while True:
+        row = get_store().get("local-job/" + str(job_id))
+        if row is None:
+            raise LookupError("local_tool_job_not_found")
+        if row["status"] in {"completed", "failed"}:
+            result = _parse_json(row.get("result_json"), None)
+            if row["status"] == "completed":
+                return result if result is not None else {"success": True, "data": None}
+            if isinstance(result, Mapping) and result.get("success") is False:
+                return result
+            error = _parse_json(row.get("error_json"), None)
+            if error is None and isinstance(result, Mapping):
+                error = result.get("error")
+            return {"success": False, "data": None, "error": error or "local_agent_job_failed"}
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return None
+        time.sleep(min(0.05, remaining))
+
+
 def _recover_expired_jobs(conn, agent_id: str) -> None:
     now = _now()
     for key, row in get_store().items(prefix="local-job/").items():
@@ -152,11 +152,6 @@ def _renew_running_leases(conn, agent_id: str, now: float) -> None:
 
 @local_agent_bp.post("/register")
 def register_local_agent():
-    try:
-        _require_bootstrap()
-    except PermissionError:
-        return jsonify({"error": "local_agent_unauthorized"}), 401
-
     data = request.get_json(silent=True) or {}
     agent_id = str(data.get("agent_id") or f"android-{uuid4().hex[:12]}").strip()
     name = str(data.get("name") or "Logos Android Agent").strip()
@@ -172,7 +167,6 @@ def register_local_agent():
     capabilities = [str(item).strip() for item in capabilities if str(item).strip()]
 
     now = _now()
-    token = secrets.token_urlsafe(32)
 
     key = "local-agent/" + agent_id
     with get_store().transaction() as tx:
@@ -185,7 +179,6 @@ def register_local_agent():
                 "version": version,
                 "capabilities_json": _json(capabilities),
                 "status": "online",
-                "token_hash": _token_hash(token),
                 "last_seen": now,
                 "created_at": old["created_at"] if old else now,
                 "updated_at": now,
@@ -201,7 +194,6 @@ def register_local_agent():
                 "capabilities": capabilities,
                 "status": "online",
             },
-            "token": token,
         }
     ), 201
 
@@ -219,8 +211,6 @@ def local_agent_heartbeat(agent_id: str):
             _renew_running_leases(tx, agent_id, now)
     except LookupError:
         return jsonify({"error": "agent_not_found"}), 404
-    except PermissionError:
-        return jsonify({"error": "local_agent_unauthorized"}), 401
 
     return jsonify({"status": "ok", "agent_id": agent_id, "last_seen": now})
 
@@ -251,8 +241,6 @@ def local_agent_poll(agent_id: str):
             )
     except LookupError:
         return jsonify({"error": "agent_not_found"}), 404
-    except PermissionError:
-        return jsonify({"error": "local_agent_unauthorized"}), 401
     return jsonify(
         {
             "job": {
@@ -303,19 +291,12 @@ def local_agent_result(agent_id: str, job_id: str):
             )
     except LookupError:
         return jsonify({"error": "agent_not_found"}), 404
-    except PermissionError:
-        return jsonify({"error": "local_agent_unauthorized"}), 401
 
     return jsonify({"status": "ok", "job_id": job_id})
 
 
 @local_agent_bp.get("/health")
 def local_agent_health():
-    try:
-        _require_bootstrap()
-    except PermissionError:
-        return jsonify({"error": "local_agent_unauthorized"}), 401
-
     cutoff = _now() - 90
     rows = sorted(get_store().items(prefix="local-agent/").values(), key=lambda row: row["id"])
 
@@ -336,4 +317,4 @@ def local_agent_health():
     return jsonify({"agents": agents})
 
 
-__all__ = ["enqueue_local_tool_job", "init_local_agent_tables", "local_agent_bp"]
+__all__ = ["enqueue_local_tool_job", "wait_for_local_tool_job", "init_local_agent_tables", "local_agent_bp"]

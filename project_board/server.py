@@ -1,11 +1,10 @@
-"""Loopback-only HTTP API for Logos Board with explicit owner Bearer authorization."""
+"""Local HTTP API for Logos Board without a sign-in requirement."""
 
 from __future__ import annotations
 from core.env import env_get
 
 import json
 import re
-import secrets
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -38,7 +37,6 @@ def _fields(data: dict[str, Any], *, allowed: set[str], required: set[str]) -> N
 
 class BoardHandler(BaseHTTPRequestHandler):
     _store: BoardStore
-    _owner_token: str
     server_version = "LogosBoard/0.1"
     sys_version = ""
 
@@ -70,14 +68,6 @@ class BoardHandler(BaseHTTPRequestHandler):
     def _json(self, code: int, payload: dict[str, Any]) -> None:
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
         self._send(code, body, "application/json; charset=utf-8")
-
-    def _auth(self) -> bool:
-        provided = self.headers.get("Authorization", "")
-        expected = ("Bearer " + self._owner_token).encode("utf-8")
-        if not secrets.compare_digest(provided.encode("utf-8"), expected):
-            self._json(401, {"error": "authentication_required"})
-            return False
-        return True
 
     def _request(self) -> dict[str, Any]:
         mime = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
@@ -124,8 +114,6 @@ class BoardHandler(BaseHTTPRequestHandler):
         if path in asset_names:
             name, mime = asset_names[path]
             return self._handle(lambda: self._send(200, (ASSETS / name).read_bytes(), mime))
-        if not self._auth():
-            return
 
         def handle() -> None:
             if path == "/api/threads":
@@ -143,8 +131,6 @@ class BoardHandler(BaseHTTPRequestHandler):
         return self._handle(handle)
 
     def do_POST(self) -> None:
-        if not self._auth():
-            return
         path = urlsplit(self.path).path
 
         def handle() -> None:
@@ -204,32 +190,26 @@ class BoardHandler(BaseHTTPRequestHandler):
 
 
 def create_server(
-    store: BoardStore, token: str, *, host: str = "127.0.0.1", port: int = 0
+    store: BoardStore, token: str | None = None, *, host: str = "127.0.0.1", port: int = 0
 ) -> ThreadingHTTPServer:
     """Create a single-process board API; never expose it to a network interface."""
     if host != "127.0.0.1":
         raise ValueError("Logos Board must bind to loopback behind a trusted proxy")
-    if not isinstance(token, str) or len(token) < 32:
-        raise ValueError("PROJECT_BOARD_TOKEN must be a high-entropy secret of 32+ characters")
 
     class BoundHandler(BoardHandler):
         _store = store
-        _owner_token = token
 
     return ThreadingHTTPServer((host, port), BoundHandler)
 
 
 def main() -> None:
-    """Start only when a dedicated token and mounted persistent data root are configured."""
-    token = env_get("PROJECT_BOARD_TOKEN", "")
-    if len(token) < 32:
-        raise SystemExit("PROJECT_BOARD_TOKEN (32+ characters) is required")
+    """Start the local board using its configured persistent data root."""
     path = env_get("PROJECT_BOARD_DB", "")
     if not path:
         raise SystemExit("PROJECT_BOARD_DB is required")
     port = int(env_get("PROJECT_BOARD_PORT", "8787"))
     with BoardStore(path) as store:
-        server = create_server(store, token, port=port)
+        server = create_server(store, port=port)
         try:
             print(f"Project board listening on 127.0.0.1:{port}", flush=True)
             server.serve_forever()

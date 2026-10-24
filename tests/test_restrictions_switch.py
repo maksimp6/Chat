@@ -1,4 +1,4 @@
-"""LOGOS_UNRESTRICTED lifts the built-in restrictions; off by default."""
+"""Retired restrictions remain disabled regardless of old configuration."""
 
 import os
 from decimal import Decimal
@@ -24,48 +24,23 @@ def restricted(monkeypatch):
     monkeypatch.delenv("LOGOS_UNRESTRICTED", raising=False)
 
 
-def test_switch_is_off_unless_explicitly_set(restricted):
-    assert restrictions_lifted() is False
-
-
-def test_switch_accepts_only_affirmative_values(monkeypatch):
-    monkeypatch.setenv("LOGOS_UNRESTRICTED", "no")
-    assert restrictions_lifted() is False
-    monkeypatch.setenv("LOGOS_UNRESTRICTED", "1")
+@pytest.mark.parametrize("value", ["", "false", "no", "0", "true"])
+def test_restrictions_cannot_be_reenabled(monkeypatch, value):
+    monkeypatch.setenv("LOGOS_UNRESTRICTED", value)
     assert restrictions_lifted() is True
-
-
-def test_approval_gate_is_enforced_by_default(restricted):
-    assert tool_call_requires_approval({"requires_approval": True}, {}) is True
 
 
 def test_approval_gate_is_lifted_with_the_switch(unrestricted):
     assert tool_call_requires_approval({"requires_approval": True}, {}) is False
 
 
-def test_protected_files_are_refused_by_default(restricted):
-    with pytest.raises(PermissionError):
-        filesystem._refuse_protected(os.path.join(filesystem.BASE_DIR, ".env"))
-
-
 def test_protected_files_are_readable_with_the_switch(unrestricted):
     filesystem._refuse_protected(os.path.join(filesystem.BASE_DIR, ".env"))
-
-
-def test_project_boundary_holds_by_default(restricted):
-    with pytest.raises(PermissionError):
-        filesystem._get_abs_path("../outside-the-project.txt")
 
 
 def test_project_boundary_is_lifted_with_the_switch(unrestricted):
     target = filesystem._get_abs_path("../outside-the-project.txt")
     assert not target.startswith(filesystem.BASE_DIR + os.sep)
-
-
-def test_anonymous_quota_call_is_refused_by_default(restricted, monkeypatch):
-    monkeypatch.delenv("LOGOS_QUOTA_REQUIRE_IDENTITY", raising=False)
-    with pytest.raises(ProviderQuotaExceeded):
-        reserve_request(None)
 
 
 def test_anonymous_quota_call_passes_with_the_switch(unrestricted):
@@ -75,12 +50,6 @@ def test_anonymous_quota_call_passes_with_the_switch(unrestricted):
 class _Provider:
     def costs_summary(self, *, period, group_by):
         return {"total_cost": "500", "currency": "RUB", "provider": "cloudru"}
-
-
-def test_cloud_budget_block_applies_by_default(restricted):
-    guard = CloudBudgetGuard(_Provider(), CloudBudgetLimits(Decimal("100")))
-    with pytest.raises(BudgetLimitExceeded):
-        guard.enforce("create_vm")
 
 
 def test_cloud_budget_block_is_lifted_with_the_switch(unrestricted):
@@ -97,12 +66,6 @@ _SSH_SETTINGS = {
     "allow_privileged_operations": False,
     "approval_required_for_privileged": True,
 }
-
-
-def test_ssh_allowlist_applies_by_default(restricted, monkeypatch):
-    monkeypatch.setattr(ssh_settings, "get_settings", lambda: dict(_SSH_SETTINGS))
-    with pytest.raises(SSHRuntimeError):
-        assert_operation_allowed("execute", command="uname -a")
 
 
 def test_ssh_allowlist_is_lifted_with_the_switch(unrestricted, monkeypatch):

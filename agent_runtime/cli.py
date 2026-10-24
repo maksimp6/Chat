@@ -4,7 +4,6 @@ from __future__ import annotations
 from core.env import env_get
 
 from typing import Any
-from urllib.parse import quote
 
 import requests
 
@@ -29,18 +28,12 @@ class CliClient:
         session: requests.Session | None = None,
     ) -> None:
         self.base_url = (base_url or env_get("LOGOS_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
-        self.short_token = (
-            short_token if short_token is not None else env_get("LOGOS_SHORT_TOKEN", "")
-        ).strip()
         self.model = (model or env_get("LOGOS_MODEL") or DEFAULT_MODEL).strip() or DEFAULT_MODEL
         self.timeout = float(timeout)
         self.http = session or requests.Session()
 
     def _url(self, path: str) -> str:
         normalized = "/" + path.lstrip("/")
-        if self.short_token:
-            prefix = "/" + quote(self.short_token, safe="")
-            return f"{self.base_url}{prefix}{normalized}"
         return f"{self.base_url}{normalized}"
 
     def _request_json(

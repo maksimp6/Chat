@@ -1,4 +1,4 @@
-"""Durable ownership boundary for user-facing conversations.
+"""Legacy ownership metadata for shared local conversations.
 
 Conversation metadata is read through the application DB boundary. Ownership is
 stored directly in the native Kristall with no SQL migration.
@@ -64,29 +64,17 @@ def set_owner(conversation_id: str, user_id: str) -> None:
         store = _store()
         existing_owner = store.get(conversation_id)
         if existing_owner is not None:
-            if existing_owner != user_id:
-                raise PermissionError("conversation_not_owned")
             return
         store.set(conversation_id, user_id, int(time.time()))
 
 
 def check_access(conversation_id: str, user_id: str) -> bool:
-    owner = get_owner(conversation_id)
-    return owner is not None and owner == str(user_id)
-
-
-def _owned_ids(user_id: str) -> set[str]:
-    owner = str(user_id)
-    with _OWNERSHIP_LOCK:
-        records = _store().records()
-    return {
-        conversation_id for conversation_id, record in records.items() if record["user_id"] == owner
-    }
+    """Every existing conversation is available to every client."""
+    return any(row["id"] == str(conversation_id) for row in _conversation_rows())
 
 
 def list_owned_conversations(user_id: str) -> list[ConversationView]:
-    owned = _owned_ids(user_id)
-    return [conversation for conversation in _conversation_rows() if conversation["id"] in owned]
+    return _conversation_rows()
 
 
 def get_owned_conversation(conversation_id: str, user_id: str) -> Optional[ConversationView]:
@@ -104,15 +92,9 @@ def get_owned_conversation(conversation_id: str, user_id: str) -> Optional[Conve
 
 
 def delete_owner(conversation_id: str, user_id: str) -> None:
-    # The owner is required: an unscoped delete would leave the conversation unowned, and the
-    # next caller to claim it would take it over.
-    if not str(user_id or "").strip():
-        raise ValueError("user_id is required to delete a conversation owner")
+    """Remove legacy metadata together with a deleted shared conversation."""
     with _OWNERSHIP_LOCK:
         store = _store()
         existing_owner = store.get(conversation_id)
-        if existing_owner is None:
-            return
-        if existing_owner != str(user_id):
-            return
-        store.delete(conversation_id, str(user_id))
+        if existing_owner is not None:
+            store.delete(conversation_id, existing_owner)

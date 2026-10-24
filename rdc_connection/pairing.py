@@ -1,4 +1,4 @@
-"""Protected redirect for the verification URL of an existing RDC device flow.
+"""Redirect for the verification URL of an existing RDC device flow.
 
 The device owns PKCE and polling. This module never receives provider tokens.
 """
@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from flask import jsonify, redirect, request
+from flask import jsonify, redirect
 
 
 def verification_url(path, now=None):
@@ -44,34 +44,14 @@ def verification_url(path, now=None):
 def install_rdc_pairing(app):
     @app.get("/rdc")
     def rdc_pairing_redirect():
-        # Pairing needs the short-token gate: the authentication it checks is only produced
-        # when the gate is enabled. With the gate off the route says so instead of answering
-        # "authentication required", which the caller could never satisfy.
-        from identity.short_token_auth import COOKIE_NAME, _enabled, _has_valid_session, _token
-
-        if not _enabled():
-            response = jsonify({"error": "RDC pairing requires LOGOS_REQUIRE_SHORT_TOKEN"})
+        path = env_get("LOGOS_RDC_PAIRING_FILE", "")
+        try:
+            if not path:
+                raise ValueError("handoff not configured")
+            response = redirect(verification_url(path), code=303)
+        except (OSError, ValueError, KeyError, TypeError):
+            response = jsonify({"error": "RDC verification link unavailable or expired"})
             response.status_code = 503
-            response.headers["Cache-Control"] = "no-store"
-            response.headers["Referrer-Policy"] = "no-referrer"
-            return response
-        token = _token()
-        # Headers supplied by a proxy alone do not authorize pairing.
-        authenticated = request.environ.get("logos.short_token_path_authenticated") or (
-            token and _has_valid_session(token, request.cookies.get(COOKIE_NAME))
-        )
-        if not token or not authenticated:
-            response = jsonify({"error": "authentication required"})
-            response.status_code = 401
-        else:
-            path = env_get("LOGOS_RDC_PAIRING_FILE", "")
-            try:
-                if not path:
-                    raise ValueError("handoff not configured")
-                response = redirect(verification_url(path), code=303)
-            except (OSError, ValueError, KeyError, TypeError):
-                response = jsonify({"error": "RDC verification link unavailable or expired"})
-                response.status_code = 503
         response.headers["Cache-Control"] = "no-store"
         response.headers["Referrer-Policy"] = "no-referrer"
         return response

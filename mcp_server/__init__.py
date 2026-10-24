@@ -13,7 +13,6 @@ from mcp_server.tools import registry
 from mcp_server.runtime_bridge import mcp_runtime_dispatcher
 from mcp_server.transport import (
     chatgpt_mcp_bp,
-    oauth_protected_resource,
     mcp_options,
     mcp_get,
     mcp_post,
@@ -30,7 +29,6 @@ __all__ = [
     "registry",
     "mcp_runtime_dispatcher",
     "chatgpt_mcp_bp",
-    "oauth_protected_resource",
     "mcp_options",
     "mcp_get",
     "mcp_post",

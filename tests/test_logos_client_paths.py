@@ -27,7 +27,6 @@ def test_continuation_after_a_non_approval_tool_call_reissues_the_request(monkey
         "extract_function_calls",
         lambda response: [{"name": "inspect"}] if response["id"] == "resp-1" else [],
     )
-    monkeypatch.setattr(mcp_routes, "_tool_call_needs_approval", lambda call: False)
     monkeypatch.setattr(
         mcp_routes, "mcp_storage", SimpleNamespace(list_servers=lambda **_owner: [])
     )
@@ -37,7 +36,7 @@ def test_continuation_after_a_non_approval_tool_call_reissues_the_request(monkey
         lambda self, call, servers, trace=None: {"result": "ok"},
     )
 
-    def run_tool_loop_once(response, execute_tool, continue_request, max_rounds, should_pause):
+    def run_tool_loop_once(response, execute_tool, continue_request, max_rounds):
         execute_tool({"name": "inspect"})
         return continue_request([{"type": "function_call_output", "output": "ok"}], response)
 
@@ -83,7 +82,6 @@ def test_execute_approved_runs_the_tool_and_returns_the_synthesized_reply(monkey
         "add_message",
         lambda conv_id, role, text, cost=0.0: added.append((conv_id, role, text, cost)),
     )
-    token = mcp_routes._approval_token("owner-1", "conv-1", "inspect", {"a": 1})
 
     app = Flask(__name__)
     app.register_blueprint(mcp_routes.mcp_bp)
@@ -94,7 +92,6 @@ def test_execute_approved_runs_the_tool_and_returns_the_synthesized_reply(monkey
             "name": "inspect",
             "arguments": {"a": 1},
             "model": "logos-runtime",
-            "approval_token": token,
         },
     )
 

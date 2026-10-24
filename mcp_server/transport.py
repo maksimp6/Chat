@@ -1,17 +1,13 @@
 from __future__ import annotations
-from core.env import env_get
+from flask import Blueprint, Response, request
 
-from flask import Blueprint, Response, jsonify, request
-
-from mcp_server.auth import _require_auth
+from mcp_server.auth import _auth_user_from_request
 from mcp_server.protocol import (
     DEFAULT_PROTOCOL_VERSION,
     MCP_PATH,
-    OAUTH_SCOPE,
     SUPPORTED_PROTOCOL_VERSIONS,
     _error_response,
     _jsonrpc_result,
-    _public_base_url,
     _request_protocol_version,
     _server_info,
 )
@@ -31,18 +27,6 @@ def _client_error_message(exc: Exception, fallback: str) -> str:
     lines = message.splitlines()
     message = lines[0].strip() if lines else ""
     return message or fallback
-
-
-@chatgpt_mcp_bp.route("/.well-known/oauth-protected-resource", methods=["GET"])
-def oauth_protected_resource() -> Response:
-    issuer = env_get("LOGOS_MCP_OAUTH_ISSUER", "").rstrip("/")
-    resource = _public_base_url() or request.url_root.rstrip("/")
-    body = {
-        "resource": resource,
-        "authorization_servers": [issuer] if issuer else [],
-        "scopes_supported": [OAUTH_SCOPE],
-    }
-    return jsonify(body)
 
 
 @chatgpt_mcp_bp.route(MCP_PATH, methods=["OPTIONS"])
@@ -97,9 +81,7 @@ def mcp_post() -> Response:
             status=400,
         )
 
-    user, auth_error = _require_auth(request_id)
-    if auth_error is not None:
-        return auth_error
+    user = _auth_user_from_request()
 
     if method == "initialize":
         return _jsonrpc_result(

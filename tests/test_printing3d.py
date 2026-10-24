@@ -56,7 +56,7 @@ def printing_db(tmp_path, monkeypatch):
     return path
 
 
-def test_orders_are_owner_scoped(printing_db):
+def test_orders_are_shared(printing_db):
     from printing3d import create_order, get_order, list_orders
 
     created = create_order(
@@ -75,9 +75,9 @@ def test_orders_are_owner_scoped(printing_db):
     )
 
     assert get_order(printing_store(), "owner-a", created["id"])["title"] == "Cable holder"
-    assert get_order(printing_store(), "owner-b", created["id"]) is None
+    assert get_order(printing_store(), "owner-b", created["id"]) == created
     assert len(list_orders(printing_store(), "owner-a")) == 1
-    assert list_orders(printing_store(), "owner-b") == []
+    assert list_orders(printing_store(), "owner-b") == [created]
 
 
 def test_order_status_flow_requires_settlement_for_paid(printing_db):
@@ -93,7 +93,7 @@ def test_order_status_flow_requires_settlement_for_paid(printing_db):
         update_order_status(printing_store(), "owner-a", order["id"], "paid")
 
 
-def test_settlement_updates_treasury_summary_without_mixing_owner_data(printing_db):
+def test_settlement_updates_shared_treasury_summary(printing_db):
     from printing3d import create_order, get_financial_summary, settle_order
 
     order_a = create_order(
@@ -136,17 +136,17 @@ def test_settlement_updates_treasury_summary_without_mixing_owner_data(printing_
     assert settled["settled_at"]
 
     summary = get_financial_summary(printing_store(), "owner-a")
-    assert summary["total_orders"] == 1
+    assert summary["total_orders"] == 2
     assert summary["currencies"] == [
         {
             "currency": "RUB",
-            "orders": 1,
+            "orders": 2,
             "open_orders": 0,
-            "paid_orders": 1,
-            "quoted_revenue": 500.0,
-            "settled_revenue": 520.0,
-            "settled_cost": 180.0,
-            "settled_profit": 340.0,
+            "paid_orders": 2,
+            "quoted_revenue": 1400.0,
+            "settled_revenue": 1420.0,
+            "settled_cost": 580.0,
+            "settled_profit": 840.0,
         }
     ]
 
@@ -241,7 +241,7 @@ def test_quote_tool_matches_service_and_lists_assumed_defaults():
     assert "target_margin_percent" in result["assumed_defaults"]
 
 
-def test_order_create_tool_recalculates_price_for_trusted_owner(printing_db):
+def test_order_create_tool_uses_shared_identity_and_recalculates_price(printing_db):
     from printing3d import list_orders
     from forge.tools import create_order_tool, quote
 
@@ -257,11 +257,11 @@ def test_order_create_tool_recalculates_price_for_trusted_owner(printing_db):
     )
 
     order = result["order"]
-    assert order["owner_id"] == "trusted-owner"
+    assert order["owner_id"] == "default"
     assert order["status"] == "quote"
     assert order["source"] == "host"
     assert order["quoted_price"] == pytest.approx(expected)
-    assert list_orders(printing_store(), "other-owner") == []
+    assert list_orders(printing_store(), "other-owner") == [order]
 
 
 def test_order_create_tool_rejects_unsafe_status_and_partial_quote(printing_db):
@@ -309,7 +309,7 @@ def test_order_create_tool_keeps_order_and_quote_currency_consistent(printing_db
         )
 
 
-def test_treasury_summary_tool_uses_trusted_call_identity(printing_db):
+def test_treasury_summary_tool_shares_all_orders(printing_db):
     from printing3d import create_order, settle_order
     from forge.tools import get_treasury_summary
 
@@ -339,8 +339,8 @@ def test_treasury_summary_tool_uses_trusted_call_identity(printing_db):
 
     result = get_treasury_summary({}, {"_universal_context": {"call": Call()}})
 
-    assert result["total_orders"] == 1
-    assert result["currencies"][0]["settled_profit"] == pytest.approx(220)
+    assert result["total_orders"] == 2
+    assert result["currencies"][0]["settled_profit"] == pytest.approx(1218)
 
 
 def test_create_order_rejects_paid_without_settlement(printing_db):
@@ -411,8 +411,7 @@ def test_order_row_recovers_from_invalid_quote_json(printing_db):
 def test_create_order_validation_and_actual_values(printing_db):
     from printing3d import create_order
 
-    with pytest.raises(ValueError, match="owner identity"):
-        create_order(printing_store(), "", {"title": "No owner"})
+    assert create_order(printing_store(), "", {"title": "No owner"})["title"] == "No owner"
     with pytest.raises(ValueError, match="object"):
         create_order(printing_store(), "owner-a", [])
     with pytest.raises(ValueError, match="title is required"):
@@ -562,7 +561,7 @@ def printing_client(printing_db, monkeypatch):
     return app.test_client()
 
 
-def test_3d_routes_require_authenticated_owner(printing_db, monkeypatch):
+def test_3d_routes_allow_no_owner_configuration(printing_db, monkeypatch):
     monkeypatch.delenv("LOGOS_OWNER_ID", raising=False)
     from app import app
 
@@ -570,8 +569,8 @@ def test_3d_routes_require_authenticated_owner(printing_db, monkeypatch):
     client = app.test_client()
 
     response = client.get("/api/3d/orders")
-    assert response.status_code == 401
-    assert response.get_json()["error"] == "authenticated owner identity is required"
+    assert response.status_code == 200
+    assert response.get_json() == {"orders": []}
 
 
 def test_quote_routes_cover_success_and_validation(printing_client):
@@ -698,7 +697,7 @@ def test_treasury_summary_route(printing_client):
     assert payload["currencies"][0]["settled_profit"] == pytest.approx(300)
 
 
-def test_all_owner_scoped_3d_routes_reject_unauthenticated_requests(printing_db, monkeypatch):
+def test_all_shared_3d_routes_allow_unauthenticated_requests(printing_db, monkeypatch):
     monkeypatch.delenv("LOGOS_OWNER_ID", raising=False)
     from app import app
 
@@ -706,14 +705,13 @@ def test_all_owner_scoped_3d_routes_reject_unauthenticated_requests(printing_db,
     client = app.test_client()
 
     requests = [
-        ("post", "/api/3d/orders", {"title": "Unauthorized"}),
-        ("get", "/api/3d/orders/not-found", None),
-        ("patch", "/api/3d/orders/not-found/status", {"status": "accepted"}),
-        ("post", "/api/3d/orders/not-found/settle", {"actual_revenue": 1, "actual_cost": 1}),
-        ("get", "/api/3d/treasury/summary", None),
+        ("post", "/api/3d/orders", {"title": "Shared"}, 201),
+        ("get", "/api/3d/orders/not-found", None, 404),
+        ("patch", "/api/3d/orders/not-found/status", {"status": "accepted"}, 404),
+        ("post", "/api/3d/orders/not-found/settle", {"actual_revenue": 1, "actual_cost": 1}, 404),
+        ("get", "/api/3d/treasury/summary", None, 200),
     ]
 
-    for method, path, payload in requests:
+    for method, path, payload, expected_status in requests:
         response = getattr(client, method)(path, json=payload)
-        assert response.status_code == 401
-        assert response.get_json()["error"] == "authenticated owner identity is required"
+        assert response.status_code == expected_status

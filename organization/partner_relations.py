@@ -1,6 +1,6 @@
-"""Partner Relations Department: trusted-owner CRM, communications and follow-up tools.
+"""Partner Relations Department: shared local CRM, communications and follow-up tools.
 
-The module keeps partner data scoped to the authenticated Logos identity.
+All clients share the installation's partner records.
 External delivery is intentionally separated from preparation/history storage:
 the current implementation can prepare and queue approved outgoing messages,
 but it does not pretend to have an external transport when none is configured.
@@ -58,12 +58,7 @@ def _parse(value: Any, default: Any) -> Any:
 
 
 def _trusted_owner(cfg: Optional[dict[str, Any]] = None) -> str:
-    context = (cfg or {}).get("_universal_context") if isinstance(cfg, dict) else None
-    call = context.get("call") if isinstance(context, dict) else None
-    user_id = getattr(call, "user_id", None) if call is not None else None
-    if user_id and str(user_id).strip():
-        return str(user_id).strip()
-    return get_current_owner_id(required=True)
+    return get_current_owner_id()
 
 
 def _trace_event(cfg: Optional[dict[str, Any]], event_type: str, payload: dict[str, Any]) -> None:
@@ -370,10 +365,10 @@ def delete_contact(
     existing = _contact_for_owner(owner_id, contact_id)
     if not existing:
         raise ValueError("contact not found")
-    key = _key("contact", contact_id, owner_id)
+    key = _stored_key("contact", contact_id, owner_id)
     with get_store().transaction() as tx:
         row = tx.get(key)
-        if row is None or row["owner_id"] != owner_id:
+        if row is None:
             raise ValueError("contact not found")
         tx.delete(key)
     _trace_event(
@@ -1110,10 +1105,10 @@ def ensure_partner_department() -> None:
             "tools": sorted(PARTNER_TOOLS),
             "policies": {
                 "external_messages_require_approval": True,
-                "trusted_owner_required": True,
+                "trusted_owner_required": False,
             },
             "knowledge_scope": {
-                "owner_scoped": True,
+                "owner_scoped": False,
                 "reference_fields": ["reference_type", "reference_id"],
             },
             "session_config": {
@@ -1168,30 +1163,45 @@ def _migrate_owner_keys() -> None:
             tx.delete(old_key)
 
 
+def _stored_key(kind: str, identity: str, owner_id: str) -> str:
+    """Locate shared legacy records without rewriting their stored namespaces.
+
+    Prefer the installation's current namespace. Duplicate legacy identifiers
+    require disambiguation rather than silently changing a different record.
+    """
+    preferred = _key(kind, identity, owner_id)
+    store = get_store()
+    if store.get(preferred) is not None:
+        return preferred
+    matches = [
+        key for key, row in store.items(prefix="partners/" + kind + "/").items()
+        if row.get("id") == identity
+    ]
+    if len(matches) > 1:
+        raise ValueError("ambiguous shared record id")
+    return matches[0] if matches else preferred
+
+
 def _get_owned(kind: str, identity: str, owner_id: str) -> Optional[dict[str, Any]]:
-    row = get_store().get(_key(kind, identity, owner_id))
-    return (
-        {key: value for key, value in row.items() if key != "owner_id"}
-        if row and row["owner_id"] == owner_id
-        else None
-    )
+    row = get_store().get(_stored_key(kind, identity, owner_id))
+    return {key: value for key, value in row.items() if key != "owner_id"} if row else None
 
 
 def _owned_rows(kind: str, owner_id: str, partner_id: Optional[str] = None) -> list[dict[str, Any]]:
     return [
         row
-        for row in get_store().items(prefix=_owner_prefix(kind, owner_id)).values()
-        if row["owner_id"] == owner_id and (partner_id is None or row["partner_id"] == partner_id)
+        for row in get_store().items(prefix="partners/" + kind + "/").values()
+        if partner_id is None or row["partner_id"] == partner_id
     ]
 
 
 def _insert_owned(kind: str, identity: str, row: dict[str, Any]) -> None:
-    key = _key(kind, identity, row["owner_id"])
+    key = _stored_key(kind, identity, row["owner_id"])
     with get_store().transaction() as tx:
         if tx.get(key) is not None:
             raise ValueError("record already exists")
         if kind != "partner":
-            parent = tx.get(_key("partner", row["partner_id"], row["owner_id"]))
+            parent = tx.get(_stored_key("partner", row["partner_id"], row["owner_id"]))
             if parent is None:
                 raise ValueError("partner not found")
         tx.set(key, row)
@@ -1205,10 +1215,10 @@ def _update_owned(
     *,
     allowed_statuses: tuple[str, ...] = (),
 ) -> bool:
-    key = _key(kind, identity, owner_id)
+    key = _stored_key(kind, identity, owner_id)
     with get_store().transaction() as tx:
         row = tx.get(key)
-        if row is None or row["owner_id"] != owner_id:
+        if row is None:
             raise ValueError("record not found")
         if allowed_statuses and row["status"] not in allowed_statuses:
             return False

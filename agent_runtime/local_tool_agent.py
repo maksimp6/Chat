@@ -1,4 +1,4 @@
-"""Client/runtime for a protected Logos Local Tool Agent."""
+"""Client/runtime for the shared Logos Local Tool Agent gateway."""
 
 from __future__ import annotations
 
@@ -32,16 +32,12 @@ def _request(
     if payload is not None:
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         headers["Content-Type"] = "application/json"
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
 
     request = Request(url, data=body, headers=headers, method=method)
     try:
         with urlopen(request, timeout=timeout) as response:
             raw = response.read().decode("utf-8")
     except HTTPError as exc:
-        if exc.code in {401, 403}:
-            raise PermissionError(f"agent gateway authentication failed: HTTP {exc.code}") from exc
         raise RuntimeError(f"agent gateway HTTP error {exc.code}: {exc.reason}") from exc
     except (URLError, TimeoutError) as exc:
         raise ConnectionError(f"agent gateway unavailable: {exc}") from exc
@@ -56,24 +52,21 @@ def _request(
 
 def register_agent(
     gateway_url: str,
-    bootstrap_token: str,
+    bootstrap_token: str = "",
     *,
     agent_id: Optional[str] = None,
     name: str = "Logos Android Agent",
     capabilities: Optional[list[str]] = None,
     version: str = "1.0",
 ) -> str:
-    """Register an agent and return a newly issued runtime token as JSON."""
+    """Register an agent and return its descriptor as JSON. Legacy token arguments are ignored."""
     gateway_url = gateway_url.rstrip("/")
     if not gateway_url:
         raise ValueError("gateway_url is required")
-    if not bootstrap_token:
-        raise ValueError("bootstrap_token is required")
 
     data = _request(
         "POST",
         f"{gateway_url}/api/local-agents/register",
-        token=bootstrap_token,
         payload={
             "agent_id": agent_id,
             "name": name,
@@ -81,10 +74,10 @@ def register_agent(
             "capabilities": capabilities or [],
         },
     )
-    if not isinstance(data, Mapping) or not data.get("token") or not data.get("agent"):
+    if not isinstance(data, Mapping) or not data.get("agent"):
         raise RuntimeError("invalid agent registration response")
     return json.dumps(
-        {"token": str(data["token"]), "agent": data["agent"]},
+        {"agent": data["agent"]},
         ensure_ascii=False,
         separators=(",", ":"),
     )
@@ -97,14 +90,13 @@ class LocalToolAgent:
         self,
         gateway_url: str,
         agent_id: str,
-        token: str,
+        token: str = "",
         *,
         poll_interval: float = 2.0,
         stop_event: Optional[threading.Event] = None,
     ) -> None:
         self.gateway_url = gateway_url.rstrip("/")
         self.agent_id = agent_id
-        self.token = token
         self.poll_interval = max(0.5, float(poll_interval))
         self.stop_event = stop_event or threading.Event()
 
@@ -112,16 +104,13 @@ class LocalToolAgent:
         poll_url = f"{self.gateway_url}/api/local-agents/{self.agent_id}/poll"
         while not self.stop_event.is_set():
             try:
-                response = _request("GET", poll_url, token=self.token, timeout=20)
+                response = _request("GET", poll_url, timeout=20)
                 job = response.get("job") if isinstance(response, Mapping) else None
                 if not job:
                     delay = float(response.get("poll_after_seconds", self.poll_interval))
                     self.stop_event.wait(max(0.5, delay))
                     continue
                 self._run_with_lease(job)
-            except PermissionError:
-                logger.error("Local agent authorization failed; stopping")
-                return
             except (ConnectionError, RuntimeError) as exc:
                 logger.warning("Local agent gateway unavailable: %s", exc)
                 self.stop_event.wait(min(self.poll_interval * 2, 30.0))
@@ -143,8 +132,8 @@ class LocalToolAgent:
         heartbeat_url = f"{self.gateway_url}/api/local-agents/{self.agent_id}/heartbeat"
         while not stop.wait(_LEASE_RENEW_SECONDS):
             try:
-                _request("POST", heartbeat_url, token=self.token, timeout=10)
-            except (ConnectionError, PermissionError, RuntimeError) as exc:
+                _request("POST", heartbeat_url, timeout=10)
+            except (ConnectionError, RuntimeError) as exc:
                 logger.warning("Local agent lease renewal failed: %s", exc)
 
     def _execute_job(self, job: Mapping[str, Any]) -> None:
@@ -200,7 +189,6 @@ class LocalToolAgent:
         _request(
             "POST",
             (f"{self.gateway_url}/api/local-agents/{self.agent_id}/jobs/{job_id}/result"),
-            token=self.token,
             payload={"status": status, "result": dict(result)},
             timeout=20,
         )
@@ -208,7 +196,7 @@ class LocalToolAgent:
 
 def start_agent(
     gateway_url: str,
-    bootstrap_token: str,
+    bootstrap_token: str = "",
     *,
     agent_id: Optional[str] = None,
     name: str = "Logos Android Agent",
@@ -225,14 +213,12 @@ def start_agent(
             version=version,
         )
     )
-    agent_token = str(registration["token"])
     descriptor = registration["agent"]
     worker = LocalToolAgent(
         gateway_url,
         str(descriptor["id"]),
-        agent_token,
     )
-    return worker, agent_token
+    return worker, ""
 
 
 __all__ = ["LocalToolAgent", "register_agent", "start_agent"]

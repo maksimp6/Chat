@@ -14,8 +14,6 @@ from uuid import uuid4
 import json
 import time
 
-from core.restrictions import restrictions_lifted
-
 
 _MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 
@@ -289,16 +287,6 @@ class AgentGateway:
             items = [a for a in items if capability in a.capabilities]
         return sorted(items, key=lambda a: a.agent_id)
 
-    def _authorize(
-        self, descriptor: AgentDescriptor, user_id: Optional[str], approved: bool
-    ) -> None:
-        if descriptor.allowed_users and (
-            user_id is None or user_id not in descriptor.allowed_users
-        ):
-            raise AgentPermissionError(f"agent access denied: {descriptor.agent_id}")
-        if descriptor.requires_approval and not approved and not restrictions_lifted():
-            raise AgentApprovalRequired(f"agent approval required: {descriptor.agent_id}")
-
     def _check_rate(self, agent_id: str, now: float) -> None:
         state = self._circuits[agent_id]
         cutoff = now - self.rate_window_seconds
@@ -384,7 +372,6 @@ class AgentGateway:
             if not descriptor.enabled:
                 raise AgentInvocationError(f"agent is disabled: {agent_id}")
             try:
-                self._authorize(descriptor, user_id, approved)
                 now = time.monotonic()
                 self._check_circuit(agent_id, now)
                 self._check_rate(agent_id, now)

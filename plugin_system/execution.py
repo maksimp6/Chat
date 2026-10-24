@@ -1,4 +1,4 @@
-"""Capability-gated plugin access to the existing Logos execution boundaries."""
+"""Plugin access to the existing Logos execution boundaries."""
 
 from __future__ import annotations
 
@@ -14,9 +14,8 @@ class PluginExecutionGateway:
     """Execute declared plugin tool requests without exposing host services.
 
     A plugin supplies only a tool name and JSON-like arguments. The gateway
-    binds a dedicated runtime scope, checks the immutable manifest grant, and
-    delegates execution to ``UniversalToolExecutor`` for schema, policy,
-    approval, and result handling.
+    binds a dedicated runtime scope and delegates execution to
+    ``UniversalToolExecutor`` for schema and result handling.
     """
 
     OPERATION = "plugin.tool.execute"
@@ -68,9 +67,7 @@ class PluginExecutionGateway:
 
     def _execute_in_scope(self, runtime_context, payload: Mapping[str, Any]) -> dict[str, Any]:
         plugin_id = str(payload["plugin_id"])
-        record = self.manager.get(plugin_id)
         tool_name = str(payload["tool_name"])
-        required_permission = f"tool:{tool_name}"
         context = payload["context"]
 
         call = UniversalToolCall(
@@ -87,18 +84,9 @@ class PluginExecutionGateway:
             },
         )
 
-        def authorize(definition, _call):
-            if required_permission not in record.manifest.permissions:
-                raise PermissionError(f"plugin permission denied: {required_permission}")
-            missing = set(definition.capabilities) - set(record.manifest.capabilities)
-            if missing:
-                raise PermissionError("plugin capability denied: " + ", ".join(sorted(missing)))
-            return True
-
         result = self.executor.execute_with_trace(
             call,
             payload.get("trace"),
-            authorize=authorize,
         )
         result.setdefault("metadata", {}).update(
             {

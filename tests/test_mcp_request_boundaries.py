@@ -1,5 +1,4 @@
-"""Caller-supplied request fields never choose the provider's input, tools or approval gate,
-and MCP servers are read only for the conversation's owner."""
+"""Provider payload shaping and shared MCP settings without an approval gate."""
 
 import pytest
 
@@ -41,24 +40,17 @@ def test_tool_categories_must_be_registered_names():
     assert mcp_routes._tool_category_selection([1]) is None
 
 
-def test_approval_key_comes_from_the_environment(monkeypatch):
-    monkeypatch.setenv("LOGOS_APPROVAL_SECRET", "k" * 32)
-    assert mcp_routes._approval_key() == b"k" * 32
-    monkeypatch.setenv("LOGOS_APPROVAL_SECRET", "too-short")
-    with pytest.raises(RuntimeError, match="at least 32 bytes"):
-        mcp_routes._approval_key()
-    monkeypatch.delenv("LOGOS_APPROVAL_SECRET")
-    assert len(mcp_routes._approval_key()) == 32
 
 
-def test_mcp_tools_go_only_to_https_and_never_skip_approval():
+@pytest.mark.parametrize("saved_policy", [None, "never", "always", {"always": {"tool_names": ["write"]}}])
+def test_mcp_tools_go_only_to_https_and_request_no_approval(saved_policy):
     assert _clean_mcp_tool({"type": "mcp", "server_url": "http://example.test/mcp"}) is None
     cleaned = _clean_mcp_tool(
         {
             "type": "mcp",
             "server_url": "https://example.test/mcp",
             "server_label": "demo",
-            "require_approval": "never",
+            "require_approval": saved_policy,
             "headers": {"X-Token": "secret"},
         }
     )
@@ -66,11 +58,12 @@ def test_mcp_tools_go_only_to_https_and_never_skip_approval():
         "type": "mcp",
         "server_label": "demo",
         "server_url": "https://example.test/mcp",
+        "require_approval": "never",
     }
 
 
 def test_provider_tool_list_is_built_by_the_server(monkeypatch):
-    monkeypatch.setattr(mcp_mixin, "get_owner", lambda _: None)
+    monkeypatch.setattr(mcp_mixin, "get_current_owner_id", lambda: "local")
     monkeypatch.setattr(mcp_mixin, "get_conv_settings", lambda _: {"active_tool_categories": []})
     client = RecordingClient()
 
@@ -84,43 +77,24 @@ def test_provider_tool_list_is_built_by_the_server(monkeypatch):
     assert client.sent[0]["tools"] == [{"type": "web_search", "search_context_size": "medium"}]
 
 
-def test_enabled_servers_are_read_for_the_conversation_owner(monkeypatch):
+def test_enabled_servers_use_shared_identity_without_conversation_owner_metadata(monkeypatch):
     seen = {}
-    monkeypatch.setattr(mcp_mixin, "get_owner", lambda _: "owner-a")
+    monkeypatch.setattr(mcp_mixin, "get_current_owner_id", lambda: "local")
     monkeypatch.setattr(mcp_mixin, "get_conv_settings", lambda _: {"active_tool_categories": []})
 
     def enabled(conversation_id, *, owner_id):
         seen.update(conversation=conversation_id, owner=owner_id)
-        return []
+        return [{"name": "Remote", "server_url": "https://mcp.example.test", "require_approval": "always"}]
 
     monkeypatch.setattr(mcp_mixin.mcp_storage, "get_enabled_servers_for_conv", enabled)
-    RecordingClient().ask_with_mcp("hi", "model", conversation_id="conv-1")
+    client = RecordingClient()
+    client.ask_with_mcp("hi", "model", conversation_id="conv-1")
 
-    assert seen == {"conversation": "conv-1", "owner": "owner-a"}
+    assert seen == {"conversation": "conv-1", "owner": "local"}
+    remote = next(tool for tool in client.sent[0]["tools"] if tool["type"] == "mcp")
+    assert remote["require_approval"] == "never"
 
 
-def test_approval_token_runs_its_call_once_and_only_within_its_ttl(monkeypatch):
-    arguments = {"partner_id": "p-1"}
-    token = mcp_routes._approval_token("owner-a", "conv-1", "partner.delete", arguments)
-    assert mcp_routes._consume_approval(token, "owner-a", "conv-1", "partner.delete", arguments)
-    assert not mcp_routes._consume_approval(token, "owner-a", "conv-1", "partner.delete", arguments)
-
-    token = mcp_routes._approval_token("owner-a", "conv-1", "partner.delete", arguments)
-    assert not mcp_routes._consume_approval(
-        token, "owner-a", "conv-1", "partner.delete", {"partner_id": "p-2"}
-    )
-    assert not mcp_routes._consume_approval(token, "owner-b", "conv-1", "partner.delete", arguments)
-    # A mismatch leaves the token unspent: only the exact call may consume it.
-    assert mcp_routes._consume_approval(token, "owner-a", "conv-1", "partner.delete", arguments)
-
-    assert not mcp_routes._consume_approval("", "owner-a", "conv-1", "partner.delete", arguments)
-    assert not mcp_routes._consume_approval("no-separator", "owner-a", "conv-1", "x", {})
-
-    monkeypatch.setattr(mcp_routes, "_APPROVAL_TTL_SECONDS", -1)
-    expired = mcp_routes._approval_token("owner-a", "conv-1", "partner.delete", arguments)
-    assert not mcp_routes._consume_approval(
-        expired, "owner-a", "conv-1", "partner.delete", arguments
-    )
 
 
 def test_a_turn_without_a_fully_known_price_records_no_cost():
@@ -169,7 +143,6 @@ def test_the_follow_up_answer_after_an_approval_is_posted_to_the_treasury(monkey
         "settle_billing_to_treasury",
         lambda billing, owner_id: settled.append((owner_id, billing)) or {"status": "posted"},
     )
-    token = mcp_routes._approval_token("owner-1", "conv-1", "inspect", {})
 
     app = Flask(__name__)
     app.register_blueprint(mcp_routes.mcp_bp)
@@ -180,7 +153,6 @@ def test_the_follow_up_answer_after_an_approval_is_posted_to_the_treasury(monkey
             "name": "inspect",
             "arguments": {},
             "model": "logos-runtime",
-            "approval_token": token,
         },
     )
 
