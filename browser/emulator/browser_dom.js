@@ -193,6 +193,19 @@ class ElementShim extends EventTargetShim {
     if (this.parentNode) this.parentNode.removeChild(this);
   }
 
+  insertAdjacentElement(position, element) {
+    if (position !== "beforebegin") {
+      throw new Error("insertAdjacentElement: position is not supported by the emulator: " + position);
+    }
+    const parent = this.parentNode;
+    if (!parent) return null;
+    if (element.parentNode) element.parentNode.removeChild(element);
+    element.parentNode = parent;
+    element.ownerDocument = parent.ownerDocument || element.ownerDocument;
+    parent.children.splice(parent.children.indexOf(this), 0, element);
+    return element;
+  }
+
   replaceWith(replacement) {
     if (!this.parentNode) return;
     const parent = this.parentNode;
@@ -285,6 +298,11 @@ class DocumentShim extends ElementShim {
   }
   get documentElement() {
     return this.body.querySelector("html") || this.body;
+  }
+  get head() {
+    // Every browser document has a head; the shim keeps one detached until a test needs it.
+    if (!this._head) this._head = this.createElement("head");
+    return this._head;
   }
 }
 

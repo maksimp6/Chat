@@ -660,29 +660,67 @@ def conv_tools(conv_id):
     return jsonify({"active_tool_categories": cats})
 
 
+# MCP servers are deployment-wide, so only the authenticated owner may read or change them.
+# Stored credentials never go back to the browser: an empty value on update means "unchanged".
+_MCP_SECRET_FIELDS = ("authorization", "headers")
+
+
+def _mcp_owner_denied():
+    try:
+        get_current_owner_id()
+    except TreasuryIdentityError as exc:
+        return jsonify({"error": str(exc)}), 401
+    return None
+
+
+def _without_secrets(record):
+    public = dict(record)
+    for field in _MCP_SECRET_FIELDS:
+        public["has_" + field] = bool(public.pop(field, ""))
+    return public
+
+
+def _update_payload():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return None
+    for field in _MCP_SECRET_FIELDS:
+        if not data.get(field):
+            data.pop(field, None)
+    return data
+
+
 @mcp_bp.route("/api/mcp-servers", methods=["GET", "POST"])
 def handle_mcp_servers():
+    denied = _mcp_owner_denied()
+    if denied:
+        return denied
     if request.method == "POST":
-        data = request.get_json(silent=True) or {}
+        data = _update_payload() or {}
         sid = mcp_storage.create_server(data)
         return jsonify({"status": "ok", "id": sid}), 201
-    return jsonify({"data": mcp_storage.list_servers()})
+    return jsonify({"data": [_without_secrets(srv) for srv in mcp_storage.list_servers()]})
 
 
 @mcp_bp.route("/api/mcp-servers/<server_id>", methods=["GET", "PUT", "DELETE"])
 def handle_mcp_server_item(server_id):
+    denied = _mcp_owner_denied()
+    if denied:
+        return denied
     if request.method == "DELETE":
         mcp_storage.delete_server(server_id)
         return jsonify({"status": "deleted"})
     if request.method == "PUT":
-        data = request.get_json(silent=True) or {}
+        data = _update_payload()
+        if data is None:
+            return jsonify({"error": "JSON object is required"}), 400
         mcp_storage.update_server(server_id, data)
         return jsonify({"status": "updated"})
 
     srv = mcp_storage.get_server(server_id)
     if not srv:
         return jsonify({"error": "Сервер не найден"}), 404
-    return jsonify(srv)
+    return jsonify(_without_secrets(srv))
 
 
 @mcp_bp.route("/api/conversations", methods=["GET", "POST"])

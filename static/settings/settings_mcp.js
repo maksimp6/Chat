@@ -167,7 +167,8 @@
           var sid = this.getAttribute("data-id");
           if (!confirm("Удалить MCP сервер?")) return;
           window.LogosDispatcher.request("/api/mcp-servers/" + sid, { method: "DELETE" })
-            .then(function () {
+            .then(function (r) {
+              if (!r.ok) throw new Error("HTTP " + r.status);
               refreshList();
             })
             .catch(function (e) {
@@ -187,6 +188,9 @@
       if (editorEl) editorEl.remove();
       var isNew = !srv;
       srv = srv || {};
+
+      // Stored secrets are not sent to the browser; the field only says that one is saved.
+      var SAVED_HINT = "сохранён — оставьте пустым, чтобы не менять";
 
       var CONNECTOR_CHOICES = [
         ["", "(нет — использовать server_url)"],
@@ -244,7 +248,14 @@
             "</div>",
           "<div>" +
             UI.lbl("Authorization") +
-            UI.inp("mcp-ed-auth", "password", srv.authorization || "", ' style="width:100%;"') +
+            UI.inp(
+              "mcp-ed-auth",
+              "password",
+              "",
+              ' style="width:100%;" placeholder="' +
+                UI.escapeHtml(srv.has_authorization ? SAVED_HINT : "") +
+                '"',
+            ) +
             "</div>",
         ) +
         '<div style="margin-bottom:8px;">' +
@@ -253,9 +264,9 @@
         "</div>" +
         '<div style="margin-bottom:8px;">' +
         UI.lbl("Headers (JSON)") +
-        '<textarea id="mcp-ed-headers" style="width:100%;min-height:40px;font-family:monospace;font-size:11px;padding:6px;border:1px solid var(--m-border,#ddd);border-radius:4px;background:var(--m-input-bg,#f5f5f5);color:var(--m-input-text,#222);box-sizing:border-box;" placeholder=\'{"X-Key":"val"}\'>' +
-        UI.escapeHtml(srv.headers || "") +
-        "</textarea></div>" +
+        '<textarea id="mcp-ed-headers" style="width:100%;min-height:40px;font-family:monospace;font-size:11px;padding:6px;border:1px solid var(--m-border,#ddd);border-radius:4px;background:var(--m-input-bg,#f5f5f5);color:var(--m-input-text,#222);box-sizing:border-box;" placeholder="' +
+        UI.escapeHtml(srv.has_headers ? SAVED_HINT : '{"X-Key":"val"}') +
+        '"></textarea></div>' +
         '<div style="margin-bottom:8px;">' +
         UI.lbl("Allowed Tools") +
         UI.inp("mcp-ed-allowed", "text", srv.allowed_tools || "", ' style="width:100%;"') +
@@ -326,6 +337,7 @@
       });
 
       document.getElementById("mcp-ed-save").addEventListener("click", function () {
+        var saveBtn = this;
         var payload = {
           name: document.getElementById("mcp-ed-name").value.trim(),
           connector_id: document.getElementById("mcp-ed-connector").value,
@@ -345,12 +357,16 @@
           require_approval_never_read_only: document.getElementById("mcp-ed-appr-never-ro").checked,
           defer_loading: document.getElementById("mcp-ed-defer").checked,
         };
+        // An empty secret field keeps the stored value, so it is not sent at all.
+        if (!payload.authorization) delete payload.authorization;
+        if (!payload.headers) delete payload.headers;
         if (!payload.name || (!payload.server_url && !payload.connector_id)) {
           alert("Заполните название и URL/Connector");
           return;
         }
         var method = isNew ? "POST" : "PUT";
         var url = isNew ? "/api/mcp-servers" : "/api/mcp-servers/" + srv.id;
+        saveBtn.disabled = true;
         window.LogosDispatcher.request(url, {
           method: method,
           headers: { "Content-Type": "application/json" },
@@ -366,6 +382,7 @@
             refreshList();
           })
           .catch(function (e) {
+            saveBtn.disabled = false;
             alert("Ошибка: " + e.message);
           });
       });
