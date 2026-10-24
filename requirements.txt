@@ -8,4 +8,4 @@ cryptography==50.0.1
 
 # Keel Platform config management (reads YAML at deployment time)
 PyYAML>=6.0
-jsonschema>=4.26.0
+-r contracts/yandex/requirements.txt

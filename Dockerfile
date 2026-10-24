@@ -20,6 +20,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY requirements.txt ./
+COPY contracts/yandex/requirements.txt ./contracts/yandex/requirements.txt
 RUN apt-get update \
     && apt-get install -y --no-install-recommends adduser openssh-client coreutils \
     && rm -rf /var/lib/apt/lists/* \

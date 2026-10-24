@@ -30,6 +30,10 @@ import sys
 import urllib.request
 from collections import Counter
 
+if __package__ in {None, ""}:
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
 REPO = os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat")
 API = f"https://api.github.com/repos/{REPO}"
 LABEL_SOURCE = "rag-source"
@@ -225,6 +229,8 @@ class BM25Index:
 
 
 def yandex_embeddings(texts: list[str]) -> list[list[float]] | None:
+    from api.yandex_transport import yandex_urlopen
+
     key = os.environ.get("YANDEX_API_KEY")
     project = os.environ.get("YANDEX_PROJECT_ID")
     if not key or not project:
@@ -241,7 +247,7 @@ def yandex_embeddings(texts: list[str]) -> list[list[float]] | None:
                 "Content-Type": "application/json",
             },
         )
-        with urllib.request.urlopen(req, timeout=30) as r:
+        with yandex_urlopen(req, timeout=30) as r:
             data = json.load(r)
         out.append(data["embedding"])
     return out

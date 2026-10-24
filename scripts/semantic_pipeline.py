@@ -396,6 +396,8 @@ def yandex_call(
     instructions: str | None = None,
 ) -> dict:
     """One bounded sync call; fixed destination, no retries, no redirects."""
+    from api.yandex_transport import yandex_connection_request
+
     enforce_native_launch_hold()
     response_schema = response_schema or MODEL_RESPONSE_SCHEMA
     instructions = instructions or INSTRUCTIONS
@@ -425,7 +427,7 @@ def yandex_call(
         "OpenAI-Project": project,
     }
     try:
-        conn.request("POST", "/v1/responses", body=body, headers=headers)
+        yandex_connection_request(conn, HOST, "POST", "/v1/responses", body=body, headers=headers)
         resp = conn.getresponse()
         raw = resp.read(MAX_RESPONSE_BYTES + 1)
         if resp.status != 200:
@@ -1242,6 +1244,8 @@ def yandex_api_request(
     max_response_bytes: int = MAX_VECTOR_RESPONSE_BYTES,
 ) -> bytes:
     """Make one fixed-host Yandex Files/Vector Stores request without retry or redirect."""
+    from api.yandex_transport import yandex_connection_request
+
     conn = http.client.HTTPSConnection(HOST, timeout=90)
     headers = {
         "Authorization": f"Api-Key {key}",
@@ -1252,7 +1256,7 @@ def yandex_api_request(
     if body is not None:
         headers["Content-Type"] = content_type
     try:
-        conn.request(method, "/v1" + path, body=body, headers=headers)
+        yandex_connection_request(conn, HOST, method, "/v1" + path, body=body, headers=headers)
         response = conn.getresponse()
         raw = response.read(max_response_bytes + 1)
         if len(raw) > max_response_bytes:

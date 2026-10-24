@@ -132,6 +132,11 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
+      - name: Install Yandex API contract validator
+        id: yandex_contract_dependencies
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
+        run: python -m pip install -r contracts/yandex/requirements.txt
       - name: Prepare PDF text extraction
         id: policy_step_05
         if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') && (inputs.mode == 'repository') }}
@@ -299,6 +304,11 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
+      - name: Install Yandex API contract validator
+        id: yandex_contract_dependencies
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
+        run: python -m pip install -r contracts/yandex/requirements.txt
       - name: Enforce model-backed court hold
         id: policy_step_03
         continue-on-error: true
@@ -444,6 +454,11 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
+      - name: Install Yandex API contract validator
+        id: yandex_contract_dependencies
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
+        run: python -m pip install -r contracts/yandex/requirements.txt
       - name: Upload the complete task snapshot and search it once
         id: policy_step_03
         continue-on-error: true
@@ -541,6 +556,11 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
+      - name: Install Yandex API contract validator
+        id: yandex_contract_dependencies
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
+        run: python -m pip install -r contracts/yandex/requirements.txt
       - name: Enforce model-backed court hold
         id: policy_step_03
         continue-on-error: true

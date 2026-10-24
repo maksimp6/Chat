@@ -1,4 +1,5 @@
 import requests
+from api.yandex_transport import yandex_request
 import json
 import os
 from datetime import datetime
@@ -35,8 +36,13 @@ def send_logs():
     }
     headers = {"Authorization": "Bearer YOUR_API_KEY", "Content-Type": "application/json"}
     try:
-        response = requests.post(
-            "https://api.yandex-ai-studio.ru/v1/logs", json=data, headers=headers, timeout=30
+        response = yandex_request(
+            requests.post,
+            "POST",
+            "https://api.yandex-ai-studio.ru/v1/logs",
+            json=data,
+            headers=headers,
+            timeout=30,
         )
         print(f"Status: {response.status_code}")
         print(f"Response: {response.text}")

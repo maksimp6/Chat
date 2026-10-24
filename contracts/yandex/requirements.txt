@@ -1,0 +1,2 @@
+# Shared by the application and standalone Yandex API runners.
+jsonschema>=4.26.0

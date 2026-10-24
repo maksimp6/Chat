@@ -1,6 +1,7 @@
 from observability.system_log import get_logger
 import uuid
 import requests
+from api.yandex_transport import yandex_request
 
 from yandex_client_modules.errors import YandexClientError
 
@@ -17,7 +18,14 @@ class YandexConversationMixin:
 
             self._log_request("POST", self.conversations_url, json={})
             resp = self._log_response(
-                self.session.post(self.conversations_url, json={}, timeout=10)
+                yandex_request(
+                    self.session.post,
+                    "POST",
+                    self.conversations_url,
+                    base_url=self.base_url,
+                    json={},
+                    timeout=10,
+                )
             )
             resp.raise_for_status()
             data = resp.json()

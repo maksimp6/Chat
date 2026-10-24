@@ -369,9 +369,7 @@ def test_yandex_http_error_omits_response_body_and_dynamic_ids(monkeypatch):
     monkeypatch.setattr(pipeline.http.client, "HTTPSConnection", Connection)
 
     with pytest.raises(pipeline.YandexHTTPError) as raised:
-        pipeline.yandex_api_request(
-            "GET", "/files/private-file-id/content?cursor=private-cursor", "project", "key"
-        )
+        pipeline.yandex_api_request("GET", "/files/private-file-id/content", "project", "key")
 
     assert pipeline.technical_error_code(raised.value) == (
         "HTTP_400 method=GET path=/files/{file_id}/content"

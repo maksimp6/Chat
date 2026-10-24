@@ -9,6 +9,7 @@ import time
 from typing import Any
 
 import requests
+from api.yandex_transport import yandex_request
 
 from core.config import TEXT_MODELS, VOICE_MODELS, registry_key_for_upstream
 
@@ -66,8 +67,11 @@ class ModelDiscovery:
         if not self.api_key:
             raise ModelDiscoveryError("provider credential is not configured")
 
-        response = self.session.get(
+        response = yandex_request(
+            self.session.get,
+            "GET",
             f"{self.base_url}/models",
+            base_url=self.base_url,
             headers={"Authorization": "Api-Key " + self.api_key},
             timeout=self.timeout_seconds,
         )

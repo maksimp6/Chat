@@ -2,6 +2,8 @@
 
 import json
 import time
+from api.contracts import ContractViolation
+from api.yandex_transport import yandex_request
 
 
 def wait_for_response(
@@ -27,7 +29,15 @@ def wait_for_response(
         poll_start = time.time()
         try:
             log_request("GET", url)
-            resp = log_response(session.get(url, timeout=15))
+            resp = log_response(
+                yandex_request(
+                    session.get,
+                    "GET",
+                    url,
+                    base_url=responses_url.rsplit("/responses", 1)[0],
+                    timeout=15,
+                )
+            )
             if resp.status_code == 404:
                 if execution_trace is not None:
                     execution_trace.add_event(
@@ -43,6 +53,8 @@ def wait_for_response(
                 continue
             resp.raise_for_status()
             data = resp.json()
+        except ContractViolation:
+            raise
         except error_cls:
             raise
         except (OSError, ValueError) as exc:

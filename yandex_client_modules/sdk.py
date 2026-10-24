@@ -3,6 +3,7 @@ sdk.py - Минимальный SDK для работы с Yandex AI Studio
 """
 
 import requests
+from api.yandex_transport import yandex_request
 import json
 
 from core.config import upstream_model_id
@@ -27,8 +28,12 @@ class AliceSDK:
 
     def create_conversation(self):
         """Создать новый диалог"""
-        resp = self.session.post(
-            f"{self.base_url}/conversations", json={"metadata": {}, "items": []}
+        resp = yandex_request(
+            self.session.post,
+            "POST",
+            f"{self.base_url}/conversations",
+            base_url=self.base_url,
+            json={"metadata": {}, "items": []},
         )
         resp.raise_for_status()
         return resp.json()
@@ -42,13 +47,21 @@ class AliceSDK:
             "background": True,
             "conversation": conv_id,
         }
-        resp = self.session.post(f"{self.base_url}/responses", json=payload)
+        resp = yandex_request(
+            self.session.post,
+            "POST",
+            f"{self.base_url}/responses",
+            base_url=self.base_url,
+            json=payload,
+        )
         resp.raise_for_status()
         return resp.json()
 
     def list_models(self):
         """Получить список доступных моделей"""
-        resp = self.session.get(f"{self.base_url}/models")
+        resp = yandex_request(
+            self.session.get, "GET", f"{self.base_url}/models", base_url=self.base_url
+        )
         resp.raise_for_status()
         return resp.json()
 

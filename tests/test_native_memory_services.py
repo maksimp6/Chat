@@ -101,6 +101,8 @@ def test_extraction_only_commits_valid_provider_result(answer, monkeypatch):
 
     def respond(*args, **kwargs):
         assert kwargs["timeout"] == 30
+        assert "responseFormat" not in kwargs["json"]["completionOptions"]
+        assert kwargs["json"]["jsonSchema"]["schema"] == extractor.MEMORY_SCHEMA
         if answer == "network-error":
             raise requests.RequestException("offline")
         text = {"bad-json": "{", "wrong-shape": '{"facts": {}}'}.get(

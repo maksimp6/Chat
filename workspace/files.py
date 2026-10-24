@@ -4,6 +4,8 @@ import json
 import time
 import requests
 import logging
+from functools import partial
+from api.yandex_transport import yandex_request, validate_yandex_request
 
 api_logger = logging.getLogger("yandex_api_debug")
 
@@ -17,6 +19,16 @@ class YandexFileManagerMixin:
     def _fm_request(self, method, url, **kwargs):
         """Запрос с retry + логирование через _log_request/_log_response.
         Для multipart убирает Content-Type из заголовков сессии."""
+        validate_yandex_request(
+            method,
+            url,
+            base_url=self.base_url,
+            json_body=kwargs.get("json"),
+            params=kwargs.get("params"),
+            data=kwargs.get("data"),
+            files=kwargs.get("files"),
+            headers=kwargs.get("headers"),
+        )
         _resolve_global_provider_credential(self)
         restore_ct = None
         if kwargs.get("files") and "Content-Type" in self.session.headers:
@@ -30,7 +42,14 @@ class YandexFileManagerMixin:
             if delay > 0:
                 time.sleep(delay)
             try:
-                resp = self.session.request(method, url, timeout=30, **kwargs)
+                resp = yandex_request(
+                    partial(self.session.request, method),
+                    method,
+                    url,
+                    base_url=self.base_url,
+                    timeout=30,
+                    **kwargs,
+                )
                 self._log_response(resp)
                 if restore_ct is not None:
                     self.session.headers["Content-Type"] = restore_ct
