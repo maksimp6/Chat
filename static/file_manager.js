@@ -70,13 +70,13 @@ window.fetchVectorStores = function () {
       '<div class="file-manager-toolbar">',
       '    <div class="file-manager-toolbar-actions">',
       '        <input type="file" id="file-upload" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none" multiple>',
-      '        <label for="file-upload" style="cursor:pointer;padding:8px 16px;background:#1f6feb;color:#fff;border-radius:6px;font-size:13px;">Загрузить файлы</label>',
+      '        <label for="file-upload" style="display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;cursor:pointer;padding:8px 16px;background:#1f6feb;color:#fff;border-radius:6px;font-size:13px;">Загрузить файлы</label>',
       "    </div>",
       "</div>",
       // === Секция Vector Stores ===
       '<div style="margin-bottom:20px;padding:16px;border:1px solid var(--m-section-border,#eee);border-radius:8px;background:var(--m-editor,#f8f9fa);">',
       '    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">',
-      '        <h3 style="margin:0;font-size:15px;color:var(--m-text,#222);">Vector Stores</h3>',
+      '        <h3 style="margin:0;font-size:15px;color:var(--m-text,#222);">Векторные хранилища</h3>',
       '        <div style="display:flex;gap:8px;">',
       '            <input id="vs-name-input" type="text" placeholder="Название..." style="padding:6px 10px;border:1px solid var(--m-border,#ddd);border-radius:4px;font-size:12px;background:var(--m-input-bg,#fff);color:var(--m-text,#222);width:160px;">',
       '            <button id="btn-create-vs" type="button" class="logos-btn file-manager-vs-create-btn">+ Создать</button>',
@@ -250,10 +250,11 @@ window.fetchVectorStores = function () {
             error && error.message ? error.message : "Не удалось загрузить Vector Stores.";
           cont.innerHTML =
             '<div style="padding:12px;color:var(--m-danger,#c33);font-size:12px;">' +
-            '<div style="font-weight:600;margin-bottom:6px;">Не удалось загрузить Vector Stores</div>' +
+            '<div style="font-weight:600;margin-bottom:6px;">Не удалось загрузить векторные хранилища</div>' +
             '<div style="margin-bottom:8px;word-break:break-word;">' +
             window.SettingsUI.escapeHtml(message) +
             "</div>" +
+            '<div style="margin-bottom:8px;color:var(--m-muted,#666);">Проверьте ключ провайдера и доступ к векторным хранилищам в настройках.</div>' +
             '<button class="logos-btn file-manager-vs-refresh-btn" id="btn-retry-vs">Повторить</button>' +
             "</div>";
           var retry = document.getElementById("btn-retry-vs");

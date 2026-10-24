@@ -164,7 +164,8 @@ def _login_page_response():
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         '<title>Logos</title></head><body style="font-family:sans-serif;'
         'display:flex;min-height:90vh;align-items:center;justify-content:center">'
-        f'<a href="{login_path()}" style="font-size:1.2em">Войти через GitHub</a>'
+        f'<a href="{login_path()}" style="font-size:1.2em;display:inline-block;min-height:44px;'
+        'padding:12px 16px;box-sizing:border-box">Войти через GitHub</a>'
         "</body></html>"
     )
     return html, 401, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"}

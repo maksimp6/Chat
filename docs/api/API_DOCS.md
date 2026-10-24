@@ -41,18 +41,25 @@ curl -X POST http://localhost:8080/api/vision \
 ### 3. Embeddings API (Векторные представления)
 
 **Эндпоинт:** `POST /api/embeddings`
-**Описание:** Получение векторного представления текста для семантического поиска
+**Описание:** Векторные представления текста через Yandex `textEmbedding`. Нужен владелец: без него ответ 401.
 **Параметры:**
 
-- `text` (string, required): Текст для векторизации
+- `text` (string): один текст. Ответ содержит `embedding`.
+- `texts` (array of string): пакет до 64 текстов. Ответ содержит `embeddings`. Нельзя передавать `text` и `texts` вместе.
+- `model` (необязательно): одна из `text-search-doc`, `text-search-query`, `text-embeddings-v2-doc`, `text-embeddings-v2-query`. Если не задана, выбирается по `mode`.
+- `mode` (`doc` или `query`, по умолчанию `doc`): используется, только когда `model` не задана. `doc` — `text-search-doc`, `query` — `text-search-query`.
+
+Каждый текст не длиннее 4000 символов (лимит токенов у Yandex в документации противоречив, см. `config/model_profiles/yandex-ultra-profiles.json`). Ответ также содержит `model`, `tokens` и `cost`. Стоимость считается по `EMBEDDING_PRICE_PER_1K_TOKENS`, если эта переменная задана; иначе `cost` показывает «неизвестно».
 
 **Пример:**
 
 ```bash
 curl -X POST http://localhost:8080/api/embeddings \
   -H "Content-Type: application/json" \
-  -d '{"text":"Привет мир"}'
+  -d '{"texts":["Привет мир"],"mode":"doc"}'
 ```
+
+Коды ответа: 400 — неверный запрос, 401 — нет владельца, 503 — не заданы `YANDEX_API_KEY` или `YANDEX_PROJECT_ID`, 502 — сбой Yandex.
 
 ### 4. TTS API (Синтез речи)
 

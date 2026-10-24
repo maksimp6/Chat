@@ -25,6 +25,13 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def _reply(self, text, status=200):
+        # Plain-text answers get a minimal page with a viewport, so they are not drawn at desktop size.
+        if not text.startswith("<"):
+            text = (
+                "<!doctype html><html lang=ru><meta charset=utf-8>"
+                "<meta name=viewport content=\"width=device-width,initial-scale=1\">"
+                "<body style='font:20px system-ui;padding:20px'>" + html.escape(text) + "</body></html>"
+            )
         data = text.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -48,9 +55,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if not self.allowed() or self.path not in ("/", "/pair/" + SESSION):
-            return self._reply("Not available", 404)
+            return self._reply("Страница недоступна", 404)
         self._reply("""<!doctype html><html lang=ru><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>A1 mini — камера</title>
-<style>body{font:18px system-ui;background:#171c1a;color:#f3f8f5;max-width:480px;margin:35px auto;padding:20px}input,button{box-sizing:border-box;width:100%;font:22px system-ui;padding:15px;margin:12px 0;border-radius:12px}button{background:#29bd75;border:0;color:#071610;font-weight:700}small{color:#adbfb4}</style>
+<style>body{font:18px system-ui;background:#171c1a;color:#f3f8f5;color-scheme:dark;max-width:480px;margin:35px auto;padding:20px}input,button{box-sizing:border-box;width:100%;font:22px system-ui;padding:15px;margin:12px 0;border-radius:12px}button{background:#29bd75;border:0;color:#071610;font-weight:700}small{color:#adbfb4}input{background:#222b27;color:#f3f8f5;border:1px solid #5d6f64}input::placeholder{color:#9fb3a7}</style>
 <h2>📷 Камера A1 mini</h2><p>Введи 8 символов Access Code с экрана принтера (буквы и цифры). Буфер обмена не нужен.</p>
 <form method=post action="/"><input type=password name=code inputmode=text autocapitalize=characters spellcheck=false minlength=8 maxlength=8 autocomplete=off required placeholder="Access Code"><button>Подключить камеру</button></form>
 <small>Один раз · только домашняя сеть · код сохраняется локально на Redmi 9. Эта временная страница работает по HTTP, без шифрования; используй только доверенную Wi-Fi-сеть.</small></html>""")
@@ -58,17 +65,17 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         global TRIES
         if not self.allowed() or self.path not in ("/", "/pair/" + SESSION) or TRIES >= 3:
-            return self._reply("Expired or unavailable", 403)
+            return self._reply("Ссылка устарела или недоступна", 403)
         if (
             self.headers.get("Content-Type", "").split(";")[0]
             != "application/x-www-form-urlencoded"
         ):
-            return self._reply("Invalid request", 415)
+            return self._reply("Некорректный запрос", 415)
         from urllib.parse import parse_qs
 
         n = int(self.headers.get("Content-Length", "0"))
         if n <= 0 or n > 200:
-            return self._reply("Invalid size", 400)
+            return self._reply("Некорректный размер данных", 400)
         raw = self.rfile.read(n).decode("ascii", errors="replace")
         code = parse_qs(raw).get("code", [""])[0]
         TRIES += 1
@@ -81,14 +88,12 @@ class Handler(BaseHTTPRequestHandler):
             length = snapshot("192.168.31.12", OUTPUT, CODE_FILE, PIN_FILE)
             print("CAMERA_SNAPSHOT_OK bytes=" + str(length), flush=True)
             self._reply(
-                "<html lang=ru><meta name=viewport content='width=device-width'><body style='font:22px system-ui;padding:20px'>✅ Камера подключена, первый кадр сохранён на Redmi 9. Вернись в ChatGPT и напиши «готово».</body></html>"
+                "<html lang=ru><meta name=viewport content='width=device-width'><body style='font:22px system-ui;padding:20px;max-width:36em;margin:0 auto'>✅ Камера подключена, первый кадр сохранён на Redmi 9. Вернись в ChatGPT и напиши «готово».</body></html>"
             )
         except Exception as exc:
-            print("CAMERA_SNAPSHOT_UNAVAILABLE " + type(exc).__name__, flush=True)
+            print("CAMERA_SNAPSHOT_UNAVAILABLE " + type(exc).__name__ + ": " + str(exc)[:140], flush=True)
             self._reply(
-                "<html lang=ru><meta name=viewport content='width=device-width'><body style='font:20px system-ui;padding:20px'>Код локально сохранён. Камера не отдала кадр: "
-                + html.escape(str(exc)[:140])
-                + ". Вернись в ChatGPT и напиши «проверить».</body></html>"
+                "<html lang=ru><meta name=viewport content='width=device-width'><body style='font:20px system-ui;padding:20px;max-width:36em;margin:0 auto'>Код локально сохранён. Камера не отдала кадр. Вернись в ChatGPT и напиши «проверить».</body></html>"
             )
 
 

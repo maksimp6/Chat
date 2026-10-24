@@ -35,13 +35,13 @@
       cache: "no-store",
     });
     if (!response.ok) {
-      var error = new Error("Project tree request failed: HTTP " + response.status);
+      var error = new Error("Не удалось загрузить структуру проекта: HTTP " + response.status);
       error.code = "PROJECT_TREE_HTTP_ERROR";
       throw error;
     }
     var data = await response.json();
     if (!data || !Array.isArray(data.nodes)) {
-      var invalid = new Error("Project tree returned an invalid payload");
+      var invalid = new Error("сервер вернул некорректную структуру проекта");
       invalid.code = "PROJECT_TREE_INVALID_PAYLOAD";
       throw invalid;
     }
@@ -73,6 +73,7 @@
         state.textContent = data.root;
         var tree = document.createElement("div");
         tree.className = "project-tree";
+        if (!data.nodes.length) tree.textContent = "Пусто";
         data.nodes.forEach(function (node) {
           renderNode(node, tree);
         });

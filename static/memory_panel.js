@@ -11,7 +11,12 @@
     if (status) status.textContent = message || "";
   }
 
+  var CATEGORY_LABELS = { general: "общее" };
+
   window.loadMemoryData = async function () {
+    // Old facts stay out of view while the request runs (пункт 51).
+    var pending = byId("memoryFactsList");
+    if (pending) pending.textContent = "Загрузка…";
     try {
       var response = await window.LogosDispatcher.request("/api/memory/manage");
       if (!response.ok) throw new Error("HTTP " + response.status);
@@ -48,13 +53,16 @@
         item.className = "memory-fact";
         var category = document.createElement("span");
         category.className = "memory-fact-category";
-        category.textContent = "[" + String(fact.category || "general") + "]";
+        category.textContent =
+          "[" + (CATEGORY_LABELS[fact.category] || String(fact.category || "общее")) + "]";
         item.appendChild(category);
         item.appendChild(document.createTextNode(" " + String(fact.fact || "")));
         list.appendChild(item);
       });
     } catch (error) {
       console.error("[Memory] Failed to load memory:", error);
+      var failed = byId("memoryFactsList");
+      if (failed) failed.replaceChildren();
       reportStatus("Не удалось загрузить память.");
     }
   };

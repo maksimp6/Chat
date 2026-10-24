@@ -14,16 +14,16 @@
     input.autocomplete = "new-password";
     input.placeholder = placeholder || "";
     input.className = "provider-field-input";
+    var error = document.createElement("div");
+    error.className = "provider-field-error";
+    wrap.appendChild(label);
+    wrap.appendChild(input);
     if (help) {
       var small = document.createElement("div");
       small.textContent = help;
       small.className = "provider-field-help";
       wrap.appendChild(small);
     }
-    var error = document.createElement("div");
-    error.className = "provider-field-error";
-    wrap.appendChild(label);
-    wrap.appendChild(input);
     wrap.appendChild(error);
     return wrap;
   }
@@ -58,7 +58,7 @@
     if (data && data.error === "credential_storage_failed") {
       return "Ключ проверен, но не удалось сохранить его на сервере.";
     }
-    return (data && (data.detail || data.error)) || "Не удалось подключить провайдера.";
+    return (data && data.detail) || "Не удалось подключить провайдера.";
   }
 
   function statusText(item) {
@@ -70,12 +70,17 @@
         : "Настроен • требуется проверка";
     }
     if (item.status === "connected") return "Подключён • авторизация OK";
-    if (item.status === "checking") return "Проверка ещё не выполнена";
+    if (item.status === "checking") return "Проверка…";
     if (item.status === "invalid" || item.status === "forbidden" || item.error === "unauthorized") {
       return "Неверный ключ / нет доступа";
     }
     if (item.status === "unavailable") return "Провайдер недоступен";
     return "Статус неизвестен";
+  }
+
+  function formatDate(value) {
+    var date = new Date(value);
+    return isNaN(date.getTime()) ? String(value) : date.toLocaleDateString("ru-RU");
   }
 
   function renderStatus(container, providers) {
@@ -94,7 +99,8 @@
       var fp = item.credential && item.credential.fingerprint;
       var exp = item.credential && item.credential.expires_at;
       meta.textContent =
-        (fp ? "fp: " + fp.slice(0, 12) : "fingerprint: —") + (exp ? " • expires: " + exp : "");
+        (fp ? "отпечаток: " + fp.slice(0, 12) : "отпечаток: —") +
+        (exp ? " • действует до " + formatDate(exp) : "");
       card.appendChild(title);
       card.appendChild(line);
       card.appendChild(meta);
@@ -109,11 +115,12 @@
         cache: "no-store",
         credentials: "same-origin",
       });
+      if (!response.ok) throw new Error("сервер вернул ошибку " + response.status);
       var data = await response.json();
-      if (!response.ok) throw new Error("HTTP " + response.status);
       renderStatus(output, data.providers);
     } catch (error) {
-      output.textContent = "Ошибка проверки: " + error.message;
+      output.textContent =
+        "Ошибка проверки: " + (error instanceof TypeError ? "нет связи с сервером" : error.message);
     }
   }
 
@@ -187,7 +194,9 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-        var data = await response.json();
+        var data = await response.json().catch(function () {
+          return {};
+        });
         if (!response.ok) {
           var provider = data && data.provider;
           var fieldId =
@@ -206,7 +215,8 @@
         document.getElementById("provider-cloudru-key").value = "";
         await fetchStatus(output);
       } catch (error) {
-        output.textContent = "Ошибка подключения: " + error.message;
+        output.textContent =
+          "Ошибка подключения: " + (error instanceof TypeError ? "нет связи с сервером" : error.message);
       } finally {
         save.disabled = false;
       }

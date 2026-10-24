@@ -92,9 +92,13 @@ def _is_secure() -> bool:
 
 def _page(message: str, status: int):
     html = (
-        '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Logos</title>'
-        f'</head><body style="font-family:sans-serif"><p>{message}</p>'
-        f'<p><a href="{LOGIN_PATH}">Попробовать снова</a></p></body></html>'
+        '<!doctype html><html lang="ru"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1"><title>Logos</title>'
+        '</head><body style="font-family:sans-serif;margin:0">'
+        '<main style="max-width:420px;margin:24px auto;padding:24px">'
+        f"<p>{message}</p>"
+        f'<p><a href="{LOGIN_PATH}" style="display:inline-block;min-height:44px;padding:12px 16px;'
+        'box-sizing:border-box">Попробовать снова</a></p></main></body></html>'
     )
     return html, status, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"}
 
