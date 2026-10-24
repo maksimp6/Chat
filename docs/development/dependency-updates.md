@@ -23,6 +23,13 @@
   wheel-репозиторием Chaquopy и проверяются `tests/test_android_requirements.py`.
   Security updates для него приходят как обычно.
 
+## Целевая ветка
+
+Все version updates нацелены на `develop` (`target-branch: develop`) — ветку
+интеграции и ветку по умолчанию. `master` — личная ветка владельца и
+автоматических PR не получает. Security updates Dependabot открывает против ветки
+по умолчанию, то есть тоже против `develop`.
+
 ## Security updates
 
 Группы в конфигурации не задают `applies-to: security-updates`, поэтому каждое

@@ -1,15 +1,26 @@
-# 3D models for GitHub preview comments
+# 3D-модели как код
 
-Files committed in this directory are treated as **untrusted geometry data**
-and rendered automatically in a GitHub pull-request comment after the trusted
-workflow is deployed on `master`. Upload only models you own or have a valid
-license to share, and never printer passwords, sensitive CAD designs or
-personally identifying documents.
+Здесь лежат модели для 3D-печати, описанные кодом OpenSCAD. Исходник `.scad`
+считается главным файлом. STL и 3MF собираются из него и лежат рядом, чтобы их
+можно было сразу открыть в Bambu Studio.
 
-Accepted: regular `.stl` and geometry-bearing `.3mf` filenames containing
-ASCII letters, numbers, hyphens, underscores or periods. The render publisher
-does not extract ZIP archives or run G-code. At most three changed files per PR
-are previewed. If no mesh exists inside a sliced 3MF, an explicit failure
-is shown instead of a fabricated rendering.
+## Правила для новой модели
 
-See [the full render/comment pipeline](../../docs/printing3d-render-comments.md).
+1. Найти исходную модель (фото, MakerWorld, Printables и т. п.) и записать в
+   README модели, откуда она взята. Лицензию чужой модели проверять отдельно
+   перед продажей.
+2. Свести модель к самой простой версии, которая делает ту же работу: меньше
+   деталей, печать плашмя без поддержек, стандартный крепёж (M3, гайки или
+   латунные вставки) вместо резьбы в пластике.
+3. Описать её кодом: все размеры, которые стоит менять, вынести в параметры в
+   начале `.scad`, а ограничения прочности проверять через `assert`.
+4. Если размеры оценены на глаз, явно написать, что они приблизительные.
+5. Положить рядом STL каждой детали и 3MF со всеми деталями на столе
+   принтера. Печатного G-code в репозитории нет: нарезка делается в слайсере
+   под конкретный принтер и пластик.
+
+## Модели
+
+| Папка                          | Что это                                           | Принтер           |
+| ------------------------------ | ------------------------------------------------- | ----------------- |
+| [bag_clip](bag_clip/README.md) | Зажим с волнистыми губками и рычагом-эксцентриком | Bambu Lab A1 mini |

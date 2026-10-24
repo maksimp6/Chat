@@ -24,7 +24,8 @@ import java.util.concurrent.TimeUnit
  *   Host other than 127.0.0.1/localhost on this port are refused, so a WebView or
  *   a DNS-rebinding page cannot reach it.
  * - GET /v1/health, /v1/device-info, /v1/status, /v1/screen/tree, /v1/screen/capture,
- *   /v1/root-probe only. One request per
+ *   /v1/root-probe only; screen tree and capture are refused (423) unless the lock screen is
+ *   known to be off. One request per
  *   connection, bounded header size, read timeout and worker count.
  */
 class RootAgentServer(
@@ -151,21 +152,38 @@ class RootAgentServer(
                 is RootOperations.Status.Answered -> 200 to "{\"keyguard_locked\":${status.keyguardLocked}}"
                 RootOperations.Status.TimedOut -> 504 to error("status_timeout")
             }
-            "/v1/screen/tree" -> when (val tree = operations.screenTree()) {
-                is RootOperations.ScreenTree.Answered -> 200 to json(mapOf("xml" to tree.xml))
-                RootOperations.ScreenTree.Unavailable -> 502 to error("screen_tree_unavailable")
-                RootOperations.ScreenTree.TimedOut -> 504 to error("screen_tree_timeout")
-            }
-            "/v1/screen/capture" -> when (val shot = operations.screenshot()) {
-                is RootOperations.Screenshot.Answered ->
-                    200 to "{\"format\":\"png\",\"png_base64\":\"${shot.pngBase64}\"}"
-                RootOperations.Screenshot.Unavailable -> 502 to error("screenshot_unavailable")
-                RootOperations.Screenshot.TimedOut -> 504 to error("screenshot_timeout")
-            }
+            "/v1/screen/tree", "/v1/screen/capture" ->
+                guardedScreenContent(path)
             else -> when (val probe = operations.rootProbe()) {
                 is RootOperations.Probe.Answered -> 200 to "{\"root\":${probe.root}}"
                 RootOperations.Probe.TimedOut -> 504 to error("root_probe_timeout")
             }
+        }
+    }
+
+    /** Screen content is served only when the lock screen is known to be off. */
+    private fun unlocked(): Boolean =
+        (operations.status() as? RootOperations.Status.Answered)?.keyguardLocked == false
+
+    private fun guardedScreenContent(path: String): Pair<Int, String?> {
+        if (!unlocked()) return 423 to error("device_locked")
+        val content = screenContent(path)
+        // Capture can take seconds. Discard success if Keyguard locked or became unknown meanwhile.
+        if (content.first == 200 && !unlocked()) return 423 to error("device_locked")
+        return content
+    }
+
+    private fun screenContent(path: String): Pair<Int, String?> = when (path) {
+        "/v1/screen/tree" -> when (val tree = operations.screenTree()) {
+            is RootOperations.ScreenTree.Answered -> 200 to json(mapOf("xml" to tree.xml))
+            RootOperations.ScreenTree.Unavailable -> 502 to error("screen_tree_unavailable")
+            RootOperations.ScreenTree.TimedOut -> 504 to error("screen_tree_timeout")
+        }
+        else -> when (val shot = operations.screenshot()) {
+            is RootOperations.Screenshot.Answered ->
+                200 to "{\"format\":\"png\",\"png_base64\":\"${shot.pngBase64}\"}"
+            RootOperations.Screenshot.Unavailable -> 502 to error("screenshot_unavailable")
+            RootOperations.Screenshot.TimedOut -> 504 to error("screenshot_timeout")
         }
     }
 
@@ -220,7 +238,7 @@ class RootAgentServer(
         private val REASONS = mapOf(
             200 to "OK", 400 to "Bad Request", 401 to "Unauthorized", 403 to "Forbidden",
             404 to "Not Found", 405 to "Method Not Allowed", 431 to "Request Header Fields Too Large",
-            502 to "Bad Gateway", 504 to "Gateway Timeout",
+            423 to "Locked", 502 to "Bad Gateway", 504 to "Gateway Timeout",
         )
 
         private fun error(code: String) = "{\"error\":\"$code\"}"

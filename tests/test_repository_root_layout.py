@@ -4,94 +4,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 PROJECT_ROOT_PYTHON = {
     "app.py",
-    "config.py",
 }
 
-# Existing debt only. New root Python modules must not be added here.
-# Delete entries as modules move into packages.
-LEGACY_ROOT_PYTHON = {
-    "agent_gateway.py",
-    "alice_agent_runner.py",
-    "api_contracts.py",
-    "archiver.py",
-    "billing.py",
-    "budget_controller.py",
-    "budget_repository.py",
-    "chatgpt_mcp.py",
-    "cli_agent.py",
-    "cloudru_api_key_provider.py",
-    "cloudru_iam.py",
-    "cloudru_iam_routes.py",
-    "compute_resources.py",
-    "conversation_metadata.py",
-    "conversation_ownership.py",
-    "credential_crypto.py",
-    "db.py",
-    "db_backend.py",
-    "departments.py",
-    "environment_manager.py",
-    "environment_routes.py",
-    "file_manager.py",
-    "file_routes.py",
-    "government.py",
-    "key_manager.py",
-    "knowledge_economics.py",
-    "local_agent_gateway.py",
-    "local_tool_agent.py",
-    "logger.py",
-    "mcp_routes.py",
-    "mcp_storage.py",
-    "mcp_trace.py",
-    "memory_db.py",
-    "memory_extractor.py",
-    "memory_manager.py",
-    "model_discovery.py",
-    "observability_migrations.py",
-    "partial_output.py",
-    "partner_relations.py",
-    "plugin_execution.py",
-    "plugin_manager.py",
-    "plugin_routes.py",
-    "pricing_registry.py",
-    "project_tree.py",
-    "provider_credentials.py",
-    "provider_credentials_routes.py",
-    "provider_key_rotation.py",
-    "provider_quota_routes.py",
-    "provider_quotas.py",
-    "reasoning_plan.py",
-    "responses_tool_loop.py",
-    "runtime_api.py",
-    "runtime_migrations.py",
-    "runtime_tools.py",
-    "sdk.py",
-    "send_logs.py",
-    "session_manager.py",
-    "session_profiles.py",
-    "session_runtime.py",
-    "short_token_auth.py",
-    "ssh_runtime.py",
-    "ssh_runtime_settings.py",
-    "storage.py",
-    "tool_registry.py",
-    "trace_manager.py",
-    "trace_security.py",
-    "trace_timing.py",
-    "treasury.py",
-    "treasury_identity.py",
-    "universal_tool_platform.py",
-    "user_identity.py",
-    "voice_routes.py",
-    "yandex_api_key_provider.py",
-    "yandex_api_logger.py",
-    "yandex_client.py",
-    "yandex_metadata_validator.py",
-    "yandex_request_builder.py",
-    "yandex_request_utils.py",
-    "yandex_response_parser.py",
-    "yandex_response_poller.py",
-    "yc_logging.py",
-}
+# Root Python modules are not allowed; every module lives in a package.
+LEGACY_ROOT_PYTHON: set[str] = set()
 
 APPROVED_ROOT_PYTHON = PROJECT_ROOT_PYTHON | LEGACY_ROOT_PYTHON
 
@@ -178,3 +94,121 @@ def test_filesystem_tools_stay_rooted_at_repository_root():
     from tool_providers import filesystem
 
     assert filesystem.BASE_DIR == str(ROOT.resolve())
+
+
+MOVED_HELPERS = {
+    "analyze_logs.sh",
+    "analyze_modules.sh",
+    "crl.sh",
+    "debug.sh",
+    "file.sh",
+    "install_protobuf_env.sh",
+    "test_api.sh",
+    "view_logs.sh",
+    "view_module_logs.sh",
+}
+
+
+def test_operational_helpers_live_in_scripts_without_root_shims():
+    for name in sorted(MOVED_HELPERS):
+        assert not (ROOT / name).exists(), f"Operational helper still in root: {name}"
+        assert (ROOT / "scripts" / name).is_file(), name
+
+
+def test_only_startup_shell_entrypoint_remains_in_root():
+    assert {path.name for path in ROOT.glob("*.sh")} == {"start.sh"}
+
+
+def test_root_inventory_covers_each_remaining_python_file():
+    import re
+
+    inventory = (ROOT / "docs/architecture/root-file-inventory.md").read_text(encoding="utf-8")
+    documented = re.findall(r"\[([^] /]+\.py)\]\(../../[^)]+\)", inventory)
+    actual = {path.name for path in ROOT.glob("*.py")}
+    assert len(documented) == len(set(documented)), "Duplicate inventory entries"
+    assert set(documented) == actual, "Update root file inventory when relocating modules"
+
+
+def test_observability_modules_live_in_package_not_repository_root():
+    legacy_names = {
+        "logger.py",
+        "yc_logging.py",
+        "trace_manager.py",
+        "trace_security.py",
+        "trace_timing.py",
+    }
+    still_in_root = sorted(name for name in legacy_names if (ROOT / name).exists())
+    assert not still_in_root, f"Observability modules still in root: {still_in_root}"
+    package = ROOT / "observability"
+    for name in (
+        "__init__.py",
+        "trace_manager.py",
+        "trace_security.py",
+        "trace_timing.py",
+        "system_log.py",
+    ):
+        assert (package / name).is_file()
+
+
+def test_economy_and_provider_modules_live_in_packages_not_repository_root():
+    moved = {
+        "economy": [
+            "billing",
+            "budget_controller",
+            "budget_repository",
+            "compute_resources",
+            "knowledge_economics",
+            "pricing_registry",
+            "treasury",
+            "treasury_identity",
+        ],
+        "provider_accounts": [
+            "credentials",
+            "credentials_routes",
+            "key_rotation",
+            "quota_routes",
+            "quotas",
+        ],
+    }
+    for package, modules in moved.items():
+        assert (ROOT / package / "__init__.py").is_file()
+        for module in modules:
+            assert (ROOT / package / f"{module}.py").is_file(), f"{package}/{module}.py"
+    assert not (ROOT / "billing.py").exists()
+    assert not (ROOT / "provider_credentials.py").exists()
+
+
+def test_agent_session_and_remote_runtime_modules_live_in_packages():
+    moved = {
+        "agent_runtime": [
+            "gateway",
+            "local_gateway",
+            "local_tool_agent",
+            "cli",
+            "responses_tool_loop",
+            "reasoning_plan",
+        ],
+        "sessions": ["manager", "profiles", "runtime"],
+        "remote_runtime": ["ssh", "ssh_settings", "environments", "environment_routes"],
+    }
+    for package, modules in moved.items():
+        assert (ROOT / package / "__init__.py").is_file()
+        for module in modules:
+            assert (ROOT / package / f"{module}.py").is_file(), f"{package}/{module}.py"
+    assert not (ROOT / "session_manager.py").exists()
+    assert not (ROOT / "agent_gateway.py").exists()
+
+
+def test_workspace_plugin_organization_and_conversation_modules_live_in_packages():
+    moved = {
+        "workspace": ["files", "file_routes", "project_tree"],
+        "plugin_system": ["manager", "routes", "execution"],
+        "organization": ["government", "departments", "partner_relations"],
+        "conversations": ["metadata", "ownership"],
+    }
+    for package, modules in moved.items():
+        assert (ROOT / package / "__init__.py").is_file()
+        for module in modules:
+            assert (ROOT / package / f"{module}.py").is_file(), f"{package}/{module}.py"
+    assert not (ROOT / "file_manager.py").exists()
+    assert not (ROOT / "plugin_manager.py").exists()
