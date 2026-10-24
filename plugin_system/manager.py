@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
@@ -59,7 +60,7 @@ class PluginManifest:
             raise PluginError(f"manifest missing required fields: {', '.join(missing)}")
 
         plugin_id = str(data["id"]).strip()
-        if not plugin_id.replace(".", "").replace("-", "").replace("_", "").isalnum():
+        if not re.fullmatch(r"[A-Za-z0-9._-]+", plugin_id):
             raise PluginError("plugin id must contain only letters, digits, '.', '_' or '-'")
 
         api_version = int(data.get("api_version", SUPPORTED_MANIFEST_VERSION))
@@ -112,7 +113,14 @@ class PluginManager:
                 manifest = PluginManifest.from_dict(data)
                 if manifest.id in discovered:
                     raise PluginError(f"duplicate plugin id: {manifest.id}")
-                discovered[manifest.id] = PluginRecord(manifest=manifest, path=manifest_path.parent)
+                record = PluginRecord(manifest=manifest, path=manifest_path.parent)
+                previous = self.records.get(manifest.id)
+                if previous is not None:
+                    # Re-reading the manifests must not reset what was enabled or configured.
+                    record.state = previous.state
+                    record.config = previous.config
+                    record.error = previous.error
+                discovered[manifest.id] = record
             except Exception as exc:
                 logger.warning("Plugin discovery failed for %s: %s", manifest_path, exc)
         self.records = discovered
@@ -143,6 +151,11 @@ class PluginManager:
         record = self.get(plugin_id)
         if not isinstance(config, Mapping):
             raise PluginError("plugin config must be an object")
+        properties = record.manifest.config_schema.get("properties")
+        if isinstance(properties, Mapping):
+            unknown = sorted(set(config) - set(properties))
+            if unknown:
+                raise PluginError(f"config has keys outside the schema: {', '.join(unknown)}")
         record.config = dict(config)
         return self._public(record)
 

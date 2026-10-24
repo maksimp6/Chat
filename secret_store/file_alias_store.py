@@ -2,13 +2,35 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import tempfile
+import threading
 from pathlib import Path
 
 from secret_store.core import SecretRef
 from secret_store.manager import SecretAlias
+
+_THREAD_LOCK = threading.RLock()
+
+
+@contextlib.contextmanager
+def _exclusive(path: Path):
+    """Serialize read-modify-write of the alias file across threads and, where fcntl exists, processes."""
+    with _THREAD_LOCK:
+        try:
+            import fcntl
+        except ImportError:
+            yield
+            return
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        with open(path.with_name(path.name + ".lock"), "a+") as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
 
 
 class FileSecretAliasStore:
@@ -19,14 +41,16 @@ class FileSecretAliasStore:
         return self._load().get(alias)
 
     def put(self, entry: SecretAlias) -> None:
-        entries = self._load()
-        entries[entry.alias] = entry
-        self._save(entries)
+        with _exclusive(self._path):
+            entries = self._load()
+            entries[entry.alias] = entry
+            self._save(entries)
 
     def delete(self, alias: str) -> None:
-        entries = self._load()
-        entries.pop(alias, None)
-        self._save(entries)
+        with _exclusive(self._path):
+            entries = self._load()
+            entries.pop(alias, None)
+            self._save(entries)
 
     def list(self) -> tuple[SecretAlias, ...]:
         entries = self._load()
@@ -69,8 +93,9 @@ class FileSecretAliasStore:
 
     def _save(self, entries: dict[str, SecretAlias]) -> None:
         parent = self._path.parent
+        # The directory is created private when it is missing. An existing directory keeps its mode:
+        # the alias file may live in a directory the operator shares.
         parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        os.chmod(parent, 0o700)
         payload = {
             "schema": 1,
             "aliases": [

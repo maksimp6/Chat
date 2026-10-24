@@ -16,6 +16,9 @@ from pathlib import PurePosixPath
 from typing import Any, Mapping, Optional
 
 
+_MAX_WRITE_BYTES = 10 * 1024 * 1024
+
+
 class SSHRuntimeError(RuntimeError):
     """Raised when an SSH runtime operation cannot be completed."""
 
@@ -257,13 +260,13 @@ class SSHRuntime:
 
         resolved_target, user = self._resolve_target(target, identity_id)
         timeout = float(timeout_seconds or resolved_target.command_timeout_seconds)
-        if timeout <= 0 or timeout > 3600:
+        if not math.isfinite(timeout) or timeout <= 0 or timeout > 3600:
             raise SSHRuntimeError("timeout_seconds must be > 0 and <= 3600")
 
         remote_command = self._wrap_remote_command(
             command,
             timeout,
-            home=f"/home/{user}",
+            home="/root" if user == "root" else f"/home/{user}",
         )
         argv = self._ssh_command(resolved_target, user, remote_command)
         try:
@@ -336,6 +339,8 @@ class SSHRuntime:
         target_config = self._targets.get(str(target))
         workspace_root = target_config.workspace_root if target_config else None
         remote_path = self._path_within_workspace(remote_path, workspace_root)
+        if len(str(content).encode("utf-8")) > _MAX_WRITE_BYTES:
+            raise SSHRuntimeError("file content exceeds the 10 MiB write limit")
         parent = str(PurePosixPath(remote_path).parent)
         quoted_parent = shlex.quote(parent)
         quoted_path = shlex.quote(remote_path)
@@ -363,12 +368,12 @@ class SSHRuntime:
 
         resolved_target, user = self._resolve_target(target, identity_id)
         timeout = float(timeout_seconds or resolved_target.command_timeout_seconds)
-        if timeout <= 0 or timeout > 3600:
+        if not math.isfinite(timeout) or timeout <= 0 or timeout > 3600:
             raise SSHRuntimeError("timeout_seconds must be > 0 and <= 3600")
         remote_command = self._wrap_remote_command(
             script,
             timeout,
-            home=f"/home/{user}",
+            home="/root" if user == "root" else f"/home/{user}",
         )
         argv = self._ssh_command(resolved_target, user, remote_command)
 

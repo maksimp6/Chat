@@ -734,7 +734,8 @@ def handle_mcp_server_item(server_id):
         data = _update_payload()
         if data is None:
             return jsonify({"error": "JSON object is required"}), 400
-        mcp_storage.update_server(server_id, data)
+        if not mcp_storage.update_server(server_id, data):
+            return jsonify({"error": "Сервер не найден"}), 404
         return jsonify({"status": "updated"})
 
     srv = mcp_storage.get_server(server_id)

@@ -4,7 +4,12 @@ from __future__ import annotations
 import uuid
 import time
 from typing import Any
+from secret_store.credential_crypto import decrypt_secret, encrypt_secret
 from storage.db import get_store
+
+# Credentials of an MCP server. Stored encrypted when a provider credential key is configured,
+# the same rule that protects provider keys.
+_SEALED_FIELDS = ("authorization", "headers")
 
 _DEFAULTS = {
     "server_url": "",
@@ -38,18 +43,39 @@ def init_db() -> None:
     get_store()
 
 
+def _seal_fields(data: dict[str, Any]) -> dict[str, Any]:
+    sealed = dict(data)
+    for field in _SEALED_FIELDS:
+        value = sealed.get(field)
+        if isinstance(value, str) and value:
+            sealed[field] = encrypt_secret(value)
+    return sealed
+
+
+def _open_fields(record: dict[str, Any]) -> dict[str, Any]:
+    opened = dict(record)
+    for field in _SEALED_FIELDS:
+        value = opened.get(field)
+        if isinstance(value, str) and value:
+            opened[field] = decrypt_secret(value)
+    return opened
+
+
 def _public(record: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in record.items() if key != "created_at"}
 
 
 def list_servers() -> list[dict[str, Any]]:
     rows = get_store().items(prefix="mcp/server/").values()
-    return [_public(row) for row in sorted(rows, key=lambda row: row["created_at"], reverse=True)]
+    return [
+        _public(_open_fields(row))
+        for row in sorted(rows, key=lambda row: row["created_at"], reverse=True)
+    ]
 
 
 def create_server(data: dict[str, Any]) -> str:
     sid = str(uuid.uuid4())
-    record = {**_DEFAULTS, **data, "id": sid, "created_at": time.time()}
+    record = {**_DEFAULTS, **_seal_fields(data), "id": sid, "created_at": time.time()}
     with get_store().transaction() as tx:
         tx.set("mcp/server/" + sid, record)
     return sid
@@ -57,15 +83,26 @@ def create_server(data: dict[str, Any]) -> str:
 
 def get_server(server_id: str) -> dict[str, Any] | None:
     record = get_store().get("mcp/server/" + server_id)
-    return _public(record) if record is not None else None
+    return _public(_open_fields(record)) if record is not None else None
 
 
-def update_server(server_id: str, data: dict[str, Any]) -> None:
+def update_server(server_id: str, data: dict[str, Any]) -> bool:
+    """Return False when no server has this id, so the caller can answer 404."""
     key = "mcp/server/" + server_id
     with get_store().transaction() as tx:
         record = tx.get(key)
-        if record is not None:
-            tx.set(key, {**record, **data, "id": server_id, "created_at": record["created_at"]})
+        if record is None:
+            return False
+        tx.set(
+            key,
+            {
+                **record,
+                **_seal_fields(data),
+                "id": server_id,
+                "created_at": record["created_at"],
+            },
+        )
+    return True
 
 
 def delete_server(server_id: str) -> None:

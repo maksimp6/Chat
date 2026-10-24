@@ -6,6 +6,7 @@ canonical SecretRef metadata and authorizes a runtime purpose before resolution.
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import re
@@ -15,6 +16,7 @@ from secret_store.admin import SecretAdminBackend
 from secret_store.core import SecretRef, SecretResolutionError, SecretResolver, SecretValue
 
 _ALIAS_RE = re.compile(r"^[a-z][a-z0-9_-]{1,63}$")
+_AUDIT_LIMIT = 1000
 
 
 class SecretAliasError(Exception):
@@ -82,7 +84,8 @@ class SecretManager:
         self._store = store
         self._resolver = resolver
         self._admin = admin
-        self._audit: list[SecretAccessEvent] = []
+        # Bounded: the newest events are kept, and the list cannot grow with every use.
+        self._audit: deque[SecretAccessEvent] = deque(maxlen=_AUDIT_LIMIT)
 
     def put_alias(self, entry: SecretAlias) -> None:
         self._store.put(entry)
@@ -98,7 +101,12 @@ class SecretManager:
         admin = self._require_admin()
         result = admin.create(purpose=secret_purpose, value=value)
         entry = SecretAlias(alias=alias, ref=result.ref, allowed_purposes=allowed_purposes)
-        self._store.put(entry)
+        try:
+            self._store.put(entry)
+        except Exception:
+            # Without its alias the new secret can never be used, so remove it instead of orphaning it.
+            admin.delete(result.ref)
+            raise
         self._record(alias, secret_purpose, "create", True)
         return entry
 

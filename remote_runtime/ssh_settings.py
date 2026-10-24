@@ -11,6 +11,7 @@ import copy
 import json
 import logging
 import os
+import re
 import subprocess
 import time
 from typing import Any, Mapping
@@ -23,6 +24,9 @@ logger = logging.getLogger("ssh_runtime_settings")
 
 SETTINGS_KEY = "ssh_runtime_settings"
 LAST_TEST_KEY = "ssh_runtime_last_test"
+# Shell separators and substitutions. An allowlist pattern matches the whole command, so a command
+# that chains a second one ("echo ok; sudo ...") would otherwise pass as the first.
+_SHELL_CONTROL_RE = re.compile(r"[;&`\n\r]|\$\(")
 
 _DEFAULTS = {
     "enabled": False,
@@ -54,6 +58,9 @@ def _env_bootstrap() -> dict[str, Any]:
     return {
         **copy.deepcopy(_DEFAULTS),
         "enabled": bool(targets),
+        # The environment carries no command allowlist, so command execution stays off until one
+        # is configured. Without this, the settings could never be read.
+        "allow_command_execution": False,
         "known_hosts": os.getenv("LOGOS_SSH_KNOWN_HOSTS") or None,
         "targets": targets,
     }
@@ -223,10 +230,11 @@ def command_matches_allowlist(command: str, allowlist: list[str]) -> bool:
 
 
 def is_privileged_command(command: str) -> bool:
-    import re
-
     value = str(command or "").strip()
-    return bool(re.match(r"^(?:sudo|su|doas|pkexec)(?:\s|$)", value))
+    # Every pipeline stage counts: a privileged stage after "|" is still privileged.
+    return any(
+        re.match(r"^(?:sudo|su|doas|pkexec)(?:\s|$)", stage.strip()) for stage in value.split("|")
+    )
 
 
 def assert_operation_allowed(
@@ -239,6 +247,8 @@ def assert_operation_allowed(
     if operation == "execute":
         if not settings["allow_command_execution"]:
             raise SSHRuntimeError("SSH command execution is disabled in SSH Runtime settings")
+        if command is not None and _SHELL_CONTROL_RE.search(command):
+            raise SSHRuntimeError("SSH command must not contain shell control operators")
         if command is None or not command_matches_allowlist(command, settings["command_allowlist"]):
             raise SSHRuntimeError(
                 "SSH command is not permitted by the configured command allowlist"
