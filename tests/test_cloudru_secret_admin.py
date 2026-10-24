@@ -190,6 +190,7 @@ def test_admin_client_maps_iam_failure_without_secret(monkeypatch):
     class BrokenIam(FakeIam):
         def _token(self):
             from cloudru_iam import CloudRuIamError
+
             raise CloudRuIamError("private-detail")
 
     c = CloudRuSecretManagementAdminClient(iam_client=BrokenIam(), parent_id="parent-1")
@@ -205,6 +206,7 @@ def test_admin_client_maps_iam_failure_without_secret(monkeypatch):
 def test_admin_client_maps_network_failure(monkeypatch):
     def fail(*args, **kwargs):
         import requests
+
         raise requests.ConnectionError("private-detail")
 
     monkeypatch.setattr("requests.request", fail)
@@ -218,8 +220,13 @@ def test_admin_client_maps_network_failure(monkeypatch):
 
 @pytest.mark.parametrize(
     ("status", "code"),
-    [(401, "auth_failed"), (403, "authorization_failed"), (404, "not_found"),
-     (409, "conflict"), (500, "provider_http_error")],
+    [
+        (401, "auth_failed"),
+        (403, "authorization_failed"),
+        (404, "not_found"),
+        (409, "conflict"),
+        (500, "provider_http_error"),
+    ],
 )
 def test_admin_client_maps_http_failures(monkeypatch, status, code):
     monkeypatch.setattr(

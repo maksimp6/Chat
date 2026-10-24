@@ -21,21 +21,12 @@ _CHECK_CONCLUSIONS = {
     "validate-image": {"success"},
 }
 
-_RDC_PATH_PREFIX = "deploy/remote-desktop-commander/"
-_RDC_WORKFLOW_PATH = ".github/workflows/remote-desktop-commander.yml"
-
 
 def required_checks_for_files(
     required_checks: list[str],
     files: list[dict[str, Any]],
 ) -> list[str]:
     checks = list(dict.fromkeys(required_checks))
-    changed_paths = {str(item.get("filename") or "") for item in files if isinstance(item, dict)}
-    rdc_changed = any(
-        path == _RDC_WORKFLOW_PATH or path.startswith(_RDC_PATH_PREFIX) for path in changed_paths
-    )
-    if rdc_changed and "validate-image" not in checks:
-        checks.append("validate-image")
     return checks
 
 
