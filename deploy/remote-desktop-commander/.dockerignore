@@ -1,7 +1,0 @@
-state/
-pairing/
-workspace/
-releases/
-.env
-.env.*
-*.log

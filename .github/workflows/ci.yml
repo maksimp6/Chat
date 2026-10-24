@@ -32,7 +32,6 @@ jobs:
       backend: ${{ steps.classify.outputs.backend }}
       android: ${{ steps.classify.outputs.android }}
       infra: ${{ steps.classify.outputs.infra }}
-      mcp: ${{ steps.classify.outputs.mcp }}
     steps:
       - name: Start job reporting clock
         id: job_policy_clock
@@ -310,14 +309,6 @@ jobs:
             --markdown-out hot-file-metrics.md
           cat hot-file-metrics.md
           cat hot-file-metrics.md >> "$GITHUB_STEP_SUMMARY"
-      - name: Validate preview deployment script
-        id: policy_step_07
-        continue-on-error: true
-        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
-        run: |
-          bash -n deploy/preview/server.sh
-          bash -n deploy/production/server.sh
-          bash tests/test_dozzle_preview.sh
       - name: Compile tracked Python sources
         id: policy_step_08
         continue-on-error: true
@@ -419,11 +410,6 @@ jobs:
         run: |
           if [ -f "$OUT/flask-live.pid" ]; then kill "$(cat "$OUT/flask-live.pid")" || true; fi
           if [ -f "$OUT/flask-live.log" ]; then tail -n 200 "$OUT/flask-live.log"; fi
-      - name: Build and check C17 fallback control server
-        id: policy_step_18
-        continue-on-error: true
-        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
-        run: bash scripts/build_c17_server.sh --check
       - name: Run Python application tests with coverage
         id: policy_step_19
         continue-on-error: true
@@ -608,111 +594,10 @@ jobs:
           if __name__ == "__main__":
               raise SystemExit(main())
           PY
-  mcp:
-    name: MCP worker tests
-    needs: changes
-    if: needs.changes.outputs.mcp == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      PUPPETEER_SKIP_DOWNLOAD: "true"
-    steps:
-      - name: Start job reporting clock
-        id: job_policy_clock
-        shell: bash
-        run: |
-          python3 - <<'PYCODE' >> "$GITHUB_OUTPUT"
-          import time
-          print(f"started_ns={time.monotonic_ns()}")
-          PYCODE
-      - name: Checkout
-        id: policy_step_01
-        continue-on-error: true
-        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - name: Set up Node
-        id: policy_step_02
-        continue-on-error: true
-        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
-        with:
-          node-version: "22.22.2"
-          cache: npm
-          cache-dependency-path: |
-            deploy/chrome-worker/package-lock.json
-            deploy/remote-desktop-commander/package-lock.json
-      - name: Playwright MCP integration tests
-        id: policy_step_03
-        continue-on-error: true
-        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
-        env:
-          CHROME_EXECUTABLE_PATH: /usr/bin/google-chrome
-          BROWSER_OAUTH_MCP_TEST: "1"
-        run: |
-          npm ci --prefix deploy/chrome-worker
-          npm test --prefix deploy/chrome-worker
-          npm run test:browser --prefix deploy/chrome-worker
-      - name: Identity provider tests
-        id: policy_step_04
-        continue-on-error: true
-        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
-        run: npm test --prefix deploy/oauth-idp
-      - name: Logos Dev OAuth and handoff regression tests
-        id: policy_step_05
-        continue-on-error: true
-        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
-        run: |
-          npm ci --prefix deploy/remote-desktop-commander --omit=dev --ignore-scripts --no-audit --no-fund
-          node --test tests/integration/remote_desktop_commander/oauth.test.mjs tests/integration/remote_desktop_commander/credential-handoff.test.mjs
-      - name: Apply owner job result policy (over 30s passes)
-        id: job_policy_result
-        if: ${{ !cancelled() }}
-        shell: bash
-        env:
-          JOB_STARTED_NS: ${{ steps.job_policy_clock.outputs.started_ns }}
-          JOB_STEP_RESULTS: ${{ toJSON(steps) }}
-        run: |
-          python3 - <<'PY'
-          """Apply the owner's duration-based reporting policy, without claiming verification."""
-
-          import json
-          import os
-          import time
-          from pathlib import Path
-
-
-          def main() -> int:
-              started = int(os.environ["JOB_STARTED_NS"])
-              elapsed = time.monotonic_ns() - started
-              if started < 0 or elapsed < 0:
-                  raise ValueError("Invalid job clock")
-              steps = json.loads(os.environ["JOB_STEP_RESULTS"])
-              failed = [name for name, step in steps.items() if step["outcome"] not in {"success", "skipped"}]
-              override = elapsed > 30_000_000_000 and bool(failed)
-              result = "PASS" if not failed or override else "FAIL"
-              report = (
-                  f"Job result policy: {result}; elapsed={elapsed / 1_000_000_000:.3f}s; "
-                  f"overridden={str(override).lower()}; original failures={','.join(failed) or 'none'}. "
-                  "Policy PASS does not mean VERIFIED."
-              )
-              print(report)
-              if override:
-                  print("::warning::" + report)
-              with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
-                  summary.write(report + "\n")
-              return int(bool(failed) and not override)
-
-
-          if __name__ == "__main__":
-              raise SystemExit(main())
-          PY
-
   required:
     name: CI required
     if: always()
-    needs: [changes, code-rules, backend, infra, mcp]
+    needs: [changes, code-rules, backend, infra]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:

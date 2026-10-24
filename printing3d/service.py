@@ -17,6 +17,7 @@ def get_store() -> PrintStore:
 
     return printing_store()
 
+
 ORDER_STATUSES = (
     "lead",
     "quote",

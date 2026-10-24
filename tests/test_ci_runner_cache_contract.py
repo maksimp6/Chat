@@ -29,10 +29,6 @@ def test_runner_cache_contract() -> None:
 
     npm_dependencies = {
         "backend": ["package.json"],
-        "mcp": [
-            "deploy/chrome-worker/package-lock.json",
-            "deploy/remote-desktop-commander/package-lock.json",
-        ],
     }
     for job, expected in npm_dependencies.items():
         steps = [

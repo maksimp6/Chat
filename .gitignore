@@ -46,5 +46,4 @@ alice.memory.lock
 node_modules/
 
 /node_modules
-# Native build output (scripts/build_c17_server.sh)
 build/
