@@ -1,0 +1,241 @@
+#!/usr/bin/env python3
+"""Alice Pro A1 mini: temporary OEM holder wide-spindle conversion v0.3.
+
+Three printable components: two half-shells, one sprung outer locking collar
+and four optional alignment pins. Reuses factory mount and spindle.
+
+THIS IS NOT A REPLACEMENT OF THE OEM SLIDE MOUNT. NO UNVERIFIED SLIDER FIT.
+Units millimetres, parametric, original shape. Physical fit/strength untested.
+"""
+from __future__ import annotations
+import argparse
+import hashlib
+import json
+import math
+from pathlib import Path
+import zipfile
+
+import cadquery as cq
+import trimesh
+
+NOMINAL_STOCK_SPINDLE_LENGTH = 68.0 # external reference; must measure
+NOMINAL_STOCK_ENDSTOP_DIAMETER = 31.0 # external reference; must measure
+TOTAL_LEN = 82.0
+FAR_EDGE = 76.0
+END_GROOVE_DEPTH = 1.0
+END_GROOVE_Z = 75.0
+END_GROOVE_H = 4.2
+FLANGE_H = 4.0
+FLANGE_D = 60.0
+RETAIN_RING_D = 60.0
+PIN_D = 3.6
+PIN_CUT_D = 3.95
+PIN_DEPTH = 4.4
+PIN_COUNT = 4
+
+
+def circle_annulus(outer_r, inner_r, height, z=0):
+    return cq.Workplane('XY').circle(outer_r).circle(inner_r).extrude(height).translate((0,0,z))
+
+
+def make_halves(spool_id:float, spindle_od:float):
+    if not (51.0 <= spool_id <= 55.5):
+        raise ValueError('Bore must be 51–55.5 mm: outside this range a larger retaining flange is required')
+    if not (15.0 <= spindle_od <= 26.0):
+        raise ValueError('Stock spindle OD must be 15–26 mm')
+    # 0.8 mm nominal diametral clearance allows spool to spin on the sleeve.
+    outer_d=spool_id - 0.8
+    if outer_d - NOMINAL_STOCK_ENDSTOP_DIAMETER < 12:
+        raise ValueError('Too little material around OEM end lip')
+    # Bore 0.8mm larger than stock spindle; no force fit.
+    inner_d=spindle_od+0.8
+    # Central bearing surface 4..75, flange at 0..4.
+    shape=circle_annulus(outer_d/2,inner_d/2,TOTAL_LEN)
+    shape=shape.union(circle_annulus(FLANGE_D/2,inner_d/2,FLANGE_H)).clean()
+    # clearance for the original widened end stop of the factory axle.
+    shape=shape.cut(cq.Workplane('XY').circle((NOMINAL_STOCK_ENDSTOP_DIAMETER+1.6)/2).extrude(TOTAL_LEN-61.0+0.1).translate((0,0,61.0)))
+    # Outer retaining groove; the printed collar seats here, not on the spool.
+    band=circle_annulus(outer_d/2+0.1, (outer_d-2*END_GROOVE_DEPTH)/2, END_GROOVE_H,END_GROOVE_Z)
+    shape=shape.cut(band).clean()
+    # Split into exact complementary halves in plane x=0 (radial assembly).
+    positive=shape.intersect(cq.Workplane('XY').box(100,150,100,centered=(False,True,False)))
+    negative=shape.intersect(cq.Workplane('XY').box(100,150,100,centered=(False,True,False)).translate((-100,0,0)))
+    # Matching holes, made from the seam into the solid near both ends.
+    # Choose radial coordinate where both halves contain solid stock around shaft.
+    y_hole=(inner_d/2 + outer_d/2)/2
+    for z in (12.0,55.0):
+        for y in (-y_hole, y_hole):
+            pos_hole=cq.Solid.makeCylinder(PIN_CUT_D/2,PIN_DEPTH+0.04,cq.Vector(-0.02,y,z),cq.Vector(1,0,0))
+            neg_hole=cq.Solid.makeCylinder(PIN_CUT_D/2,PIN_DEPTH+0.04,cq.Vector(0.02,y,z),cq.Vector(-1,0,0))
+            positive=positive.cut(pos_hole)
+            negative=negative.cut(neg_hole)
+    pos=positive.clean();neg=negative.clean()
+    # Print both halves with outside surface down and seam/bore UP, so no
+    # roof bridging over the internal shaft bore. Trim 0.75mm near outer apex
+    # to create a flat, strong contact patch ~12mm wide on print bed.
+    # Final orientation: long axis vertical Z -> horizontal X.
+    def make_print(part,deg):
+        oriented=part.rotate((0,0,0),(0,1,0),deg)
+        bb=oriented.val().BoundingBox()
+        # Flat lower portion of the curved exterior creates contact with plate.
+        oriented=oriented.cut(cq.Workplane('XY').box(150,150,5).translate((0,0,bb.zmin-1.75)))
+        bb=oriented.val().BoundingBox()
+        oriented=oriented.translate((-(bb.xmin+bb.xmax)/2,-(bb.ymin+bb.ymax)/2,-bb.zmin))
+        return oriented.clean()
+    return make_print(pos,90),make_print(neg,-90),{
+        'spool_bore_nominal_mm':spool_id,'stock_spindle_od_nominal_mm':spindle_od,
+        'outer_bearing_diameter_mm':round(outer_d,2),'inner_shaft_clearance_diameter_mm':round(inner_d,2),
+        'stock_tip_clearance_diameter_mm':NOMINAL_STOCK_ENDSTOP_DIAMETER+1.6,
+        'total_length_mm':TOTAL_LEN,'usable_width_between_retainer_faces_mm':END_GROOVE_Z-FLANGE_H,
+    }
+
+
+def snap_ring(spool_id):
+    outer_d=spool_id - 0.8
+    groove_d=outer_d-2*END_GROOVE_DEPTH
+    inner=(groove_d+0.35)/2
+    r=circle_annulus(RETAIN_RING_D/2,inner,END_GROOVE_H-0.25)
+    # Flexible axial slit: ring is intended to slide from the outer end only.
+    angle=math.radians(14)
+    wedge=(cq.Workplane('XY').polyline([(0,0),(100*math.cos(-angle),100*math.sin(-angle)),
+                                      (100*math.cos(angle),100*math.sin(angle))]).close().extrude(END_GROOVE_H+0.2))
+    return r.cut(wedge).clean()
+
+
+def test_pin():
+    pin=cq.Workplane('XY').circle(PIN_D/2).extrude(2*PIN_DEPTH-0.55)
+    # slight chamfer both ends, PETG should not be pounded into holes
+    pin=pin.edges('>Z').chamfer(.4).edges('<Z').chamfer(.35)
+    return pin.clean()
+
+
+def fit_gauge(spindle_od):
+    # Small split fit templates: can be held around OEM shaft without disassembly.
+    # Internal radius intentionally 0.4 larger than nominal spindle.
+    inner=(spindle_od+0.8)/2
+    g=circle_annulus(inner+5.0,inner,5)
+    a=g.intersect(cq.Workplane('XY').box(100,100,10,centered=(False,True,False)))
+    return a.clean()
+
+
+def export_checked(shape,path):
+    path.parent.mkdir(parents=True,exist_ok=True)
+    cq.exporters.export(shape,str(path),tolerance=0.075,angularTolerance=0.14)
+    mesh=trimesh.load_mesh(path,process=True)
+    dims=(mesh.bounds[1]-mesh.bounds[0]).tolist()
+    bb=mesh.bounds
+    data={'name':path.name,'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),
+          'dimensions_mm':[round(float(q),2) for q in dims],
+          'watertight':bool(mesh.is_watertight),
+          'winding_consistent':bool(mesh.is_winding_consistent),
+          'components':len(mesh.split(only_watertight=False)),
+          'triangle_count':len(mesh.faces),'volume_cm3':round(float(mesh.volume)/1000,2),
+          'fits_A1_mini':bool(dims[0]<=180 and dims[1]<=180 and dims[2]<=180),
+          'rests_on_plate':bool(abs(bb[0,2])<0.15),
+          'nominal_petg_weight_g':round(float(mesh.volume)/1000*1.27,2)}
+    if not(all([data['watertight'],data['winding_consistent'],data['components']==1,
+                data['fits_A1_mini'],data['rests_on_plate']])):
+        raise AssertionError(data)
+    return data
+
+
+def main():
+    cli=argparse.ArgumentParser()
+    cli.add_argument('--spool-bore',type=float,default=52.5)
+    cli.add_argument('--spindle-od',type=float,default=22.0)
+    cli.add_argument('--out',type=Path,default=Path('/mnt/data/alice_stock_spool_replacement_v03'))
+    args=cli.parse_args();out=args.out;out.mkdir(parents=True,exist_ok=True)
+    halves1,halves2,geom=make_halves(args.spool_bore,args.spindle_od)
+    shapes={
+        'a1mini_oem_wide_hub_HALF_A.stl':halves1,
+        'a1mini_oem_wide_hub_HALF_B.stl':halves2,
+        'a1mini_oem_wide_hub_END_RETAINER.stl':snap_ring(args.spool_bore),
+        'alignment_pin_PRINT_4.stl':test_pin(),
+    }
+    checks={};
+    for name,shape in shapes.items():
+        checks[name]=export_checked(shape,out/name)
+        print('CHECK',json.dumps(checks[name],ensure_ascii=False),flush=True)
+    gauges={}
+    for d in (18.,20.,22.,24.):
+        name=f'fit_gauge_stock_spindle_{int(d)}mm_HALF.stl'
+        gauges[name]=export_checked(fit_gauge(d),out/'01_GAUGES_PRINT_FIRST'/name)
+    for name,shape in {'half_shell_A':halves1,'half_shell_B':halves2,'retainer':shapes['a1mini_oem_wide_hub_END_RETAINER.stl']}.items():
+        try:
+            cq.exporters.export(shape,str(out/(name+'.step')))
+        except Exception as exc:print('STEP_SKIPPED',name,str(exc)[:100])
+    report={
+        'name':'Alice Pro A1 mini stock holder wide hub conversion v0.3',
+        'scope':'Temporary replacement of NARROW CONTACT SHAFT; OEM bracket and spindle retained',
+        'material':'PETG', 'extruder_nozzle_mm':0.4,'unit':'mm',
+        'fit_status':'UNVERIFIED - dimensional inputs must be measured on physical OEM holder and spool',
+        'geometry_nominal':geom,'files':checks,'gauge_files':gauges,
+        'counts_to_print':{'HALF_A':1,'HALF_B':1,'END_RETAINER':1,'PIN':4},
+        'assembly_notes':[ 'Confirm spool core diameter and OEM shaft diameter using caliper or photo and ruler',
+            'Print small spindle fit gauge before printing complete halves',
+            'Place the two halves around the factory spindle; insert four aligning pins into matching blind holes',
+            'Install spool over wide hub, then stretch retaining ring slightly over end lip into annular groove',
+            'Do not install if end retainer is loose, pin binding, shell cracks or spool rubs frame',
+            'Perform unloaded spin and full 1kg spool dry test; keep clear of PTFE tube and moving printer components'],
+        'print_approval':'NOT GIVEN',
+        'known_blockers':['Stock shaft diameter unmeasured','Spool bore unmeasured',
+                          'PETG shrink and spring force untested',
+                          'OEM arm 68mm, sleeve extends ~14mm beyond it: load check required',
+                          'Actual fit of retainer ring not physically tested',
+                          'Slicing PETG Bambu Studio not verified'],
+    }
+    (out/'report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
+    (out/'README_RU.md').write_text(f'''# Alice Pro: широкая ось на комплектном держателе A1 mini (PETG v0.3)
+
+Это **временная модернизация комплектного держателя**, НЕ замена заводской
+двухвинтовой монтажной пластины. Существующий шток и крепление остаются на принтере.
+Крупную ось формируют **две печатные половинки**, четыре штифта и внешний стопор.
+
+**ВНИМАНИЕ:** заводская защёлка и соединение со станиной не моделируются: их
+точные размеры неизвестны. Эта версия НЕ рассчитана на слепую печать/нагрузку 1 кг.
+
+## Параметры CAD (нужны реальные измерения!)
+
+- Номинальное отверстие катушки: **{args.spool_bore} мм** (надо измерить).
+- Номинальный Ø заводского тонкого штока: **{args.spindle_od} мм** (надо измерить).
+- Контактный Ø широкой оси: **{geom['outer_bearing_diameter_mm']} мм**.
+- Известная по стороннему описанию длина OEM штока: около **68 мм**, стопор около **31 мм**;
+  эти значения могут не совпадать с твоим экземпляром.
+- Полная длина новой оси: **82 мм**. Между фланцем и стопором примерно **71 мм**.
+- Проверочные шаблоны в `01_GAUGES_PRINT_FIRST`: Ø18, 20, 22, 24 мм.
+
+## Состав
+
+1. `a1mini_oem_wide_hub_HALF_A.stl`: 1 шт.
+2. `a1mini_oem_wide_hub_HALF_B.stl`: 1 шт.
+3. `alignment_pin_PRINT_4.stl`: 4 шт.
+4. `a1mini_oem_wide_hub_END_RETAINER.stl`: 1 шт.
+
+Запасов крепежа не требует, но перед использованием необходима примерка.
+**Нельзя запускать печать без проверки слайсера** (Bambu Studio, A1 mini,
+сопло 0,4 мм, реальный профиль PETG).
+
+## Рекомендуемая подготовка (после примерки)
+
+PETG, 0,2 мм слой, 4–5 стенок, 35–45% gyroid, широкая поддерживающая зона
+для половинок, brim 5 мм по необходимости. Половинки распечатаны плоской
+срезанной внешней гранью на столе, внутренней полостью вверх.
+Контроль толщин, овальности и зазоров обязателен до нагрузки.
+
+**Ни модель, ни печатное задание на принтер не отправлены.**
+
+## Лицензия и источники
+
+Параметрическая конструкция оригинальная для Alice Pro.
+Монтажные свойства заводского крепления подтверждены официальной
+инструкцией Bambu Lab и карточкой запчасти; диаметры штока необходимо
+сверить физически.
+''')
+    archive=out.parent/'alice_stock_spool_replacement_v03.zip'
+    with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
+        for path in sorted(out.rglob('*')):
+            if path.is_file():z.write(path,path.relative_to(out))
+        z.write(__file__,'alice_stock_spool_replacement_v03.py')
+    print('OUTPUT_ZIP',archive,archive.stat().st_size,flush=True)
+
+if __name__=='__main__':main()
