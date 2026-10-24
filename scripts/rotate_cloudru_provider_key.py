@@ -109,7 +109,6 @@ def main() -> int:
             reissue_existing=True,
             ttl=_ttl(),
         )
-        pass
         logger.info(
             "Rotated Cloud.ru Foundation Models provider key id=%s expires_at=%s",
             new_id,
@@ -117,14 +116,8 @@ def main() -> int:
         )
         return 0
     except Exception:
-        try:
-            pass
-        except Exception:
-            pass
         logger.exception("Cloud.ru provider-key rotation failed")
         return 1
-    finally:
-        pass
 
 
 if __name__ == "__main__":

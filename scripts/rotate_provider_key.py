@@ -64,7 +64,6 @@ def main() -> int:
             commit_before_revoke=True,
             provider_name="yandex",
         )
-        pass
         logger.info(
             "Rotated global Yandex provider key id=%s expires_at=%s",
             new_id,
@@ -72,14 +71,8 @@ def main() -> int:
         )
         return 0
     except Exception:
-        try:
-            pass
-        except Exception:
-            pass
         logger.exception("Global provider-key rotation failed")
         return 1
-    finally:
-        pass
 
 
 if __name__ == "__main__":
