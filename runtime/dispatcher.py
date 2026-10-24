@@ -305,7 +305,8 @@ class RuntimeDispatcher:
                 trace_id=raw_call.get("trace_id"),
                 invocation_id=raw_call.get("invocation_id"),
                 user_id=raw_call.get("user_id"),
-                approved=bool(raw_call.get("approved")),
+                # An approval is granted by the host, never by a mapping that runtime code sends.
+                approved=False,
                 metadata=dict(raw_call.get("metadata") or {}),
             )
         else:

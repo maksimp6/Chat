@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import builtins
 import hashlib
 import importlib.machinery
 from dataclasses import dataclass
@@ -11,6 +12,10 @@ from types import MappingProxyType
 from typing import Any, Mapping
 
 from runtime.dispatcher import RuntimeDispatcher
+
+
+# Builtins that give revision code the host: files, the terminal, and type introspection.
+_DENIED_BUILTINS = frozenset({"breakpoint", "exit", "help", "input", "open", "quit", "type"})
 
 
 class RuntimeLoadError(ValueError):
@@ -74,7 +79,11 @@ class RuntimeLoader:
             raise RuntimeLoadError("runtime entry point could not be read")
         self._validate(source, str(path))
         namespace: dict[str, Any] = {
-            "__builtins__": __builtins__,
+            "__builtins__": {
+                name: value
+                for name, value in vars(builtins).items()
+                if name not in _DENIED_BUILTINS
+            },
             "__file__": str(path),
             "__name__": loader.name,
             "__package__": "",

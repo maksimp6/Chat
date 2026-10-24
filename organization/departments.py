@@ -89,9 +89,15 @@ def upsert_department(
         "updated_at": _now(),
     }
     for field in ("model_config", "policies", "knowledge_scope", "session_config", "metadata"):
-        record[field] = dict(data.get(field) or {})
+        value = data.get(field) or {}
+        if not isinstance(value, dict):
+            raise ValueError(f"{field} must be an object")
+        record[field] = dict(value)
     for field in ("tools", "capabilities"):
-        record[field] = list(data.get(field) or [])
+        value = data.get(field) or []
+        if not isinstance(value, list):
+            raise ValueError(f"{field} must be a list")
+        record[field] = list(value)
     with get_store().transaction() as tx:
         old = tx.get("department/" + ident)
         record["created_at"] = old["created_at"] if old else record["updated_at"]
@@ -108,8 +114,11 @@ def departments_list():
 def departments_create():
     if not _admin_ok():
         return jsonify({"error": "department admin authorization required"}), 401
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        return jsonify({"error": "invalid_department_request"}), 400
     try:
-        return jsonify({"department": upsert_department(request.get_json(silent=True) or {})}), 201
+        return jsonify({"department": upsert_department(body)}), 201
     except ValueError:
         return jsonify({"error": "invalid_department_request"}), 400
 
@@ -130,9 +139,10 @@ def departments_update(department_id: str):
     if not _admin_ok():
         return jsonify({"error": "department admin authorization required"}), 401
     try:
-        return jsonify(
-            {"department": upsert_department(request.get_json(silent=True) or {}, department_id)}
-        )
+        body = request.get_json(silent=True) or {}
+        if not isinstance(body, dict):
+            return jsonify({"error": "invalid_department_request"}), 400
+        return jsonify({"department": upsert_department(body, department_id)})
     except ValueError:
         return jsonify({"error": "invalid_department_request"}), 400
 
@@ -174,7 +184,7 @@ def departments_start_session(department_id: str):
 
 @departments_bp.get("/<department_id>/sessions/<session_id>")
 def departments_session_status(department_id: str, session_id: str):
-    department = get_department(department_id)
+    department = _find_department(department_id)
     if not department:
         return jsonify({"error": "department_not_found"}), 404
     session = get_session(session_id)

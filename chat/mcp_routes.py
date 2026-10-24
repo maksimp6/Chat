@@ -35,6 +35,7 @@ from storage.db import (
     save_conv_settings,
     maybe_update_conversation_title,
     get_conversation_title,
+    normalize_conversation_title,
 )
 from agent_runtime.partial_output import extract_last_response_text, format_partial_output_message
 from agent_runtime.responses_tool_loop import run_tool_loop, extract_function_calls
@@ -61,12 +62,27 @@ mcp_bp = Blueprint("mcp", __name__)
 skill_registry = SkillRegistry()
 
 
+_MAX_TOOL_ROUNDS = 32
+
+
+def _tool_rounds(value: Any) -> int:
+    """Tool-loop rounds the client asked for, clamped so one request cannot loop without bound."""
+    try:
+        rounds = int(16 if value is None else value)
+    except (TypeError, ValueError):
+        rounds = 16
+    return max(1, min(rounds, _MAX_TOOL_ROUNDS))
+
+
 def _tool_call_parts(tool_call: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
-    name = tool_call.get("name") or tool_call.get("function", {}).get("name")
+    function = tool_call.get("function")
+    if not isinstance(function, dict):
+        function = {}
+    name = tool_call.get("name") or function.get("name")
     if name and "<|" in name:
         name = name.split("<|", 1)[0].strip()
 
-    arguments = tool_call.get("arguments") or tool_call.get("function", {}).get("arguments", {})
+    arguments = tool_call.get("arguments") or function.get("arguments", {})
     if isinstance(arguments, str):
         try:
             arguments = _json.loads(arguments)
@@ -241,7 +257,7 @@ class LogosClient(YandexResponsesClient):
                     response,
                     execute_tool,
                     continue_request,
-                    max_rounds=base_params.get("max_rounds", 16),
+                    max_rounds=_tool_rounds(base_params.get("max_rounds")),
                     should_pause=should_pause,
                 )
 
@@ -290,6 +306,9 @@ def chat():
             return jsonify({"error": "conversation_id и message обязательны"}), 400
 
         owner_id = get_current_owner_id(required=False)
+        # The reply, the history and the billing all belong to the caller's conversation.
+        if not owner_id or not check_access(conv_id, owner_id):
+            return jsonify({"error": "conversation_not_found"}), 404
         invocation = create_invocation(
             session_id,
             conv_id,
@@ -733,7 +752,11 @@ def conversations():
         return jsonify({"error": "invalid_owner_identity"}), 401
 
     if request.method == "POST":
+        if not owner_id:
+            return jsonify({"error": "conversation_owner_required"}), 401
         data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({"error": "JSON object is required"}), 400
         client = LogosClient(Config)
         creation_trace = ExecutionTrace()
         creation_trace.set_request(
@@ -764,7 +787,7 @@ def conversations():
                     "trace": creation_trace.finalize(),
                 }
             ), 502
-        title = data.get("title") or "Новый чат"
+        title = normalize_conversation_title(data.get("title"))
         model = data.get("model", "logos-runtime")
         create_conversation(conv_id, title, model)
         if owner_id:
@@ -812,6 +835,8 @@ def execute_approved():
             return jsonify({"error": f"Неизвестный инструмент: {func_name}"}), 400
 
         owner_id = get_current_owner_id(required=False)
+        if not owner_id or not conv_id or not check_access(str(conv_id), owner_id):
+            return jsonify({"error": "conversation_not_found"}), 404
         # Only a tool call this server proposed (and signed) may skip the approval gate.
         expected_token = _approval_token(owner_id, conv_id, func_name, arguments)
         if not hmac.compare_digest(
@@ -822,7 +847,9 @@ def execute_approved():
         tool_arguments = dict(arguments or {})
         if func_name == "set_ui_theme":
             current_theme = str(data.get("current_theme") or "").strip().lower()
-            if current_theme:
+            if current_theme and len(current_theme) <= 32 and all(
+                ch.isalnum() or ch in "-_" for ch in current_theme
+            ):
                 tool_arguments["current_theme"] = current_theme
         call = UniversalToolCall(
             tool_name=func_name,

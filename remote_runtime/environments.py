@@ -32,6 +32,7 @@ _RUNTIME_DISPATCHER = RuntimeDispatcher()
 _RUNTIME_WORKERS: dict[str, "EnvironmentRuntime"] = {}
 _RUNTIME_WORKERS_LOCK = threading.RLock()
 _RUNTIME_STOP = object()
+_STREAM_IDLE_SECONDS = 60.0
 _ALLOWED_TRANSITIONS = {
     "CREATING": {"STOPPED", "FAILED"},
     "STOPPED": {"RUNNING", "DELETING"},
@@ -83,6 +84,9 @@ def resolve_commit(branch: str, commit_sha: Optional[str] = None) -> str:
         raise ValueError("branch is required")
     if not value:
         raise ValueError("commit is required")
+    if value.startswith("-") or branch_value.startswith("-"):
+        # A leading dash would be read by git as an option.
+        raise ValueError("invalid git ref")
     if any(ch in value for ch in ("\x00", "\n", "\r")) or any(
         ch in branch_value for ch in ("\x00", "\n", "\r")
     ):
@@ -247,7 +251,10 @@ class RuntimeHTTPStream:
     def __iter__(self):
         try:
             while True:
-                event = self._events.get()
+                try:
+                    event = self._events.get(timeout=_STREAM_IDLE_SECONDS)
+                except queue.Empty as exc:
+                    raise TimeoutError("environment runtime HTTP stream stalled") from exc
                 kind = event[0]
                 if kind == "chunk":
                     yield event[1]
@@ -401,7 +408,14 @@ class EnvironmentRuntime:
         cancel = threading.Event()
         with self._stream_lock:
             self._active_streams[cancel] = events
-        self._jobs.put(("http", "http.request", dict(payload), events, cancel))
+        # Each HTTP request gets its own thread, so one slow response cannot block the environment's
+        # other calls.
+        threading.Thread(
+            target=self._run_http,
+            args=(dict(payload), events, cancel),
+            name=f"logos-runtime-http-{self.runtime_id[:8]}",
+            daemon=True,
+        ).start()
         try:
             first = events.get(timeout=timeout)
         except queue.Empty as exc:
@@ -456,6 +470,39 @@ class EnvironmentRuntime:
 
         shutil.rmtree(self.worktree.parent, ignore_errors=True)
 
+    def _run_http(self, payload: Dict[str, Any], events: queue.Queue, cancel: threading.Event) -> None:
+        source = None
+        try:
+            base_path = str(payload.get("base_path") or "")
+            with bind_runtime_request(
+                self.runtime_id,
+                base_path,
+                data_root=str(self.data_dir),
+            ):
+                source = _RUNTIME_DISPATCHER.dispatch(self.runtime_id, "http.request", payload)
+                status_code = int(source["status_code"])
+                headers = list(source.get("headers") or [])
+                if not _stream_put(events, ("start", status_code, headers), cancel):
+                    return
+                for chunk in source.get("body") or ():
+                    if cancel.is_set():
+                        break
+                    if isinstance(chunk, str):
+                        chunk = chunk.encode("utf-8")
+                    if chunk and not _stream_put(events, ("chunk", bytes(chunk)), cancel):
+                        break
+        except Exception as exc:
+            _stream_put(events, ("error", exc), cancel)
+        finally:
+            if source is not None:
+                close = source.get("close")
+                if callable(close):
+                    close()
+            if not cancel.is_set():
+                _stream_put(events, ("end",), cancel)
+            with self._stream_lock:
+                self._active_streams.pop(cancel, None)
+
     def _run(self) -> None:
         while True:
             job = self._jobs.get()
@@ -476,38 +523,6 @@ class EnvironmentRuntime:
                     result.put(("error", exc))
                 continue
 
-            _, operation, payload, events, cancel = job
-            source = None
-            try:
-                base_path = str(payload.get("base_path") or "")
-                with bind_runtime_request(
-                    self.runtime_id,
-                    base_path,
-                    data_root=str(self.data_dir),
-                ):
-                    source = _RUNTIME_DISPATCHER.dispatch(self.runtime_id, operation, payload)
-                    status_code = int(source["status_code"])
-                    headers = list(source.get("headers") or [])
-                    if not _stream_put(events, ("start", status_code, headers), cancel):
-                        continue
-                    for chunk in source.get("body") or ():
-                        if cancel.is_set():
-                            break
-                        if isinstance(chunk, str):
-                            chunk = chunk.encode("utf-8")
-                        if chunk and not _stream_put(events, ("chunk", bytes(chunk)), cancel):
-                            break
-            except Exception as exc:
-                _stream_put(events, ("error", exc), cancel)
-            finally:
-                if source is not None:
-                    close = source.get("close")
-                    if callable(close):
-                        close()
-                if not cancel.is_set():
-                    _stream_put(events, ("end",), cancel)
-                with self._stream_lock:
-                    self._active_streams.pop(cancel, None)
 
 
 def register_runtime_operation(name: str, handler) -> None:
@@ -622,8 +637,10 @@ def list_environments(owner_id: Optional[str] = None) -> list[Dict[str, Any]]:
         for row in get_store().items(prefix="environment/record/").values()
         if not owner_id or not row["owner_id"] or row["owner_id"] == owner_id
     ]
+    # Owner ids of other environments are not part of the listing.
     return [
-        _row_to_dict(row) for row in sorted(rows, key=lambda row: row["created_at"], reverse=True)
+        {key: value for key, value in _row_to_dict(row).items() if key != "owner_id"}
+        for row in sorted(rows, key=lambda row: row["created_at"], reverse=True)
     ]
 
 
@@ -678,7 +695,13 @@ def stop_environment(
     with _RUNTIME_WORKERS_LOCK:
         runtime = _RUNTIME_WORKERS.get(environment_id)
     if runtime is not None:
-        runtime.stop()
+        try:
+            runtime.stop()
+        except RuntimeError as exc:
+            # The worker did not stop, so the environment is not stopped. Record that instead of
+            # leaving it RUNNING while its worker is still registered.
+            _persist_environment(environment_id, {"status": "FAILED", "error": str(exc)})
+            raise
     _persist_environment(
         environment_id,
         {"status": "STOPPED", "runtime_pid": None, "runtime_port": None, "stopped_at": _now()},
@@ -713,11 +736,13 @@ def delete_environment(
         stop_environment(environment_id, owner_id, context=context)
         item = _require(environment_id, owner_id)
     _transition(item["status"], "DELETING")
-    EnvironmentRuntime(item).remove()
     item.update({"status": "DELETING", "deleted_at": _now()})
     _record_trace(item, "DELETE_ENVIRONMENT", "SUCCESS", context=context)
+    # The record goes first: if the files were removed and the record then survived, the record
+    # would claim an environment whose source and data are gone.
     with get_store().transaction() as tx:
         tx.delete("environment/record/" + environment_id)
+    EnvironmentRuntime(item).remove()
     return item
 
 

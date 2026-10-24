@@ -8,10 +8,27 @@ from datetime import datetime, timezone
 from threading import RLock
 from typing import Any, Callable, Mapping, MutableMapping, Optional
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 from uuid import uuid4
 import json
 import time
+
+
+_MAX_RESPONSE_BYTES = 4 * 1024 * 1024
+
+
+def _require_http_endpoint(endpoint: str, name: str) -> None:
+    # urllib also opens file:// and other schemes; a remote agent endpoint is http(s) only.
+    if urlsplit(endpoint.strip()).scheme not in {"http", "https"}:
+        raise ValueError(f"{name} must use http or https")
+
+
+def _read_bounded(response: Any) -> str:
+    raw = response.read(_MAX_RESPONSE_BYTES + 1)
+    if len(raw) > _MAX_RESPONSE_BYTES:
+        raise ValueError("remote agent response is too large")
+    return raw.decode("utf-8")
 
 
 class AgentGatewayError(Exception):
@@ -92,6 +109,7 @@ class A2AClient:
     ) -> None:
         if not config.endpoint.strip():
             raise ValueError("A2A endpoint must not be empty")
+        _require_http_endpoint(config.endpoint, "A2A endpoint")
         if config.timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
         self._config = config
@@ -118,11 +136,14 @@ class A2AClient:
         req = Request(self._config.endpoint, data=body, headers=headers, method="POST")
         try:
             with urlopen(req, timeout=self._config.timeout_seconds) as response:
-                raw = response.read().decode("utf-8")
+                raw = _read_bounded(response)
         except HTTPError as exc:
             raise A2AProtocolError(f"A2A HTTP error {exc.code}: {exc.reason}") from exc
         except (URLError, TimeoutError) as exc:
-            raise A2AProtocolError(f"A2A transport error: {exc}") from exc
+            # The transport error text can name internal hosts, so callers get only the fact.
+            raise A2AProtocolError("A2A transport error") from exc
+        except ValueError as exc:
+            raise A2AProtocolError(str(exc)) from exc
         try:
             obj = json.loads(raw)
         except json.JSONDecodeError as exc:
@@ -150,6 +171,7 @@ class RESTAgentClient:
     ) -> None:
         if not endpoint.strip():
             raise ValueError("REST endpoint must not be empty")
+        _require_http_endpoint(endpoint, "REST endpoint")
         if timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
         self.endpoint = endpoint
@@ -170,11 +192,13 @@ class RESTAgentClient:
         )
         try:
             with urlopen(req, timeout=self.timeout_seconds) as response:
-                raw = response.read().decode("utf-8")
+                raw = _read_bounded(response)
         except HTTPError as exc:
             raise AgentInvocationError(f"REST HTTP error {exc.code}: {exc.reason}") from exc
         except (URLError, TimeoutError) as exc:
-            raise AgentInvocationError(f"REST transport error: {exc}") from exc
+            raise AgentInvocationError("REST transport error") from exc
+        except ValueError as exc:
+            raise AgentInvocationError(str(exc)) from exc
         if not raw:
             return None
         try:
@@ -316,15 +340,18 @@ class AgentGateway:
     def _invoke_once(
         handler: AgentHandler, payload: Mapping[str, Any], timeout_seconds: float
     ) -> Any:
-        with ThreadPoolExecutor(max_workers=1) as pool:
+        # Not a `with` block: leaving one waits for the handler, which would make the timeout
+        # meaningless. An overrunning handler keeps running in its thread, but the caller returns.
+        pool = ThreadPoolExecutor(max_workers=1)
+        try:
             future = pool.submit(handler, payload)
-            try:
-                return future.result(timeout=timeout_seconds)
-            except FutureTimeoutError as exc:
-                future.cancel()
-                raise AgentInvocationError(
-                    f"agent invocation timed out after {timeout_seconds:.2f}s"
-                ) from exc
+            return future.result(timeout=timeout_seconds)
+        except FutureTimeoutError as exc:
+            raise AgentInvocationError(
+                f"agent invocation timed out after {timeout_seconds:.2f}s"
+            ) from exc
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
 
     def invoke(
         self,
@@ -388,6 +415,14 @@ class AgentGateway:
         attempts = 0
         for attempt in range(1, retries + 2):
             attempts = attempt
+            if attempt > 1:
+                # A circuit that opened during an earlier attempt stops the retries too.
+                with self._lock:
+                    try:
+                        self._check_circuit(agent_id, time.monotonic())
+                    except AgentCircuitOpenError as exc:
+                        last_error = str(exc)
+                        break
             try:
                 result = self._invoke_once(handler, payload, timeout)
                 with self._lock:
