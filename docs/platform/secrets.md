@@ -16,7 +16,7 @@ A **secret** is sensitive data (API keys, passwords, signing keys) that:
 Configuration files reference secrets by path, never by value:
 
 ```yaml
-# config/alice/secrets.yaml
+# config/platform/secrets.yaml
 secrets:
   oauth:
     client_secret: alice/prod/oauth-client-secret
@@ -137,7 +137,7 @@ Production secret access is also:
 1. Decide the path: `alice/<lane>/<service>/<name>`
 2. Generate a secure random value
 3. Store in secret storage with access controls
-4. Add reference to `config/alice/secrets.yaml`
+4. Add reference to `config/platform/secrets.yaml`
 5. Update service configuration to read the secret
 6. Deploy the change
 

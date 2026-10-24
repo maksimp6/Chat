@@ -21,7 +21,7 @@ EXPECTED_IDLE_SECONDS = {
 
 
 def test_live_acceptance_runtime_windows_are_short_and_single_instance():
-    config = load_config(Path("config/alice"))
+    config = load_config(Path("config/platform"))
     services = config["services"]
 
     for name, idle_seconds in EXPECTED_IDLE_SECONDS.items():

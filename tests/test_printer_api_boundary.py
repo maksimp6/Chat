@@ -4,8 +4,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from alice_pro.printers.api import CloudReader, LanReader, PrinterService
-from alice_pro.printers.models import PrinterIdentity
+from printer_service.printers.api import CloudReader, LanReader, PrinterService
+from printer_service.printers.models import PrinterIdentity
 
 
 def test_service_uses_injected_reader_only():

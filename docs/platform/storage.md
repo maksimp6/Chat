@@ -16,7 +16,7 @@ The Chrome worker requires persistent storage for session state, cache, and brow
 
 ### Configuration
 
-Storage is defined in `config/alice/storage.yaml`:
+Storage is defined in `config/platform/storage.yaml`:
 
 ```yaml
 storage:

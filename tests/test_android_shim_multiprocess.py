@@ -3,7 +3,7 @@
 import multiprocessing
 import unittest
 
-from alice_pro.android_shim import AndroidShim, Backend, Evidence, Keyguard
+from printer_service.android_shim import AndroidShim, Backend, Evidence, Keyguard
 
 
 def _worker(start, counter, result):

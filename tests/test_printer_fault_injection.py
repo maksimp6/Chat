@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from alice_pro.printers.bambu_a1mini import PrinterProtocolError, probe
-from alice_pro.printers import lan_socket
+from printer_service.printers.bambu_a1mini import PrinterProtocolError, probe
+from printer_service.printers import lan_socket
 
 ROUTES = (
     "Iface Destination Gateway Flags RefCnt Use Metric Mask MTU Window IRTT\n"

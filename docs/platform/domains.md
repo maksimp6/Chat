@@ -65,7 +65,7 @@ When validating config, the system checks:
 
 ## Configuration Format
 
-Domains are defined in `config/alice/domains.yaml`:
+Domains are defined in `config/platform/domains.yaml`:
 
 ```yaml
 oauth.maxxxpavlov.online:

@@ -4,7 +4,7 @@ import socket
 
 import pytest
 
-from alice_pro.printers.lan_socket import LanBindingError, connect_lan_impl as connect_lan
+from printer_service.printers.lan_socket import LanBindingError, connect_lan_impl as connect_lan
 
 
 class FakeSocket:
@@ -38,7 +38,7 @@ class FakeSocket:
 @pytest.fixture
 def pinned(monkeypatch):
     monkeypatch.setattr(
-        "alice_pro.printers.lan_socket.resolve_lan", lambda *a, **kw: "192.168.31.12"
+        "printer_service.printers.lan_socket.resolve_lan", lambda *a, **kw: "192.168.31.12"
     )
     monkeypatch.setattr(
         socket, "SO_BINDTODEVICE", getattr(socket, "SO_BINDTODEVICE", 25), raising=False

@@ -92,7 +92,7 @@ conn.execute("PRAGMA synchronous=NORMAL")
 
 ```python
 def _get_abs_path(path: str) -> str:
-    base_dir = os.path.realpath("/storage/emulated/0/alice_pro")
+    base_dir = os.path.realpath("/storage/emulated/0/printer_service")
     if not path or path == ".":
         return base_dir
     full_path = os.path.realpath(os.path.join(base_dir, path))
@@ -103,7 +103,7 @@ def _get_abs_path(path: str) -> str:
 
 ### Как это работает
 
-1. Определяет базовую директорию (`/storage/emulated/0/alice_pro`).
+1. Определяет базовую директорию (`/storage/emulated/0/printer_service`).
 2. Формирует полный путь к запрашиваемому файлу.
 3. Проверяет, что путь начинается с базовой директории.
 4. Вызывает ошибку, если путь выходит за пределы базовой директории.

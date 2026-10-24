@@ -13,8 +13,8 @@ import statistics
 
 import pytest
 
-from alice_pro.printers.lan_address import private_ipv4
-from alice_pro.printers.persistent_session import PrinterSession
+from printer_service.printers.lan_address import private_ipv4
+from printer_service.printers.persistent_session import PrinterSession
 
 
 def test_persistent_a1mini_real_network():

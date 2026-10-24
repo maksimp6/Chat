@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
         (["android/app/src/main/Main.kt"], {"android"}),
         (["cloud/cloudru/client.py"], {"infra"}),
         (["requirements-deploy.txt"], {"infra"}),
-        (["config/alice/alice-dev-delete-ids.txt"], {"infra"}),
+        (["config/platform/retired_container_ids.txt"], {"infra"}),
         (["db.py"], {"backend", "database"}),
         (["db_backend.py"], {"backend", "database"}),
         (["tests/test_user_identity.py"], {"backend"}),

@@ -126,10 +126,10 @@ This:
 All configuration changes are tracked in git:
 
 ```bash
-git log config/alice/platform.yaml
+git log config/platform/platform.yaml
 
 # View change details
-git show abc1234:config/alice/platform.yaml
+git show abc1234:config/platform/platform.yaml
 ```
 
 ### Rollback Scenarios
@@ -141,7 +141,7 @@ git show abc1234:config/alice/platform.yaml
 **Recovery**:
 ```bash
 # Check recent changes
-git log --oneline config/alice/ | head -5
+git log --oneline config/platform/ | head -5
 
 # Rollback to last known good
 python -m keel recovery rollback-config \
@@ -149,7 +149,7 @@ python -m keel recovery rollback-config \
   --approve
 
 # After recovery, investigate the bad change
-git diff abc1234 HEAD config/alice/
+git diff abc1234 HEAD config/platform/
 ```
 
 ## Failure Diagnosis

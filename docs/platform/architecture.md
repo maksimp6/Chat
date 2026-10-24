@@ -3,7 +3,7 @@
 Keel Platform is a configuration-driven deployment system that uses three layers:
 
 1. **Documentation** (docs/platform/) — explains rules and principles
-2. **Configuration** (config/alice/) — contains desired state facts (YAML)
+2. **Configuration** (config/platform/) — contains desired state facts (YAML)
 3. **Code** (keel/) — validates config and reconciles reality to desired state
 
 This document explains the platform structure and principles.
@@ -66,7 +66,7 @@ A **lane** is a deployment environment with its own configuration, secrets, and 
 
 ## Configuration Structure
 
-All configuration lives in `config/alice/` and is validated before deployment.
+All configuration lives in `config/platform/` and is validated before deployment.
 
 ### platform.yaml
 Defines services, dependencies, and resource requirements:
@@ -144,7 +144,7 @@ The config system enforces nine validation rules automatically:
 
 ### Validation
 ```bash
-python -m keel validate [--config-dir config/alice]
+python -m keel validate [--config-dir config/platform]
 ```
 Checks all YAML files for schema, semantic, and policy violations.
 

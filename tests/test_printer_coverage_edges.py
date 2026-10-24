@@ -4,16 +4,16 @@ import socket
 
 import pytest
 
-from alice_pro.printers.api import CloudReader, LanReader
-from alice_pro.printers.bambu_a1mini import PrinterProtocolError, decode_probe
-from alice_pro.printers.lan_address import _route_is_local, resolve_lan
-from alice_pro.printers.lan_socket import connect_lan_impl
+from printer_service.printers.api import CloudReader, LanReader
+from printer_service.printers.bambu_a1mini import PrinterProtocolError, decode_probe
+from printer_service.printers.lan_address import _route_is_local, resolve_lan
+from printer_service.printers.lan_socket import connect_lan_impl
 
 
 def test_reader_identity_delegates(monkeypatch):
     seen = []
     monkeypatch.setattr(
-        "alice_pro.printers.lan.probe",
+        "printer_service.printers.lan.probe",
         lambda host, timeout: seen.append((host, timeout)) or "identity",
     )
     assert LanReader("printer.local", 2.0).identity() == "identity"
@@ -66,7 +66,7 @@ def test_empty_dns_answer_fails(monkeypatch):
 )
 def test_invalid_socket_options_fail_before_dns(monkeypatch, options):
     monkeypatch.setattr(
-        "alice_pro.printers.lan_socket.resolve_lan", lambda *a, **kw: pytest.fail("resolver called")
+        "printer_service.printers.lan_socket.resolve_lan", lambda *a, **kw: pytest.fail("resolver called")
     )
     with pytest.raises(ValueError):
         connect_lan_impl("printer.example.test", **options)

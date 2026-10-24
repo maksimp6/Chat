@@ -6,7 +6,7 @@ Keel Platform automates deployment of services from configuration. This document
 
 Deployments follow this process:
 
-1. **Configuration committed** to git (config/alice/*.yaml)
+1. **Configuration committed** to git (config/platform/*.yaml)
 2. **Validation** runs in CI (all rules checked)
 3. **Planning** calculates needed changes
 4. **Approval** required for production changes
@@ -144,13 +144,13 @@ All deployments are tracked in git commit history:
 
 ```bash
 # View deployment history
-git log --oneline config/alice/
+git log --oneline config/platform/
 
 # See what changed in a deployment
-git show abc1234:config/alice/platform.yaml
+git show abc1234:config/platform/platform.yaml
 
 # Compare two versions
-git diff abc1234 def5678 config/alice/
+git diff abc1234 def5678 config/platform/
 ```
 
 ## Deployment Checklist
@@ -173,7 +173,7 @@ Make changes in `test.yaml` only:
 
 ```bash
 git checkout -b add-test-feature
-# Edit config/alice/test.yaml
+# Edit config/platform/test.yaml
 python -m keel validate
 python -m keel plan test
 git commit -m "Add test feature"
@@ -186,7 +186,7 @@ git push
 Make changes that affect both lanes:
 
 ```bash
-# Edit config/alice/platform.yaml (affects both lanes)
+# Edit config/platform/platform.yaml (affects both lanes)
 # Or edit both production.yaml and test.yaml
 
 python -m keel plan test
@@ -206,7 +206,7 @@ If deploying from backups:
 
 ```bash
 # Restore from known-good commit
-git checkout tags/v1.0.0 -- config/alice/
+git checkout tags/v1.0.0 -- config/platform/
 
 # Restore storage
 python -m keel recovery restore --storage chrome-state --snapshot 2024-10-01

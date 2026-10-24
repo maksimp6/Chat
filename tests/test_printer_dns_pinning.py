@@ -2,8 +2,8 @@
 
 import socket
 import pytest
-from alice_pro.printers.lan_address import resolve_lan, _route_is_local
-from alice_pro.printers.bambu_a1mini import probe
+from printer_service.printers.lan_address import resolve_lan, _route_is_local
+from printer_service.printers.bambu_a1mini import probe
 
 ROUTES = (
     "Iface Destination Gateway Flags RefCnt Use Metric Mask MTU Window IRTT\n"

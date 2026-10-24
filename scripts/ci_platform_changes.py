@@ -75,7 +75,7 @@ def _path_platforms(path: str) -> set[str]:
                 "scripts/cloudru_",
                 "scripts/ci_",
                 "keel/",
-                "config/alice/",
+                "config/platform/",
                 ".github/workflows/",
             )
         )

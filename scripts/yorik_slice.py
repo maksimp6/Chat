@@ -88,13 +88,13 @@ def validate_process(profile):
 
 
 def slice_model(root, mesh, out):
-    from alice_a1mini_pla_cube_slice import (
+    from a1mini_pla_cube_slice import (
         _read_sliced_archive,
         _validate_gcode,
         _validate_profile,
         profiles,
     )
-    from alice_a1mini_preview import embed_preview
+    from a1mini_preview import embed_preview
 
     out.mkdir(parents=True, exist_ok=True)
     count = validate_mesh(mesh)

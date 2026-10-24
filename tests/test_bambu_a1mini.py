@@ -5,7 +5,7 @@ import struct
 
 import pytest
 
-from alice_pro.printers.bambu_a1mini import (
+from printer_service.printers.bambu_a1mini import (
     PrinterProtocolError,
     decode_probe,
     merge_report,

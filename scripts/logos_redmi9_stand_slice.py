@@ -12,13 +12,13 @@ import struct
 import subprocess
 import sys
 import zipfile
-from alice_a1mini_pla_cube_slice import (
+from a1mini_pla_cube_slice import (
     _read_sliced_archive,
     _validate_gcode,
     _validate_profile,
     profiles,
 )
-from alice_a1mini_preview import embed_preview
+from a1mini_preview import embed_preview
 
 OUTPUT = "Logos_Redmi9_Stand_v3_Generic_PLA_A1mini.gcode.3mf"
 SMALL_OUTPUT = "Logos_Redmi9_Stand_Compact_Generic_PLA_A1mini.gcode.3mf"

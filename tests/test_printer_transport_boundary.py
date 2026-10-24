@@ -2,9 +2,9 @@
 
 import pytest
 
-from alice_pro.printers.cloud_api import CloudApiNotConfigured, DisabledCloudApi
-from alice_pro.printers.lan import probe
-from alice_pro.printers.models import merge_report, summarize_status
+from printer_service.printers.cloud_api import CloudApiNotConfigured, DisabledCloudApi
+from printer_service.printers.lan import probe
+from printer_service.printers.models import merge_report, summarize_status
 
 
 def test_lan_probe_is_separate_entrypoint():

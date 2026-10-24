@@ -11,8 +11,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from alice_pro.printers.bambu_a1mini import PrinterProtocolError
-from alice_pro.printers.persistent_session import PrinterSession
+from printer_service.printers.bambu_a1mini import PrinterProtocolError
+from printer_service.printers.persistent_session import PrinterSession
 
 
 class Socket:

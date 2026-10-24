@@ -13,8 +13,8 @@ import statistics
 import time
 from typing import Callable
 
-from alice_pro.printers.bambu_a1mini import decode_probe, merge_report
-from alice_pro.printers.lan_address import _route_is_local, private_ipv4
+from printer_service.printers.bambu_a1mini import decode_probe, merge_report
+from printer_service.printers.lan_address import _route_is_local, private_ipv4
 
 PAYLOAD = b'{"login":{"command":"detect","model":"N1"}}'
 FRAME = bytes((165, 165)) + struct.pack("<H", len(PAYLOAD) + 6) + PAYLOAD + bytes((167, 167))

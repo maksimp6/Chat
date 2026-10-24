@@ -23,7 +23,7 @@ The repository is actively evolving. This README separates shipped behavior from
 - **Invocation context and execution trace** for provider requests, polling, tool calls, errors, timing, continuations and billing correlation.
 - **Deterministic trace lifecycle**: snapshots are read-only and finalization is idempotent; see [execution trace lifecycle](docs/execution-trace-lifecycle.md).
 - **Agent Gateway and RuntimeDispatcher** for runtime-scoped invocations. The target architecture is one Python process with managed threads/contexts; threads are not a hostile-code security boundary.
-- **Logos GitHub agent**: issue/label-triggered workflow, headless runner, filesystem-only sandboxed tools, draft PR output and CI/review gates. See [Logos GitHub agent](docs/agents/alice-github-agent.md).
+- **Logos GitHub agent**: issue/label-triggered workflow, headless runner, filesystem-only sandboxed tools, draft PR output and CI/review gates. See [Logos GitHub agent](docs/agents/github-agent.md).
 - **Compute energy accounting** based on measured CPU time and configured watts/price; if no electricity price is configured, the trace remains unpriced. See [compute energy billing](docs/compute-energy-billing.md).
 - **Treasury and billing controls**, internal usage accounting and demo balances.
 - **3D Printing Business**: quote calculation, owner-scoped orders and settlement, realized P&L, finance/payback tracking and AI-first purchase assessment. See [3D Printing Business](docs/printing3d.md).
@@ -133,7 +133,7 @@ For frontend/runtime work, preserve the progressive-enhancement path and Browser
 - [Logos runtime agents](docs/agents/overview.md)
 - [Repository development roles](docs/agents/role-based-agent-office.md)
 - [Runtime Dispatcher policy](docs/runtime/runtime-dispatcher-policy.md)
-- [Logos GitHub agent](docs/agents/alice-github-agent.md)
+- [Logos GitHub agent](docs/agents/github-agent.md)
 - [Compute energy billing](docs/compute-energy-billing.md)
 - [Execution trace lifecycle](docs/execution-trace-lifecycle.md)
 - [Provider key rotation](docs/provider-key-rotation.md)

@@ -51,7 +51,7 @@ def _service(**overrides):
 
 
 def test_repository_declares_complete_canonical_runtime_desired_state():
-    config = load_config(Path("config/alice"))
+    config = load_config(Path("config/platform"))
     services = config["services"]
 
     for name, expected in EXPECTED_RUNTIME.items():
@@ -65,7 +65,7 @@ def test_repository_declares_complete_canonical_runtime_desired_state():
 
 
 def test_production_and_lab_lanes_are_isolated_and_browser_is_shared():
-    config = load_config(Path("config/alice"))
+    config = load_config(Path("config/platform"))
     production = set(config["lanes"]["production"]["services"])
     lab = set(config["lanes"]["test"]["services"])
 
@@ -139,7 +139,7 @@ def test_gross_runtime_cost_estimator_contract_exists_and_is_not_provider_billin
 
 
 def test_desired_state_does_not_claim_live_provider_or_owner_acceptance():
-    config = load_config(Path("config/alice"))
+    config = load_config(Path("config/platform"))
     serialized = repr(config).lower()
     for forbidden in (
         "cloudru_verified",

@@ -2,7 +2,7 @@
 
 import pytest
 
-from alice_pro.printers.android_bridge_contract import (
+from printer_service.printers.android_bridge_contract import (
     AndroidBridgeUnavailable,
     DiscoveryRequest,
     DiscoveryResult,

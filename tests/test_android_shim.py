@@ -1,5 +1,5 @@
 import unittest
-from alice_pro.android_shim import AndroidShim, Backend, Keyguard, SimulatedAndroid, Evidence
+from printer_service.android_shim import AndroidShim, Backend, Keyguard, SimulatedAndroid, Evidence
 
 
 class AndroidShimTests(unittest.TestCase):
@@ -75,7 +75,7 @@ class AndroidShimTests(unittest.TestCase):
         self.assertEqual(len(shim.transport.events), 40)
 
     def test_png_corrupt_crc_and_trailing_data(self):
-        from alice_pro.android_shim import validate_png
+        from printer_service.android_shim import validate_png
 
         png = AndroidShim().screenshot()
         self.assertTrue(validate_png(png))
@@ -132,7 +132,7 @@ class AndroidShimTests(unittest.TestCase):
     def test_png_invalid_compressed_payload_with_valid_crc(self):
         import struct
         import zlib
-        from alice_pro.android_shim import validate_png
+        from printer_service.android_shim import validate_png
 
         png = bytearray(AndroidShim().screenshot())
         offset = 8 + 25
@@ -146,7 +146,7 @@ class AndroidShimTests(unittest.TestCase):
     def test_png_trailing_zlib_stream_rejected(self):
         import struct
         import zlib
-        from alice_pro.android_shim import validate_png
+        from printer_service.android_shim import validate_png
 
         png = AndroidShim().screenshot()
         offset = 33
@@ -160,7 +160,7 @@ class AndroidShimTests(unittest.TestCase):
     def test_png_invalid_filter_rejected(self):
         import struct
         import zlib
-        from alice_pro.android_shim import validate_png
+        from printer_service.android_shim import validate_png
 
         png = AndroidShim().screenshot()
         offset = 33

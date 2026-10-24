@@ -75,14 +75,14 @@ Those are owned by #1096 and need separate staging/start gates.
   not wall thickness, physical fit, strength, bed contact or printability.
 - A saved STL is **not** a sliced `.gcode.3mf`; slicing and staging
   belong to #1096. Users must not assume a CAD tool has started a print.
-- The standalone `scripts/alice_model_addcube.py` remains supported;
+- The standalone `scripts/model_add_cube.py` remains supported;
   the registry-based tool uses the immutable scene engine instead.
 
 ## Local verification
 
 ```bash
 python -m unittest discover -s tests -p test_model_editor_tools.py -v
-python -m unittest discover -s tests -p test_alice_model_addcube.py -v
+python -m unittest discover -s tests -p test_model_add_cube.py -v
 ruff check model_editor tests/test_model_editor_tools.py
 ruff format --check model_editor tests/test_model_editor_tools.py
 mypy --config-file pyproject.toml --follow-imports=silent model_editor

@@ -40,20 +40,20 @@ def test_cli_error_and_empty_paths(tmp_path, capsys):
     assert "Config error" in capsys.readouterr().err
 
     with patch("keel.__main__.load_config", side_effect=RuntimeError("boom")):
-        assert cmd_validate(_args(config_dir="config/alice")) == 1
+        assert cmd_validate(_args(config_dir="config/platform")) == 1
         assert "Error: boom" in capsys.readouterr().err
 
     with (
         patch("keel.__main__.load_config", return_value={}),
         patch("keel.__main__.generate_health_plan", return_value=[]),
     ):
-        assert cmd_health(_args(lane="test", config_dir="config/alice")) == 0
+        assert cmd_health(_args(lane="test", config_dir="config/platform")) == 0
         assert "no health checks" in capsys.readouterr().out
 
     with patch("keel.__main__.load_config", side_effect=ConfigError("bad")):
-        assert cmd_health(_args(lane="test", config_dir="config/alice")) == 1
+        assert cmd_health(_args(lane="test", config_dir="config/platform")) == 1
     with patch("keel.__main__.load_config", side_effect=RuntimeError("boom")):
-        assert cmd_health(_args(lane="test", config_dir="config/alice")) == 1
+        assert cmd_health(_args(lane="test", config_dir="config/platform")) == 1
 
 
 @pytest.mark.parametrize("command", ["plan", "reconcile"])

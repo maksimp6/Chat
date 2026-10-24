@@ -19,8 +19,8 @@ import zipfile
 from collections.abc import Sequence
 from pathlib import Path
 
-from scripts import alice_a1mini_bagclip_slice as bagclip
-from scripts.alice_a1mini_pla_cube_slice import (
+from scripts import a1mini_bagclip_slice as bagclip
+from scripts.a1mini_pla_cube_slice import (
     _read_sliced_archive,
     _validate_gcode,
     _validate_profile,

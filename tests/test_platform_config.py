@@ -407,7 +407,7 @@ class TestIntegration:
 
 
 def test_core_platform_config_excludes_product_and_lab_experiments():
-    config = load_config(Path("config/alice"))
+    config = load_config(Path("config/platform"))
 
     services = config["services"]
     assert "dota-commentator" not in services
@@ -494,7 +494,7 @@ class TestContainerAppsScalingContract:
             load_config(config_dir)
 
     def test_repository_runtime_profiles_are_exact(self):
-        config = load_config(Path("config/alice"))
+        config = load_config(Path("config/platform"))
         services = config["services"]
 
         expected = {
@@ -527,7 +527,7 @@ class TestContainerAppsScalingContract:
             assert service["idle_timeout_seconds"] == contract["idle_timeout_seconds"]
 
     def test_prod_and_lab_are_isolated_by_lane(self):
-        config = load_config(Path("config/alice"))
+        config = load_config(Path("config/platform"))
         production = set(config["lanes"]["production"]["services"])
         test = set(config["lanes"]["test"]["services"])
 
@@ -537,7 +537,7 @@ class TestContainerAppsScalingContract:
         assert "alice-lab" not in production
 
     def test_browser_is_shared_capability_but_single_instance(self):
-        config = load_config(Path("config/alice"))
+        config = load_config(Path("config/platform"))
         browser = config["services"]["alice-browser"]
 
         assert "alice-browser" in config["lanes"]["production"]["services"]
@@ -546,17 +546,17 @@ class TestContainerAppsScalingContract:
         assert browser["max_instances"] == 1
 
     def test_runtime_services_keep_oauth_dependency(self):
-        config = load_config(Path("config/alice"))
+        config = load_config(Path("config/platform"))
         for name in ("alice", "alice-lab", "alice-browser"):
             assert "oauth" in config["services"][name]["depends_on"]
 
     def test_legacy_services_remain_during_migration(self):
-        config = load_config(Path("config/alice"))
+        config = load_config(Path("config/platform"))
         assert "oauth" in config["services"]
         assert "chrome" in config["services"]
 
     def test_runtime_names_are_stable(self):
-        config = load_config(Path("config/alice"))
+        config = load_config(Path("config/platform"))
         runtime = {"alice", "alice-lab", "alice-browser"}
         assert runtime.issubset(config["services"])
         for forbidden in ("alice-prod", "alice-dev", "browser"):

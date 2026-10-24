@@ -105,7 +105,7 @@ vision weights are present**, and photographic accuracy remains unknown.
 Train a private 0600 model and evaluate over actual loopback HTTP on the
 original hash-pinned local gallery:
 
-    python3 -m scripts.alice_vision_loopback evaluate \
+    python3 -m scripts.vision_loopback evaluate \
       --train-manifest tests/fixtures/visual3d_cases.json \
       --eval-manifest tests/fixtures/visual3d_cases.json \
       --gallery /path/to/authorized/private/gallery \
@@ -114,7 +114,7 @@ original hash-pinned local gallery:
 
 Evaluate the distinct pinned overview.png (six held-out render panels):
 
-    python3 -m scripts.alice_vision_loopback evaluate \
+    python3 -m scripts.vision_loopback evaluate \
       --train-manifest tests/fixtures/visual3d_cases.json \
       --eval-manifest tests/fixtures/visual3d_holdout.json \
       --gallery /path/to/authorized/private/gallery \
@@ -143,7 +143,7 @@ RDC, printers, live services or the Android UI.
 To quantify failure modes, generate dim/bright/blur/mirror/grayscale/occluded
 variations **on the same authorized device**, never into public GitHub:
 
-    python3 -m scripts.alice_vision_perturbations \
+    python3 -m scripts.vision_perturbations \
       --manifest tests/fixtures/visual3d_holdout.json \
       --gallery /path/to/authorized/private/gallery \
       --private-out /path/to/private/synthetic-corpus

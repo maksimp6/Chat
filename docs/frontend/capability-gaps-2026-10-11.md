@@ -231,7 +231,7 @@ box — физической посадкой. Owners #1097/#1079; live deployed
 
 **Тип:** backend integration/transport gaps + будущий UI.
 [#1101](https://github.com/maksimp6/Chat/pull/1101) —
-[calibration-cube script](https://github.com/maksimp6/Chat/blob/c597beea512f18b518512947c70422530030995d/scripts/alice_a1mini_pla_cube_slice.py)
+[calibration-cube script](https://github.com/maksimp6/Chat/blob/c597beea512f18b518512947c70422530030995d/scripts/a1mini_pla_cube_slice.py)
 и workflow proof, не общий slicer/job API. [#1109](https://github.com/maksimp6/Chat/pull/1109)
 даёт [offline plate inspection](https://github.com/maksimp6/Chat/blob/d535922a5dfd16aa59efb080b5252df5eab8cebf/printing3d/plate.py),
 не upload/controller. Оба Draft.

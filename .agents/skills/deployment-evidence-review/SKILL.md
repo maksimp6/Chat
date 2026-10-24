@@ -16,7 +16,7 @@ Exact source head, current canonical config/schema, admitted checks, immutable i
 Read repository config, planner/validators and existing provider evidence. Use dry-run fixtures that count mutation calls.
 
 ## Procedure
-1. Keep three layers aligned: docs explain policy; config/alice stores desired facts; alice_platform observes/plans/reconciles.
+1. Keep three layers aligned: docs explain policy; config/platform stores desired facts; alice_platform observes/plans/reconciles.
 2. Validate unknown fields, duplicate resources, dependency cycles, secret-value exclusion and exact admitted origins.
 3. Inventory service-specific authentication and lifecycle: IAM, deploy, gateway, model, storage and database credentials are not interchangeable. Distinguish app/build/audit/gateway/model logs.
 4. Confirm read-only observation is provider-backed; unknown observations stay UNKNOWN/BLOCKED. Assert dry-run performs zero mutations.

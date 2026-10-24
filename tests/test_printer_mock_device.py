@@ -6,7 +6,7 @@ import struct
 
 import pytest
 
-from alice_pro.printers.bambu_a1mini import PrinterProtocolError, probe
+from printer_service.printers.bambu_a1mini import PrinterProtocolError, probe
 
 
 def framed(payload):
@@ -70,7 +70,7 @@ def mock_printer(monkeypatch):
         sock.settimeout(timeout)
         return sock
 
-    monkeypatch.setattr("alice_pro.printers.lan_socket.connect_lan", connect)
+    monkeypatch.setattr("printer_service.printers.lan_socket.connect_lan", connect)
     return sockets, connections
 
 
@@ -100,7 +100,7 @@ def test_mock_discovery_fragmented_tcp(mock_printer):
 )
 def test_mock_malformed_and_missing_identity(monkeypatch, reply):
     monkeypatch.setattr(
-        "alice_pro.printers.lan_socket.connect_lan", lambda *a, **kw: MockPrinterSocket(reply)
+        "printer_service.printers.lan_socket.connect_lan", lambda *a, **kw: MockPrinterSocket(reply)
     )
     with pytest.raises(PrinterProtocolError):
         probe("printer.example.test")
@@ -108,7 +108,7 @@ def test_mock_malformed_and_missing_identity(monkeypatch, reply):
 
 def test_mock_rejects_invalid_timeout_without_network(monkeypatch):
     monkeypatch.setattr(
-        "alice_pro.printers.lan_socket.connect_lan", lambda *a, **kw: pytest.fail("network used")
+        "printer_service.printers.lan_socket.connect_lan", lambda *a, **kw: pytest.fail("network used")
     )
     with pytest.raises(ValueError):
         probe("printer.example.test", timeout=0)

@@ -2,9 +2,9 @@
 
 import pytest
 
-from alice_pro.printers.service import Transport, identify, cloud_reader
-from alice_pro.printers.cloud_api import CloudApiNotConfigured
-from alice_pro.printers.lan import require_lan_host
+from printer_service.printers.service import Transport, identify, cloud_reader
+from printer_service.printers.cloud_api import CloudApiNotConfigured
+from printer_service.printers.lan import require_lan_host
 
 
 @pytest.mark.parametrize(

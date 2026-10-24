@@ -12,7 +12,7 @@ class TestCLIValidate:
     """CLI validate command tests."""
 
     def test_validate_command_success(self):
-        args = argparse.Namespace(config_dir="config/alice")
+        args = argparse.Namespace(config_dir="config/platform")
         assert cmd_validate(args) == 0
 
     def test_validate_command_default_config_dir(self):
@@ -24,11 +24,11 @@ class TestCLIHealth:
     """CLI health command tests."""
 
     def test_health_command_test_lane(self):
-        args = argparse.Namespace(lane="test", config_dir="config/alice")
+        args = argparse.Namespace(lane="test", config_dir="config/platform")
         assert cmd_health(args) == 0
 
     def test_health_command_production_lane(self):
-        args = argparse.Namespace(lane="production", config_dir="config/alice")
+        args = argparse.Namespace(lane="production", config_dir="config/platform")
         assert cmd_health(args) == 0
 
     def test_health_command_default_config_dir(self):
