@@ -25,6 +25,7 @@ CASE_STATUSES = (
     "REJECTED",
     "ARCHIVED",
 )
+EDITABLE_STATUSES = ("DRAFT", "PENDING_USER_DATA", "READY_FOR_APPROVAL")
 IP_REQUIRED_FIELDS = ("full_name", "birth_date", "citizenship", "passport")
 
 
@@ -128,16 +129,24 @@ def collect_data(case_id: str, data: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(data, Mapping):
         raise ValueError("data must be an object")
     case = _require_case(case_id)
+    if case["status"] not in EDITABLE_STATUSES:
+        raise ValueError("case data cannot be changed in its current state")
     payload = dict(case["payload"])
     payload.update(dict(data))
     case["payload"] = payload
-    if case["status"] == "DRAFT":
-        case["status"] = "PENDING_USER_DATA"
+    # The approval and the prepared documents describe the data they were made from. New data
+    # invalidates both, so the user approves exactly what will be submitted.
+    case["status"] = "PENDING_USER_DATA"
+    case["user_approved"] = False
+    case["approval_at"] = None
+    case["documents"] = []
     return _save(case)
 
 
 def validate_data(case_id: str) -> dict[str, Any]:
     case = _require_case(case_id)
+    if case["status"] not in EDITABLE_STATUSES:
+        raise ValueError("case data cannot be validated in its current state")
     case["status"] = "VALIDATING"
     payload = case["payload"]
     errors = [
@@ -151,6 +160,10 @@ def validate_data(case_id: str) -> dict[str, Any]:
     ):
         errors.append({"field": "okved", "code": "invalid_format"})
     case["status"] = "PENDING_USER_DATA" if errors else "READY_FOR_APPROVAL"
+    if errors:
+        # An approval given for data that no longer validates does not carry over.
+        case["user_approved"] = False
+        case["approval_at"] = None
     saved = _save(case)
     return {
         "case_id": saved["case_id"],
@@ -245,6 +258,8 @@ def process_response(case_id: str, response: Mapping[str, Any]) -> dict[str, Any
     if not isinstance(response, Mapping):
         raise ValueError("response must be an object")
     case = _require_case(case_id)
+    if case["status"] not in {"SUBMITTED", "PROCESSING"}:
+        raise ValueError("responses are accepted only for a submitted case")
     case["responses"].append(
         {
             "response_id": "response-" + uuid4().hex[:12],

@@ -220,19 +220,27 @@ def update_partner(
     partner_id = str(arguments.get("partner_id") or "").strip()
     if not partner_id:
         raise ValueError("partner_id is required")
-    if not _get_partner(owner_id, partner_id):
+    existing = _get_partner(owner_id, partner_id)
+    if not existing:
         raise ValueError("partner not found")
 
-    allowed = {
-        "name": str(arguments.get("name") or "").strip(),
-        "organization": str(arguments.get("organization") or "").strip(),
-        "email": str(arguments.get("email") or "").strip(),
-        "phone": str(arguments.get("phone") or "").strip(),
-        "notes": str(arguments.get("notes") or "").strip(),
-    }
-    status = _validate_status(arguments.get("status") or "lead", PARTNER_STATUSES, "partner status")
+    # A partial update changes only the fields it names; absent fields keep their stored values.
+    changes: dict[str, Any] = {}
+    for field in ("organization", "email", "phone", "notes"):
+        if field in arguments:
+            changes[field] = str(arguments.get(field) or "").strip()
+    if "name" in arguments:
+        name = str(arguments.get("name") or "").strip()
+        if not name:
+            raise ValueError("partner name is required")
+        changes["name"] = name
+    if arguments.get("status") is not None:
+        changes["status"] = _validate_status(
+            arguments["status"], PARTNER_STATUSES, "partner status"
+        )
+    status = changes.get("status", existing["status"])
     now = _now()
-    _update_owned("partner", partner_id, owner_id, {**allowed, "status": status, "updated_at": now})
+    _update_owned("partner", partner_id, owner_id, {**changes, "updated_at": now})
     _trace_event(
         cfg,
         "partner_action",
@@ -655,7 +663,7 @@ PARTNER_TOOLS = {
                 "status": {"type": "string", "enum": list(PARTNER_STATUSES)},
                 "notes": {"type": "string", "maxLength": 10000},
             },
-            ["partner_id", "name", "organization", "email", "phone", "status", "notes"],
+            ["partner_id"],
         ),
         "capabilities": ["partner", "crm"],
         "risk_level": "medium",
@@ -899,7 +907,7 @@ def _http_owner() -> str:
 def partners_list():
     try:
         return jsonify(list_partners({}))
-    except Exception as exc:
+    except TreasuryIdentityError as exc:
         return jsonify({"error": str(exc)}), 401
 
 
