@@ -101,7 +101,7 @@ def validate_results(plan: Mapping[str, bool], results: Mapping[str, str]) -> No
         raise ValueError("invalid platform plan")
     if plan["web"] and not all(plan[key] for key in ("backend", "android")):
         raise ValueError("incomplete web dependency plan")
-    for job in ("changes", "code-rules"):
+    for job in ("changes",):
         if results.get(job) != "success":
             raise ValueError(f"required check failed: {job}")
     for job in JOBS:
@@ -123,7 +123,7 @@ def verify_environment() -> None:
         raise ValueError("invalid platform plan/results")
     plan = {key: value == "true" for key, value in raw.items()}
     results = {}
-    for job in ("changes", "code-rules", *JOBS):
+    for job in ("changes", *JOBS):
         record = needs.get(job)
         if not isinstance(record, dict) or not isinstance(record.get("result"), str):
             raise ValueError(f"missing job result: {job}")

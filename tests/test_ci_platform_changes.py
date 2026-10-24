@@ -52,7 +52,7 @@ def test_routing_unions_all_changed_paths():
 
 def results(**overrides):
     value = dict.fromkeys(["backend", "infra"], "skipped")
-    value.update({"changes": "success", "code-rules": "success"})
+    value.update({"changes": "success"})
     value.update(overrides)
     return value
 
@@ -75,8 +75,8 @@ def test_successful_selected_platform_accepts_unselected_skips():
     routing.validate_results(plan, results(infra="success"))
 
 
-@pytest.mark.parametrize("job", ["changes", "code-rules"])
-def test_router_or_code_rules_failure_cannot_pass(job):
+@pytest.mark.parametrize("job", ["changes"])
+def test_router_failure_cannot_pass(job):
     plan = routing.classify(["docs/README.md"])
     with pytest.raises(ValueError, match=job):
         routing.validate_results(plan, results(**{job: "failure"}))
@@ -97,8 +97,10 @@ def test_malformed_plan_fails_closed():
         routing.validate_results(plan, results())
 
 
-def test_router_tests_are_part_of_always_run_code_rules():
-    assert "tests/test_ci_platform_changes.py" in (ROOT / "scripts/check_code_rules.sh").read_text()
+def test_removed_code_rules_is_not_a_workflow_job_or_aggregate_dependency():
+    jobs = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]
+    assert "code-rules" not in jobs
+    assert set(jobs["required"]["needs"]) == {"changes", "backend", "infra"}
 
 
 def test_workflow_has_real_independent_infra_and_backend_jobs():

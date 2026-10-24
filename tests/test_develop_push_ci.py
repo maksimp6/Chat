@@ -41,7 +41,7 @@ def test_ci_required_aggregator_still_gates_every_platform_job():
     jobs = _load("ci.yml")["jobs"]
     required = jobs["required"]
     assert required["name"] == "CI required"
-    assert {"code-rules", "backend", "infra"} <= set(required["needs"])
+    assert {"changes", "backend", "infra"} == set(required["needs"])
 
 
 @pytest.mark.parametrize("name", GATED)

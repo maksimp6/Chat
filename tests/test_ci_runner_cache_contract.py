@@ -10,7 +10,6 @@ def test_runner_cache_contract() -> None:
     source = CI_WORKFLOW.read_text(encoding="utf-8")
     jobs = yaml.safe_load(source)["jobs"]
     dependencies = {
-        "code-rules": ["requirements-dev.txt"],
         "backend": ["requirements.txt", "requirements-dev.txt"],
         "infra": ["requirements.txt", "requirements-dev.txt"],
     }

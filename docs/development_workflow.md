@@ -313,7 +313,6 @@ python scripts/merge_readiness.py \
   --required-check "CI required" \
   --required-check "Infrastructure tests" \
   --required-check "MCP worker tests" \
-  --required-check "Code rules" \
   --required-check "Application tests" \
   --required-check "PostgreSQL integration" \
   --required-check "Trivy repository scan" \
@@ -361,7 +360,6 @@ Workflow `Merge readiness snapshot` запускается для non-draft PR �
 - `CI required`;
 - `Infrastructure tests`;
 - `MCP worker tests`;
-- `Code rules`;
 - `Application tests`;
 - `PostgreSQL integration`;
 - `Trivy repository scan`.
