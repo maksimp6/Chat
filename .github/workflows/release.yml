@@ -42,6 +42,12 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+          lfs: true
+      - name: Verify pinned Chaquopy runtime from LFS
+        id: policy_step_01b
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
+        run: python3 scripts/fetch_chaquopy_runtime.py --verify-only android/runtime
       - name: Set up Java
         id: policy_step_02
         continue-on-error: true

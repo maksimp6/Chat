@@ -46,6 +46,17 @@ def test_release_verifies_identity_and_metadata_before_publish() -> None:
     assert "versionName='${GITHUB_REF_NAME#v}'" in workflow
 
 
+def test_release_fetches_lfs_runtime_and_verifies_pins_before_publish() -> None:
+    workflow = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+    checkout = workflow.index("uses: actions/checkout@")
+    verification = workflow.index("- name: Verify pinned Chaquopy runtime from LFS")
+    publication = workflow.index("- name: Publish GitHub Release")
+
+    assert checkout < verification < publication
+    assert "lfs: true" in workflow[checkout:verification]
+    assert "scripts/fetch_chaquopy_runtime.py --verify-only android/runtime" in workflow
+
+
 def test_job_level_env_does_not_use_step_only_contexts() -> None:
     # GitHub rejects the whole workflow when jobs.<id>.env references the runner context.
     for path in WORKFLOWS.glob("*.yml"):
