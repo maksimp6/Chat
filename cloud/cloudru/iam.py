@@ -307,5 +307,11 @@ class CloudRuIamClient:
         body = {"expires_at": expires_at} if expires_at else {}
         return self._request("POST", path, json_body=body)
 
+    def delete_api_key(self, *, api_key_id: str) -> dict[str, Any]:
+        """Revoke an API key that was issued but never stored, so no live credential is left behind."""
+        if not api_key_id.strip():
+            raise ValueError("api_key_id is required")
+        return self._request("DELETE", f"{API_KEYS_PATH}/{api_key_id.strip()}")
+
 
 __all__ = ["CloudRuIamError", "CloudRuIamClient"]

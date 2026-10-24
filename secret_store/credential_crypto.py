@@ -29,6 +29,10 @@ def _fernet():
     return Fernet(derived), InvalidToken
 
 
+def encryption_configured() -> bool:
+    return bool(os.getenv("LOGOS_PROVIDER_CREDENTIAL_KEY", "").strip())
+
+
 def encrypt_secret(value: str) -> str:
     fernet, _ = _fernet()
     if fernet is None:

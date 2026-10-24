@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import hmac
 import json
 import os
 import logging
@@ -11,7 +12,12 @@ import uuid
 from flask import Blueprint, jsonify, request
 
 from core.config import config
-from secret_store.credential_crypto import CredentialCryptoError, decrypt_secret, encrypt_secret
+from secret_store.credential_crypto import (
+    CredentialCryptoError,
+    decrypt_secret,
+    encrypt_secret,
+    encryption_configured,
+)
 from storage.db import get_store
 from provider_accounts.credentials import list_provider_credentials
 from provider_accounts.credentials import (
@@ -53,7 +59,7 @@ def _authorized() -> bool:
     if configured:
         auth = request.headers.get("Authorization", "")
         token = auth[7:].strip() if auth.startswith("Bearer ") else ""
-        return bool(token) and token == configured
+        return bool(token) and hmac.compare_digest(token.encode("utf-8"), configured.encode("utf-8"))
 
     # When the application's short-token gate is enabled, its before_request
     # middleware has already authenticated this request. Reuse that session
@@ -224,12 +230,21 @@ def _perform_health_check(provider: str) -> dict:
             _provider_client(provider).validate_key(credential.api_key)
         error = None
         status = "connected"
-    except PermissionError:
-        logger.exception("Provider health check authorization failed: provider=%s", provider)
+    except PermissionError as exc:
+        # The exception text is not logged: it can echo request details, and the key must never reach a log.
+        logger.error(
+            "Provider health check authorization failed: provider=%s error=%s",
+            provider,
+            type(exc).__name__,
+        )
         error = "authorization_failed"
         status = "invalid"
-    except Exception:
-        logger.exception("Provider health check failed: provider=%s", provider)
+    except Exception as exc:
+        logger.error(
+            "Provider health check failed: provider=%s error=%s",
+            provider,
+            type(exc).__name__,
+        )
         error = "provider_unavailable"
         status = "unavailable"
 
@@ -357,6 +372,34 @@ def cloudru_service_accounts():
         ), 502
 
 
+def _discard_cloudru_key(management, api_key_id) -> None:
+    """Revoke a Cloud.ru key that was issued but never stored, so no live credential is left behind."""
+    if management is None or not api_key_id:
+        return
+    try:
+        management.delete_api_key(api_key_id=api_key_id)
+    except Exception as exc:
+        logger.error(
+            "Cloud.ru key %s was issued but could not be revoked: error=%s; revoke it in the console",
+            api_key_id,
+            type(exc).__name__,
+        )
+
+
+def _revoke_replaced_yandex_key(previous: ProviderCredential) -> None:
+    """Revoke the Yandex key that a replacement has superseded, once the replacement is stored."""
+    key_id = previous.provider_key_id or previous.yandex_key_id
+    if not key_id:
+        # A key entered by hand has no provider identity to revoke.
+        return
+    try:
+        _provider_client(YANDEX, previous.project_id).revoke_key(key_id)
+    except Exception as exc:
+        logger.error(
+            "Replaced Yandex key %s could not be revoked: error=%s", key_id, type(exc).__name__
+        )
+
+
 @provider_credentials_bp.post("/cloudru/bootstrap")
 @traced_operation("cloudru.bootstrap")
 def bootstrap_cloudru():
@@ -405,6 +448,14 @@ def bootstrap_cloudru():
             }
         ), 400
 
+    if not encryption_configured():
+        # The IAM master secret can issue every Cloud.ru key, so it is never stored unencrypted.
+        return jsonify(
+            {
+                "error": "encryption_not_configured",
+                "detail": "Задайте LOGOS_PROVIDER_CREDENTIAL_KEY: ключ IAM нельзя сохранить открытым текстом.",
+            }
+        ), 503
     iam_expires_raw = pick("expiresAt", "expires_at", "keyExpiresAt", "key_expires_at")
     iam_expires_at = None
     if iam_expires_raw:
@@ -415,6 +466,8 @@ def bootstrap_cloudru():
         except ValueError:
             return jsonify({"error": "invalid_cloudru_iam_master_key_expiry"}), 400
 
+    management = None
+    issued_id = None
     try:
         # Static API keys are issued directly for an existing service account.
         # Do not enumerate or auto-create accounts here: the Cloud.ru API documents
@@ -436,6 +489,7 @@ def bootstrap_cloudru():
                 {"error": "Cloud.ru API-key creation did not return key ID and secret"}
             ), 502
 
+        issued_id = api_key_id
         provider = CloudRuApiKeyProvider(base_url=config.CLOUDRU_BASE_URL, iam_client=management)
         provider.validate_key(api_secret)
 
@@ -457,6 +511,8 @@ def bootstrap_cloudru():
             provider_key_id=api_key_id,
             ttl=_cloudru_ttl(),
         )
+        # Stored now: this is the active key, so it must not be revoked from here on.
+        issued_id = None
         record_health_check(conn, CLOUDRU, status="connected", error=None)
 
         return jsonify(
@@ -471,10 +527,13 @@ def bootstrap_cloudru():
                 },
             }
         )
-    except PermissionError:
+    except PermissionError as exc:
+        _discard_cloudru_key(management, issued_id)
+        logger.error("Cloud.ru key validation was refused: error=%s", type(exc).__name__)
         return jsonify({"error": "Cloud.ru Foundation Models authorization failed"}), 401
-    except Exception:
-        logger.exception("Cloud.ru bootstrap failed")
+    except Exception as exc:
+        _discard_cloudru_key(management, issued_id)
+        logger.error("Cloud.ru bootstrap failed: error=%s", type(exc).__name__)
         return jsonify(
             {
                 "error": "cloudru_bootstrap_failed",
@@ -533,6 +592,7 @@ def update_provider_credentials():
     if any(len(value) > 4096 for _, value in supplied):
         return jsonify({"error": "API key is too long"}), 400
 
+    stored_providers: list[str] = []
     try:
         for provider, api_key in supplied:
             client = _provider_client(provider, yandex_project_id if provider == YANDEX else None)
@@ -551,8 +611,12 @@ def update_provider_credentials():
                         "status": "invalid",
                     }
                 ), 401
-            except Exception:
-                logger.exception("provider credential validation failed: provider=%s", provider)
+            except Exception as exc:
+                logger.error(
+                    "provider credential validation failed: provider=%s error=%s",
+                    provider,
+                    type(exc).__name__,
+                )
                 return jsonify(
                     {
                         "error": "provider_health_check_failed",
@@ -565,6 +629,11 @@ def update_provider_credentials():
                 logger.debug("provider credential accepted for storage: provider=%s", provider)
 
         conn = get_store()
+        # The Yandex key being replaced is revoked only after the new one is stored, so the provider
+        # never holds an active key that nothing in Logos uses.
+        previous_yandex = (
+            _load_credential(YANDEX) if any(p == YANDEX for p, _ in supplied) else None
+        )
         for provider, api_key in supplied:
             replace_active_credential(
                 conn,
@@ -583,16 +652,21 @@ def update_provider_credentials():
                 status="connected" if provider == CLOUDRU else "configured",
                 error=None,
             )
+            stored_providers.append(provider)
+        if previous_yandex is not None:
+            _revoke_replaced_yandex_key(previous_yandex)
     except Exception as exc:
-        logger.exception(
+        logger.error(
             "Provider credential storage failed: providers=%s error=%s",
             [provider for provider, _ in supplied],
-            exc,
+            type(exc).__name__,
         )
         return jsonify(
             {
                 "error": "credential_storage_failed",
                 "detail": "Ключ проверен, но сервер не смог сохранить его. Подробности записаны в серверный лог.",
+                # Providers stored before the failure: their new keys are active.
+                "stored_providers": stored_providers,
             }
         ), 503
 
