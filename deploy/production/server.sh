@@ -15,10 +15,19 @@ ACME_FILE="$ACME_DIR/acme.json"
 log() { printf '[production] %s\n' "$*"; }
 die() { printf '[production] ERROR: %s\n' "$*" >&2; exit 1; }
 
+# Secrets arrive on stdin, one per line, so they never appear in process
+# arguments: the short token, then the optional GitHub OAuth App client id,
+# client secret and allowed account ids. Values already in the environment win.
 require_runtime_secret() {
-  if [[ -z "${ALICE_SHORT_TOKEN:-}" ]]; then
-    IFS= read -r ALICE_SHORT_TOKEN || true
-  fi
+  local line
+  IFS= read -r line || true
+  ALICE_SHORT_TOKEN="${ALICE_SHORT_TOKEN:-$line}"
+  IFS= read -r line || true
+  ALICE_GITHUB_CLIENT_ID="${ALICE_GITHUB_CLIENT_ID:-$line}"
+  IFS= read -r line || true
+  ALICE_GITHUB_CLIENT_SECRET="${ALICE_GITHUB_CLIENT_SECRET:-$line}"
+  IFS= read -r line || true
+  ALICE_GITHUB_ALLOWED_IDS="${ALICE_GITHUB_ALLOWED_IDS:-$line}"
   [[ -n "${ALICE_SHORT_TOKEN:-}" ]] || die "ALICE_SHORT_TOKEN is required"
 }
 
@@ -57,6 +66,8 @@ deploy() {
   ensure_provider_credential_key
   validate_traefik
   mkdir -p "$ROOT_DIR/incoming" "$ROOT_DIR/production"
+  local pairing_dir="${ALICE_RDC_ROOT:-$ROOT_DIR/services/remote-desktop-commander}/pairing"
+  mkdir -p "$pairing_dir"
 
   local workdir="$ROOT_DIR/production/build"
   rm -rf -- "$workdir"
@@ -71,6 +82,13 @@ deploy() {
     printf 'ALICE_REQUIRE_SHORT_TOKEN=1\n'
     printf 'ALICE_SHORT_TOKEN=%s\n' "$ALICE_SHORT_TOKEN"
     printf 'ALICE_PROVIDER_CREDENTIAL_KEY=%s\n' "$ALICE_PROVIDER_CREDENTIAL_KEY"
+    # Optional GitHub sign-in (identity/github_oauth.py); disabled unless both OAuth values are set.
+    if [[ -n "${ALICE_GITHUB_CLIENT_ID:-}" && -n "${ALICE_GITHUB_CLIENT_SECRET:-}" ]]; then
+      printf 'ALICE_GITHUB_CLIENT_ID=%s\n' "$ALICE_GITHUB_CLIENT_ID"
+      printf 'ALICE_GITHUB_CLIENT_SECRET=%s\n' "$ALICE_GITHUB_CLIENT_SECRET"
+      printf 'ALICE_GITHUB_REDIRECT_URI=%s\n' "${ALICE_GITHUB_REDIRECT_URI:-https://maxxxpavlov.ru/auth/github/callback}"
+      printf 'ALICE_GITHUB_ALLOWED_IDS=%s\n' "${ALICE_GITHUB_ALLOWED_IDS:-}"
+    fi
   ) > "$runtime_env"
 
   log "building $IMAGE_NAME"
@@ -86,6 +104,8 @@ deploy() {
     --restart unless-stopped \
     --network "$NETWORK_NAME" \
     --env-file "$runtime_env" \
+    --mount "type=bind,src=$pairing_dir,dst=/app/rdc-pairing,readonly" \
+    -e ALICE_RDC_PAIRING_FILE=/app/rdc-pairing/handoff.json \
     --label "traefik.enable=true" \
     --label "traefik.docker.network=$NETWORK_NAME" \
     --label "traefik.http.routers.alice-production-http.rule=$route_rule" \
@@ -105,6 +125,8 @@ deploy() {
     --label "traefik.http.services.alice-production.loadbalancer.server.port=8080" \
     -e HOST=0.0.0.0 \
     -e PORT=8080 \
+    -e CLOUDRU_MONTHLY_BUDGET=10000 \
+    -e CLOUDRU_BILLING_CURRENCY=RUB \
     "$IMAGE_NAME" >/dev/null
 
   local health_status

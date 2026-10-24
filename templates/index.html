@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, initial-scale=1.0, viewport-fit=cover"
     />
-    <title>Alice Pro</title>
+    <title>Logos</title>
     {% set static_root = (preview_base_path ~ "/static") if preview_base_path else "/static" %}
     <link rel="stylesheet" href="{{ static_root }}/style.css?v={{ static_version }}" />
     <link
@@ -65,14 +65,13 @@
     <script src="{{ static_root }}/theme_assistant.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/sidebar.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/models.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/trace_summary.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/execution_surface.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/chat.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/trace_viewer.js?v={{ static_version }}" defer></script>
-    <script
-      src="{{ static_root }}/trace_viewer_timing_fix.js?v={{ static_version }}"
-      defer
-    ></script>
+    <script src="{{ static_root }}/trace_viewer_timing.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/trace_viewer_error_ui.js?v={{ static_version }}" defer></script>
-    <script src="{{ static_root }}/trace_viewer_auto.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/trace_viewer_bridge.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/voice.js?v={{ static_version }}" defer></script>
     <script
       src="{{ static_root }}/android_diagnostics.js?v={{ static_version }}"
@@ -265,6 +264,17 @@
                 alt=""
                 width="22"
                 height="22" /></a
+            >{% endif %}{% if github_login_enabled %}<a
+              id="github-login-btn"
+              class="header-btn github-login-btn"
+              href="{{ preview_base_path }}{{ github_login_url }}"
+              title="{{ ('GitHub: ' ~ github_login) if github_login else 'Войти через GitHub' }}"
+              aria-label="{{ ('GitHub: ' ~ github_login) if github_login else 'Войти через GitHub' }}"
+              ><svg viewBox="0 0 16 16" width="22" height="22" aria-hidden="true" focusable="false">
+                <path
+                  fill="currentColor"
+                  d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
+                /></svg></a
             >{% endif %}<button
               id="theme-toggle"
               type="button"
@@ -288,7 +298,7 @@
             {% for message in selected_messages %}
             <article class="server-message server-message-{{ message.role }}">
               <header class="server-message-role">
-                {{ "Вы" if message.role == "user" else "Alice Pro" }}
+                {{ "Вы" if message.role == "user" else "Logos" }}
               </header>
               <div class="server-message-content">{{ message.text }}</div>
             </article>

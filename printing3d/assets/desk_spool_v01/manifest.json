@@ -1,0 +1,75 @@
+{
+  "name": "Alice Pro Desk Spool Stand v0.1",
+  "target_printer": "Bambu Lab A1 mini",
+  "material": "PETG (1 color, no AMS)",
+  "max_nominal_spool": "1 kg, diameter 200 mm, width up to 85 mm, core opening >=36 mm",
+  "parts_to_print": {
+    "base_frame": 1,
+    "upright_A_print_twice": 2,
+    "axle_D_section": 1
+  },
+  "no_extra_hardware": true,
+  "assembly_length_mm": 158.0,
+  "assembly_depth_mm": 136.0,
+  "axis_height_mm": 138.0,
+  "fit_tolerance_per_side_mm": 0.35,
+  "manufacturing": {
+    "nozzle_mm": 0.4,
+    "layer_height_mm": 0.2,
+    "walls": 4,
+    "infill": "25-35% gyroid",
+    "supports": "none for base/stand; review slicer for axle",
+    "brim": "recommended 5mm for axle"
+  },
+  "status": "CAD prototype; require physical dry-fit and printer-specific slicing verification",
+  "checks": {
+    "base_frame": {
+      "file": "base_frame.stl",
+      "sha256": "01794175c431e85af2e8acfb6a022e91651cbd419c11be8004da866e06a85c76",
+      "dimensions_mm": [
+        158.0,
+        136.0,
+        9.0
+      ],
+      "volume_cm3": 93.21,
+      "watertight": true,
+      "winding_consistent": true,
+      "components": 1,
+      "faces": 124,
+      "fits_A1_mini_build_area": true,
+      "on_bed": true
+    },
+    "upright_A_print_twice": {
+      "file": "upright_A_print_twice.stl",
+      "sha256": "04fae68183e27b688d2ca0561f1e0142722196d62a7c3f728fa4b4ff3ceefad0",
+      "dimensions_mm": [
+        151.0,
+        110.0,
+        12.0
+      ],
+      "volume_cm3": 78.39,
+      "watertight": true,
+      "winding_consistent": true,
+      "components": 1,
+      "faces": 216,
+      "fits_A1_mini_build_area": true,
+      "on_bed": true
+    },
+    "axle_D_section": {
+      "file": "axle_D_section.stl",
+      "sha256": "0518998a2f416eae925dca52c1b1542d67df6ac22ac82bf948f0d825eabcc12d",
+      "dimensions_mm": [
+        156.0,
+        34.0,
+        26.47
+      ],
+      "volume_cm3": 73.16,
+      "watertight": true,
+      "winding_consistent": true,
+      "components": 1,
+      "faces": 804,
+      "fits_A1_mini_build_area": true,
+      "on_bed": true
+    }
+  }
+}

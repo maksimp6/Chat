@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { BrowserShim } = require("./browser_dom");
+const { BrowserShim } = require("../browser/emulator/browser_dom");
 
 (async () => {
   const shim = new BrowserShim('<button id="project-tree-btn" type="button"></button>');

@@ -1,0 +1,8 @@
+services:
+  oauth:
+    type: oauth
+    depends_on: []
+  chrome:
+    type: chrome
+    depends_on:
+      - oauth

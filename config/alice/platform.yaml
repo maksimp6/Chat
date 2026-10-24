@@ -1,0 +1,66 @@
+# Keel Platform services definition
+# Each service represents a deployable component
+
+services:
+  oauth:
+    type: oauth
+    depends_on: []
+    scale: 1
+    resources:
+      cpu: "0.1"
+      memory: 256Mi
+    repository: oauth-idp
+    scopes:
+      - browser.read
+      - browser.control
+
+  chrome:
+    type: chrome
+    depends_on:
+      - oauth
+    scale: 0
+    resources:
+      cpu: "0.5"
+      memory: 1024Mi
+    repository: chrome-worker
+    owner_id: "293531601"
+
+  alice:
+    type: alice
+    depends_on:
+      - oauth
+    scale: 0
+    min_instances: 0
+    max_instances: 1
+    idle_timeout_seconds: 60
+    resources:
+      cpu: "1"
+      memory: 1024Mi
+    repository: alice
+
+  alice-lab:
+    type: alice
+    depends_on:
+      - oauth
+    scale: 0
+    min_instances: 0
+    max_instances: 1
+    idle_timeout_seconds: 30
+    resources:
+      cpu: "1"
+      memory: 1024Mi
+    repository: alice
+
+  alice-browser:
+    type: chrome
+    depends_on:
+      - oauth
+    scale: 0
+    min_instances: 0
+    max_instances: 1
+    idle_timeout_seconds: 30
+    resources:
+      cpu: "2"
+      memory: 2048Mi
+    repository: chrome-worker
+    owner_id: "293531601"

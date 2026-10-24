@@ -1,0 +1,6 @@
+lanes:
+  test:
+    sign_in: passphrase
+    services:
+      - oauth
+      - chrome

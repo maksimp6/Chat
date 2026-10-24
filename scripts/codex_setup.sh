@@ -9,10 +9,15 @@ mkdir -p "$INSTALL_DIR" "$BIN_DIR"
 
 # Setup runs from the checkout Codex already prepared. Network access and a
 # configured Git remote are not prerequisites: install the scripts we have.
-for name in codex_setup.sh codex_maintenance.sh; do
+for name in codex_setup.sh codex_maintenance.sh codex_cloudru_env.sh codex_agent_credentials.sh; do
   test -f "scripts/$name"
   install -m 700 "scripts/$name" "$INSTALL_DIR/$name"
 done
+
+# Cloud.ru secrets are available during setup only. Normalize the legacy
+# Codex names and materialize a mode-600 hand-off for the deploy CLI.
+# shellcheck disable=SC1091
+source scripts/codex_cloudru_env.sh
 
 python --version | grep -q '3.14'
 node --version | grep -q '^v22\.'
@@ -21,9 +26,6 @@ java -version 2>&1 | head -1 | grep -q '"25'
 python -m pip install --disable-pip-version-check \
   -r requirements.txt -r requirements-dev.txt
 npm install --ignore-scripts --no-audit --no-fund --package-lock=false
-
-mkdir -p "$HOME/.ssh" "$HOME/.gnupg"
-chmod 700 "$HOME/.ssh" "$HOME/.gnupg"
 
 git config --global commit.gpgsign true
 git config --global tag.gpgsign true
@@ -50,8 +52,12 @@ if ! command -v gh >/dev/null 2>&1; then
 fi
 
 gh --version
-if test -n "${GITHUB_TOKEN:-}"; then
-  GH_TOKEN="$GITHUB_TOKEN" gh auth status >/dev/null
+# Setup-only GitHub/GPG/SSH credentials must be installed after gh is present;
+# Codex removes their environment variables before the interactive agent phase.
+# shellcheck disable=SC1091
+source scripts/codex_agent_credentials.sh
+if test -n "${CODEX_GITHUB_TOKEN:+configured}${GITHUB_TOKEN:+configured}"; then
+  gh auth status >/dev/null
 fi
 if ! command -v cloud >/dev/null 2>&1; then
   bash scripts/install_cloud_cli.sh

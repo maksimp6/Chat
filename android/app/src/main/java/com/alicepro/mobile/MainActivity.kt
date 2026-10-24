@@ -144,6 +144,14 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun openBrowserTakeover() {
+            AppLogger.info("AndroidBridge", "Browser takeover opened from web UI")
+            runOnUiThread {
+                startActivity(android.content.Intent(this@MainActivity, BrowserTakeoverActivity::class.java))
+            }
+        }
+
+        @JavascriptInterface
         fun log(level: String, tag: String, message: String) {
             val mappedLevel = when (level.uppercase()) {
                 "DEBUG" -> AppLogger.LogLevel.DEBUG
@@ -163,7 +171,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         AlertDialog.Builder(this)
-            .setTitle("Connect Alice Pro")
+            .setTitle("Connect Logos")
             .setMessage("Enter the Yandex AI Studio API key. It is stored in this app's private preferences and is not bundled into the APK.")
             .setView(input)
             .setCancelable(false)
@@ -253,6 +261,8 @@ class MainActivity : AppCompatActivity() {
         AppLogger.info("LocalAgent", "Starting outbound local agent", mapOf("gateway" to gatewayUrl))
 
         if (!Python.isStarted()) Python.start(AndroidPlatform(this))
+        Python.getInstance().getModule("printer_native_bridge")
+            .callAttr("install_context", applicationContext)
 
         Thread {
             try {
@@ -273,6 +283,8 @@ class MainActivity : AppCompatActivity() {
     private fun startPythonServer(apiKey: String) {
         AppLogger.info("Python", "Starting embedded server")
         if (!Python.isStarted()) Python.start(AndroidPlatform(this))
+        Python.getInstance().getModule("printer_native_bridge")
+            .callAttr("install_context", applicationContext)
 
         Thread {
             try {
@@ -307,7 +319,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 } else {
                     AppLogger.error("Startup", "Local server did not become ready")
-                    Toast.makeText(this, "Alice Pro server did not start", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "Logos server did not start", Toast.LENGTH_LONG).show()
                 }
             }
         }.start()

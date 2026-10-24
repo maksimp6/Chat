@@ -1,6 +1,6 @@
 from browser.adapters import BrowserAdapterRegistry, register_browser_tools
-from trace_manager import ExecutionTrace
-from universal_tool_platform import (
+from observability.trace_manager import ExecutionTrace
+from tool_providers.universal_tool_platform import (
     UniversalToolCall,
     UniversalToolDefinition,
     UniversalToolExecutor,

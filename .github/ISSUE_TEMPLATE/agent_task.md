@@ -1,6 +1,6 @@
 ---
 name: Agent task
-about: A focused task for a coding agent (@claude, @codex, @copilot or @alice)
+about: A focused task for a Logos role agent or coding-agent backend
 title: "[Agent] "
 labels: "agent-task"
 ---
@@ -8,6 +8,22 @@ labels: "agent-task"
 ## Goal
 
 One or two sentences: what should change and why.
+
+## Role
+
+Choose the narrowest matching role in the GitHub Agents UI:
+
+- [ ] Team Lead
+- [ ] Backend Engineer
+- [ ] Frontend Engineer
+- [ ] Android Engineer
+- [ ] Test Engineer
+- [ ] Infra Engineer
+- [ ] Security Reviewer
+- [ ] Docs Engineer
+- [ ] Release Manager
+
+Use the repository role and its approved deterministic tools. External model-backed agents are optional escalation paths, not required executors.
 
 ## Acceptance criteria
 
@@ -30,5 +46,5 @@ What the agent must not change.
 
 ## Dispatch
 
-Mention exactly one agent in a comment, e.g. `@alice please take this`.
-The agent opens a pull request; the maintainer (Claude, see AGENTS.md) merges it after green CI.
+Assign exactly one primary role/agent. The agent opens a pull request; the maintainer
+(see `AGENTS.md`) merges it only after the repository merge gates are satisfied.

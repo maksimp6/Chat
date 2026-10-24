@@ -12,6 +12,14 @@ logs
 __pycache__
 *.pyc
 
+# Local Cloud.ru deployment secrets and backup artifacts
+deploy/cloudru/private
+deploy/cloudru/**/*.local.json
+deploy/cloudru/**/*.local.env
+deploy/cloudru/**/*.pem
+deploy/cloudru/**/*.key
+deploy/cloudru/**/*.dump
+
 # Android/build caches
 android/.gradle
 android/build

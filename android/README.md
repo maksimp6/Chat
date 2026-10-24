@@ -1,10 +1,10 @@
-# Alice Pro Android wrapper
+# Logos Android wrapper
 
 This module packages the existing Flask application in an Android shell using Chaquopy and a WebView. The backend source remains in the repository root and is staged into the Android Python source directory before packaging.
 
 ## Build
 
-CI stages the backend with `scripts/stage_python.py` and then builds the debug APK with Android Gradle Plugin 8.7.3 and Gradle 8.9.
+CI stages the backend with `scripts/stage_python.py` using Python 3.13 and then builds the debug APK with Gradle 9.5.0 on Java 25. `android/build.gradle.kts` declares Android Gradle Plugin 9.2.1 and Chaquopy 17.0.0; the app uses SDK 37 and JVM toolchain 17. There is no checked-in Gradle wrapper, so these commands require an installed `gradle`. See [the CI workflow](../.github/workflows/ci.yml) for the build sequence.
 
 ```bash
 cd android
@@ -52,6 +52,47 @@ cd android
 gradle :app:testDebugUnitTest
 ```
 
+## RootAgent (first slice, #650)
+
+`rootagent/` is the in-app replacement for the Termux Live Server: one foreground
+`RootAgentService` serving a loopback-only API on `127.0.0.1:8766`.
+
+- Open **Diagnostics → RootAgent: панель** for owner-operated diagnostics. Opening the
+  panel starts no service or request. Separate buttons start/stop the service, check
+  health/root/status/device metadata, parse a requested XML hierarchy, or decode and
+  preview a requested PNG. Screen requests are never included in the API/root check.
+  Only one panel operation runs at a time across Activity recreation. Leaving the panel
+  cancels and disconnects its HTTP client; total request deadlines also stop dripping
+  responses. Results have timestamps and can be copied without
+  screen content or credentials. The screenshot preview is protected from ordinary
+  Android screenshots and dismissed when the activity leaves the foreground.
+  Stop reports submission, not verified port closure. Unlock is explicitly unavailable:
+  there is no unlock endpoint or C-driver adapter in this build. No input or grants.
+  Host-side Robolectric tests exercise the actual Activity, native bitmap preview and
+  lifecycle with synthetic responses; they do not prove Redmi 9 behavior. Complete
+  PNG validation and post-capture Keyguard hardening remain a dependency on draft #1216;
+  this panel does not accept or merge that security change.
+  The service is not exported and never starts on its own.
+- Routes: `GET /v1/health`, `GET /v1/device-info` (Build model/device/SDK), `GET /v1/status`
+  (`{"keyguard_locked": bool}` from a root `dumpsys window`; missing or unexpected fields count as
+  locked; the foreground app is not exposed), `GET /v1/screen/tree` (`{"xml": ...}` from a root
+  `uiautomator dump /proc/self/fd/1`, 15 s timeout, 2 MiB bound; failed, truncated or non-XML output is
+  `502` without the raw output; the read-only counterpart of Live Server `/screen/tree`),
+  `GET /v1/screen/capture` (`{"format":"png","png_base64": ...}` from a root `screencap -p | base64`,
+  15 s timeout, 12 MiB bound; anything that does not decode to a PNG is `502` without the raw
+  output; the read-only counterpart of Live Server `/screen/capture`),
+  `GET /v1/root-probe` (`su -c "id -u"` must print `0`,
+  5 s timeout). Screen tree and capture return `423 device_locked` unless `/v1/status` reads the
+  lock screen as off; a timeout or unexpected output counts as locked. No shell, input, package
+  or process mutation.
+- Bearer token: 32 random bytes, encrypted at rest with an AndroidKeyStore AES-256-GCM key;
+  it never leaves the app process. Requests with `Origin`, a cross-site `Sec-Fetch-Site` or a
+  foreign `Host` are refused, so WebView pages and DNS rebinding cannot reach the API.
+- JVM unit tests in `app/src/test/java/com/alicepro/mobile/rootagent/` cover the bounded shell,
+  the HTTP boundary and the self-check client. Redmi 9 smoke (2026-10-13, #650): loopback-only
+  listener, 401 without or with a wrong token, 403 with a foreign `Origin`, self-check
+  `root: true` once Magisk allows the app uid. Magisk must grant root to Logos explicitly.
+
 ## System insets
 
 The Android WebView runs in edge-to-edge mode. Safe content padding is resolved centrally from three inset sources: system bars, display cutout and IME. The resolver takes the largest value for each edge, so a keyboard cannot reduce the navigation-bar safe area and a display cutout cannot be hidden by the system-bar inset.
@@ -62,7 +103,7 @@ The resolver is unit-tested independently from Android rendering code. UI verifi
 
 ## CI APK updates
 
-The Android shell exposes an **Update APK** button in the header. In the updater you can choose a repository branch and then select one of the latest successful CI runs that produced the `alice-pro-debug-apk` artifact.
+The Android shell exposes an **Update APK** button in the header. In the updater you can choose a repository branch and then select one of the latest successful CI runs that produced the `alice-pro-debug-apk-<run_number>` artifact.
 
 The updater fetches public GitHub Actions metadata, validates the artifact SHA-256 digest, verifies package name and signing certificate, rejects APKs that are not newer than the installed build, and starts the Android package installer through a `FileProvider`.
 

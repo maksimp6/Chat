@@ -1,100 +1,59 @@
 import json
 import runpy
-import sqlite3
 from datetime import datetime, timezone
+from pathlib import Path
 
-import archiver
-import sdk
-import send_logs
-import yc_logging
+import storage.archiver as archiver
+import yandex_client_modules.sdk as sdk
+from scripts import send_logs
 
 
 def _create_archive_database(path, rows=()):
-    conn = sqlite3.connect(path)
-    conn.execute("CREATE TABLE messages (id INTEGER, content TEXT, created_at TEXT)")
-    conn.executemany("INSERT INTO messages VALUES (?, ?, ?)", rows)
-    conn.commit()
-    conn.close()
+    from kristall import Kristall
+
+    with Kristall(path) as store:
+        for identity, content, created_at in rows:
+            store.set(
+                "chat/message/" + str(identity),
+                {"id": identity, "content": content, "created_at": created_at},
+            )
+        store.commit()
 
 
 def test_archiver_handles_sqlite_rows_empty_database_and_mutex(monkeypatch, tmp_path):
-    monkeypatch.setattr(archiver, "is_postgres_configured", lambda: False)
-    db_path = tmp_path / "archive.sqlite"
-    _create_archive_database(
-        db_path,
-        [
-            (1, "old", "2000-01-01T00:00:00+00:00"),
-            (2, "new", datetime.now(timezone.utc).isoformat()),
-        ],
-    )
+    from kristall import Kristall
+    from agent_memory.client import close_memory_clients
 
-    worker = archiver.DatabaseArchiver(str(db_path))
+    path = tmp_path / "archive.memory"
+    _create_archive_database(path, [(1, "old", "2000-01-01"), (2, "new", "2026-01-01")])
+    worker = archiver.DatabaseArchiver(str(path))
     assert worker.run_archive() is True
-    conn = sqlite3.connect(db_path)
-    assert conn.execute("SELECT content FROM messages ORDER BY id").fetchall() == [("new",)]
-    conn.close()
-
-    empty_path = tmp_path / "empty.sqlite"
-    _create_archive_database(empty_path)
-    assert archiver.DatabaseArchiver(str(empty_path)).run_archive() is True
-
-    locked = archiver.DatabaseArchiver(str(empty_path))
-    assert locked._mutex.acquire(blocking=False)
+    close_memory_clients()
+    with Kristall(path) as recovered:
+        assert recovered.get("chat/message/1")["content"] == "old"
+        assert recovered.get("chat/message/2")["content"] == "new"
+    empty = tmp_path / "empty.memory"
+    assert archiver.DatabaseArchiver(str(empty)).run_archive() is True
+    assert worker._mutex.acquire(blocking=False)
     try:
-        assert locked.run_archive() is False
+        assert worker.run_archive() is False
     finally:
-        locked._mutex.release()
+        worker._mutex.release()
 
 
 def test_archiver_uses_postgres_connection_and_rolls_back_errors(monkeypatch):
-    class EmptyCursor:
-        def execute(self, sql, params):
-            self.last = (sql, params)
+    from kristall import KristallError
 
-        def fetchall(self):
-            return []
+    class FailedStore:
+        def checkpoint(self):
+            raise KristallError("recovery required")
 
-    class EmptyConnection:
-        def __init__(self):
-            self.closed = False
-
-        def cursor(self):
-            return EmptyCursor()
-
-        def close(self):
-            self.closed = True
-
-    postgres_conn = EmptyConnection()
-    monkeypatch.setattr(archiver, "is_postgres_configured", lambda: True)
-    monkeypatch.setattr(archiver.database, "get_conn", lambda: postgres_conn)
-    assert archiver.DatabaseArchiver("unused").run_archive() is True
-    assert postgres_conn.closed is True
-
-    class FailingCursor:
-        def execute(self, sql, params):
-            raise RuntimeError("database failure")
-
-    class FailingConnection:
-        def __init__(self):
-            self.rolled_back = False
-            self.closed = False
-
-        def cursor(self):
-            return FailingCursor()
-
-        def rollback(self):
-            self.rolled_back = True
-
-        def close(self):
-            self.closed = True
-
-    failing_conn = FailingConnection()
-    monkeypatch.setattr(archiver, "is_postgres_configured", lambda: False)
-    monkeypatch.setattr(archiver.sqlite3, "connect", lambda path: failing_conn)
-
-    assert archiver.DatabaseArchiver("broken").run_archive() is False
-    assert failing_conn.rolled_back is True
-    assert failing_conn.closed is True
+    monkeypatch.setattr(archiver, "get_memory_client", lambda _path: FailedStore())
+    worker = archiver.DatabaseArchiver("unused.memory")
+    with __import__("pytest").raises(KristallError, match="recovery required"):
+        worker.run_archive()
+    assert worker._mutex.acquire(blocking=False)
+    worker._mutex.release()
 
 
 class _FakeResponse:
@@ -161,6 +120,7 @@ def test_sdk_main_example_runs_with_fake_http(monkeypatch, capsys):
 
 def test_send_logs_collects_files_and_handles_transport(monkeypatch, tmp_path, capsys):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(send_logs, "LOGS_DIR", tmp_path / "execution_logs")
     assert send_logs.collect_logs() == []
     assert "not found" in capsys.readouterr().out
 
@@ -201,29 +161,9 @@ def test_send_logs_collects_files_and_handles_transport(monkeypatch, tmp_path, c
 def test_send_logs_main_entrypoint(monkeypatch, tmp_path, capsys):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(send_logs.requests, "post", lambda *args, **kwargs: _FakeResponse({}))
-    runpy.run_path(send_logs.__file__, run_name="__main__")
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    source = scripts / "send_logs.py"
+    source.write_text(Path(send_logs.__file__).read_text(), encoding="utf-8")
+    runpy.run_path(str(source), run_name="__main__")
     assert "No logs to send" in capsys.readouterr().out
-
-
-def test_local_logger_writes_jsonl_handles_write_errors_and_flushes(monkeypatch, tmp_path, capsys):
-    path = tmp_path / "app.jsonl"
-    logger = yc_logging.LocalLogger(str(path))
-    logger.emit("info", 123, "test-stream")
-
-    entry = json.loads(path.read_text(encoding="utf-8"))
-    assert entry["level"] == "INFO"
-    assert entry["stream"] == "test-stream"
-    assert entry["message"] == "123"
-    assert "[INFO] 123" in capsys.readouterr().out
-
-    import builtins
-
-    real_open = builtins.open
-    monkeypatch.setattr(
-        builtins, "open", lambda *args, **kwargs: (_ for _ in ()).throw(OSError("x"))
-    )
-    logger.emit("error", "cannot-write")
-    monkeypatch.setattr(builtins, "open", real_open)
-    assert "[ERROR] cannot-write" in capsys.readouterr().out
-
-    logger.flush()

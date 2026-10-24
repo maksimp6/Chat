@@ -266,7 +266,8 @@ body {
   text-decoration: none;
 }
 
-.alice-pro-app .donate-btn img {
+.alice-pro-app .donate-btn img,
+.alice-pro-app .github-login-btn svg {
   display: block;
   pointer-events: none;
 }
@@ -330,6 +331,13 @@ body {
   color: var(--text-bubble-bot);
   border-bottom-left-radius: 4px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+.alice-pro-app .msg.error {
+  align-self: flex-start;
+  background: var(--bg-bubble-bot);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-bottom-left-radius: 4px;
 }
 
 .alice-pro-app .billing-bubble {
@@ -1179,9 +1187,40 @@ body {
   margin-left: 4px;
 }
 
-.alice-pro-app .msg-trace-details {
+.alice-pro-app .msg-trace-details,
+.alice-pro-app .msg-technical-details {
   width: 100%;
   margin-top: 4px;
+}
+
+.alice-pro-app .msg-technical-list {
+  gap: 4px;
+}
+
+.alice-pro-app .msg-technical-step {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 3px 0;
+}
+
+.alice-pro-app .msg-technical-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alice-pro-app .msg-technical-detail {
+  color: var(--text-secondary);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.alice-pro-app .msg-technical-step[data-kind="error"] .msg-technical-label,
+.alice-pro-app .msg-technical-step[data-kind="error"] .msg-technical-detail {
+  color: var(--danger);
 }
 
 .alice-pro-app .alice-trace-open-viewer {
@@ -1527,21 +1566,24 @@ body {
   font-size: 13px;
 }
 
-/* Header actions stay on one horizontal line; narrow screens scroll instead of wrapping. */
+/* Header actions keep their existing rows and wrap secondary actions instead of scrolling. */
 .alice-pro-app #header {
-  flex-direction: row;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow-x: visible;
+  overflow-y: visible;
 }
 
 .alice-pro-app #header .header-row {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .alice-pro-app #header .header-row-secondary {
-  overflow: visible;
+  flex-wrap: wrap;
+  overflow-x: visible;
+  overflow-y: visible;
   padding-bottom: 0;
 }
 
@@ -1741,4 +1783,33 @@ body {
   border: 1px solid var(--m-border, #ddd);
   background: var(--m-card, #fff);
   color: var(--m-text, #222);
+}
+
+.alice-pro-app .execution-surface {
+  margin: 4px 0;
+  font-size: 12px;
+  color: var(--text-secondary, inherit);
+}
+.alice-pro-app .execution-surface-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.alice-pro-app .execution-surface-stages li {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  opacity: 0.5;
+}
+.alice-pro-app .execution-surface-stages li[data-status="done"],
+.alice-pro-app .execution-surface-stages li[data-status="active"] {
+  opacity: 1;
+}
+.alice-pro-app .execution-surface-blocker,
+.alice-pro-app .execution-surface[data-state="error"] .execution-surface-summary,
+.alice-pro-app .execution-surface[data-state="timeout"] .execution-surface-summary {
+  color: var(--danger);
 }

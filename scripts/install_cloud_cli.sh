@@ -32,6 +32,9 @@ else
   curl --fail --location --retry 3 --output "$TMP_DIR/$ASSET" "$URL"
 fi
 printf '%s  %s\n' "$SHA256" "$TMP_DIR/$ASSET" | sha256sum --check -
+# Keep the verified archive so later setups skip the download.
+mkdir -p "$CACHE_DIR"
+cp "$TMP_DIR/$ASSET" "$CACHED.tmp.$$" && mv -f "$CACHED.tmp.$$" "$CACHED"
 
 tar -xzf "$TMP_DIR/$ASSET" -C "$TMP_DIR"
 CLOUD_BIN="$(find "$TMP_DIR" -type f -name cloud -perm -u+x -print -quit)"

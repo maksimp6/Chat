@@ -1,10 +1,10 @@
-# Alice Pro production deployment
+# Logos production deployment
 
 Production uses the existing VPS reverse proxy and Docker network already used by Preview.
 
 ## Domains and DNS
 
-Point both domains to the Alice Pro VM public address:
+Point both domains to the Logos VM public address:
 
 - `maxxxpavlov.ru`
 - `maxxxpavlov.online`
@@ -112,6 +112,42 @@ Do not place the old or new value into Issues, pull requests, logs, screenshots,
 Run the production workflow again with the previous known-good Git ref after restoring the intended secret and certificate state on the VM.
 
 For an immediate service stop, remove the `alice-production` container on the VPS. Preview containers and the shared Traefik entry point remain separate resources.
+
+## Backups and restore
+
+Retired: PostgreSQL is no longer a runtime target. Production data is the native Kristall journal at `ALICE_MEMORY_PATH`, on persistent storage, with exactly one writer process. `ALICE_DATABASE_URL` is retired and must not be set. See [docs/database.md](database.md) for the store, the backup and restore contract, and the writer rules.
+
+The Managed PostgreSQL cluster backups, the `scripts/pg_backup.sh` dumps (the script is no longer in the repository), the `ALICE_RESTORE_*` URLs and the PostgreSQL restore runbook are retired. The PostgreSQL CI lane that exercised them is removed.
+
+### Restore runbook
+
+Retired for PostgreSQL. To restore the native journal, follow [docs/database.md](database.md#backup-and-restore): stop writes, restore a verified backup into an empty journal path (never the live one), run the `--check-db` preflight against it, start the app, and check `/healthz`, sign-in, and the latest conversations.
+
+Changing production data or the journal path needs the owner's approval (see `AGENTS.md`).
+
+## Cloud budget limits
+
+Logos reads real spend from the Cloud.ru billing API (`organization.api.cloud.ru`, method `consumption`) and compares it with a monthly limit.
+
+| Variable | Meaning |
+| --- | --- |
+| `CLOUDRU_BILLING_ENDPOINT` | `https://organization.api.cloud.ru` |
+| `CLOUDRU_BILLING_SUMMARY_PATH` | consumption method path, may include query parameters such as `customer_id` or dates |
+| `CLOUDRU_MONTHLY_BUDGET` | monthly limit; unset disables the guard. Production sets `10000` (RUB) in `deploy/production/server.sh` |
+| `CLOUDRU_BUDGET_WARN_RATIO` | warning threshold as a share of the limit, default `0.80` |
+| `CLOUDRU_BILLING_CURRENCY` | limit currency, default `RUB` |
+
+The service account needs the `platform.customer.expense-admin` role (or organization admin) to read consumption.
+
+Behaviour:
+
+- `cloud.budget.status` shows spend, limit, remaining amount and a status: `ok`, `warn`, `block`, `unconfigured` or `unknown`.
+- At `block`, cost-creating operations (`cloud.compute.start`) are refused with `budget_exceeded`. Stopping resources and backups are never blocked.
+- If billing is unreachable, returns an unusable total, or reports a different currency, the status is `unknown` and nothing is blocked.
+- The guard reads billing for the current month (`YYYY-MM`) at most once every 5 minutes per process; `cloud.budget.status` with `refresh: true` reads it immediately.
+- Warn, block and unknown results are recorded in the ExecutionTrace as `cloud_budget_<status>` events.
+
+For a hard stop that does not depend on Logos, also set a budget alert in the Cloud.ru console.
 
 ## Troubleshooting
 

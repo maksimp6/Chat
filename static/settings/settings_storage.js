@@ -31,7 +31,7 @@
     mcp_approval: {},
     tools_config: {
       web_search: {
-        enabled: false,
+        enabled: true,
         context_size: "medium",
         allowed_domains: "",
         blocked_domains: "",

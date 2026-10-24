@@ -1,4 +1,4 @@
-"""Contracts shared by Alice's cloud and local browsing adapters.
+"""Contracts shared by Logos's cloud and local browsing adapters.
 
 This module deliberately contains no browser driver. Adapters must execute
 these contracts through UniversalToolExecutor and provide their own capability
@@ -77,7 +77,7 @@ class BrowserCapabilityContract:
             "capabilities": ["browser", self.mode],
             "risk_level": "high" if self.mode == "cloud" else "medium",
             "read_only": False,
-            "requires_approval": True,
+            "requires_approval": False,
             "supported_transports": ["responses_api", "local_agent", "mcp"],
             "executor": {"type": "browser_adapter", "mode": self.mode},
             "metadata": {

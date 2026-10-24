@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 def _trace() -> ExecutionTrace:
@@ -13,7 +13,7 @@ def _trace() -> ExecutionTrace:
     trace.add_response(
         {
             "id": "response-1",
-            "model": "aliceai-llm",
+            "model": "logos-runtime",
             "usage": {"input_tokens": 100, "output_tokens": 20, "total_tokens": 120},
         }
     )
@@ -58,7 +58,9 @@ def test_snapshot_and_final_results_are_deep_independent():
 
 def test_failed_final_rebuild_keeps_trace_mutable():
     trace = _trace()
-    with patch("billing.aggregate_billing", side_effect=RuntimeError("billing unavailable")):
+    with patch(
+        "economy.billing.aggregate_billing", side_effect=RuntimeError("billing unavailable")
+    ):
         with pytest.raises(RuntimeError, match="billing unavailable"):
             trace.finalize()
 
@@ -88,3 +90,38 @@ def test_snapshot_serializes_non_json_values_safely():
 
     assert isinstance(snapshot["request"]["opaque"], str)
     assert trace.finalize()["request"]["opaque"] == snapshot["request"]["opaque"]
+
+
+def test_finalized_property_reflects_frozen_state():
+    trace = _trace()
+    assert trace.finalized is False
+
+    trace.finalize()
+
+    assert trace.finalized is True
+
+
+def test_registered_secret_redaction_covers_strings_and_dicts():
+    trace = _trace()
+    trace.register_sensitive_value("sensitive-value")
+
+    assert trace._redact_registered_values("sensitive-value") == "<redacted>"
+    assert trace._redact_registered_values(
+        {"key-sensitive-value": "prior <redacted> prefix sensitive-value suffix"}
+    ) == {"key-sensitive-value": "prior <redacted> prefix <redacted> suffix"}
+
+
+def test_short_redaction_preserves_trace_keys_and_marker_across_snapshots():
+    trace = _trace()
+    trace.register_sensitive_value("e")
+    trace.register_sensitive_value("redacted")
+    trace.add_event("short_secret", {"value": "e"})
+
+    first = trace.make_snapshot()
+    second = trace.make_snapshot()
+
+    assert first["trace_id"] == "snapshot-trace"
+    assert first["schema_version"] == trace.SCHEMA_VERSION
+    assert first["events"][-1]["type"] == "short_secret"
+    assert first["events"][-1]["payload"]["value"] == "<redacted>"
+    assert second["events"][-1]["payload"]["value"] == "<redacted>"
