@@ -98,6 +98,25 @@ assert.match(rendered.textContent, /120 ток\. \(кэш 40\)/);
 assert.match(rendered.textContent, /стоимость: неизвестно/);
 assert.equal(rendered.querySelectorAll("li").length, 4);
 
+// Expanded view: body and metrics are present and show measured/unknown semantics
+const expandedBody = rendered.querySelector(".execution-surface-body");
+assert.ok(expandedBody, "expanded body element is present");
+const timingEl = rendered.querySelector(".execution-surface-timing");
+assert.ok(timingEl, "timing row is present in expanded view");
+assert.equal(timingEl.dataset.status, "measured");
+assert.match(timingEl.textContent, /1\.5 с.*измерено/);
+const usageEl = rendered.querySelector(".execution-surface-usage");
+assert.equal(usageEl.dataset.status, "measured");
+assert.match(usageEl.textContent, /120 ток\..*измерено/);
+const costExpandedEl = rendered.querySelector(".execution-surface-cost");
+assert.equal(costExpandedEl.dataset.status, "unknown");
+assert.match(costExpandedEl.textContent, /неизвестно/);
+const modelsEl = rendered.querySelector(".execution-surface-models");
+assert.ok(modelsEl, "models row present");
+assert.match(modelsEl.textContent, /demo/);
+// Secret-redaction fixture: expanded body must not expose payload content
+assert.ok(!expandedBody.textContent.includes(CANARY), "expanded body leaked a payload");
+
 // Billing items -> calculated / partial cost; billing tokens are authoritative
 const billed = finishedTrace({
   billing: {
@@ -121,6 +140,17 @@ assert.match(surfaceApi.summary(project(billed)), /≥ 0\.1235 RUB/);
 billed.billing.currency = "";
 assert.equal(project(billed).cost.currency, null);
 assert.match(surfaceApi.summary(project(billed)), /≥ 0\.1235 \(/);
+// Expanded cost: calculated status exposed via data-status and text
+const renderedCalc = surfaceApi.render(calculated);
+const costCalcEl = renderedCalc.querySelector(".execution-surface-cost");
+assert.equal(costCalcEl.dataset.status, "calculated");
+assert.match(costCalcEl.textContent, /0\.1235 RUB.*calculated/);
+// Expanded cost: partial status
+billed.billing.cost_status = "partial";
+const renderedPartial = surfaceApi.render(project(billed));
+const costPartialEl = renderedPartial.querySelector(".execution-surface-cost");
+assert.equal(costPartialEl.dataset.status, "partial");
+assert.match(costPartialEl.textContent, /≥.*partial/);
 
 // Working: no responses yet, nothing measured
 const working = project({ api_requests: [{ step: 1 }], events: [{ payload: {} }] });
@@ -191,6 +221,65 @@ assert.deepEqual(project({ responses: [{ raw: { usage: {} } }] }).usage, {
 assert.equal(
   project({ responses: [{ raw: { status: "completed", usage: "n/a" } }] }).usage.status,
   "unknown",
+);
+
+// BrowserShim coverage: missing and malformed optional telemetry
+// Missing duration (null timing) -> unknown
+const noDurationSurface = project({ responses: [{ raw: { status: "completed" } }] });
+const noDurationEl = surfaceApi.render(noDurationSurface);
+assert.equal(
+  noDurationEl.querySelector(".execution-surface-timing").dataset.status,
+  "unknown",
+  "null duration_ms shows unknown timing",
+);
+assert.match(
+  noDurationEl.querySelector(".execution-surface-timing").textContent,
+  /неизвестно/,
+);
+// Unknown usage -> unknown
+assert.equal(noDurationEl.querySelector(".execution-surface-usage").dataset.status, "unknown");
+assert.match(
+  noDurationEl.querySelector(".execution-surface-usage").textContent,
+  /Токены: неизвестно/,
+);
+// Unknown cost -> unknown
+assert.equal(noDurationEl.querySelector(".execution-surface-cost").dataset.status, "unknown");
+// Malformed timing string -> null duration -> unknown
+const malformedTimingEl = surfaceApi.render(project({ timings: { total_duration_ms: "abc" } }));
+assert.equal(
+  malformedTimingEl.querySelector(".execution-surface-timing").dataset.status,
+  "unknown",
+  "malformed timing string shows unknown",
+);
+// Empty models array -> no models element
+assert.equal(
+  surfaceApi.render(project({})).querySelector(".execution-surface-models"),
+  null,
+  "no models element when projection has no models",
+);
+// Done state: no blocker element
+const doneBlockerCheck = surfaceApi.render(project(finishedTrace()));
+assert.equal(
+  doneBlockerCheck.querySelector(".execution-surface-blocker"),
+  null,
+  "done state has no blocker element",
+);
+// Explicit state coverage via data-state attribute on root details element
+assert.equal(surfaceApi.render(project(finishedTrace())).dataset.state, "done");
+assert.equal(surfaceApi.render(timeout).dataset.state, "timeout");
+assert.equal(surfaceApi.render(blocked).dataset.state, "blocked");
+assert.equal(surfaceApi.render(project({ errors: [{}] })).dataset.state, "error");
+assert.equal(surfaceApi.render(project(rawWith("cancelled"))).dataset.state, "cancelled");
+assert.equal(surfaceApi.render(project(rawWith("incomplete"))).dataset.state, "partial");
+// Blocked state: blocker element present in expanded body
+const blockedRendered = surfaceApi.render(blocked);
+assert.ok(
+  blockedRendered.querySelector(".execution-surface-blocker"),
+  "blocked state has blocker element in expanded body",
+);
+assert.match(
+  blockedRendered.querySelector(".execution-surface-blocker").textContent,
+  /Квота провайдера/,
 );
 
 // Chat integration: assistant messages with a trace show the compact surface

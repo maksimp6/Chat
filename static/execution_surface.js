@@ -211,17 +211,9 @@
     return parts;
   }
 
-  function render(surface) {
-    var doc = document;
-    var root = doc.createElement("div");
-    root.className = "execution-surface";
-    root.dataset.state = surface.state;
-    root.setAttribute("role", "status");
-
-    var line = doc.createElement("div");
-    line.className = "execution-surface-summary";
-    line.textContent = summaryParts(surface).join(" · ");
-    root.appendChild(line);
+  function renderBody(surface, doc) {
+    var body = doc.createElement("div");
+    body.className = "execution-surface-body";
 
     var stagesEl = doc.createElement("ol");
     stagesEl.className = "execution-surface-stages";
@@ -231,14 +223,80 @@
       item.textContent = stage.label;
       stagesEl.appendChild(item);
     });
-    root.appendChild(stagesEl);
+    body.appendChild(stagesEl);
+
+    var metricsEl = doc.createElement("div");
+    metricsEl.className = "execution-surface-metrics";
+
+    var timingRow = doc.createElement("div");
+    timingRow.className = "execution-surface-timing";
+    if (surface.duration_ms !== null) {
+      timingRow.dataset.status = "measured";
+      timingRow.textContent = "Время: " + formatDuration(surface.duration_ms) + " (измерено)";
+    } else {
+      timingRow.dataset.status = "unknown";
+      timingRow.textContent = "Время: неизвестно";
+    }
+    metricsEl.appendChild(timingRow);
+
+    var usageRow = doc.createElement("div");
+    usageRow.className = "execution-surface-usage";
+    usageRow.dataset.status = surface.usage.status;
+    if (surface.usage.status === "measured") {
+      var tokenParts = [surface.usage.total + " ток."];
+      if (surface.usage.input) tokenParts.push("вх " + surface.usage.input);
+      if (surface.usage.output) tokenParts.push("вых " + surface.usage.output);
+      if (surface.usage.cached) tokenParts.push("кэш " + surface.usage.cached);
+      usageRow.textContent = "Токены: " + tokenParts.join(", ") + " (измерено)";
+    } else {
+      usageRow.textContent = "Токены: неизвестно";
+    }
+    metricsEl.appendChild(usageRow);
+
+    var costRow = doc.createElement("div");
+    costRow.className = "execution-surface-cost";
+    costRow.dataset.status = surface.cost.status;
+    if (surface.cost.status === "unknown") {
+      costRow.textContent = "Стоимость: неизвестно";
+    } else {
+      var prefix = surface.cost.status === "partial" ? "≥ " : "";
+      var amount = surface.cost.amount.toFixed(4) + " " + (surface.cost.currency || "");
+      costRow.textContent =
+        "Стоимость: " + prefix + amount.trim() + " (" + surface.cost.status + ")";
+    }
+    metricsEl.appendChild(costRow);
+
+    body.appendChild(metricsEl);
 
     if (surface.blocker) {
-      var blocker = doc.createElement("div");
-      blocker.className = "execution-surface-blocker";
-      blocker.textContent = "Причина: " + surface.blocker.label;
-      root.appendChild(blocker);
+      var blockerEl = doc.createElement("div");
+      blockerEl.className = "execution-surface-blocker";
+      blockerEl.textContent = "Причина: " + surface.blocker.label;
+      body.appendChild(blockerEl);
     }
+
+    if (surface.models && surface.models.length) {
+      var modelsEl = doc.createElement("div");
+      modelsEl.className = "execution-surface-models";
+      modelsEl.textContent = "Модели: " + surface.models.join(", ");
+      body.appendChild(modelsEl);
+    }
+
+    return body;
+  }
+
+  function render(surface) {
+    var doc = document;
+    var root = doc.createElement("details");
+    root.className = "execution-surface";
+    root.dataset.state = surface.state;
+
+    var summaryEl = doc.createElement("summary");
+    summaryEl.className = "execution-surface-summary";
+    summaryEl.textContent = summaryParts(surface).join(" · ");
+    root.appendChild(summaryEl);
+
+    root.appendChild(renderBody(surface, doc));
     return root;
   }
 
