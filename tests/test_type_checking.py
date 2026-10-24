@@ -68,6 +68,7 @@ STRICT_CLEAN_FILES = {
     "agent_memory/repository.py",
     "invocation/manager.py",
     "sessions/manager.py",
+    "alice_pro/android_shim.py",
     "agent_context/__init__.py",
     "agent_context/cache.py",
     "agent_context/models.py",
