@@ -29,6 +29,16 @@ def _admin_ok() -> bool:
     )
 
 
+def _flag(value) -> bool:
+    # bool("false") is True and bool(None) is False, so a string or null would silently turn a
+    # policy on or off. Only real booleans and their JSON-string spellings are accepted.
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.strip().lower() in {"true", "false"}:
+        return value.strip().lower() == "true"
+    raise ValueError("enabled must be a boolean")
+
+
 @provider_quota_bp.get("/me")
 def quota_me():
     try:
@@ -61,7 +71,7 @@ def quota_policy_update(policy_name: str):
             "period_seconds": int(data.get("period_seconds", 86400)),
             "max_requests": int(data.get("max_requests", 100)),
             "max_requests_per_minute": int(data.get("max_requests_per_minute", 20)),
-            "enabled": bool(data.get("enabled", True)),
+            "enabled": _flag(data.get("enabled", True)),
         }
         upsert_policy(
             values["name"],
