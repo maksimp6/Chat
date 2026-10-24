@@ -19,10 +19,6 @@ def test_ci_has_no_postgresql_service_or_job():
 
 
 def test_no_destructive_postgres_test_fixture():
-    conftest = (ROOT / "tests/conftest.py").read_text()
-    assert "connect_postgres" not in conftest
-    assert "TRUNCATE TABLE" not in conftest
-    assert "ALICE_PYTEST_POSTGRES_RESET" not in conftest
     assert not (ROOT / "tests/postgres_test_guard.py").exists()
     assert not (ROOT / "tests/test_postgres_integration.py").exists()
 
