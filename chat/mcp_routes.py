@@ -349,6 +349,16 @@ class LogosClient(YandexResponsesClient):
         return response
 
 
+def _turn_cost(billing: dict[str, Any], model_key: Any) -> float | None:
+    """The cost recorded on a reply. A turn whose price is unknown has no cost, and is never
+    recorded as free."""
+    if billing.get("cost_status") not in {"calculated", "partial"}:
+        return None
+    if is_claude_model(model_key) and billing.get("unknown_cost_items"):
+        return None
+    return float(billing.get("total_cost") or 0)
+
+
 def _append_post_final_error(trace_data, source, message, error_type):
     """Record an error raised after ExecutionTrace.finalize() in the returned copy only."""
     import time
@@ -572,15 +582,7 @@ def chat():
 
         trace_data.setdefault("billing", {})["settlement"] = settlement
         billing = trace_data.get("billing") or {}
-        cost = (
-            float(billing.get("total_cost") or 0)
-            if billing.get("cost_status") in {"calculated", "partial"}
-            else None
-            if is_claude_model(model_key)
-            else 0.0
-        )
-        if is_claude_model(model_key) and billing.get("unknown_cost_items"):
-            cost = None
+        cost = _turn_cost(billing, model_key)
 
         persist_invocation_trace(invocation.invocation_id, trace_data)
         add_message(
