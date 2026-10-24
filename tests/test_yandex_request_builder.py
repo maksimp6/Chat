@@ -1,7 +1,7 @@
 import unittest
 
-from yandex_metadata_validator import MetadataValidationError
-from yandex_request_builder import build_response_payload, validate_generation_params
+from yandex_client_modules.metadata_validator import MetadataValidationError
+from yandex_client_modules.request_builder import build_response_payload, validate_generation_params
 
 
 class YandexRequestBuilderTests(unittest.TestCase):

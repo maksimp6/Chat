@@ -1,6 +1,6 @@
 # Provider API-key lifecycle and rotation
 
-Alice Pro keeps one backend-owned runtime API key per provider. The credential
+Logos keeps one backend-owned runtime API key per provider. The credential
 store is provider-aware, encrypted at rest, and never exposes plaintext keys
 through metadata, traces, logs, or frontend responses.
 
@@ -10,7 +10,7 @@ through metadata, traces, logs, or frontend responses.
 
 - Runtime authentication uses `Authorization: Api-Key <API_KEY>`.
 - A replacement key is created through Yandex IAM.
-- Alice Pro validates the replacement against the configured Yandex Responses endpoint.
+- Logos validates the replacement against the configured Yandex Responses endpoint.
 - After validation, the replacement is promoted and the old provider key is revoked.
 - The existing Yandex deployment lifecycle remains 12 hours with rotation in the final hour.
 
@@ -20,11 +20,11 @@ through metadata, traces, logs, or frontend responses.
   `https://foundation-models.api.cloud.ru/v1`.
 - The Foundation Models key is created for a service account with the
   Foundation Models service selected.
-- Cloud.ru supports key lifetimes from one day to one year. Alice Pro defaults
+- Cloud.ru supports key lifetimes from one day to one year. Logos defaults
   to a one-day lifetime via `CLOUDRU_KEY_TTL_DAYS=1`, so the key is rotated daily.
 - Cloud.ru documents API-key reissue: the Key Secret and expiry change while
   the key ID remains unchanged.
-- Alice Pro therefore uses in-place reissue for Cloud.ru. The new secret is
+- Logos therefore uses in-place reissue for Cloud.ru. The new secret is
   validated against Foundation Models before the local credential is promoted.
   The same Cloud.ru provider resource is not revoked after reissue.
 - Automated Cloud.ru rotation additionally requires a provider key ID and IAM
@@ -112,4 +112,4 @@ Fernet-key format.
 
 ## Administration endpoint security
 
-The provider-credential API is administrative. Set `ALICE_PROVIDER_CREDENTIALS_TOKEN` for explicit Bearer-token authorization. When Alice Pro short-token authentication is enabled, the existing authenticated short-token session is reused. Remote requests are rejected when neither mechanism is configured.
+The provider-credential API is administrative. Set `ALICE_PROVIDER_CREDENTIALS_TOKEN` for explicit Bearer-token authorization. When Logos short-token authentication is enabled, the existing authenticated short-token session is reused. Remote requests are rejected when neither mechanism is configured.

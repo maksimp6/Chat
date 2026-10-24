@@ -43,7 +43,7 @@ def test_web_search_is_available_when_not_explicitly_configured(monkeypatch):
     client = CapturingClient()
     client.ask_with_mcp(
         "Find current 3D printer prices",
-        "aliceai-llm",
+        "logos-runtime",
         conversation_id="conv-1",
     )
 
@@ -71,7 +71,7 @@ def test_explicit_web_search_disable_is_respected(monkeypatch):
     client = CapturingClient()
     client.ask_with_mcp(
         "Do not search the web",
-        "aliceai-llm",
+        "logos-runtime",
         conversation_id="conv-2",
     )
 
@@ -96,7 +96,7 @@ def test_explicit_web_search_config_keeps_context_and_domain_filters(monkeypatch
     client = CapturingClient()
     client.ask_with_mcp(
         "Research current offers",
-        "aliceai-llm",
+        "logos-runtime",
         conversation_id="conv-3",
     )
 
@@ -118,7 +118,7 @@ def test_param_level_explicit_disable_is_respected_without_saved_settings(monkey
     client = CapturingClient()
     client.ask_with_mcp(
         "No web",
-        "aliceai-llm",
+        "logos-runtime",
         params={"tools_config": {"web_search": {"enabled": False}}},
     )
 

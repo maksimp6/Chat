@@ -7,9 +7,9 @@ from contextvars import ContextVar
 from typing import Iterator
 
 
-_runtime_id: ContextVar[str | None] = ContextVar("alice_runtime_id", default=None)
-_runtime_base_path: ContextVar[str] = ContextVar("alice_runtime_base_path", default="")
-_runtime_data_root: ContextVar[str | None] = ContextVar("alice_runtime_data_root", default=None)
+_runtime_id: ContextVar[str | None] = ContextVar("logos_runtime_id", default=None)
+_runtime_base_path: ContextVar[str] = ContextVar("logos_runtime_base_path", default="")
+_runtime_data_root: ContextVar[str | None] = ContextVar("logos_runtime_data_root", default=None)
 
 
 def current_runtime_id() -> str | None:

@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim
+FROM node:25-bookworm-slim
 
 # No dependencies: only Node's built-in crypto and HTTP, so the image builds in seconds.
 WORKDIR /opt/oauth-idp
