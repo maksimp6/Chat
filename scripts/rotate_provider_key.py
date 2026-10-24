@@ -38,9 +38,8 @@ def main() -> int:
             logger.info("Global provider key is not inside the one-hour rotation window")
             return 0
 
-        pass
-        # Re-read after acquiring the write lock so a second worker cannot use
-        # stale rotation metadata.
+        # Re-read the active key before rotating. Nothing here takes a lock: a concurrent rotation is
+        # caught only by the active-key check inside rotate_active_key.
         row = next(
             (
                 item
@@ -50,7 +49,6 @@ def main() -> int:
             None,
         )
         if not row or not rotation_needed(row["expires_at"]):
-            pass
             return 0
 
         provider = YandexApiKeyProvider(project_id=str(row["project_id"]))
