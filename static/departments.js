@@ -75,6 +75,9 @@
                   return;
                 }
                 row.querySelector("span").textContent = "Сессия: " + result.data.session.id;
+              })
+              .catch(function (error) {
+                alert("Ошибка: " + error.message);
               });
           };
           list.appendChild(row);

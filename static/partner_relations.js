@@ -102,6 +102,23 @@
         });
     }
 
+    // Details must show the server's current state, not the copy taken before the change.
+    function reloadPartner(id) {
+      return window.LogosDispatcher.request("/api/partners/" + encodeURIComponent(id), {
+        headers: { Accept: "application/json" },
+      })
+        .then(function (r) {
+          return r.json().then(function (data) {
+            if (!r.ok) throw new Error(data.error || "HTTP " + r.status);
+            return data.partner;
+          });
+        })
+        .then(function (fresh) {
+          load();
+          showDetails(fresh);
+        });
+    }
+
     function showDetails(partner) {
       var detail = document.getElementById("partner-relations-detail");
       if (detail) detail.remove();
@@ -211,9 +228,7 @@
               .then(function (r) {
                 return r.json().then(function (data) {
                   if (!r.ok) throw new Error(data.error || "HTTP " + r.status);
-                  load().then(function () {
-                    showDetails(data.followup ? partner : partner);
-                  });
+                  return reloadPartner(partner.id);
                 });
               })
               .catch(function (err) {
