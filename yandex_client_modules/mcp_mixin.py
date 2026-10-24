@@ -159,16 +159,9 @@ class YandexMcpMixin:
         if active_cats is None:
             active_cats = params.get("active_tool_categories")
         if active_cats is None:
-            active_cats = [
-                "git",
-                "termux",
-                "system",
-                "filesystem",
-                "wikipedia",
-                "profiler",
-                "runtime",
-                "3d",
-            ]
+            # Same default as the tools panel: every registered category. The
+            # registry offers only tools this transport and host can execute.
+            active_cats = list(registry.get_available_categories())
 
         hosted_tools = []
         conv_settings = get_conv_settings(conversation_id) or {} if conversation_id else {}
@@ -190,6 +183,24 @@ class YandexMcpMixin:
             blocked_domains = [
                 x.strip() for x in blocked.replace("\\n", ",").split(",") if x.strip()
             ]
+            # A project-wide exclusion is not removable through conversation settings.
+            required_blocks = tuple(getattr(self, "mandatory_blocked_web_domains", ()))
+            if required_blocks:
+                normalized_blocks = {domain.casefold().rstrip(".") for domain in required_blocks}
+                allowed_domains = [
+                    domain
+                    for domain in allowed_domains
+                    if not any(
+                        domain.casefold().removeprefix("*.").rstrip(".") == block
+                        or domain.casefold().removeprefix("*.").rstrip(".").endswith("." + block)
+                        for block in normalized_blocks
+                    )
+                ]
+                seen_blocks = {domain.casefold().rstrip(".") for domain in blocked_domains}
+                for domain in required_blocks:
+                    if domain not in seen_blocks:
+                        blocked_domains.append(domain)
+                        seen_blocks.add(domain)
             if allowed_domains or blocked_domains:
                 web_tool["filters"] = {}
                 if allowed_domains:

@@ -75,7 +75,9 @@ jobs:
           fi
 
   logos:
-    if: github.event_name == 'workflow_dispatch' && (inputs.mode == 'logos' || inputs.mode == 'logos-response' || inputs.mode == 'logos-tools')
+    # Court decision #1413 D0: a new generation needs LOGOS_GENERATION_ALLOWED=true;
+    # reading a saved response and the offline tool audit stay available.
+    if: github.event_name == 'workflow_dispatch' && ((inputs.mode == 'logos' && vars.LOGOS_GENERATION_ALLOWED == 'true') || inputs.mode == 'logos-response' || inputs.mode == 'logos-tools')
     name: Run Logos or inspect runtime tools and saved responses
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -99,6 +101,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Enforce native Logos court hold
+        if: inputs.mode == 'logos'
+        run: python -m agent_runtime.logos_launch_hold
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -129,6 +135,8 @@ jobs:
         run: |
           python -m scripts.logos_knowledge \
             --context-file "$RUNNER_TEMP/logos-context.json" \
+            --cache-owner "$GITHUB_REPOSITORY_OWNER" \
+            --cache-access-scope "repository:$GITHUB_REPOSITORY" \
             --out "$RUNNER_TEMP/logos-knowledge.json"
 
       - name: Audit native Logos tools
@@ -144,6 +152,7 @@ jobs:
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
           GITHUB_TOKEN: ${{ github.token }}
           LOGOS_MODE: ${{ inputs.mode }}
+          LOGOS_GENERATION_ALLOWED: ${{ vars.LOGOS_GENERATION_ALLOWED }}
         run: |
           set -euo pipefail
           ALICE_PROVIDER_CREDENTIAL_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"

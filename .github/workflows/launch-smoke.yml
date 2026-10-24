@@ -13,6 +13,10 @@ on:
 permissions:
   contents: read
 
+# Выходные файлы пишем только в RUNNER_TEMP, вне рабочей копии репозитория.
+env:
+  EVIDENCE_DIR: ${{ runner.temp }}/ci-out/launch-smoke
+
 concurrency:
   group: launch-smoke-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
@@ -21,6 +25,7 @@ jobs:
   offline:
     name: Offline startup and restart smoke
     runs-on: ubuntu-latest
+    timeout-minutes: 1
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -41,21 +46,37 @@ jobs:
       - name: Run deterministic offline launch smoke
         run: |
           set -euo pipefail
-          python scripts/local_launch_smoke.py --offline | tee launch-smoke.json
+          mkdir -p "$EVIDENCE_DIR"
+          out="$(realpath -m "$EVIDENCE_DIR/launch-smoke.json")"
+          case "$out" in *..*) echo "::error::path traversal refused: $out"; exit 1;; esac
+          case "$out" in "$RUNNER_TEMP"/ci-out/*) ;; *) echo "::error::output outside ci-out: $out"; exit 1;; esac
+          python scripts/local_launch_smoke.py --offline | tee "$out"
+      - name: Workspace must stay clean
+        if: always()
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::workflow left files in the checkout:"; git status --porcelain; exit 1
+          fi
       - name: Upload smoke evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: local-launch-smoke-${{ github.run_number }}
-          path: launch-smoke.json
+          path: ${{ env.EVIDENCE_DIR }}/launch-smoke.json
           if-no-files-found: warn
 
   live-provider:
     name: Live Yandex chat and persisted trace smoke
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.live_provider }}
     runs-on: ubuntu-latest
+    # 1 минута задана вручную: замера прогона нет
+    timeout-minutes: 1
     environment: production
     steps:
+      - name: Enforce native Logos court hold
+        run: |
+          printf '%s\n' 'Native Logos live testing is held by https://github.com/maksimp6/Chat/issues/1413#issuecomment-6366889282; offline smoke remains available.'
+          exit 1
       - name: Checkout protected master
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -79,11 +100,21 @@ jobs:
           ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
         run: |
           set -euo pipefail
-          python scripts/local_launch_smoke.py --require-master | tee launch-smoke.json
+          mkdir -p "$EVIDENCE_DIR"
+          out="$(realpath -m "$EVIDENCE_DIR/launch-smoke.json")"
+          case "$out" in *..*) echo "::error::path traversal refused: $out"; exit 1;; esac
+          case "$out" in "$RUNNER_TEMP"/ci-out/*) ;; *) echo "::error::output outside ci-out: $out"; exit 1;; esac
+          python scripts/local_launch_smoke.py --require-master | tee "$out"
+      - name: Workspace must stay clean
+        if: always()
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::workflow left files in the checkout:"; git status --porcelain; exit 1
+          fi
       - name: Upload smoke evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: live-launch-smoke-${{ github.run_number }}
-          path: launch-smoke.json
+          path: ${{ env.EVIDENCE_DIR }}/launch-smoke.json
           if-no-files-found: warn

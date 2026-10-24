@@ -89,28 +89,16 @@ def _normalize_requested_skills(data, params):
 
 
 class LogosClient(YandexResponsesClient):
-    def ask_with_mcp(
-        self,
-        message,
-        model_key,
-        conversation_id=None,
-        params=None,
-        trace=None,
-        *,
-        execution_policy=None,
-    ):
-        policy_kwargs = (
-            {"execution_policy": execution_policy} if execution_policy is not None else {}
-        )
+    # Alice Pro shopping policy: never source recommendations from Yandex Market.
+    # Keep Yandex AI Studio and unrelated Yandex services available.
+    mandatory_blocked_web_domains = (
+        "market.yandex.ru",
+        "market.yandex.com",
+        "market.yandex.kz",
+        "market.yandex.by",
+    )
 
-        def needs_approval(call: dict[str, Any]) -> bool:
-            if execution_policy is not None:
-                name, _ = _tool_call_parts(call)
-                definition = registry.get_universal_definition(name) if name else None
-                if definition is None or not execution_policy.allows_tool(definition):
-                    return False
-            return _tool_call_needs_approval(call)
-
+    def ask_with_mcp(self, message, model_key, conversation_id=None, params=None, trace=None):
         response = super().ask_with_mcp(
             message=message,
             model_key=model_key,
@@ -121,20 +109,42 @@ class LogosClient(YandexResponsesClient):
         )
 
         calls = extract_function_calls(response)
+        # "pause" (default) hands an approval-gated batch to an interactive approver.
+        # "deny" serves unattended runs: the executor refuses each gated call, the
+        # rest of the batch runs and the model is told what was not executed.
+        deny_unapproved = (params or {}).get("approval_mode") == "deny"
         if calls:
-            approval_required = any(needs_approval(call) for call in calls)
+            approval_required = not deny_unapproved and any(
+                _tool_call_needs_approval(call) for call in calls
+            )
 
             if not approval_required:
                 tool_servers = mcp_storage.list_servers()
                 base_params = dict(params or {})
+                refused = []
 
                 def execute_tool(call):
                     result = self._execute_single_tool(
                         call, tool_servers, trace=trace, **policy_kwargs
                     )
                     if result.get("error"):
-                        return {"error": result["error"], "tool": result.get("name")}
+                        output = {"error": result["error"], "tool": result.get("name")}
+                        if deny_unapproved and _tool_call_needs_approval(call):
+                            refused.append(result.get("name"))
+                            output.update(
+                                executed=False,
+                                reason="Owner approval is unavailable in this run; "
+                                "the call was not executed.",
+                            )
+                        return output
                     return result.get("result")
+
+                def should_pause(batch: list[dict[str, Any]]) -> bool:
+                    gated = [_tool_call_needs_approval(call) for call in batch]
+                    if deny_unapproved:
+                        # After a refusal, a batch of only gated calls makes no progress.
+                        return bool(refused) and all(gated)
+                    return any(gated)
 
                 def continue_request(input_items, previous_response):
                     continuation_params = dict(base_params)
@@ -154,7 +164,7 @@ class LogosClient(YandexResponsesClient):
                     execute_tool,
                     continue_request,
                     max_rounds=base_params.get("max_rounds", 16),
-                    should_pause=lambda batch: any(needs_approval(call) for call in batch),
+                    should_pause=should_pause,
                 )
 
         if trace is not None:

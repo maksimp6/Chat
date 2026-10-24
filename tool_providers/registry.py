@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import inspect
 import logging
+import shutil
 from typing import Any, Mapping, Optional
 
 from tool_providers.universal_tool_platform import UniversalToolDefinition, validate_json_schema
@@ -190,6 +191,14 @@ class ToolRegistry:
             logger.error(f"[REGISTRY] Ошибка загрузки 3D Printing: {e}")
 
         try:
+            from model_editor.tools import MODEL_EDITOR_TOOLS
+
+            for name, cfg in MODEL_EDITOR_TOOLS.items():
+                self._register("3d", name, cfg)
+        except ImportError as e:
+            logger.error(f"[REGISTRY] Ошибка загрузки Model Editor: {e}")
+
+        try:
             from cloud.tools import CLOUD_TOOLS
 
             for name, cfg in CLOUD_TOOLS.items():
@@ -198,14 +207,40 @@ class ToolRegistry:
             logger.error(f"[REGISTRY] Ошибка загрузки Cloud tools: {e}")
 
     @staticmethod
+    def _is_open_object(schema: Any) -> bool:
+        """A free-form object (no declared properties) cannot be expressed strictly."""
+        return (
+            isinstance(schema, dict)
+            and schema.get("type") == "object"
+            and "properties" not in schema
+        )
+
+    @staticmethod
+    def _has_open_object(schema: Any) -> bool:
+        if not isinstance(schema, dict):
+            return False
+        if ToolRegistry._is_open_object(schema):
+            return True
+        children = list((schema.get("properties") or {}).values()) + list(schema.get("anyOf") or [])
+        if isinstance(schema.get("items"), dict):
+            children.append(schema["items"])
+        return any(ToolRegistry._has_open_object(child) for child in children)
+
+    @staticmethod
     def _strict_schema(schema: dict) -> dict:
-        """Normalize a JSON Schema for strict function calling."""
+        """Normalize a JSON Schema for strict function calling.
+
+        Free-form objects stay open: closing them would only admit ``{}``.
+        Tools containing one are advertised with ``strict: False``.
+        """
         if not isinstance(schema, dict):
             return schema
 
         result = copy.deepcopy(schema)
         schema_type = result.get("type")
 
+        if ToolRegistry._is_open_object(result):
+            return result
         if schema_type == "object" or "properties" in result:
             properties = result.get("properties") or {}
             normalized = {}
@@ -230,6 +265,29 @@ class ToolRegistry:
 
         return result
 
+    @staticmethod
+    def is_offered(cfg: Mapping[str, Any], transport: str = "responses_api") -> bool:
+        """Offer a tool only when the executor accepts this transport and the host can run it."""
+        transports = cfg.get("supported_transports") or ("responses_api", "local_agent")
+        if transport not in transports:
+            return False
+        required = (cfg.get("metadata") or {}).get("requires_executables") or ()
+        return all(shutil.which(str(executable)) for executable in required)
+
+    def _function_definition(self, name: str, cfg: Mapping[str, Any]) -> dict[str, Any]:
+        parameters = cfg.get(
+            "parameters",
+            cfg.get("inputSchema") or {"type": "object", "properties": {}},
+        )
+        return {
+            "type": "function",
+            "name": name,
+            "description": cfg.get("description", ""),
+            "parameters": self._strict_schema(parameters),
+            "strict": not self._has_open_object(parameters),
+            "defer_loading": False,
+        }
+
     def get_definitions(self, active_categories: set = None) -> list:
         tools_list = []
         for name, cfg in self._tools.items():
@@ -239,23 +297,8 @@ class ToolRegistry:
             )
             if active_categories is not None and category not in active_categories:
                 continue
-
-            parameters = cfg.get(
-                "parameters",
-                cfg.get("inputSchema") or {"type": "object", "properties": {}},
-            )
-            strict_parameters = self._strict_schema(parameters)
-
-            tools_list.append(
-                {
-                    "type": "function",
-                    "name": name,
-                    "description": cfg.get("description", ""),
-                    "parameters": strict_parameters,
-                    "strict": True,
-                    "defer_loading": False,
-                }
-            )
+            if self.is_offered(cfg):
+                tools_list.append(self._function_definition(name, cfg))
         return tools_list
 
     def get_tools_by_category(self, category: str) -> list:
@@ -264,23 +307,8 @@ class ToolRegistry:
         tools_list = []
         for name in names:
             cfg = self._tools.get(name)
-            if not cfg:
-                continue
-
-            parameters = cfg.get(
-                "parameters",
-                cfg.get("inputSchema") or {"type": "object", "properties": {}},
-            )
-            tools_list.append(
-                {
-                    "type": "function",
-                    "name": name,
-                    "description": cfg.get("description", ""),
-                    "parameters": self._strict_schema(parameters),
-                    "strict": True,
-                    "defer_loading": False,
-                }
-            )
+            if cfg and self.is_offered(cfg):
+                tools_list.append(self._function_definition(name, cfg))
         return tools_list
 
     def get_universal_definition(self, tool_name: str) -> Optional[UniversalToolDefinition]:

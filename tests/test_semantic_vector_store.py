@@ -94,6 +94,155 @@ def test_vector_search_does_not_guess_between_duplicate_source_quotes():
     assert evidence == {"verbatim": False, "reason": "ambiguous_source_match"}
 
 
+def test_retrieved_marker_has_provenance_without_being_supplied_in_query():
+    query = "Where is the regression evidence recorded?"
+    marker = "SYNTHETIC_RETRIEVAL_MARKER_671391_UNIQUE"
+    row = source()
+    row["text"] = "Regression evidence: " + marker
+    row["sha256"] = hashlib.sha256(row["text"].encode()).hexdigest()
+    row["body_sha256"] = row["sha256"]
+    assert marker not in query
+
+    evidence = pipeline.verify_vector_result({"content": [{"type": "text", "text": marker}]}, [row])
+
+    assert evidence["verbatim"] is True
+    assert evidence["quote"] == marker
+    assert evidence["sha256"] == row["sha256"]
+    assert evidence["url"] == row["url"]
+    assert pipeline.verify_vector_result({"content": marker}, []) == {"verbatim": False}
+    assert pipeline.verify_vector_result(
+        {"content": "ABSENT_MARKER_000000000000000000000"}, [row]
+    ) == {"verbatim": False}
+
+
+@pytest.mark.parametrize(
+    "field", ["text", "title", "sha256", "title_sha256", "body_sha256", "url", "body_offset"]
+)
+def test_vector_match_rejects_stale_hash_or_wrong_source_identity(field):
+    row = source()
+    if field in {"text", "title", "url"}:
+        row[field] += " changed after capture"
+    elif field == "body_offset":
+        row[field] = 999999999
+    else:
+        row[field] = "0" * 64
+
+    evidence = pipeline.verify_vector_result({"content": row["text"]}, [row])
+
+    assert evidence == {"verbatim": False, "reason": "source_hash_mismatch"}
+
+
+def test_dialogue_excerpt_hash_is_distinct_from_full_original_body_hash():
+    row = source()
+    prefix = "Historical owner dialogue\n---\n"
+    row["corpus_kind"] = "dialogues"
+    row["body_offset"] = len(prefix)
+    row["body_sha256"] = hashlib.sha256((prefix + row["text"]).encode()).hexdigest()
+
+    evidence = pipeline.verify_vector_result({"content": BODY}, [row])
+
+    assert evidence["verbatim"] is True
+    assert evidence["sha256"] == row["sha256"]
+    assert evidence["declared_body_offset"] == len(prefix)
+    assert evidence["original_body_sha256"] == row["body_sha256"]
+    assert evidence["hash_verification"] == "extracted_text_only"
+    assert "body_start" not in evidence and "body_end" not in evidence
+
+
+@pytest.mark.parametrize("corpus", [[None], [source(), source()]])
+def test_vector_match_rejects_invalid_or_duplicate_source_records(corpus):
+    assert pipeline.verify_vector_result({"content": BODY}, corpus) == {
+        "verbatim": False,
+        "reason": "source_hash_mismatch",
+    }
+
+
+@pytest.mark.parametrize("field", ["text", "index_sha256", "sha256"])
+def test_repository_match_rejects_stale_text_or_snapshot_hash(field):
+    row = pipeline._repository_file_record("evidence.md", BODY.encode(), False)
+    row[field] = row[field] + " changed" if field == "text" else "0" * 64
+    hit = {"content": 'Repository path JSON: "evidence.md"\n' + row["text"]}
+
+    assert pipeline.verify_repository_vector_result(hit, [row]) == {
+        "verbatim": False,
+        "reason": "repository_source_hash_mismatch",
+    }
+    assert pipeline.verify_vector_result(hit, [source()], [row]) == {
+        "verbatim": False,
+        "reason": "repository_source_hash_mismatch",
+    }
+
+
+def test_repository_redaction_verifies_index_hash_without_claiming_original_bytes():
+    row = pipeline._repository_file_record(
+        "evidence.md", (BODY + "\napi_key=" + "g" * 32).encode(), False
+    )
+    hit = {"content": 'Repository path JSON: "evidence.md"\n' + row["text"]}
+
+    evidence = pipeline.verify_repository_vector_result(hit, [row])
+
+    assert evidence["verbatim"] is True
+    assert evidence["sha256"] != evidence["index_sha256"]
+    assert evidence["index_sha256"] == hashlib.sha256(row["text"].encode()).hexdigest()
+    assert evidence["hash_verification"] == "indexed_text_only"
+    assert "source_start" not in evidence
+    assert "g" * 32 not in json.dumps(evidence)
+
+
+@pytest.mark.parametrize(
+    "damage", ["not_record", "duplicate_path", "unknown_kind", "missing_index_hash"]
+)
+def test_repository_match_rejects_unverifiable_source_metadata(damage):
+    row = pipeline._repository_file_record("evidence.md", BODY.encode(), False)
+    rows = [row]
+    if damage == "not_record":
+        rows = [None]
+    elif damage == "duplicate_path":
+        rows.append(dict(row))
+    elif damage == "unknown_kind":
+        row["kind"] = "unknown"
+    else:
+        row["redactions"] = 1
+        row.pop("index_sha256")
+    hit = {"content": 'Repository path JSON: "evidence.md"\n' + BODY}
+
+    assert pipeline.verify_repository_vector_result(hit, rows) == {
+        "verbatim": False,
+        "reason": "repository_source_hash_mismatch",
+    }
+
+
+def test_repository_hit_with_wrong_file_label_cannot_borrow_another_files_text():
+    rows = [
+        pipeline._repository_file_record("evidence.md", BODY.encode(), False),
+        pipeline._repository_file_record("other.md", b"Unrelated content", False),
+    ]
+    hit = {"content": 'Repository path JSON: "other.md"\n' + BODY}
+
+    assert pipeline.verify_repository_vector_result(hit, rows) == {"verbatim": False}
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "../outside.md",
+        "/outside.md",
+        "./evidence.md",
+        "a//b.md",
+        "a\\b.md",
+        "C:/file.md",
+        "a\0b.md",
+    ],
+)
+def test_repository_match_rejects_noncanonical_paths(path):
+    row = pipeline._repository_file_record(path, BODY.encode(), False)
+    hit = {"content": "Repository path JSON: " + json.dumps(path) + "\n" + BODY}
+    assert pipeline.verify_repository_vector_result(hit, [row]) == {
+        "verbatim": False,
+        "reason": "repository_source_hash_mismatch",
+    }
+
+
 def test_existing_named_file_is_reused_only_when_bytes_match(monkeypatch):
     filename = "chat-task-history-abc.md"
     content = b"task snapshot"
@@ -574,6 +723,8 @@ def test_repository_document_preserves_identity_without_exposing_omitted_data(re
 
 @pytest.fixture
 def vector_model_transport(monkeypatch):
+    # Only synthetic provider transports run after this test-only substitution.
+    monkeypatch.setattr(pipeline, "enforce_native_launch_hold", lambda: None)
     calls = []
     reply = {
         "answer": "Проверка офиса описана в журнале.",

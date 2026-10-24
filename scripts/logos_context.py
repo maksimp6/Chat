@@ -23,6 +23,8 @@ from typing import Any
 from scripts.semantic_pipeline import _redact_repository_text, _repository_path_is_sensitive
 
 SCHEMA_VERSION = 1
+CONTENT_VIEW_VERSION = 1
+REDACTION_POLICY_VERSION = "recognizable-repository-credentials-v1"
 DEFAULT_REPOSITORY = "maksimp6/Chat"
 REQUIRED_FILES = (
     "AGENTS.md",
@@ -54,7 +56,7 @@ def _canonical_json(value: Any) -> str:
 
 
 def _repository_name(value: str) -> str:
-    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", value):
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", value):
         raise ContextError("Expected a GitHub owner/repository name")
     return value
 
@@ -339,21 +341,23 @@ def build_context(
         "current-invocation",
         owner_context,
     )
-    return _seal(
-        {
-            "schema_version": SCHEMA_VERSION,
-            "complete": True,
-            "repository": repository,
-            "checkout_sha": sha,
-            "captured_at": datetime.now(UTC).isoformat(),
-            "case": case,
-            "required_files": list(files),
-            "owner_context": owner,
-            "sources": sources,
-            "coverage": _coverage(sources),
-            "manifest": _manifest(owner, sources),
-            "evidence_notice": EVIDENCE_NOTICE,
-        }
+    return validate_context(
+        _seal(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "complete": True,
+                "repository": repository,
+                "checkout_sha": sha,
+                "captured_at": datetime.now(UTC).isoformat(),
+                "case": case,
+                "required_files": list(files),
+                "owner_context": owner,
+                "sources": sources,
+                "coverage": _coverage(sources),
+                "manifest": _manifest(owner, sources),
+                "evidence_notice": EVIDENCE_NOTICE,
+            }
+        )
     )
 
 
@@ -380,6 +384,8 @@ def validate_context(packet: Any) -> dict[str, Any]:
         raise ContextError("Required guidance is missing from context sources")
     if packet.get("manifest") != _manifest(owner, sources):
         raise ContextError("Context manifest differs from captured sources")
+    if packet.get("coverage") != _coverage(sources):
+        raise ContextError("Context coverage differs from captured sources")
     _validate_case(packet, sources)
     return packet
 
@@ -424,6 +430,52 @@ def _validate_case(packet: dict[str, Any], sources: list[dict[str, Any]]) -> Non
         for kind in ("issue_comment", "pr_comment", "review", "inline_comment")
     ):
         raise ContextError("Context comment count does not match manifest")
+    _validate_case_links(packet, sources)
+
+
+def _validate_case_links(packet: dict[str, Any], sources: list[dict[str, Any]]) -> None:
+    """Keep source URLs and PR revisions bound to the declared case.
+
+    This checks internal provenance, not the authenticity of an arbitrarily
+    rebuilt packet; authoritative source reads remain a separate obligation.
+    """
+    case = packet["case"]
+    repository = _repository_name(packet.get("repository"))
+    issue = _positive_number(case.get("issue_number"))
+    pr = _positive_number(case.get("pr_number"))
+    web = f"https://github.com/{repository}"
+    roots = {
+        "issue": f"{web}/issues/{issue}",
+        "pull_request": f"{web}/pull/{pr}",
+        "issue_comment": f"{web}/issues/{issue}",
+        "pr_comment": f"{web}/pull/{pr}",
+        "review": f"{web}/pull/{pr}",
+        "inline_comment": f"{web}/pull/{pr}",
+    }
+    fragments = {
+        "issue_comment": "issuecomment-",
+        "pr_comment": "issuecomment-",
+        "review": "pullrequestreview-",
+        "inline_comment": "discussion_r",
+    }
+    for source in sources:
+        kind = source["kind"]
+        if kind == "repository_guidance":
+            continue
+        if kind not in roots:
+            raise ContextError("Unknown context source kind")
+        match = re.fullmatch(rf"github:{kind}:([1-9][0-9]*)", source["id"])
+        if match is None:
+            raise ContextError("Context source identity differs from its kind")
+        permitted_urls = {roots[kind]}
+        if kind in fragments:
+            permitted_urls.add(roots[kind] + "#" + fragments[kind] + match.group(1))
+        if source["url"] not in permitted_urls:
+            raise ContextError("Context source URL does not belong to the declared case")
+        if kind == "pull_request" and any(
+            source.get(key) != case.get(key) for key in ("head_sha", "base_sha")
+        ):
+            raise ContextError("Context pull request source revisions differ from the case")
 
 
 def _validate_case_revision(case: dict[str, Any], checkout_sha: Any) -> None:
@@ -466,6 +518,27 @@ def render_context(packet: dict[str, Any]) -> str:
         + "\n\nProject snapshot and source manifest:\n"
         + _canonical_json(packet)
     )
+
+
+def knowledge_content(packet: dict[str, Any]) -> dict[str, Any]:
+    """Separate reusable source content from the provenance of one collection.
+
+    The original sealed packet remains the audit record. Its collection time and
+    digest do not change the sources, and must not force another paid upload.
+    Source revisions, hashes, redactions and every captured text remain in this
+    derivative view; no field is removed recursively from untrusted evidence.
+    """
+    validate_context(packet)
+    return {
+        "content_view_version": CONTENT_VIEW_VERSION,
+        "redaction_policy_version": REDACTION_POLICY_VERSION,
+        "collection_provenance": "retained_in_original_context_packet_and_knowledge_receipt",
+        "snapshot": {
+            key: value
+            for key, value in packet.items()
+            if key not in {"captured_at", "packet_sha256"}
+        },
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
