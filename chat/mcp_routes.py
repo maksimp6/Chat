@@ -7,6 +7,7 @@ import logging
 import os
 import json as _json
 import secrets
+import time
 from typing import Any
 from yandex_client_modules.client import YandexResponsesClient
 from provider_accounts.claude_oauth import (
@@ -31,6 +32,7 @@ from tool_providers.registry import registry
 from storage.db import (
     create_conversation,
     get_messages,
+    get_store,
     add_message,
     get_conv_settings,
     save_conv_settings,
@@ -118,10 +120,16 @@ def _approval_key() -> bytes:
 _APPROVAL_KEY = _approval_key()
 
 
-def _approval_token(owner_id, conversation_id, name, arguments) -> str:
-    """Sign a proposed tool call so the approval endpoint only runs calls the server proposed."""
+# An approval token runs its call once and only within its TTL. The nonce is stored when the call is
+# proposed and removed when the call is approved, so a token that leaks cannot be replayed.
+_APPROVAL_PREFIX = "mcp/approval/"
+_APPROVAL_TTL_SECONDS = 900
+
+
+def _approval_mac(nonce, owner_id, conversation_id, name, arguments) -> str:
     payload = _json.dumps(
         {
+            "nonce": nonce,
             "owner": owner_id or "",
             "conversation": conversation_id or "",
             "name": name or "",
@@ -132,6 +140,31 @@ def _approval_token(owner_id, conversation_id, name, arguments) -> str:
         default=str,
     )
     return hmac.new(_APPROVAL_KEY, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _approval_token(owner_id, conversation_id, name, arguments) -> str:
+    """Sign a proposed tool call so the approval endpoint only runs calls the server proposed."""
+    nonce = secrets.token_urlsafe(16)
+    with get_store().transaction() as tx:
+        tx.set(_APPROVAL_PREFIX + nonce, {"expires_at": int(time.time()) + _APPROVAL_TTL_SECONDS})
+    return nonce + "." + _approval_mac(nonce, owner_id, conversation_id, name, arguments)
+
+
+def _consume_approval(token, owner_id, conversation_id, name, arguments) -> bool:
+    """True once for a token this server issued for exactly this call, before it expires."""
+    nonce, separator, mac = str(token or "").partition(".")
+    if not separator or not nonce:
+        return False
+    expected = _approval_mac(nonce, owner_id, conversation_id, name, arguments)
+    if not hmac.compare_digest(mac.encode("utf-8"), expected.encode("utf-8")):
+        return False
+    key = _APPROVAL_PREFIX + nonce
+    with get_store().transaction() as tx:
+        record = tx.get(key)
+        if record is None:
+            return False
+        tx.delete(key)
+    return record["expires_at"] >= time.time()
 
 
 def _normalize_requested_skills(data, params):
@@ -909,11 +942,9 @@ def execute_approved():
         owner_id = get_current_owner_id(required=False)
         if not owner_id or not conv_id or not check_access(str(conv_id), owner_id):
             return jsonify({"error": "conversation_not_found"}), 404
-        # Only a tool call this server proposed (and signed) may skip the approval gate.
-        expected_token = _approval_token(owner_id, conv_id, func_name, arguments)
-        if not hmac.compare_digest(
-            str(data.get("approval_token") or "").encode("utf-8"),
-            expected_token.encode("ascii"),
+        # Only a call this server proposed, and has not run yet, may skip the approval gate.
+        if not _consume_approval(
+            data.get("approval_token"), owner_id, conv_id, func_name, arguments
         ):
             return jsonify({"error": "approval_token_invalid"}), 403
         tool_arguments = dict(arguments or {})

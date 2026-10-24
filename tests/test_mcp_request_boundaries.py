@@ -97,3 +97,27 @@ def test_enabled_servers_are_read_for_the_conversation_owner(monkeypatch):
     RecordingClient().ask_with_mcp("hi", "model", conversation_id="conv-1")
 
     assert seen == {"conversation": "conv-1", "owner": "owner-a"}
+
+
+def test_approval_token_runs_its_call_once_and_only_within_its_ttl(monkeypatch):
+    arguments = {"partner_id": "p-1"}
+    token = mcp_routes._approval_token("owner-a", "conv-1", "partner.delete", arguments)
+    assert mcp_routes._consume_approval(token, "owner-a", "conv-1", "partner.delete", arguments)
+    assert not mcp_routes._consume_approval(token, "owner-a", "conv-1", "partner.delete", arguments)
+
+    token = mcp_routes._approval_token("owner-a", "conv-1", "partner.delete", arguments)
+    assert not mcp_routes._consume_approval(
+        token, "owner-a", "conv-1", "partner.delete", {"partner_id": "p-2"}
+    )
+    assert not mcp_routes._consume_approval(token, "owner-b", "conv-1", "partner.delete", arguments)
+    # A mismatch leaves the token unspent: only the exact call may consume it.
+    assert mcp_routes._consume_approval(token, "owner-a", "conv-1", "partner.delete", arguments)
+
+    assert not mcp_routes._consume_approval("", "owner-a", "conv-1", "partner.delete", arguments)
+    assert not mcp_routes._consume_approval("no-separator", "owner-a", "conv-1", "x", {})
+
+    monkeypatch.setattr(mcp_routes, "_APPROVAL_TTL_SECONDS", -1)
+    expired = mcp_routes._approval_token("owner-a", "conv-1", "partner.delete", arguments)
+    assert not mcp_routes._consume_approval(
+        expired, "owner-a", "conv-1", "partner.delete", arguments
+    )
