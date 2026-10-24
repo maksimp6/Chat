@@ -19,16 +19,19 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  OUT: ${{ runner.temp }}/ci-out/ci
+
 jobs:
   changes:
     name: Platform changes
     runs-on: ubuntu-latest
+    timeout-minutes: 1
     outputs:
       web: ${{ steps.classify.outputs.web }}
       backend: ${{ steps.classify.outputs.backend }}
       android: ${{ steps.classify.outputs.android }}
       infra: ${{ steps.classify.outputs.infra }}
-      database: ${{ steps.classify.outputs.database }}
       mcp: ${{ steps.classify.outputs.mcp }}
     steps:
       - name: Checkout
@@ -76,6 +79,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -88,12 +92,32 @@ jobs:
         run: timeout --signal=TERM --kill-after=1s 2s python3 tests/alice_input_security/fast_gate.py
       - name: Check naming, layout and reliability rules
         run: bash scripts/check_code_rules.sh
+      - name: Check changed function contracts
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            base="$PR_BASE_SHA"
+          else
+            base="$PUSH_BEFORE_SHA"
+          fi
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "changed-function check: comparison base is unavailable" >&2
+            exit 2
+          fi
+          git fetch --no-tags --depth=1 origin "$base"
+          git rev-parse --verify "$base^{commit}"
+          python scripts/check_changed_types.py --base "$base" --head "$GITHUB_SHA"
 
   backend:
     name: Application tests
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     env:
       YANDEX_API_KEY: ci-test-placeholder
     steps:
@@ -122,6 +146,12 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
           npm install --ignore-scripts --no-audit --no-fund --package-lock=false
           echo "- Application dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
+      - name: Install video codec test tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version
+          ffprobe -version
       - name: Generate hot-file modularity report
         run: |
           python scripts/hot_file_metrics.py \
@@ -149,29 +179,29 @@ jobs:
       - name: Run frontend JavaScript regression tests with coverage
         run: |
           set -euo pipefail
-          rm -rf coverage-js
-          mkdir -p coverage-js
-          : > frontend-test.log
+          rm -rf "$OUT/coverage-js"
+          mkdir -p "$OUT/coverage-js"
+          : > "$OUT/frontend-test.log"
 
           run_node() {
             local test_file="$1"
             shift
-            "$@" node "$test_file" 2>&1 | tee -a frontend-test.log
+            "$@" node "$test_file" 2>&1 | tee -a "$OUT/frontend-test.log"
           }
 
-          run_node tests/test_file_manager.js env NODE_V8_COVERAGE=coverage-js
-          run_node tests/test_dozzle_header.js env NODE_V8_COVERAGE=coverage-js
-          run_node tests/test_frontend_boot.js env NODE_V8_COVERAGE=coverage-js
-          run_node tests/test_project_tree.js env NODE_V8_COVERAGE=coverage-js
-          run_node tests/test_header_dom.js env NODE_V8_COVERAGE=coverage-js
-          run_node tests/test_frontend_smoke.js env NODE_V8_COVERAGE=coverage-js
-          run_node tests/test_browser_self_test_runner.js env NODE_V8_COVERAGE=coverage-js
+          run_node tests/test_file_manager.js env NODE_V8_COVERAGE="$OUT/coverage-js"
+          run_node tests/test_dozzle_header.js env NODE_V8_COVERAGE="$OUT/coverage-js"
+          run_node tests/test_frontend_boot.js env NODE_V8_COVERAGE="$OUT/coverage-js"
+          run_node tests/test_project_tree.js env NODE_V8_COVERAGE="$OUT/coverage-js"
+          run_node tests/test_header_dom.js env NODE_V8_COVERAGE="$OUT/coverage-js"
+          run_node tests/test_frontend_smoke.js env NODE_V8_COVERAGE="$OUT/coverage-js"
+          run_node tests/test_browser_self_test_runner.js env NODE_V8_COVERAGE="$OUT/coverage-js"
           run_node tests/test_frontend_runtime_safety.js env
           run_node tests/test_system_status.js env
           run_node tests/test_ui_action_contract.js env
           run_node tests/test_real_header_actions.js env
-          run_node tests/test_trace_summary.js env NODE_V8_COVERAGE=coverage-js
-          run_node tests/test_execution_surface.js env NODE_V8_COVERAGE=coverage-js
+          run_node tests/test_trace_summary.js env NODE_V8_COVERAGE="$OUT/coverage-js"
+          run_node tests/test_execution_surface.js env NODE_V8_COVERAGE="$OUT/coverage-js"
           run_node tests/test_model_catalog_diagnostics.js env
           run_node tests/test_settings_ui_security.js env
           run_node tests/test_ui_modal_contract.js env
@@ -179,9 +209,9 @@ jobs:
           run_node tests/test_chat_history_roles.js env NODE_V8_COVERAGE=coverage-js
           run_node tests/test_browser_emulator.js env NODE_V8_COVERAGE=coverage-js
 
-          test -n "$(find coverage-js -type f -name '*.json' -print -quit)"
+          test -n "$(find "$OUT/coverage-js" -type f -name '*.json' -print -quit)"
       - name: Report frontend coverage
-        run: python tests/report_frontend_coverage.py coverage-js frontend-coverage.json
+        run: python tests/report_frontend_coverage.py "$OUT/coverage-js" "$OUT/frontend-coverage.json"
       - name: Start Flask for live resource validation
         env:
           HOST: 127.0.0.1
@@ -189,8 +219,9 @@ jobs:
           FLASK_DEBUG: "0"
           ALICE_MEMORY_PATH: alice_ci_live.memory
         run: |
-          python app.py > flask-live.log 2>&1 &
-          echo $! > flask-live.pid
+          mkdir -p "$OUT"
+          python app.py > "$OUT/flask-live.log" 2>&1 &
+          echo $! > "$OUT/flask-live.pid"
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:5678/ >/dev/null; then
               break
@@ -205,36 +236,37 @@ jobs:
       - name: Stop Flask live validation server
         if: always()
         run: |
-          if [ -f flask-live.pid ]; then kill "$(cat flask-live.pid)" || true; fi
-          if [ -f flask-live.log ]; then tail -n 200 flask-live.log; fi
+          if [ -f "$OUT/flask-live.pid" ]; then kill "$(cat "$OUT/flask-live.pid")" || true; fi
+          if [ -f "$OUT/flask-live.log" ]; then tail -n 200 "$OUT/flask-live.log"; fi
 
       - name: Build and check C17 fallback control server
         run: bash scripts/build_c17_server.sh --check
       - name: Run Python application tests with coverage
         run: |
           started=$SECONDS
-          pytest -n auto --dist=loadfile --durations=30 --cov=. --cov-config=.coveragerc --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=json:coverage.json -q
+          pytest -n auto --dist=loadfile --durations=30 --cov=. --cov-config=.coveragerc --cov-branch --cov-report=term-missing --cov-report=xml:$OUT/coverage.xml --cov-report=json:$OUT/coverage.json -q
           echo "- Parallel Python application tests: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
       - name: Generate validation report
         if: always()
         run: |
-          python tests/generate_ci_validation_report.py | tee ci-validation-report.md
-          cat ci-validation-report.md >> "$GITHUB_STEP_SUMMARY"
+          mkdir -p "$OUT"
+          python tests/generate_ci_validation_report.py | tee "$OUT/ci-validation-report.md"
+          cat "$OUT/ci-validation-report.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-${{ github.run_number }}
           path: |
-            coverage.xml
-            coverage.json
-            coverage-js/
-            frontend-coverage.json
-            frontend-test.log
-            ci-validation-report.md
+            ${{ env.OUT }}/coverage.xml
+            ${{ env.OUT }}/coverage.json
+            ${{ env.OUT }}/coverage-js/
+            ${{ env.OUT }}/frontend-coverage.json
+            ${{ env.OUT }}/frontend-test.log
+            ${{ env.OUT }}/ci-validation-report.md
             hot-file-metrics.json
             hot-file-metrics.md
-            flask-live.log
+            ${{ env.OUT }}/flask-live.log
           if-no-files-found: warn
       - name: Enforce coverage quality gates
         run: |
@@ -311,13 +343,14 @@ jobs:
       - name: Logos Dev OAuth and handoff regression tests
         run: |
           npm ci --prefix deploy/remote-desktop-commander --omit=dev --ignore-scripts --no-audit --no-fund
-          node --test deploy/remote-desktop-commander/oauth.test.mjs deploy/remote-desktop-commander/credential-handoff.test.mjs
+          node --test tests/integration/remote_desktop_commander/oauth.test.mjs tests/integration/remote_desktop_commander/credential-handoff.test.mjs
 
   required:
     name: CI required
     if: always()
     needs: [changes, code-rules, backend, infra, mcp]
     runs-on: ubuntu-latest
+    timeout-minutes: 1
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1

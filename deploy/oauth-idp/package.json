@@ -5,6 +5,6 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test crypto.test.mjs jwt.test.mjs idp.test.mjs"
+    "test": "node --test ../../tests/unit/oauth_idp/crypto.test.mjs ../../tests/unit/oauth_idp/jwt.test.mjs ../../tests/integration/oauth_idp/idp.test.mjs"
   }
 }

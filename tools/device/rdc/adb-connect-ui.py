@@ -1,5 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/python
 """Local-only ADB pairing and connection panel for Redmi 9."""
+
 from __future__ import annotations
 
 import html
@@ -12,6 +13,7 @@ from urllib.parse import parse_qs
 HOST, PORT = "127.0.0.1", 18685
 ADB = "/data/data/com.termux/files/usr/bin/adb"
 TOKEN = secrets.token_hex(24)
+
 
 def render(ip="192.168.31.109", port="42125", result="", error=False):
     ip, port = html.escape(ip, quote=True), html.escape(port, quote=True)
@@ -53,6 +55,7 @@ pre{{white-space:pre-wrap;font:13px monospace;margin:0}}footer{{font-size:12px;c
 <footer>Панель доступна только на этом телефоне: 127.0.0.1. Коды не сохраняются.</footer>
 </main></body></html>"""
 
+
 class Handler(BaseHTTPRequestHandler):
     def respond(self, code, data, mime="text/html; charset=utf-8"):
         raw = data.encode("utf-8")
@@ -60,7 +63,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", mime)
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'")
+        self.send_header(
+            "Content-Security-Policy",
+            "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'",
+        )
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
         self.wfile.write(raw)
@@ -105,17 +111,32 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 raise ValueError("Неизвестная операция")
             output = subprocess.run(cmd, input=stdin, capture_output=True, text=True, timeout=22)
-            status = output.stdout.strip() or output.stderr.strip() or f"ADB exit code: {output.returncode}"
+            status = (
+                output.stdout.strip()
+                or output.stderr.strip()
+                or f"ADB exit code: {output.returncode}"
+            )
             if output.returncode == 0 and action == "connect":
-                devices = subprocess.run([ADB, "devices", "-l"], capture_output=True, text=True, timeout=8)
+                devices = subprocess.run(
+                    [ADB, "devices", "-l"], capture_output=True, text=True, timeout=8
+                )
                 status += "\n\n" + devices.stdout.strip()
             self.respond(200, render(ip, port, status[:3000], output.returncode != 0))
         except (ValueError, subprocess.TimeoutExpired, UnicodeDecodeError) as exc:
-            self.respond(200, render(fields.get("ip", [""])[0] if "fields" in locals() else "", fields.get("port", [""])[0] if "fields" in locals() else "", f"Ошибка: {exc}", True))
+            self.respond(
+                200,
+                render(
+                    fields.get("ip", [""])[0] if "fields" in locals() else "",
+                    fields.get("port", [""])[0] if "fields" in locals() else "",
+                    f"Ошибка: {exc}",
+                    True,
+                ),
+            )
 
     def log_message(self, fmt, *args):
         # Never log pairing codes, IP/port submissions, or user input.
         pass
+
 
 if __name__ == "__main__":
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()

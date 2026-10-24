@@ -77,7 +77,7 @@ jobs:
           cat out/audit.json
 
       - name: Upload ready-to-stage sliced job
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: alice-a1mini-pla-cube-ready
           path: |
@@ -114,7 +114,7 @@ jobs:
           cat out-bag/bagclip_audit.json
 
       - name: Upload single verified bag clip sliced job
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: alice-a1mini-bagclip-pla-prototype-ready
           path: |

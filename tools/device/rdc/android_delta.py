@@ -1,10 +1,13 @@
 """Change-only screenshot detection for local Android live server."""
+
 import base64
 from io import BytesIO
 from PIL import Image, ImageChops, ImageFilter
 
+
 class DeltaDetector:
     """Track the last observed frame; return only changed region."""
+
     def __init__(self):
         self.previous = None
         self.sequence = 0
@@ -29,7 +32,12 @@ class DeltaDetector:
         crop = frame.crop(box)
         out = BytesIO()
         crop.save(out, format="JPEG", quality=68, optimize=True)
-        return {"changed": True, "sequence": self.sequence, "type": reason,
-                "bbox": [left, top, right-left, bottom-top],
-                "screen_size": list(frame.size), "encoding": "jpeg_base64",
-                "image": base64.b64encode(out.getvalue()).decode("ascii")}
+        return {
+            "changed": True,
+            "sequence": self.sequence,
+            "type": reason,
+            "bbox": [left, top, right - left, bottom - top],
+            "screen_size": list(frame.size),
+            "encoding": "jpeg_base64",
+            "image": base64.b64encode(out.getvalue()).decode("ascii"),
+        }

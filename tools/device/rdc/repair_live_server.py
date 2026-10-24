@@ -4,6 +4,7 @@
 Keeps existing bearer authentication, loopback binding and bounded verbs.
 No ADB input is issued by this repair script.
 """
+
 from __future__ import annotations
 
 import json
@@ -43,17 +44,25 @@ def atomic_write(path: Path, content: str) -> None:
 
 
 def patch_actions(source: str) -> str:
-    source = once(source, '"""RDC Android actions over authenticated ADB; no root or arbitrary shell."""',
-                  '"""Live Server Android actions bound to a trusted target; no arbitrary shell."""',
-                  "action docstring")
-    source = once(source, 'ENV = dict(os.environ, TMPDIR="/data/data/com.termux/files/usr/tmp")',
-                  'ENV = dict(os.environ, TMPDIR="/data/data/com.termux/files/usr/tmp")\n'
-                  'POLICY = pathlib.Path.home() / ".alice-rdc" / "live-device.json"',
-                  "policy path")
-    source = once(source,
-                  'capture_output=True, check=True)\n    return p.stdout',
-                  'capture_output=True, check=True, timeout=12)\n    return p.stdout',
-                  "adb timeout")
+    source = once(
+        source,
+        '"""RDC Android actions over authenticated ADB; no root or arbitrary shell."""',
+        '"""Live Server Android actions bound to a trusted target; no arbitrary shell."""',
+        "action docstring",
+    )
+    source = once(
+        source,
+        'ENV = dict(os.environ, TMPDIR="/data/data/com.termux/files/usr/tmp")',
+        'ENV = dict(os.environ, TMPDIR="/data/data/com.termux/files/usr/tmp")\n'
+        'POLICY = pathlib.Path.home() / ".alice-rdc" / "live-device.json"',
+        "policy path",
+    )
+    source = once(
+        source,
+        "capture_output=True, check=True)\n    return p.stdout",
+        "capture_output=True, check=True, timeout=12)\n    return p.stdout",
+        "adb timeout",
+    )
     beginning = source.index("def device():\n")
     end = source.index("\ndef action(a):", beginning)
     replacement = '''def device():
@@ -85,44 +94,59 @@ def patch_actions(source: str) -> str:
     return matches[0]
 '''
     source = source[:beginning] + replacement + source[end:]
-    source = once(source,
-                  '    elif a.command == "back":\n',
-                  '    elif a.command == "wake":\n'
-                  '        adb(*prefix, "shell", "input", "keyevent", "KEYCODE_WAKEUP")\n'
-                  '    elif a.command == "back":\n',
-                  "safe wake verb")
-    source = once(source,
-                  'return {"device": serial, "focus": adb(*prefix, "shell", "dumpsys", "window").split("mCurrentFocus=")[-1].splitlines()[0]}',
-                  'return {"device": serial, "target": "Redmi_9", "focus": adb(*prefix, "shell", "dumpsys", "window").split("mCurrentFocus=")[-1].splitlines()[0]}',
-                  "status binding")
+    source = once(
+        source,
+        '    elif a.command == "back":\n',
+        '    elif a.command == "wake":\n'
+        '        adb(*prefix, "shell", "input", "keyevent", "KEYCODE_WAKEUP")\n'
+        '    elif a.command == "back":\n',
+        "safe wake verb",
+    )
+    source = once(
+        source,
+        'return {"device": serial, "focus": adb(*prefix, "shell", "dumpsys", "window").split("mCurrentFocus=")[-1].splitlines()[0]}',
+        'return {"device": serial, "target": "Redmi_9", "focus": adb(*prefix, "shell", "dumpsys", "window").split("mCurrentFocus=")[-1].splitlines()[0]}',
+        "status binding",
+    )
     index = source.index("\np = argparse.ArgumentParser()")
-    parser = source[index + 1:]
-    parser = once(parser,
-                  'choices=["tap", "swipe", "back", "home", "open", "screenshot", "status"]',
-                  'choices=["tap", "swipe", "back", "home", "open", "screenshot", "status", "wake"]',
-                  "wake CLI command")
-    parser = once(parser,
-                  'except (RuntimeError, ValueError, subprocess.CalledProcessError) as e:',
-                  'except (RuntimeError, ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:',
-                  "CLI timeout guard")
-    source = source[:index] + '\ndef main(argv=None):\n' + "".join(
-        ("    " + line if line.strip() else line)
-        for line in parser.splitlines(keepends=True)
-    ) + '\n\nif __name__ == "__main__":\n    main()\n'
+    parser = source[index + 1 :]
+    parser = once(
+        parser,
+        'choices=["tap", "swipe", "back", "home", "open", "screenshot", "status"]',
+        'choices=["tap", "swipe", "back", "home", "open", "screenshot", "status", "wake"]',
+        "wake CLI command",
+    )
+    parser = once(
+        parser,
+        "except (RuntimeError, ValueError, subprocess.CalledProcessError) as e:",
+        "except (RuntimeError, ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:",
+        "CLI timeout guard",
+    )
+    source = (
+        source[:index]
+        + "\ndef main(argv=None):\n"
+        + "".join(
+            ("    " + line if line.strip() else line) for line in parser.splitlines(keepends=True)
+        )
+        + '\n\nif __name__ == "__main__":\n    main()\n'
+    )
     return source
 
 
 def patch_server(source: str) -> str:
-    source = once(source,
-                  'ALLOWED = {"status", "tap", "swipe", "back", "home", "open", "screenshot"}\nSAFE_APP = "com.mobile.legends"',
-                  'ALLOWED = {"status", "tap", "swipe", "back", "home", "open", "screenshot", "wake"}\nTRUSTED_TARGET = "Redmi_9"',
-                  "allowed verbs + app removal")
-    source = once(source,
-                  '''    def safe_screen(self):
+    source = once(
+        source,
+        'ALLOWED = {"status", "tap", "swipe", "back", "home", "open", "screenshot"}\nSAFE_APP = "com.mobile.legends"',
+        'ALLOWED = {"status", "tap", "swipe", "back", "home", "open", "screenshot", "wake"}\nTRUSTED_TARGET = "Redmi_9"',
+        "allowed verbs + app removal",
+    )
+    source = once(
+        source,
+        """    def safe_screen(self):
         focus = execute([ACTIONS, "status"]).get("focus") or ""
         return isinstance(focus, str) and (" " + SAFE_APP + "/") in focus
-''',
-                  '''    def safe_screen(self):
+""",
+        '''    def safe_screen(self):
         """Authenticate the actual bound device; no app-specific allowlist."""
         status = execute([ACTIONS, "status"])
         serial = status.get("device")
@@ -134,42 +158,50 @@ def patch_server(source: str) -> str:
         os.environ["ANDROID_SERIAL"] = serial
         return True
 ''',
-                  "device guard")
-    source = once(source,
-                  'return self.send(200, {"ok": True, "modes": ["screen", "ocr"]})',
-                  'return self.send(200, {"ok": True, "modes": ["screen", "ocr", "actions"], '
-                  '"device_policy": "redmi9_bound", "commands": sorted(ALLOWED)})',
-                  "health capabilities")
-    source = once(source,
-                  '''            if path == "/status":
+        "device guard",
+    )
+    source = once(
+        source,
+        'return self.send(200, {"ok": True, "modes": ["screen", "ocr"]})',
+        'return self.send(200, {"ok": True, "modes": ["screen", "ocr", "actions"], '
+        '"device_policy": "redmi9_bound", "commands": sorted(ALLOWED)})',
+        "health capabilities",
+    )
+    source = once(
+        source,
+        """            if path == "/status":
                 return self.send(200, execute([ACTIONS, "status"]))
-''',
-                  '''            if path == "/status":
+""",
+        """            if path == "/status":
                 result = execute([ACTIONS, "status"])
                 if result.get("target") != TRUSTED_TARGET:
                     return self.send(403, {"error": "wrong_device"})
                 os.environ["ANDROID_SERIAL"] = result["device"]
                 return self.send(200, result)
-''',
-                  "status device guard")
-    source = once(source,
-                  '''                if command == "open":
+""",
+        "status device guard",
+    )
+    source = once(
+        source,
+        """                if command == "open":
                     if data.get("package") != SAFE_APP:
                         return self.send(403, {"error": "package_not_allowlisted"})
-''',
-                  "",
-                  "remove app restriction")
+""",
+        "",
+        "remove app restriction",
+    )
     source = source.replace('"screen_not_allowlisted"', '"device_not_authorized"')
-    if 'SAFE_APP' in source or '"com.mobile.legends"' in source:
+    if "SAFE_APP" in source or '"com.mobile.legends"' in source:
         raise RuntimeError("Old app allowlist remains")
     return source
 
 
 def main() -> None:
-    previous = {ACTION: ACTION.read_text(encoding="utf-8"),
-                SERVER: SERVER.read_text(encoding="utf-8")}
-    changes = {ACTION: patch_actions(previous[ACTION]),
-               SERVER: patch_server(previous[SERVER])}
+    previous = {
+        ACTION: ACTION.read_text(encoding="utf-8"),
+        SERVER: SERVER.read_text(encoding="utf-8"),
+    }
+    changes = {ACTION: patch_actions(previous[ACTION]), SERVER: patch_server(previous[SERVER])}
     # Verify syntax before any persistent changes.
     for path, content in changes.items():
         compile(content, str(path), "exec")
@@ -195,9 +227,16 @@ def main() -> None:
         for path in previous:
             atomic_write(path, previous[path])
         raise
-    print(json.dumps({"result": "patched", "backup": str(backup),
-                      "files": [path.name for path in changes],
-                      "policy": "redmi9_bound"}))
+    print(
+        json.dumps(
+            {
+                "result": "patched",
+                "backup": str(backup),
+                "files": [path.name for path in changes],
+                "policy": "redmi9_bound",
+            }
+        )
+    )
 
 
 if __name__ == "__main__":
