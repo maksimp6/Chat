@@ -21,7 +21,7 @@ aapt2 link -o "$OUT/base.apk" -I "$JAR" \
 find "$HERE/src" "$OUT/gen" -name '*.java' > "$OUT/sources.txt"
 javac -source 17 -target 17 -encoding UTF-8 -Xlint:-options \
   -classpath "$JAR:$OUT/xmlpull" -d "$OUT/classes" @"$OUT/sources.txt"
-d8 --min-api 26 --output "$OUT/dex" $(find "$OUT/classes" -name '*.class')
+d8 --min-api 26 --lib "$JAR" --output "$OUT/dex" $(find "$OUT/classes" -name '*.class')
 
 python3 - "$OUT" <<'PY'
 import sys, zipfile
