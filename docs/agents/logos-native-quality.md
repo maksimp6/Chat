@@ -1,5 +1,11 @@
 # Native Logos: quality and complete case context
 
+Owner update, 23 October 2026: the requested replacement configuration is the
+[Pro 5.1 async profile](logos-pro51-async-profile.md), with a requested
+32768-token output budget and no silent downgrade. That artifact is prepared,
+not activated; its transport and model limitations are explicit. The existing
+Responses runtime below remains unchanged until a separately reviewed integration.
+
 Canonical task: #1413. Implementation: PR #1435, `feat/semantic-pipeline`.
 Accepted owner direction, 22 October 2026:
 
@@ -46,6 +52,15 @@ Every registered local category is available through the existing executor and
 its existing approval rules. Availability in the request is not proof of every
 external dependency or tool's successful execution.
 
+The run has no approver, so it uses `approval_mode=deny`: one approval-gated call
+no longer stops its whole batch. The other calls execute, each gated call is
+refused by the executor (never auto-approved) and the model is told it was not
+executed; the result lists such tools in `approval_refused_tools`. Tools the
+runner cannot execute are not offered: MCP-only bridge tools and Termux:API tools
+without their Android helper. Git tools without an explicit repository use this
+checkout. Partner and 3D tools still require a trusted owner identity, which an
+unattended run does not have; they fail closed with that reason.
+
 ## Context and continuation
 
 Before the first model response, load full AGENTS.md, the applicable admission
@@ -80,6 +95,33 @@ therefore leaves an inspectable response identity rather than inviting a duplica
 generation. Captured source patches include the current dialogue, context,
 knowledge, quality and runtime files in addition to the original tool-repair
 paths; changes outside those explicit paths remain names-only for review.
+
+## Generation permission (court decision D0)
+
+The court decision in #1413 keeps native generation closed until the owner
+explicitly allows it. The technical control is the repository variable
+`LOGOS_GENERATION_ALLOWED` (Settings → Secrets and variables → Actions →
+Variables). Only the value `true` opens generation; an absent or any other value
+keeps it closed. Actions compares this value ignoring case, and so does the code.
+
+- `logos.yml` does not start its job for any trigger: comment, new issue or
+  label. The existing trigger rules still apply when the variable is `true`.
+- In `rag-work.yml`, `mode=logos` (context capture, knowledge attachment and the
+  dialogue) does not start. `logos-response` (reading a stored response without
+  generation), `logos-tools` and `logos-result` stay available.
+- `agent_runtime.issue_runner` and the question mode of `scripts.logos_dialogue`
+  check the same variable before reading context, seeding credentials or creating
+  a client. A refusal writes `status=blocked` and `error=GenerationNotPermitted`,
+  makes no model request and exits with 1.
+
+This control only covers workflow and code versions that contain it. A re-run of
+an earlier run uses that run's original commit, and a manual dispatch on an older
+ref uses that ref's workflow file. Neither is closed by this change. Closing them
+needs owner-level measures: restricting or moving the `YANDEX_API_KEY` secret,
+disabling the workflows, or limiting the key at the provider. Server chat
+endpoints (`/api/chat`, `/api/mcp/execute-approved`, `/api/voice/*`) are not
+affected; whether the decision covers them is the owner's call. The inventory of
+entry points is recorded in #1413.
 
 ## Evidence and acceptance
 

@@ -236,7 +236,10 @@ def test_finisher_persists_full_large_trace_and_full_large_answer():
     assert loaded["result"]["checkpoint"]["reply_verified"] is True
 
 
-def test_final_response_checkpoint_and_ask_do_not_duplicate_id():
+def test_final_response_checkpoint_and_ask_do_not_duplicate_id(monkeypatch):
+    # This checkpoint contract uses the synthetic Client below. Production
+    # launch admission remains covered with the real guard in its own module.
+    monkeypatch.setattr(dialogue, "enforce_native_launch_hold", lambda: None)
     result = dialogue._new_result()
     response = {
         "id": "same-final-id",

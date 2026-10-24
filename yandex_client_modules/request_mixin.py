@@ -1,9 +1,10 @@
 import time
+import copy
 
 import os
 import math
 import requests
-from typing import Any
+from typing import Any, Callable
 
 from observability.trace_manager import ExecutionTrace
 from storage.db import get_store
@@ -16,6 +17,7 @@ except ImportError:  # pragma: no cover
     encrypt_secret = None
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_client_modules.request_builder import build_response_payload
+from yandex_client_modules.request_receipt import build_request_manifest
 from yandex_client_modules.errors import YandexClientError
 from provider_accounts.quotas import ProviderQuotaExceeded, record_usage, reserve_request
 
@@ -31,6 +33,56 @@ def _transport_timeout(params: dict[str, Any], key: str, default: float, maximum
     ):
         raise ValueError(f"{key} must be a finite number in (0, {maximum}]")
     return value
+
+
+def _capture_request_input(
+    execution_trace: Any,
+    payload: dict[str, Any],
+    step: int | None,
+    callback: Callable[[dict[str, Any]], Any] | None,
+) -> None:
+    traced = isinstance(execution_trace, ExecutionTrace)
+    if not traced and callback is None:
+        return
+    manifest = build_request_manifest(payload)
+    correlation_id = (
+        execution_trace.get_step_correlation_id(step) if traced and step is not None else None
+    )
+    if traced:
+        execution_trace.add_event(
+            "api_request_manifest",
+            {
+                "method": "POST",
+                "step": step,
+                "correlation_id": correlation_id,
+                "manifest": manifest,
+            },
+        )
+    if callback is not None:
+        callback(
+            {
+                "schema_version": 1,
+                "capture_stage": "assembled_payload_before_post",
+                "trace_id": execution_trace.trace_id if traced else None,
+                "step": step,
+                "correlation_id": correlation_id,
+                "manifest": copy.deepcopy(manifest),
+                # This trusted local writer receives a protected original,
+                # never an event/export or the tools definitions/headers.
+                "data": copy.deepcopy(
+                    {
+                        name: payload[name]
+                        for name in (
+                            "input",
+                            "instructions",
+                            "conversation",
+                            "previous_response_id",
+                        )
+                        if name in payload
+                    }
+                ),
+            }
+        )
 
 
 def _resolve_quota_user_id(execution_trace=None):
@@ -125,6 +177,9 @@ class YandexRequestMixin:
         on_provider_response = params.get("on_provider_response")
         if on_provider_response is not None and not callable(on_provider_response):
             raise ValueError("on_provider_response must be callable or None")
+        on_provider_input = params.get("on_provider_input")
+        if on_provider_input is not None and not callable(on_provider_input):
+            raise ValueError("on_provider_input must be callable or None")
         is_background = params.get("background", True)
         is_stream = params.get("stream", False)
         if is_background:
@@ -171,13 +226,15 @@ class YandexRequestMixin:
             yandex_conv_id=yandex_conv_id,
         )
 
+        trace_step_number = trace_step
+        if isinstance(execution_trace, ExecutionTrace) and trace_step_number is None:
+            trace_step_number = len(execution_trace.trace.get("api_requests", [])) + 1
+
+        self._log_request("POST", self.responses_url, json=payload)
+        _capture_request_input(execution_trace, payload, trace_step_number, on_provider_input)
         request_start_timestamp = time.time()
         request_start_perf = time.perf_counter()
-        trace_step_number = trace_step
-
         if execution_trace and isinstance(execution_trace, ExecutionTrace):
-            if trace_step_number is None:
-                trace_step_number = len(execution_trace.trace.get("api_requests", [])) + 1
             execution_trace.add_api_request(
                 _sanitize_for_log(payload),
                 step_index=trace_step_number,
@@ -195,7 +252,6 @@ class YandexRequestMixin:
                 },
             )
 
-        self._log_request("POST", self.responses_url, json=payload)
         resp = None
         try:
             resp = self._log_response(

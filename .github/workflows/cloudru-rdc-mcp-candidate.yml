@@ -4,6 +4,18 @@ on:
   push:
     branches: [master]
     paths:
+      - "cloud/base.py"
+      - "cloud/cloudru/client.py"
+      - "cloud/cloudru/registry_client.py"
+      - "requirements-deploy.txt"
+      - ".python-version"
+      - "scripts/cloudru_deploy.py"
+      - "scripts/cloudru_browser_probe.py"
+      - "config/alice/alice-dev-delete-ids.txt"
+      - "deploy/remote-desktop-commander/config.json"
+      - "deploy/remote-desktop-commander/dependency-smoke.cjs"
+      - "deploy/remote-desktop-commander/dev-bootstrap.sh"
+      - "deploy/remote-desktop-commander/credential-handoff.mjs"
       - "cloud/cloudru/container_apps_client.py"
       - "cloud/cloudru/registry_client.py"
       - "requirements-deploy.txt"
@@ -19,6 +31,9 @@ on:
       - "deploy/remote-desktop-commander/credential-handoff.mjs"
       - "deploy/remote-desktop-commander/credential-handoff.test.mjs"
       - "deploy/remote-desktop-commander/oauth.mjs"
+      - "deploy/remote-desktop-commander/oauth-state.mjs"
+      - "deploy/remote-desktop-commander/oauth-state.test.mjs"
+      - "deploy/remote-desktop-commander/oauth-restart.test.mjs"
       - "deploy/remote-desktop-commander/oauth.test.mjs"
       - "deploy/remote-desktop-commander/oauth-discovery-smoke.mjs"
       - "deploy/remote-desktop-commander/oauth-discovery-smoke.test.mjs"
@@ -53,6 +68,8 @@ jobs:
           cache-dependency-path: requirements-deploy.txt
       - name: Install Python deploy dependencies
         run: pip install -r requirements-deploy.txt
+      - name: Validate minimal deploy environment
+        run: python scripts/cloudru_rdc_mcp_candidate.py --help > /dev/null
       - name: Deploy isolated candidate
         id: candidate
         env:

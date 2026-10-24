@@ -68,10 +68,15 @@ if __name__ == "__main__":
         report["categories"] = {name: len(names) for name, names in sorted(categories.items())}
         native = dialogue_params([DEFAULT_STORE_ID], list(categories))
         native_definitions = registry.get_definitions(set(native["active_tool_categories"]))
+        offered_names = {tool["name"] for tool in native_definitions}
         report["native_profile"] = {
             "model": MODEL,
             "categories": native["active_tool_categories"],
             "offered_count": len(native_definitions),
+            # Registered tools this host or transport cannot execute are not offered.
+            "not_offered": sorted(
+                name for names in categories.values() for name in names if name not in offered_names
+            ),
             "hosted_enabled": {
                 name: cfg["enabled"] for name, cfg in native["tools_config"].items()
             },

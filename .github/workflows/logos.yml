@@ -8,8 +8,8 @@ name: Logos
 #
 # Repository secrets (Settings -> Secrets and variables -> Actions):
 #   YANDEX_API_KEY, YANDEX_PROJECT_ID  - Yandex AI Studio credentials for Logos
-#   ALICE_APP_PRIVATE_KEY              - private key of the "Alice Pro" GitHub App, so
-#                                        Alice Pro commits, opens PRs and comments under
+#   ALICE_APP_PRIVATE_KEY              - private key of the Logos GitHub App, so
+#                                        Logos commits, opens PRs and comments under
 #                                        its own name; PRs opened with it run CI.
 # Repository variable ALICE_APP_CLIENT_ID - client ID of that GitHub App.
 # Fallback until the App exists: ALICE_GITHUB_TOKEN, a personal fine-grained token
@@ -31,7 +31,10 @@ concurrency:
 jobs:
   alice:
     name: Logos works on the issue
+    # Court decision #1413 D0: native generation stays closed until the owner sets
+    # the repository variable LOGOS_GENERATION_ALLOWED to true.
     if: |
+      vars.LOGOS_GENERATION_ALLOWED == 'true' &&
       !github.event.issue.pull_request && (
         (github.event_name == 'issue_comment' &&
           contains(github.event.comment.body, '@logos') &&
@@ -47,12 +50,16 @@ jobs:
       contents: read
     env:
       ISSUE_NUMBER: ${{ github.event.issue.number }}
+      LOGOS_GENERATION_ALLOWED: ${{ vars.LOGOS_GENERATION_ALLOWED }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           persist-credentials: false
+
+      - name: Enforce native Logos court hold
+        run: python -m agent_runtime.logos_launch_hold
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -78,6 +85,40 @@ jobs:
             fi
           } > "$RUNNER_TEMP/body.txt"
 
+      - name: Check App credentials
+        id: app-credentials
+        if: always()
+        env:
+          APP_CLIENT_ID: ${{ vars.ALICE_APP_CLIENT_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.ALICE_APP_PRIVATE_KEY }}
+        run: |
+          if [ -n "$APP_CLIENT_ID" ] && [ -n "$APP_PRIVATE_KEY" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create Logos app token
+        id: app-token
+        if: always() && steps.app-credentials.outputs.ready == 'true'
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.ALICE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ALICE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+
+      - name: Require publishing token
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.ALICE_GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          test -n "$GH_TOKEN" || { echo "::error::Configure the Logos GitHub App key or ALICE_GITHUB_TOKEN before running the model."; exit 1; }
+          gh api --silent "repos/$REPOSITORY"
+
       - name: Run Alice
         env:
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
@@ -93,7 +134,17 @@ jobs:
             --issue "$ISSUE_NUMBER" \
             --title-file "$RUNNER_TEMP/title.txt" \
             --body-file "$RUNNER_TEMP/body.txt" \
-            --out "$RUNNER_TEMP/result.json" || echo "Logos runner reported a failure"
+            --out "$RUNNER_TEMP/result.json"
+
+      - name: Preserve response evidence
+        id: evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: logos-response-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/result.json
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Guard the diff
         run: |
@@ -118,43 +169,17 @@ jobs:
             python tests/validate_frontend_modules.py
           fi
 
-      - name: Create Alice Pro app token
-        id: app-token
-        if: vars.ALICE_APP_CLIENT_ID != ''
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          client-id: ${{ vars.ALICE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.ALICE_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-issues: write
-          permission-pull-requests: write
-
-      - name: Open pull request and report
+      - name: Open pull request
+        id: open-pr
+        if: success()
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.ALICE_GITHUB_TOKEN }}
-          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          APP_SLUG: ${{ steps.app-token.outputs.token && steps.app-token.outputs.app-slug || '' }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          test -n "$GH_TOKEN" || { echo "::error::Neither the Alice Pro GitHub App (ALICE_APP_CLIENT_ID + ALICE_APP_PRIVATE_KEY) nor ALICE_GITHUB_TOKEN is configured."; exit 1; }
-          python - "$RUNNER_TEMP/result.json" > "$RUNNER_TEMP/report.md" <<'PY'
-          import json, sys
-          r = json.load(open(sys.argv[1], encoding="utf-8"))
-          # Never echo "@logos" back: a comment must not re-trigger this workflow.
-          for key in ("summary",):
-              if r.get(key):
-                  r[key] = r[key].replace("@", "@\u200b")
-          b = r.get("billing", {})
-          print(f"Logos ({r.get('model')}) finished with status **{r['status']}**.\n")
-          if r.get("summary"):
-              print(r["summary"] + "\n")
-          if r.get("pending_tools"):
-              print("Stopped: these tools need a maintainer's approval: " + ", ".join(r["pending_tools"]) + "\n")
-          cost = b.get("total_cost")
-          print(f"Cost: {cost} {b.get('currency', 'RUB')} ({b.get('cost_status', 'unknown')}), "
-                f"tokens: {b.get('total_tokens', 0)}, trace: `{r.get('trace_id')}`")
-          PY
           if [ -s "$RUNNER_TEMP/files.txt" ]; then
+            test -n "$GH_TOKEN" || { echo "::error::No publishing token is configured."; exit 1; }
             branch="alice/issue-$ISSUE_NUMBER-$GITHUB_RUN_ID"
             gh auth setup-git
             if [ -n "$APP_SLUG" ]; then
@@ -164,20 +189,105 @@ jobs:
               git config user.name "$bot"
               git config user.email "$bot_id+$bot@users.noreply.github.com"
             else
-              git config user.name "Alice Pro"
-              git config user.email "alice-pro@users.noreply.github.com"
+              git config user.name "Logos"
+              git config user.email "logos@users.noreply.github.com"
             fi
             git checkout -b "$branch"
             git add -A
             git commit -m "Logos: work on issue #$ISSUE_NUMBER" -m "Closes #$ISSUE_NUMBER"
             git push origin "$branch"
-            {
-              cat "$RUNNER_TEMP/report.md"
-              printf '\nCloses #%s\n' "$ISSUE_NUMBER"
-            } > "$RUNNER_TEMP/pr.md"
-            url="$(gh pr create --repo "$REPOSITORY" --draft --head "$branch" \
+            printf 'Work on #%s. See the issue comment for the final result.\n\nExecution: %s/%s/actions/runs/%s\n\nCloses #%s\n' \
+              "$ISSUE_NUMBER" "$GITHUB_SERVER_URL" "$REPOSITORY" "$GITHUB_RUN_ID" "$ISSUE_NUMBER" > "$RUNNER_TEMP/pr.md"
+            url="$(gh pr create --repo "$REPOSITORY" --draft --base develop --head "$branch" \
               --title "Logos: issue #$ISSUE_NUMBER" --body-file "$RUNNER_TEMP/pr.md")"
-            printf '\nPull request: %s\n' "$url" >> "$RUNNER_TEMP/report.md"
+            printf 'url=%s\n' "$url" >> "$GITHUB_OUTPUT"
           fi
-          gh issue comment "$ISSUE_NUMBER" --repo "$REPOSITORY" --body-file "$RUNNER_TEMP/report.md"
+
+      - name: Report result
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.ALICE_GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          WORKFLOW_STATUS: ${{ job.status }}
+          PR_URL: ${{ steps.open-pr.outputs.url }}
+          APP_TOKEN_OUTCOME: ${{ steps.app-token.outcome }}
+          EVIDENCE_URL: ${{ steps.evidence.outputs.artifact-url }}
+          EVIDENCE_OUTCOME: ${{ steps.evidence.outcome }}
+        run: |
+          set -euo pipefail
+          python -I - "$RUNNER_TEMP/result.json" > "$RUNNER_TEMP/report.md" <<'PY'
+          import hashlib, json, os, re, sys
+          from pathlib import Path
+
+          try:
+              r = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+              if not isinstance(r, dict) or not isinstance(r.get("status"), str):
+                  raise ValueError("Invalid result")
+              if r["status"] not in {"changed", "no_changes", "needs_approval", "failed", "running"}:
+                  raise ValueError("Invalid result status")
+              if not isinstance(r.get("pending_tools", []), list):
+                  raise ValueError("Invalid pending tools")
+              if r["status"] == "running":
+                  r.update(status="failed", interrupted=True)
+              if (r.get("provider_error_present") is True or
+                      r.get("provider_status") in {"failed", "incomplete", "cancelled", "in_progress", "queued"}):
+                  r["status"] = "failed"
+          except (OSError, ValueError):
+              r = {"status": "failed", "summary": "No valid result.json was produced. See the workflow logs."}
+          b = r.get("billing") or {}
+          if not isinstance(b, dict):
+              b = {}
+          reply = r.get("reply")
+          reply_state = "unknown"
+          if isinstance(reply, str) and r.get("reply_state") in {"available", "empty"}:
+              reply_state = "available" if reply else "empty"
+          substantive_reply = reply_state == "available" and bool(reply.strip())
+          evidence_url = os.environ.get("EVIDENCE_URL", "")
+          evidence_saved = os.environ.get("EVIDENCE_OUTCOME") == "success" and bool(evidence_url)
+          lines = [f"Logos ({r.get('model', 'unknown')}) finished with status **{r['status']}**.\n",
+                   f"Workflow before reporting: **{os.environ['WORKFLOW_STATUS']}**.\n",
+                   "File status is not a review verdict or owner acceptance.\n",
+                   f"Assistant reply: **{reply_state}**.\n"]
+          if r.get("interrupted"):
+              lines.append("Execution was interrupted; this is the last saved response checkpoint.\n")
+          if r.get("summary"):
+              lines.append("Reply preview (up to 4000 characters):\n" + str(r["summary"])[:4000] + "\n")
+          if reply_state != "unknown":
+              digest = hashlib.sha256(reply.encode("utf-8")).hexdigest()
+              lines.append(f"Full reply: {len(reply)} characters; SHA-256 `{digest}`.\n")
+          lines.append(f"Provider response: `{r.get('response_id') or 'unknown'}`; "
+                       f"provider status: `{r.get('provider_status') or 'unknown'}`.\n")
+          # Treat result.json as untrusted; export machine tokens, never raw error bodies.
+          for key in ("provider_reason", "provider_error_code", "provider_error_type"):
+              value = r.get(key)
+              if (isinstance(value, str) and re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]{0,63}", value)
+                      and not value.startswith(("ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_", "sk-"))):
+                  lines.append(f"{key}: `{value}`.\n")
+          if r.get("provider_error_present") is True:
+              lines.append("Provider returned a non-null error; the task did not complete.\n")
+          if evidence_saved:
+              lines.append("Full result (including the unabridged reply): " + evidence_url + "\n")
+          else:
+              lines.append("Response artifact was not confirmed. Delivery is incomplete.\n")
+          if r.get("pending_tools"):
+              lines.append("Stopped: these tools need a maintainer's approval: " + ", ".join(map(str, r["pending_tools"])) + "\n")
+          if os.environ.get("APP_TOKEN_OUTCOME") == "failure":
+              lines.append("GitHub App authentication failed. " +
+                           ("The personal-token fallback is available for this report.\n" if os.environ.get("GH_TOKEN")
+                            else "No publishing token is available.\n"))
+          cost = b.get("total_cost", "unknown")
+          lines.append(f"Cost: {cost} {b.get('currency', 'RUB')} ({b.get('cost_status', 'unknown')}), "
+                       f"tokens: {b.get('total_tokens', 'unknown')}, trace: `{r.get('trace_id', 'unknown')}`")
+          if os.environ.get("PR_URL"):
+              lines.append("\nPull request: " + os.environ["PR_URL"])
+          # Escape every mention, including tool names, so reports never re-trigger Logos.
+          print("\n".join(lines).replace("@", "@\u200b"))
+          Path(os.environ["RUNNER_TEMP"], "report-status.txt").write_text(
+              "failed" if (r["status"] == "failed" or not evidence_saved or
+                           (not substantive_reply and r["status"] != "needs_approval"))
+              else "ok", encoding="utf-8")
+          PY
           cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"
+          test -n "$GH_TOKEN" || { echo "::error::No publishing token: the report is available in the job summary only."; exit 1; }
+          gh issue comment "$ISSUE_NUMBER" --repo "$REPOSITORY" --body-file "$RUNNER_TEMP/report.md"
+          test "$(cat "$RUNNER_TEMP/report-status.txt")" = "ok"

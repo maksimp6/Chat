@@ -1,0 +1,18 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# One-tap push for the current repo, with a confirmation step.
+# Usage: gpush [repo_dir]   (defaults to ~/Chat)
+REPO="${1:-$HOME/Chat}"
+cd "$REPO" || { echo "No repo at $REPO"; exit 1; }
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+echo "Repo:   $REPO"
+echo "Branch: $BRANCH"
+echo "--- status ---"
+git status --short
+echo "--- commits to push ---"
+git log --oneline "@{u}..HEAD" 2>/dev/null || echo "(no upstream set)"
+echo "--------------------"
+read -r -p "Push $BRANCH to origin? [y/N] " ans
+case "$ans" in
+  y|Y) git push origin "$BRANCH" && echo "Pushed." ;;
+  *)   echo "Cancelled." ;;
+esac

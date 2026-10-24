@@ -31,11 +31,14 @@
 - [Сообщество ботов](integrations/chatgpt-bot-community.md) — интеграция ChatGPT, MCP и A2A-ботов
 - [Work Map: trips.db](integrations/work-map-trips.md) — ручной прототип обработки `trips.db` и границы будущей интеграции; в Logos не реализовано
 - [Конспекты внешней документации](notes/README.md) — переработанные знания и выводы для Logos
+- [Официальная документация Yandex AI Studio и Yandex Cloud](yandex-documentation.md) — проверенные ссылки на API, тарифы, лимиты и управление доступом
 - [Markdown-зеркала](mirrors/README.md) — близкие к источнику локальные копии внешней документации
 - [Markdown-зеркало Cloud.ru](integrations/cloudru-docs-mirror.md) — спецификация crawler/fetch pipeline и manifest для Cloud.ru
 - [Агенты Logos](agents/overview.md) — runtime-агенты и адаптеры приложения (чат, голос, CLI, инструменты)
 - [Роли разработки в репозитории](agents/role-based-agent-office.md) — GitHub-роли (Team Lead, Backend, Docs Engineer и др.), не часть runtime Logos
 - [Фронтенд](frontend/overview.md) — структура пользовательского интерфейса
+- [Пробелы пользовательских сценариев](frontend/capability-gaps-2026-10-11.md) — код и локальный UI на 2026-10-11, приоритеты и критерии приёмки
+- [Повторно применимые уроки и навыки](lessons/README.md) — источники, границы истории и каталог процедур
 - [Бэкенд](backend/overview.md) — архитектура серверной части
 - [База данных](database/overview.md) — модели данных и схема БД
 - [Безопасность](security/overview.md) — меры защиты и безопасность системы

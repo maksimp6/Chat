@@ -66,7 +66,16 @@ def test_offline_probe_reports_native_contracts_and_cleans_owned_files(tmp_path)
     assert set(native["categories"]) == set(params["active_tool_categories"])
     assert len(native["categories"]) == len(set(native["categories"]))
     assert set(native["categories"]) == set(report["categories"])
-    assert native["offered_count"] == sum(report["categories"].values())
+    from tool_providers.registry import ToolRegistry
+    from tool_providers.termux import TERMUX_TOOLS
+
+    # Only Termux:API tools whose Android helper is absent on this host are withheld.
+    assert native["not_offered"] == sorted(
+        name for name, cfg in TERMUX_TOOLS.items() if not ToolRegistry.is_offered(cfg)
+    )
+    assert native["offered_count"] + len(native["not_offered"]) == sum(
+        report["categories"].values()
+    )
     assert native["offered_count"] > report["exposed_count"]
     assert native["hosted_enabled"] == {
         "code_interpreter": True,
