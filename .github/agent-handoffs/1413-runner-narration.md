@@ -70,3 +70,32 @@ issue runner/generation gate/Gradle; прежние цифры выше отно
 на этот срез. Новая доставка тестовых аудиобайтов проверена через реальные
 emit_result/log chunks с восстановлением base64; TTS в контроле подменён.
 Header/байты тестового контейнера не доказывают живое воспроизведение.
+
+## Продолжение по команде владельца «▶ Дальше»
+
+Допуск возобновлён: та же задача/исполнитель/PR #1588, новый проверенный develop
+`5cc930233a2889710fcc6df9f46288d2107c04e1`, локальная ветка
+feat/logos-narration-continue, publication branch feat/logos-runner-narration.
+Инструкции AGENTS.md и scoped admission перечитаны. Merge и платные вызовы
+командой продолжения не разрешены; #1569 всё ещё открыт.
+
+Причина отсутствия backend CI доказана публичной страницей run 40083161591:
+`(Line: 23, Col: 8): Unrecognized named-value: 'runner'` в root env OUT.
+Такой же отказ root env EVIDENCE_DIR подтверждён в launch-smoke 40083162814.
+Переменные перенесены в job env без смены путей, D0 и owner job-result policy.
+Добавлен ранний offline narration/delivery pytest step в существующий backend
+job; один видимый шаг ручного logos не меняется. Остальные прежние invalid
+workflow (pr-court/observer) не переписываются в рамках этой задачи.
+
+Добавлен logos_narration_receive: извлечение готовых story/receipt/ogg из
+existing single-step log chunks с проверкой полноты/порядка, общего SHA,
+SHA текста/аудио и безопасных имён до записи. Повторное использование каталога
+запрещено. Recovery не считается декодированием или воспроизведением речи.
+Регрессии включают порчу, traversal, потерю последнего frame и duplicate YAML
+env keys. Числа итоговых проверок/точный HEAD публикуются в PR.
+
+Итоговый повторный base: `7cfefcc5d54c78b8d0c746ff1692786aaff387e7`.
+Обновлённый AGENTS.md («Законы Логоса») прочитан; 260 focused tests passed на
+синхронизированном checkout, Ruff изменённых Python-файлов и canonical
+pre-push gate PASS. Секреты/расходы/D0/merge не менялись. Новые CI-результаты
+требуют проверки после публикации; прежние не переиспользуются.

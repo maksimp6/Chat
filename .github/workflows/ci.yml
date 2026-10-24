@@ -19,9 +19,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  OUT: ${{ runner.temp }}/ci-out/ci
-
 jobs:
   changes:
     name: Platform changes
@@ -242,6 +239,7 @@ jobs:
     timeout-minutes: 2
     env:
       YANDEX_API_KEY: ci-test-placeholder
+      OUT: ${{ runner.temp }}/ci-out/ci
     steps:
       - name: Start job reporting clock
         id: job_policy_clock
@@ -288,6 +286,12 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
           npm install --ignore-scripts --no-audit --no-fund --package-lock=false
           echo "- Application dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify Logos narration and delivery offline
+        id: narration_tests
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
+        run: |
+          python -m pytest -q tests/test_logos_narration.py tests/test_logos_narration_receive.py tests/test_logos_once.py tests/test_logos_workflow.py
       - name: Install video codec test tools
         id: policy_step_05
         continue-on-error: true

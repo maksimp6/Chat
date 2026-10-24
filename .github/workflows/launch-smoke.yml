@@ -13,10 +13,6 @@ on:
 permissions:
   contents: read
 
-# Выходные файлы пишем только в RUNNER_TEMP, вне рабочей копии репозитория.
-env:
-  EVIDENCE_DIR: ${{ runner.temp }}/ci-out/launch-smoke
-
 concurrency:
   group: launch-smoke-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
@@ -26,6 +22,8 @@ jobs:
     name: Offline startup and restart smoke
     runs-on: ubuntu-latest
     timeout-minutes: 1
+    env:
+      EVIDENCE_DIR: ${{ runner.temp }}/ci-out/launch-smoke
     steps:
       - name: Start job reporting clock
         id: job_policy_clock
@@ -138,6 +136,8 @@ jobs:
     # 1 минута задана вручную: замера прогона нет
     timeout-minutes: 1
     environment: production
+    env:
+      EVIDENCE_DIR: ${{ runner.temp }}/ci-out/launch-smoke
     steps:
       - name: Start job reporting clock
         id: job_policy_clock
