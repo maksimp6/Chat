@@ -7,7 +7,7 @@ from yandex_client_modules.errors import YandexClientError
 
 
 class YandexPollingMixin:
-    def _wait(self, task_id, timeout=180, execution_trace=None, trace_step=None):
+    def _wait(self, task_id, timeout=180, execution_trace=None, trace_step=None, headers=None):
         start = time.time()
         url = self.responses_url + "/" + task_id
         delay = 0.5
@@ -18,7 +18,7 @@ class YandexPollingMixin:
                 # Polls read a request that ask() already admitted and counted. Charging
                 # a quota unit per poll could deny the result of a task the provider keeps running.
                 self._log_request("GET", url)
-                resp = self._log_response(self.session.get(url, timeout=15))
+                resp = self._log_response(self.session.get(url, headers=headers, timeout=15))
                 if resp.status_code == 404:
                     if execution_trace and isinstance(execution_trace, ExecutionTrace):
                         execution_trace.add_event(

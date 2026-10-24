@@ -285,7 +285,8 @@ class TestYandexResponsesPollingTrace(unittest.TestCase):
         )
         client.session.post.return_value = response
         params = {"background": False, "prompt_cache_key": "stable-prefix-v1"}
-        with patch(
+        # Quota identity is not under test here; anonymous calls now fail closed.
+        with patch.dict("os.environ", {"LOGOS_QUOTA_REQUIRE_IDENTITY": "false"}), patch(
             "yandex_client_modules.request_mixin._resolve_global_provider_credential"
         ) as resolve_credential:
             resolve_credential.return_value = Mock(

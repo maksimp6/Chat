@@ -95,7 +95,7 @@ def test_replenishment_requires_policy_approval():
 
 def test_win_increases_available():
     controller = make_controller()
-    controller.record_win("150", account_type=AccountType.REAL)
+    controller._record_win("150", account_type=AccountType.REAL)
     assert controller.account(AccountType.REAL).won == Decimal("150.00")
     assert controller.account(AccountType.REAL).available == Decimal("250.00")
 

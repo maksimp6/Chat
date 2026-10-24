@@ -102,15 +102,25 @@ def _resolve_quota_user_id(execution_trace=None):
         return None
 
 
+def _usage_count(usage, key, default=0):
+    """A provider token count; malformed values count as zero instead of failing the call."""
+    value = usage.get(key, default)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 0
+    if not math.isfinite(value) or value < 0:
+        return 0
+    return int(value)
+
+
 def _record_quota_usage(execution_trace, reservation, response):
     if reservation is None or not isinstance(response, dict):
         return
     usage = response.get("usage") or {}
     if not isinstance(usage, dict):
         return
-    input_tokens = int(usage.get("input_tokens", 0) or 0)
-    output_tokens = int(usage.get("output_tokens", 0) or 0)
-    total_tokens = int(usage.get("total_tokens", input_tokens + output_tokens) or 0)
+    input_tokens = _usage_count(usage, "input_tokens")
+    output_tokens = _usage_count(usage, "output_tokens")
+    total_tokens = _usage_count(usage, "total_tokens", input_tokens + output_tokens)
     token_count = max(total_tokens, input_tokens + output_tokens)
     record_usage(reservation, token_count=token_count)
     if isinstance(execution_trace, ExecutionTrace):
@@ -148,12 +158,6 @@ def _resolve_global_provider_credential(client, execution_trace=None):
 
     if not isinstance(credential.project_id, str) or not credential.project_id.strip():
         raise YandexClientError("Active Yandex credential has no project_id")
-    client.session.headers.update(
-        {
-            "Authorization": "Api-Key " + credential.api_key,
-            "OpenAI-Project": credential.project_id,
-        }
-    )
 
     if execution_trace and isinstance(execution_trace, ExecutionTrace):
         execution_trace.set_provider_key(
@@ -165,6 +169,15 @@ def _resolve_global_provider_credential(client, execution_trace=None):
             source="global",
         )
     return credential
+
+
+def provider_request_headers(credential) -> dict[str, str]:
+    """Credential headers for one request. The shared session is never mutated, so
+    concurrent requests cannot send each other's key or project."""
+    return {
+        "Authorization": "Api-Key " + credential.api_key,
+        "OpenAI-Project": credential.project_id,
+    }
 
 
 class YandexRequestMixin:
@@ -192,6 +205,7 @@ class YandexRequestMixin:
             params["store"] = True
 
         credential = _resolve_global_provider_credential(self, execution_trace)
+        headers = provider_request_headers(credential)
         quota_user_id = _resolve_quota_user_id(execution_trace)
         try:
             quota_reservation = reserve_request(quota_user_id)
@@ -261,7 +275,9 @@ class YandexRequestMixin:
         resp = None
         try:
             resp = self._log_response(
-                self.session.post(self.responses_url, json=payload, timeout=request_timeout)
+                self.session.post(
+                    self.responses_url, json=payload, headers=headers, timeout=request_timeout
+                )
             )
             resp.raise_for_status()
         except requests.RequestException as e:
@@ -348,6 +364,7 @@ class YandexRequestMixin:
             task_id,
             execution_trace=execution_trace,
             trace_step=trace_step_number,
+            headers=headers,
             **wait_params,
         )
         if on_provider_response is not None:

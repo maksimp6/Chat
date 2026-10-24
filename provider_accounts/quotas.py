@@ -178,12 +178,17 @@ def reserve_request(
 ) -> Optional[QuotaReservation]:
     """Atomically reserve one provider request for a trusted user.
 
-    A missing identity preserves backwards compatibility. Set
-    LOGOS_QUOTA_REQUIRE_IDENTITY=true to fail closed instead.
+    A missing identity fails closed by default: an uncounted provider call would
+    bypass every quota. Only LOGOS_QUOTA_REQUIRE_IDENTITY=false (for headless local
+    runs) lets anonymous requests through unmetered.
     """
     trusted_user_id = str(user_id or "").strip()
     if not trusted_user_id:
-        if env_get("LOGOS_QUOTA_REQUIRE_IDENTITY", "").strip().lower() in {"1", "true", "yes"}:
+        if env_get("LOGOS_QUOTA_REQUIRE_IDENTITY", "true").strip().lower() not in {
+            "0",
+            "false",
+            "no",
+        }:
             raise ProviderQuotaExceeded(
                 reason="trusted_user_identity_required",
                 user_id="unknown",

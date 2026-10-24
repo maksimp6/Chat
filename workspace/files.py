@@ -8,7 +8,10 @@ import logging
 api_logger = logging.getLogger("yandex_api_debug")
 
 from yandex_client_modules.client import YandexClientError, _sanitize_for_log
-from yandex_client_modules.request_mixin import _resolve_global_provider_credential
+from yandex_client_modules.request_mixin import (
+    _resolve_global_provider_credential,
+    provider_request_headers,
+)
 
 
 class YandexFileManagerMixin:
@@ -17,10 +20,14 @@ class YandexFileManagerMixin:
     def _fm_request(self, method, url, **kwargs):
         """Запрос с retry + логирование через _log_request/_log_response.
         Для multipart убирает Content-Type из заголовков сессии."""
-        _resolve_global_provider_credential(self)
-        restore_ct = None
-        if kwargs.get("files") and "Content-Type" in self.session.headers:
-            restore_ct = self.session.headers.pop("Content-Type")
+        credential = _resolve_global_provider_credential(self)
+        headers = dict(kwargs.pop("headers", None) or {})
+        headers.update(provider_request_headers(credential))
+        if kwargs.get("files"):
+            # None removes the session's JSON Content-Type for this request only,
+            # so requests can write the multipart boundary.
+            headers["Content-Type"] = None
+        kwargs["headers"] = headers
 
         self._log_request(method, url, **kwargs)
 
@@ -32,8 +39,6 @@ class YandexFileManagerMixin:
             try:
                 resp = self.session.request(method, url, timeout=30, **kwargs)
                 self._log_response(resp)
-                if restore_ct is not None:
-                    self.session.headers["Content-Type"] = restore_ct
                 return resp
             except requests.exceptions.Timeout:
                 last_exc = YandexClientError("Network timeout")
@@ -42,8 +47,6 @@ class YandexFileManagerMixin:
                 last_exc = YandexClientError(f"Network error: {e}")
                 api_logger.warning(f"[FILES/VS] Network error attempt {attempt + 1}/4: {e}")
 
-        if restore_ct is not None:
-            self.session.headers["Content-Type"] = restore_ct
         raise last_exc or YandexClientError("Unknown network error")
 
     def _fm_handle_error(self, resp, context):

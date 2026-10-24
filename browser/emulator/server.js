@@ -5,7 +5,13 @@
 const readline = require("node:readline");
 const { EmulatorSession, EmulatorError } = require("./session");
 
-function serve(input = process.stdin, output = process.stdout, session = new EmulatorSession()) {
+function serve(
+  input = process.stdin,
+  output = process.stdout,
+  session = new EmulatorSession({
+    allowNonPublicHosts: process.env.LOGOS_EMULATOR_ALLOW_NON_PUBLIC === "1",
+  }),
+) {
   const lines = readline.createInterface({ input });
   let queue = Promise.resolve();
   lines.on("line", (line) => {

@@ -115,6 +115,18 @@ def traced_operation(operation: str, *, include_request: bool = True):
     return decorator
 
 
+def _guarded(method: Callable[..., Any]) -> Callable[..., Any]:
+    """Run one trace mutation or snapshot under the trace lock, so a concurrent
+    snapshot never copies a dict while another thread is resizing it."""
+
+    @wraps(method)
+    def wrapper(self: "ExecutionTrace", *args: Any, **kwargs: Any) -> Any:
+        with self._sensitive_values_lock:
+            return method(self, *args, **kwargs)
+
+    return wrapper
+
+
 class ExecutionTrace:
     SCHEMA_VERSION = 1
     _SENSITIVE_KEYS = SENSITIVE_KEYS
@@ -226,6 +238,7 @@ class ExecutionTrace:
     def get_metadata(self) -> Dict[str, str]:
         return {"trace_id": str(self.trace_id)}
 
+    @_guarded
     def set_provider_key(
         self,
         key_id: str,
@@ -266,6 +279,7 @@ class ExecutionTrace:
             },
         )
 
+    @_guarded
     def set_context(
         self,
         invocation_id: Optional[str] = None,
@@ -294,6 +308,7 @@ class ExecutionTrace:
             if key in context:
                 billing[key] = context[key]
 
+    @_guarded
     def add_skill(
         self,
         name: str,
@@ -313,6 +328,7 @@ class ExecutionTrace:
         skills.append(entry)
         self.add_event("skill_loaded", entry)
 
+    @_guarded
     def set_request(self, payload: Dict[str, Any]) -> None:
         self._ensure_mutable()
         clean_payload = (
@@ -374,6 +390,7 @@ class ExecutionTrace:
         """Return a stable correlation identifier for one logical API step."""
         return step_correlation_id(self.trace_id, step_index)
 
+    @_guarded
     def add_api_request(
         self,
         payload: Dict[str, Any],
@@ -448,6 +465,7 @@ class ExecutionTrace:
         except Exception as exc:
             self.add_event("billing_error", {"step": step_index, "error": str(exc)})
 
+    @_guarded
     def add_response(
         self,
         raw_json: Dict[str, Any],
@@ -628,7 +646,8 @@ class ExecutionTrace:
                 entry["step"] = step
             if server is not None:
                 entry["server"] = server
-            self.trace["tool_calls"].append(entry)
+            with self._sensitive_values_lock:
+                self.trace["tool_calls"].append(entry)
             self.add_event(
                 "tool_executed",
                 {
@@ -643,6 +662,7 @@ class ExecutionTrace:
                 },
             )
 
+    @_guarded
     def set_reasoning_plan(self, plan: Dict[str, Any]) -> None:
         """Attach a sanitized structured reasoning plan to this execution trace."""
         self._ensure_mutable()
@@ -659,6 +679,7 @@ class ExecutionTrace:
             },
         )
 
+    @_guarded
     def record_reasoning_event(
         self,
         event_type: str,
@@ -678,6 +699,7 @@ class ExecutionTrace:
             raise ValueError(f"unsupported reasoning event: {event_type}")
         self.add_event(event_type, self._sanitize_trace_value(payload or {}))
 
+    @_guarded
     def add_event(self, event_type: str, payload: Optional[Dict[str, Any]] = None) -> None:
         self._ensure_mutable()
         if event_type in self._INTERNAL_EVENT_TYPES:
@@ -724,6 +746,7 @@ class ExecutionTrace:
                 "total_cost": 0.0,
             }
 
+    @_guarded
     def record_error(
         self,
         source: str,
@@ -767,11 +790,13 @@ class ExecutionTrace:
             return {"trace_id": obj.trace_id, "<circular_ref>": True}
         return safe_repr(obj)
 
+    @_guarded
     def _snapshot_copy(self, trace: Dict[str, Any]) -> Dict[str, Any]:
         """Return a JSON-safe independent trace copy, without altering the source."""
         snapshot = json.loads(json.dumps(trace, default=self._json_default))
         return self._redact_registered_values(snapshot)
 
+    @_guarded
     def _build_snapshot(self, *, end_perf: Optional[float] = None) -> Dict[str, Any]:
         """Build a read-only view and derive billing solely from source billing items."""
         snapshot = self._snapshot_copy(self.trace)
@@ -795,6 +820,7 @@ class ExecutionTrace:
         snapshot["billing"] = aggregate_billing(items, snapshot.get("context", {}))
         return self._snapshot_copy(snapshot)
 
+    @_guarded
     def make_snapshot(self) -> Dict[str, Any]:
         """Return an independent, non-persisting snapshot of the current trace."""
         if self._finalized:

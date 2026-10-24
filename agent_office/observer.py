@@ -127,18 +127,27 @@ class Finding:
 # Who did it
 
 
+_LOGIN_WORD = re.compile(r"[a-z0-9]+")
+
+
 def classify_login(login: str | None) -> str:
-    """Map a GitHub login or commit author name to an agent id."""
+    """Map a GitHub login or commit author name to an agent id.
+
+    Matches whole words of the login, so a person whose name merely contains
+    "logos" or "codex" is not taken for that agent. Names are still self-chosen,
+    so this labels activity; it does not prove who acted.
+    """
     name = (login or "").strip().lower()
     if not name:
         return "human"
-    if "copilot" in name:
+    words = set(_LOGIN_WORD.findall(name))
+    if "copilot" in words:
         return "copilot"
-    if "codex" in name or name == "chatgpt-connector[bot]":
+    if "codex" in words or name == "chatgpt-connector[bot]":
         return "codex"
-    if "claude" in name or "anthropic" in name:
+    if words & {"claude", "anthropic"}:
         return "claude"
-    if "logos" in name:
+    if "logos" in words:
         return "logos"
     if name.endswith("[bot]") or name in {"github-actions", "dependabot"}:
         return "ci"

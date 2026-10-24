@@ -48,7 +48,7 @@ class CloudRuSecretManagementAdminClient:
             "name": name,
             "description": description,
             "parent_id": self.parent_id,
-            "payload": {"data": {"value": self._encoded(value)}},
+            "payload": {"data": self._encoded(value)},
         }
         response = self._request("POST", "/v1/secrets", payload)
         secret_id = str(response.get("id") or response.get("secret_id") or "").strip()
@@ -68,7 +68,7 @@ class CloudRuSecretManagementAdminClient:
         response = self._request(
             "POST",
             VERSIONS_PATH.format(secret_id=secret_id),
-            {"payload": {"data": {"value": self._encoded(value)}}},
+            {"payload": {"data": self._encoded(value)}},
         )
         version_id = self._version_id(response)
         if not version_id:

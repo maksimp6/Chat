@@ -17,7 +17,7 @@ from pathlib import Path
 from threading import RLock
 from typing import Any, Self
 
-from agent_memory.file_memory_db import FileMemoryDB, FileMemoryError
+from memory_engine import MemoryStore, StoreError
 
 
 class BoardError(ValueError):
@@ -51,6 +51,65 @@ def _sha(kind: str, payload: dict[str, Any]) -> str:
     return hashlib.sha256(blob).hexdigest()
 
 
+class FileMemoryError(RuntimeError):
+    """The durable event journal refused or could not confirm a write."""
+
+
+def _drop_torn_tail(path: Path) -> None:
+    """Remove a partial last frame left by a crash during an unacknowledged write.
+
+    A frame is acknowledged only after its newline is written and fsynced, so every
+    byte after the final newline belongs to a write that was never confirmed.
+    Complete frames are never touched; a corrupt complete frame still fails closed.
+    """
+    if not path.exists():
+        return
+    with path.open("rb+") as journal:
+        content = journal.read()
+        if not content or content.endswith(b"\n"):
+            return
+        journal.truncate(content.rfind(b"\n") + 1)
+        journal.flush()
+        os.fsync(journal.fileno())
+
+
+class _EventJournal:
+    """Append-only event journal on the native Memory DB.
+
+    Each event is one committed key, so the commit sequence equals the event count.
+    Keys are derived from that sequence, which keeps the journal free of an index
+    that would grow with every write.
+    """
+
+    def __init__(self, path: Path) -> None:
+        _drop_torn_tail(path)
+        try:
+            self._store = MemoryStore(path)
+        except StoreError as exc:
+            raise BoardUnavailable("event journal cannot be opened") from exc
+
+    @property
+    def sequence(self) -> int:
+        return self._store.last_commit.sequence
+
+    def items(self) -> dict[str, Any]:
+        return {
+            f"{PREFIX}{seq:09d}": self._store.get(f"{PREFIX}{seq:09d}")
+            for seq in range(1, self.sequence + 1)
+        }
+
+    def put(self, key: str, value: Any) -> int:
+        try:
+            with self._store.transaction() as tx:
+                tx.set(key, value)
+        except StoreError as exc:
+            raise FileMemoryError("event journal write failed") from exc
+        return self.sequence
+
+    def close(self) -> None:
+        self._store.close()
+
+
 class BoardStore:
     """Single-writer event store with immutable posts, traceable tasks and replay."""
 
@@ -78,7 +137,7 @@ class BoardStore:
             os.close(self._lock_fd)
             raise BoardUnavailable("board already has a writer") from exc
         try:
-            self._db = FileMemoryDB(self.path)
+            self._db = _EventJournal(self.path)
             if self.path.exists() and (
                 self.path.stat().st_mode & 0o077 or self.path.stat().st_uid != os.getuid()
             ):
@@ -371,6 +430,9 @@ class BoardStore:
             if self._closed:
                 return
             self._closed = True
+            db = getattr(self, "_db", None)
+            if db is not None and os.getpid() == self._pid:
+                db.close()
             if os.getpid() == self._pid:
                 fcntl.flock(self._lock_fd, fcntl.LOCK_UN)
             os.close(self._lock_fd)

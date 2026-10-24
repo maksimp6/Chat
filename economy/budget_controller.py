@@ -363,10 +363,11 @@ class BudgetController:
                 )
             return self.snapshot()
 
-    def record_win(
+    def _record_win(
         self, amount: Any, *, account_type: Optional[AccountType] = None
     ) -> Dict[str, Any]:
-        """Record a provider-confirmed win; LLMs cannot mint this value."""
+        """Record a provider-confirmed win. Private: nothing in the app may mint wins,
+        and no provider settlement path exists yet to call this."""
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
             account = self.account(account_type)

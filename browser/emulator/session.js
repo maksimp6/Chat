@@ -4,6 +4,7 @@ const { DocumentShim } = require("./browser_dom");
 
 const DEFAULT_MAX_BYTES = 2 * 1024 * 1024;
 const DEFAULT_TEXT_LIMIT = 8000;
+const DEFAULT_TIMEOUT_MS = 15000;
 
 class EmulatorError extends Error {}
 
@@ -13,11 +14,59 @@ function collapse(text) {
     .trim();
 }
 
+// Literal private, loopback, link-local and metadata hosts. Pages are fetched
+// on behalf of the agent, so these must never be reachable through the emulator.
+function isNonPublicHost(hostname) {
+  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return true;
+  if (host === "::1" || host === "::" || host.startsWith("fc") || host.startsWith("fd")) return true;
+  if (host.startsWith("fe80:") || host.startsWith("::ffff:")) return true;
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!ipv4) return false;
+  const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 100 && b >= 64 && b <= 127)
+  );
+}
+
+// Read a response body without buffering more than maxBytes of it.
+async function readCapped(response, maxBytes) {
+  if (!response.body || typeof response.body.getReader !== "function") {
+    const text = await response.text();
+    if (Buffer.byteLength(text) > maxBytes) {
+      throw new EmulatorError("page exceeds emulator size limit");
+    }
+    return text;
+  }
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new EmulatorError("page exceeds emulator size limit");
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 class EmulatorSession {
   constructor(options = {}) {
     this.fetch = options.fetch || globalThis.fetch;
     this.maxBytes = options.maxBytes || DEFAULT_MAX_BYTES;
     this.textLimit = options.textLimit || DEFAULT_TEXT_LIMIT;
+    this.timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
+    this.allowNonPublicHosts = options.allowNonPublicHosts === true;
     this.document = null;
     this.url = null;
     this.status = null;
@@ -44,11 +93,19 @@ class EmulatorSession {
 
   async navigate(target, init = {}) {
     const url = this._resolve(target);
-    const response = await this.fetch(url.href, { redirect: "follow", ...init });
-    const html = await response.text();
-    if (Buffer.byteLength(html) > this.maxBytes) {
-      throw new EmulatorError("page exceeds emulator size limit");
+    if (!this.allowNonPublicHosts && isNonPublicHost(url.hostname)) {
+      throw new EmulatorError("address is not public: " + url.hostname);
     }
+    const response = await this.fetch(url.href, {
+      redirect: "follow",
+      signal: AbortSignal.timeout(this.timeoutMs),
+      ...init,
+    });
+    // Redirects were followed by fetch, so the host that actually answered is checked too.
+    if (!this.allowNonPublicHosts && response.url && isNonPublicHost(new URL(response.url).hostname)) {
+      throw new EmulatorError("redirected to a non-public address");
+    }
+    const html = await readCapped(response, this.maxBytes);
     this.document = new DocumentShim(html);
     this.url = response.url || url.href;
     this.status = response.status;

@@ -52,7 +52,7 @@ def test_admin_client_create_encodes_secret_without_returning_plaintext(monkeypa
     assert (secret_id, version_id) == ("secret-1", "version-1")
     assert seen["method"] == "POST"
     assert seen["url"].endswith("/v1/secrets")
-    encoded = seen["json"]["payload"]["data"]["value"]
+    encoded = seen["json"]["payload"]["data"]
     assert base64.b64decode(encoded).decode() == "synthetic-secret"
     assert "synthetic-secret" not in repr((secret_id, version_id))
 

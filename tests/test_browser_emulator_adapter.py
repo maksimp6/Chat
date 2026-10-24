@@ -39,7 +39,8 @@ def site():
 
 @pytest.fixture()
 def adapter():
-    instance = EmulatorBrowserAdapter()
+    # The fixture serves pages from 127.0.0.1, which the production default refuses.
+    instance = EmulatorBrowserAdapter(allow_non_public_hosts=True)
     yield instance
     instance.close()
 

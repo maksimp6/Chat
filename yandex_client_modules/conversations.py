@@ -10,14 +10,16 @@ api_logger = get_logger("yandex_api")
 class YandexConversationMixin:
     def create_conversation(self, execution_trace=None):
         try:
-            if execution_trace is not None:
-                from yandex_client_modules.request_mixin import _resolve_global_provider_credential
+            from yandex_client_modules.request_mixin import (
+                _resolve_global_provider_credential,
+                provider_request_headers,
+            )
 
-                _resolve_global_provider_credential(self, execution_trace)
-
+            credential = _resolve_global_provider_credential(self, execution_trace)
+            headers = provider_request_headers(credential)
             self._log_request("POST", self.conversations_url, json={})
             resp = self._log_response(
-                self.session.post(self.conversations_url, json={}, timeout=10)
+                self.session.post(self.conversations_url, json={}, headers=headers, timeout=10)
             )
             resp.raise_for_status()
             data = resp.json()
