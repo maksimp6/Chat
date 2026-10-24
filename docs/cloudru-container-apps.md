@@ -29,7 +29,8 @@ the service-account key pair and ignore `CLOUDRU_API_KEY` (Foundation Models).
    token is reused) with:
    - secrets `CLOUDRU_IAM_KEY_ID`, `CLOUDRU_IAM_KEY_SECRET`, `LOGOS_SHORT_TOKEN`,
      `LOGOS_GITHUB_CLIENT_ID`, `LOGOS_GITHUB_CLIENT_SECRET`,
-     and optionally `LOGOS_PROVIDER_CREDENTIAL_KEY`; repository-level OAuth
+     and `LOGOS_PROVIDER_CREDENTIAL_KEY` (keep the same value across redeploys,
+     or encrypted provider keys become unreadable); repository-level OAuth
      secrets are inherited, so do not duplicate them;
    - variable `CLOUDRU_PROJECT_ID`, and optionally `CLOUDRU_REGISTRY_NAME`,
      `CLOUDRU_REPOSITORY_NAME`, `CLOUDRU_CONTAINER_NAME`, `CLOUDRU_CONTAINER_CPU`,

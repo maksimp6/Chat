@@ -11,7 +11,7 @@ import uuid
 from flask import Blueprint, jsonify, request
 
 from core.config import config
-from secret_store.credential_crypto import decrypt_secret, encrypt_secret
+from secret_store.credential_crypto import CredentialCryptoError, decrypt_secret, encrypt_secret
 from storage.db import get_store
 from provider_accounts.credentials import list_provider_credentials
 from provider_accounts.credentials import (
@@ -258,6 +258,16 @@ def provider_credentials_status_check():
             if provider not in (YANDEX, CLOUDRU):
                 return jsonify({"error": "unsupported_provider"}), 400
             results[provider] = _perform_health_check(provider)
+    except CredentialCryptoError:
+        # Covers a missing key and a key that does not match the stored ciphertext.
+        logger.warning("Provider credential unreadable with the configured encryption key")
+        return jsonify(
+            {
+                "error": "credential_unreadable",
+                "detail": "Сохранённый ключ провайдера нельзя расшифровать. "
+                "Проверьте ключ шифрования на сервере или сохраните ключ заново.",
+            }
+        ), 503
     except Exception:
         logger.exception("Provider health check request failed")
         return jsonify(

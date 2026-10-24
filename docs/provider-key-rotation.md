@@ -96,8 +96,10 @@ worker validates the new/reissued secret before promoting it in the database.
 ## Runtime credential source
 
 `provider_credentials.resolve_client_credential` reads the active credential
-exclusively from the database. The Yandex request path additionally requires
-`LOGOS_PROVIDER_CREDENTIAL_KEY` and a non-empty Project ID in that record.
+exclusively from the database. An encrypted credential needs
+`LOGOS_PROVIDER_CREDENTIAL_KEY` to be read; a credential saved while no key was
+configured is plaintext and is read as stored. The Yandex request path also
+requires a non-empty Project ID in that record.
 
 Environment-only `YANDEX_API_KEY`, `YC_API_KEY`, `YANDEX_PROJECT_ID` or
 `CLOUDRU_API_KEY` values are not a fallback for this resolver. Their presence
@@ -105,7 +107,9 @@ in an environment template does not bootstrap the current web runtime.
 Configure the credential through the UI/API before sending a model request.
 
 Set a persistent `LOGOS_PROVIDER_CREDENTIAL_KEY` before saving credentials and
-retain it with deployment configuration. The provider crypto helper derives
+retain it with deployment configuration. Keep the same value on every start: an
+encrypted credential that cannot be decrypted is reported by the status check as
+`credential_unreadable`, and requests fail until the key is restored. The provider crypto helper derives
 encryption material from this value; it does not generate a deployment key.
 If the same value is used by Key Manager, it must also satisfy that component's
 Fernet-key format.

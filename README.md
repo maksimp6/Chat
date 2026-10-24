@@ -80,7 +80,7 @@ python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Copy `.env.example` only for a fresh installation. Replace its placeholders and remove unused integration examples before starting. For local development, set `HOST=127.0.0.1` and configure a persistent `LOGOS_PROVIDER_CREDENTIAL_KEY` before saving provider credentials.
+Copy `.env.example` only for a fresh installation. Replace its placeholders and remove unused integration examples before starting. For local development, set `HOST=127.0.0.1`. Set a persistent `LOGOS_PROVIDER_CREDENTIAL_KEY` before saving provider credentials: with it, keys are encrypted; without it, they are stored unencrypted. Keep the same value on every start, because encrypted keys cannot be read without it.
 
 Start the backend with `python app.py`. Open `http://localhost:8080` when using the template's `PORT=8080`; without `PORT`, `app.py` defaults to `5000`. In **Провайдеры**, save the Yandex API key together with its Project ID. The current web runtime resolves both from the active database credential; environment-only `YANDEX_API_KEY` / `YANDEX_PROJECT_ID` values do not configure the chat. See the [installation guide](docs/setup/installation.md) and [provider-key lifecycle](docs/provider-key-rotation.md).
 

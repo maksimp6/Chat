@@ -490,6 +490,31 @@ def test_provider_status_check_hides_internal_exception(monkeypatch):
     assert internal_marker not in str(payload)
 
 
+def test_status_check_reports_an_unreadable_stored_credential(monkeypatch):
+    from flask import Flask
+    from secret_store.credential_crypto import CredentialCryptoError
+
+    def unreadable(_provider):
+        raise CredentialCryptoError("Encrypted provider credential cannot be read")
+
+    monkeypatch.setattr(routes, "_perform_health_check", unreadable)
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/provider-credentials/status/check",
+            json={"provider": "cloudru"},
+        )
+
+    assert response.status_code == 503
+    payload = response.get_json()
+    assert payload["error"] == "credential_unreadable"
+    assert "Encrypted provider credential" not in str(payload)
+
+
 def test_perform_health_check_classifies_provider_failures(monkeypatch):
     from types import SimpleNamespace
 
