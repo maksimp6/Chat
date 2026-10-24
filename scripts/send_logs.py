@@ -1,10 +1,31 @@
 import requests
 import json
 import os
+import re
+import uuid
 from datetime import datetime
 from pathlib import Path
 
 LOGS_DIR = Path(__file__).resolve().parents[1] / "execution_logs"
+# Whole-word credential names only: "input_tokens" is usage data and must still be sent.
+_SENSITIVE_KEY_RE = re.compile(
+    r"api[_-]?key|authorization|password|passwd|secret|cookie|private[_-]?key|credential"
+    r"|(?:^|[_-])token(?:$|[_-])",
+    re.IGNORECASE,
+)
+
+
+def _redact(value):
+    # Logs leave the machine, so credential-bearing fields are removed before upload.
+    if isinstance(value, dict):
+        return {
+            str(key): _redact(item)
+            for key, item in value.items()
+            if not _SENSITIVE_KEY_RE.search(str(key))
+        }
+    if isinstance(value, list):
+        return [_redact(item) for item in value]
+    return value
 
 
 def collect_logs():
@@ -28,9 +49,10 @@ def send_logs():
         print("No logs to send")
         return
     data = {
-        "session_id": f"sess_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-        "user_id": "local_user",
-        "logs": logs,
+        # A random suffix keeps two uploads in the same second from sharing a session id.
+        "session_id": f"sess_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}",
+        "user_id": os.environ.get("LOGOS_USER_ID", "").strip() or "local_user",
+        "logs": _redact(logs),
         "timestamp": int(datetime.now().timestamp()),
     }
     api_key = os.environ.get("YANDEX_API_KEY", "").strip()
