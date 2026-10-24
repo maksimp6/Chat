@@ -1,39 +1,36 @@
-# Logos Android wrapper
+# Logos Android sources and direct SDK browser controller
 
-This module packages the existing Flask application in an Android shell using Chaquopy and a WebView. The backend source remains in the repository root and is staged into the Android Python source directory before packaging.
+## Current build
 
-## Build
-
-CI stages the backend with `scripts/stage_python.py` using Python 3.13 and then builds the debug APK with Gradle 9.5.0 on Java 25. `android/build.gradle.kts` declares Android Gradle Plugin 9.2.1 and Chaquopy 17.0.0; the app uses SDK 37 and JVM toolchain 17. There is no checked-in Gradle wrapper, so these commands require an installed `gradle`. See [the CI workflow](../.github/workflows/ci.yml) for the build sequence.
-
-```bash
-cd android
-python scripts/stage_python.py
-gradle :app:assembleDebug
-```
-
-To produce an updateable CI APK, pass a monotonically increasing build number:
+The supported direct build uses aapt2, javac, d8, zipalign and apksigner. It needs
+JDK 17+, Android SDK platform 35 and build-tools 35.0.0:
 
 ```bash
-gradle -PaliceBuildNumber=123 :app:assembleDebug
+bash android/scripts/test_direct.sh
+ALICE_BUILD_NUMBER=123 ALICE_VERSION_NAME=0.2.0-direct bash android/scripts/build_direct.sh
 ```
 
-CI uses the GitHub Actions run number as the Android `versionCode`, so newer CI runs can be installed over older CI builds.
+The output is `android/build/direct/alice-pro-direct.apk`, package
+`com.alicepro.mobile`. The direct manifest and Java sources are under `direct/`.
+This APK is a browser controller. It does **not** embed the Flask/Python backend
+or include all features of the former app. A build or successful contract check
+alone does not prove operation on a phone.
 
-The resulting APK is generated under:
+## Retained embedded-backend sources
 
-```text
-android/app/build/outputs/apk/debug/app-debug.apk
-```
+`app/src/` and `scripts/stage_python.py` remain as source material. The former
+packaging configuration and dependency-updater integration have been removed
+under #1423. There is no supported build of these retained sources or their old
+JVM/instrumentation test suite. They must not be presented as features included
+in the direct APK.
 
-## Runtime
+The `Release` tag workflow reports an explicit packaging blocker before using
+signing credentials or publishing anything. A replacement must preserve required
+features, identity and signing, pass artifact inspection, and be accepted on the
+target device before release publication can resume.
 
-- Python starts inside the Android process through Chaquopy.
-- Flask listens on `127.0.0.1:5000`.
-- The WebView opens `http://127.0.0.1:5000` after the server becomes reachable.
-- The Yandex AI Studio API key is entered on first launch and stored in app-private preferences. It is not bundled into the APK.
-- SQLite and the local repository are stored below the Python `HOME` directory supplied by Android.
-- Desktop behavior remains unchanged because `ALICE_LOCAL_REPO_DIR` defaults to `/sdcard/repo` outside Android.
+The sections below describe the retained embedded-backend implementation and
+historical verification; they are not a claim that the direct APK includes it.
 
 ## Diagnostics
 
@@ -45,12 +42,8 @@ Diagnostic records are redacted before they reach logcat or disk. Common API key
 
 The exported file is generated in app cache and shared through the existing `FileProvider`. It contains the already-redacted JSONL records rather than credentials or the Yandex API key.
 
-Android unit tests cover redaction and diagnostic query filtering:
-
-```bash
-cd android
-gradle :app:testDebugUnitTest
-```
+The retained Android test sources cover redaction and diagnostic query filtering.
+Their former test packager has been removed; they are not run by the direct build.
 
 ## RootAgent (first slice, #650)
 
