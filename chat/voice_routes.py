@@ -88,7 +88,11 @@ def _require_session(session_id: str) -> VoiceSession:
 
 
 def _check_owner(session: VoiceSession) -> None:
-    current_owner = get_current_owner_id(required=False)
+    try:
+        current_owner = get_current_owner_id(required=False)
+    except TreasuryIdentityError as exc:
+        # A presented token that does not match an account is a refusal, not a server error.
+        raise PermissionError("voice session access denied") from exc
     if session.owner_id and current_owner != session.owner_id:
         raise PermissionError("voice session access denied")
     # Without an identity a conversation cannot be proven to belong to the caller, so refuse.
