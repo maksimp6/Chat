@@ -38,6 +38,8 @@ MYPY_ERROR_BASELINE = {
 
 # Files with zero strict errors. Errors here fail outright.
 STRICT_CLEAN_FILES = {
+    "agent_rules/__init__.py",
+    "agent_rules/controller.py",
     "steel/guardian/admission.py",
     "agent_runtime/provider_receipt.py",
     "forge/__init__.py",
@@ -84,6 +86,8 @@ STRICT_CLEAN_FILES = {
     "agent_shell/__init__.py",
     "agent_skills/__init__.py",
     "agent_skills/registry.py",
+    "alice_mouse/__init__.py",
+    "alice_mouse/core.py",
     "alice_mouse/security/__init__.py",
     "alice_mouse/security/grants.py",
     "alice_mouse/security/socket_boundary.py",
@@ -136,6 +140,9 @@ STRICT_CLEAN_FILES = {
     "printing3d/model_preflight.py",
     "printing3d/preprint_readiness.py",
     "printing3d/quality_capability.py",
+    "printing3d/ftps_storage.py",
+    "printing3d/print_workflow.py",
+    "printing3d/video_archive.py",
     "provider_key_rotation.py",
     "printing3d/shape_benchmarks.py",
     "provider_accounts/key_rotation.py",
