@@ -160,7 +160,8 @@ def _fetch_github_account(code: str) -> dict | None:
             headers={"Accept": "application/json"},
             timeout=HTTP_TIMEOUT,
         )
-        access_token = (token_response.json() or {}).get("access_token")
+        token_payload = token_response.json()
+        access_token = token_payload.get("access_token") if isinstance(token_payload, dict) else None
         if token_response.status_code != 200 or not access_token:
             logger.warning(
                 "[GITHUB_AUTH] code exchange failed: status=%s", token_response.status_code
@@ -178,11 +179,11 @@ def _fetch_github_account(code: str) -> dict | None:
         if user_response.status_code != 200:
             logger.warning("[GITHUB_AUTH] user lookup failed: status=%s", user_response.status_code)
             return None
-        account = user_response.json() or {}
+        account = user_response.json()
     except (requests.RequestException, ValueError) as exc:
         logger.warning("[GITHUB_AUTH] GitHub request failed: %s", type(exc).__name__)
         return None
-    if not account.get("id") or not account.get("login"):
+    if not isinstance(account, dict) or not account.get("id") or not account.get("login"):
         return None
     return {"id": account["id"], "login": str(account["login"])}
 
