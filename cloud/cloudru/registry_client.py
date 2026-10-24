@@ -22,7 +22,7 @@ from typing import Any, Callable
 
 from cloud.base import CloudProviderError
 from cloud.cloudru.client import CloudRuClient
-from cloudru_iam import CloudRuIamClient
+from cloud.cloudru.iam import CloudRuIamClient
 
 
 SERVICE = "artifact_registry"
@@ -191,7 +191,7 @@ class CloudRuRegistryClient:
         if not _TAG_RE.match(tag or ""):
             raise CloudProviderError("tag is invalid", code="validation_error")
         # A throwaway Docker config keeps the registry credential off disk after the push.
-        with tempfile.TemporaryDirectory(prefix="alice-docker-") as docker_config:
+        with tempfile.TemporaryDirectory(prefix="logos-docker-") as docker_config:
             env = {**os.environ, "DOCKER_CONFIG": docker_config}
             return self._build_and_push(
                 registry_name, repository, tag, context_dir, dockerfile, platform, env
@@ -212,6 +212,23 @@ class CloudRuRegistryClient:
         # CI runners start empty, so layers are reused through an inline BuildKit
         # cache kept in the same private registry under a fixed tag.
         cache = ImageRef(host, repository, CACHE_TAG).tagged
+        # Hosted runners start with an empty local image store. Classic
+        # docker build --cache-from can only reuse the registry cache after the
+        # cache image has been pulled locally. A cold/missing cache is harmless.
+        started = time.perf_counter()
+        cache_pull = self._run(
+            ["docker", "pull", cache], text=True, capture_output=True, check=False, env=env
+        )
+        print(
+            json.dumps(
+                {
+                    "stage": "registry_cache_pull",
+                    "seconds": time.perf_counter() - started,
+                    "returncode": cache_pull.returncode,
+                }
+            ),
+            flush=True,
+        )
         for argv in (
             [
                 "docker",

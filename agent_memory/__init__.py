@@ -1,6 +1,6 @@
-"""GitHub-first shared memory contracts for Alice Pro agents."""
+"""GitHub-first shared memory contracts for Logos agents."""
 
-from .models import MemoryLookup, MemoryRecord
-from .repository import AgentMemoryStore
+from agent_memory.models import MemoryLookup, MemoryRecord
+from agent_memory.repository import AgentMemoryStore
 
 __all__ = ["AgentMemoryStore", "MemoryLookup", "MemoryRecord"]

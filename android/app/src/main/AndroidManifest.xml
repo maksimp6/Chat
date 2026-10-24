@@ -1,15 +1,25 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+        <permission
+        android:name="com.alicepro.mobile.STATUS"
+        android:protectionLevel="signature" />
 
     <application
         android:theme="@style/AppTheme"
-        android:label="Alice Pro"
+        android:label="Logos"
         android:icon="@drawable/ic_launcher"
         android:roundIcon="@drawable/ic_launcher"
         android:usesCleartextTraffic="true">
         <activity
             android:name=".DiagnosticsActivity"
+            android:exported="false" />
+        <activity
+            android:name=".RootAgentDiagnosticsActivity"
             android:exported="false" />
         <activity
             android:name=".BrowserTakeoverActivity"
@@ -28,6 +38,15 @@
             </intent-filter>
         </activity>
 
+        <service
+            android:name=".rootagent.RootAgentService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Owner-started loopback device-control agent for Logos" />
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -37,5 +56,9 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+        <service
+            android:name=".rootagent.LauncherStatusService"
+            android:exported="true"
+            android:permission="com.alicepro.mobile.STATUS" />
     </application>
 </manifest>
