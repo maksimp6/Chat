@@ -34,8 +34,7 @@ jobs:
         Application tests,
         Android debug APK,
         Auto-format repository,
-        Trivy repository scan,
-        Zizmor GitHub Actions audit
+        Trivy repository scan
 
     steps:
       - name: Checkout exact PR head

@@ -30,10 +30,14 @@ def write_op(func):
     return wrapper
 
 
+PROJECT_DIR = os.path.realpath(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
 def _resolve_repo_path(repo_name: str = None, cfg: dict = None) -> str:
     cfg = cfg or {}
     base_dir = cfg.get("repos_base_dir") or "/sdcard/repo"
-    target = repo_name or cfg.get("active_repo") or cfg.get("repo_path") or "alice_pro"
+    explicit = repo_name or cfg.get("active_repo") or cfg.get("repo_path")
+    target = explicit or "alice_pro"
 
     if os.path.isabs(target) and os.path.isdir(target):
         return target
@@ -47,6 +51,9 @@ def _resolve_repo_path(repo_name: str = None, cfg: dict = None) -> str:
         if os.path.isdir(alt):
             return alt
 
+    # Off the Android device the default repository is Logos's own checkout.
+    if not explicit and os.path.exists(os.path.join(PROJECT_DIR, ".git")):
+        return PROJECT_DIR
     return candidate
 
 
@@ -237,7 +244,8 @@ def git_remote(args: dict, cfg: dict) -> dict:
 def git_push(args: dict, cfg: dict) -> dict:
     repo = args.get("repo") or args.get("repo_path")
     remote = args.get("remote", "origin")
-    branch = args.get("branch") or "master"
+    # Without an explicit branch push the current one; never default to a protected branch.
+    branch = args.get("branch") or "HEAD"
     cmd = ["push"]
     if args.get("set_upstream"):
         cmd.append("-u")
@@ -352,7 +360,7 @@ TOOL_REGISTRY = {
     },
     "git_push": {
         "func": git_push,
-        "description": "Отправка изменений в remote (по умолчанию ветка master).",
+        "description": "Отправка изменений в remote (по умолчанию текущая ветка).",
         "parameters": {
             "type": "object",
             "properties": {
