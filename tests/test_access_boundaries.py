@@ -154,3 +154,23 @@ def test_revision_loader_accepts_plain_code():
 
 def test_take_photo_requires_an_explicit_output_path():
     assert termux_system.take_photo({}, {}) == {"error": "Параметр 'output_path' обязателен"}
+
+
+def test_conversation_tools_are_denied_without_owner_access(monkeypatch):
+    monkeypatch.setattr(mcp_routes, "get_current_owner_id", lambda required=False: None)
+    client = app_module.app.test_client()
+
+    assert client.get("/api/conversations/c1/tools").status_code == 404
+    denied = client.put("/api/conversations/c1/tools", json={"active_tool_categories": []})
+    assert denied.status_code == 404
+
+
+def test_conversation_tools_are_read_for_the_owner(monkeypatch):
+    monkeypatch.setattr(mcp_routes, "get_current_owner_id", lambda required=False: "owner-1")
+    monkeypatch.setattr(mcp_routes, "check_access", lambda conv_id, owner_id: True)
+    monkeypatch.setattr(
+        mcp_routes, "get_conv_settings", lambda conv_id: {"active_tool_categories": ["web"]}
+    )
+
+    response = app_module.app.test_client().get("/api/conversations/c1/tools")
+    assert response.get_json() == {"active_tool_categories": ["web"]}
