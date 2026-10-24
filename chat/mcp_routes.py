@@ -135,9 +135,7 @@ class LogosClient(YandexResponsesClient):
         # rest of the batch runs and the model is told what was not executed.
         deny_unapproved = (params or {}).get("approval_mode") == "deny"
         if calls:
-            approval_required = not deny_unapproved and any(
-                needs_approval(call) for call in calls
-            )
+            approval_required = not deny_unapproved and any(needs_approval(call) for call in calls)
 
             if not approval_required:
                 tool_servers = mcp_storage.list_servers()

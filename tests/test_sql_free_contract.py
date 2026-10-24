@@ -107,8 +107,6 @@ def test_runtime_has_no_sql_connection_boundary():
 
 
 DATABASE_DOC = ROOT / "docs/database.md"
-CLOUDRU_SERVICES = ROOT / "deploy/cloudru/services.md"
-CLOUDRU_IDENTITIES = ROOT / "deploy/cloudru/identities-and-secrets.md"
 
 
 def _only_line(text, needle):
@@ -131,19 +129,3 @@ def test_database_doc_describes_only_the_native_store():
         "docker-compose.postgres.yml",
     ):
         assert banned not in text
-
-
-def test_cloudru_services_retire_external_postgresql_requirements():
-    text = CLOUDRU_SERVICES.read_text(encoding="utf-8")
-    assert "retired" in _only_line(text, "| Внешний PostgreSQL").lower()
-    assert "retired" in _only_line(text, "external PostgreSQL connection").lower()
-
-
-def test_cloudru_identities_retire_postgresql_secrets_without_renaming_paths():
-    text = CLOUDRU_IDENTITIES.read_text(encoding="utf-8")
-    assert "retired" in _only_line(text, "| PostgreSQL role password").lower()
-    assert "retired" in _only_line(text, "`alice/runtime/postgres-dsn`").lower()
-    assert "retired" in _only_line(text, "`alice/backup/postgres-role-password`").lower()
-    assert "retired" in _only_line(text, "sslrootcert").lower()
-    assert "`alice/runtime/postgres-dsn`" in text
-    assert "`alice/backup/postgres-role-password`" in text

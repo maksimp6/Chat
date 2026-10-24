@@ -57,31 +57,9 @@ updates:
       actions-minor-patch:
         update-types: [minor, patch]
 
-  - package-ecosystem: docker
-    directories:
-      - "/"
-      - "/deploy/chrome-worker"
-      - "/deploy/oauth-idp"
-      - "/deploy/remote-desktop-commander"
-    target-branch: develop
-    schedule:
-      interval: weekly
-      day: monday
-    cooldown:
-      default-days: 7
-    open-pull-requests-limit: 3
-    labels: [dependencies]
-    commit-message:
-      prefix: "chore(deps)"
-    groups:
-      docker-minor-patch:
-        update-types: [minor, patch]
-
   - package-ecosystem: npm
     directories:
       - "/"
-      - "/deploy/chrome-worker"
-      - "/deploy/remote-desktop-commander"
     target-branch: develop
     schedule:
       interval: monthly
