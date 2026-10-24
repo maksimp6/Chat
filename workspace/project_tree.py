@@ -43,7 +43,12 @@ def _tree(path, depth=0, budget=None):
         budget[0] -= 1
         entries.append(item)
         if is_dir:
-            item["children"] = _tree(full, depth + 1, budget)
+            try:
+                item["children"] = _tree(full, depth + 1, budget)
+            except RuntimeError:
+                # One unreadable folder is marked on its own node; the rest of the tree still loads.
+                item["children"] = []
+                item["unreadable"] = True
     return entries
 
 
