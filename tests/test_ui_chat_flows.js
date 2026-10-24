@@ -8,7 +8,8 @@ const { BrowserShim } = require("../browser/emulator/browser_dom");
 
 const HTML =
   '<div id="chatbox"></div><textarea id="msg-input"></textarea>' +
-  '<button id="send-btn" type="button"></button><div id="model-modal"></div>';
+  '<button id="send-btn" type="button"></button>' +
+  '<div id="model-modal" class="modal" hidden aria-hidden="true"></div>';
 
 function reply(status, body) {
   return Promise.resolve({
@@ -31,7 +32,7 @@ function boot({ conversation = "c1", responses = [] } = {}) {
     },
   };
   const shim = new BrowserShim(HTML);
-  const { document, context } = shim.load(["static/chat.js"], {
+  const { document, context } = shim.load(["static/core_api.js", "static/chat.js"], {
     LogosDispatcher: dispatcher,
     currentConvId: conversation,
     currentModel: "logos-runtime",

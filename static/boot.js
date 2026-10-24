@@ -85,9 +85,18 @@
       if (criticalId && failedCriticalScripts.indexOf(criticalId) === -1) {
         failedCriticalScripts.push(criticalId);
         showDegradedStatus();
-        emitDiagnostic("error", "critical_script_failed", "Critical script unavailable", {
-          script: criticalId,
-        });
+        // A load failure has no error object; a runtime error keeps its own message here.
+        emitDiagnostic(
+          "error",
+          "critical_script_failed",
+          event.error || event.message || "Critical script unavailable",
+          {
+            script: criticalId,
+            filename: event.filename || "",
+            line: event.lineno || 0,
+            column: event.colno || 0,
+          },
+        );
         return;
       }
       emitDiagnostic("error", "uncaught_error", event.error || event.message, {
