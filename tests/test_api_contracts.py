@@ -1,6 +1,6 @@
 import pytest
 
-from api_contracts import ContractViolation, validate_api_contract
+from api.contracts import ContractViolation, validate_api_contract
 
 
 def test_contract_rejects_unknown_contract_name():

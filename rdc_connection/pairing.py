@@ -46,7 +46,7 @@ def install_rdc_pairing(app):
     def rdc_pairing_redirect():
         # Require actual short-token authentication, even when the global gate
         # is disabled; headers supplied by a proxy alone do not authorize pairing.
-        from short_token_auth import COOKIE_NAME, _enabled, _has_valid_session, _token
+        from identity.short_token_auth import COOKIE_NAME, _enabled, _has_valid_session, _token
 
         token = _token()
         authenticated = request.environ.get("alice.short_token_path_authenticated") or (

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 def test_trace_records_provider_key_identity_without_secret():

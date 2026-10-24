@@ -1,7 +1,7 @@
 # Browser capability contracts
 
 Issue [#409](https://github.com/maksimp6/Chat/issues/409) defines two separate
-capabilities for Alice:
+capabilities for Logos:
 
 - `browser_cloud` uses an explicitly approved cloud session;
 - `browser_local` uses the project Browser Emulator/BrowserShim scope and never

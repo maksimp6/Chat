@@ -33,6 +33,24 @@
       }
     });
     actionRow.appendChild(button);
+
+    if (typeof bridge().openBrowserTakeover === "function" && !document.getElementById("android-browser-btn")) {
+      var browserButton = document.createElement("button");
+      browserButton.id = "android-browser-btn";
+      browserButton.className = "header-btn alice-btn";
+      browserButton.type = "button";
+      browserButton.title = "Облачный браузер";
+      browserButton.setAttribute("aria-label", "Открыть облачный браузер");
+      browserButton.textContent = "🌐";
+      browserButton.addEventListener("click", function () {
+        try {
+          bridge().openBrowserTakeover();
+        } catch (error) {
+          nativeLog("ERROR", "BrowserTakeover", error);
+        }
+      });
+      actionRow.appendChild(browserButton);
+    }
   }
 
   window.addEventListener(

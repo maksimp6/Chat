@@ -1,73 +1,53 @@
-import sqlite3
+"""Logos's single native storage boundary, including fresh-process recovery."""
 
-import db
-from db_backend import is_postgres_configured, is_postgres_connection, postgres_url_from_env
-
-
-def test_postgres_backend_is_explicit_opt_in(monkeypatch):
-    monkeypatch.delenv("ALICE_DATABASE_URL", raising=False)
-    monkeypatch.setenv("DATABASE_URL", "postgresql://must-not-enable")
-    assert postgres_url_from_env() == ""
-    assert is_postgres_configured() is False
-
-    monkeypatch.setenv("ALICE_DATABASE_URL", "postgresql://explicit")
-    assert postgres_url_from_env() == "postgresql://explicit"
-    assert is_postgres_configured() is True
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import storage.db as db
+from agent_memory.client import close_memory_clients
 
 
-def test_sql_translation_keeps_sqlite_semantics():
-    from db_backend import translate_sql
+def test_no_sql_connection_api():
+    assert not hasattr(db, "get_conn")
+    assert not (Path(db.__file__).parent / "db_backend.py").exists()
 
-    assert "BIGSERIAL PRIMARY KEY" in translate_sql(
-        "CREATE TABLE demo (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)"
+
+def test_native_chat_and_settings_survive_fresh_process(tmp_path, monkeypatch):
+    path = tmp_path / "alice.memory"
+    monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))
+    db.create_conversation("chat", "Новый чат", "alice")
+    db.add_message("chat", "user", "Привет", trace={"trace_id": "trace-1"})
+    db.save_conv_settings("chat", {"temperature": 0.2})
+    db.set_config("feature", {"enabled": True})
+    db.set_yandex_conversation("chat", "provider-chat")
+    close_memory_clients()
+    code = "import json,storage.db as db; print(json.dumps([db.get_conversations(),db.get_messages('chat'),db.get_conv_settings('chat'),db.get_config('feature'),db.get_yandex_conversation('chat')]))"
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=os.environ.copy(),
     )
-    assert translate_sql("BEGIN IMMEDIATE") == "BEGIN"
-    assert (
-        translate_sql("SELECT * FROM demo WHERE name LIKE 'bootstrap-%'")
-        == "SELECT * FROM demo WHERE name LIKE 'bootstrap-%%'"
-    )
+    recovered = json.loads(result.stdout)
+    assert recovered[0][0]["id"] == "chat"
+    assert recovered[1][0]["text"] == "Привет"
+    assert recovered[1][0]["trace"] == {"trace_id": "trace-1"}
+    assert recovered[2:] == [{"temperature": 0.2}, {"enabled": True}, "provider-chat"]
 
 
-def test_sqlite_is_the_default_backend(monkeypatch, tmp_path):
-    monkeypatch.delenv("ALICE_DATABASE_URL", raising=False)
-    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice_pro.db"))
-
-    conn = db.get_conn()
-    try:
-        assert isinstance(conn, sqlite3.Connection)
-        conn.execute("CREATE TABLE probe (id INTEGER PRIMARY KEY, value TEXT)")
-        conn.execute("INSERT INTO probe (id, value) VALUES (?, ?)", (1, "termux"))
-        conn.commit()
-        assert conn.execute("SELECT value FROM probe WHERE id = ?", (1,)).fetchone()[0] == "termux"
-    finally:
-        conn.close()
-
-
-def test_core_db_schema_and_conversations_work_on_sqlite(monkeypatch, tmp_path):
-    monkeypatch.delenv("ALICE_DATABASE_URL", raising=False)
-    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice_pro.db"))
-
-    db.init_db()
-    db.create_conversation("termux-test", "Termux", "test-model")
-    db.add_message("termux-test", "user", "local database")
-
-    assert db.get_conversations()[0]["id"] == "termux-test"
-    assert db.get_messages("termux-test")[0]["text"] == "local database"
-
-
-def test_backend_detection_uses_open_connection_not_environment(monkeypatch, tmp_path):
-    monkeypatch.setenv("ALICE_DATABASE_URL", "postgresql://configured-but-not-selected")
-    path = tmp_path / "runtime.db"
-    connection = sqlite3.connect(path)
-    try:
-        assert is_postgres_connection(connection) is False
-    finally:
-        connection.close()
-
-
-def test_postgres_selection_takes_precedence_over_explicit_sqlite_path(monkeypatch, tmp_path):
-    postgres_connection = object()
-    monkeypatch.setattr(db, "postgres_url_from_env", lambda: "postgresql://configured")
-    monkeypatch.setattr(db, "connect_postgres", lambda _url: postgres_connection)
-
-    assert db.get_conn(tmp_path / "local.sqlite") is postgres_connection
+def test_delete_is_one_durable_cascade():
+    db.create_conversation("chat", "Chat", "alice")
+    db.add_message("chat", "user", "message")
+    db.save_conv_settings("chat", {"value": 1})
+    db.set_yandex_conversation("chat", "provider")
+    before = db.get_store().last_commit.sequence
+    db.delete_conversation("chat")
+    assert db.get_store().last_commit.sequence == before + 1
+    close_memory_clients()
+    assert db.get_conversations() == []
+    assert db.get_messages("chat") == []
+    assert db.get_conv_settings("chat") is None
+    assert db.get_yandex_conversation("chat") is None
