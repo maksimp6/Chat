@@ -180,9 +180,9 @@ runtime_smoke() {
   prepare_runtime_smoke "$key" "$workdir"
 
   cat > "$smoke_script" <<'PY'
-from trace_manager import ExecutionTrace
-from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
-from tool_registry import registry
+from observability.trace_manager import ExecutionTrace
+from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_providers.registry import registry
 
 OWNER = "preview-runtime-owner"
 TARGET = "preview-runtime"
@@ -345,7 +345,7 @@ deploy() {
     --label "traefik.http.middlewares.${container}-proxy-auth.headers.customrequestheaders.X-Alice-Proxy-Authenticated=true" \
     --label "traefik.http.services.${container}.loadbalancer.server.port=8080" \
     -v "$data_dir:/app/data" \
-    -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_DB_PATH=/app/data/alice_pro.db -e ALICE_REQUIRE_SHORT_TOKEN=1 -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" -e ALICE_PROVIDER_CREDENTIAL_KEY="$ALICE_PROVIDER_CREDENTIAL_KEY" -e ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path" -e ALICE_MCP_ALLOW_ANONYMOUS=true "$image" >/dev/null
+    -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_MEMORY_PATH=/app/data/alice.memory -e ALICE_REQUIRE_SHORT_TOKEN=1 -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" -e ALICE_PROVIDER_CREDENTIAL_KEY="$ALICE_PROVIDER_CREDENTIAL_KEY" -e ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path" -e ALICE_MCP_ALLOW_ANONYMOUS=true "$image" >/dev/null
   local dozzle_container="${container}-dozzle"
   local dozzle_ru_router="${dozzle_container}-logs-ru"
   local dozzle_online_router="${dozzle_container}-logs-online"

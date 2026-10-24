@@ -1,9 +1,8 @@
 import os
 import tempfile
 
-import db
-
-from partner_relations import (
+import storage.db as db
+from organization.partner_relations import (
     PARTNER_TOOLS,
     add_contact,
     create_followup,
@@ -14,8 +13,8 @@ from partner_relations import (
     update_contact,
     update_status,
 )
-from universal_tool_platform import UniversalToolExecutor, UniversalToolCall
-from tool_registry import ToolRegistry
+from tool_providers.universal_tool_platform import UniversalToolExecutor, UniversalToolCall
+from tool_providers.registry import ToolRegistry
 
 
 def _ctx(user_id):

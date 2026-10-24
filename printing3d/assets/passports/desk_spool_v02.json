@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "id": "desk_spool_v02",
+  "name": "Центрирующие втулки катушки v0.2",
+  "source_sha256": "54ae7342ad43376bd74879e7ac58639a53192ce364b1be25ded458cda6bf0885",
+  "source_status": "measure_spool_bore_first",
+  "fit_status": "unverified",
+  "fit_evidence": null,
+  "license_status": "creator-stated original CAD, independent attribution not performed",
+  "machine": {
+    "model": "Bambu Lab A1 mini",
+    "nozzle_mm": "0.4",
+    "bed_mm": [
+      180,
+      180,
+      180
+    ]
+  },
+  "material": "PETG",
+  "gcode_status": "not_built",
+  "firmware_open_verified": false,
+  "physical_fit_verified": false,
+  "parts": {
+    "adapters/ring_for_spool_bore_36mm_PRINT_2.stl": 2,
+    "adapters/ring_for_spool_bore_52mm_PRINT_2.stl": 2,
+    "adapters/ring_for_spool_bore_55mm_PRINT_2.stl": 2
+  },
+  "verification_required": [
+    "source_hash",
+    "mesh_geometry",
+    "slicer_warning_free",
+    "gcode_crc_md5",
+    "printer_profile",
+    "material",
+    "toolpath_bounds",
+    "extrusion",
+    "firmware_open",
+    "physical_fit"
+  ],
+  "target_printer": {
+    "device_id": "bambu-a1mini-lan-192-168-31-12",
+    "host": "192.168.31.12",
+    "model": "Bambu Lab A1 mini",
+    "identity_source": "paired LAN credentials + authenticated MQTT",
+    "serial_match_verified": true,
+    "firmware_version": "01.08.01.00",
+    "firmware_compatibility_verified": false,
+    "ftps_certificate_pin_verified": false,
+    "printer_file_sha256": null,
+    "printer_file_readback_verified": false,
+    "touchscreen_open_verified": false,
+    "printer_start_authorized": false,
+    "firmware_evidence": "authenticated MQTT info/get_version (2026-10-11)"
+  },
+  "intended_function": "Center a measured spool bore on the matching shaft without excessive play",
+  "process_profile_id": null,
+  "quality_requirements": [
+    {
+      "metric": "bore_fit_error_mm",
+      "max_value": 0.3,
+      "unit": "mm",
+      "method": "caliper of actual bore and printed adapter"
+    },
+    {
+      "metric": "runout_mm",
+      "max_value": 0.5,
+      "unit": "mm",
+      "method": "assembled spool runout measurement"
+    }
+  ],
+  "quality_capability_status": "UNKNOWN",
+  "quality_approved": false,
+  "quality_evidence_required": [
+    "actual filament and nozzle",
+    "calibration print measurements",
+    "part fit test",
+    "functional load test"
+  ],
+  "quality_requirements_approved": false,
+  "quality_requirements_source": "PROPOSED engineering thresholds, not measured or approved; must be validated against actual use"
+}
