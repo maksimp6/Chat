@@ -466,14 +466,14 @@ body {
 .logos-pro-app #msg-input {
   flex: 1;
   padding: 12px 16px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--control-border);
   border-radius: 20px;
   font-size: 16px;
   outline: none;
   resize: none;
   height: 44px;
   max-height: 120px;
-  background: var(--bg-sidebar);
+  background: var(--bg-app);
   color: var(--text-main);
   overflow: hidden;
 }
@@ -1082,8 +1082,7 @@ body {
 }
 .logos-pro-app #voice-ui,
 .logos-pro-app #response-mode-wrap,
-.logos-pro-app #mic-btn,
-.logos-pro-app #upload-image-btn {
+.logos-pro-app #mic-btn {
   display: none;
 }
 
@@ -1101,15 +1100,11 @@ body {
   display: none;
 }
 
-.logos-pro-app.logos-model-multimodal #upload-image-btn {
-  display: flex;
-}
 
 .logos-pro-app #voice-ui[aria-hidden="true"],
 .logos-pro-app #text-ui[aria-hidden="true"],
 .logos-pro-app #response-mode-wrap[aria-hidden="true"],
-.logos-pro-app #mic-btn[aria-hidden="true"],
-.logos-pro-app #upload-image-btn[aria-hidden="true"] {
+.logos-pro-app #mic-btn[aria-hidden="true"] {
   display: none;
 }
 
@@ -2038,3 +2033,29 @@ body {
 .logos-pro-app .memory-modal-close {
   font-size: 24px;
 }
+
+/* Индикатор набора ответа (пункт 16) */
+.logos-pro-app .typing {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  align-self: flex-start;
+}
+.logos-pro-app .typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  animation: typing-blink 1.2s infinite;
+}
+.logos-pro-app .typing span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.logos-pro-app .typing span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes typing-blink {
+  0%, 80%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
+}
+

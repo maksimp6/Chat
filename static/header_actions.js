@@ -26,13 +26,6 @@
     actions.register("header.departments.open", call("openDepartmentsModal"));
     actions.register("header.credentials.open", call("openProviderCredentialsModal"));
 
-    var upload = document.getElementById("upload-image-btn");
-    if (upload && upload.dataset.bound !== "true") {
-      upload.addEventListener("click", function () {
-        window.uploadImage();
-      });
-      upload.dataset.bound = "true";
-    }
   }
 
   if (document.readyState === "loading") {

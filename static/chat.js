@@ -574,6 +574,11 @@ document.addEventListener("DOMContentLoaded", function () {
       typeof window.getResponsesParams === "function" ? window.getResponsesParams() : {};
     const t0 = performance.now();
 
+    var chatboxEl = document.getElementById("chatbox");
+    var typingEl = document.createElement("div");
+    typingEl.className = "typing";
+    typingEl.innerHTML = "<span></span><span></span><span></span>";
+    if (chatboxEl) chatboxEl.appendChild(typingEl);
     window.LogosDispatcher.request("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -589,6 +594,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return { ok: r.ok, status: r.status, data };
       })
       .then((result) => {
+        typingEl.remove();
         const data = result.data || {};
         const clientTotalMs = Math.round(performance.now() - t0);
         if (data.title && Array.isArray(conversations)) {
@@ -643,6 +649,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       })
       .catch((e) => {
+        typingEl.remove();
         addMessage("⚠️ Ошибка: " + (e.message || "Сетевой сбой"), "error", false, 0);
       });
   }

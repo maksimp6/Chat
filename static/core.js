@@ -313,7 +313,6 @@ function saveMessages(id, msgs) {
 window.updateUIForModel = function () {
   var root = document.querySelector(".logos-pro-app");
   var micBtn = document.getElementById("mic-btn");
-  var uploadBtn = document.getElementById("upload-image-btn");
   var modeWrap = document.getElementById("response-mode-wrap");
   var voiceUi = document.getElementById("voice-ui");
   var textUi = document.getElementById("text-ui");
@@ -329,7 +328,6 @@ window.updateUIForModel = function () {
   root.classList.toggle("logos-model-multimodal", isMultimodal);
 
   if (micBtn) micBtn.setAttribute("aria-hidden", isVoice ? "false" : "true");
-  if (uploadBtn) uploadBtn.setAttribute("aria-hidden", isMultimodal ? "false" : "true");
   if (modeWrap) modeWrap.setAttribute("aria-hidden", isVoice ? "false" : "true");
   if (voiceUi) voiceUi.setAttribute("aria-hidden", isVoice ? "false" : "true");
   if (textUi) textUi.setAttribute("aria-hidden", isVoice ? "true" : "false");
