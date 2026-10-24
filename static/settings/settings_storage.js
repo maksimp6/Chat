@@ -89,7 +89,7 @@
     if (convId) {
       serverSettingsCache[convId] = settings;
       localStorage.setItem(convKey(convId), JSON.stringify(settings));
-      // Асинхронная отправка в бэкенд SQLite
+      // Асинхронная отправка на бэкенд (нативное хранилище Kristall)
       window.LogosDispatcher.request("/api/conversations/" + convId + "/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },

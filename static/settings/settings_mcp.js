@@ -188,21 +188,28 @@
       var isNew = !srv;
       srv = srv || {};
 
-      var CONNECTOR_OPTS =
-        '<option value="">(нет — использовать server_url)</option>' +
-        '<option value="termux_api">📱 Termux API (Android Hardware)</option>' +
-        '<option value="local_git">📁 Local Git</option>' +
-        '<option value="connector_dropbox">Dropbox</option>' +
-        '<option value="connector_gmail">Gmail</option>' +
-        '<option value="connector_googlecalendar">Google Calendar</option>' +
-        '<option value="connector_googledrive">Google Drive</option>' +
-        '<option value="connector_microsoftteams">Microsoft Teams</option>' +
-        '<option value="connector_outlookcalendar">Outlook Calendar</option>' +
-        '<option value="connector_outlookemail">Outlook Email</option>' +
-        '<option value="connector_sharepoint">SharePoint</option>';
+      var CONNECTOR_CHOICES = [
+        ["", "(нет — использовать server_url)"],
+        ["termux_api", "📱 Termux API (Android Hardware)"],
+        ["local_git", "📁 Local Git"],
+        ["connector_dropbox", "Dropbox"],
+        ["connector_gmail", "Gmail"],
+        ["connector_googlecalendar", "Google Calendar"],
+        ["connector_googledrive", "Google Drive"],
+        ["connector_microsoftteams", "Microsoft Teams"],
+        ["connector_outlookcalendar", "Outlook Calendar"],
+        ["connector_outlookemail", "Outlook Email"],
+        ["connector_sharepoint", "SharePoint"],
+      ];
 
       function connSelected(val) {
-        return CONNECTOR_OPTS.replace('value="' + val + '"', 'value="' + val + '" selected');
+        return CONNECTOR_CHOICES.map(function (choice) {
+          var selected = choice[0] === val ? " selected" : "";
+          return (
+            '<option value="' + UI.escapeHtml(choice[0]) + '"' + selected + ">" +
+            UI.escapeHtml(choice[1]) + "</option>"
+          );
+        }).join("");
       }
 
       var e = document.createElement("div");

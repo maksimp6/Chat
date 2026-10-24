@@ -1,6 +1,19 @@
 (function () {
   "use strict";
 
+  // The schema is typed as JSON text in settings; the provider expects an object.
+  function parseJsonSchema(raw) {
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw;
+    if (typeof raw !== "string" || !raw.trim()) return null;
+    try {
+      var parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+    } catch (error) {
+      console.warn("[SETTINGS] json_schema is not valid JSON; text format is not sent", error);
+    }
+    return null;
+  }
+
   window.getResponsesParams = function () {
     var Storage = window.SettingsStorage;
     var currentConvId = typeof window.currentConvId !== "undefined" ? window.currentConvId : null;
@@ -25,13 +38,16 @@
     }
 
     if (s.text_format === "json") {
-      params.text = {
-        format: "json",
-        json_schema: {
-          name: s.json_schema_name || "response",
-          schema: s.json_schema || "{}",
-        },
-      };
+      var schema = parseJsonSchema(s.json_schema);
+      if (schema) {
+        params.text = {
+          format: {
+            type: "json_schema",
+            name: s.json_schema_name || "response",
+            schema: schema,
+          },
+        };
+      }
     }
 
     if (s.service_tier && s.service_tier !== "auto") {
@@ -39,11 +55,11 @@
     }
 
     if (s.previous_response_id) {
-      params.previous_response_id = s.previous_response_id.trim();
+      params.previous_response_id = String(s.previous_response_id).trim();
     }
 
     if (s.prompt_cache_key) {
-      params.prompt_cache_key = s.prompt_cache_key.trim();
+      params.prompt_cache_key = String(s.prompt_cache_key).trim();
     }
 
     if (s.top_logprobs > 0) {
