@@ -18,7 +18,6 @@ WORKFLOW = ".github/workflows/cloudru-rdc-mcp-candidate.yml"
         "cloud/cloudru/client.py",
         "cloud/cloudru/container_apps_client.py",
         "cloud/cloudru/registry_client.py",
-        "cloudru_iam.py",
         "requirements-deploy.txt",
         ".python-version",
         "scripts/cloudru_rdc_mcp_candidate.py",
