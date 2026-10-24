@@ -535,6 +535,12 @@ def chat():
                 if tool_config and tool_call_requires_approval(tool_config, raw_args):
                     trace_data = trace.finalize()
                     persist_invocation_trace(invocation.invocation_id, trace_data)
+                    # The turn ends here; the pending call is tracked by its approval token. Leaving the
+                    # invocation running would keep it "running" for good.
+                    finish_invocation(
+                        invocation.invocation_id,
+                        result={"status": "requires_approval", "tool": func_name},
+                    )
                     return jsonify(
                         {
                             "requires_approval": True,
