@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import os
+import re
+import stat
 from typing import Any, Mapping, Optional
 
 from economy.treasury_identity import get_current_owner_id
@@ -162,6 +166,25 @@ def _tool_schema(properties: dict[str, Any], required: list[str]) -> dict[str, A
 
 
 PRINTING3D_TOOLS = {
+    "printing3d.plate.inspect": {
+        "title": "3D Plate Preflight",
+        "description": (
+            "Read-only verify one owner-staged Bambu A1 mini .gcode.3mf file: "
+            "ZIP integrity, material/profile, G-code heat commands and single plate. "
+            "Return readiness findings; NEVER start/upload a print or read other paths."
+        ),
+        "parameters": _tool_schema(
+            {"artifact_name": {"type": "string", "minLength": 5, "maxLength": 140}},
+            ["artifact_name"],
+        ),
+        "capabilities": ["3d", "read", "preflight"],
+        "risk_level": "low",
+        "read_only": True,
+        "requires_approval": False,
+        "supported_transports": ["responses_api", "local_agent", "mcp"],
+        "executor": {"type": "local"},
+        "func": plate_inspect,
+    },
     "printing3d.quote": {
         "title": "3D Printing Order Quote",
         "description": (
