@@ -16,7 +16,8 @@ def _permission_error_message(exc: PermissionError) -> str:
         message = "Unauthorized"
     if "Traceback (most recent call last):" in message:
         return "Unauthorized"
-    return message.splitlines()[0]
+    lines = message.splitlines()
+    return lines[0] if lines else "Unauthorized"
 
 
 def _truthy(value: str | None) -> bool:
@@ -73,7 +74,10 @@ def _auth_user_from_request() -> Optional[str]:
         user_id = os.getenv("LOGOS_MCP_USER_ID", "")
         if not expected or not user_id:
             raise PermissionError("MCP bearer authentication is not fully configured")
-        if not secrets.compare_digest(token, expected):
+        # Compare bytes: compare_digest rejects non-ASCII str, which would be a 500 instead of a refusal.
+        if not secrets.compare_digest(
+            token.encode("utf-8"), expected.encode("utf-8")
+        ):
             raise PermissionError("Invalid bearer token")
         return user_id
 
@@ -93,7 +97,10 @@ def _introspect_token(token: str) -> Optional[str]:
 
     auth_user = os.getenv("LOGOS_MCP_INTROSPECTION_CLIENT_ID", "")
     auth_password = os.getenv("LOGOS_MCP_INTROSPECTION_CLIENT_SECRET", "")
-    timeout = float(os.getenv("LOGOS_MCP_INTROSPECTION_TIMEOUT", "5"))
+    try:
+        timeout = float(os.getenv("LOGOS_MCP_INTROSPECTION_TIMEOUT", "5"))
+    except ValueError as exc:
+        raise PermissionError("OAuth introspection is not configured") from exc
 
     kwargs: dict[str, Any] = {
         "data": {"token": token},
@@ -103,9 +110,13 @@ def _introspect_token(token: str) -> Optional[str]:
     if auth_user:
         kwargs["auth"] = (auth_user, auth_password)
 
-    response = requests.post(url, **kwargs)
-    response.raise_for_status()
-    data = response.json()
+    try:
+        response = requests.post(url, **kwargs)
+        response.raise_for_status()
+        data = response.json()
+    except (requests.RequestException, ValueError) as exc:
+        # An unreachable or rejecting introspection server is a refusal, not a server error.
+        raise PermissionError("Access token could not be validated") from exc
     if not isinstance(data, Mapping) or not data.get("active"):
         raise PermissionError("Access token is inactive")
 
@@ -118,7 +129,7 @@ def _introspect_token(token: str) -> Optional[str]:
 
 def _require_auth(request_id: Any) -> tuple[Optional[str], Optional[Any]]:
     try:
-        return _auth_user_from_request(), None
+        user = _auth_user_from_request()
     except PermissionError as exc:
         return None, _jsonrpc_error(
             request_id,
@@ -127,3 +138,14 @@ def _require_auth(request_id: Any) -> tuple[Optional[str], Optional[Any]]:
             status=401,
             headers={"WWW-Authenticate": _www_authenticate()},
         )
+    # Tools run as a principal. A token with no subject, or anonymous mode without a user id,
+    # must not run them as nobody.
+    if not user:
+        return None, _jsonrpc_error(
+            request_id,
+            -32001,
+            "Authenticated MCP principal is required",
+            status=401,
+            headers={"WWW-Authenticate": _www_authenticate()},
+        )
+    return user, None
