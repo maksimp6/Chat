@@ -1,0 +1,83 @@
+# Alice Input Security v1 — isolated protocol
+
+Refs #1085 and #650. This module defines owner/device-bound signed grants shared by mouse and keyboard. It is a test-only protocol boundary, **not a production root service**.
+
+- Trusted Live Server authenticates an owner/controller and creates a session lease.
+- TrustedSigner signs a bounded action grant with HMAC-SHA256, epoch, session, nonce, monotonic sequence, timestamp and device identity.
+- ProtectedVerifier rejects unsigned, expired, revoked, wrong-device, replayed and malformed grants before invoking a backend callback.
+- No raw plaintext input endpoint, shell command, or client-selected role is part of this API.
+- The `provision()` method is **lab-only direct memory handoff**. A production root-owned authenticated handoff and key isolation are NOT implemented.
+- Action payload is bounded in bytes but still needs strict action-specific schema validation before physical dispatch. Do not attach a real backend until those validators, foreground focus checks and sensitive-operation policy are proven.
+- This Python test module is not independently secure against same-UID memory access or modification. Production root binary, protected keys, peer identity, cancellation, watchdog and physical device tests remain blocking.
+
+Run `python -m pytest -q tests/alice_input_security/test_grants.py`.
+
+No SELinux changes, no root cutover and no merge until independent review and exact-head CI.
+
+## RED→GREEN progress (2026-10-10)
+
+Root-side action-specific payload validation now rejects unknown fields, invalid coordinates, forbidden power keys, invalid package names and unsafe text fields. 6 of 7 security RED tests are now GREEN; **forged controller identity is intentionally still RED** until authenticated Live Server identity issuance is designed and verified. Do not equate the public dataclass `AuthenticatedPrincipal` with proof of login. Physical dispatch remains disconnected.
+
+## Identity verifier contract (GREEN local, still not deployed)
+
+`SessionAuthority` now fails closed unless a **trusted Live Server-provided** `identity_verifier` callback positively authenticates the controller identity. Matching public `AuthenticatedPrincipal` fields alone is insufficient. The callback is an integration boundary, not a standalone authentication system: a caller controlling authority construction or callback can bypass it. Production must instantiate it only inside the trusted server with verified login/session context and protect root key handoff independently. Test fixture uses object identity solely to prove same-field forgery is rejected.
+
+## Isolated Unix transport (2026-10-10)
+
+`SignedInputSocket` is a lab-only Unix `SOCK_SEQPACKET` boundary: it refuses pre-existing socket paths, requires an owned private directory, restricts the socket to mode 0600, checks Linux `SO_PEERCRED` UID and accepts only bounded signed grants through `ProtectedVerifier`. It has no sign/provision endpoint, no plaintext fallback, no uinput access, and cleans up only its own socket inode. Eight socket tests plus existing security tests pass locally.
+
+**Not a production root trust boundary:** these tests run under the Termux UID. A real root-owned immutable deployment, credential/key handoff, trusted Live Server authentication, action-level confirmation, crash/restart E2E, independent review and rollback remain blocking. Do not replace the live root bridge with this code yet.
+
+## Optional shared-group socket policy (staging)
+
+For a future root-owned verifier and separate Live Server UID, `SignedInputSocket(..., shared_gid=GID)` checks a service-owned directory with **exact mode 0710** and matching group GID, then applies socket mode **0660** with that group. The group may traverse the directory and connect to the socket but cannot write to the directory. The server still enforces the explicit `peer_uid` through `SO_PEERCRED`, validates HMAC/session/sequence and rejects unsigned packets. Existing private 0700/0600 mode remains the default.
+
+This is a filesystem/Unix-socket policy design only. It does **not** prove Android SELinux policy, cross-UID kernel permissions, or root-owned service deployment. Group membership and directory ownership must be provisioned by a trusted installer, not request data. Do not make a world-writable socket or change SELinux to permissive. Physical dispatch remains disconnected until independent root E2E.
+
+## Socket lifecycle RED/GREEN tests
+
+Four additional cases cover restart serving a second signed grant, injected group-mode chown/listen failures and a parent-directory replacement during validation. Local result: 67 Python tests pass. Restart now resets the stop event. Parent inode/device are compared before/after policy validation and after bind. **These pathname checks narrow but do not eliminate TOCTOU**: production still requires descriptor-relative operations/pinned directory and adversarial cross-UID/SELinux testing. No root deployment authorized.
+
+## Descriptor-pinned socket cleanup (staging)
+
+The server now opens its parent directory with `O_DIRECTORY|O_NOFOLLOW`, retains that descriptor across the socket lifecycle, and uses descriptor-relative `stat`/`unlink` plus socket inode verification for cleanup. Tests cover a renamed parent with a foreign replacement path, and a second `start()` while the first server is live. **Remaining risk:** `socket.bind()` and `chown`/`chmod` still use pathnames, so this is not a complete TOCTOU elimination. Cross-UID and SELinux-Enforcing physical tests are still mandatory before deployment.
+
+## Pinned-directory permission operations
+
+`chown` and `chmod` now operate on the socket basename relative to the previously pinned parent directory FD (`dir_fd`, no symlink following), rather than re-resolving the full pathname. AF_UNIX socket descriptors do not refer to the socket filesystem inode, so `fchmod` on the listening socket FD cannot set the socket file's permissions. Local 69-test suite passes. The initial `bind(path)` remains pathname-based; cross-UID and adversarial mount/rename E2E are still release blockers.
+
+## Server worker startup fault (2026-10-10)
+
+An injected `threading.Thread.start()` failure previously left a bound socket and an unstarted thread, causing cleanup errors. Startup now closes the socket, removes only the owned inode, releases the pinned parent descriptor and resets instance state. The test also verifies a subsequent clean start. 71 isolated Python tests pass. This does not replace the pending cross-UID/SELinux and root E2E.
+
+## Fail-closed backend dispatch (staging)
+
+A signed packet that reaches a failing physical backend is no longer treated as a recoverable success. An exception or explicit rejection revokes the verifier session, denies the command, and prevents further commands on that session. Isolated tests inject both backend exceptions and false returns, verifying that the Unix server remains alive but denies subsequent grants. This is **not** proof of physical KEY_UP: the privileged driver still needs its own watchdog and UI_DEV_DESTROY fallback.
+
+## Shutdown/in-flight dispatch contract
+
+Stopping the Unix server now marks the verifier shutdown immediately, prevents new grants and revokes the session after its worker finishes. A slow already-running backend callback cannot be interrupted safely by Python; after it returns the verifier denies success if shutdown was requested. Restart requires a newly authorized session and explicit verifier provisioning. Isolated race test and 74 total Python tests pass. This does not replace the C driver watchdog or kernel uinput cleanup on process death.
+
+## Provisioning lease TOCTOU (2026-10-10)
+
+A new RED test showed that the authority's lease could be valid before `ProtectedVerifier.provision()` acquires its locks and invalid by the time session state is copied. Provisioning now rechecks `authority.active(principal)` while holding both locks. Two focused cases cover revoked authorization between checks and an expired lease; the 76-test security suite passes. Root-owned credential handoff and cross-UID E2E are still pending.
+
+## Shutdown epoch fencing
+
+After a verifier shutdown, re-provisioning the **same epoch** is rejected even if the old authority lease is still valid. A new authority authorization rotates epoch/session before re-provisioning. RED test reproduced stale-session resurrection, then 77 security tests passed. The shutdown flag is set without waiting for a slow backend dispatch lock. This is an isolated in-process contract, not a root-owned authentication guarantee.
+
+## Shutdown/provision interleaving (2026-10-10)
+
+A deterministic concurrency RED test demonstrated that an in-flight `provision()` could clear the shutdown event after `request_shutdown()` set it. The verifier now tracks a shutdown generation and refuses to complete provisioning if shutdown occurred during the clear operation. Local 78-test suite passes. **This is not a formal concurrency proof**: production still needs a single root-owned lifecycle state machine with verified atomic transitions, cross-process credentials and independent physical teardown.
+
+## Keyboard protocol integration fixture
+
+Three isolated integration tests exercise signed keyboard down/up and Ctrl+A chord over the real Unix SOCK_SEQPACKET transport, reject unsigned/replayed/KEY_POWER events, and inject a partially failing backend. The failure test intentionally demonstrates that Python session revocation cannot release a physically held key; root C watchdog and UI_DEV_DESTROY remain mandatory. The backend is mocked: no /dev/uinput, root UID, Android InputReader or cross-UID connection is exercised. 81 total security tests pass locally.
+
+## Keyboard keycode parity (2026-10-10)
+
+RED contract detected five keycode policy mismatches against the staged C keyboard driver: Python previously permitted KEY_MUTE (113), KEY_VOLUMEDOWN (114) and KEY_VOLUMEUP (115), but the C driver rejects them; Python omitted supported F11 (87) and F12 (88). Updated Python verifier's allowed set and added negative/positive parity tests. 95 Python tests PASS locally. This is a focused policy alignment, not a complete generated cross-language contract or physical E2E.
+
+## Complete C/Python keycode parity probe
+
+Compiled the staged C `alice_keyboard_allowed()` on Redmi 9 and enumerated keycodes 0..255, then compared with Python `_validate_action_payload('key_down', {'key':code})`. Found 18 C-only codes (69..86), all in the C driver's accepted keyboard keycode set. Added RED tests and aligned Python's set. The two 0..255 sets now each contain 100 allowed codes; 113 Python tests PASS. A permanent parity check in the eventual combined integration checkout remains required to catch future C/Python drift.
