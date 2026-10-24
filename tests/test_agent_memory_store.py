@@ -1,6 +1,6 @@
 import json
 
-from memory_engine.store import MemoryStore
+from kristall.store import Kristall
 
 import pytest
 
@@ -8,7 +8,7 @@ from agent_memory import AgentMemoryStore, MemoryLookup, MemoryRecord
 
 
 def _native_store(tmp_path):
-    return AgentMemoryStore(MemoryStore(tmp_path / "agent-memory.memory"))
+    return AgentMemoryStore(Kristall(tmp_path / "agent-memory.memory"))
 
 
 def _github_record(
@@ -25,7 +25,7 @@ def _github_record(
         memory_id=memory_id,
         kind=kind,
         scope=scope,
-        text="MemoryStore is the only native store.",
+        text="Kristall is the only native store.",
         provenance={
             "source_type": "github",
             "repository": "maksimp6/Chat",
@@ -289,8 +289,8 @@ def test_delete_round_trip_on_native_memory_store(tmp_path):
 
 
 def test_separate_memory_store_paths_are_isolated(tmp_path):
-    first = AgentMemoryStore(MemoryStore(tmp_path / "first.memory"))
-    second = AgentMemoryStore(MemoryStore(tmp_path / "second.memory"))
+    first = AgentMemoryStore(Kristall(tmp_path / "first.memory"))
+    second = AgentMemoryStore(Kristall(tmp_path / "second.memory"))
     first.upsert(_github_record(memory_id="first-memory"))
     second.upsert(_github_record(memory_id="second-memory"))
     assert first.get("first-memory") is not None
@@ -327,10 +327,10 @@ def test_memory_record_rejects_none_and_negative_timestamps():
 
 def test_native_store_survives_verified_reopen(tmp_path):
     path = tmp_path / "durable.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         repository = AgentMemoryStore(store)
         repository.upsert(_github_record(memory_id="durable"))
-    with MemoryStore(path) as reopened:
+    with Kristall(path) as reopened:
         assert AgentMemoryStore(reopened).get("durable").memory_id == "durable"
 
 

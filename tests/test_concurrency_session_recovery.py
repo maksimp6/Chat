@@ -3,7 +3,7 @@ import os
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
-import db
+import storage.db as db
 from invocation.manager import (
     create_invocation,
     fail_invocation,
@@ -13,7 +13,7 @@ from invocation.manager import (
     start_invocation,
 )
 from invocation.trace import create_invocation_trace
-from session_manager import create_session, get_session, restore_session
+from sessions.manager import create_session, get_session, restore_session
 
 
 def setup_db(tmpdir):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static policy validator for Alice Pro preview/runtime Python modules."""
+"""Static policy validator for Logos preview/runtime Python modules."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ BOUNDARY_FILES = {RUNTIME_DIR / "dispatcher.py"}
 
 FORBIDDEN_IMPORT_ROOTS = {
     "db",
-    "mcp_storage",
+    "mcp_server.storage",
     "requests",
     "httpx",
     "socket",
@@ -55,10 +55,13 @@ FORBIDDEN_ATTRIBUTE_CALLS = {
 }
 
 
+TWO_PART_ROOTS = {"urllib.request", "mcp_server.storage"}
+
+
 def _root_name(name: str) -> str:
     parts = name.split(".")
-    if len(parts) >= 2 and ".".join(parts[:2]) == "urllib.request":
-        return "urllib.request"
+    if len(parts) >= 2 and ".".join(parts[:2]) in TWO_PART_ROOTS:
+        return ".".join(parts[:2])
     return parts[0]
 
 

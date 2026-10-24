@@ -1,14 +1,14 @@
 import json
 import time
 
-from trace_manager import ExecutionTrace
-from tool_registry import registry
-import mcp_storage
-from db import get_conv_settings
+from observability.trace_manager import ExecutionTrace
+from tool_providers.registry import registry
+import mcp_server.storage as mcp_storage
+from storage.db import get_conv_settings
 
-from yandex_request_utils import sanitize_for_log as _sanitize_for_log
-from yandex_api_logger import api_logger
-from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
+from yandex_client_modules.api_logger import api_logger
+from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 
 
 class YandexMcpMixin:
@@ -143,16 +143,9 @@ class YandexMcpMixin:
         if active_cats is None:
             active_cats = params.get("active_tool_categories")
         if active_cats is None:
-            active_cats = [
-                "git",
-                "termux",
-                "system",
-                "filesystem",
-                "wikipedia",
-                "profiler",
-                "runtime",
-                "3d",
-            ]
+            # Same default as the tools panel: every registered category. The
+            # registry offers only tools this transport and host can execute.
+            active_cats = list(registry.get_available_categories())
 
         hosted_tools = []
         conv_settings = get_conv_settings(conversation_id) or {} if conversation_id else {}

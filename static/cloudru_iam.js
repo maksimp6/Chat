@@ -46,8 +46,8 @@
       ),
     );
     box.appendChild(makeInput("cloudru-iam-service-account", "Service account ID", "text", "UUID"));
-    box.appendChild(makeInput("cloudru-iam-name", "Название ключа", "text", "Alice Pro"));
-    box.appendChild(makeInput("cloudru-iam-description", "Описание", "text", "Для Alice Pro"));
+    box.appendChild(makeInput("cloudru-iam-name", "Название ключа", "text", "Logos"));
+    box.appendChild(makeInput("cloudru-iam-description", "Описание", "text", "Для Logos"));
     box.appendChild(
       makeInput(
         "cloudru-iam-products",

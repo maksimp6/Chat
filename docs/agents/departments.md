@@ -2,7 +2,7 @@
 
 Departments are first-class domain containers that group an agent, capabilities, tools, policies, knowledge scope, session configuration and status.
 
-The repository provides a persistent SQLite-backed registry and REST API:
+The repository provides a persistent registry, stored in the native Kristall journal, and REST API:
 
 - GET /api/departments
 - GET /api/departments/:id
@@ -62,5 +62,5 @@ ExecutionTrace sanitizer and correlation chain:
 
 conversation_id -> session_id -> invocation_id -> trace_id
 
-The case is owner-scoped when an authenticated Alice Pro identity is available.
+The case is owner-scoped when an authenticated Logos identity is available.
 Anonymous test/bootstrap environments retain the existing system behavior.

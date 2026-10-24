@@ -1,13 +1,13 @@
-"""Real MemoryStore integration test for failed /api/chat partial output persistence."""
+"""Real Kristall integration test for failed /api/chat partial output persistence."""
 
 import os
 import tempfile
 import unittest
 from unittest.mock import patch
 
-import db
-import mcp_routes
-from trace_manager import ExecutionTrace
+import storage.db as db
+import chat.mcp_routes as mcp_routes
+from observability.trace_manager import ExecutionTrace
 
 
 class TestChatMemoryStoreIntegration(unittest.TestCase):
@@ -44,11 +44,11 @@ class TestChatMemoryStoreIntegration(unittest.TestCase):
             with (
                 patch.object(db, "DB_PATH", db_path),
                 patch.dict(os.environ, {"ALICE_MEMORY_PATH": db_path}),
-                patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
+                patch.object(mcp_routes, "LogosClient", lambda _config: FakeClient()),
             ):
                 db.init_db()
                 db.create_conversation(
-                    conversation_id, "MemoryStore integration test", "aliceai-llm"
+                    conversation_id, "Kristall integration test", "logos-runtime"
                 )
 
                 app.config["TESTING"] = True
@@ -58,7 +58,7 @@ class TestChatMemoryStoreIntegration(unittest.TestCase):
                         json={
                             "conversation_id": conversation_id,
                             "message": "trigger failure",
-                            "model": "aliceai-llm",
+                            "model": "logos-runtime",
                             "params": {},
                         },
                     )

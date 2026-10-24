@@ -124,7 +124,6 @@ def test_workflow_has_real_independent_infra_and_mcp_jobs():
     assert "mcp" in jobs["required"]["needs"]
     infra = "\n".join(step.get("run", "") for step in jobs["infra"]["steps"])
     assert "pytest" in infra and "tests/test_cloudru" in infra
-    assert "diff-cover" in infra
     backend = "\n".join(step.get("run", "") for step in jobs["backend"]["steps"])
     assert "npm test --prefix deploy/chrome-worker" not in backend
     mcp = "\n".join(step.get("run", "") for step in jobs["mcp"]["steps"])

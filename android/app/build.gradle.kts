@@ -6,6 +6,10 @@ plugins {
 android {
     namespace = "com.alicepro.mobile"
     compileSdk = 37
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -91,4 +95,11 @@ dependencies {
     implementation("androidx.webkit:webkit:1.12.1")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.6.2")
+    testImplementation("org.robolectric:robolectric:4.17")
+}
+
+// AGP 9 exposes JVM arguments on Gradle Test tasks, not the Android unit-test DSL.
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    testLogging.events("passed", "failed", "skipped")
+    jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED", "--add-opens=java.base/java.util=ALL-UNNAMED", "--add-opens=java.base/java.io=ALL-UNNAMED", "--add-opens=java.base/java.net=ALL-UNNAMED", "--add-opens=java.base/java.security=ALL-UNNAMED", "--add-opens=java.base/java.text=ALL-UNNAMED")
 }

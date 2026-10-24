@@ -1,4 +1,4 @@
-"""Financing and payback tracking for the Alice Pro 3D-printing business."""
+"""Financing and payback tracking for the Logos 3D-printing business."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Literal, overload
 
-from db import get_store
+from printing3d.store import PrintStore
 
 _MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
@@ -52,10 +52,6 @@ def _optional_int(value: Any, name: str) -> int | None:
     return number
 
 
-def init_3d_finance_tables() -> None:
-    get_store()
-
-
 def _plan_row(row) -> dict[str, Any]:
     return {
         "owner_id": row["owner_id"],
@@ -74,7 +70,7 @@ def _plan_row(row) -> dict[str, Any]:
     }
 
 
-def set_financing_plan(owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
+def set_financing_plan(store: PrintStore, owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
     if not owner_id:
         raise ValueError("owner identity is required")
     if not isinstance(data, dict):
@@ -113,7 +109,6 @@ def set_financing_plan(owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
     now = datetime.utcnow().isoformat()
     started_at = str(data.get("started_at") or now).strip() or now
 
-    init_3d_finance_tables()
     record = {
         "owner_id": owner_id,
         "printer_model": model,
@@ -129,20 +124,20 @@ def set_financing_plan(owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
         "started_at": started_at,
         "updated_at": now,
     }
-    with get_store().transaction() as tx:
+    with store.transaction() as tx:
         tx.set("printing/finance/" + owner_id, record)
-    return get_financing_plan(owner_id) or {}
+    return get_financing_plan(store, owner_id) or {}
 
 
-def get_financing_plan(owner_id: str) -> dict[str, Any] | None:
-    return get_store().get("printing/finance/" + owner_id)
+def get_financing_plan(store: PrintStore, owner_id: str) -> dict[str, Any] | None:
+    return store.get("printing/finance/" + owner_id)
 
 
-def _month_profit(owner_id: str, currency: str, month: str) -> Decimal:
-    from .service import list_orders
+def _month_profit(store: PrintStore, owner_id: str, currency: str, month: str) -> Decimal:
+    from printing3d.service import list_orders
 
     profit = Decimal("0")
-    for order in list_orders(owner_id, status="paid"):
+    for order in list_orders(store, owner_id, status="paid"):
         if str(order.get("currency") or "RUB") != currency:
             continue
         settled_at = str(order.get("settled_at") or "")
@@ -154,18 +149,20 @@ def _month_profit(owner_id: str, currency: str, month: str) -> Decimal:
     return profit
 
 
-def _cumulative_profit(owner_id: str, currency: str) -> Decimal:
-    from .service import get_financial_summary
+def _cumulative_profit(store: PrintStore, owner_id: str, currency: str) -> Decimal:
+    from printing3d.service import get_financial_summary
 
-    summary = get_financial_summary(owner_id)
+    summary = get_financial_summary(store, owner_id)
     for bucket in summary["currencies"]:
         if bucket["currency"] == currency:
             return Decimal(str(bucket["settled_profit"]))
     return Decimal("0")
 
 
-def get_payback_status(owner_id: str, *, month: str | None = None) -> dict[str, Any]:
-    plan = get_financing_plan(owner_id)
+def get_payback_status(
+    store: PrintStore, owner_id: str, *, month: str | None = None
+) -> dict[str, Any]:
+    plan = get_financing_plan(store, owner_id)
     if plan is None:
         return {"plan": None, "status": "not_configured"}
 
@@ -184,8 +181,8 @@ def get_payback_status(owner_id: str, *, month: str | None = None) -> dict[str, 
         financing_cost = Decimal(str(total_repayment_raw)) - credit_principal
 
     known_cost_basis = equipment_price + setup_cost + financing_cost
-    cumulative_profit = _cumulative_profit(owner_id, plan["currency"])
-    month_profit = _month_profit(owner_id, plan["currency"], selected_month)
+    cumulative_profit = _cumulative_profit(store, owner_id, plan["currency"])
+    month_profit = _month_profit(store, owner_id, plan["currency"], selected_month)
     remaining = max(known_cost_basis - cumulative_profit, Decimal("0"))
 
     progress = None
@@ -223,14 +220,14 @@ def get_payback_status(owner_id: str, *, month: str | None = None) -> dict[str, 
     }
 
 
-def assess_financing(owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
+def assess_financing(store: PrintStore, owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
     """Assess sparse candidate terms without persisting or choosing a lender."""
     if not owner_id:
         raise ValueError("owner identity is required")
     if not isinstance(data, dict):
         raise ValueError("finance assessment must be an object")
 
-    saved = get_financing_plan(owner_id) or {}
+    saved = get_financing_plan(store, owner_id) or {}
     purchase_mode = str(data.get("purchase_mode") or "").strip().lower()
     if not purchase_mode:
         if saved and saved.get("credit_principal") in (None, 0, 0.0):
@@ -283,8 +280,8 @@ def assess_financing(owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
                 missing_fields.append(name)
 
     observed_month = datetime.utcnow().strftime("%Y-%m")
-    observed_monthly_profit = _month_profit(owner_id, currency, observed_month)
-    cumulative_profit = _cumulative_profit(owner_id, currency)
+    observed_monthly_profit = _month_profit(store, owner_id, currency, observed_month)
+    cumulative_profit = _cumulative_profit(store, owner_id, currency)
 
     profit_source = "none"
     profit_basis: Decimal | None = None

@@ -1,5 +1,6 @@
 from agent_memory.client import close_memory_clients
 import pytest
+from forge.binding import printing_store
 
 
 def test_quote_calculates_cost_risk_fee_and_profit():
@@ -43,14 +44,15 @@ def test_quote_rejects_impossible_margin_and_fee():
 
 @pytest.fixture
 def printing_db(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
+    import forge.binding as binding
     import printing3d.service as service
 
     path = tmp_path / "printing3d.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setattr(service, "get_store", db.get_store)
+    monkeypatch.setattr(binding, "get_store", db.get_store)
     db.init_db()
-    service.init_3d_printing_tables()
+    binding.init_printing_tables()
     return path
 
 
@@ -58,6 +60,7 @@ def test_orders_are_owner_scoped(printing_db):
     from printing3d import create_order, get_order, list_orders
 
     created = create_order(
+        printing_store(),
         "owner-a",
         {
             "title": "Cable holder",
@@ -71,29 +74,30 @@ def test_orders_are_owner_scoped(printing_db):
         },
     )
 
-    assert get_order("owner-a", created["id"])["title"] == "Cable holder"
-    assert get_order("owner-b", created["id"]) is None
-    assert len(list_orders("owner-a")) == 1
-    assert list_orders("owner-b") == []
+    assert get_order(printing_store(), "owner-a", created["id"])["title"] == "Cable holder"
+    assert get_order(printing_store(), "owner-b", created["id"]) is None
+    assert len(list_orders(printing_store(), "owner-a")) == 1
+    assert list_orders(printing_store(), "owner-b") == []
 
 
 def test_order_status_flow_requires_settlement_for_paid(printing_db):
     from printing3d import create_order, update_order_status
 
-    order = create_order("owner-a", {"title": "Adapter"})
-    accepted = update_order_status("owner-a", order["id"], "accepted")
-    printing = update_order_status("owner-a", order["id"], "printing")
+    order = create_order(printing_store(), "owner-a", {"title": "Adapter"})
+    accepted = update_order_status(printing_store(), "owner-a", order["id"], "accepted")
+    printing = update_order_status(printing_store(), "owner-a", order["id"], "printing")
 
     assert accepted["status"] == "accepted"
     assert printing["status"] == "printing"
     with pytest.raises(ValueError, match="requires settlement"):
-        update_order_status("owner-a", order["id"], "paid")
+        update_order_status(printing_store(), "owner-a", order["id"], "paid")
 
 
 def test_settlement_updates_treasury_summary_without_mixing_owner_data(printing_db):
     from printing3d import create_order, get_financial_summary, settle_order
 
     order_a = create_order(
+        printing_store(),
         "owner-a",
         {
             "title": "Meter bracket",
@@ -102,6 +106,7 @@ def test_settlement_updates_treasury_summary_without_mixing_owner_data(printing_
         },
     )
     order_b = create_order(
+        printing_store(),
         "owner-b",
         {
             "title": "Other owner order",
@@ -111,12 +116,14 @@ def test_settlement_updates_treasury_summary_without_mixing_owner_data(printing_
     )
 
     settled = settle_order(
+        printing_store(),
         "owner-a",
         order_a["id"],
         actual_revenue=520,
         actual_cost=180,
     )
     settle_order(
+        printing_store(),
         "owner-b",
         order_b["id"],
         actual_revenue=900,
@@ -128,7 +135,7 @@ def test_settlement_updates_treasury_summary_without_mixing_owner_data(printing_
     assert settled["actual_cost"] == pytest.approx(180)
     assert settled["settled_at"]
 
-    summary = get_financial_summary("owner-a")
+    summary = get_financial_summary(printing_store(), "owner-a")
     assert summary["total_orders"] == 1
     assert summary["currencies"] == [
         {
@@ -148,6 +155,7 @@ def test_settlement_is_idempotent_when_retried_without_new_values(printing_db):
     from printing3d import create_order, settle_order
 
     order = create_order(
+        printing_store(),
         "owner-a",
         {
             "title": "DIN rail clip",
@@ -155,8 +163,10 @@ def test_settlement_is_idempotent_when_retried_without_new_values(printing_db):
         },
     )
 
-    first = settle_order("owner-a", order["id"], actual_revenue=260, actual_cost=80)
-    second = settle_order("owner-a", order["id"])
+    first = settle_order(
+        printing_store(), "owner-a", order["id"], actual_revenue=260, actual_cost=80
+    )
+    second = settle_order(printing_store(), "owner-a", order["id"])
 
     assert second["settled_at"] == first["settled_at"]
     assert second["actual_revenue"] == pytest.approx(260)
@@ -164,7 +174,7 @@ def test_settlement_is_idempotent_when_retried_without_new_values(printing_db):
 
 
 def test_printing3d_tools_are_registered_read_only():
-    from tool_registry import ToolRegistry
+    from tool_providers.registry import ToolRegistry
 
     registry = ToolRegistry()
     definitions = {item["name"]: item for item in registry.get_definitions()}
@@ -181,7 +191,7 @@ def test_printing3d_tools_are_registered_read_only():
 
 
 def test_quote_tool_is_read_only_and_order_create_requires_approval():
-    from tool_registry import ToolRegistry
+    from tool_providers.registry import ToolRegistry
 
     registry = ToolRegistry()
     quote_tool = registry.get_tool_meta("printing3d.quote")
@@ -194,7 +204,7 @@ def test_quote_tool_is_read_only_and_order_create_requires_approval():
 
 
 def test_quote_tool_reports_missing_cost_drivers_instead_of_zero_price():
-    from printing3d.tools import quote
+    from forge.tools import quote
 
     result = quote({"material_grams": 120, "material_cost_per_kg": None, "print_hours": None})
 
@@ -206,7 +216,7 @@ def test_quote_tool_reports_missing_cost_drivers_instead_of_zero_price():
 
 def test_quote_tool_matches_service_and_lists_assumed_defaults():
     from printing3d import calculate_quote
-    from printing3d.tools import quote
+    from forge.tools import quote
 
     args = {
         "material_grams": 120,
@@ -233,7 +243,7 @@ def test_quote_tool_matches_service_and_lists_assumed_defaults():
 
 def test_order_create_tool_recalculates_price_for_trusted_owner(printing_db):
     from printing3d import list_orders
-    from printing3d.tools import order_create, quote
+    from forge.tools import create_order_tool, quote
 
     class Call:
         user_id = "trusted-owner"
@@ -241,7 +251,7 @@ def test_order_create_tool_recalculates_price_for_trusted_owner(printing_db):
     quote_args = {"material_grams": 80, "material_cost_per_kg": 2000, "print_hours": 3}
     expected = quote(quote_args)["quote"]["recommended_price"]
 
-    result = order_create(
+    result = create_order_tool(
         {"title": "Cable clip x10", "customer_name": "Ivan", "quote": quote_args},
         {"_universal_context": {"call": Call()}},
     )
@@ -251,16 +261,16 @@ def test_order_create_tool_recalculates_price_for_trusted_owner(printing_db):
     assert order["status"] == "quote"
     assert order["source"] == "alice"
     assert order["quoted_price"] == pytest.approx(expected)
-    assert list_orders("other-owner") == []
+    assert list_orders(printing_store(), "other-owner") == []
 
 
 def test_order_create_tool_rejects_unsafe_status_and_partial_quote(printing_db):
-    from printing3d.tools import order_create
+    from forge.tools import create_order_tool
 
     with pytest.raises(ValueError, match="status"):
-        order_create({"title": "X", "status": "paid"}, {})
+        create_order_tool({"title": "X", "status": "paid"}, {})
     with pytest.raises(ValueError, match="print_hours"):
-        order_create(
+        create_order_tool(
             {"title": "X", "quote": {"material_grams": 10, "material_cost_per_kg": 1000}},
             {},
         )
@@ -271,14 +281,14 @@ def test_order_create_tool_rejects_unsafe_status_and_partial_quote(printing_db):
     [{}, {"material_grams": None, "material_cost_per_kg": None, "print_hours": None}],
 )
 def test_order_create_tool_rejects_empty_or_all_null_quote(printing_db, empty_quote):
-    from printing3d.tools import order_create
+    from forge.tools import create_order_tool
 
     with pytest.raises(ValueError, match="quote is missing"):
-        order_create({"title": "X", "status": "accepted", "quote": empty_quote}, {})
+        create_order_tool({"title": "X", "status": "accepted", "quote": empty_quote}, {})
 
 
 def test_order_create_tool_keeps_order_and_quote_currency_consistent(printing_db):
-    from printing3d.tools import order_create
+    from forge.tools import create_order_tool
 
     class Call:
         user_id = "trusted-owner"
@@ -286,14 +296,14 @@ def test_order_create_tool_keeps_order_and_quote_currency_consistent(printing_db
     cfg = {"_universal_context": {"call": Call()}}
     quote_args = {"material_grams": 80, "material_cost_per_kg": 20, "print_hours": 3}
 
-    order = order_create({"title": "EUR order", "currency": "EUR", "quote": quote_args}, cfg)[
+    order = create_order_tool({"title": "EUR order", "currency": "EUR", "quote": quote_args}, cfg)[
         "order"
     ]
     assert order["currency"] == "EUR"
     assert order["quote"]["currency"] == "EUR"
 
     with pytest.raises(ValueError, match="currency"):
-        order_create(
+        create_order_tool(
             {"title": "X", "currency": "EUR", "quote": {**quote_args, "currency": "RUB"}},
             {},
         )
@@ -301,17 +311,23 @@ def test_order_create_tool_keeps_order_and_quote_currency_consistent(printing_db
 
 def test_treasury_summary_tool_uses_trusted_call_identity(printing_db):
     from printing3d import create_order, settle_order
-    from printing3d.tools import treasury_summary
+    from forge.tools import get_treasury_summary
 
-    order = create_order("trusted-owner", {"title": "Socket holder", "quoted_price": 300})
+    order = create_order(
+        printing_store(), "trusted-owner", {"title": "Socket holder", "quoted_price": 300}
+    )
     settle_order(
+        printing_store(),
         "trusted-owner",
         order["id"],
         actual_revenue=320,
         actual_cost=100,
     )
-    other = create_order("other-owner", {"title": "Hidden order", "quoted_price": 999})
+    other = create_order(
+        printing_store(), "other-owner", {"title": "Hidden order", "quoted_price": 999}
+    )
     settle_order(
+        printing_store(),
         "other-owner",
         other["id"],
         actual_revenue=999,
@@ -321,7 +337,7 @@ def test_treasury_summary_tool_uses_trusted_call_identity(printing_db):
     class Call:
         user_id = "trusted-owner"
 
-    result = treasury_summary({}, {"_universal_context": {"call": Call()}})
+    result = get_treasury_summary({}, {"_universal_context": {"call": Call()}})
 
     assert result["total_orders"] == 1
     assert result["currencies"][0]["settled_profit"] == pytest.approx(220)
@@ -331,26 +347,32 @@ def test_create_order_rejects_paid_without_settlement(printing_db):
     from printing3d import create_order
 
     with pytest.raises(ValueError, match="requires settlement"):
-        create_order("owner-a", {"title": "Impossible paid order", "status": "paid"})
+        create_order(
+            printing_store(), "owner-a", {"title": "Impossible paid order", "status": "paid"}
+        )
 
 
 def test_settlement_requires_cost_when_no_quote_exists(printing_db):
     from printing3d import create_order, settle_order
 
-    order = create_order("owner-a", {"title": "Manual quote", "quoted_price": 500})
+    order = create_order(
+        printing_store(), "owner-a", {"title": "Manual quote", "quoted_price": 500}
+    )
 
     with pytest.raises(ValueError, match="actual_cost is required"):
-        settle_order("owner-a", order["id"], actual_revenue=500)
+        settle_order(printing_store(), "owner-a", order["id"], actual_revenue=500)
 
 
 def test_cancelled_orders_do_not_inflate_quoted_revenue(printing_db):
     from printing3d import create_order, get_financial_summary, update_order_status
 
-    active = create_order("owner-a", {"title": "Active", "quoted_price": 300})
-    cancelled = create_order("owner-a", {"title": "Cancelled", "quoted_price": 700})
-    update_order_status("owner-a", cancelled["id"], "cancelled")
+    active = create_order(printing_store(), "owner-a", {"title": "Active", "quoted_price": 300})
+    cancelled = create_order(
+        printing_store(), "owner-a", {"title": "Cancelled", "quoted_price": 700}
+    )
+    update_order_status(printing_store(), "owner-a", cancelled["id"], "cancelled")
 
-    summary = get_financial_summary("owner-a")
+    summary = get_financial_summary(printing_store(), "owner-a")
 
     assert active["quoted_price"] == pytest.approx(300)
     assert summary["total_orders"] == 2
@@ -372,45 +394,47 @@ def test_quote_validation_edges():
 
 
 def test_schema_migrates_legacy_print_orders(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
+    import forge.binding as binding
     import printing3d.service as service
 
     evidence = b"SQLite format 3\0legacy order evidence"
     legacy = tmp_path / "legacy.db"
     legacy.write_bytes(evidence)
-    service.init_3d_printing_tables()
-    created = service.create_order("owner", {"title": "Native order"})
+    binding.init_printing_tables()
+    created = service.create_order(printing_store(), "owner", {"title": "Native order"})
     close_memory_clients()
-    assert service.get_order("owner", created["id"]) == created
+    assert service.get_order(printing_store(), "owner", created["id"]) == created
     assert legacy.read_bytes() == evidence
 
 
 def test_order_row_recovers_from_invalid_quote_json(printing_db):
-    import db
+    import storage.db as db
     from printing3d import create_order, get_order
 
-    order = create_order("owner-a", {"title": "Malformed native quote"})
+    order = create_order(printing_store(), "owner-a", {"title": "Malformed native quote"})
     key = "printing/order/" + order["id"]
     with db.get_store().transaction() as tx:
         tx.set(key, {**tx.get(key), "quote": "invalid"})
     close_memory_clients()
     with pytest.raises(ValueError, match="invalid native order record"):
-        get_order("owner-a", order["id"])
+        get_order(printing_store(), "owner-a", order["id"])
 
 
 def test_create_order_validation_and_actual_values(printing_db):
     from printing3d import create_order
 
     with pytest.raises(ValueError, match="owner identity"):
-        create_order("", {"title": "No owner"})
+        create_order(printing_store(), "", {"title": "No owner"})
     with pytest.raises(ValueError, match="object"):
-        create_order("owner-a", [])
+        create_order(printing_store(), "owner-a", [])
     with pytest.raises(ValueError, match="title is required"):
-        create_order("owner-a", {})
+        create_order(printing_store(), "owner-a", {})
     with pytest.raises(ValueError, match="invalid order status"):
-        create_order("owner-a", {"title": "Bad status", "status": "mystery"})
+        create_order(printing_store(), "owner-a", {"title": "Bad status", "status": "mystery"})
 
     order = create_order(
+        printing_store(),
         "owner-a",
         {
             "title": "Measured job",
@@ -425,30 +449,34 @@ def test_create_order_validation_and_actual_values(printing_db):
 def test_list_orders_status_filter_and_validation(printing_db):
     from printing3d import create_order, list_orders
 
-    create_order("owner-a", {"title": "Lead"})
-    create_order("owner-a", {"title": "Accepted", "status": "accepted"})
+    create_order(printing_store(), "owner-a", {"title": "Lead"})
+    create_order(printing_store(), "owner-a", {"title": "Accepted", "status": "accepted"})
 
-    accepted = list_orders("owner-a", status="accepted")
+    accepted = list_orders(printing_store(), "owner-a", status="accepted")
     assert [order["title"] for order in accepted] == ["Accepted"]
 
     with pytest.raises(ValueError, match="invalid order status"):
-        list_orders("owner-a", status="unknown")
+        list_orders(printing_store(), "owner-a", status="unknown")
 
 
 def test_update_order_status_rejects_unknown_status(printing_db):
     from printing3d import create_order, update_order_status
 
-    order = create_order("owner-a", {"title": "Status validation"})
+    order = create_order(printing_store(), "owner-a", {"title": "Status validation"})
     with pytest.raises(ValueError, match="invalid order status"):
-        update_order_status("owner-a", order["id"], "teleported")
+        update_order_status(printing_store(), "owner-a", order["id"], "teleported")
 
 
 def test_settlement_edge_cases_and_quote_defaults(printing_db):
     from printing3d import create_order, settle_order, update_order_status
 
-    assert settle_order("owner-a", "missing-order", actual_revenue=1, actual_cost=1) is None
+    assert (
+        settle_order(printing_store(), "owner-a", "missing-order", actual_revenue=1, actual_cost=1)
+        is None
+    )
 
     quoted = create_order(
+        printing_store(),
         "owner-a",
         {
             "title": "Quoted job",
@@ -461,11 +489,12 @@ def test_settlement_edge_cases_and_quote_defaults(printing_db):
             },
         },
     )
-    settled = settle_order("owner-a", quoted["id"])
+    settled = settle_order(printing_store(), "owner-a", quoted["id"])
     assert settled["actual_revenue"] == pytest.approx(quoted["quoted_price"])
     assert settled["actual_cost"] == pytest.approx(quoted["quote"]["estimated_total_cost"])
 
     same = settle_order(
+        printing_store(),
         "owner-a",
         quoted["id"],
         actual_revenue=settled["actual_revenue"],
@@ -475,37 +504,44 @@ def test_settlement_edge_cases_and_quote_defaults(printing_db):
 
     with pytest.raises(ValueError, match="already settled"):
         settle_order(
+            printing_store(),
             "owner-a",
             quoted["id"],
             actual_revenue=settled["actual_revenue"] + 1,
             actual_cost=settled["actual_cost"],
         )
 
-    cancelled = create_order("owner-a", {"title": "Cancelled", "quoted_price": 100})
-    update_order_status("owner-a", cancelled["id"], "cancelled")
+    cancelled = create_order(
+        printing_store(), "owner-a", {"title": "Cancelled", "quoted_price": 100}
+    )
+    update_order_status(printing_store(), "owner-a", cancelled["id"], "cancelled")
     with pytest.raises(ValueError, match="cancelled order"):
-        settle_order("owner-a", cancelled["id"], actual_revenue=100, actual_cost=20)
+        settle_order(
+            printing_store(), "owner-a", cancelled["id"], actual_revenue=100, actual_cost=20
+        )
 
-    no_price = create_order("owner-a", {"title": "No revenue"})
+    no_price = create_order(printing_store(), "owner-a", {"title": "No revenue"})
     with pytest.raises(ValueError, match="actual_revenue is required"):
-        settle_order("owner-a", no_price["id"], actual_cost=20)
+        settle_order(printing_store(), "owner-a", no_price["id"], actual_cost=20)
 
 
 def test_printing3d_tool_helpers_cover_fallback_and_order_filters(printing_db, monkeypatch):
     from printing3d import create_order
-    import printing3d.tools as printing_tools
+    import forge.tools as printing_tools
 
     monkeypatch.setattr(
         printing_tools,
         "get_current_owner_id",
         lambda required=True: "fallback-owner",
     )
-    create_order("fallback-owner", {"title": "Fallback lead"})
-    create_order("fallback-owner", {"title": "Fallback accepted", "status": "accepted"})
+    create_order(printing_store(), "fallback-owner", {"title": "Fallback lead"})
+    create_order(
+        printing_store(), "fallback-owner", {"title": "Fallback accepted", "status": "accepted"}
+    )
 
     assert printing_tools._trusted_owner({}) == "fallback-owner"
-    all_orders = printing_tools.orders_list({}, {})
-    accepted = printing_tools.orders_list({"status": "accepted"}, {})
+    all_orders = printing_tools.list_orders({}, {})
+    accepted = printing_tools.list_orders({"status": "accepted"}, {})
 
     assert len(all_orders["orders"]) == 2
     assert [order["title"] for order in accepted["orders"]] == ["Fallback accepted"]
@@ -514,12 +550,12 @@ def test_printing3d_tool_helpers_cover_fallback_and_order_filters(printing_db, m
 def test_registry_survives_printing3d_tool_import_failure(monkeypatch):
     import builtins
 
-    from tool_registry import ToolRegistry
+    from tool_providers.registry import ToolRegistry
 
     real_import = builtins.__import__
 
     def guarded_import(name, *args, **kwargs):
-        if name == "printing3d.tools":
+        if name == "forge.tools":
             raise ImportError("printing3d tool import test")
         return real_import(name, *args, **kwargs)
 

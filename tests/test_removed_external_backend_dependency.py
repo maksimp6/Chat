@@ -21,7 +21,7 @@ def _files():
         if path.is_dir():
             for candidate in path.rglob("*"):
                 # This isolated third-party CLI uses its own relay/auth backend.
-                # Its dependency metadata is not an Alice backend or configuration;
+                # Its dependency metadata is not a Logos backend or configuration;
                 # keep every executable/config file in the deployment scan.
                 if candidate == ROOT / "deploy/remote-desktop-commander/package-lock.json":
                     continue

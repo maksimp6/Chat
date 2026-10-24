@@ -11,26 +11,26 @@ import sys
 
 import pytest
 
-from memory_engine import MemoryStore, StoreError
-from memory_engine.store import _JournalStore
+from kristall import Kristall, KristallError
+from kristall.store import _JournalStore
 
 
 def test_truncated_frame_fails_closed_without_mutation(tmp_path):
     path = tmp_path / "journal.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("stable", {"n": 1})
         assert store.commit() == 1
     with path.open("ab") as out:
         out.write(b'{"payload":')
     before = path.read_bytes()
-    with pytest.raises(StoreError, match="incomplete journal tail"):
-        MemoryStore(path)
+    with pytest.raises(KristallError, match="incomplete journal tail"):
+        Kristall(path)
     assert path.read_bytes() == before
 
 
 def test_semantically_invalid_hashed_frame_never_publishes_partial_changes(tmp_path):
     path = tmp_path / "journal.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("stable", 1)
         store.commit()
     state, seq, digest = _JournalStore._inspect_log(path)
@@ -59,8 +59,8 @@ def test_semantically_invalid_hashed_frame_never_publishes_partial_changes(tmp_p
     with path.open("ab") as out:
         out.write(frame)
     before = path.read_bytes()
-    with pytest.raises(StoreError, match="corrupt committed journal"):
-        MemoryStore(path)
+    with pytest.raises(KristallError, match="corrupt committed journal"):
+        Kristall(path)
     assert path.read_bytes() == before
     assert state["values"]["stable"] == 1
 
@@ -70,9 +70,9 @@ def test_sigkill_commit_replay_e2e(tmp_path, boundary):
     path = tmp_path / "crash.memory"
     code = """
 import os,signal,sys
-from memory_engine import MemoryStore
-from memory_engine.store import _JournalStore
-db=MemoryStore(sys.argv[1])
+from kristall import Kristall
+from kristall.store import _JournalStore
+db=Kristall(sys.argv[1])
 db.set('stable',1);db.commit()
 original=_JournalStore._append_frame
 def injected(self,frame):
@@ -93,7 +93,7 @@ os.kill(os.getpid(),signal.SIGKILL)
     )
     assert result.returncode == -signal.SIGKILL, result.stderr
     assert ("ACK" in result.stdout) == (boundary == "after_ack")
-    with MemoryStore(path) as recovered:
+    with Kristall(path) as recovered:
         assert recovered.get("stable") == 1
         assert recovered.get("next") == (None if boundary == "before_append" else 2)
 
@@ -101,7 +101,7 @@ os.kill(os.getpid(),signal.SIGKILL)
 def test_fsync_failure_fences_writer_and_preserves_acknowledged_state(tmp_path, monkeypatch):
     """An ambiguous fsync failure must not publish or permit another commit."""
     path = tmp_path / "fsync.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("stable", 1)
         assert store.commit() == 1
         store.set("pending", 2)
@@ -116,43 +116,43 @@ def test_fsync_failure_fences_writer_and_preserves_acknowledged_state(tmp_path, 
             return original_fsync(fd)
 
         monkeypatch.setattr(os, "fsync", fail_once)
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             store.commit()
         assert store.last_commit.sequence == 1
         assert store.get("stable") == 1
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             store.commit()
 
     # The failed fsync can leave a complete frame on disk; reopening must
     # independently verify its fate instead of assuming it was rolled back.
-    with MemoryStore(path) as recovered:
+    with Kristall(path) as recovered:
         assert recovered.get("stable") == 1
         assert recovered.get("pending") in (None, 2)
         assert recovered.last_commit.sequence in (1, 2)
 
 
 def test_oversized_unterminated_frame_rejected_without_truncation(tmp_path):
-    from memory_engine.store import MAX_JOURNAL_FRAME_BYTES
+    from kristall.store import MAX_JOURNAL_FRAME_BYTES
 
     path = tmp_path / "oversized.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("safe", 1)
         assert store.commit() == 1
     with path.open("ab") as stream:
         stream.write(b"x" * (MAX_JOURNAL_FRAME_BYTES + 1))
     before = path.stat().st_size
-    with pytest.raises(StoreError, match="journal frame exceeds size limit"):
-        MemoryStore(path)
+    with pytest.raises(KristallError, match="journal frame exceeds size limit"):
+        Kristall(path)
     assert path.stat().st_size == before
 
 
 def test_oversized_commit_rejected_without_publishing(tmp_path):
-    from memory_engine.store import MAX_JOURNAL_FRAME_BYTES
+    from kristall.store import MAX_JOURNAL_FRAME_BYTES
 
     path = tmp_path / "oversized-write.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("large", "x" * MAX_JOURNAL_FRAME_BYTES)
-        with pytest.raises(StoreError, match="journal frame exceeds size limit"):
+        with pytest.raises(KristallError, match="journal frame exceeds size limit"):
             store.commit()
         assert store.last_commit.sequence == 0
         assert not path.exists()
@@ -160,14 +160,14 @@ def test_oversized_commit_rejected_without_publishing(tmp_path):
 
 def test_corrupt_complete_frame_fails_closed(tmp_path):
     path = tmp_path / "corrupt.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("safe", "committed")
         assert store.commit() == 1
     with path.open("ab") as stream:
         stream.write(b'{"payload": {}, "digest": "bad"}\n')
     original = path.read_bytes()
-    with pytest.raises(StoreError, match="corrupt committed journal"):
-        MemoryStore(path)
+    with pytest.raises(KristallError, match="corrupt committed journal"):
+        Kristall(path)
     assert path.read_bytes() == original
 
 
@@ -194,6 +194,6 @@ def test_invalid_later_operation_does_not_mutate_input_state():
     ).encode()
     digest = hashlib.sha256(bytes(32) + encoded).hexdigest()
     frame = json.dumps({"payload": payload, "digest": digest}).encode() + b"\n"
-    with pytest.raises(StoreError, match="corrupt committed journal"):
+    with pytest.raises(KristallError, match="corrupt committed journal"):
         _JournalStore._apply_verified_frame(frame, state, 0, "0" * 64)
     assert state == {"values": {"stable": {"version": 1}}}

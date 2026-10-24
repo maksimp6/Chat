@@ -3,10 +3,10 @@
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 import pytest
-import db
+import storage.db as db
 from agent_memory.client import close_memory_clients
-from budget_repository import BudgetPersistenceError, BudgetRepository
-from budget_controller import AccountType, BudgetAccount, BudgetLimits
+from economy.budget_repository import BudgetPersistenceError, BudgetRepository
+from economy.budget_controller import AccountType, BudgetAccount, BudgetLimits
 
 
 def account(kind=AccountType.REAL, allocated="100"):
@@ -110,7 +110,7 @@ def test_repository_emits_execution_trace_event(monkeypatch):
         def add_event(self, event, payload):
             events.append((event, payload))
 
-    monkeypatch.setattr("budget_repository.get_current_trace", lambda: Trace())
+    monkeypatch.setattr("economy.budget_repository.get_current_trace", lambda: Trace())
     repository().apply("budget", "DEMO", "WIN", 5, actor="provider")
     assert events[0][0] == "budget_operation_persisted"
     assert events[0][1]["account_type"] == "DEMO"
