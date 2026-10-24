@@ -1,0 +1,49 @@
+name: Redmi 9 native shell acceptance
+
+on:
+  push:
+    branches: [ops/redmi9-python-runner]
+
+permissions: {}
+
+jobs:
+  native:
+    runs-on: redmi9
+    timeout-minutes: 3
+    steps:
+      - name: Verify Redmi and test exact runner source
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, platform, subprocess, urllib.request
+          from pathlib import Path
+          model = subprocess.check_output(['/system/bin/getprop', 'ro.product.model'], text=True).strip()
+          assert model == 'Redmi 9', model
+          assert platform.machine() == 'aarch64'
+          sha = os.environ['GITHUB_SHA']
+          for name in ('scripts/redmi_python_runner.py', 'tests/test_redmi_python_runner.py',
+                       'scripts/redmi_repository_backup.sh', 'tests/test_redmi_repository_backup.py',
+                       'scripts/redmi_android_diagnostics.sh', 'scripts/redmi_publish_diagnostics.sh',
+                       'scripts/redmi_store_github_token.sh', 'tests/test_redmi_android_diagnostics.py'):
+              data = urllib.request.urlopen('https://raw.githubusercontent.com/maksimp6/Chat/' + sha + '/' + name, timeout=30).read()
+              path = Path(name)
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(data)
+          installed = Path.home() / 'github-python-runner/runner.py'
+          expected = Path('scripts/redmi_python_runner.py').read_bytes()
+          assert installed.read_bytes() == expected, 'Installed source differs from tested commit'
+          subprocess.run(['python', '-m', 'pytest', '-q', 'tests/test_redmi_python_runner.py', 'tests/test_redmi_repository_backup.py', 'tests/test_redmi_android_diagnostics.py'], check=True)
+          proof = {'device': model, 'engine': 'python-native', 'commit': sha,
+                   'runner_sha256': hashlib.sha256(expected).hexdigest(), 'run_id': os.environ['GITHUB_RUN_ID']}
+          Path('native-proof.json').write_text(json.dumps(proof))
+          print(json.dumps(proof), flush=True)
+          PY
+      - name: Verify Python shell and shared workspace
+        shell: python
+        run: |
+          import json, os
+          from pathlib import Path
+          proof = json.loads(Path('native-proof.json').read_text())
+          assert proof['commit'] == os.environ['GITHUB_SHA']
+          assert Path.cwd() == Path(os.environ['GITHUB_WORKSPACE'])
+          print('VERIFIED: native bash, python, shared workspace, and exact source')
