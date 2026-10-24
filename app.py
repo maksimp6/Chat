@@ -3,6 +3,7 @@ import os
 import logging
 import json
 from core.config import TEXT_MODELS, VOICE_MODELS, get_donation_url
+from core.model_profiles import annotate_catalog
 from provider_accounts.model_discovery import (
     ModelDiscoveryError,
     get_model_discovery,
@@ -244,11 +245,11 @@ MODEL_DISCOVERY = get_model_discovery()
 def list_models():
     force_refresh = request.args.get("refresh", "").lower() in {"1", "true", "yes"}
     try:
-        catalog = MODEL_DISCOVERY.get_models(force_refresh=force_refresh)
+        catalog = annotate_catalog(MODEL_DISCOVERY.get_models(force_refresh=force_refresh))
         catalog["degraded"] = False
         return jsonify(catalog)
     except ModelDiscoveryError:
-        catalog = static_model_catalog()
+        catalog = annotate_catalog(static_model_catalog())
         catalog["degraded"] = True
         catalog["error"] = "model_discovery_unavailable"
         return jsonify(catalog)
