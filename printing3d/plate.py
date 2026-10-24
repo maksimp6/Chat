@@ -12,6 +12,7 @@ import json
 import math
 import re
 import stat
+import zlib
 from pathlib import Path
 from typing import BinaryIO
 from zipfile import BadZipFile, LargeZipFile, ZipFile, ZipInfo
@@ -257,7 +258,17 @@ def inspect_archive(stream: BinaryIO, filename: str) -> dict[str, object]:
                 raise PlateError("sliced print must be named .gcode.3mf")
             material, nozzle, wall_loops = _configuration(archive, names)
             result = _gcode(archive, names, material)
-    except (PlateError, BadZipFile, LargeZipFile, OSError, EOFError, RuntimeError) as exc:
+    except (
+        PlateError,
+        BadZipFile,
+        LargeZipFile,
+        OSError,
+        EOFError,
+        RuntimeError,
+        zlib.error,
+    ) as exc:
+        # A member whose compressed stream is corrupt raises zlib.error, which is a blocked print,
+        # not a crash of the audit.
         return {"status": "blocked", "filename": filename, "reason": str(exc)}
     return {
         "status": "ready_for_review",
