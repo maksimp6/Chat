@@ -30,13 +30,24 @@ def _verify_motion_bounds(command: str, bed: list[int]) -> None:
             raise ValueError("Z outside printer height")
 
 
+def _opcode(command: str) -> str:
+    # The firmware skips a leading line number ("N5 M112") and reads leading zeros in a code ("M0112"
+    # is M112), so both are removed before the code is compared with the forbidden list.
+    words = command.split()
+    while words and re.fullmatch(r"N\d+", words[0], re.IGNORECASE):
+        words.pop(0)
+    if not words:
+        return ""
+    return re.sub(r"^([GM])0*(\d+)$", r"\1\2", words[0].upper())
+
+
 def _verify_toolpaths(gcode: str, bed: list[int]) -> tuple[int, int]:
     count, extrusion, heaters = 0, 0, set[str]()
     for line in gcode.splitlines():
         command = line.split(";", 1)[0].strip()
         if not command:
             continue
-        opcode = command.split()[0]
+        opcode = _opcode(command)
         if opcode in ("M112", "M500", "M502", "M997", "M999"):
             raise ValueError("unexpected dangerous firmware command")
         if opcode in ("M190", "M109"):
