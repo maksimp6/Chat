@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import math
 import json
+import threading
 from typing import Any
 from storage.db import get_store
 
@@ -73,8 +74,11 @@ def _record(
     return True
 
 
-# Largest demo credit in one call. Without a bound a single request could mint any balance.
+# Largest demo credit in one call, and the most one owner may receive in total. Without the
+# total bound a caller could repeat the single-call limit without end.
 DEMO_TOP_UP_LIMIT = 10_000.0
+DEMO_TOP_UP_TOTAL_LIMIT = 10_000.0
+_DEMO_LOCK = threading.Lock()
 
 
 def demo_top_up(owner_id: str, amount: Any, description: str = "Demo top-up") -> dict[str, Any]:
@@ -84,7 +88,17 @@ def demo_top_up(owner_id: str, amount: Any, description: str = "Demo top-up") ->
         raise ValueError("amount must be a number") from exc
     if value > DEMO_TOP_UP_LIMIT:
         raise ValueError(f"amount exceeds the demo top-up limit of {DEMO_TOP_UP_LIMIT:g}")
-    _record(owner_id, value, description, "credit")
+    key = "treasury/demo/" + str(owner_id)
+    # The check, the credit and the running total are one step for this process.
+    with _DEMO_LOCK:
+        credited = float((get_store().get(key) or {}).get("total", 0.0))
+        if credited + value > DEMO_TOP_UP_TOTAL_LIMIT:
+            raise ValueError(
+                f"demo top-ups are limited to {DEMO_TOP_UP_TOTAL_LIMIT:g} per owner"
+            )
+        _record(owner_id, value, description, "credit")
+        with get_store().transaction() as tx:
+            tx.set(key, {"total": credited + value})
     return get_account(owner_id)
 
 
