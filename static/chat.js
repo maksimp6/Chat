@@ -53,6 +53,7 @@ function renderApprovalCard(toolCall, origMsg) {
       model: currentModel,
       name: toolCall.name,
       arguments: toolCall.arguments,
+      approval_token: toolCall.approval_token,
       original_message: origMsg,
     };
     if (toolCall.name === "set_ui_theme" && window.AliceTheme) {

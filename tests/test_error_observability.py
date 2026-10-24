@@ -10,7 +10,9 @@ def test_unhandled_backend_exception_is_logged_and_not_swallowed(monkeypatch, ca
 
     # /api/conversations is owned by the MCP routes blueprint, so patch the
     # dependency where that route resolves it rather than the app module alias.
-    monkeypatch.setattr(mcp_routes, "get_conversations", explode)
+    # Anonymous callers get no conversations, so exercise the owned-list path.
+    monkeypatch.setattr(mcp_routes, "get_current_owner_id", lambda required=False: "owner-1")
+    monkeypatch.setattr(mcp_routes, "list_owned_conversations", explode)
     client = app_module.app.test_client()
 
     with caplog.at_level(logging.ERROR, logger="alice_app"):

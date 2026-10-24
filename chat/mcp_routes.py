@@ -1,8 +1,11 @@
 """Маршруты чата с сохранением полной цепочки выполнения в БД."""
 
 from flask import Blueprint, request, jsonify
+import hashlib
+import hmac
 import logging
 import json as _json
+import secrets
 from typing import Any
 from yandex_client_modules.client import YandexResponsesClient
 from provider_accounts.claude_oauth import (
@@ -24,7 +27,6 @@ from mcp_server.trace import record_yandex_mcp_activity
 import mcp_server.storage as mcp_storage
 from tool_providers.registry import registry
 from storage.db import (
-    get_conversations,
     create_conversation,
     get_messages,
     add_message,
@@ -78,6 +80,25 @@ def _tool_call_needs_approval(tool_call: dict[str, Any]) -> bool:
     name, arguments = _tool_call_parts(tool_call)
     tool_config = registry.get_tool_meta(name) if name else None
     return bool(tool_config and tool_call_requires_approval(tool_config, arguments))
+
+
+_APPROVAL_KEY = secrets.token_bytes(32)
+
+
+def _approval_token(owner_id, conversation_id, name, arguments) -> str:
+    """Sign a proposed tool call so the approval endpoint only runs calls the server proposed."""
+    payload = _json.dumps(
+        {
+            "owner": owner_id or "",
+            "conversation": conversation_id or "",
+            "name": name or "",
+            "arguments": arguments,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    return hmac.new(_APPROVAL_KEY, payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def _normalize_requested_skills(data, params):
@@ -408,6 +429,9 @@ def chat():
                                 "description": tool_config.get("description", func_name),
                                 "arguments": raw_args,
                                 "call_id": tc.get("call_id") or tc.get("id") or func_name,
+                                "approval_token": _approval_token(
+                                    owner_id, invocation.conversation_id, func_name, raw_args
+                                ),
                             },
                             "original_message": message,
                             "invocation_id": invocation.invocation_id,
@@ -721,13 +745,13 @@ def conversations():
 
     if owner_id:
         return jsonify({"conversations": list_owned_conversations(owner_id)})
-    return jsonify({"conversations": get_conversations()})
+    return jsonify({"conversations": []})
 
 
 @mcp_bp.route("/api/conversations/<conv_id>/messages", methods=["GET"])
 def get_conv_messages(conv_id):
     owner_id = get_current_owner_id(required=False)
-    if owner_id and not check_access(conv_id, owner_id):
+    if not owner_id or not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
     return jsonify({"messages": get_messages(conv_id)})
 
@@ -746,6 +770,13 @@ def execute_approved():
             return jsonify({"error": f"Неизвестный инструмент: {func_name}"}), 400
 
         owner_id = get_current_owner_id(required=False)
+        # Only a tool call this server proposed (and signed) may skip the approval gate.
+        expected_token = _approval_token(owner_id, conv_id, func_name, arguments)
+        if not hmac.compare_digest(
+            str(data.get("approval_token") or "").encode("utf-8"),
+            expected_token.encode("ascii"),
+        ):
+            return jsonify({"error": "approval_token_invalid"}), 403
         tool_arguments = dict(arguments or {})
         if func_name == "set_ui_theme":
             current_theme = str(data.get("current_theme") or "").strip().lower()

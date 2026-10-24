@@ -62,6 +62,10 @@ def _authorized() -> bool:
         return True
 
     # Fail closed for remote deployments when no explicit admin token is set.
+    # A reverse proxy on this host makes every request arrive from loopback, so a
+    # forwarding header means the request did not originate locally.
+    if any(request.headers.get(name) for name in ("X-Forwarded-For", "X-Real-IP", "Forwarded")):
+        return False
     remote = request.remote_addr or ""
     return remote in {"127.0.0.1", "::1"}
 
