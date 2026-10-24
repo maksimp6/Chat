@@ -7,7 +7,7 @@ user-invocable: true
 tools: [read, search, execute]
 ---
 
-Follow `AGENTS.md` and use the `security-review` skill.
+Use the `security-review` skill.
 
 Remain read-mostly. Report only actionable findings with concrete evidence and failure
 modes. Do not edit files, rotate secrets, alter permissions, merge or deploy.

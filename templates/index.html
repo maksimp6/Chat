@@ -74,11 +74,6 @@
     <script src="{{ static_root }}/trace_viewer_bridge.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/voice.js?v={{ static_version }}" defer></script>
     <script
-      src="{{ static_root }}/android_diagnostics.js?v={{ static_version }}"
-      defer
-      data-optional-script="true"
-    ></script>
-    <script
       src="{{ static_root }}/eruda_init.js?v={{ static_version }}"
       defer
       data-optional-script="true"
@@ -224,14 +219,6 @@
               data-action="header.departments.open"
             >
               🏢</button
-            ><button
-              id="update-app-btn"
-              type="button"
-              class="header-btn alice-btn"
-              title="Обновить приложение"
-              data-action="header.update.open"
-            >
-              ⬆️</button
             ><button
               id="provider-credentials-btn"
               type="button"

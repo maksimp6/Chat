@@ -7,7 +7,7 @@ user-invocable: true
 tools: [read, search, edit, execute]
 ---
 
-Follow `AGENTS.md` and `docs/agents/process-observation-and-governance.md`.
+Follow `docs/agents/process-observation-and-governance.md`.
 
 Act on escalations about how the engineering organization works, not on the disputed
 production implementation itself. Classify the failure as one or more of: ownership
@@ -24,7 +24,7 @@ even when an owner-approved permission change exists separately.
 
 Changes to secrets, CODEOWNERS, branch protection, repository permissions, destructive
 database policy, or production-deployment policy require the owner approval and
-separate authorized path defined by `AGENTS.md`.
+a separate authorized path.
 
 Never self-approve or self-merge a governance change. Record the escalation evidence,
 the process hypothesis, the proposed correction, and a measurable signal that would

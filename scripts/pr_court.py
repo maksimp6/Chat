@@ -77,6 +77,17 @@ def bounded_input(rules: str, pr: dict, files: list) -> str:
     return text
 
 
+def read_base_rules(endpoint: str, base: str, token: str) -> str:
+    """Read optional base guidance; only a missing file means no supplied rules."""
+    try:
+        data = request(f"{endpoint}/contents/AGENTS.md?ref={base}", token)
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return ""
+        raise
+    return base64.b64decode(data["content"]).decode()
+
+
 def main() -> int:
     output = Path("pr-court-output")
     output.mkdir(exist_ok=True)
@@ -86,18 +97,30 @@ def main() -> int:
         sha = event["pull_request"]["head"]["sha"]
         number = event["number"]
         token = os.environ["GH_TOKEN"]
-        key = os.environ["YANDEX_API_KEY"].strip()
-        project = os.environ["YANDEX_PROJECT_ID"].strip()
-        if not key or not project:
-            raise ValueError("YANDEX_API_KEY or YANDEX_PROJECT_ID is missing")
         endpoint = f"{API}/repos/{repo}"
         pr_url = f"{endpoint}/pulls/{number}"
         pr = request(pr_url, token)
         validate_pr(pr, sha, repo)
         files = request(f"{pr_url}/files?per_page=100", token)
         base = pr["base"]["sha"]
-        rules = request(f"{endpoint}/contents/AGENTS.md?ref={base}", token)
-        rules = base64.b64decode(rules["content"]).decode()
+        rules = read_base_rules(endpoint, base, token)
+        if not rules.strip():
+            report = {
+                "status": "NO_RULES_NOT_APPROVAL",
+                "model_call": "NOT_RUN",
+                "pr": number,
+                "head": sha,
+                "develop_head": base,
+                "merge_approval": False,
+                "limitations": ["The base revision has no AGENTS.md rules to cite."],
+            }
+            (output / "report.json").write_text(json.dumps(report, indent=2))
+            print(f"NO_RULES_NOT_APPROVAL PR #{number} HEAD {sha}; model not called")
+            return 0
+        key = os.environ["YANDEX_API_KEY"].strip()
+        project = os.environ["YANDEX_PROJECT_ID"].strip()
+        if not key or not project:
+            raise ValueError("YANDEX_API_KEY or YANDEX_PROJECT_ID is missing")
         evidence = bounded_input(rules, pr, files)
         response = request(
             PROVIDER,

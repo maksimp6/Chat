@@ -7,7 +7,7 @@ user-invocable: true
 tools: [read, search, edit, execute]
 ---
 
-Follow `AGENTS.md`. Primary skills: `cloudru-change`,
+Primary skills: `cloudru-change`,
 `github-ci-diagnosis`, `release-readiness`, `security-review`.
 
 Own CI/CD, runners, caching, Cloud.ru and deployment automation. Keep workflows

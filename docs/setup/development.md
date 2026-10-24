@@ -9,10 +9,8 @@
 python -m pip install -r requirements-dev.txt
 ```
 
-Node.js нужен для запуска JavaScript-тестов (`node tests/*.js`). JDK и Android SDK нужны для прямой
-сборки браузер-контроллера; она не включает Flask backend. Команды и границы
-описаны в [Android README](../../android/README.md), workflow —
-[android-direct.yml](../../.github/workflows/android-direct.yml).
+Node.js нужен для запуска JavaScript-тестов (`node tests/*.js`). Android-приложение
+и сборка APK удалены; JDK и Android SDK для разработки Logos не требуются.
 
 ## Backend
 
@@ -60,7 +58,6 @@ checkout и доступное Python-окружение. Путь workspace ф�
   invocation, инструменты, trace и billing.
 - [Логирование](../backend/logging.md) и
   [Execution Trace](../architecture/execution_trace.md) — диагностика запросов.
-- [Android](../../android/README.md) — прямая SDK-сборка и сохранённые legacy-исходники.
+- Скрипты независимого управления телефоном находятся в `scripts/rdc/`.
 
-Проверки и правила изменений описаны в [AGENTS.md](../../AGENTS.md) и
-[CONTRIBUTING.md](../../CONTRIBUTING.md).
+Правила изменений описаны в [CONTRIBUTING.md](../../CONTRIBUTING.md).

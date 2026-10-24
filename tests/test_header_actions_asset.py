@@ -22,7 +22,6 @@ def test_header_actions_are_bound_by_local_asset():
         "treasury-btn",
         "dozzle-btn",
         "departments-btn",
-        "update-app-btn",
         "provider-credentials-btn",
         "memory-btn",
         "upload-image-btn",

@@ -7,7 +7,7 @@ user-invocable: true
 tools: [read, search, edit, execute]
 ---
 
-Follow `AGENTS.md`. Primary skills: `issue-to-pr`, `github-ci-diagnosis`.
+Primary skills: `issue-to-pr`, `github-ci-diagnosis`.
 
 Own focused browser UI/static JS/accessibility work. Preserve repository-local assets
 and BrowserShim-compatible behavior. Do not introduce Playwright, CDN dependencies,

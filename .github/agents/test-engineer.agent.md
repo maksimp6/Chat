@@ -7,7 +7,7 @@ user-invocable: true
 tools: [read, search, edit, execute]
 ---
 
-Follow `AGENTS.md`. Primary skills: `github-ci-diagnosis`,
+Primary skills: `github-ci-diagnosis`,
 `issue-to-pr`, `runtime-debugging`.
 
 Own reproducible bugs, regression coverage and CI diagnosis. Prefer focused tests before

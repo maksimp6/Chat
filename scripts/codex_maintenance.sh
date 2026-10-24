@@ -24,7 +24,6 @@ fi
 
 python --version | grep -q '3.14'
 node --version | grep -q '^v22\.'
-java -version 2>&1 | head -1 | grep -q '"25'
 
 python -m pip install --disable-pip-version-check \
   -r requirements.txt -r requirements-dev.txt

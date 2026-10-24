@@ -12,7 +12,7 @@ from scripts import logos_context as context
 
 @pytest.fixture
 def repo(tmp_path):
-    for name in context.REQUIRED_FILES:
+    for name in (*context.OPTIONAL_FILES, *context.REQUIRED_FILES):
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"Complete guidance: {name}\n", encoding="utf-8")
@@ -112,6 +112,14 @@ def test_complete_case_contains_full_guidance_dialogues_reviews_and_reply_chain(
         source for source in packet["sources"] if source["id"] == "github:inline_comment:5"
     )
     assert reply["in_reply_to_id"] == 4
+
+
+def test_context_without_optional_repository_rules_is_complete(repo, transport):
+    (repo / "AGENTS.md").unlink()
+    packet = build(repo, transport)
+    assert "AGENTS.md" not in packet["required_files"]
+    assert not any(source["id"] == "local:AGENTS.md" for source in packet["sources"])
+    context.verify_checkout(packet, repo)
 
 
 def test_long_context_is_not_clipped_or_replaced_with_links(repo, transport):

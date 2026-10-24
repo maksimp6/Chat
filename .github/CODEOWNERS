@@ -14,8 +14,6 @@ docker-compose.postgres.yml        @maksimp6
 /storage/db.py                     @maksimp6
 /db_backend.py                     @maksimp6
 
-# Android-клиент
-/android/                          @maksimp6
 
 # Real-provider acceptance is changed only through owner review.
 /tests/real_api/                   @maksimp6
@@ -26,4 +24,3 @@ docker-compose.postgres.yml        @maksimp6
 README.md                          @maksimp6
 CONTRIBUTING.md                    @maksimp6
 SECURITY.md                        @maksimp6
-AGENTS.md                          @maksimp6

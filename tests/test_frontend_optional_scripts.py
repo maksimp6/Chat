@@ -4,7 +4,7 @@ from pathlib import Path
 def test_optional_debug_scripts_are_deferred_and_marked_optional():
     html = Path("templates/index.html").read_text(encoding="utf-8")
 
-    for script in ("android_diagnostics.js", "eruda_init.js"):
+    for script in ("eruda_init.js",):
         marker = f'src="{{{{ static_root }}}}/{script}?v={{{{ static_version }}}}"'
         start = html.find(marker)
         assert start >= 0, f"{script} is not present in the main template"
@@ -22,6 +22,6 @@ def test_critical_shell_is_not_hidden_by_optional_modules():
     assert 'id="app-root"' in html
     assert 'id="msg-input"' in html
 
-    optional_scripts = ("android_diagnostics.js", "eruda_init.js")
+    optional_scripts = ("eruda_init.js",)
     for _script in optional_scripts:
         assert 'data-optional-script="true"' in html

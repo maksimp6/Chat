@@ -47,4 +47,4 @@ What the agent must not change.
 ## Dispatch
 
 Assign exactly one primary role/agent. The agent opens a pull request; the maintainer
-(see `AGENTS.md`) merges it only after the repository merge gates are satisfied.
+merges it only after the repository merge gates are satisfied.

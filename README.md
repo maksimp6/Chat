@@ -1,6 +1,6 @@
 # Logos
 
-Logos — self-hosted AI assistant platform around Yandex AI Studio, MCP/local tools, agent orchestration, execution traces, billing and an Android WebView client.
+Logos — self-hosted AI assistant platform around Yandex AI Studio, MCP/local tools, agent orchestration, execution traces and billing, with a web interface.
 
 The repository is actively evolving. This README separates shipped behavior from open scope: Issues define implementation scope and acceptance criteria; docs define contracts and operating rules; Discussions capture questions and decisions.
 
@@ -10,7 +10,6 @@ The repository is actively evolving. This README separates shipped behavior from
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Run the backend                         | `app.py`, `start.sh`                                                                                                        |
 | Web interface                           | `static/`, `templates/`                                                                                                     |
-| Android client                          | `android/`                                                                                                                  |
 | Tests                                   | `tests/`                                                                                                                    |
 | Developer and diagnostic tools          | [scripts guide](scripts/README.md)                                                                                          |
 | Architecture and operating instructions | [docs index](docs/README.md)                                                                                                |
@@ -29,14 +28,13 @@ The repository is actively evolving. This README separates shipped behavior from
 - **Treasury and billing controls**, internal usage accounting and demo balances.
 - **3D Printing Business**: quote calculation, owner-scoped orders and settlement, realized P&L, finance/payback tracking and AI-first purchase assessment. See [3D Printing Business](docs/printing3d.md).
 - **Files, knowledge and Departments** integrations with local Execution Trace persistence.
-- **Android debug client** with WebView integration, diagnostics, updates and a reproducible debug-build path.
 - **Native Kristall** for local/Termux and shared deployments, with one writer per durable journal.
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    U[User / Android] --> O[Chat API / Orchestrator]
+    U[Web browser] --> O[Chat API / Orchestrator]
     O --> C[InvocationContext]
     C --> Y[Yandex Responses API]
     C --> T[UniversalToolExecutor]
@@ -64,7 +62,7 @@ Still experimental or roadmap unless the corresponding issue is complete:
 - Government workflows, Partner Relations and Kwork integration;
 - richer theme/voice assistance;
 - resilient backup/failover providers;
-- public release automation and versioned Android releases.
+- public release automation.
 
 ## Quick start
 
@@ -72,7 +70,6 @@ Still experimental or roadmap unless the corresponding issue is complete:
 
 - Python: backend CI uses 3.14; Ruff targets 3.12.
 - Git.
-- For the direct Android browser controller: JDK 17+, Android SDK platform 35 and build-tools 35.0.0. See [Android scope and build](android/README.md).
 
 ### Backend
 
@@ -89,14 +86,12 @@ Start the backend with `python app.py`. Open `http://localhost:8080` when using 
 
 Logos stores authoritative runtime data in `kristall.Kristall`; set `ALICE_MEMORY_PATH` to its journal on persistent storage. SQL drivers, SQL runtime adapters and the PostgreSQL CI lane are removed. Existing legacy data is preserved; deployment and production cutover still require explicit acceptance.
 
-### Android
+### Phone access
 
-```bash
-bash android/scripts/test_direct.sh
-bash android/scripts/build_direct.sh
-```
-
-This debug APK is the direct SDK browser controller. It does not package the Flask backend or prove feature parity with the retained embedded-backend Android sources. The old release packager is removed; release publication reports an explicit blocker until an equivalent replacement is verified. Release signing keys must never be committed.
+Open the web interface in a browser. The Android application and APK build tooling
+were removed on 2026-10-24. The backend can still run in Termux.
+Independent device-control launchers are in `scripts/rdc/`; the fallback phone
+agent is in `scripts/device/`.
 
 ## Configuration and security
 
@@ -115,15 +110,13 @@ For security-sensitive reports, follow [SECURITY.md](SECURITY.md). Runtime tools
 Issue → branch → implementation → tests → PR → CI → review → merge → verification
 ```
 
-Open pull requests against `develop` and keep changes independently testable. Follow [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the [sprint workflow](docs/development/sprint-workflow.md). Issues are the canonical source for scope and acceptance; a Discussion is not a substitute for an issue or a passing CI check.
+Open pull requests against `develop` and keep changes independently testable. Follow [CONTRIBUTING.md](CONTRIBUTING.md) and the [sprint workflow](docs/development/sprint-workflow.md). Issues are the canonical source for scope and acceptance; a Discussion is not a substitute for an issue or a passing CI check.
 
 ## Testing
 
 ```bash
 python -m compileall -q .
 pytest -q
-bash android/scripts/test_direct.sh
-bash android/scripts/build_direct.sh
 ```
 
 For frontend/runtime work, preserve the progressive-enhancement path and BrowserShim/VM tests. Do not introduce Playwright as a runtime dependency. Browser Emulator/self-testing work is tracked in [#409](https://github.com/maksimp6/Chat/issues/409).

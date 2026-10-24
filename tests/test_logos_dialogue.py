@@ -282,7 +282,9 @@ def test_native_dialogue_reads_repository_and_preserves_answer_usage_and_trace(
     }
     initial = result["capability_receipt"]["initial_input"]
     assert initial["context_status"] == "complete"
-    assert initial["context_manifest"]["source_count"] == len(logos_context.REQUIRED_FILES) + 9
+    assert initial["context_manifest"]["source_count"] == (
+        len(logos_context.REQUIRED_FILES) + len(logos_context.OPTIONAL_FILES) + 9
+    )
 
 
 def test_native_command_requires_approval_without_running_child(
@@ -898,4 +900,10 @@ def test_runner_roots_resolve_to_repository_not_package():
     from agent_runtime import issue_runner
 
     assert dialogue.ROOT == issue_runner.ROOT == Path(__file__).resolve().parents[1]
-    assert (dialogue.ROOT / "AGENTS.md").is_file()
+    assert (dialogue.ROOT / "app.py").is_file()
+
+
+def test_unprepared_prompt_without_repository_rules_still_contains_owner_question(tmp_path):
+    prompt = dialogue.build_prompt("Explain the current state.", tmp_path)
+    assert "Explain the current state." in prompt
+    assert "Repository rules:" not in prompt

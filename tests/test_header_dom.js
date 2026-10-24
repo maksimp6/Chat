@@ -59,7 +59,6 @@ async function flush() {
     "dozzle-btn",
     "project-tree-btn",
     "departments-btn",
-    "update-app-btn",
     "provider-credentials-btn",
     "memory-btn",
     "donate-btn",
