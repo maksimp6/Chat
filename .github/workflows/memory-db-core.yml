@@ -1,0 +1,33 @@
+name: Memory DB core contract
+
+on:
+  pull_request:
+    paths:
+      - "memory_engine/**"
+      - "tests/test_memory_explicit_commit_contract.py"
+      - "tests/test_memory_v1_acceptance.py"
+      - "tests/test_memory_store.py"
+      - "tests/test_memory_standalone_boundary.py"
+      - ".github/workflows/memory-db-core.yml"
+  push:
+    branches:
+      - "feature/memory-db-core-only-1045"
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: Install only pytest
+        run: python -m pip install pytest==9.1.1
+      - name: Verify core and durability
+        run: python -m pytest -q tests/test_memory_explicit_commit_contract.py tests/test_memory_v1_acceptance.py tests/test_memory_store.py tests/test_memory_standalone_boundary.py

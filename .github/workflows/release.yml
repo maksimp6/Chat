@@ -12,10 +12,15 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  OUT: ${{ runner.temp }}/ci-out/release
+
 jobs:
   release:
     name: Build and publish release
     runs-on: ubuntu-latest
+    # 1 минута задана вручную: замера прогона нет
+    timeout-minutes: 1
     env:
       ALICE_RELEASE_STORE_PASSWORD: ${{ secrets.ALICE_RELEASE_STORE_PASSWORD }}
       ALICE_RELEASE_KEY_ALIAS: ${{ secrets.ALICE_RELEASE_KEY_ALIAS }}
@@ -48,10 +53,7 @@ jobs:
           java-version: "25"
 
       - name: Set up Python
-        id: policy_step_03
-        continue-on-error: true
-        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
 
@@ -173,7 +175,7 @@ jobs:
             echo "commit=$GITHUB_SHA"
             echo "build_number=$GITHUB_RUN_NUMBER"
             echo "apk=$APK"
-          } | tee android/release-metadata.txt
+          } | tee "$OUT/release-metadata.txt"
 
       - name: Publish GitHub Release
         id: policy_step_12
@@ -185,11 +187,11 @@ jobs:
           set -euo pipefail
           gh release create "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "Alice Pro $GITHUB_REF_NAME" \
+            --title "Logos $GITHUB_REF_NAME" \
             --generate-notes \
             android/app/build/outputs/apk/release/app-release.apk \
             android/app/build/outputs/apk/release/app-release.apk.sha256 \
-            android/release-metadata.txt
+            ${{ env.OUT }}/release-metadata.txt
 
       - name: Remove release keystore
         id: policy_step_13

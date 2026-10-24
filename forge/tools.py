@@ -1,7 +1,11 @@
-"""Universal local tools for the Alice Pro 3D-printing business domain."""
+"""Universal local tools for the Logos 3D-printing business domain."""
 
 from __future__ import annotations
 
+import hashlib
+import os
+import re
+import stat
 from typing import Any, Mapping, Optional
 
 from economy.treasury_identity import get_current_owner_id
@@ -113,7 +117,7 @@ def create_order_tool(
         if arguments.get(key) is not None
     }
     data["status"] = status
-    data["source"] = "alice"
+    data["source"] = "host"
     raw_quote = arguments.get("quote")
     if raw_quote is not None:
         quote_input = _quote_input(raw_quote)
@@ -162,6 +166,25 @@ def _tool_schema(properties: dict[str, Any], required: list[str]) -> dict[str, A
 
 
 PRINTING3D_TOOLS = {
+    "printing3d.plate.inspect": {
+        "title": "3D Plate Preflight",
+        "description": (
+            "Read-only verify one owner-staged Bambu A1 mini .gcode.3mf file: "
+            "ZIP integrity, material/profile, G-code heat commands and single plate. "
+            "Return readiness findings; NEVER start/upload a print or read other paths."
+        ),
+        "parameters": _tool_schema(
+            {"artifact_name": {"type": "string", "minLength": 5, "maxLength": 140}},
+            ["artifact_name"],
+        ),
+        "capabilities": ["3d", "read", "preflight"],
+        "risk_level": "low",
+        "read_only": True,
+        "requires_approval": False,
+        "supported_transports": ["responses_api", "local_agent", "mcp"],
+        "executor": {"type": "local"},
+        "func": plate_inspect,
+    },
     "printing3d.quote": {
         "title": "3D Printing Order Quote",
         "description": (

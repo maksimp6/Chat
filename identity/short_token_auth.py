@@ -1,4 +1,4 @@
-"""Runtime short-token authentication for production and preview Alice Pro.
+"""Runtime short-token authentication for production and preview Logos.
 
 The token is supplied only through ALICE_SHORT_TOKEN. A token may be used as a
 URL path prefix. The prefix is consumed internally; no HTTP redirect is used.
@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import os
 from typing import Optional
+
+from secret_store.core import SecretRef, SecretResolutionError, SecretResolver
 from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, request
@@ -25,6 +27,41 @@ _TOKEN_PATH_MARKER = "alice.short_token_path_authenticated"
 _PROXY_AUTH_HEADER = "X-Alice-Proxy-Authenticated"
 
 
+class _ShortTokenSource:
+    def __init__(self) -> None:
+        self.resolver: SecretResolver | None = None
+        self.ref: SecretRef | None = None
+
+    def configure(self, resolver: SecretResolver, ref: SecretRef) -> None:
+        self.resolver = resolver
+        self.ref = ref
+
+    def reset(self) -> None:
+        self.resolver = None
+        self.ref = None
+
+    def resolve(self) -> str:
+        if self.resolver is None or self.ref is None:
+            return os.environ.get("ALICE_SHORT_TOKEN", "")
+        try:
+            return self.resolver.resolve(self.ref).reveal()
+        except SecretResolutionError:
+            return ""
+
+
+_SHORT_TOKEN_SOURCE = _ShortTokenSource()
+
+
+def configure_short_token_secret(resolver: SecretResolver, ref: SecretRef) -> None:
+    """Configure the canonical Secret Store source for the runtime short token."""
+    _SHORT_TOKEN_SOURCE.configure(resolver, ref)
+
+
+def reset_short_token_secret() -> None:
+    """Reset process-local resolver wiring. Intended for tests/bootstrap reloads."""
+    _SHORT_TOKEN_SOURCE.reset()
+
+
 def _enabled() -> bool:
     return os.environ.get("ALICE_REQUIRE_SHORT_TOKEN", "").strip().lower() in {
         "1",
@@ -35,7 +72,7 @@ def _enabled() -> bool:
 
 
 def _token() -> str:
-    return os.environ.get("ALICE_SHORT_TOKEN", "")
+    return _SHORT_TOKEN_SOURCE.resolve()
 
 
 def _serializer(token: str) -> URLSafeTimedSerializer:
@@ -106,7 +143,7 @@ def _login_page_response():
     html = (
         '<!doctype html><html lang="ru"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        '<title>Alice Pro</title></head><body style="font-family:sans-serif;'
+        '<title>Logos</title></head><body style="font-family:sans-serif;'
         'display:flex;min-height:90vh;align-items:center;justify-content:center">'
         f'<a href="{login_path()}" style="font-size:1.2em">Войти через GitHub</a>'
         "</body></html>"

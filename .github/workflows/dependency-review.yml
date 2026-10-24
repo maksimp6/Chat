@@ -15,6 +15,7 @@ jobs:
   dependency-review:
     name: Review dependency vulnerabilities
     runs-on: ubuntu-latest
+    timeout-minutes: 1
     steps:
       - name: Start job reporting clock
         id: job_policy_clock

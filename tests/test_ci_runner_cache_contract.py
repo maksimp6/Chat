@@ -45,7 +45,7 @@ def test_runner_cache_contract() -> None:
         assert config["cache-dependency-path"].splitlines() == expected
 
     assert "cache: gradle" not in source
-    assert source.count("uses: gradle/actions/setup-gradle@") == 1
+    assert "gradle/actions/setup-gradle@" not in source
 
 
 def test_runner_cache_timings_are_reported() -> None:
@@ -54,7 +54,4 @@ def test_runner_cache_timings_are_reported() -> None:
     assert (
         'echo "- Application dependency install: $((SECONDS - started))s" '
         '>> "$GITHUB_STEP_SUMMARY"' in workflow
-    )
-    assert (
-        'echo "- Android test/build: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"' in workflow
     )

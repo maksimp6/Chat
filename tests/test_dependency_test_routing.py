@@ -5,8 +5,8 @@ import pytest
 from scripts.ci_platform_changes import classify
 
 
-ALL = {"web", "backend", "android", "infra", "database", "mcp"}
-WEB = {"web", "backend", "android", "database", "mcp"}
+ALL = {"web", "backend", "android", "infra", "mcp"}
+WEB = {"web", "backend", "android", "mcp"}
 
 
 @pytest.mark.parametrize(

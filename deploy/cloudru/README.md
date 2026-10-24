@@ -1,4 +1,4 @@
-# Alice Pro: EDS + Container Apps + нативный Kristall
+# Logos: EDS + Container Apps + нативный Kristall
 
 Комплект для Codex и оператора, проверен 2026-09-28. Это подготовленные шаблоны
 и runbook, **не выполненный деплой**. Канонический репозиторий
@@ -11,7 +11,7 @@
 справочник сервисов Evolution. Навык лежит в репозитории: он не устанавливает
 EDS и не создаёт ресурсы сам.
 
-Текущий AI backend Алисы — Yandex Cloud через Yandex AI Studio. Этот Cloud.ru
+Текущий AI backend Logos — Yandex Cloud через Yandex AI Studio. Этот Cloud.ru
 runbook готовит инфраструктуру приложения и не переключает AI-провайдера.
 Foundation Models, Guardrails и AI Agents в справочнике Evolution — каталог для
 отдельной будущей оценки, не часть текущего runtime или rollout.
@@ -61,7 +61,7 @@ python scripts/cloudru_deploy_preflight.py --help
 | Encrypted credentials | `ALICE_PROVIDER_CREDENTIAL_KEY`; сохранить прежний при миграции |
 | Вход владельца | GitHub client ID/secret, явные allowed IDs, HTTPS callback URI |
 | S3, если включён | Bucket/region/tenant + отдельные S3 key ID/secret, минимум прав |
-| AI backend | Alice currently uses Yandex AI Studio in Yandex Cloud; this deployment needs no Cloud.ru model key |
+| AI backend | Logos currently uses Yandex AI Studio in Yandex Cloud; this deployment needs no Cloud.ru model key |
 
 Для новых app/encryption secrets использовать случайные высокоэнтропийные
 значения через защищённый генератор и Secret Management. Не менять существующий
@@ -100,7 +100,10 @@ Bootstrap identity для чтения Secret Management должна сущес
    timeout=300s, idleTimeout=600s. Проверить cold start и streaming на выбранном
    протоколе; фоновые задачи в scale-to-zero процессе ненадёжны.
 6. Заполнить `deployment.local.json` по example, затем выполнить проверку в
-   подготовленной среде (секреты уже в environment):
+   подготовленной среде (секреты уже в environment). Если `deployment.local.json`
+   скопирован из старого example, в нём может остаться retired engine
+   `memory_engine.MemoryStore`; preflight такой файл отклонит, поэтому замените
+   `"engine"` на `"kristall.Kristall"`:
 
 ```bash
 python scripts/cloudru_deploy_preflight.py --config deploy/cloudru/deployment.local.json
@@ -156,7 +159,7 @@ MCP metadata и поведение прямого Container Apps URL. Не ме�
 до end-to-end проверки и плана отката.
 
 Gateway default address не аутентифицирует пользователя. Политики API-key, IAM
-или поддерживаемая OIDC policy защищают gateway/client boundary, а Alice сохраняет
+или поддерживаемая OIDC policy защищают gateway/client boundary, а Logos сохраняет
 GitHub owner login, short token, MCP OAuth, user ownership и authorization. Не
 включать общий cache для персональных/API/MCP/streaming routes. Gateway rate
 limit — агрегат route/window в примере, не per-user quota; проверять backend
@@ -209,7 +212,7 @@ registry digest, публичный origin и pipeline с подтвержден
 
 ## Native storage transition
 
-The deployment example uses schema version 2 and `memory_engine.MemoryStore`.
+The deployment example uses schema version 2 and `kristall.Kristall`.
 PostgreSQL provisioning, SQL backups and SQL driver installation are retired.
 `--check-db` verifies an existing journal under its exclusive writer lock; it
 never repairs, replaces or deletes source data. Static config success is not

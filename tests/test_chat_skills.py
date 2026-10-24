@@ -51,7 +51,7 @@ def test_chat_lazily_loads_selected_skill_into_instructions_and_trace():
             return None
 
     with (
-        patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
+        patch.object(mcp_routes, "LogosClient", lambda _config: FakeClient()),
         patch.object(mcp_routes, "get_conv_settings", return_value={}),
         patch.object(mcp_routes, "add_message"),
         patch.object(

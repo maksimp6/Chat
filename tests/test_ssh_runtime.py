@@ -98,6 +98,19 @@ class SSHRuntimeTests(unittest.TestCase):
                 identity_id="owner-2",
             )
 
+    @patch("remote_runtime.ssh.subprocess.run")
+    def test_mapped_target_without_identity_is_rejected_before_ssh(self, run):
+        with self.assertRaises(SSHRuntimeError) as raised:
+            self.runtime().execute(
+                target="preview",
+                command="id -un",
+            )
+        self.assertEqual(
+            str(raised.exception),
+            "Trusted Logos identity is required for this SSH target",
+        )
+        run.assert_not_called()
+
     def test_linux_user_cannot_be_selected_by_runtime_call(self):
         with self.assertRaises(TypeError):
             self.runtime().execute(

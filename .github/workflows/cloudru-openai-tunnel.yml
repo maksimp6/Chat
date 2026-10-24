@@ -1,7 +1,7 @@
 name: Cloud.ru OpenAI tunnel
 
-# Persistent Alice Pro service with the OpenAI Secure MCP Tunnel client running
-# next to it (scripts/container_entrypoint.py). ChatGPT reaches Alice's /mcp
+# Persistent Logos service with the OpenAI Secure MCP Tunnel client running
+# next to it (scripts/container_entrypoint.py). ChatGPT reaches Logos's /mcp
 # through the tunnel; the container needs no inbound MCP exposure for that.
 
 on:
@@ -28,6 +28,9 @@ concurrency:
 
 permissions:
   contents: read
+
+env:
+  OUT: ${{ runner.temp }}/ci-out/cloudru-openai-tunnel
 
 jobs:
   tunnel:
@@ -94,10 +97,7 @@ jobs:
           fi
           echo 'Configuration validated; no secret values displayed.'
       - name: Set up Python
-        id: policy_step_04
-        continue-on-error: true
-        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version-file: .python-version
       - name: Install dependencies
@@ -127,7 +127,7 @@ jobs:
         run: |
           set -o pipefail
           umask 077
-          # Alice and the tunnel client share this token inside the container only;
+          # Logos and the tunnel client share this token inside the container only;
           # a fresh one per deploy means there is nothing to store or rotate.
           ALICE_MCP_BEARER_TOKEN="$(openssl rand -hex 32)"
           echo "::add-mask::$ALICE_MCP_BEARER_TOKEN"
@@ -135,14 +135,14 @@ jobs:
           python scripts/cloudru_deploy.py deploy --tag "$(git rev-parse HEAD)" \
             --env ALICE_REQUIRE_SHORT_TOKEN --env ALICE_SHORT_TOKEN \
             --env OPENAI_TUNNEL_ID --env OPENAI_TUNNEL_API_KEY \
-            --env ALICE_MCP_BEARER_TOKEN --env ALICE_MCP_USER_ID | tee deploy.json
+            --env ALICE_MCP_BEARER_TOKEN --env ALICE_MCP_USER_ID | tee "$OUT/deploy.json"
           {
             echo '### Cloud.ru OpenAI tunnel deploy'
             echo '```json'
-            cat deploy.json
+            cat "$OUT/deploy.json"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          rm -f deploy.json
+          rm -f "$OUT/deploy.json"
       - name: Status
         id: policy_step_08
         continue-on-error: true

@@ -9,19 +9,18 @@ CI определяет затронутые платформы по полно�
 
 - `Infrastructure tests`: Cloud.ru, deployment и CI regression suites, без APK и
   PostgreSQL. Для infrastructure-only изменений действует changed-line coverage.
-- `MCP worker tests`: Node-тесты Chrome, identity provider и Alice Dev, включая
+- `MCP worker tests`: Node-тесты Chrome, identity provider и Logos Dev, включая
   OAuth и credential handoff. Выполняются отдельно от Python application suite.
 - `Application tests`: Python/web-контракт приложения и его существующие coverage
   gates. Изменения runtime Python дополнительно проверяют совместимость с SQL до
   завершения миграции Kristall.
-- `Android debug APK`: native Android/build изменения и общий web-контракт.
   `android/scripts/stage_python.py` пока включает общие Python-файлы в APK;
   классификация не объявляет эти файлы архитектурно независимыми и не меняет
   состав APK. Полное устранение этой зависимости требует отдельного изменения.
 - `PostgreSQL integration`: SQL/backend compatibility, не зависимость MCP от БД.
 
 Общее web-приложение включает проверки backend, Android, PostgreSQL и MCP.
-Отдельные `deploy/chrome-worker`, `deploy/oauth-idp` и Alice Dev не считаются
+Отдельные `deploy/chrome-worker`, `deploy/oauth-idp` и Logos Dev не считаются
 изменением общего web UI и сами по себе не запускают Android.
 
 ## Защита от ложного успеха

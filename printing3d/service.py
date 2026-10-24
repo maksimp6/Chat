@@ -1,4 +1,4 @@
-"""Domain services for the Alice Pro 3D-printing business MVP."""
+"""Domain services for the Logos 3D-printing business MVP."""
 
 from __future__ import annotations
 

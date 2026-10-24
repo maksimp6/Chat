@@ -1,6 +1,6 @@
-"""Regression tests: CI, CodeQL and security checks must run on pushes to develop.
+"""Regression tests: CI and security checks must run on pushes to develop.
 
-Issue #1237: before this change ci.yml, codeql.yml and security.yml ran on push
+Issue #1237: before this change ci.yml and security.yml ran on push
 only for master, so a direct push to develop executed no checks at all.
 """
 
@@ -11,7 +11,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
-GATED = ("ci.yml", "codeql.yml", "security.yml")
+GATED = ("ci.yml", "security.yml")
 
 
 def _load(name: str) -> dict:
@@ -46,13 +46,10 @@ def test_ci_required_aggregator_still_gates_every_platform_job():
     jobs = _load("ci.yml")["jobs"]
     required = jobs["required"]
     assert required["name"] == "CI required"
-    assert {"code-rules", "backend", "android", "infra", "mcp"} <= set(required["needs"])
+    assert {"code-rules", "backend", "infra", "mcp"} <= set(required["needs"])
 
 
 @pytest.mark.parametrize("name", GATED)
 def test_workflow_permissions_are_least_privilege(name):
     permissions = _load(name)["permissions"]
-    if name == "codeql.yml":
-        assert permissions == {"contents": "read", "security-events": "write", "packages": "read"}
-    else:
-        assert permissions == {"contents": "read"}
+    assert permissions == {"contents": "read"}

@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   validate:
-    name: Validate exact commit in Alice Pro host
+    name: Validate exact commit in Logos host
     # Enable only after #347 and #349 are merged and deployed on the host.
     if: vars.ALICE_HOST_PREVIEW_ENABLED == 'true'
     environment: production

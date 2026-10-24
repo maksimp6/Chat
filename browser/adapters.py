@@ -1,4 +1,4 @@
-"""Adapter boundary for Alice's cloud and local browser capabilities.
+"""Adapter boundary for Logos's cloud and local browser capabilities.
 
 The registry is deliberately explicit: an adapter is unavailable until the
 runtime registers it. This prevents a tool contract from implying access to a

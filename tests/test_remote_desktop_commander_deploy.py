@@ -162,6 +162,8 @@ def test_legacy_workflow_is_validation_only_and_has_no_deploy_credentials():
     assert "/rdc status" not in source
     assert "environment: production" not in source
     assert "StrictHostKeyChecking=yes" not in source
+    assert "--browser-smoke-test" not in source
+    assert "ALICE_RDC_MODE=cloud-probe" not in source
 
     scripts = "\n".join(step.get("run", "") for step in job["steps"])
     assert "docker compose logs" not in scripts
@@ -173,7 +175,7 @@ def test_legacy_workflow_is_validation_only_and_has_no_deploy_credentials():
     assert "docker compose" in scripts
     assert "desktop-session.test.cjs" in scripts
     assert "pairing-handoff.test.cjs" in scripts
-    assert "Alice Dev" not in source
+    assert "Logos Dev" not in source
     assert "oauth" not in scripts.lower()
     assert "browser-smoke-test" not in scripts
     assert "chromium" not in scripts.lower()

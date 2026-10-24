@@ -1,4 +1,4 @@
-"""Voice assistant HTTP pipeline for SpeechKit STT/TTS and Alice chat."""
+"""Voice assistant HTTP pipeline for SpeechKit STT/TTS and Logos chat."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import requests
 from flask import Blueprint, Response, jsonify, request, stream_with_context
 
 from core.config import Config, TEXT_MODELS
-from chat.mcp_routes import AliceClient
+from chat.mcp_routes import LogosClient
 from conversations.ownership import check_access
 from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 
@@ -141,9 +141,9 @@ def _chat(text: str, conversation_id: str | None, model: str) -> str:
     if not conversation_id:
         raise ValueError("conversation_id is required for voice chat")
     text_model = (
-        model if model in TEXT_MODELS else os.getenv("ALICE_VOICE_CHAT_MODEL", "aliceai-llm")
+        model if model in TEXT_MODELS else os.getenv("ALICE_VOICE_CHAT_MODEL", "logos-runtime")
     )
-    client = AliceClient(Config)
+    client = LogosClient(Config)
     response = client.ask_with_mcp(
         message=text,
         model_key=text_model,

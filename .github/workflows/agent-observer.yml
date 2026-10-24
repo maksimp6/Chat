@@ -1,6 +1,6 @@
 name: Agent observer
 
-# Watches the agent office (Claude, Codex, Copilot, Alice) every hour: builds a
+# Watches the agent office (Claude, Codex, Copilot, Logos) every hour: builds a
 # thread per issue and pull request and flags stuck work. The digest replaces
 # the body of the open issue labelled "agent-observer" (created on first run)
 # and is shown in the run summary. It reads GitHub and edits only that issue;
@@ -16,6 +16,9 @@ permissions: {}
 concurrency:
   group: agent-observer
   cancel-in-progress: true
+
+env:
+  OUT: ${{ runner.temp }}/ci-out/agent-observer
 
 jobs:
   observe:
@@ -44,10 +47,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Python
-        id: policy_step_02
-        continue-on-error: true
-        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
       - name: Observe the agent office
@@ -56,7 +56,7 @@ jobs:
         if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python -m agent_office.observer --repo "$GITHUB_REPOSITORY" --publish --json-out agent-observer.json > /dev/null
+        run: mkdir -p "$OUT" && python -m agent_office.observer --repo "$GITHUB_REPOSITORY" --publish --json-out "$OUT/agent-observer.json" > /dev/null
       - name: Save threads as JSON
         id: policy_step_04
         continue-on-error: true
@@ -64,7 +64,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: agent-observer
-          path: agent-observer.json
+          path: ${{ env.OUT }}/agent-observer.json
           if-no-files-found: ignore
           retention-days: 7
       - name: Apply owner job result policy (over 30s passes)

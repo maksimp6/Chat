@@ -8,7 +8,7 @@ import yaml
 from scripts import ci_platform_changes as routing
 
 
-ALL = {"web", "backend", "android", "infra", "database", "mcp"}
+ALL = {"web", "backend", "android", "infra", "mcp"}
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -27,10 +27,11 @@ ROOT = Path(__file__).resolve().parents[1]
         (["db.py"], {"backend", "database"}),
         (["db_backend.py"], {"backend", "database"}),
         (["tests/test_user_identity.py"], {"backend"}),
-        (["static/app.js"], {"web", "backend", "android", "database", "mcp"}),
-        (["templates/index.html"], {"web", "backend", "android", "database", "mcp"}),
-        (["tests/test_frontend_smoke.js"], {"web", "backend", "android", "database", "mcp"}),
+        (["static/app.js"], {"web", "backend", "android", "mcp"}),
+        (["templates/index.html"], {"web", "backend", "android", "mcp"}),
+        (["tests/test_frontend_smoke.js"], {"web", "backend", "android", "mcp"}),
         (["docs/README.md"], set()),
+        (["android/README.md"], set()),
         (["README.md", "docs/operations.md"], set()),
         (["tests/test_ci_platform_changes.py"], {"infra"}),
         (["scripts/ci_platform_changes.py"], {"infra"}),
@@ -59,7 +60,7 @@ def test_routing_unions_all_changed_paths():
 
 
 def results(**overrides):
-    value = dict.fromkeys(["backend", "android", "infra", "mcp"], "skipped")
+    value = dict.fromkeys(["backend", "infra", "mcp"], "skipped")
     value.update({"changes": "success", "code-rules": "success"})
     value.update(overrides)
     return value
@@ -73,9 +74,9 @@ def test_selected_platform_cannot_be_skipped():
 
 @pytest.mark.parametrize("state", ["failure", "cancelled", "skipped", "", "queued"])
 def test_selected_platform_requires_success(state):
-    plan = routing.classify(["android/app/src/main/Main.kt"])
-    with pytest.raises(ValueError, match="android"):
-        routing.validate_results(plan, results(android=state))
+    plan = routing.classify(["cloud/cloudru/registry_client.py"])
+    with pytest.raises(ValueError, match="infra"):
+        routing.validate_results(plan, results(infra=state))
 
 
 def test_successful_selected_platform_accepts_unselected_skips():
@@ -118,13 +119,12 @@ def test_router_tests_are_part_of_always_run_code_rules():
 def test_workflow_has_real_independent_infra_and_mcp_jobs():
     workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
     jobs = workflow["jobs"]
-    for job in ("backend", "android", "infra", "mcp"):
+    for job in ("backend", "infra", "mcp"):
         assert jobs[job]["needs"] == "changes"
     assert "infra" in jobs["required"]["needs"]
     assert "mcp" in jobs["required"]["needs"]
     infra = "\n".join(step.get("run", "") for step in jobs["infra"]["steps"])
     assert "pytest" in infra and "tests/test_cloudru" in infra
-    assert "diff-cover" in infra
     backend = "\n".join(step.get("run", "") for step in jobs["backend"]["steps"])
     assert "npm test --prefix deploy/chrome-worker" not in backend
     mcp = "\n".join(step.get("run", "") for step in jobs["mcp"]["steps"])
@@ -150,6 +150,15 @@ def test_cli_classifies_stdin(monkeypatch, capsys, mode):
     monkeypatch.setattr(routing.sys, "stdin", io.StringIO("cloud/cloudru/client.py" + separator))
     assert routing.main() == 0
     assert json.loads(capsys.readouterr().out)["infra"] is True
+
+
+def test_cli_can_select_android_for_manual_build(monkeypatch, capsys):
+    import json
+
+    monkeypatch.setattr(routing.sys, "argv", ["ci_platform_changes.py", "--platform", "android"])
+    assert routing.main() == 0
+    plan = json.loads(capsys.readouterr().out)
+    assert {name for name, enabled in plan.items() if enabled} == {"android"}
 
 
 def test_cli_all_is_conservative(monkeypatch, capsys):

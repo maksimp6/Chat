@@ -10,13 +10,13 @@ Do not mix unrelated refactors, deploy production, or write directly to master.
 
 ## Inputs
 - Ready issue with goal, acceptance criteria and scope.
-- Current protected master.
+- Current `develop` HEAD; `master` stays protected.
 
 ## Tools
 Use repository reads, branch/file writes, tests and pull-request creation allowed by the active role.
 
 ## Procedure
-1. Inspect the issue and current master.
+1. Inspect the issue and current `develop` HEAD.
 2. Identify the smallest independent implementation slice.
 3. Create a focused branch.
 4. Implement only the required change.

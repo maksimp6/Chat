@@ -1,4 +1,4 @@
-"""Thin CLI/Termux adapter for the canonical Alice Pro runtime."""
+"""Thin CLI/Termux adapter for the canonical Logos runtime."""
 
 from __future__ import annotations
 
@@ -10,15 +10,15 @@ import requests
 
 
 DEFAULT_BASE_URL = "http://127.0.0.1:5000"
-DEFAULT_MODEL = "aliceai-llm"
+DEFAULT_MODEL = "logos-runtime"
 DEFAULT_TIMEOUT = 60.0
 
 
-class AliceCliError(RuntimeError):
+class CliError(RuntimeError):
     """Safe CLI-facing backend error that never includes secret URL tokens."""
 
 
-class AliceCliClient:
+class CliClient:
     def __init__(
         self,
         *,
@@ -58,23 +58,23 @@ class AliceCliClient:
                 timeout=self.timeout,
             )
         except requests.RequestException as exc:
-            raise AliceCliError("Alice Pro backend is unavailable") from exc
+            raise CliError("Logos backend is unavailable") from exc
 
         try:
             data = response.json()
         except ValueError as exc:
-            raise AliceCliError("Alice Pro backend returned invalid JSON") from exc
+            raise CliError("Logos backend returned invalid JSON") from exc
 
         if response.status_code >= 400:
             error = data.get("error") if isinstance(data, dict) else None
             message = str(error or "request failed")
-            raise AliceCliError(f"Alice Pro HTTP {response.status_code}: {message}")
+            raise CliError(f"Logos HTTP {response.status_code}: {message}")
 
         if not isinstance(data, dict):
-            raise AliceCliError("Alice Pro backend returned an invalid response")
+            raise CliError("Logos backend returned an invalid response")
         return data
 
-    def create_conversation(self, *, title: str = "Alice Pro CLI") -> str:
+    def create_conversation(self, *, title: str = "Logos CLI") -> str:
         payload = self._request_json(
             "POST",
             "/api/conversations",
@@ -82,7 +82,7 @@ class AliceCliClient:
         )
         conversation_id = str(payload.get("id") or "").strip()
         if not conversation_id:
-            raise AliceCliError("Alice Pro did not return a conversation id")
+            raise CliError("Logos did not return a conversation id")
         return conversation_id
 
     def send_message(
@@ -131,7 +131,7 @@ def _print_reply(payload: dict[str, Any]) -> None:
 
 
 def _handle_approval(
-    client: AliceCliClient,
+    client: CliClient,
     conversation_id: str,
     payload: dict[str, Any],
 ) -> None:
@@ -159,22 +159,21 @@ def _handle_approval(
 
 
 def main() -> None:
-    client = AliceCliClient()
+    client = CliClient()
     conversation_id = os.getenv("ALICE_CONVERSATION_ID", "").strip()
 
     try:
         if not conversation_id:
             conversation_id = client.create_conversation(
-                title=os.getenv("ALICE_CLI_TITLE", "Alice Pro CLI").strip() or "Alice Pro CLI"
+                title=os.getenv("ALICE_CLI_TITLE", "Logos CLI").strip() or "Logos CLI"
             )
-    except AliceCliError as exc:
-        print(f"Alice Pro CLI startup failed: {exc}")
+    except CliError as exc:
+        print(f"Logos CLI startup failed: {exc}")
         return
 
     session_id = os.getenv("ALICE_SESSION_ID", "").strip() or conversation_id
     print(
-        "🚀 Alice Pro CLI подключён к каноническому runtime. "
-        "Введите запрос (или 'exit' для выхода):\n"
+        "🚀 Logos CLI подключён к каноническому runtime. Введите запрос (или 'exit' для выхода):\n"
     )
     print(f"Conversation: {conversation_id}\n")
 
@@ -197,8 +196,8 @@ def main() -> None:
                 _handle_approval(client, conversation_id, payload)
             else:
                 _print_reply(payload)
-        except AliceCliError as exc:
-            print(f"\nAlice Pro request failed: {exc}\n")
+        except CliError as exc:
+            print(f"\nLogos request failed: {exc}\n")
 
 
 if __name__ == "__main__":

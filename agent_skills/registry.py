@@ -29,6 +29,8 @@ REQUIRED_SECTIONS = (
 
 ROLE_SKILL_ALLOWLIST = {
     "team-lead": {
+        "3d-print-preflight",
+        "a1-mini-print-watch",
         "github-pr-readiness",
         "github-ci-diagnosis",
         "issue-to-pr",
@@ -39,6 +41,7 @@ ROLE_SKILL_ALLOWLIST = {
         "release-readiness",
     },
     "backend-engineer": {
+        "3d-print-preflight",
         "issue-to-pr",
         "github-ci-diagnosis",
         "runtime-debugging",
@@ -74,6 +77,8 @@ ROLE_SKILL_ALLOWLIST = {
         "docs-sync",
     },
     "alice": {
+        "3d-print-preflight",
+        "a1-mini-print-watch",
         "github-pr-readiness",
         "github-ci-diagnosis",
         "issue-to-pr",

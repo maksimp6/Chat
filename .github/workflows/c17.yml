@@ -13,6 +13,7 @@ permissions:
 jobs:
   c17:
     runs-on: ubuntu-latest
+    timeout-minutes: 1
     steps:
       - name: Start job reporting clock
         id: job_policy_clock

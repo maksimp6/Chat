@@ -5,6 +5,8 @@ sdk.py - Минимальный SDK для работы с Yandex AI Studio
 import requests
 import json
 
+from core.config import upstream_model_id
+
 
 class AliceSDK:
     """SDK для работы с Yandex AI Studio API"""
@@ -31,10 +33,10 @@ class AliceSDK:
         resp.raise_for_status()
         return resp.json()
 
-    def send_message(self, conv_id, message, model="aliceai-llm"):
+    def send_message(self, conv_id, message, model="logos-runtime"):
         """Отправить сообщение в диалог"""
         payload = {
-            "model": f"gpt://{self.project_id}/{model}/latest",
+            "model": f"gpt://{self.project_id}/{upstream_model_id(model)}/latest",
             "input": [{"role": "user", "content": message}],
             "instructions": "Ты — полезный ассистент.",
             "background": True,
@@ -62,5 +64,5 @@ if __name__ == "__main__":
     print(f"Создан диалог: {conv['id']}")
 
     # Отправить сообщение
-    resp = sdk.send_message(conv["id"], "Привет!", model="aliceai-llm")
+    resp = sdk.send_message(conv["id"], "Привет!", model="logos-runtime")
     print(f"Ответ: {resp}")

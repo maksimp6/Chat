@@ -1,7 +1,7 @@
 # Agent observer
 
 `agent_office/observer.py` watches the agent office: Claude, Codex, Copilot and
-Alice working through issues and pull requests in this repository.
+Logos working through issues and pull requests in this repository.
 
 Every hour `.github/workflows/agent-observer.yml` runs it. It:
 

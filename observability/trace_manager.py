@@ -1,4 +1,4 @@
-"""Centralized execution trace for the Alice Pro chat pipeline."""
+"""Centralized execution trace for the Logos chat pipeline."""
 
 import copy
 import json
@@ -12,7 +12,7 @@ from functools import wraps
 from typing import Any, Dict, Optional, Callable
 
 _current_trace: ContextVar["ExecutionTrace | None"] = ContextVar(
-    "alice_execution_trace", default=None
+    "logos_execution_trace", default=None
 )
 
 from observability.trace_security import (
