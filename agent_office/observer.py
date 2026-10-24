@@ -788,7 +788,8 @@ def render_digest(
         lines.append("")
         lines.append(f"[Открыть на GitHub]({thread.url})")
         lines.append("")
-        shown = thread.events[-events_per_thread:]
+        # events[-0:] is the whole list, so a limit of 0 must select nothing explicitly.
+        shown = thread.events[-events_per_thread:] if events_per_thread > 0 else []
         if len(thread.events) > len(shown):
             lines.append(f"- … ещё {len(thread.events) - len(shown)} шагов раньше")
         for event in shown:
