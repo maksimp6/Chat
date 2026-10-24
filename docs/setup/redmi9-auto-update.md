@@ -25,11 +25,10 @@ Creating `autoupdate.disabled` in `~/logos-local-state` pauses the native update
 Removing that marker resumes it on the next check. An intentional maintenance stop
 should create the marker before stopping the application.
 
-The GitHub server workflow remains available as a second trigger through the same
-deployment lock. Full repository archives keep their push trigger and read all
-branch/tag/PR refs, but redundant pending archive runs are coalesced. Android
-diagnostics run automatically when their own scripts/workflow change, or manually.
-They no longer run a duplicate full repository archive.
+Only `.github/workflows/redmi9-app-server.yml` remains in GitHub Actions, as a
+second trigger through the same deployment lock. The archive, Android diagnostics
+and Yandex key issuance workflow files have been removed. Their scripts and stored
+data remain available; the native updater continues independently of Actions.
 
 Validation must include a fresh push followed by an automatic SHA and process
 transition on the physical Redmi 9, without calling the deployment command manually.

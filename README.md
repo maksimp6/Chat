@@ -63,9 +63,9 @@ can use its available APIs and tools. Provider API keys and SSH credentials are 
 needed by the external services themselves.
 
 Repository CI acceptance, code-policy and pre-push gates have been removed.
-Functional tests remain available for explicit verification. The phone deployment,
-backup, diagnostics and Yandex key workflows remain; deployment still verifies the
-running process and HTTP readiness and preserves its backup/rollback behavior.
+Functional tests remain available for explicit verification. Only the phone application
+server workflow remains. Deployment still verifies the running process and HTTP
+readiness and preserves its backup/rollback behavior.
 `develop` is the integration branch; `master` remains the owner's personal branch.
 Repository code changes do not by themselves prove the installed phone version or
 access from a second device.
