@@ -1,6 +1,8 @@
 """Static Claude capabilities; prices remain unknown until configured."""
 
-CLAUDE_MODELS = {
+from typing import Any
+
+CLAUDE_MODELS: dict[str, dict[str, Any]] = {
     "claude-opus-5-5": {
         "name": "Claude Opus 5.5 (Console OAuth)",
         "provider": "anthropic",

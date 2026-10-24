@@ -265,11 +265,11 @@ def calculate_cost(model_key, input_tokens, output_tokens=0, cached_tokens=0, to
 
 
 def calculate_full_cost(model_key, usage):
-    if get_model_info(model_key).get("pricing_status") == "unknown":
+    m = get_model_info(model_key)
+    if m.get("pricing_status") == "unknown":
         return None
     if not usage:
         return 0.0
-    m = get_model_info(model_key)
     token_cost = (
         usage.get("input_tokens", 0) * m["input"]
         + usage.get("output_tokens", 0) * m.get("output", m["input"])

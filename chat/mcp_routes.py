@@ -94,20 +94,20 @@ def _normalize_requested_skills(data, params):
 
 
 class LogosClient(YandexResponsesClient):
-    def _claude_transport(self):
+    def _claude_transport(self) -> ClaudeOAuthTransport:
         if not hasattr(self, "_claude_oauth"):
             self._claude_oauth = ClaudeOAuthTransport()
         return self._claude_oauth
 
     def ask(
         self,
-        message,
-        model_key,
-        conversation_id=None,
-        params=None,
-        execution_trace=None,
-        trace_step=None,
-    ):
+        message: Any,
+        model_key: Any,
+        conversation_id: Any = None,
+        params: Any = None,
+        execution_trace: Any = None,
+        trace_step: Any = None,
+    ) -> Any:
         if is_claude_model(model_key):
             return self._claude_transport().ask(
                 message, model_key, conversation_id, params, execution_trace
@@ -121,7 +121,7 @@ class LogosClient(YandexResponsesClient):
             trace_step=trace_step,
         )
 
-    def _ask_provider(self, **kwargs):
+    def _ask_provider(self, **kwargs: Any) -> Any:
         if is_claude_model(kwargs["model_key"]):
             return self._claude_transport().ask_with_mcp(**kwargs)
         return super().ask_with_mcp(**kwargs)

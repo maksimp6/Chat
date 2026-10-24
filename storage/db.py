@@ -158,7 +158,7 @@ def add_message(
     conv_id: str,
     role: str,
     content: Any,
-    cost: float = 0.0,
+    cost: float | None = 0.0,
     timings: Any = None,
     usage: Any = None,
     model: Any = None,
