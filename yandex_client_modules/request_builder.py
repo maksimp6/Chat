@@ -5,6 +5,7 @@ It deliberately has no HTTP, database, tracing, or MCP side effects.
 """
 
 from core.config import upstream_model_id
+from core.model_profiles import ultra_request_defaults
 from yandex_client_modules.metadata_validator import validate_metadata
 
 
@@ -37,7 +38,11 @@ def build_response_payload(
     yandex_conv_id=None,
 ):
     """Build a Yandex Responses API payload from client parameters."""
-    params = params or {}
+    # A copy, so Ultra defaults never leak back into the caller's params.
+    params = dict(params or {})
+    for name, value in ultra_request_defaults(model_key).items():
+        if params.get(name) in (None, ""):
+            params[name] = value
     is_background = params.get("background", True)
 
     if is_background:

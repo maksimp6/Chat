@@ -47,7 +47,7 @@ curl -X POST http://localhost:8080/api/vision \
 - `text` (string): один текст. Ответ содержит `embedding`.
 - `texts` (array of string): пакет до 64 текстов. Ответ содержит `embeddings`. Нельзя передавать `text` и `texts` вместе.
 - `model` (необязательно): одна из `text-search-doc`, `text-search-query`, `text-embeddings-v2-doc`, `text-embeddings-v2-query`. Если не задана, выбирается по `mode`.
-- `mode` (`doc` или `query`, по умолчанию `doc`): используется, только когда `model` не задана. `doc` — `text-search-doc`, `query` — `text-search-query`.
+- `mode` (`doc` или `query`, по умолчанию `doc`): используется, только когда `model` не задана. Нельзя передавать `model` и `mode` вместе: ответ 400. `doc` — `text-search-doc`, `query` — `text-search-query`.
 
 Каждый текст не длиннее 4000 символов (лимит токенов у Yandex в документации противоречив, см. `config/model_profiles/yandex-ultra-profiles.json`). Ответ также содержит `model`, `tokens` и `cost`. Стоимость считается по `EMBEDDING_PRICE_PER_1K_TOKENS`, если эта переменная задана; иначе `cost` показывает «неизвестно».
 
@@ -60,6 +60,26 @@ curl -X POST http://localhost:8080/api/embeddings \
 ```
 
 Коды ответа: 400 — неверный запрос, 503 — не заданы `YANDEX_API_KEY` или `YANDEX_PROJECT_ID`, 502 — сбой Yandex, 504 — превышен общий лимит времени. В ответах 502 и 504 есть `completed` (сколько текстов уже обработано) и `tokens_spent`.
+
+### Completion API (отдельно от Responses)
+
+**Эндпоинт:** `POST /api/completion`
+**Описание:** Генерация через Yandex completion API для моделей с транспортом `text_generation_async` (сейчас только `yandexgpt-5.1`). Авторизация не требуется; запросы тратят серверный `YANDEX_API_KEY`.
+**Параметры:**
+
+- `message` (string) или `messages` (до 32 элементов с `role` = `system`, `user` или `assistant` и `text`). Нельзя передавать оба.
+- `temperature` (0–1, по умолчанию 0.3 из профиля).
+- `max_tokens` (целое от 1 до 32768, по умолчанию 32768 из профиля).
+
+Ответ: `model`, `reply`, `usage`. Коды: 400 — неверный запрос, 502 — сбой Yandex, 503 — модель или ключ не настроены.
+
+**Пример:**
+
+```bash
+curl -X POST http://localhost:8080/api/completion \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Привет","max_tokens":200}'
+```
 
 ### 4. TTS API (Синтез речи)
 

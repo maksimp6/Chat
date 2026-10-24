@@ -144,8 +144,12 @@
         });
       })
       .then(function (data) {
-        setSshFormLocked(false);
+        // Unlock only after a successful populate, so a failure leaves the form closed.
         populateSshSettings(data);
+        setSshFormLocked(false);
+        var readOnly = data.read_only === true;
+        document.getElementById("set-ssh-allow-exec").disabled = readOnly;
+        document.getElementById("set-ssh-allow-write").disabled = readOnly;
       })
       .catch(function (err) {
         setSshStatus(err.message, true);

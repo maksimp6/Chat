@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import time
 
 import requests
@@ -61,7 +62,7 @@ def _token_count(value) -> int:
     """Upstream token counts are integers; a fractional value is truncated, not an error."""
     try:
         return int(float(value or 0))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0
 
 
@@ -87,6 +88,8 @@ def _cost(tokens: int) -> dict:
         per_1k_tokens = float(price) if price not in (None, "") else None
     except ValueError:
         per_1k_tokens = None  # a bad price must not turn a paid request into a 500
+    if per_1k_tokens is not None and not math.isfinite(per_1k_tokens):
+        per_1k_tokens = None  # nan or inf would reach the JSON response unparseable
     config = KnowledgeCostConfig(embedding_per_1k_tokens=per_1k_tokens)
     return calculate_knowledge_cost(embedding_tokens=tokens, config=config)
 
@@ -96,6 +99,8 @@ def create_embeddings():
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         return jsonify({"error": "json_body_required"}), 400
+    if "model" in body and "mode" in body:
+        return jsonify({"error": "send model or mode, not both"}), 400
     if "model" in body:
         model_name = body["model"]
         if not isinstance(model_name, str) or model_name not in EMBEDDING_MODELS:
