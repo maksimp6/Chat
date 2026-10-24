@@ -7,6 +7,7 @@ backend.
 """
 
 from __future__ import annotations
+from core.env import env_require, env_snapshot
 
 import json
 import os
@@ -79,7 +80,7 @@ class VirtualLowConsumptionServer:
         with self._lock:
             self.start()
             # Only what a shell needs: the backend's own environment holds provider and deployment secrets.
-            env = {name: os.environ[name] for name in _COMMAND_ENV_NAMES if name in os.environ}
+            env = {name: env_require(name) for name in _COMMAND_ENV_NAMES if name in env_snapshot()}
             env.update({str(k): str(v) for k, v in self.config.env.items()})
             timeout = max(1, min(int(timeout or self.config.command_timeout_seconds), 3600))
 

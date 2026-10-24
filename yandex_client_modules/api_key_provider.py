@@ -1,9 +1,9 @@
 """Concrete Yandex Cloud API-key provider used by the rotation worker."""
 
 from __future__ import annotations
+from core.env import env_get
 
 from datetime import datetime
-import os
 from typing import Iterable, Optional
 
 import requests
@@ -29,14 +29,14 @@ class YandexApiKeyProvider:
         project_id: Optional[str] = None,
         timeout: float = 30.0,
     ) -> None:
-        self.iam_token = iam_token or os.getenv("YANDEX_IAM_TOKEN")
-        self.service_account_id = service_account_id or os.getenv("YANDEX_SERVICE_ACCOUNT_ID")
+        self.iam_token = iam_token or env_get("YANDEX_IAM_TOKEN")
+        self.service_account_id = service_account_id or env_get("YANDEX_SERVICE_ACCOUNT_ID")
         raw_scopes = (
             list(scopes)
             if scopes is not None
             else [
                 item.strip()
-                for item in os.getenv(
+                for item in env_get(
                     "YANDEX_API_KEY_SCOPES",
                     "yc.ai.languageModels.execute,"
                     "yc.ai.speechkitStt.execute,"
@@ -48,14 +48,14 @@ class YandexApiKeyProvider:
         self.scopes = raw_scopes
         self.endpoint = (
             endpoint
-            or os.getenv(
+            or env_get(
                 "YANDEX_IAM_ENDPOINT",
                 "https://iam.api.cloud.yandex.net",
             )
         ).rstrip("/")
         self.ai_endpoint = (
             ai_endpoint
-            or os.getenv(
+            or env_get(
                 "YANDEX_AI_ENDPOINT",
                 "https://ai.api.cloud.yandex.net/v1",
             )

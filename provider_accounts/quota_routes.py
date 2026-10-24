@@ -1,8 +1,8 @@
 """HTTP API for inspecting and configuring per-user provider quotas."""
 
 from __future__ import annotations
+from core.env import env_get
 
-import os
 import secrets
 
 from flask import Blueprint, jsonify, request
@@ -19,7 +19,7 @@ provider_quota_bp = Blueprint(
 
 
 def _admin_ok() -> bool:
-    expected = os.getenv("LOGOS_QUOTA_ADMIN_TOKEN", "").strip()
+    expected = env_get("LOGOS_QUOTA_ADMIN_TOKEN", "").strip()
     supplied = request.headers.get("X-Provider-Quota-Admin-Token", "").strip()
     # Compare bytes: compare_digest rejects non-ASCII str, which would be a 500 instead of a refusal.
     return bool(

@@ -5,12 +5,12 @@ change a model profile, or retry a failed command or provider request.
 """
 
 from __future__ import annotations
+from core.env import env_get, env_require, env_snapshot
 
 import base64
 import hashlib
 import html
 import json
-import os
 import re
 import secrets
 import subprocess
@@ -251,9 +251,9 @@ def emit_result(
 def main() -> int:
     # Direct script invocation must import the checked-out repository, not the scripts directory.
     sys.path.insert(0, str(ROOT))
-    temporary = Path(os.environ["RUNNER_TEMP"]) / "logos-once"
-    result, exit_code = run_native(ROOT, temporary, dict(os.environ))
-    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    temporary = Path(env_require("RUNNER_TEMP")) / "logos-once"
+    result, exit_code = run_native(ROOT, temporary, dict(env_snapshot()))
+    summary = env_get("GITHUB_STEP_SUMMARY")
     emit_result(result, Path(summary) if summary else None)
     return exit_code
 

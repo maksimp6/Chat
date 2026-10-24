@@ -2,9 +2,9 @@
 
 The device owns PKCE and polling. This module never receives provider tokens.
 """
+from core.env import env_get
 
 import json
-import os
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -56,7 +56,7 @@ def install_rdc_pairing(app):
             response = jsonify({"error": "authentication required"})
             response.status_code = 401
         else:
-            path = os.environ.get("LOGOS_RDC_PAIRING_FILE", "")
+            path = env_get("LOGOS_RDC_PAIRING_FILE", "")
             try:
                 if not path:
                     raise ValueError("handoff not configured")

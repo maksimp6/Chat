@@ -1,6 +1,6 @@
 from __future__ import annotations
+from core.env import env_get
 
-import os
 from flask import Blueprint, Response, jsonify, request
 
 from mcp_server.auth import _require_auth
@@ -35,7 +35,7 @@ def _client_error_message(exc: Exception, fallback: str) -> str:
 
 @chatgpt_mcp_bp.route("/.well-known/oauth-protected-resource", methods=["GET"])
 def oauth_protected_resource() -> Response:
-    issuer = os.getenv("LOGOS_MCP_OAUTH_ISSUER", "").rstrip("/")
+    issuer = env_get("LOGOS_MCP_OAUTH_ISSUER", "").rstrip("/")
     resource = _public_base_url() or request.url_root.rstrip("/")
     body = {
         "resource": resource,

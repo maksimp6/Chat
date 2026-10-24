@@ -16,10 +16,10 @@ Dialog issue format (label `lexical-dialog`):
 Chunk bodies must concatenate (in the declared order, no separators) to exactly
 the source document. Mismatch = FAIL, no report is generalized.
 """
+from core.env import env_get, env_require
 
 import hashlib
 import json
-import os
 import re
 import subprocess
 import sys
@@ -27,7 +27,7 @@ import urllib.request
 from pathlib import Path
 
 API = "https://api.github.com"
-REPO = os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat")
+REPO = env_get("GITHUB_REPOSITORY", "maksimp6/Chat")
 LABEL = "lexical-dialog"
 DIALOG_RE = re.compile(r"<!--\s*lexical-dialog\s*\n(.*?)-->", re.DOTALL)
 PARSER = Path("scripts/idea_parser.py")
@@ -88,7 +88,7 @@ STOP_WORDS = frozenset(
 
 def gh(method: str, path: str, body: object | None = None) -> object:
     """Call the GitHub API with the workflow token."""
-    token = os.environ["GH_TOKEN"]
+    token = env_require("GH_TOKEN")
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(
         f"{API}/repos/{REPO}/{path}",

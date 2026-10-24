@@ -1,3 +1,4 @@
+from core.env import env_get
 from flask import Flask, request, jsonify, render_template
 from werkzeug.exceptions import HTTPException
 from kristall import KristallError
@@ -87,12 +88,12 @@ def preview_base_path():
     scoped = current_runtime_base_path()
     if scoped:
         return scoped
-    return os.environ.get("LOGOS_PREVIEW_BASE_PATH", "").rstrip("/")
+    return env_get("LOGOS_PREVIEW_BASE_PATH", "").rstrip("/")
 
 
 def _static_asset_version():
     """Return a stable version token that changes when the deployed assets change."""
-    configured = os.environ.get("LOGOS_STATIC_VERSION")
+    configured = env_get("LOGOS_STATIC_VERSION")
     if configured:
         return configured
     static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -468,7 +469,7 @@ def test_ssh_runtime_connection():
 
 
 if __name__ == "__main__":
-    host = os.environ.get("HOST", "127.0.0.1")
-    port = int(os.environ.get("PORT", "5000"))
-    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+    host = env_get("HOST", "127.0.0.1")
+    port = int(env_get("PORT", "5000"))
+    debug = env_get("FLASK_DEBUG", "0") == "1"
     app.run(host=host, port=port, debug=debug, use_reloader=False)

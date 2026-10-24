@@ -1,9 +1,9 @@
 """Loopback-only HTTP API for Logos Board with explicit owner Bearer authorization."""
 
 from __future__ import annotations
+from core.env import env_get
 
 import json
-import os
 import re
 import secrets
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -221,13 +221,13 @@ def create_server(
 
 def main() -> None:
     """Start only when a dedicated token and mounted persistent data root are configured."""
-    token = os.environ.get("PROJECT_BOARD_TOKEN", "")
+    token = env_get("PROJECT_BOARD_TOKEN", "")
     if len(token) < 32:
         raise SystemExit("PROJECT_BOARD_TOKEN (32+ characters) is required")
-    path = os.environ.get("PROJECT_BOARD_DB", "")
+    path = env_get("PROJECT_BOARD_DB", "")
     if not path:
         raise SystemExit("PROJECT_BOARD_DB is required")
-    port = int(os.environ.get("PROJECT_BOARD_PORT", "8787"))
+    port = int(env_get("PROJECT_BOARD_PORT", "8787"))
     with BoardStore(path) as store:
         server = create_server(store, token, port=port)
         try:

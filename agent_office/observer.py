@@ -18,10 +18,10 @@ The scheduled workflow ``.github/workflows/agent-observer.yml`` runs it hourly.
 """
 
 from __future__ import annotations
+from core.env import env_get
 
 import argparse
 import json
-import os
 import re
 import sys
 import urllib.error
@@ -996,7 +996,7 @@ def run(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat"))
+    parser.add_argument("--repo", default=env_get("GITHUB_REPOSITORY", "maksimp6/Chat"))
     parser.add_argument("--publish", action="store_true", help="update the tracking issue")
     parser.add_argument("--json-out", help="write threads and findings as JSON to this file")
     parser.add_argument(
@@ -1006,7 +1006,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or ""
+    token = env_get("GITHUB_TOKEN") or env_get("GH_TOKEN") or ""
     gh = GitHub(token, args.repo)
     try:
         result = run(gh, publish=args.publish)
@@ -1016,7 +1016,7 @@ def main(argv: list[str] | None = None) -> int:
 
     digest = result["digest"]
     print(digest)
-    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    summary = env_get("GITHUB_STEP_SUMMARY")
     if summary:
         with open(summary, "a", encoding="utf-8") as handle:
             handle.write(digest)

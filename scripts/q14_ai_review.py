@@ -1,12 +1,12 @@
 """Q14 runner evidence and bounded, explicitly approved Yandex model review."""
 
 from __future__ import annotations
+from core.env import env_get, env_snapshot
 
 import argparse
 import hashlib
 import http.client
 import json
-import os
 import re
 import time
 from pathlib import Path
@@ -415,9 +415,9 @@ def main() -> int:
     results = run_cases()
     metadata: JsonObject = {
         "baseline_head": BASELINE_HEAD,
-        "checkout_head": os.environ.get("Q14_CHECKOUT_SHA", "LOCAL_NOT_GITHUB_VERIFIED"),
-        "run_id": os.environ.get("GITHUB_RUN_ID"),
-        "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+        "checkout_head": env_get("Q14_CHECKOUT_SHA", "LOCAL_NOT_GITHUB_VERIFIED"),
+        "run_id": env_get("GITHUB_RUN_ID"),
+        "run_attempt": env_get("GITHUB_RUN_ATTEMPT"),
         "mode": args.mode,
         "scope": "EDUCATIONAL_LOGICAL_MODEL_ONLY",
         "context_sha256": digest(CONTEXT),
@@ -432,7 +432,7 @@ def main() -> int:
     secrets: tuple[str, ...] = ()
     try:
         if args.mode != "offline":
-            key, project = credentials(dict(os.environ))
+            key, project = credentials(dict(env_snapshot()))
             secrets = (key, project)
             send = make_transport(key, project)
             if args.mode == "probe":

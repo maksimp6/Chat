@@ -10,6 +10,7 @@
 - Управление файлами и папками (os, shutil): copy, move, delete, mkdir
 - Запуск команд через shell текущей ОС (subprocess) и сбор сведений о системе
 """
+from core.env import env_require, env_snapshot
 
 import os
 import re
@@ -654,7 +655,7 @@ def run_command(args: dict) -> dict:
                 "PATH": os.defpath,
                 "LANG": "C.UTF-8",
                 "LC_ALL": "C.UTF-8",
-                **{key: os.environ[key] for key in ("SystemRoot", "WINDIR") if key in os.environ},
+                **{key: env_require(key) for key in ("SystemRoot", "WINDIR") if key in env_snapshot()},
             },
         )
         return {

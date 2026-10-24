@@ -2,6 +2,7 @@
 """Benchmark verified Python index builds and queries on fixed local Git fixtures."""
 
 from __future__ import annotations
+from core.env import env_snapshot
 
 import argparse
 from collections.abc import Callable
@@ -43,7 +44,7 @@ def _json_bytes(value: Any) -> bytes:
 def _git(root: Path, *arguments: str) -> str:
     """Run bounded local Git with fixed identity, dates and isolated configuration."""
     environment = {
-        **os.environ,
+        **env_snapshot(),
         "GIT_CONFIG_NOSYSTEM": "1",
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_CONFIG_COUNT": "0",

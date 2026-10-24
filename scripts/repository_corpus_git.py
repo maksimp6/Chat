@@ -5,6 +5,7 @@ fetching the authorized refs first; gaps describe the observed local boundary.
 """
 
 from __future__ import annotations
+from core.env import env_snapshot
 
 import hashlib
 import json
@@ -34,7 +35,7 @@ def _json(value: object) -> bytes:
 
 def _git(root: Path, *args: str) -> bytes:
     env = {
-        **os.environ,
+        **env_snapshot(),
         "GIT_NO_REPLACE_OBJECTS": "1",
         "GIT_NO_LAZY_FETCH": "1",
         "GIT_OPTIONAL_LOCKS": "0",

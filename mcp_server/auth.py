@@ -1,6 +1,6 @@
 from __future__ import annotations
+from core.env import env_get
 
-import os
 import secrets
 from typing import Any, Mapping, Optional
 
@@ -33,11 +33,11 @@ def _auth_mode() -> str:
       - introspection: standards-based OAuth resource-server validation via an
         external OAuth token-introspection endpoint.
     """
-    if os.getenv("LOGOS_MCP_INTROSPECTION_URL"):
+    if env_get("LOGOS_MCP_INTROSPECTION_URL"):
         return "introspection"
-    if os.getenv("LOGOS_MCP_BEARER_TOKEN"):
+    if env_get("LOGOS_MCP_BEARER_TOKEN"):
         return "bearer"
-    if _truthy(os.getenv("LOGOS_MCP_ALLOW_ANONYMOUS")):
+    if _truthy(env_get("LOGOS_MCP_ALLOW_ANONYMOUS")):
         return "anonymous"
     return "disabled"
 
@@ -60,7 +60,7 @@ def _auth_user_from_request() -> Optional[str]:
     """Resolve the authenticated MCP principal."""
     mode = _auth_mode()
     if mode == "anonymous":
-        return os.getenv("LOGOS_MCP_USER_ID") or None
+        return env_get("LOGOS_MCP_USER_ID") or None
 
     authorization = request.headers.get("Authorization", "")
     if not authorization.startswith("Bearer "):
@@ -70,8 +70,8 @@ def _auth_user_from_request() -> Optional[str]:
         raise PermissionError("Bearer access token required")
 
     if mode == "bearer":
-        expected = os.getenv("LOGOS_MCP_BEARER_TOKEN", "")
-        user_id = os.getenv("LOGOS_MCP_USER_ID", "")
+        expected = env_get("LOGOS_MCP_BEARER_TOKEN", "")
+        user_id = env_get("LOGOS_MCP_USER_ID", "")
         if not expected or not user_id:
             raise PermissionError("MCP bearer authentication is not fully configured")
         # Compare bytes: compare_digest rejects non-ASCII str, which would be a 500 instead of a refusal.
@@ -91,14 +91,14 @@ def _introspect_token(token: str) -> Optional[str]:
     """Validate an OAuth access token using RFC 7662-style introspection."""
     import requests
 
-    url = os.getenv("LOGOS_MCP_INTROSPECTION_URL", "")
+    url = env_get("LOGOS_MCP_INTROSPECTION_URL", "")
     if not url:
         raise PermissionError("OAuth introspection is not configured")
 
-    auth_user = os.getenv("LOGOS_MCP_INTROSPECTION_CLIENT_ID", "")
-    auth_password = os.getenv("LOGOS_MCP_INTROSPECTION_CLIENT_SECRET", "")
+    auth_user = env_get("LOGOS_MCP_INTROSPECTION_CLIENT_ID", "")
+    auth_password = env_get("LOGOS_MCP_INTROSPECTION_CLIENT_SECRET", "")
     try:
-        timeout = float(os.getenv("LOGOS_MCP_INTROSPECTION_TIMEOUT", "5"))
+        timeout = float(env_get("LOGOS_MCP_INTROSPECTION_TIMEOUT", "5"))
     except ValueError as exc:
         raise PermissionError("OAuth introspection is not configured") from exc
 

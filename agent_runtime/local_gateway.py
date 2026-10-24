@@ -1,10 +1,10 @@
 """Secure, persistent gateway for remote Local Tool Agents."""
 
 from __future__ import annotations
+from core.env import env_get
 
 import hashlib
 import json
-import os
 import re
 import secrets
 import time
@@ -54,7 +54,7 @@ def _bearer_token() -> Optional[str]:
 
 
 def _require_bootstrap() -> None:
-    expected = os.getenv("LOGOS_LOCAL_AGENT_BOOTSTRAP_TOKEN", "").strip()
+    expected = env_get("LOGOS_LOCAL_AGENT_BOOTSTRAP_TOKEN", "").strip()
     token = _bearer_token()
     # Compare bytes: compare_digest rejects non-ASCII str, which would be a 500 instead of a refusal.
     if not expected or not token or not secrets.compare_digest(

@@ -5,9 +5,9 @@ URL path prefix. The prefix is consumed internally; no HTTP redirect is used.
 """
 
 from __future__ import annotations
+from core.env import env_get
 
 import hmac
-import os
 import secrets
 from typing import Optional
 
@@ -46,7 +46,7 @@ class _ShortTokenSource:
 
     def resolve(self) -> str:
         if self.resolver is None or self.ref is None:
-            return os.environ.get("LOGOS_SHORT_TOKEN", "")
+            return env_get("LOGOS_SHORT_TOKEN", "")
         try:
             return self.resolver.resolve(self.ref).reveal()
         except SecretResolutionError:
@@ -67,7 +67,7 @@ def reset_short_token_secret() -> None:
 
 
 def _enabled() -> bool:
-    return os.environ.get("LOGOS_REQUIRE_SHORT_TOKEN", "").strip().lower() in {
+    return env_get("LOGOS_REQUIRE_SHORT_TOKEN", "").strip().lower() in {
         "1",
         "true",
         "yes",
@@ -89,7 +89,7 @@ def _serializer(token: str) -> URLSafeTimedSerializer:
 
 
 def _max_age() -> int:
-    raw = os.environ.get("LOGOS_SHORT_TOKEN_TTL_SECONDS", str(DEFAULT_MAX_AGE))
+    raw = env_get("LOGOS_SHORT_TOKEN_TTL_SECONDS", str(DEFAULT_MAX_AGE))
     try:
         value = int(raw)
     except ValueError:
@@ -112,7 +112,7 @@ def _request_path() -> str:
 
     Otherwise a client could send any path in the header and have it judged instead of the real one.
     """
-    trusted = os.environ.get("LOGOS_TRUST_FORWARDED_URI", "").strip().lower() in {
+    trusted = env_get("LOGOS_TRUST_FORWARDED_URI", "").strip().lower() in {
         "1",
         "true",
         "yes",

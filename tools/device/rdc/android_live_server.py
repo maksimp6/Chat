@@ -1,9 +1,9 @@
 #!/data/data/com.termux/files/usr/bin/python
 """Loopback-only authenticated Android live server: screen and OCR/actions."""
+from core.env import env_get
 
 import json
 import hashlib
-import os
 from pathlib import Path
 import secrets
 import subprocess
@@ -19,7 +19,7 @@ from urllib.parse import urlparse, parse_qs
 
 BASE = Path.home() / ".logos-rdc"
 TOKEN_PATH = BASE / "live-token"
-ACTIONS = Path(os.environ.get("LOGOS_LIVE_ACTIONS", str(BASE / "android_actions.py")))
+ACTIONS = Path(env_get("LOGOS_LIVE_ACTIONS", str(BASE / "android_actions.py")))
 OCR = BASE / "android_find_mark.py"
 DOM = BASE / "android_screen_dom.py"
 IMAGE = BASE / "screenshots" / "latest.jpg"

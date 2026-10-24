@@ -7,8 +7,8 @@ generation and is not gated here.
 """
 
 from __future__ import annotations
+from core.env import env_snapshot
 
-import os
 from collections.abc import Mapping
 
 GENERATION_ENV = "LOGOS_GENERATION_ALLOWED"
@@ -16,5 +16,5 @@ GENERATION_BLOCKED = "GenerationNotPermitted"
 
 
 def generation_allowed(environ: Mapping[str, str] | None = None) -> bool:
-    value = (os.environ if environ is None else environ).get(GENERATION_ENV, "")
+    value = (env_snapshot() if environ is None else environ).get(GENERATION_ENV, "")
     return value.lower() == "true"

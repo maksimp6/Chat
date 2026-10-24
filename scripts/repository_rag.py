@@ -6,6 +6,7 @@ equating the available subset with the complete repository.
 """
 
 from __future__ import annotations
+from core.env import env_get
 
 import argparse
 import fcntl
@@ -876,7 +877,7 @@ def _github_pass(args, archive, reader, number, epoch):
 def _collect_github_passes(args, archive, result):
     from scripts.repository_corpus_github import MAX_TOTAL_BYTES, GitHubReader
 
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("CODEX_GITHUB_TOKEN", "")
+    token = env_get("GITHUB_TOKEN") or env_get("CODEX_GITHUB_TOKEN", "")
     state = {
         "epoch": datetime.now(timezone.utc).isoformat(),
         "requested": args.github_passes,
@@ -933,7 +934,7 @@ def _collect(args, archive: CorpusArchive, result: dict) -> None:
 
 
 def _run(args, archive: CorpusArchive, result: dict) -> None:
-    project, key = os.environ.get("YANDEX_PROJECT_ID", ""), os.environ.get("YANDEX_API_KEY", "")
+    project, key = env_get("YANDEX_PROJECT_ID", ""), env_get("YANDEX_API_KEY", "")
     if args.provider_check:
         result["provider_inventory"] = provider_inventory(
             args.repository, args.store_id, project, key

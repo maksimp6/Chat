@@ -1,11 +1,11 @@
 """One-shot, read-only PR judgment; model opinion is never merge approval."""
 
 from __future__ import annotations
+from core.env import env_require
 
 import base64
 import hashlib
 import json
-import os
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -92,11 +92,11 @@ def main() -> int:
     output = Path("pr-court-output")
     output.mkdir(exist_ok=True)
     try:
-        event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
-        repo = os.environ["GITHUB_REPOSITORY"]
+        event = json.loads(Path(env_require("GITHUB_EVENT_PATH")).read_text())
+        repo = env_require("GITHUB_REPOSITORY")
         sha = event["pull_request"]["head"]["sha"]
         number = event["number"]
-        token = os.environ["GH_TOKEN"]
+        token = env_require("GH_TOKEN")
         endpoint = f"{API}/repos/{repo}"
         pr_url = f"{endpoint}/pulls/{number}"
         pr = request(pr_url, token)
@@ -117,8 +117,8 @@ def main() -> int:
             (output / "report.json").write_text(json.dumps(report, indent=2))
             print(f"NO_RULES_NOT_APPROVAL PR #{number} HEAD {sha}; model not called")
             return 0
-        key = os.environ["YANDEX_API_KEY"].strip()
-        project = os.environ["YANDEX_PROJECT_ID"].strip()
+        key = env_require("YANDEX_API_KEY").strip()
+        project = env_require("YANDEX_PROJECT_ID").strip()
         if not key or not project:
             raise ValueError("YANDEX_API_KEY or YANDEX_PROJECT_ID is missing")
         evidence = bounded_input(rules, pr, files)
@@ -166,7 +166,7 @@ def main() -> int:
             "pr": number,
             "head": sha,
             "develop_head": base,
-            "run_id": os.environ["GITHUB_RUN_ID"],
+            "run_id": env_require("GITHUB_RUN_ID"),
             "response_id": response["id"],
             "model": "yandexgpt-lite/latest",
             "evidence_sha256": hashlib.sha256(evidence.encode()).hexdigest(),
@@ -188,7 +188,7 @@ def main() -> int:
             "Стоимость провайдером не сообщена. Один запрос, без retries, max_output_tokens=1500.\n"
         )
         (output / "report.md").write_text(markdown)
-        with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+        with open(env_require("GITHUB_STEP_SUMMARY"), "a") as summary:
             summary.write(markdown)
         print(f"{assessment['status']} PR #{number} HEAD {sha}")
         return 1 if assessment["status"] == "MODEL_OUTPUT_REJECTED" else 0

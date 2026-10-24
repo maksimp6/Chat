@@ -1,6 +1,7 @@
 """Universal local tools for the Logos 3D-printing business domain."""
 
 from __future__ import annotations
+from core.env import env_get
 
 import hashlib
 import os
@@ -47,7 +48,7 @@ def plate_inspect(
     name = arguments.get("artifact_name")
     if type(name) is not str or not PRINT_ARTIFACT_NAME.fullmatch(name):
         raise ValueError("artifact_name must be one plain .3mf or .gcode.3mf filename")
-    root = os.environ.get("LOGOS_3D_ARTIFACT_ROOT")
+    root = env_get("LOGOS_3D_ARTIFACT_ROOT")
     if not root:
         return {"status": "needs_configuration", "missing_fields": ["LOGOS_3D_ARTIFACT_ROOT"]}
     # Owner identity comes ONLY from authenticated universal context, never

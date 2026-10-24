@@ -5,9 +5,9 @@ This module uses the separate admin IAM identity and never logs or traces payloa
 """
 
 from __future__ import annotations
+from core.env import env_get
 
 import base64
-import os
 from typing import Any
 
 import requests
@@ -28,7 +28,7 @@ class CloudRuSecretManagementAdminClient:
     ) -> None:
         self.iam_client = iam_client or CloudRuIamClient()
         self.parent_id = (
-            parent_id or os.getenv("CLOUDRU_SECRET_MANAGEMENT_PARENT_ID") or ""
+            parent_id or env_get("CLOUDRU_SECRET_MANAGEMENT_PARENT_ID") or ""
         ).strip()
         self.timeout = float(timeout)
         self._client = CloudRuClient(

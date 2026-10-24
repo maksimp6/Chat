@@ -1,11 +1,11 @@
 """Cloud.ru IAM API-key wizard routes."""
 
 from __future__ import annotations
+from core.env import env_get
 
 from datetime import datetime, timedelta, timezone
 import hmac
 import ipaddress
-import os
 from typing import Any
 
 from flask import Blueprint, jsonify, request
@@ -28,11 +28,11 @@ def _is_local_request() -> bool:
 
 
 def _enabled() -> bool:
-    return os.getenv("CLOUDRU_IAM_WIZARD_ENABLED", "false").strip().lower() == "true"
+    return env_get("CLOUDRU_IAM_WIZARD_ENABLED", "false").strip().lower() == "true"
 
 
 def _authorized() -> bool:
-    configured = os.getenv("CLOUDRU_IAM_WIZARD_TOKEN", "").strip()
+    configured = env_get("CLOUDRU_IAM_WIZARD_TOKEN", "").strip()
     if configured:
         auth = request.headers.get("Authorization", "")
         token = auth[7:].strip() if auth.startswith("Bearer ") else ""

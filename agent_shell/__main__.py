@@ -1,10 +1,10 @@
 """CLI: python -m agent_shell add|list|run-next|approve|show|recover."""
 
 from __future__ import annotations
+from core.env import env_get
 
 import argparse
 import json
-import os
 import sys
 
 from agent_shell.handlers import default_handlers
@@ -14,7 +14,7 @@ from agent_shell.store import TaskStore
 
 def main(argv=None, handlers=None):
     parser = argparse.ArgumentParser(prog="agent_shell", description=__doc__)
-    parser.add_argument("--db", default=os.environ.get("LOGOS_SHELL_DB", "agent_shell.memory"))
+    parser.add_argument("--db", default=env_get("LOGOS_SHELL_DB", "agent_shell.memory"))
     commands = parser.add_subparsers(dest="command", required=True)
     add = commands.add_parser("add")
     add.add_argument("--role", required=True)

@@ -1,8 +1,8 @@
 """Runtime registry for cloud providers."""
 
 from __future__ import annotations
+from core.env import env_get
 
-import os
 from typing import Any
 
 from cloud.base import CloudProviderError
@@ -50,4 +50,4 @@ def resolve_provider_name(args: dict[str, Any]) -> str:
     value = args.get("provider")
     if isinstance(value, str) and value.strip():
         return value.strip().lower()
-    return os.getenv("LOGOS_CLOUD_PROVIDER", "cloudru").strip().lower() or "cloudru"
+    return env_get("LOGOS_CLOUD_PROVIDER", "cloudru").strip().lower() or "cloudru"

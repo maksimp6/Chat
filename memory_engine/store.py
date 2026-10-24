@@ -5,6 +5,7 @@ No SQL, background flush, or unsafe pickle deserialization.
 """
 
 from __future__ import annotations
+from core.env import env_get
 
 from contextlib import contextmanager
 from copy import deepcopy
@@ -189,7 +190,7 @@ def _open_directory_nofollow(directory: Path, *, trusted: bool | None = None) ->
     absolute = Path(os.path.abspath(directory))
     fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
     if trusted is None:
-        trusted = os.environ.get("LOGOS_MEMORY_TRUSTED_ROOT") == "1"
+        trusted = env_get("LOGOS_MEMORY_TRUSTED_ROOT") == "1"
     try:
         if trusted:
             _verify_trusted_ancestor(fd)
@@ -273,7 +274,7 @@ def _open_journal_nofollow(
         if not stat.S_ISREG(os.fstat(fd).st_mode):
             raise StoreError("journal must be a regular file")
         if trusted is None:
-            trusted = os.environ.get("LOGOS_MEMORY_TRUSTED_ROOT") == "1"
+            trusted = env_get("LOGOS_MEMORY_TRUSTED_ROOT") == "1"
         if trusted:
             _verify_private_file(fd)
         return fd
@@ -294,7 +295,7 @@ class _JournalStore:
 
     def __init__(self, path: str | Path, *, trusted: bool | None = None) -> None:
         self._trusted = (
-            (os.environ.get("LOGOS_MEMORY_TRUSTED_ROOT") == "1") if trusted is None else trusted
+            (env_get("LOGOS_MEMORY_TRUSTED_ROOT") == "1") if trusted is None else trusted
         )
         self._pid = os.getpid()
         self.path = Path(path)

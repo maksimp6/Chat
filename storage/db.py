@@ -1,22 +1,22 @@
 """Logos chat/config repositories backed by the native durable Kristall."""
 
 from __future__ import annotations
+from core.env import env_get
 import json
-import os
 from pathlib import Path
 import time
 from typing import Any
 from runtime.request_context import current_runtime_data_root
 from kristall import Kristall, KristallError
 
-DB_PATH = os.getenv("LOGOS_DB_PATH", "").strip()
+DB_PATH = env_get("LOGOS_DB_PATH", "").strip()
 
 
 def memory_file_path() -> Path:
     root = current_runtime_data_root()
     if root:
         return Path(root).resolve() / "logos.memory"
-    explicit = os.getenv("LOGOS_MEMORY_PATH", "").strip()
+    explicit = env_get("LOGOS_MEMORY_PATH", "").strip()
     if explicit:
         return Path(explicit).expanduser().resolve()
     if not DB_PATH:

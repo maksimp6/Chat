@@ -5,6 +5,7 @@ remote OS identity, so Linux permissions remain the authorization boundary.
 """
 
 from __future__ import annotations
+from core.env import env_get
 
 import json
 import os
@@ -49,14 +50,14 @@ class SSHRuntime:
         known_hosts: Optional[str] = None,
     ) -> None:
         self._targets = self._load_targets(targets)
-        self._default_known_hosts = known_hosts or os.getenv("LOGOS_SSH_KNOWN_HOSTS")
+        self._default_known_hosts = known_hosts or env_get("LOGOS_SSH_KNOWN_HOSTS")
 
     @staticmethod
     def _load_targets(
         targets: Optional[Mapping[str, Mapping[str, Any]]],
     ) -> dict[str, SSHTarget]:
         if targets is None:
-            text = os.getenv("LOGOS_SSH_TARGETS_JSON", "").strip()
+            text = env_get("LOGOS_SSH_TARGETS_JSON", "").strip()
             if not text:
                 return {}
             try:

@@ -1,10 +1,10 @@
 """Voice assistant HTTP pipeline for SpeechKit STT/TTS and Logos chat."""
 
 from __future__ import annotations
+from core.env import env_get
 
 import base64
 import json
-import os
 import queue
 import threading
 import time
@@ -50,7 +50,7 @@ _sessions_lock = threading.RLock()
 
 
 def _credentials() -> tuple[str | None, str | None]:
-    return os.getenv("YANDEX_API_KEY"), os.getenv("YANDEX_IAM_TOKEN")
+    return env_get("YANDEX_API_KEY"), env_get("YANDEX_IAM_TOKEN")
 
 
 def _auth_headers() -> dict[str, str]:
@@ -63,7 +63,7 @@ def _auth_headers() -> dict[str, str]:
 
 
 def _folder_id() -> str | None:
-    return os.getenv("YANDEX_PROJECT_ID") or os.getenv("YANDEX_FOLDER_ID")
+    return env_get("YANDEX_PROJECT_ID") or env_get("YANDEX_FOLDER_ID")
 
 
 def _cleanup_sessions() -> None:
@@ -141,7 +141,7 @@ def _chat(text: str, conversation_id: str | None, model: str) -> str:
     if not conversation_id:
         raise ValueError("conversation_id is required for voice chat")
     text_model = (
-        model if model in TEXT_MODELS else os.getenv("LOGOS_VOICE_CHAT_MODEL", "logos-runtime")
+        model if model in TEXT_MODELS else env_get("LOGOS_VOICE_CHAT_MODEL", "logos-runtime")
     )
     client = LogosClient(Config)
     response = client.ask_with_mcp(

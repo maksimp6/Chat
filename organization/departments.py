@@ -1,8 +1,8 @@
 """First-class Department registry and API for Logos."""
 
 from __future__ import annotations
+from core.env import env_get
 import json
-import os
 import secrets
 import time
 from typing import Any, Mapping, Optional
@@ -35,7 +35,7 @@ def init_department_tables() -> None:
 
 
 def _admin_ok() -> bool:
-    expected = os.getenv("LOGOS_DEPARTMENTS_ADMIN_TOKEN", "").strip()
+    expected = env_get("LOGOS_DEPARTMENTS_ADMIN_TOKEN", "").strip()
     supplied = request.headers.get("X-Department-Admin-Token", "").strip()
     # compare_digest rejects non-ASCII str; comparing bytes turns a bad header into a refusal, not a 500.
     return bool(

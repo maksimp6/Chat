@@ -1,9 +1,9 @@
 """Cloud.ru cloud API client with trace-safe logging."""
 
 from __future__ import annotations
+from core.env import env_get
 
 from datetime import datetime, timezone
-import os
 from typing import Any
 
 import requests
@@ -32,7 +32,7 @@ class CloudRuClient:
     ) -> None:
         # Evolution control-plane APIs accept only IAM bearer tokens; callers for
         # those services pass api_key_auth=False so a Foundation Models key is ignored.
-        self.api_key = (api_key or os.getenv("CLOUDRU_API_KEY")) if api_key_auth else None
+        self.api_key = (api_key or env_get("CLOUDRU_API_KEY")) if api_key_auth else None
         self.iam_client = iam_client
         self.timeout = float(timeout)
 
@@ -41,7 +41,7 @@ class CloudRuClient:
         return f"CLOUDRU_{service.upper()}_ENDPOINT"
 
     def endpoint(self, service: str) -> str:
-        configured = os.getenv(self._env_name(service), "").strip()
+        configured = env_get(self._env_name(service), "").strip()
         if configured:
             return configured.rstrip("/")
         fallback = DEFAULT_ENDPOINTS.get(service)

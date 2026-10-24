@@ -44,10 +44,10 @@ Design constraints from issue #477, enforced here rather than left to callers:
 """
 
 from __future__ import annotations
+from core.env import env_get
 
 import base64
 import binascii
-import os
 import time
 from typing import Any
 
@@ -103,9 +103,9 @@ class CloudRuSecretManagementClient:
             # directly instead of passed through the constructor - passing an
             # empty/None value there would itself trigger the same fallback.
             self.iam_client = CloudRuIamClient()
-            self.iam_client.key_id = key_id or os.getenv("CLOUDRU_SECRET_MANAGEMENT_KEY_ID") or None
+            self.iam_client.key_id = key_id or env_get("CLOUDRU_SECRET_MANAGEMENT_KEY_ID") or None
             self.iam_client.key_secret = (
-                key_secret or os.getenv("CLOUDRU_SECRET_MANAGEMENT_KEY_SECRET") or None
+                key_secret or env_get("CLOUDRU_SECRET_MANAGEMENT_KEY_SECRET") or None
             )
         self.timeout = float(timeout)
         self.max_retries = max(0, int(max_retries))

@@ -1,7 +1,7 @@
 """Logos - Configuration & Pricing"""
+from core.env import env_get
 
 import logging
-import os
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -18,13 +18,13 @@ load_dotenv(_ENV_FILE)
 # Provider credentials are resolved at runtime from provider_credentials.
 # No provider API key belongs in application configuration.
 
-BASE_URL = os.getenv("YANDEX_BASE_URL", "https://ai.api.cloud.yandex.net/v1")
-CLOUDRU_BASE_URL = os.getenv(
+BASE_URL = env_get("YANDEX_BASE_URL", "https://ai.api.cloud.yandex.net/v1")
+CLOUDRU_BASE_URL = env_get(
     "CLOUDRU_BASE_URL",
     "https://foundation-models.api.cloud.ru/v1",
 )
-YANDEX_PROVIDER_KEY_ID = os.getenv("YANDEX_PROVIDER_KEY_ID")
-CLOUDRU_API_KEY_ID = os.getenv("CLOUDRU_API_KEY_ID")
+YANDEX_PROVIDER_KEY_ID = env_get("YANDEX_PROVIDER_KEY_ID")
+CLOUDRU_API_KEY_ID = env_get("CLOUDRU_API_KEY_ID")
 
 
 def get_donation_url():
@@ -33,7 +33,7 @@ def get_donation_url():
     Only absolute http/https URLs without embedded credentials are accepted so
     the header button can never be turned into a script or credential carrier.
     """
-    raw = (os.getenv("LOGOS_DONATION_URL") or "").strip()
+    raw = (env_get("LOGOS_DONATION_URL") or "").strip()
     if not raw:
         return None
     if any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in raw):

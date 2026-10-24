@@ -1,7 +1,7 @@
 from __future__ import annotations
+from core.env import env_get
 
 import json
-import os
 from typing import Any, Mapping, Optional
 
 from flask import Response, request
@@ -14,13 +14,13 @@ SUPPORTED_PROTOCOL_VERSIONS = {
 }
 DEFAULT_PROTOCOL_VERSION = "2026-07-28"
 SERVER_NAME = "Logos Pro"
-SERVER_VERSION = os.getenv("LOGOS_VERSION", "dev")
-OAUTH_SCOPE = os.getenv("LOGOS_MCP_OAUTH_SCOPE", "logos.read")
-PUBLIC_BASE_URL = os.getenv("LOGOS_MCP_PUBLIC_URL", "").rstrip("/")
+SERVER_VERSION = env_get("LOGOS_VERSION", "dev")
+OAUTH_SCOPE = env_get("LOGOS_MCP_OAUTH_SCOPE", "logos.read")
+PUBLIC_BASE_URL = env_get("LOGOS_MCP_PUBLIC_URL", "").rstrip("/")
 
 
 def _public_base_url() -> str:
-    return os.getenv("LOGOS_MCP_PUBLIC_URL", "").rstrip("/") or PUBLIC_BASE_URL
+    return env_get("LOGOS_MCP_PUBLIC_URL", "").rstrip("/") or PUBLIC_BASE_URL
 
 
 def _sanitize_error_string(value: Any) -> str:

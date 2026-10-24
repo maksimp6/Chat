@@ -2,6 +2,7 @@
 """Build a compact deterministic Python AST index for AI agents."""
 
 from __future__ import annotations
+from core.env import env_snapshot
 
 import argparse
 import ast
@@ -234,7 +235,7 @@ def _assemble_index(files: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _git(root: Path, *args: str, stdin: bytes | None = None) -> bytes:
-    env = os.environ.copy()
+    env = env_snapshot()
     for key in (
         "GIT_DIR",
         "GIT_WORK_TREE",

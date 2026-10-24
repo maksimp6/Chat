@@ -2,9 +2,9 @@
 """Select affected platform suites and reject unsupported successful CI results."""
 
 from __future__ import annotations
+from core.env import env_require
 
 import json
-import os
 from pathlib import PurePosixPath
 import sys
 from typing import Mapping
@@ -112,8 +112,8 @@ def validate_results(plan: Mapping[str, bool], results: Mapping[str, str]) -> No
 
 
 def verify_environment() -> None:
-    raw = json.loads(os.environ["CI_PLATFORM_PLAN"])
-    needs = json.loads(os.environ["CI_JOB_RESULTS"])
+    raw = json.loads(env_require("CI_PLATFORM_PLAN"))
+    needs = json.loads(env_require("CI_JOB_RESULTS"))
     if (
         not isinstance(raw, dict)
         or set(raw) != set(PLATFORMS)

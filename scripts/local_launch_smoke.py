@@ -11,11 +11,11 @@ Secret values are read only from environment variables and are never printed.
 """
 
 from __future__ import annotations
+from core.env import env_get, env_snapshot
 
 import argparse
 from dataclasses import dataclass
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -221,8 +221,8 @@ def _session_persisted(
 
 
 def _provider_inputs() -> tuple[str, str]:
-    api_key = os.getenv("LOGOS_LAUNCH_SMOKE_YANDEX_API_KEY", "").strip()
-    project_id = os.getenv("LOGOS_LAUNCH_SMOKE_YANDEX_PROJECT_ID", "").strip()
+    api_key = env_get("LOGOS_LAUNCH_SMOKE_YANDEX_API_KEY", "").strip()
+    project_id = env_get("LOGOS_LAUNCH_SMOKE_YANDEX_PROJECT_ID", "").strip()
     return api_key, project_id
 
 
@@ -348,7 +348,7 @@ def _conversation_persisted(
 def _build_runtime_env(*, db_path: Path, port: int) -> dict[str, str]:
     from cryptography.fernet import Fernet
 
-    env = dict(os.environ)
+    env = dict(env_snapshot())
     env["HOST"] = "127.0.0.1"
     env["PORT"] = str(port)
     env["FLASK_DEBUG"] = "0"

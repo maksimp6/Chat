@@ -6,8 +6,8 @@ bearer token stored in the HttpOnly identity cookie/header. The fixed
 LOGOS_OWNER_ID fallback remains available for explicitly configured
 single-user deployments.
 """
+from core.env import env_get
 
-import os
 from typing import Optional
 
 from flask import g, has_request_context, request
@@ -34,7 +34,7 @@ def get_current_owner_id(*, required: bool = True) -> Optional[str]:
             owner_id = token_owner_id
 
     if owner_id is None:
-        owner_id = os.getenv("LOGOS_OWNER_ID")
+        owner_id = env_get("LOGOS_OWNER_ID")
 
     if owner_id is None or not str(owner_id).strip():
         if required:

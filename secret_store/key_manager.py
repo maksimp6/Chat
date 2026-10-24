@@ -6,6 +6,7 @@ never returned by metadata/list operations.
 """
 
 from __future__ import annotations
+from core.env import env_get
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -61,7 +62,7 @@ def _iso(value: datetime) -> str:
 
 def _manager_key() -> bytes:
     raw = (
-        os.getenv("LOGOS_KEY_MANAGER_KEY") or os.getenv("LOGOS_PROVIDER_CREDENTIAL_KEY") or ""
+        env_get("LOGOS_KEY_MANAGER_KEY") or env_get("LOGOS_PROVIDER_CREDENTIAL_KEY") or ""
     ).strip()
     if not raw:
         raise KeyManagerError(

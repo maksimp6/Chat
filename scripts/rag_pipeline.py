@@ -19,18 +19,18 @@ Modes:
 """
 
 from __future__ import annotations
+from core.env import env_get
 
 import argparse
 import hashlib
 import json
 import math
-import os
 import re
 import sys
 import urllib.request
 from collections import Counter
 
-REPO = os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat")
+REPO = env_get("GITHUB_REPOSITORY", "maksimp6/Chat")
 API = f"https://api.github.com/repos/{REPO}"
 LABEL_SOURCE = "rag-source"
 LABEL_QUERY = "rag-query"
@@ -225,8 +225,8 @@ class BM25Index:
 
 
 def yandex_embeddings(texts: list[str]) -> list[list[float]] | None:
-    key = os.environ.get("YANDEX_API_KEY")
-    project = os.environ.get("YANDEX_PROJECT_ID")
+    key = env_get("YANDEX_API_KEY")
+    project = env_get("YANDEX_PROJECT_ID")
     if not key or not project:
         return None
     out = []
@@ -340,7 +340,7 @@ def main() -> int:
     if args.selftest:
         return selftest()
 
-    token = os.environ.get("GITHUB_TOKEN")
+    token = env_get("GITHUB_TOKEN")
     corpus = fetch_corpus(token)
     units = build_units(corpus)
     idx = BM25Index(units)

@@ -6,11 +6,11 @@ reference to an existing key file.
 """
 
 from __future__ import annotations
+from core.env import env_get
 
 import copy
 import json
 import logging
-import os
 import re
 import subprocess
 import time
@@ -44,7 +44,7 @@ _DEFAULTS = {
 
 
 def _env_bootstrap() -> dict[str, Any]:
-    raw = os.getenv("LOGOS_SSH_TARGETS_JSON", "").strip()
+    raw = env_get("LOGOS_SSH_TARGETS_JSON", "").strip()
     targets: dict[str, Any] = {}
     if raw:
         try:
@@ -61,7 +61,7 @@ def _env_bootstrap() -> dict[str, Any]:
         # The environment carries no command allowlist, so command execution stays off until one
         # is configured. Without this, the settings could never be read.
         "allow_command_execution": False,
-        "known_hosts": os.getenv("LOGOS_SSH_KNOWN_HOSTS") or None,
+        "known_hosts": env_get("LOGOS_SSH_KNOWN_HOSTS") or None,
         "targets": targets,
     }
 

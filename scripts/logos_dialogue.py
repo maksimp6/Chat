@@ -1,6 +1,7 @@
 """Run one owner-requested dialogue through Logos's native runtime in CI."""
 
 from __future__ import annotations
+from core.env import env_pop
 
 import argparse
 import hashlib
@@ -336,7 +337,7 @@ def run_dialogue(
 
         # The read token belongs to the scoped read transport, never to shell env,
         # function arguments, instructions, or exported receipts.
-        project_token = os.environ.pop("GITHUB_TOKEN", "")
+        project_token = env_pop("GITHUB_TOKEN", "")
         register_project_reader(project_token, context_packet["repository"])
 
         if knowledge_receipt.get("status") != "indexed":

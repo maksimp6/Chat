@@ -1,4 +1,5 @@
 """Flask routes for Files and Vector Stores API"""
+from core.env import env_get
 
 import os
 import logging
@@ -226,7 +227,7 @@ def remove_file_from_vs(vs_id, file_id):
 
 
 # Local Files API. Desktop keeps the historical path; Android can override it.
-LOCAL_REPO_DIR = os.getenv("LOGOS_LOCAL_REPO_DIR", "/sdcard/repo")
+LOCAL_REPO_DIR = env_get("LOGOS_LOCAL_REPO_DIR", "/sdcard/repo")
 
 
 @file_bp.route("/api/local-files", methods=["GET"])

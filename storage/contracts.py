@@ -1,10 +1,10 @@
 """Provider-neutral storage contracts and the repository-local adapter."""
 
 from __future__ import annotations
+from core.env import env_snapshot
 
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-import os
 from typing import Mapping, Protocol
 
 
@@ -122,7 +122,7 @@ def storage_provider_from_env(
     env: Mapping[str, str] | None = None, *, local_root: str | Path | None = None
 ) -> StorageProvider:
     """Build the provider selected by ``LOGOS_STORAGE_PROVIDER`` (``local`` by default)."""
-    env = os.environ if env is None else env
+    env = env_snapshot() if env is None else env
     name = str(env.get("LOGOS_STORAGE_PROVIDER", "") or "").strip().lower() or "local"
     if name == "local":
         root = env.get("LOGOS_STORAGE_LOCAL_ROOT") or local_root or DEFAULT_LOCAL_STORAGE_ROOT

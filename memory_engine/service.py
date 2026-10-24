@@ -6,6 +6,7 @@ UID; untrusted code must never execute under the service UID.
 """
 
 from __future__ import annotations
+from core.env import env_get
 
 import argparse
 from collections import deque
@@ -94,7 +95,7 @@ def _serve_one(
 def serve(database: Path, socket_path: Path, allowed_uid: int) -> None:
     if os.geteuid() == 0 or allowed_uid == os.geteuid():
         raise RuntimeError("service requires distinct non-root service and client UIDs")
-    if os.environ.get("LOGOS_MEMORY_TRUSTED_ROOT") != "1":
+    if env_get("LOGOS_MEMORY_TRUSTED_ROOT") != "1":
         raise RuntimeError("trusted mode must be enabled before service startup")
     if socket_path.exists() or socket_path.is_symlink():
         raise RuntimeError("socket path already exists")

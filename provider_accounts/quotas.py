@@ -6,8 +6,8 @@ The native Kristall write barrier serializes reservation and usage mutations.
 """
 
 from __future__ import annotations
+from core.env import env_get
 
-import os
 import time
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -87,7 +87,7 @@ def _now() -> int:
 
 def _env_int(name: str, default: int, minimum: int = 0) -> int:
     try:
-        value = int(os.getenv(name, str(default)))
+        value = int(env_get(name, str(default)))
     except (TypeError, ValueError):
         return default
     return max(minimum, value)
@@ -183,7 +183,7 @@ def reserve_request(
     """
     trusted_user_id = str(user_id or "").strip()
     if not trusted_user_id:
-        if os.getenv("LOGOS_QUOTA_REQUIRE_IDENTITY", "").strip().lower() in {"1", "true", "yes"}:
+        if env_get("LOGOS_QUOTA_REQUIRE_IDENTITY", "").strip().lower() in {"1", "true", "yes"}:
             raise ProviderQuotaExceeded(
                 reason="trusted_user_identity_required",
                 user_id="unknown",

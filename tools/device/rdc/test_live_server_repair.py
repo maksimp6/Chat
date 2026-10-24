@@ -2,10 +2,10 @@
 
 All ADB/input calls are mocked; no device interaction or token printing.
 """
+from core.env import env_get, env_pop, env_set
 
 import importlib.util
 import json
-import os
 from pathlib import Path
 import sys
 import tempfile
@@ -93,16 +93,16 @@ class ServerGuards(unittest.TestCase):
             "device": "redmi9-device",
             "focus": "other.package/MainActivity",
         }
-        previous = os.environ.get("ANDROID_SERIAL")
+        previous = env_get("ANDROID_SERIAL")
         try:
             with patch.object(server, "execute", return_value=status):
                 self.assertTrue(h.safe_screen())
-                self.assertEqual(os.environ.get("ANDROID_SERIAL"), "redmi9-device")
+                self.assertEqual(env_get("ANDROID_SERIAL"), "redmi9-device")
         finally:
             if previous is None:
-                os.environ.pop("ANDROID_SERIAL", None)
+                env_pop("ANDROID_SERIAL", None)
             else:
-                os.environ["ANDROID_SERIAL"] = previous
+                env_set("ANDROID_SERIAL", previous)
 
     def test_wrong_or_missing_device_fails_closed(self):
         h = object.__new__(server.Handler)

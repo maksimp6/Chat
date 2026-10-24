@@ -1,9 +1,9 @@
 """Read all Workflow Studio applications with bounded, secret-safe reporting."""
 
 from __future__ import annotations
+from core.env import env_get
 
 import json
-import os
 import re
 import subprocess
 import time
@@ -101,8 +101,8 @@ def query_page(offset, remaining):
 
 
 def main():
-    secret = os.environ.get("EDS_API_KEY", "")
-    if not secret or not os.environ.get("EDS_PROJECT_ID"):
+    secret = env_get("EDS_API_KEY", "")
+    if not secret or not env_get("EDS_PROJECT_ID"):
         print("Missing EDS_API_KEY or EDS_PROJECT_ID.")
         return 1
     try:

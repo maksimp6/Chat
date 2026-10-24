@@ -2,10 +2,10 @@
 """Read-only fail-closed merge readiness check for Logos pull requests."""
 
 from __future__ import annotations
+from core.env import env_get
 
 import argparse
 import json
-import os
 import subprocess
 import tempfile
 import zipfile
@@ -500,8 +500,8 @@ def _collection_error_result(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY"))
-    parser.add_argument("--pr", type=int, default=os.environ.get("PR_NUMBER"))
+    parser.add_argument("--repo", default=env_get("GITHUB_REPOSITORY"))
+    parser.add_argument("--pr", type=int, default=env_get("PR_NUMBER"))
     parser.add_argument("--base", default="master")
     parser.add_argument(
         "--required-check",
@@ -519,7 +519,7 @@ def main() -> int:
 
     required_checks = args.required_check
     if required_checks is None:
-        raw_required_checks = os.environ.get("MERGE_REQUIRED_CHECKS", "")
+        raw_required_checks = env_get("MERGE_REQUIRED_CHECKS", "")
         required_checks = [name.strip() for name in raw_required_checks.split(",") if name.strip()]
 
     try:

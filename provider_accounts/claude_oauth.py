@@ -5,10 +5,10 @@ refresh tokens are read here. Nothing is installed, authorized or run on import.
 """
 
 from __future__ import annotations
+from core.env import env_get, env_snapshot
 
 import copy
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -91,10 +91,10 @@ def _fetch_access_token() -> str:
     binary = shutil.which("ant")
     if not binary:
         raise ClaudeOAuthError("Official ant CLI is required for Claude Console OAuth")
-    profile = os.getenv("LOGOS_CLAUDE_OAUTH_PROFILE", "logos")
+    profile = env_get("LOGOS_CLAUDE_OAUTH_PROFILE", "logos")
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", profile):
         raise ClaudeOAuthError("Invalid Claude Console OAuth profile")
-    credential_environment = dict(os.environ)
+    credential_environment = dict(env_snapshot())
     for name in (
         "ANTHROPIC_API_KEY",
         "ANTHROPIC_AUTH_TOKEN",

@@ -1,9 +1,9 @@
 #!/data/data/com.termux/files/usr/bin/python
 """Live Server Android actions bound to a trusted target; no arbitrary shell."""
+from core.env import env_get, env_snapshot
 
 import argparse
 import json
-import os
 import pathlib
 import re
 import secrets
@@ -11,9 +11,9 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path.home() / ".logos-rdc" / "screenshots"
-ENV = dict(os.environ, TMPDIR="/data/data/com.termux/files/usr/tmp")
+ENV = dict(env_snapshot(), TMPDIR="/data/data/com.termux/files/usr/tmp")
 POLICY = pathlib.Path(
-    os.environ.get(
+    env_get(
         "LOGOS_LIVE_DEVICE_POLICY", str(pathlib.Path.home() / ".logos-rdc" / "live-device.json")
     )
 )

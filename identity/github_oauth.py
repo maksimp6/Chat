@@ -17,10 +17,10 @@ never stored or logged.
 """
 
 from __future__ import annotations
+from core.env import env_get
 
 import hmac
 import logging
-import os
 import secrets
 from urllib.parse import urlencode, urlsplit
 
@@ -48,11 +48,11 @@ LOGIN_PATH = "/auth/github/login"
 
 
 def _client_id() -> str:
-    return os.environ.get("LOGOS_GITHUB_CLIENT_ID", "").strip()
+    return env_get("LOGOS_GITHUB_CLIENT_ID", "").strip()
 
 
 def _client_secret() -> str:
-    return os.environ.get("LOGOS_GITHUB_CLIENT_SECRET", "").strip()
+    return env_get("LOGOS_GITHUB_CLIENT_SECRET", "").strip()
 
 
 def github_login_enabled() -> bool:
@@ -64,7 +64,7 @@ def login_path() -> str:
 
 
 def _allowed_ids() -> set[str]:
-    raw = os.environ.get("LOGOS_GITHUB_ALLOWED_IDS", "")
+    raw = env_get("LOGOS_GITHUB_ALLOWED_IDS", "")
     return {item.strip() for item in raw.split(",") if item.strip()}
 
 
@@ -75,7 +75,7 @@ def _account_allowed(github_id) -> bool:
 
 
 def _redirect_uri() -> str:
-    configured = os.environ.get("LOGOS_GITHUB_REDIRECT_URI", "").strip()
+    configured = env_get("LOGOS_GITHUB_REDIRECT_URI", "").strip()
     if configured:
         return configured
     return request.host_url.rstrip("/") + CALLBACK_PATH

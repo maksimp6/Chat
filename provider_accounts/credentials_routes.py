@@ -1,11 +1,11 @@
 """Provider credential configuration and health-check API."""
 
 from __future__ import annotations
+from core.env import env_get
 
 from datetime import datetime, timedelta, timezone
 import hmac
 import json
-import os
 import logging
 import uuid
 
@@ -55,7 +55,7 @@ CLOUDRU_DEFAULT_TTL = timedelta(days=1)
 
 def _authorized() -> bool:
     """Authorize provider-credential administration without exposing secrets publicly."""
-    configured = os.getenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", "").strip()
+    configured = env_get("LOGOS_PROVIDER_CREDENTIALS_TOKEN", "").strip()
     if configured:
         auth = request.headers.get("Authorization", "")
         token = auth[7:].strip() if auth.startswith("Bearer ") else ""
@@ -64,7 +64,7 @@ def _authorized() -> bool:
     # When the application's short-token gate is enabled, its before_request
     # middleware has already authenticated this request. Reuse that session
     # rather than introducing a second browser credential.
-    if os.getenv("LOGOS_REQUIRE_SHORT_TOKEN", "").strip().lower() in {"1", "true", "yes", "on"}:
+    if env_get("LOGOS_REQUIRE_SHORT_TOKEN", "").strip().lower() in {"1", "true", "yes", "on"}:
         return True
 
     # Fail closed for remote deployments when no explicit admin token is set.
@@ -108,7 +108,7 @@ def _guard():
 
 def _cloudru_ttl() -> timedelta:
     try:
-        days = int(os.getenv("CLOUDRU_KEY_TTL_DAYS", "1"))
+        days = int(env_get("CLOUDRU_KEY_TTL_DAYS", "1"))
     except ValueError as exc:
         raise ValueError("CLOUDRU_KEY_TTL_DAYS must be an integer") from exc
     if not 1 <= days <= 365:

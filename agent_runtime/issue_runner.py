@@ -5,6 +5,7 @@ grant writes, shell execution, hosted tools or network access.
 """
 
 from __future__ import annotations
+from core.env import env_get
 
 import argparse
 import hashlib
@@ -118,8 +119,8 @@ def build_prompt(issue_number: int, title: str, body: str, rules: str) -> str:
 
 def seed_provider_credential() -> None:
     """Store the CI-provided Yandex key in the (temporary) credential database."""
-    api_key = os.getenv("YANDEX_API_KEY", "").strip()
-    project_id = os.getenv("YANDEX_PROJECT_ID", "").strip()
+    api_key = env_get("YANDEX_API_KEY", "").strip()
+    project_id = env_get("YANDEX_PROJECT_ID", "").strip()
     if not api_key or not project_id:
         raise RuntimeError("YANDEX_API_KEY and YANDEX_PROJECT_ID are required")
     from secret_store.credential_crypto import decrypt_secret, encrypt_secret
@@ -362,7 +363,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--issue", type=int, required=True)
     parser.add_argument("--title-file", type=Path, required=True)
     parser.add_argument("--body-file", type=Path, required=True)
-    parser.add_argument("--model", default=os.getenv("LOGOS_AGENT_MODEL") or DEFAULT_MODEL)
+    parser.add_argument("--model", default=env_get("LOGOS_AGENT_MODEL") or DEFAULT_MODEL)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
 

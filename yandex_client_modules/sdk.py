@@ -1,6 +1,7 @@
 """
 sdk.py - Минимальный SDK для работы с Yandex AI Studio
 """
+from core.env import env_require
 
 import requests
 import json
@@ -55,9 +56,8 @@ class LogosSDK:
 
 # Пример использования
 if __name__ == "__main__":
-    import os
 
-    sdk = LogosSDK(os.environ["YANDEX_API_KEY"], os.environ["YANDEX_PROJECT_ID"])
+    sdk = LogosSDK(env_require("YANDEX_API_KEY"), env_require("YANDEX_PROJECT_ID"))
 
     # Создать диалог
     conv = sdk.create_conversation()
