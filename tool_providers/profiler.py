@@ -20,7 +20,7 @@ def profile_application_performance(arguments: dict, cfg: dict = None) -> dict:
     sort_by = arguments.get("sort") or "cumulative"
     if sort_by not in SORT_KEYS:
         raise ValueError(f"sort must be one of {', '.join(SORT_KEYS)}")
-    lines_count = int(arguments.get("limit") or 15)
+    lines_count = int(15 if arguments.get("limit") is None else arguments["limit"])
 
     pr = cProfile.Profile()
     pr.enable()

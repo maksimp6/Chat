@@ -129,7 +129,7 @@ def cloud_logs_query(args: dict[str, Any], cfg: dict | None = None) -> dict[str,
     return provider.query_logs(
         query=str(args.get("query") or ""),
         service=(str(args.get("service")) if isinstance(args.get("service"), str) else None),
-        limit=int(args.get("limit") or 100),
+        limit=int(100 if args.get("limit") is None else args["limit"]),
     )
 
 
@@ -140,7 +140,7 @@ def cloud_metrics_query(args: dict[str, Any], cfg: dict | None = None) -> dict[s
         query=str(args.get("query") or ""),
         service=(str(args.get("service")) if isinstance(args.get("service"), str) else None),
         window=(str(args.get("window")) if isinstance(args.get("window"), str) else None),
-        limit=int(args.get("limit") or 100),
+        limit=int(100 if args.get("limit") is None else args["limit"]),
     )
 
 
