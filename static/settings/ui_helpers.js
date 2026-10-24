@@ -30,7 +30,8 @@
   }
 
   function escapeHtml(str) {
-    if (!str) return "";
+    // 0 and false are real values; only a missing value renders empty.
+    if (str === null || str === undefined) return "";
     return String(str)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")

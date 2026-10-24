@@ -80,6 +80,7 @@
         UI.inp("tools-fs-max", "number", fs.max_results || 20, ' min="1"') +
         "</div>",
       '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">Эти инструменты выполняются на стороне Yandex AI Studio. Они независимы от MCP и локального Tool Registry.</div>',
+      '<div id="tools-status" role="status" style="color:var(--m-danger,#c33);font-size:12px;min-height:16px;"></div>',
       '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;border-top:1px solid var(--m-border,#ddd);padding-top:12px;">',
       ' <button class="logos-btn settings-contract-btn" id="tools-save-btn">Сохранить инструменты</button>',
       "</div>",
@@ -113,15 +114,16 @@
       profiler: "⏱️ Профайлер и инспекция состояния",
     };
 
+    // fetch resolves for HTTP errors too, so a non-OK status must be turned into a failure here.
+    function readOk(r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }
     Promise.all([
-      window.LogosDispatcher.request("/api/tools/categories").then(function (r) {
-        return r.json();
-      }),
+      window.LogosDispatcher.request("/api/tools/categories").then(readOk),
       currentConvId
         ? window.LogosDispatcher.request("/api/conversations/" + currentConvId + "/tools").then(
-            function (r) {
-              return r.json();
-            },
+            readOk,
           )
         : Promise.resolve({ active_tool_categories: null }),
     ])
@@ -183,16 +185,21 @@
           ),
         },
       };
+      var status = document.getElementById("tools-status");
+      status.textContent = "";
       var localSave = currentConvId
         ? window.LogosDispatcher.request("/api/conversations/" + currentConvId + "/tools", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ active_tool_categories: selected }),
+          }).then(function (r) {
+            if (!r.ok) throw new Error("HTTP " + r.status);
           })
         : Promise.resolve();
-      Promise.all([localSave, Promise.resolve(Storage.save(settings, currentConvId))])
-        .then(closeModal)
-        .catch(closeModal);
+      Promise.all([localSave, Storage.save(settings, currentConvId)]).then(closeModal, function () {
+        status.textContent =
+          "Не удалось сохранить инструменты на сервер. Настройки сохранены только в этом браузере.";
+      });
     });
   };
 
@@ -485,6 +492,7 @@
     ].join("");
 
     var footer = [
+      '<div id="set-status" role="status" style="color:var(--m-danger,#c33);font-size:12px;min-height:16px;margin-top:12px;"></div>',
       '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;border-top:1px solid var(--m-border,#ddd);padding-top:14px;">',
       '    <button class="logos-btn settings-contract-btn" id="set-reset-btn">Сброс</button>',
       '    <button class="logos-btn settings-contract-btn" id="set-save-btn">Сохранить параметры</button>',
@@ -497,6 +505,10 @@
 
     function closeModal() {
       ov.remove();
+    }
+    function showSaveError() {
+      document.getElementById("set-status").textContent =
+        "Не удалось сохранить на сервер. Настройки сохранены только в этом браузере.";
     }
     document.getElementById("set-close-btn").addEventListener("click", closeModal);
     ov.addEventListener("click", function (e) {
@@ -540,13 +552,15 @@
     document.getElementById("set-reset-btn").addEventListener("click", function () {
       if (!confirm("Сбросить параметры генерации к значениям по умолчанию?")) return;
       var defs = window.resetSettings(currentConvId);
-      Storage.save(defs, currentConvId);
-      closeModal();
+      Storage.save(defs, currentConvId).then(closeModal, showSaveError);
     });
 
     document.getElementById("set-save-btn").addEventListener("click", function () {
-      settings.temperature = parseFloat(document.getElementById("set-temp").value) || 0.7;
-      settings.top_p = parseFloat(document.getElementById("set-topp").value) || 1.0;
+      // Zero is a valid temperature and top_p; only a non-number falls back to the default.
+      var temperature = parseFloat(document.getElementById("set-temp").value);
+      settings.temperature = Number.isNaN(temperature) ? 0.7 : temperature;
+      var topP = parseFloat(document.getElementById("set-topp").value);
+      settings.top_p = Number.isNaN(topP) ? 1.0 : topP;
       settings.max_output_tokens =
         parseInt(document.getElementById("set-tokens").value, 10) || 2000;
       settings.truncation = document.getElementById("set-trunc").value;
@@ -574,8 +588,7 @@
       settings.prompt_version = document.getElementById("set-prompt-ver").value.trim();
       settings.prompt_variables = document.getElementById("set-prompt-vars").value.trim();
       settings.conv_metadata = document.getElementById("set-conv-meta").value.trim();
-      Storage.save(settings, currentConvId);
-      closeModal();
+      Storage.save(settings, currentConvId).then(closeModal, showSaveError);
     });
   };
 })();

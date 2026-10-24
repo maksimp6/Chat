@@ -82,24 +82,25 @@
     return base;
   }
 
-  // Сохранение локально и на сервер
+  // Сохранение локально сразу; для диалога — и на сервер (нативное хранилище Kristall).
+  // Промис отклоняется, если сервер не принял копию, чтобы окно могло остаться открытым.
   function save(settings, convId) {
     convId =
       convId || (typeof currentConvId !== "undefined" && currentConvId ? currentConvId : null);
-    if (convId) {
-      serverSettingsCache[convId] = settings;
-      localStorage.setItem(convKey(convId), JSON.stringify(settings));
-      // Асинхронная отправка на бэкенд (нативное хранилище Kristall)
-      window.LogosDispatcher.request("/api/conversations/" + convId + "/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-      }).catch(function (e) {
-        console.warn("[SETTINGS] Failed to save on server:", e);
-      });
-    } else {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    if (!convId) {
+      globalSettingsCache = JSON.stringify(settings);
+      localStorage.setItem(STORAGE_KEY, globalSettingsCache);
+      return Promise.resolve();
     }
+    serverSettingsCache[convId] = settings;
+    localStorage.setItem(convKey(convId), JSON.stringify(settings));
+    return window.LogosDispatcher.request("/api/conversations/" + convId + "/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(settings),
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+    });
   }
 
   // Загрузка настроек с сервера при смене диалога
@@ -146,6 +147,7 @@
       }).catch(function () {});
     } else {
       localStorage.removeItem(STORAGE_KEY);
+      globalSettingsCache = "";
     }
     return JSON.parse(JSON.stringify(DEFAULTS));
   };
