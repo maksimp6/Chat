@@ -1,5 +1,6 @@
 """Offline regression tests; no GitHub credentials or paid API calls."""
 import importlib.util
+import base64
 import json
 import os
 from pathlib import Path
@@ -114,6 +115,71 @@ def test_failed_completion_does_not_write_success_receipt(tmp_path):
 def test_redirect_cannot_forward_credentials():
     with pytest.raises(runner.APIError, match="Redirect refused"):
         runner.NoRedirect().redirect_request(None, None, 302, "", {}, "https://example.org")
+
+
+def test_ephemeral_token_only_in_explicit_env_and_masked(tmp_path):
+    payload = message('printf "%s\\n" "$GH_TOKEN"; printf "%s" "x-access-token:$GH_TOKEN" | base64')
+    payload["contextData"]["github"]["token"] = "ephemeral-test-secret"
+    payload["steps"][0]["environment"] = {"map": [
+        {"Key": "GH_TOKEN", "Value": {"type": 3, "expr": "github.token"}}]}
+    (_, result), receipt = execute_job(tmp_path, payload)
+    assert result["conclusion"] == "succeeded"
+    assert "ephemeral-test-secret" not in json.dumps(receipt)
+    assert base64.b64encode(b"x-access-token:ephemeral-test-secret").decode() not in json.dumps(receipt)
+    assert receipt["steps"][0]["output"].splitlines() == ["***", "***"]
+    payload = message('test -z "${GH_TOKEN-}"')
+    payload["contextData"]["github"]["token"] = "ephemeral-test-secret"
+    assert execute_job(tmp_path, payload)[0][1]["conclusion"] == "succeeded"
+
+
+def test_other_env_expressions_rejected_before_execution(tmp_path):
+    marker = tmp_path / "must-not-run"
+    payload = message(f"touch {marker}")
+    payload["steps"][0]["environment"] = {"map": [
+        {"Key": "X", "Value": {"type": 3, "expr": "secrets.UNKNOWN"}}]}
+    assert execute_job(tmp_path, payload)[0][1]["conclusion"] == "failed"
+    assert not marker.exists()
+
+
+@pytest.mark.parametrize("reject_metadata", [False, True])
+def test_standard_logs_upload_masking_and_failure(tmp_path, monkeypatch, reject_metadata):
+    payload = message("printf test-secret-token")
+    payload["variables"] = {"system.github.results_endpoint": {"value": "https://results.actions.githubusercontent.com/"}}
+    uploads, metadata = [], []
+    def request(api, url, token, method="GET", data=None, **kwargs):
+        if url.endswith("SignedBlobURL"):
+            return {"logs_url": "https://logs.blob.core.windows.net/test?sig=secret",
+                    "blob_storage_type": "BLOB_STORAGE_TYPE_AZURE", "soft_size_limit": 10000}
+        metadata.append((url, data))
+        return {"ok": not reject_metadata}
+    monkeypatch.setattr(runner.API, "request", request)
+    monkeypatch.setattr(runner.API, "upload_blob", lambda api, url, content, kind: uploads.append(content))
+    (_, result), receipt = execute_job(tmp_path, payload)
+    assert result["conclusion"] == ("failed" if reject_metadata else "succeeded")
+    assert all(b"test-secret-token" not in content and b"***" in content for content in uploads)
+    assert len(uploads) == (1 if reject_metadata else 2)
+    assert metadata[0][1]["step_backend_id"] == payload["steps"][0]["id"]
+    assert metadata[0][1]["line_count"] == 1
+    assert list((tmp_path / "work" / payload["jobId"]).glob("step-*-receipt.json"))
+
+
+def test_signed_storage_upload_has_no_bearer_header(monkeypatch):
+    requests = []
+    class Response:
+        status = 201
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+    class Opener:
+        def open(self, request, timeout):
+            requests.append(request)
+            return Response()
+    monkeypatch.setattr(runner.urllib.request, "build_opener", lambda *args: Opener())
+    runner.API().upload_blob("https://logs.blob.core.windows.net/test?sig=secret", b"test", "BLOB_STORAGE_TYPE_AZURE")
+    assert "authorization" not in {k.lower(): v for k, v in requests[0].header_items()}
+    assert requests[0].get_header("X-ms-blob-type") == "BlockBlob"
+    for url in ("http://logs.blob.core.windows.net/x", "https://example.org/x", "https://127.0.0.1/x"):
+        with pytest.raises(ValueError):
+            runner.API().upload_blob(url, b"test", "BLOB_STORAGE_TYPE_AZURE")
 
 
 @pytest.mark.parametrize("heartbeat", [False, True])

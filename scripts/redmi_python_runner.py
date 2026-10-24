@@ -50,7 +50,12 @@ class API:
         self.secrets = []
 
     def mask(self, text):
-        for secret in sorted(set(self.secrets), key=len, reverse=True):
+        secrets = set(self.secrets)
+        for secret in tuple(secrets):
+            if secret:
+                secrets.add(base64.b64encode(secret.encode()).decode())
+                secrets.add(base64.b64encode(("x-access-token:" + secret).encode()).decode())
+        for secret in sorted(secrets, key=len, reverse=True):
             if secret:
                 text = text.replace(secret, "***")
         return re.sub(r"\b(?:gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+|eyJ[A-Za-z0-9_.-]+)", "***", text)
@@ -86,6 +91,29 @@ class API:
         except urllib.error.HTTPError as exc:
             body = self.mask(exc.read(3000).decode(errors="replace"))
             raise APIError(exc.code, body[:600]) from None
+
+    def upload_blob(self, url, payload, storage_type):
+        """PUT to a signed Results storage URL, without forwarding a job token."""
+        target = urllib.parse.urlsplit(url)
+        host = target.hostname or ""
+        if target.scheme != "https" or target.username or target.password or target.port not in (None, 443):
+            raise ValueError("Invalid log storage URL")
+        if not (host.endswith(".blob.core.windows.net") or
+                re.fullmatch(r"[a-z0-9.-]+\.s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com", host)):
+            raise ValueError("Unexpected log storage host: " + host)
+        self.secrets.append(url)
+        headers = {"Content-Type": "text/plain; charset=utf-8", "User-Agent": USER_AGENT}
+        if storage_type == "BLOB_STORAGE_TYPE_AZURE":
+            headers["x-ms-blob-type"] = "BlockBlob"
+        try:
+            request = urllib.request.Request(url, data=payload, headers=headers, method="PUT")
+            with urllib.request.build_opener(NoRedirect()).open(request, timeout=40) as response:
+                if response.status not in (200, 201):
+                    raise APIError(response.status, "Log storage rejected upload")
+        except urllib.error.HTTPError as exc:
+            raise APIError(exc.code, "Log storage rejected upload") from None
+        except urllib.error.URLError:
+            raise RuntimeError("Log storage upload unavailable") from None
 
 def secure_json(path, value):
     temp = path.with_suffix(".tmp")
@@ -243,6 +271,19 @@ def decode(value):
         return {}
     return {k: decode(v) for k, v in value.items()}
 
+def decode_env(value, github):
+    """Only the ephemeral job token is supported as an environment expression."""
+    if isinstance(value, dict) and "expr" in value:
+        if value["expr"].strip() != "github.token" or not github.get("token"):
+            raise ValueError("Unsupported environment expression")
+        return github["token"]
+    if isinstance(value, dict) and "map" in value:
+        return {decode(x.get("key", x.get("Key"))): decode_env(x.get("value", x.get("Value")), github)
+                for x in value["map"]}
+    if isinstance(value, dict) and "type" not in value and "t" not in value:
+        return {k: decode_env(v, github) for k, v in value.items()}
+    return decode(value)
+
 def validate_job(job, repository):
     github = decode(job.get("contextData", {}).get("github", {}))
     if github.get("repository") != repository:
@@ -279,7 +320,7 @@ def validate_job(job, repository):
             raise ValueError("Unsupported step condition")
         if decode(step.get("continueOnError", False)):
             raise ValueError("continue-on-error is unsupported")
-        env = decode(step.get("environment", {}))
+        env = decode_env(step.get("environment", {}), github)
         if not isinstance(env, dict) or not all(isinstance(v, (str, int, float, bool)) for v in env.values()):
             raise ValueError("Only literal environment values are supported")
     return github
@@ -346,6 +387,29 @@ class Job:
         github = decode(message.get("contextData", {}).get("github", {}))
         if github.get("token"):
             self.api.secrets.append(github["token"])
+        self.results_url = message.get("variables", {}).get("system.github.results_endpoint", {}).get("value")
+
+    def upload_log(self, text, step_id=None):
+        if not self.results_url:
+            return False
+        kind = "Step" if step_id else "Job"
+        data = {"workflow_run_backend_id": self.message["plan"]["planId"],
+                "workflow_job_run_backend_id": self.id}
+        if step_id:
+            data["step_backend_id"] = step_id
+        route = urllib.parse.urljoin(self.results_url, "twirp/results.services.receiver.Receiver/")
+        signed = self.api.request(route + "Get" + kind + "LogsSignedBlobURL", self.token, "POST", data)
+        lines = self.api.mask(text).splitlines() or ["(no output)"]
+        payload = "".join(timestamp() + " " + line + "\n" for line in lines).encode()
+        limit = signed.get("soft_size_limit")
+        if limit and len(payload) > int(limit):
+            raise ValueError("Log exceeds Results storage size limit")
+        self.api.upload_blob(signed["logs_url"], payload, signed.get("blob_storage_type"))
+        data.update(uploaded_at=timestamp(), line_count=len(lines))
+        result = self.api.request(route + "Create" + kind + "LogsMetadata", self.token, "POST", data)
+        if not result or result.get("ok") is not True:
+            raise RuntimeError("Actions log finalization failed")
+        return True
 
     def request(self, path, data):
         return self.api.request(urllib.parse.urljoin(self.url, path), self.token, "POST", data)
@@ -376,7 +440,7 @@ class Job:
                 if isinstance(github.get(key), (str, int)):
                     env["GITHUB_" + key.upper()] = str(github[key])
             for block in self.message.get("environmentVariables", []):
-                env.update({k: str(v) for k, v in decode(block).items()})
+                env.update({k: str(v) for k, v in decode_env(block, github).items()})
             result = 0
             for number, step in enumerate(self.message["steps"], 1):
                 condition = step.get("condition", "success()")
@@ -391,21 +455,25 @@ class Job:
                         raise ValueError("Working directory leaves job workspace")
                     target.mkdir(mode=0o700, parents=True, exist_ok=True)
                     step_env = dict(env)
-                    step_env.update({k: str(v) for k, v in decode(step.get("environment", {})).items()})
+                    step_env.update({k: str(v) for k, v in decode_env(step.get("environment", {}), github).items()})
                     limit = min(900, max(1, float(decode(step.get("timeoutInMinutes")) or 5) * 60))
                     code, text_output = execute_script(inputs["script"], inputs.get("shell", "bash"), target, step_env, self.cancel, limit)
                     text_output = self.api.mask(text_output)
                     conclusion = 3 if self.cancel.is_set() else (0 if code == 0 else 2)
                     record.update({"conclusion": {0: "succeeded", 2: "failed", 3: "canceled"}[conclusion], "completed_at": timestamp(),
-                        "annotations": [{"level": 1 if conclusion == 0 else 3, "message": text_output[-6000:] or f"Exit code: {code}", "title": "Native Python runner output"}]})
+                        "annotations": [{"level": 1 if conclusion == 0 else 3, "message": text_output[-6000:] or f"Exit code: {code}", "title": "Native Termux shell output"}]})
                     output.append({"step": number, "exit_code": code, "output": text_output})
                     if conclusion != 0:
                         result = conclusion
+                    secure_json(work / ("step-" + str(number) + "-receipt.json"), output[-1])
+                    self.upload_log(text_output, step["id"])
                 step_results.append(record)
             if self.error:
                 raise RuntimeError(self.error)
             if self.cancel.is_set():
                 result = 3
+            self.upload_log("\n".join("Step " + str(item["step"]) + " (exit " +
+                                      str(item["exit_code"]) + ")\n" + item["output"] for item in output))
         except Exception as exc:
             result = 3 if self.cancel.is_set() else 2
             output.append({"error": self.api.mask(str(exc))})

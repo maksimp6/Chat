@@ -1,4 +1,4 @@
-# Native Python runner on Redmi 9
+# Native Termux shell runner on Redmi 9
 
 The repository runner `redmi9-python` (runner ID 21) executes small GitHub Actions
 shell/Python jobs directly in Termux on Redmi 9 (`galahad`, ARM64). Runtime:
@@ -11,7 +11,7 @@ runtime packages. Pytest is used only for regression tests.
 permissions: {}
 jobs:
   example:
-    runs-on: redmi9-python
+    runs-on: redmi9
     steps:
       - shell: python
         run: |
@@ -29,9 +29,14 @@ the active process group and skips subsequent commands.
 
 Containers, `uses:` actions (including checkout/setup/cache/artifact actions),
 unresolved expressions, job outputs/defaults, and `continue-on-error` are rejected
-as failures. GitHub environment/output command files and normal streamed Actions
-logs are not implemented. A redacted output tail is attached to job/step
-annotations; a local receipt contains up to 1 MiB per step. Steps default to a
+as failures. The sole supported environment expression is `${{ github.token }}`;
+only explicitly configured step/job environment variables receive this ephemeral
+token. It is never written to a credential helper or runner configuration.
+GitHub environment/output command files and live streaming are not implemented.
+Standard Actions logs are uploaded to GitHub Results after each step and at job
+completion, with token masking before upload. Upload/finalization failure fails
+the job; local per-step receipts preserve the output. A redacted output tail is
+also attached to annotations; a receipt contains up to 1 MiB per step. Steps default to a
 5-minute limit, with a maximum of 15 minutes; the GitHub job timeout can also
 cancel execution. This is a custom implementation of the current broker
 protocol, not the official runner or a drop-in replacement. Compatibility is
