@@ -37,7 +37,12 @@ def init_department_tables() -> None:
 def _admin_ok() -> bool:
     expected = os.getenv("LOGOS_DEPARTMENTS_ADMIN_TOKEN", "").strip()
     supplied = request.headers.get("X-Department-Admin-Token", "").strip()
-    return bool(expected and supplied and secrets.compare_digest(expected, supplied))
+    # compare_digest rejects non-ASCII str; comparing bytes turns a bad header into a refusal, not a 500.
+    return bool(
+        expected
+        and supplied
+        and secrets.compare_digest(expected.encode("utf-8"), supplied.encode("utf-8"))
+    )
 
 
 def _validate_id(value: str) -> str:
@@ -45,6 +50,14 @@ def _validate_id(value: str) -> str:
     if not value or len(value) > 64 or any(ch not in _DEPT_ID_CHARS for ch in value):
         raise ValueError("invalid department id")
     return value
+
+
+def _find_department(department_id: str) -> Optional[dict[str, Any]]:
+    # A malformed id is simply not a department here; the caller answers 404, not 500.
+    try:
+        return get_department(department_id)
+    except ValueError:
+        return None
 
 
 def list_departments() -> list[dict[str, Any]]:
@@ -128,7 +141,7 @@ def departments_update(department_id: str):
 def departments_delete(department_id: str):
     if not _admin_ok():
         return jsonify({"error": "department admin authorization required"}), 401
-    department = get_department(department_id)
+    department = _find_department(department_id)
     if not department:
         return jsonify({"error": "department_not_found"}), 404
     key = "department/" + _validate_id(department_id)
@@ -141,7 +154,7 @@ def departments_delete(department_id: str):
 
 @departments_bp.post("/<department_id>/sessions")
 def departments_start_session(department_id: str):
-    department = get_department(department_id)
+    department = _find_department(department_id)
     if not department:
         return jsonify({"error": "department_not_found"}), 404
     if department["status"] != "active":

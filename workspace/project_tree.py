@@ -3,13 +3,18 @@
 import os
 from flask import Blueprint, jsonify, request
 
+from identity.deployment_admin import deployment_admin_denied
+
 project_tree_bp = Blueprint("project_tree", __name__)
 PROJECT_ROOT = os.path.realpath(os.getenv("LOGOS_PROJECT_ROOT", os.path.dirname(__file__)))
 MAX_NODES = 2000
 SKIP_NAMES = {".git", "node_modules", "__pycache__", ".venv", "venv", ".pytest_cache"}
 
 
-def _tree(path, depth=0):
+def _tree(path, depth=0, budget=None):
+    # One budget for the whole walk, so MAX_NODES bounds the response, not each level.
+    if budget is None:
+        budget = [MAX_NODES]
     if depth > 12:
         return []
     entries = []
@@ -22,6 +27,8 @@ def _tree(path, depth=0):
         raise RuntimeError(f"Cannot read project tree: {exc}") from exc
 
     for name in names:
+        if budget[0] <= 0:
+            break
         if name in SKIP_NAMES or name.startswith("."):
             continue
         full = os.path.realpath(os.path.join(path, name))
@@ -34,19 +41,17 @@ def _tree(path, depth=0):
             "kind": "directory" if is_dir else "file",
             "icon": "📁" if is_dir else "📄",
         }
-        if is_dir:
-            item["children"] = _tree(full, depth + 1)
+        budget[0] -= 1
         entries.append(item)
-        if sum(1 for _ in _walk_count(entries)) >= MAX_NODES:
-            break
+        if is_dir:
+            item["children"] = _tree(full, depth + 1, budget)
     return entries
 
 
-def _walk_count(items):
-    for item in items:
-        yield item
-        for child in _walk_count(item.get("children", [])):
-            yield child
+# The tree shows the source layout, which belongs to the deployment rather than to a user.
+@project_tree_bp.before_request
+def _deployment_admin_only():
+    return deployment_admin_denied()
 
 
 @project_tree_bp.route("/api/project-tree", methods=["GET"])
