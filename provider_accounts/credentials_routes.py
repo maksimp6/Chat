@@ -706,4 +706,3 @@ def update_provider_credentials():
         invalidate_model_discovery_cache()
 
     return provider_credentials_status()
-
