@@ -138,14 +138,14 @@ def test_degraded_catalog_keeps_haiku_selectable_alongside_yandex(monkeypatch):
     catalog = response.get_json()
     assert catalog["degraded"] is True
     assert catalog["text"][MODEL]["provider"] == "anthropic"
-    assert "logosai-llm" in catalog["text"]
+    assert "aliceai-llm" in catalog["text"]
 
 
 def test_haiku_conversation_selection_survives_database_reload(isolated_store, monkeypatch):
     import app as application
 
-    isolated_store.create_conversation("haiku-dialog", "Haiku", "logosai-llm")
-    isolated_store.create_conversation("yandex-dialog", "Yandex", "logosai-llm")
+    isolated_store.create_conversation("haiku-dialog", "Haiku", "aliceai-llm")
+    isolated_store.create_conversation("yandex-dialog", "Yandex", "aliceai-llm")
     monkeypatch.setattr(application, "get_current_owner_id", lambda required=False: "owner")
     monkeypatch.setattr(application, "check_access", lambda *args: True)
     response = application.app.test_client().patch(
@@ -154,7 +154,7 @@ def test_haiku_conversation_selection_survives_database_reload(isolated_store, m
     assert response.status_code == 200
     conversations = {row["id"]: row for row in isolated_store.get_conversations()}
     assert conversations["haiku-dialog"]["model"] == MODEL
-    assert conversations["yandex-dialog"]["model"] == "logosai-llm"
+    assert conversations["yandex-dialog"]["model"] == "aliceai-llm"
 
 
 def test_trace_retains_anthropic_usage_and_usd_estimate_across_continuation():
@@ -201,7 +201,7 @@ def test_usd_billing_is_not_posted_as_rubles(monkeypatch):
 
 
 def test_yandex_billing_remains_rub_per_thousand_tokens():
-    item = build_ai_billing_item("logosai-llm", {"input_tokens": 1000, "output_tokens": 1000}, 1)
+    item = build_ai_billing_item("aliceai-llm", {"input_tokens": 1000, "output_tokens": 1000}, 1)
     assert item["currency"] == "RUB"
     assert item["provider"] == "yandex_ai_studio"
     assert item["cost_status"] == "calculated"

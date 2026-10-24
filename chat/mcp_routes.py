@@ -75,7 +75,7 @@ def _tool_rounds(value: Any) -> int:
     """Tool-loop rounds the client asked for, clamped so one request cannot loop without bound."""
     try:
         rounds = int(16 if value is None else value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         rounds = 16
     return max(1, min(rounds, _MAX_TOOL_ROUNDS))
 
@@ -358,6 +358,9 @@ class LogosClient(YandexResponsesClient):
         return response
 
 
+OUTPUT_LIMIT_MESSAGE = "Модель не успела ответить: лимит вывода исчерпан"
+
+
 def _turn_cost(billing: dict[str, Any]) -> float | None:
     """The cost recorded on a reply: the calculated total only. A turn with any unpriced item is
     not posted to the treasury (see settle_billing_to_treasury), so it records no cost either."""
@@ -575,6 +578,12 @@ def chat():
 
         reasoning, reply = client.extract_reasoning_and_text(response)
         if not reply:
+            details = response.get("incomplete_details") if isinstance(response, dict) else None
+            # Provider sends status "incomplete" with no text when the output limit is used up
+            # (in the traces details can be null). A content filter keeps its own reason.
+            if isinstance(response, dict) and response.get("status") == "incomplete":
+                if (details or {}).get("reason") != "content_filter":
+                    raise RuntimeError(OUTPUT_LIMIT_MESSAGE)
             raise RuntimeError("Responses API завершил tool-call цепочку без текстового ответа")
         usage = client.extract_usage(response)
         timings = response.get("step_timings", []) if isinstance(response, dict) else []
@@ -642,11 +651,14 @@ def chat():
         is_temperature_error = (
             isinstance(e, ValueError) and "temperature" in internal_error_message.lower()
         )
-        error_message = (
-            "Некорректное значение temperature"
-            if is_temperature_error
-            else "Внутренняя ошибка обработки запроса"
-        )
+        if is_temperature_error:
+            error_message = "Некорректное значение temperature"
+        elif "HTTP 403" in internal_error_message:
+            error_message = "Нет доступа к этой модели в аккаунте провайдера."
+        elif internal_error_message == OUTPUT_LIMIT_MESSAGE:
+            error_message = OUTPUT_LIMIT_MESSAGE + "."
+        else:
+            error_message = "Внутренняя ошибка обработки запроса"
 
         try:
             # The failure can come before the access check (for example a malformed skills field),

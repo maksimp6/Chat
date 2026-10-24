@@ -8,9 +8,9 @@ const { BrowserShim } = require("../browser/emulator/browser_dom");
 const shim = new BrowserShim('<div id="model-list"></div>');
 const runtime = shim.load([], {});
 vm.runInContext(
-  `var currentModel = "logosai-llm";
+  `var currentModel = "aliceai-llm";
    var modelsData = {text: {
-     "logosai-llm": {name: "Logos", input: 0.5, output: 1.2},
+     "aliceai-llm": {name: "Logos", input: 0.5, output: 1.2},
      "claude-haiku-5-5": {name: "Haiku 5.5", provider: "anthropic", currency: "USD",
        price_unit: "per_million_tokens", input: 0.1, output: 0.5}
    }, voice: {}};`,

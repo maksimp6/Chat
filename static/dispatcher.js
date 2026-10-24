@@ -32,22 +32,38 @@
 
   function request(input, init, options) {
     const settings = options || {};
-    const timeoutMs = Math.min(
-      Math.max(Number(settings.timeoutMs || DEFAULT_TIMEOUT_MS), 1),
-      MAX_TIMEOUT_MS,
-    );
+    const requested = Number(settings.timeoutMs);
+    const timeoutMs =
+      Number.isFinite(requested) && requested > 0
+        ? Math.min(requested, MAX_TIMEOUT_MS)
+        : DEFAULT_TIMEOUT_MS;
     const requestInit = Object.assign({}, init || {});
     if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
-      requestInit.signal = AbortSignal.timeout(timeoutMs);
+      const timeoutSignal = AbortSignal.timeout(timeoutMs);
+      // Keep a signal the caller passed in: cancelling it must still cancel the request.
+      requestInit.signal =
+        init && init.signal && typeof AbortSignal.any === "function"
+          ? AbortSignal.any([init.signal, timeoutSignal])
+          : timeoutSignal;
     }
 
     const trace = beginRequestTrace(input);
     activeRequests += 1;
     setNetworkStatus("running", "Сетевой запрос выполняется");
 
+    let pending;
+    try {
+      pending = fetch(input, requestInit);
+    } catch (error) {
+      // A synchronous throw never reaches the promise handlers below: release the slot here.
+      activeRequests = Math.max(activeRequests - 1, 0);
+      setNetworkStatus("error", "Сетевой запрос завершился ошибкой");
+      throw error;
+    }
+
     // Release the slot once, first: a throw while reporting the response must not
     // release it again, and the error handler must not run for a success path.
-    return fetch(input, requestInit).then(
+    return pending.then(
       function (response) {
         activeRequests = Math.max(activeRequests - 1, 0);
         if (trace) {

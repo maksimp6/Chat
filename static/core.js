@@ -1,6 +1,6 @@
 let currentConvId = null;
 let conversations = [];
-let currentModel = "logos-runtime";
+let currentModel = localStorage.getItem("current_model") || "logos-runtime";
 let currentModelType = "text";
 let modelsData = { text: {}, voice: {} };
 let coreInitialized = false;
@@ -60,8 +60,8 @@ window.LogosTheme = {
 
 // Keys renamed in #1316; stored conversations may still carry the old names.
 const LEGACY_MODEL_KEYS = {
-  "logosai-llm": "logos-runtime",
-  "logosai-llm-flash": "logos-runtime-flash",
+  "aliceai-llm": "logos-runtime",
+  "aliceai-llm-flash": "logos-runtime-flash",
 };
 
 const savedTheme = window.LogosTheme.getStored();
@@ -180,6 +180,11 @@ async function loadModels() {
       throw new Error("Empty model catalog");
     }
     modelsData = { text: text, voice: voice };
+    // A saved model that is no longer in the catalog falls back to the default.
+    if (!text[currentModel] && !voice[currentModel]) {
+      currentModel = "logos-runtime";
+      localStorage.setItem("current_model", currentModel);
+    }
     modelLoadState = { status: "ready", message: "" };
     reportModelLoad("success", {
       modelCount: Object.keys(text).length + Object.keys(voice).length,
@@ -324,7 +329,11 @@ window.updateUIForModel = function () {
   var textModels = modelsData.text || {};
   var voiceModels = modelsData.voice || {};
   var isVoice = !!voiceModels[currentModel];
-  var isMultimodal = !!(textModels[currentModel] && textModels[currentModel].multimodal);
+  var currentEntry = textModels[currentModel] || {};
+  var isMultimodal = !!(
+    currentEntry.multimodal ||
+    (currentEntry.capabilities && currentEntry.capabilities.multimodal)
+  );
 
   if (!root) return;
 

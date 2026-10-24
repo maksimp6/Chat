@@ -527,14 +527,6 @@ def _has_copilot_review(thread: Thread) -> bool:
     )
 
 
-def _has_codex_check(thread: Thread) -> bool:
-    """Codex's own bot answered with a review or comment; a request or a Codex commit is not one."""
-    return any(
-        event.kind in {"reviewed", "commented"} and classify_login(event.actor) == "codex"
-        for event in thread.events
-    )
-
-
 _MAINTAINER_STATUS = re.compile(
     r"^\s*(?:BLOCKED|DEFERRED|ЗАБЛОКИРОВАНО|ОТЛОЖЕНО)\s*:",
     re.IGNORECASE,

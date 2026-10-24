@@ -163,6 +163,11 @@ def settle_billing_to_treasury(billing: Dict[str, Any], owner_id: Optional[str])
     amount = float(billing.get("total_cost") or 0)
     if amount <= 0:
         return {"status": "skipped", "reason": "zero_cost"}
+    # The treasury holds rubles and there is no exchange rate in the repository,
+    # so a USD amount must not be debited as if it were rubles.
+    currency = str(billing.get("currency", "RUB"))
+    if currency != "RUB":
+        return {"status": "skipped", "reason": "currency_not_debitable", "currency": currency}
 
     import math
 

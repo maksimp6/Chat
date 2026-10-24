@@ -38,11 +38,11 @@ def build_response_payload(
     yandex_conv_id=None,
 ):
     """Build a Yandex Responses API payload from client parameters."""
-    # A copy, so Ultra defaults never leak back into the caller's params.
+    # A copy, so Ultra values never leak back into the caller's params. The Ultra profile
+    # wins for the keys it sets: the web UI always sends its own reasoning_effort default.
     params = dict(params or {})
     for name, value in ultra_request_defaults(model_key).items():
-        if params.get(name) in (None, ""):
-            params[name] = value
+        params[name] = value
     is_background = params.get("background", True)
 
     if is_background:

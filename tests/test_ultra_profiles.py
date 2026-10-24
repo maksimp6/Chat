@@ -25,8 +25,8 @@ class UltraProfilesTest(unittest.TestCase):
     def test_complete_registry_and_aliases(self):
         profiles = self.validate()
         self.assertEqual(len(profiles), 14)
-        self.assertEqual(profiles["logos-runtime"]["upstream_id"], "logosai-llm")
-        self.assertEqual(profiles["logos-runtime-flash"]["upstream_id"], "logosai-llm-flash")
+        self.assertEqual(profiles["logos-runtime"]["upstream_id"], "aliceai-llm")
+        self.assertEqual(profiles["logos-runtime-flash"]["upstream_id"], "aliceai-llm-flash")
 
     def test_new_registry_model_requires_new_profile(self):
         self.registry["new-provider-model"] = {"type": "text"}
@@ -44,7 +44,7 @@ class UltraProfilesTest(unittest.TestCase):
 
     def test_alias_uri_cannot_silently_point_at_another_model(self):
         self.catalog["profiles"]["logos-runtime"]["model_uri_template"] = (
-            "gpt://${YANDEX_PROJECT_ID}/logosai-llm-flash/latest"
+            "gpt://${YANDEX_PROJECT_ID}/aliceai-llm-flash/latest"
         )
         with self.assertRaisesRegex(ultra.ProfileError, "URI mismatch"):
             self.validate()

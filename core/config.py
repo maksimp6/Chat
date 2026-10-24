@@ -6,7 +6,6 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
-from provider_accounts.claude_catalog import CLAUDE_MODELS
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +59,8 @@ PORT = 8080
 TEXT_MODELS = {
     "logos-runtime": {
         "name": "Logos Runtime",
-        "upstream": "logosai-llm",
+        "currency": "RUB",
+        "upstream": "aliceai-llm",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.50,
@@ -70,6 +70,7 @@ TEXT_MODELS = {
     },
     "yandexgpt-5.1": {
         "name": "YandexGPT 5.1 Pro",
+        "currency": "RUB",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.80,
@@ -79,6 +80,7 @@ TEXT_MODELS = {
     },
     "yandexgpt-5-pro": {
         "name": "YandexGPT 5 Pro",
+        "currency": "RUB",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 1.20,
@@ -88,6 +90,7 @@ TEXT_MODELS = {
     },
     "yandexgpt-5-lite": {
         "name": "YandexGPT 5 Lite",
+        "currency": "RUB",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.20,
@@ -97,7 +100,8 @@ TEXT_MODELS = {
     },
     "logos-runtime-flash": {
         "name": "Logos Runtime Flash",
-        "upstream": "logosai-llm-flash",
+        "currency": "RUB",
+        "upstream": "aliceai-llm-flash",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.10,
@@ -107,6 +111,7 @@ TEXT_MODELS = {
     },
     "deepseek-v4.1-flash": {
         "name": "DeepSeek V4.1 Flash",
+        "currency": "RUB",
         "type": "text",
         "capabilities": {"tools": True, "function_calling": True, "multimodal": None},
         "context_window": 1048576,
@@ -119,6 +124,7 @@ TEXT_MODELS = {
     },
     "deepseek-v4-flash": {
         "name": "DeepSeek V4 Flash",
+        "currency": "RUB",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.30,
@@ -128,6 +134,7 @@ TEXT_MODELS = {
     },
     "qwen3-235b-a22b-fp8": {
         "name": "Qwen3 235B A22B FP8",
+        "currency": "RUB",
         # Retired by the provider on 2026-09-30: kept for accounting, not selectable.
         "available": False,
         "type": "text",
@@ -139,6 +146,7 @@ TEXT_MODELS = {
     },
     "gpt-oss-120b": {
         "name": "GPT OSS 120B",
+        "currency": "RUB",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.30,
@@ -148,6 +156,7 @@ TEXT_MODELS = {
     },
     "gpt-oss-20b": {
         "name": "GPT OSS 20B",
+        "currency": "RUB",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.10,
@@ -157,6 +166,7 @@ TEXT_MODELS = {
     },
     "qwen3.6-35b-a3b": {
         "name": "Qwen3.6 35B A3B",
+        "currency": "RUB",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": True},
         "input": 0.20,
@@ -169,6 +179,7 @@ TEXT_MODELS = {
 VOICE_MODELS = {
     "speech-realtime-260528": {
         "name": "Speech Realtime 260528",
+        "currency": "RUB",
         # Retired by the provider on 2026-10-12: kept for accounting, not selectable.
         "available": False,
         "type": "voice",
@@ -180,6 +191,7 @@ VOICE_MODELS = {
     },
     "speech-realtime-250923": {
         "name": "Speech Realtime 250923",
+        "currency": "RUB",
         # Retired by the provider on 2026-10-12: kept for accounting, not selectable.
         "available": False,
         "type": "voice",
@@ -191,6 +203,7 @@ VOICE_MODELS = {
     },
     "speech-realtime-deepseek-v4-flash": {
         "name": "Speech Realtime DeepSeek V4 Flash",
+        "currency": "RUB",
         "type": "voice",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.30,
@@ -200,7 +213,6 @@ VOICE_MODELS = {
     },
 }
 
-TEXT_MODELS.update(CLAUDE_MODELS)
 ALL_MODELS = {**TEXT_MODELS, **VOICE_MODELS}
 AUDIO_STT_PRICE_PER_SEC = 0.0264
 AUDIO_TTS_PRICE_PER_SEC = 0.0203
@@ -217,8 +229,8 @@ class Config:
 
 # Keys renamed in #1316. Stored conversations and older clients may still send them.
 LEGACY_MODEL_KEYS = {
-    "logosai-llm": "logos-runtime",
-    "logosai-llm-flash": "logos-runtime-flash",
+    "aliceai-llm": "logos-runtime",
+    "aliceai-llm-flash": "logos-runtime-flash",
 }
 
 

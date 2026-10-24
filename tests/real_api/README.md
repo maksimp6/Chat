@@ -75,7 +75,7 @@ python tests/real_api/run.py \
   --allow-paid-api \
   --secret-file "$HOME/.config/logos-qwen/yandex-secret.json" \
   --project-id '<existing-folder-id>' \
-  --model logosai-llm-flash \
+  --model aliceai-llm-flash \
   --state-root "$HOME/.local/state/logos-pro/real-api" \
   --max-output-tokens 32
 ```
@@ -94,7 +94,7 @@ For the installed-app probe on Redmi 9, with its existing stored credential:
 ```bash
 python tests/real_api/run.py \
   --allow-paid-api --probe-installed \
-  --model logosai-llm-flash \
+  --model aliceai-llm-flash \
   --installed-build 0.1.0-cc82083 \
   --state-root "$HOME/.local/state/logos-pro/real-api"
 ```

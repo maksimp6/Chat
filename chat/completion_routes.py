@@ -38,7 +38,8 @@ def _messages_from_body(body: dict) -> list[dict]:
         raise _BadInput("send message or messages")
     messages = []
     for item in raw:
-        if not isinstance(item, dict) or item.get("role") not in ROLES:
+        role = item.get("role") if isinstance(item, dict) else None
+        if not isinstance(role, str) or role not in ROLES:
             raise _BadInput("each message needs role system, user or assistant")
         text = item.get("text")
         if not isinstance(text, str) or not text.strip():

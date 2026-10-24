@@ -110,7 +110,7 @@ def create_embeddings():
             )
     else:
         mode = body.get("mode", "doc")
-        if mode not in MODES:
+        if not isinstance(mode, str) or mode not in MODES:
             return jsonify({"error": "mode must be doc or query"}), 400
         model_name = MODES[mode]
     try:

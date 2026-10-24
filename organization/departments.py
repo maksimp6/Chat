@@ -23,13 +23,6 @@ def _json(value: Any) -> str:
     return json.dumps(value if value is not None else {}, ensure_ascii=False)
 
 
-def _parse(value: Any, default: Any) -> Any:
-    try:
-        return json.loads(value or "")
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return default
-
-
 def init_department_tables() -> None:
     get_store()
 

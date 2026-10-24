@@ -553,6 +553,16 @@ function loadHistory(convId) {
     });
 }
 
+// Server error codes become plain sentences; anything unknown gets one generic line.
+const CHAT_ERROR_TEXT = {
+  conversation_not_found: "Этот диалог не найден. Создайте новый чат.",
+  model_uses_completion_api: "Эта модель пока недоступна в чате.",
+};
+
+function chatErrorText(code) {
+  return CHAT_ERROR_TEXT[code] || "Не удалось получить ответ. Попробуйте ещё раз.";
+}
+
 document.addEventListener("DOMContentLoaded", function () {
   const sendBtn = document.getElementById("send-btn");
   const input = document.getElementById("msg-input");
@@ -574,7 +584,6 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    input.value = "";
     addMessage(text, "user", false, 0);
     const params =
       typeof window.getResponsesParams === "function" ? window.getResponsesParams() : {};
@@ -594,7 +603,7 @@ document.addEventListener("DOMContentLoaded", function () {
         model: currentModel,
         params: params,
       }),
-    })
+    }, { timeoutMs: 30000 })
       .then(async (r) => {
         const data = await r.json().catch(() => ({}));
         return { ok: r.ok, status: r.status, data };
@@ -602,6 +611,8 @@ document.addEventListener("DOMContentLoaded", function () {
       .then((result) => {
         typingEl.remove();
         const data = result.data || {};
+        // Clear the input only once the server has taken the message; an error keeps the text.
+        if ((data.reply || data.requires_approval) && input.value === text) input.value = "";
         const clientTotalMs = Math.round(performance.now() - t0);
         if (data.title && Array.isArray(conversations)) {
           var conversation = conversations.find(function (item) {
@@ -630,7 +641,7 @@ document.addEventListener("DOMContentLoaded", function () {
           );
         } else if (data.error) {
           addMessage(
-            "⚠️ Ошибка: " + data.error,
+            "⚠️ " + chatErrorText(data.error),
             "error",
             false,
             data.cost || 0,
@@ -642,7 +653,7 @@ document.addEventListener("DOMContentLoaded", function () {
           );
         } else {
           addMessage(
-            `⚠️ Ошибка HTTP ${result.status}`,
+            "⚠️ Сервер не ответил. Попробуйте ещё раз.",
             "error",
             false,
             0,
@@ -656,7 +667,7 @@ document.addEventListener("DOMContentLoaded", function () {
       })
       .catch((e) => {
         typingEl.remove();
-        addMessage("⚠️ Ошибка: " + (e.message || "Сетевой сбой"), "error", false, 0);
+        addMessage("⚠️ Нет связи с сервером. Попробуйте ещё раз.", "error", false, 0);
       });
   }
 

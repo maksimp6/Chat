@@ -18,11 +18,9 @@ function formatUltraSummary(summary) {
     parts.push("снята");
     return parts.join(" · ");
   }
-  if (summary.status === "prepared_not_activated") parts.push("не активирован");
   if (summary.context_window_tokens) {
     parts.push("контекст " + summary.context_window_tokens + " ток.");
   }
-  parts.push("блокеров: " + (summary.blockers || []).length);
   return parts.join(" · ");
 }
 
@@ -68,14 +66,17 @@ function renderModelModal() {
       (unavailable ? " model-option-unavailable" : "");
     var priceText = "";
     if (m.input != null && m.output != null) {
-      priceText =
-        m.currency === "USD" || m.price_unit === "per_million_tokens"
-          ? m.input + " / " + m.output + " USD/1M"
-          : m.input + " / " + m.output + " \u20bd/1K";
+      // Show only the unit we know; an unknown currency gets no unit.
+      var unit = "";
+      if (m.currency === "USD" || m.price_unit === "per_million_tokens") unit = " USD/1M";
+      else if (m.currency === "RUB") unit = " \u20bd/1K";
+      priceText = m.input + " / " + m.output + unit;
     }
     var badges = "";
     if (modelsData.voice && modelsData.voice[key]) badges += " \uD83C\uDFA4";
-    if (m.multimodal) badges += " \uD83D\uDCF7";
+    if (m.multimodal || (m.capabilities && m.capabilities.multimodal)) {
+      badges += " \uD83D\uDCF7";
+    }
     if (unavailable)
       badges += " \u00B7 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430";
     var nameWrap = document.createElement("div");
@@ -94,7 +95,6 @@ function renderModelModal() {
       var ultra = document.createElement("div");
       ultra.className = "model-option-ultra";
       ultra.textContent = formatUltraSummary(m.ultra_profile);
-      ultra.title = (m.ultra_profile.blockers || []).join(", ");
       div.appendChild(ultra);
     }
     div.addEventListener("click", function () {

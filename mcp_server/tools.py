@@ -52,7 +52,8 @@ def _system_status(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str
         },
         "models": {
             "count": len(ALL_MODELS),
-            "available": sorted(ALL_MODELS.keys()),
+            # Retired registry entries stay listed for accounting but cannot be selected.
+            "available": sorted(k for k, v in ALL_MODELS.items() if v.get("available") is not False),
         },
         "local_tools": {
             "category_count": len(categories),

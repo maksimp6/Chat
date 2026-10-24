@@ -11,7 +11,6 @@ from typing import Any
 import requests
 
 from core.config import TEXT_MODELS, VOICE_MODELS, registry_key_for_upstream
-from provider_accounts.claude_catalog import CLAUDE_MODELS
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +86,6 @@ class ModelDiscovery:
         if not text_models:
             raise ModelDiscoveryError("provider returned an empty model catalog")
 
-        text_models.update({key: dict(value) for key, value in CLAUDE_MODELS.items()})
         return {"text": text_models, "voice": dict(VOICE_MODELS)}
 
     @staticmethod
@@ -104,7 +102,10 @@ class ModelDiscovery:
             if len(parts) >= 2:
                 model_id = parts[-2]
         elif "/" in raw_id:
-            model_id = raw_id.rstrip("/").split("/")[-1]
+            # "name/latest" names the model "name"; a version tag is not part of the id.
+            segments = raw_id.rstrip("/").split("/")
+            is_tag = segments[-1] in ("latest", "rc", "stable")
+            model_id = segments[-2] if is_tag and len(segments) >= 2 else segments[-1]
         model_id = model_id.strip()
         if not model_id:
             return None

@@ -91,6 +91,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond(403, "Forbidden", "text/plain; charset=utf-8")
         if self.headers.get("Origin") not in (None, f"http://{HOST}:{PORT}"):
             return self.respond(403, "Forbidden", "text/plain; charset=utf-8")
+        fields = {}  # the error path below echoes these back, so they must exist before parsing
         try:
             size = int(self.headers.get("Content-Length", "-1"))
             if not 0 <= size <= 2048:
@@ -142,8 +143,8 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(
                 200,
                 render(
-                    fields.get("ip", [""])[0] if "fields" in locals() else "",
-                    fields.get("port", [""])[0] if "fields" in locals() else "",
+                    fields.get("ip", [""])[0],
+                    fields.get("port", [""])[0],
                     f"Ошибка: {reason}",
                     True,
                 ),
