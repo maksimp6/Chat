@@ -51,6 +51,17 @@ def _sanitize_metadata(value: Any) -> Any:
     return value
 
 
+def _sanitize_for_storage(value: Any) -> Any:
+    """Remove credential-like keys and credential-like text before a value is persisted."""
+    sanitized = _sanitize_metadata(value)
+    try:
+        from observability.trace_manager import ExecutionTrace
+
+        return ExecutionTrace._sanitize_trace_value(sanitized)
+    except (ImportError, AttributeError):
+        return sanitized
+
+
 def _key(invocation_id: str) -> str:
     return _INVOCATION_PREFIX + str(invocation_id)
 
@@ -82,13 +93,23 @@ def create_invocation(
 ) -> InvocationContext:
     session_id = _resolve_request_session_id(session_id, conversation_id)
     session = restore_session(session_id)
+    if session is not None:
+        # A session that belongs to one owner is not reused by another owner.
+        session_owner = (session.get("metadata") or {}).get("user_id")
+        if session_owner and str(session_owner) != str(user_id or "").strip():
+            raise ValueError(f"Session not found: {session_id}")
     if session is None:
         if not create_missing_session:
             raise ValueError(f"Session not found: {session_id}")
+        legacy_owner = str(user_id).strip() if user_id and str(user_id).strip() else None
         try:
             create_session(
                 session_id,
-                metadata={"conversation_id": conversation_id, "legacy": True},
+                metadata={
+                    "conversation_id": conversation_id,
+                    "legacy": True,
+                    **({"user_id": legacy_owner} if legacy_owner else {}),
+                },
             )
         except ValueError:
             # Concurrent first use may have created the same native session.
@@ -146,7 +167,7 @@ def start_invocation(invocation_id: str) -> bool:
 def _prepare_value(
     invocation_id: str, field: str, value: Any, *, force_chunks: bool = False
 ) -> tuple[Any, Optional[dict[str, Any]]]:
-    sanitized = _sanitize_metadata(value)
+    sanitized = _sanitize_for_storage(value)
     try:
         encoded = json.dumps(
             sanitized, ensure_ascii=False, separators=(",", ":"), allow_nan=False
@@ -202,18 +223,45 @@ def persist_invocation_trace(invocation_id: str, trace: Any) -> bool:
     force_chunks = False
     while True:
         prepared = _prepare_value(invocation_id, "trace", trace or {}, force_chunks=force_chunks)
+        stored = False
         try:
             with store.transaction() as tx:
                 record = tx.get(key)
-                if record is None:
-                    return False
-                _assign_value(record, "trace", prepared)
-                tx.set(key, record)
-            return True
+                if record is not None:
+                    _assign_value(record, "trace", prepared)
+                    tx.set(key, record)
+                    stored = True
         except KristallError as exc:
+            _discard_prepared_chunks(invocation_id, "trace", prepared[1])
             if force_chunks or str(exc) not in _VALUE_LIMIT_ERRORS:
                 raise
             force_chunks = True
+            continue
+        except Exception:
+            _discard_prepared_chunks(invocation_id, "trace", prepared[1])
+            raise
+        if not stored:
+            _discard_prepared_chunks(invocation_id, "trace", prepared[1])
+            return False
+        return True
+
+
+def _discard_prepared_chunks(
+    invocation_id: str, field: str, manifest: Optional[dict[str, Any]]
+) -> None:
+    """Remove the chunks of a value that was never published, so a failed write leaves nothing behind."""
+    if not manifest:
+        return
+    store = get_memory_client(memory_file_path())
+    prefix = f"{_VALUE_CHUNK_PREFIX}{invocation_id}:{field}:{manifest['generation']}:"
+    try:
+        for index in range(manifest["chunks"]):
+            with store.transaction() as tx:
+                if tx.get(prefix + str(index)) is not None:
+                    tx.delete(prefix + str(index))
+    except Exception:
+        # Best effort: the caller reports the original failure, not this cleanup.
+        return
 
 
 def _read_chunked_value(invocation_id: str, field: str, manifest: Any) -> Any:
@@ -276,21 +324,41 @@ def _complete(invocation_id: str, status: str, result: Any = None, error: Any = 
     while True:
         prepared_result = _prepare_value(invocation_id, "result", result, force_chunks=force_chunks)
         prepared_error = _prepare_value(invocation_id, "error", error, force_chunks=force_chunks)
+        published = False
         try:
             with store.transaction() as tx:
                 record = tx.get(key)
-                if record is None or record["status"] not in {"created", "running"}:
-                    return False
-                record["status"] = status
-                record["completed_at"] = _now()
-                _assign_value(record, "result", prepared_result)
-                _assign_value(record, "error", prepared_error)
-                tx.set(key, record)
-            return True
+                if record is not None and record["status"] in {"created", "running"}:
+                    record["status"] = status
+                    record["completed_at"] = _now()
+                    _assign_value(record, "result", prepared_result)
+                    _assign_value(record, "error", prepared_error)
+                    tx.set(key, record)
+                    published = True
         except KristallError as exc:
+            _discard_prepared_chunks(invocation_id, "result", prepared_result[1])
+            _discard_prepared_chunks(invocation_id, "error", prepared_error[1])
             if force_chunks or str(exc) not in _VALUE_LIMIT_ERRORS:
                 raise
             force_chunks = True
+            continue
+        except Exception:
+            _discard_prepared_chunks(invocation_id, "result", prepared_result[1])
+            _discard_prepared_chunks(invocation_id, "error", prepared_error[1])
+            raise
+        if not published:
+            _discard_prepared_chunks(invocation_id, "result", prepared_result[1])
+            _discard_prepared_chunks(invocation_id, "error", prepared_error[1])
+            return False
+        return True
+
+
+def get_invocation_owner(invocation_id: str) -> Optional[str]:
+    """Return the owner an invocation was created for, without reading its trace or result."""
+    value = get_memory_client(memory_file_path()).get(_key(invocation_id))
+    if not isinstance(value, dict) or value.get("id") != str(invocation_id):
+        return None
+    return value.get("user_id")
 
 
 def get_invocation(invocation_id: str) -> Optional[Dict[str, Any]]:
