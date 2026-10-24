@@ -81,10 +81,13 @@ For a production ChatGPT connection, configure an OAuth 2.1 resource-server flow
 LOGOS_MCP_PUBLIC_URL=https://mcp.example.com
 LOGOS_MCP_OAUTH_ISSUER=https://auth.example.com
 LOGOS_MCP_OAUTH_SCOPE=logos.read
+LOGOS_MCP_AUDIENCE=https://mcp.example.com/mcp
 LOGOS_MCP_INTROSPECTION_URL=https://auth.example.com/oauth2/introspect
 LOGOS_MCP_INTROSPECTION_CLIENT_ID=<id>
 LOGOS_MCP_INTROSPECTION_CLIENT_SECRET=<secret>
 ```
+
+`LOGOS_MCP_AUDIENCE` is the canonical URL of this MCP endpoint (RFC 8707). Introspection refuses every token whose `aud` does not list it, and refuses to run without it.
 
 Logos publishes:
 

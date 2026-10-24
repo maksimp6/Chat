@@ -200,14 +200,31 @@ def test_introspect_token_covers_configuration_scopes_and_subject(monkeypatch):
         payload = fake_post.payloads.pop(0)
         return FakeResponse(payload)
 
+    audience = "https://logos.example/mcp"
     fake_post.payloads = [
         {"active": False},
-        {"active": True, "scope": "other", "sub": "user-1"},
-        {"active": True, "scope": protocol.OAUTH_SCOPE, "sub": "user-3"},
+        {"active": True, "scope": "other", "sub": "user-1", "aud": audience},
+        {
+            "active": True,
+            "scope": protocol.OAUTH_SCOPE,
+            "sub": "user-2",
+            "aud": "https://other.example/mcp",
+        },
+        {
+            "active": True,
+            "scope": protocol.OAUTH_SCOPE,
+            "sub": "user-3",
+            "aud": [audience, "https://other.example/mcp"],
+        },
     ]
 
     monkeypatch.setattr(requests, "post", fake_post)
     monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_URL", "https://issuer.example/introspect")
+    monkeypatch.delenv("LOGOS_MCP_AUDIENCE", raising=False)
+    with pytest.raises(PermissionError, match="audience is not configured"):
+        auth._introspect_token("token-0")
+    assert calls == []
+    monkeypatch.setenv("LOGOS_MCP_AUDIENCE", audience)
     monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_CLIENT_ID", "client")
     monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_CLIENT_SECRET", "secret")
     monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_TIMEOUT", "7.5")
@@ -217,7 +234,9 @@ def test_introspect_token_covers_configuration_scopes_and_subject(monkeypatch):
         auth._introspect_token("token-1")
     with pytest.raises(PermissionError, match="required scope"):
         auth._introspect_token("token-2")
-    assert auth._introspect_token("token-3") == "user-3"
+    with pytest.raises(PermissionError, match="another resource"):
+        auth._introspect_token("token-3")
+    assert auth._introspect_token("token-4") == "user-3"
 
     request_call = calls[0]
     assert request_call[0] == "https://issuer.example/introspect"
@@ -227,10 +246,12 @@ def test_introspect_token_covers_configuration_scopes_and_subject(monkeypatch):
     assert request_call[1]["headers"]["Accept"] == "application/json"
 
     calls.clear()
-    fake_post.payloads = [{"active": True, "scope": protocol.OAUTH_SCOPE, "sub": "user-4"}]
+    fake_post.payloads = [
+        {"active": True, "scope": protocol.OAUTH_SCOPE, "sub": "user-5", "aud": audience}
+    ]
     monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_CLIENT_ID", raising=False)
     monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_CLIENT_SECRET", raising=False)
-    assert auth._introspect_token("token-4") == "user-4"
+    assert auth._introspect_token("token-5") == "user-5"
     assert "auth" not in calls[0][1]
 
 

@@ -94,6 +94,10 @@ def _introspect_token(token: str) -> Optional[str]:
     url = env_get("LOGOS_MCP_INTROSPECTION_URL", "")
     if not url:
         raise PermissionError("OAuth introspection is not configured")
+    audience = env_get("LOGOS_MCP_AUDIENCE", "").strip()
+    if not audience:
+        # Without an audience this server cannot tell its own tokens from another resource's.
+        raise PermissionError("OAuth audience is not configured")
 
     auth_user = env_get("LOGOS_MCP_INTROSPECTION_CLIENT_ID", "")
     auth_password = env_get("LOGOS_MCP_INTROSPECTION_CLIENT_SECRET", "")
@@ -119,6 +123,13 @@ def _introspect_token(token: str) -> Optional[str]:
         raise PermissionError("Access token could not be validated") from exc
     if not isinstance(data, Mapping) or not data.get("active"):
         raise PermissionError("Access token is inactive")
+
+    # RFC 8707: a token minted for another resource or client must not run this server's tools.
+    audiences = data.get("aud")
+    if isinstance(audiences, str):
+        audiences = [audiences]
+    if not isinstance(audiences, list) or audience not in audiences:
+        raise PermissionError("Access token was issued for another resource")
 
     scopes = str(data.get("scope") or "").split()
     if OAUTH_SCOPE and OAUTH_SCOPE not in scopes:
