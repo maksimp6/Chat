@@ -4,7 +4,6 @@ import pytest
 
 from scripts.ci_platform_changes import classify
 
-
 ALL = {"web", "backend", "android", "infra", "database"}
 WEB = {"web", "backend", "android"}
 
