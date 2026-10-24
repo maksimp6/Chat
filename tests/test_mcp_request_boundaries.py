@@ -130,3 +130,65 @@ def test_a_turn_without_a_fully_known_price_records_no_cost():
     assert mcp_routes._turn_cost(calculated) == 0.25
     partial = {"cost_status": "partial", "total_cost": 0.1, "unknown_cost_items": 1}
     assert mcp_routes._turn_cost(partial) is None
+
+
+def test_the_follow_up_answer_after_an_approval_is_posted_to_the_treasury(monkeypatch):
+    from types import SimpleNamespace
+
+    from flask import Flask
+
+    settled = []
+
+    class FakeClient:
+        def __init__(self, config):
+            pass
+
+        def ask(self, prompt, model_key, conv_id, extra):
+            return {"text": prompt}
+
+        def extract_text(self, response):
+            return "Готово"
+
+        def extract_usage(self, response):
+            return {"input_tokens": 1000, "output_tokens": 1000}
+
+    monkeypatch.setattr(mcp_routes, "LogosClient", FakeClient)
+    monkeypatch.setattr(
+        mcp_routes, "registry", SimpleNamespace(get_tool_meta=lambda name: {"name": name})
+    )
+    monkeypatch.setattr(mcp_routes, "get_current_owner_id", lambda required=False: "owner-1")
+    monkeypatch.setattr(mcp_routes, "check_access", lambda conv_id, owner_id: True)
+    monkeypatch.setattr(
+        mcp_routes,
+        "UniversalToolExecutor",
+        lambda registry: SimpleNamespace(execute=lambda call: {"success": True, "data": {}}),
+    )
+    monkeypatch.setattr(mcp_routes, "add_message", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        mcp_routes,
+        "settle_billing_to_treasury",
+        lambda billing, owner_id: settled.append((owner_id, billing)) or {"status": "posted"},
+    )
+    token = mcp_routes._approval_token("owner-1", "conv-1", "inspect", {})
+
+    app = Flask(__name__)
+    app.register_blueprint(mcp_routes.mcp_bp)
+    response = app.test_client().post(
+        "/api/mcp/execute-approved",
+        json={
+            "conversation_id": "conv-1",
+            "name": "inspect",
+            "arguments": {},
+            "model": "logos-runtime",
+            "approval_token": token,
+        },
+    )
+
+    assert response.status_code == 200
+    assert len(settled) == 1
+    owner_id, billing = settled[0]
+    assert owner_id == "owner-1"
+    assert billing["cost_status"] == "calculated"
+    assert billing["trace_id"].startswith("approval-")
+    assert billing["total_cost"] > 0
+    assert response.get_json()["cost"] == billing["total_cost"]

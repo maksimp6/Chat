@@ -28,7 +28,9 @@ def test_continuation_after_a_non_approval_tool_call_reissues_the_request(monkey
         lambda response: [{"name": "inspect"}] if response["id"] == "resp-1" else [],
     )
     monkeypatch.setattr(mcp_routes, "_tool_call_needs_approval", lambda call: False)
-    monkeypatch.setattr(mcp_routes, "mcp_storage", SimpleNamespace(list_servers=lambda **_owner: []))
+    monkeypatch.setattr(
+        mcp_routes, "mcp_storage", SimpleNamespace(list_servers=lambda **_owner: [])
+    )
     monkeypatch.setattr(
         LogosClient,
         "_execute_single_tool",
@@ -69,7 +71,8 @@ def test_execute_approved_runs_the_tool_and_returns_the_synthesized_reply(monkey
     monkeypatch.setattr(
         mcp_routes, "registry", SimpleNamespace(get_tool_meta=lambda name: {"name": name})
     )
-    monkeypatch.setattr(mcp_routes, "get_current_owner_id", lambda required=False: None)
+    monkeypatch.setattr(mcp_routes, "get_current_owner_id", lambda required=False: "owner-1")
+    monkeypatch.setattr(mcp_routes, "check_access", lambda conv_id, owner_id: True)
     monkeypatch.setattr(
         mcp_routes,
         "UniversalToolExecutor",
@@ -80,6 +83,7 @@ def test_execute_approved_runs_the_tool_and_returns_the_synthesized_reply(monkey
         "add_message",
         lambda conv_id, role, text, cost=0.0: added.append((conv_id, role, text, cost)),
     )
+    token = mcp_routes._approval_token("owner-1", "conv-1", "inspect", {"a": 1})
 
     app = Flask(__name__)
     app.register_blueprint(mcp_routes.mcp_bp)
@@ -90,6 +94,7 @@ def test_execute_approved_runs_the_tool_and_returns_the_synthesized_reply(monkey
             "name": "inspect",
             "arguments": {"a": 1},
             "model": "logos-runtime",
+            "approval_token": token,
         },
     )
 

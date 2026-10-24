@@ -8,6 +8,7 @@ import os
 import json as _json
 import secrets
 import time
+import uuid
 from typing import Any
 from yandex_client_modules.client import YandexResponsesClient
 from provider_accounts.claude_oauth import (
@@ -15,7 +16,7 @@ from provider_accounts.claude_oauth import (
     create_local_conversation,
     is_claude_model,
 )
-from core.config import Config, calculate_full_cost
+from core.config import Config
 from observability.trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
 from invocation.manager import (
     create_invocation,
@@ -42,7 +43,7 @@ from storage.db import (
 )
 from agent_runtime.partial_output import extract_last_response_text, format_partial_output_message
 from agent_runtime.responses_tool_loop import run_tool_loop, extract_function_calls
-from economy.billing import settle_billing_to_treasury
+from economy.billing import aggregate_billing, build_ai_billing_item, settle_billing_to_treasury
 from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 from provider_accounts.quotas import ProviderQuotaExceeded
 from agent_skills.registry import SkillRegistry, SkillRegistryError, compose_skill_instructions
@@ -985,7 +986,20 @@ def execute_approved():
         )
         reply = client.extract_text(synth_response) or f"Действие {func_name} успешно выполнено."
         usage = client.extract_usage(synth_response)
-        cost = calculate_full_cost(model_key, usage) if usage else 0.0
+        # The follow-up answer is a model call like any chat turn, so it is billed the same way.
+        billing = aggregate_billing(
+            [build_ai_billing_item(model_key, usage, step=1)],
+            context={
+                "trace_id": "approval-" + uuid.uuid4().hex,
+                "owner_id": owner_id,
+                "conversation_id": conv_id,
+            },
+        )
+        try:
+            settle_billing_to_treasury(billing, owner_id)
+        except Exception:
+            logger.exception("[BILLING] Approval follow-up settlement failed")
+        cost = _turn_cost(billing)
 
         add_message(conv_id, "assistant", reply, cost=cost)
         return jsonify({"reply": reply, "cost": cost, "execution_result": exec_res})
