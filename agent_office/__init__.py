@@ -1,1 +1,1 @@
-"""Tools that watch the GitHub "agent office": Claude, Codex, Copilot and Alice."""
+"""Tools that watch the GitHub "agent office": Claude, Codex, Copilot and Logos."""

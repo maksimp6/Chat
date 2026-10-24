@@ -5,6 +5,22 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "deploy" / "production" / "server.sh"
 
 
+def test_production_mounts_only_readonly_pairing_handoff():
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert (
+        'local pairing_dir="${ALICE_RDC_ROOT:-$ROOT_DIR/services/remote-desktop-commander}/pairing"'
+        in source
+    )
+    docker_block = source.split("docker run -d", 1)[1].split('"$IMAGE_NAME"', 1)[0]
+    mounts = [
+        line.strip() for line in docker_block.splitlines() if "--mount" in line or "-v " in line
+    ]
+    assert mounts == ['--mount "type=bind,src=$pairing_dir,dst=/app/rdc-pairing,readonly" \\']
+    assert "-e ALICE_RDC_PAIRING_FILE=/app/rdc-pairing/handoff.json" in docker_block
+    assert "device.json" not in docker_block
+    assert "/state" not in docker_block
+
+
 def test_production_server_script_is_valid_bash():
     result = subprocess.run(
         ["bash", "-n", str(SCRIPT)],

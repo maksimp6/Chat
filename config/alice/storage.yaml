@@ -1,0 +1,11 @@
+# Storage configuration
+# Persistent volumes for services
+
+storage:
+  chrome-state:
+    mount_path: /chrome-state
+    size: 10Gi
+    backup_policy: daily
+    retention_days: 30
+    mounted_by:
+      - chrome

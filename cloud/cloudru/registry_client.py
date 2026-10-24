@@ -12,15 +12,17 @@ https://cloud.ru/docs/artifact-registry-evolution/ug/index
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import os
 import re
 import subprocess
 import tempfile
+import time
 from typing import Any, Callable
 
 from cloud.base import CloudProviderError
 from cloud.cloudru.client import CloudRuClient
-from cloudru_iam import CloudRuIamClient
+from cloud.cloudru.iam import CloudRuIamClient
 
 
 SERVICE = "artifact_registry"
@@ -29,6 +31,8 @@ ALLOWED_REGISTRY_DOMAINS = frozenset({DEFAULT_REGISTRY_DOMAIN})
 _NAME_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
 _TAG_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$")
 _DIGEST_RE = re.compile(r"sha256:[0-9a-f]{64}")
+# Fixed tag holding the inline BuildKit layer cache for the next CI build.
+CACHE_TAG = "buildcache"
 
 Runner = Callable[..., subprocess.CompletedProcess]
 
@@ -187,7 +191,7 @@ class CloudRuRegistryClient:
         if not _TAG_RE.match(tag or ""):
             raise CloudProviderError("tag is invalid", code="validation_error")
         # A throwaway Docker config keeps the registry credential off disk after the push.
-        with tempfile.TemporaryDirectory(prefix="alice-docker-") as docker_config:
+        with tempfile.TemporaryDirectory(prefix="logos-docker-") as docker_config:
             env = {**os.environ, "DOCKER_CONFIG": docker_config}
             return self._build_and_push(
                 registry_name, repository, tag, context_dir, dockerfile, platform, env
@@ -205,21 +209,63 @@ class CloudRuRegistryClient:
     ) -> ImageRef:
         host = self.docker_login(registry_name, env=env)
         ref = ImageRef(host, repository, tag)
+        # CI runners start empty, so layers are reused through an inline BuildKit
+        # cache kept in the same private registry under a fixed tag.
+        cache = ImageRef(host, repository, CACHE_TAG).tagged
+        # Hosted runners start with an empty local image store. Classic
+        # docker build --cache-from can only reuse the registry cache after the
+        # cache image has been pulled locally. A cold/missing cache is harmless.
+        started = time.perf_counter()
+        cache_pull = self._run(
+            ["docker", "pull", cache], text=True, capture_output=True, check=False, env=env
+        )
+        print(
+            json.dumps(
+                {
+                    "stage": "registry_cache_pull",
+                    "seconds": time.perf_counter() - started,
+                    "returncode": cache_pull.returncode,
+                }
+            ),
+            flush=True,
+        )
         for argv in (
             [
                 "docker",
                 "build",
                 "--platform",
                 platform,
+                "--cache-from",
+                cache,
+                "--build-arg",
+                "BUILDKIT_INLINE_CACHE=1",
                 "-f",
                 dockerfile,
                 "-t",
                 ref.tagged,
+                "-t",
+                cache,
                 context_dir,
             ],
             ["docker", "push", ref.tagged],
         ):
+            started = time.perf_counter()
             result = self._run(argv, text=True, capture_output=True, check=False, env=env)
+            print(
+                json.dumps(
+                    {
+                        "stage": "registry_" + argv[1],
+                        "seconds": time.perf_counter() - started,
+                        "returncode": result.returncode,
+                        "cached_steps": len(
+                            re.findall(
+                                r"(?m)^#\d+ CACHED", (result.stdout or "") + (result.stderr or "")
+                            )
+                        ),
+                    }
+                ),
+                flush=True,
+            )
             if result.returncode != 0:
                 raise CloudProviderError(
                     f"{argv[1]} failed: {(result.stderr or '').strip()[-500:]}",
@@ -234,4 +280,20 @@ class CloudRuRegistryClient:
                         code="docker_error",
                     )
                 ref = ImageRef(host, repository, tag, match.group(0))
+        # The cache only speeds up the next build; failing to refresh it must not
+        # fail a deploy whose pinned image is already pushed.
+        started = time.perf_counter()
+        refresh = self._run(
+            ["docker", "push", cache], text=True, capture_output=True, check=False, env=env
+        )
+        print(
+            json.dumps(
+                {
+                    "stage": "registry_cache_refresh",
+                    "seconds": time.perf_counter() - started,
+                    "returncode": refresh.returncode,
+                }
+            ),
+            flush=True,
+        )
         return ref

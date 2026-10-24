@@ -66,6 +66,8 @@ deploy() {
   ensure_provider_credential_key
   validate_traefik
   mkdir -p "$ROOT_DIR/incoming" "$ROOT_DIR/production"
+  local pairing_dir="${ALICE_RDC_ROOT:-$ROOT_DIR/services/remote-desktop-commander}/pairing"
+  mkdir -p "$pairing_dir"
 
   local workdir="$ROOT_DIR/production/build"
   rm -rf -- "$workdir"
@@ -102,6 +104,8 @@ deploy() {
     --restart unless-stopped \
     --network "$NETWORK_NAME" \
     --env-file "$runtime_env" \
+    --mount "type=bind,src=$pairing_dir,dst=/app/rdc-pairing,readonly" \
+    -e ALICE_RDC_PAIRING_FILE=/app/rdc-pairing/handoff.json \
     --label "traefik.enable=true" \
     --label "traefik.docker.network=$NETWORK_NAME" \
     --label "traefik.http.routers.alice-production-http.rule=$route_rule" \

@@ -1,4 +1,4 @@
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 def test_reasoning_plan_is_sanitized_and_attached_to_trace():

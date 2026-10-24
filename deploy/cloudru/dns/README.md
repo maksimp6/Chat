@@ -1,6 +1,9 @@
 # Cloud DNS для API Gateway
 
-Cloud DNS API endpoint: `https://console.cloud.ru/api/clouddns`; запросы требуют
+Наши зоны находятся в Evolution DNS: `https://dns.api.cloud.ru`.
+`https://console.cloud.ru/api/clouddns` — отдельный классический Cloud DNS.
+У Evolution API Gateway нет публичного API управления (только консоль), поэтому
+Chrome MCP работает на адресе контейнера без Gateway. Запросы требуют
 Evolution IAM bearer token. Токен берётся штатным IAM service-account flow и
 истекает через час. Для Cloud DNS получи Service Instance ID `parentId` в разделе
 зон. Не подставляй Cloud project UUID вместо DNS service instance UUID.
@@ -28,7 +31,7 @@ Evolution IAM bearer token. Токен берётся штатным IAM service
    Certificate Manager и добавить требуемый этим шлюзом CNAME. Cloud.ru описывает
    проверочную запись `<domain> CNAME <gateway-uuid>.apigw.cloud.ru`.
 5. Дождаться validation, проверить DNS авторитетным resolver, TLS chain/SAN,
-   статус домена и каждый URL. Только затем менять рабочий endpoint Алисы.
+   статус домена и каждый URL. Только затем менять рабочий endpoint Logos.
 
 Container Apps не поддерживает собственный домен. DNS направляет custom name
 на API Gateway; Gateway проксирует на Container Apps. Для apex/root домена не

@@ -19,12 +19,11 @@ Contents: [credentials](#do-not-mix-identities-or-credentials) ·
 | Evolution IAM Key ID + Key Secret | Exchanges at IAM for short-lived Bearer token; many service REST APIs | `CLOUDRU_IAM_KEY_ID` / `CLOUDRU_IAM_KEY_SECRET` only in control plane; IAM token lifetime documented as 1h |
 | EDS `EDS_API_KEY` | Evolution DevServices `eds repo` / `eds wf` CLI | Product API key in `X-API-KEY`, paired with `EDS_PROJECT_ID`; **not** IAM key pair |
 | Standalone Workflow Studio Public API | Direct Workflow Studio API | Service-account IAM auth and Bearer token, per Workflow Studio API docs; EDS CLI has its own DevServices auth |
-| API Gateway static API key | One API client allowed by Gateway policy | Send Key Secret in the expected header from protected clients; never embed one shared secret in Alice browser code |
-| Foundation Models API key | Model API for a configured service account | A service-specific secret, separate from IAM/EDS; keep behind Alice provider-credentials boundary |
+| API Gateway static API key | One API client allowed by Gateway policy | Send Key Secret in the expected header from protected clients; never embed one shared secret in Logos browser code |
+| Foundation Models API key | Model API for a configured service account | A service-specific secret, separate from IAM/EDS; keep behind Logos provider-credentials boundary |
 | Object Storage S3 access pair | S3 object operations | Dedicated storage Key ID/Secret + tenant/region/bucket scope; not a Foundation Models key |
-| Alice GitHub OAuth client secret | Alice owner login with immutable GitHub account ID allowlist | Runtime app secret; different identity plane from Cloud.ru IAM |
-| PostgreSQL role/password | Alice runtime SQL access | Dedicated database role and TLS-verified DSN; do not reuse Cloud.ru credentials |
-| Certificate private key | TLS termination for a custom domain or database | Keep inside Certificate Manager/origin host/approved secret flow; never source, log, issue or `env` example |
+| Logos GitHub OAuth client secret | Logos owner login with immutable GitHub account ID allowlist | Runtime app secret; different identity plane from Cloud.ru IAM |
+| Certificate private key | TLS termination for a custom domain or remote service | Keep inside Certificate Manager/origin host/approved secret flow; never source, log, issue or `env` example |
 
 Do not print tokens, secrets, Authorization headers or raw config. Prefer short-lived
 IAM tokens to long-lived static keys where the service supports it. Record
@@ -36,8 +35,8 @@ an existing key as an unrequested cleanup.
 Cloud IAM roles are distinct from application users. Evolution service accounts
 have a scope selected at creation (org or project); AI Agents docs say this scope
 cannot be changed later. Do not grant project administrator to an app runtime
-when a service-specific invoker/read role works. Alice's GitHub user, browser
-session, conversation owner and MCP OAuth claims continue to authorize Alice
+when a service-specific invoker/read role works. Logos's GitHub user, browser
+session, conversation owner and MCP OAuth claims continue to authorize Logos
 requests even when a Gateway or service account authenticated the infrastructure.
 
 ## Workflow: two separate APIs
@@ -50,35 +49,39 @@ requests even when a Gateway or service account authenticated the infrastructure
   interchangeable with the EDS CLI product key. Confirm the current OpenAPI path,
   resource IDs and operation before calling it.
 - Workflow Studio deployment pipeline is distinct from **AI Workflows** in AI
-  Agents. Do not route an Alice application deploy into an AI agent workflow.
+  Agents. Do not route a Logos application deploy into an AI agent workflow.
 
 Before enabling a Workflow Studio pipeline, establish how it injects runtime
-secrets, PostgreSQL CA, registry identity and exact committed source digest
-before it publishes. EDS create/deploy accepts a branch; branch name alone does
+secrets, registry identity and exact committed source digest before it
+publishes. EDS create/deploy accepts a branch; branch name alone does
 not prove the image matches an approved commit.
 
 ## DNS, TLS and API Gateway
 
-- Cloud DNS management endpoint documented at
-  `https://console.cloud.ru/api/clouddns`; service operations use an Evolution IAM
+- Our zones live in **Evolution DNS** (`https://dns.api.cloud.ru`). The classic
+  Cloud DNS endpoint `https://console.cloud.ru/api/clouddns` is a separate
+  service; do not mix them. Service operations use an Evolution IAM
   Bearer token. The zone API needs the Cloud DNS Service Instance ID (`parentId`),
   which differs from the Cloud project UUID. List/inventory first.
+- Evolution API Gateway has **no public management API** (console only;
+  `apigw.api.cloud.ru` is NXDOMAIN as of 2026-10-04). Automation must not depend
+  on it; the Chrome MCP worker is served from its Container Apps origin.
 - Container Apps currently issues a provider URL, not a custom domain. Shared
   API Gateway supports a system `*.apigw.cloud.ru` domain and custom domain via
   Certificate Manager. Gateway domain validation uses CNAME to the gateway system
   domain. See `deploy/cloudru/dns/README.md` and `deploy/cloudru/api-gateway/README.md`.
 - Gateway OpenAPI supports provider `x-cloud-*` extensions including backend,
   rate counter and log-group references. Its default public address does not
-  authenticate a caller. Alice must continue its GitHub/short-token/MCP OAuth
+  authenticate a caller. Logos must continue its GitHub/short-token/MCP OAuth
   checks; Gateway IAM auth or a static API key cannot replace that identity.
-- No cache for Alice user/chat/files/voice/MCP endpoints. Streaming and WebSocket
+- No cache for Logos user/chat/files/voice/MCP endpoints. Streaming and WebSocket
   behavior require route-specific tests; a regular HTTP proxy/read timeout may
   cut a response.
 - Certificate Manager controls certificate lifecycle and can issue Let's Encrypt
   certificates. Attach a certificate to a custom Gateway domain; Container Apps
   itself does not accept a custom host today. Never route public TLS private key
-  through a repo config. Database TLS trust is separate: the Alice client must
-  pin the database's trusted CA and verify the PostgreSQL server name.
+  through a repo config. Remote TLS trust is separate: the Logos client must
+  pin the trusted CA and verify the server name.
 - Before DNS/CA changes, preserve existing records and verify domain ownership.
   Changing authoritative NS or apex routing can affect MX, mail verification and
   unrelated services. Keep a secret-free before/after snapshot and rollback value.
@@ -112,10 +115,11 @@ matrix before choosing the runtime identity. Runtime read must never imply admin
 rotation/delete.
 
 Key Management protects cryptographic operations/material; it does not replace
-TLS between Alice and PostgreSQL. Separate `sckm.admin` key lifecycle duties from
-runtime encrypt/decrypt user rights (`sckm.user`) when the service's current
-operation matrix permits. First integrate it with encrypted PostgreSQL backups
-in S3, then test decrypt/restore before changing keys. No plaintext fallback.
+TLS between Logos and any remote service. Separate `sckm.admin` key lifecycle
+duties from runtime encrypt/decrypt user rights (`sckm.user`) when the service's
+current operation matrix permits. First integrate it with encrypted backups of
+the Kristall store in S3, then test decrypt/restore before changing keys. No
+plaintext fallback.
 
 Secret Management and KMS adapters are tasks #477 and #479. Until a supported
 runtime provider adapter exists, do not invent a `secretRef`, CSI mount or
@@ -136,25 +140,25 @@ version/status/expiry metadata in inventory. Imported certificates support
 additional versions; Let's Encrypt uses its managed lifecycle and is not manually
 versioned like imported certs. Test renewal/expiry notification and Gateway binding.
 
-Do not copy the PostgreSQL root/client CA private material into Certificate
-Manager unless that precise use is supported and intended. Public trust anchors,
+Do not copy the root/client CA private material into Certificate Manager
+unless that precise use is supported and intended. Public trust anchors,
 server certificates and private signing keys have different confidentiality
 requirements.
 
 ## AI services in Evolution
 
-Alice's current AI backend is Yandex Cloud / Yandex AI Studio. The services below
+Logos's current AI backend is Yandex Cloud / Yandex AI Studio. The services below
 are documented for a separate future evaluation; this Cloud.ru skill must not
-switch Alice's model provider or request Cloud.ru model credentials as part of
+switch Logos's model provider or request Cloud.ru model credentials as part of
 the current deployment.
 
 | Service | Role and integration | Guardrail / cost boundary |
 |---|---|---|
-| Foundation Models | Model API endpoint documented as `https://foundation-models.api.cloud.ru/v1`; service-account API key. Optional integration exists in the repository, but it is not Alice's active AI backend |
+| Foundation Models | Model API endpoint documented as `https://foundation-models.api.cloud.ru/v1`; service-account API key. Optional integration exists in the repository, but it is not Logos's active AI backend |
 | Foundation Models Guardrails | Input/output sensitive-data masking/restore and monitoring alerts; test model prompts, traces, tool arguments and cross-user isolation |
 | AI Agents | Public APIs can manage agents, agent systems and MCP servers; use service invoker/viewer roles for runtime calls and admin only for lifecycle |
-| Agents Space | Separate user-facing agent workspace built on EvoClaw; depends on AI Agents, Foundation Models and Object Storage. Keep it a pilot, not an implicit Alice runtime migration |
-| EvoClaw / AI Workflows | Distinct AI-agent runtime/workflow concepts within AI Agents. Preserve Alice's `UniversalToolExecutor`, approvals and ExecutionTrace when testing |
+| Agents Space | Separate user-facing agent workspace built on EvoClaw; depends on AI Agents, Foundation Models and Object Storage. Keep it a pilot, not an implicit Logos runtime migration |
+| EvoClaw / AI Workflows | Distinct AI-agent runtime/workflow concepts within AI Agents. Preserve Logos's `UniversalToolExecutor`, approvals and ExecutionTrace when testing |
 | Distributed Train | ML jobs/experiment tracking have separate quotas and credentials. Tracking SDK availability does not make GPU training free |
 | Artifact Registry | Container images/packages used by services are billed/lifecycle-managed separately; deploy by immutable OCI digest |
 | Logaas / Monas / Audaas | Logs, metrics and audit for AI entities, separate from Container Apps stdout and project audit |

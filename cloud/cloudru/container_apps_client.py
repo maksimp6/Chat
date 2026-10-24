@@ -22,7 +22,7 @@ import requests
 
 from cloud.base import CloudProviderError
 from cloud.cloudru.client import CloudRuClient
-from cloudru_iam import CloudRuIamClient
+from cloud.cloudru.iam import CloudRuIamClient
 
 
 SERVICE = "container_apps"
@@ -192,12 +192,49 @@ class CloudRuContainerAppsClient:
                 return None
             raise
 
+    def find_for_deploy(
+        self,
+        name: str,
+        *,
+        transient_attempts: int = 3,
+        retry_delay_s: float = 1.0,
+    ) -> dict[str, Any] | None:
+        """Resolve a deploy target without treating Cloud.ru HTTP 499 as not-found."""
+        if transient_attempts < 1:
+            raise CloudProviderError(
+                "transient_attempts must be positive",
+                code="validation_error",
+            )
+
+        last_499: CloudProviderError | None = None
+        for attempt in range(transient_attempts):
+            try:
+                return self.get(name)
+            except CloudProviderError as exc:
+                if exc.http_status != 499:
+                    raise
+                last_499 = exc
+                if attempt + 1 < transient_attempts:
+                    self._sleep(retry_delay_s)
+
+        inventory = self.list(require_total=True)
+        matches = [item for item in inventory if item.get("name") == self._name(name)]
+        if len(matches) == 1:
+            return matches[0]
+        if not matches:
+            return None
+        raise CloudProviderError(
+            f"Cloud.ru Container Apps inventory contains duplicate name '{name}'",
+            code="invalid_response",
+        ) from last_499
+
     def list(
         self,
         *,
         page_size: int = 100,
         filter_expr: str | None = None,
         order_by: str | None = None,
+        require_total: bool = False,
     ) -> list[dict[str, Any]]:
         """Return all Container Services using the documented v2 pagination contract."""
         if page_size < 1:
@@ -206,6 +243,7 @@ class CloudRuContainerAppsClient:
         items: list[dict[str, Any]] = []
         page_token: str | None = None
         seen_tokens: set[str] = set()
+        expected_total: int | None = None
         while True:
             params: dict[str, Any] = {
                 "projectId": self._project(),
@@ -219,24 +257,41 @@ class CloudRuContainerAppsClient:
                 params["orderBy"] = order_by
 
             payload = self.client.request(SERVICE, "GET", "/v2/containers", params=params)
-            data = payload.get("data", [])
+            data = payload.get("data")
             if not isinstance(data, list) or not all(isinstance(item, dict) for item in data):
                 raise CloudProviderError(
                     "Cloud.ru Container Apps returned invalid list payload",
                     code="invalid_response",
                 )
             items.extend(data)
+            if "total" in payload:
+                total = payload["total"]
+                # ProtoJSON serializes 64-bit integer counters as decimal strings.
+                if isinstance(total, str) and re.fullmatch(r"0|[1-9][0-9]{0,18}", total):
+                    total = int(total)
+                if (
+                    type(total) is not int
+                    or total < 0
+                    or total > (1 << 63) - 1
+                    or (expected_total is not None and total != expected_total)
+                ):
+                    raise CloudProviderError("Invalid inventory total", code="invalid_response")
+                expected_total = total
 
             next_token = payload.get("nextPageToken")
-            if next_token is None:
+            if next_token is None or next_token == "":
+                if require_total and expected_total is None:
+                    raise CloudProviderError("Missing inventory total", code="invalid_response")
+                if expected_total is not None and len(items) != expected_total:
+                    raise CloudProviderError(
+                        "Incomplete container inventory", code="invalid_response"
+                    )
                 return items
             if not isinstance(next_token, str):
                 raise CloudProviderError(
                     "Cloud.ru Container Apps returned invalid pagination token",
                     code="invalid_response",
                 )
-            if next_token == "":
-                return items
             if next_token in seen_tokens:
                 raise CloudProviderError(
                     "Cloud.ru Container Apps returned invalid pagination token",
@@ -288,12 +343,9 @@ class CloudRuContainerAppsClient:
         }
         return self.client.request(SERVICE, "POST", "/v2/containers", json_body=body)
 
-    def update(self, spec: ContainerSpec) -> dict[str, Any]:
-        """Roll out a new revision with ``spec`` applied to the current configuration."""
+    def update_from_current(self, spec: ContainerSpec, current: dict[str, Any]) -> dict[str, Any]:
+        """Roll out ``spec`` using a caller-verified current service snapshot."""
         spec.validate()
-        current = self.get(spec.name)
-        if current is None:
-            raise CloudProviderError(f"container '{spec.name}' not found", code="not_found")
         body = _patch_body(current, project_id=self._project())
         body.setdefault("configuration", {}).setdefault("ingress", {})["publiclyAccessible"] = (
             spec.public
@@ -313,6 +365,13 @@ class CloudRuContainerAppsClient:
             f"/v2/containers/{spec.name}",
             json_body=body,
         )
+
+    def update(self, spec: ContainerSpec) -> dict[str, Any]:
+        """Roll out a new revision with ``spec`` applied to the current configuration."""
+        current = self.get(spec.name)
+        if current is None:
+            raise CloudProviderError(f"container '{spec.name}' not found", code="not_found")
+        return self.update_from_current(spec, current)
 
     def restore(self, name: str, previous: dict[str, Any]) -> dict[str, Any]:
         """Roll out a revision with exactly the configuration captured in ``previous``."""

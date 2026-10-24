@@ -42,7 +42,7 @@ def test_patch_conversation_model_rejects_unauthorized_conversation(monkeypatch)
 
 
 def test_list_conversations_rejects_invalid_owner_token(monkeypatch):
-    from treasury_identity import TreasuryIdentityError
+    from economy.treasury_identity import TreasuryIdentityError
 
     def raise_invalid_token(*, required=False):
         raise TreasuryIdentityError("invalid authenticated owner token")
@@ -62,7 +62,7 @@ def test_list_conversations_rejects_invalid_owner_token(monkeypatch):
 
 
 def test_create_conversation_hides_provider_exception(monkeypatch):
-    import mcp_routes
+    import chat.mcp_routes as mcp_routes
 
     internal_marker = "provider-create-internal-marker"
 
@@ -71,13 +71,13 @@ def test_create_conversation_hides_provider_exception(monkeypatch):
             assert execution_trace is not None
             raise RuntimeError(internal_marker)
 
-    monkeypatch.setattr(mcp_routes, "AliceClient", lambda _config: FailingClient())
+    monkeypatch.setattr(mcp_routes, "LogosClient", lambda _config: FailingClient())
     monkeypatch.setattr(mcp_routes, "get_current_owner_id", lambda required=False: None)
 
     client = app_module.app.test_client()
     response = client.post(
         "/api/conversations",
-        json={"model": "aliceai-llm", "title": "Test"},
+        json={"model": "logos-runtime", "title": "Test"},
     )
 
     assert response.status_code == 502

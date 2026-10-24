@@ -18,11 +18,11 @@ The current A2A specification defines `message/send` as a JSON-RPC method over H
 
 Source: https://a2a-protocol.org/v0.3.0/specification/
 
-## Design decision for Alice Pro
+## Design decision for Logos
 
-Alice Pro should not embed a Cloud.ru/EvoClaw-specific Python SDK in the Android application. Instead:
+Logos should not embed a Cloud.ru/EvoClaw-specific Python SDK in the Android application. Instead:
 
-1. Android talks to the Alice Pro backend.
+1. Android talks to the Logos backend.
 2. The Agent Gateway owns provider adapters.
 3. A2A is the first remote-agent transport adapter.
 4. Provider credentials stay in the backend credential store and are never written to Execution Trace.

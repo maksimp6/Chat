@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Build, push and run Alice Pro on Cloud.ru Container Apps.
+"""Build, push and run Logos on Cloud.ru Container Apps.
 
 Usage:
   python scripts/cloudru_deploy.py deploy --tag <git-sha> [--env NAME ...]
   python scripts/cloudru_deploy.py status
+  python scripts/cloudru_deploy.py inventory
   python scripts/cloudru_deploy.py delete --yes
   python scripts/cloudru_deploy.py estimate
 
@@ -24,6 +25,7 @@ import re
 import subprocess
 import sys
 import tarfile
+from typing import Any
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -193,18 +195,10 @@ def cmd_deploy(args: argparse.Namespace) -> dict:
             "deploy needs --env ALICE_REQUIRE_SHORT_TOKEN (set to 1) and --env ALICE_SHORT_TOKEN",
             code="validation_error",
         )
-    database_url = os.environ.get("ALICE_DATABASE_URL", "")
-    if "ALICE_DATABASE_URL" not in args.env or not database_url.startswith(
-        ("postgres://", "postgresql://")
-    ):
-        raise CloudProviderError(
-            "deploy needs --env ALICE_DATABASE_URL set to durable PostgreSQL",
-            code="validation_error",
-        )
     registry = CloudRuRegistryClient()
     apps = CloudRuContainerAppsClient()
 
-    with tempfile.TemporaryDirectory(prefix="alice-build-") as build_dir:
+    with tempfile.TemporaryDirectory(prefix="logos-build-") as build_dir:
         _export_commit(args.tag, args.context, build_dir)
         registry.ensure_registry(cfg["registry"])
         image = registry.build_and_push(
@@ -214,12 +208,15 @@ def cmd_deploy(args: argparse.Namespace) -> dict:
             context_dir=build_dir,
             dockerfile=os.path.join(build_dir, "Dockerfile"),
         )
+    if getattr(args, "acceptance_image_file", None):
+        Path(args.acceptance_image_file).write_text(image.pinned)
     spec = ContainerSpec(
         name=cfg["name"],
         image=image.pinned,
         cpu=cfg["cpu"],
         min_instances=cfg["min_instances"],
         max_instances=cfg["max_instances"],
+        idle_timeout="60s",
         env={name: os.environ[name] for name in args.env},
     )
     result = apps.deploy_verified(spec, timeout_s=args.timeout)
@@ -236,10 +233,84 @@ def cmd_status(_: argparse.Namespace) -> dict:
     return CloudRuContainerAppsClient().status(cfg["name"])
 
 
+def cmd_inventory(_: argparse.Namespace) -> dict:
+    """Check project-level access without assuming a container already exists."""
+    cfg = _settings()
+    items = CloudRuContainerAppsClient().list(order_by="name", require_total=True)
+    names = [item.get("name") for item in items]
+    if any(not isinstance(name, str) or not name for name in names) or len(set(names)) != len(
+        names
+    ):
+        raise CloudProviderError("Invalid container inventory", code="invalid_response")
+    # Do not publish provider metadata, environment values or even resource names.
+    return {
+        "status": "INVENTORY_COMPLETE",
+        "container_count": len(items),
+        "configured_container_exists": cfg["name"] in names,
+    }
+
+
+def _cleanup_from_cli(args: argparse.Namespace) -> dict[str, Any]:
+    snapshot = json.loads(Path(args.snapshot_json).read_text()) if args.snapshot_json else None
+    return cmd_cleanup(
+        argparse.Namespace(
+            yes=args.yes,
+            acceptance_created=args.acceptance_created,
+            acceptance_updated=args.acceptance_updated,
+            snapshot=snapshot,
+        )
+    )
+
+
+def cmd_cleanup_failed_create(args: argparse.Namespace) -> dict[str, Any]:
+    if not args.yes:
+        raise CloudProviderError("pass --yes to cleanup acceptance", code="validation_error")
+    if args.preexisting:
+        raise CloudProviderError(
+            "failed-create cleanup cannot own a pre-existing container",
+            code="validation_error",
+        )
+    cfg = _settings()
+    apps = CloudRuContainerAppsClient()
+    current = apps.get(cfg["name"])
+    if current is None:
+        return {"status": "NOOP"}
+    containers = (current.get("template") or {}).get("containers") or []
+    current_image = containers[0].get("image") if containers else None
+    if not args.expected_image or current_image != args.expected_image:
+        raise CloudProviderError(
+            "cannot prove acceptance ownership of failed-create container",
+            code="validation_error",
+        )
+    return {"deleted": cfg["name"], "operation": apps.delete(cfg["name"])}
+
+
+def cmd_cleanup(args: argparse.Namespace) -> dict[str, Any]:
+    if not args.yes:
+        raise CloudProviderError("pass --yes to cleanup acceptance", code="validation_error")
+    cfg = _settings()
+    apps = CloudRuContainerAppsClient()
+    if args.acceptance_created:
+        return {"deleted": cfg["name"], "operation": apps.delete(cfg["name"])}
+    if args.acceptance_updated:
+        if not isinstance(args.snapshot, dict):
+            raise CloudProviderError(
+                "pre-existing acceptance target requires a rollback snapshot",
+                code="validation_error",
+            )
+        return {"restored": cfg["name"], "operation": apps.restore(cfg["name"], args.snapshot)}
+    return {"status": "NOOP"}
+
+
 def cmd_delete(args: argparse.Namespace) -> dict:
     if not args.yes:
         raise CloudProviderError(
             "pass --yes to delete the container service", code="validation_error"
+        )
+    if not getattr(args, "acceptance_created", False):
+        raise CloudProviderError(
+            "cleanup may delete only a container created by this acceptance run",
+            code="validation_error",
         )
     cfg = _settings()
     return {"deleted": cfg["name"], "operation": CloudRuContainerAppsClient().delete(cfg["name"])}
@@ -271,12 +342,24 @@ def main(argv: list[str] | None = None) -> int:
         help="pass this environment variable into the container (repeatable)",
     )
     deploy.add_argument("--timeout", type=float, default=600, help="seconds to wait for readiness")
+    deploy.add_argument("--acceptance-image-file")
     deploy.set_defaults(func=cmd_deploy)
 
     sub.add_parser("status", help="show service status").set_defaults(func=cmd_status)
+    sub.add_parser("inventory", help="check project-level container access").set_defaults(
+        func=cmd_inventory
+    )
+
+    cleanup = sub.add_parser("cleanup", help="restore or remove an acceptance target")
+    cleanup.add_argument("--yes", action="store_true")
+    cleanup.add_argument("--acceptance-created", action="store_true")
+    cleanup.add_argument("--acceptance-updated", action="store_true")
+    cleanup.add_argument("--snapshot-json")
+    cleanup.set_defaults(func=_cleanup_from_cli)
 
     delete = sub.add_parser("delete", help="delete the container service")
     delete.add_argument("--yes", action="store_true")
+    delete.add_argument("--acceptance-created", action="store_true")
     delete.set_defaults(func=cmd_delete)
 
     sub.add_parser("estimate", help="monthly cost floor").set_defaults(func=cmd_estimate)

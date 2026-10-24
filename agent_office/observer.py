@@ -3,7 +3,7 @@
 The observer reads open issues and pull requests (plus the ones closed in the
 last day), turns each GitHub timeline into one chronological "thread" with the
 agent behind every step, and flags work that is stuck: red CI, merge conflicts,
-missing Copilot or Codex reviews, green pull requests nobody merged, and agents
+missing required reviews, green pull requests nobody merged, and agents
 that went silent after being given a task.
 
 It only reads GitHub, except with ``--publish``: then it rewrites the body of
@@ -40,18 +40,19 @@ TRACKING_TITLE = "Наблюдатель: офис агентов"
 DIGEST_MARKER = "<!-- agent-office-observer -->"
 ISSUE_BODY_LIMIT = 60000
 
-AGENTS = ("claude", "codex", "copilot", "alice")
+AGENTS = ("codex", "copilot", "alice")
 AGENT_LABELS = {
     "claude": "Claude",
     "codex": "Codex",
     "copilot": "Copilot",
-    "alice": "Alice",
+    "alice": "Logos",
     "ci": "CI-бот",
     "human": "человек",
 }
 
 FAILED_CONCLUSIONS = {"failure", "timed_out", "cancelled", "action_required", "startup_failure"}
 PASSED_CONCLUSIONS = {"success", "neutral", "skipped"}
+ADMISSION_CHECK_NAMES = {"Merge readiness snapshot"}
 SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 SEVERITY_ICONS = {"high": "🔴", "medium": "🟡", "low": "⚪"}
 
@@ -63,6 +64,8 @@ class Thresholds:
     agent_silent: timedelta = timedelta(hours=2)
     review_wait: timedelta = timedelta(hours=1)
     merge_wait: timedelta = timedelta(hours=2)
+    maintainer_passes: int = 2
+    observer_minute: int = 17
     checks_pending: timedelta = timedelta(hours=2)
     stale: timedelta = timedelta(hours=24)
     recent_window: timedelta = timedelta(hours=24)
@@ -93,10 +96,16 @@ class Thread:
     events: list[Event] = field(default_factory=list)
     draft: bool = False
     mergeable_state: str = ""
+    base_ref: str = ""
+    head_sha: str = ""
+    behind_by: int | None = None
     checks: dict[str, str] = field(default_factory=dict)
     checks_started_at: datetime | None = None
     linked_prs: list[int] = field(default_factory=list)
     dispatches: list[tuple[str, datetime]] = field(default_factory=list)
+    trigger_eligible_dispatches: list[tuple[str, datetime, bool]] = field(default_factory=list)
+    executable_dispatches: list[tuple[str, datetime]] = field(default_factory=list)
+    maintainer_dispatches: list[tuple[str, datetime]] = field(default_factory=list)
 
     @property
     def last_activity(self) -> datetime:
@@ -164,11 +173,40 @@ def classify_branch(ref: str | None) -> str | None:
     return prefix if prefix in AGENTS else None
 
 
-_MENTION = re.compile(r"(?<![\w/])@(claude|codex|copilot|alice)\b", re.I)
+_MENTION = re.compile(r"(?<![\w/])@(claude|codex|copilot|alice|logos)\b", re.I)
+_EXECUTABLE_MENTION = re.compile(r"(?<![\w/])@(codex|copilot|alice|logos)\b", re.I)
+# "@logos" addresses the Logos workflow, which is the "alice" agent (see AGENT_LABELS).
+_MENTION_ALIASES = {"logos": "alice"}
+_EXECUTABLE_AGENT = {
+    "codex": "codex",
+    "copilot": "copilot",
+    "alice": "alice",
+}
+_MAINTAINER_INTENT = re.compile(r"\bmaintainer\b", re.I)
+_EXECUTABLE_AUTHOR_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
+
+
+def _mention_agent(token: str) -> str:
+    name = token.lower()
+    return _MENTION_ALIASES.get(name, name)
 
 
 def mentioned_agents(text: str | None) -> list[str]:
-    return sorted({match.lower() for match in _MENTION.findall(text or "")})
+    return sorted({_mention_agent(match) for match in _MENTION.findall(text or "")})
+
+
+def executable_mentioned_agents(text: str | None) -> list[str]:
+    """Return the agent ids named by executable mentions in ``text``.
+
+    Pull request threads never start the Logos backend; only issue threads do.
+    The thread-kind rule is applied where trigger eligibility is recorded.
+    """
+    return sorted(
+        {
+            _EXECUTABLE_AGENT[_mention_agent(match)]
+            for match in _EXECUTABLE_MENTION.findall(text or "")
+        }
+    )
 
 
 # --------------------------------------------------------------------------
@@ -269,6 +307,7 @@ def build_thread(
     timeline: list[dict[str, Any]],
     pull: dict[str, Any] | None = None,
     check_runs: list[dict[str, Any]] | None = None,
+    behind_by: int | None = None,
 ) -> Thread:
     """Assemble the thread of one issue or pull request from GitHub data."""
     is_pr = pull is not None or "pull_request" in item
@@ -277,7 +316,8 @@ def build_thread(
     created_at = parse_time(item.get("created_at")) or datetime.now(UTC)
 
     if is_pr:
-        head_ref = ((pull or {}).get("head") or {}).get("ref")
+        head = (pull or {}).get("head") or {}
+        head_ref = head.get("ref")
         owner_agent = classify_branch(head_ref) or classify_actor(author, body)
         merged = bool(
             (pull or {}).get("merged_at") or (item.get("pull_request") or {}).get("merged_at")
@@ -297,6 +337,9 @@ def build_thread(
         created_at=created_at,
         draft=bool((pull or {}).get("draft") or item.get("draft")),
         mergeable_state=(pull or {}).get("mergeable_state") or "",
+        base_ref=str(((pull or {}).get("base") or {}).get("ref") or ""),
+        head_sha=str(((pull or {}).get("head") or {}).get("sha") or ""),
+        behind_by=behind_by,
     )
     thread.events.append(
         Event(
@@ -308,7 +351,14 @@ def build_thread(
         )
     )
     if not is_pr:
-        _record_dispatch(thread, body, created_at, author)
+        # logos.yml also starts on the issue title, so a title mention counts like a body mention.
+        _record_dispatch(
+            thread,
+            f"{thread.title}\n{body}",
+            created_at,
+            author,
+            author_association=item.get("author_association"),
+        )
         for assignee in item.get("assignees") or []:
             if classify_login(_login(assignee)) == "copilot":
                 thread.dispatches.append(("copilot", created_at))
@@ -323,8 +373,27 @@ def build_thread(
             source = (raw.get("source") or {}).get("issue") or {}
             if "pull_request" in source and source.get("number") not in thread.linked_prs:
                 thread.linked_prs.append(source["number"])
-        elif not is_pr and kind == "commented":
-            _record_dispatch(thread, raw.get("body"), event.at, event.actor)
+        elif kind == "commented":
+            if (
+                event.agent in AGENTS
+                and classify_login(event.actor) == event.agent
+                and _is_backend_acknowledgement(event.agent, raw.get("body"), kind)
+            ):
+                _acknowledge_backend_dispatch(thread, event.agent, event.at)
+            _record_dispatch(
+                thread,
+                raw.get("body"),
+                event.at,
+                event.actor,
+                author_association=raw.get("author_association"),
+            )
+        elif kind == "reviewed":
+            if (
+                event.agent in AGENTS
+                and classify_login(event.actor) == event.agent
+                and _is_backend_acknowledgement(event.agent, raw.get("body"), kind)
+            ):
+                _acknowledge_backend_dispatch(thread, event.agent, event.at)
         elif not is_pr and kind == "assigned":
             if classify_login(_login(raw.get("assignee"))) == "copilot":
                 thread.dispatches.append(("copilot", event.at))
@@ -355,28 +424,80 @@ def build_thread(
     return thread
 
 
-def _record_dispatch(thread: Thread, text: str | None, at: datetime, actor: str) -> None:
-    """A task is handed to an agent when someone other than that agent's bot mentions it.
-
-    The maintainer dispatches with the owner's token, so a signed Claude comment
-    that says "@claude" or "@codex" still counts; only an agent's own bot account
-    quoting its name does not.
-    """
+def _record_dispatch(
+    thread: Thread,
+    text: str | None,
+    at: datetime,
+    actor: str,
+    *,
+    author_association: str | None = None,
+) -> None:
+    """Record mention intent separately from trigger eligibility and execution evidence."""
     poster = classify_login(actor)
     for agent in mentioned_agents(text):
         if agent != poster:
             thread.dispatches.append((agent, at))
+
+    if (author_association or "").upper() not in _EXECUTABLE_AUTHOR_ASSOCIATIONS:
+        return
+
+    maintainer_intent = bool(thread.kind == "pr" and _MAINTAINER_INTENT.search(text or ""))
+    for agent in executable_mentioned_agents(text):
+        # The Logos workflow ignores pull request comments (logos.yml guards on issue threads).
+        if agent == "alice" and thread.kind == "pr":
+            continue
+        if agent != poster:
+            thread.trigger_eligible_dispatches.append((agent, at, maintainer_intent))
+
+
+def _is_backend_acknowledgement(agent: str, body: str | None, kind: str) -> bool:
+    """Require visible backend evidence after an eligible trigger."""
+    return kind in {"commented", "reviewed"}
+
+
+def _acknowledge_backend_dispatch(thread: Thread, agent: str, at: datetime) -> None:
+    """Promote the latest eligible mention only after that backend visibly acknowledges it."""
+    already_executed = set(thread.executable_dispatches)
+    candidates = [
+        candidate
+        for candidate in thread.trigger_eligible_dispatches
+        if candidate[0] == agent
+        and candidate[1] <= at
+        and (candidate[0], candidate[1]) not in already_executed
+    ]
+    if not candidates:
+        return
+
+    target, dispatched_at, maintainer_intent = max(candidates, key=lambda item: item[1])
+    thread.executable_dispatches.append((target, dispatched_at))
+    if maintainer_intent:
+        thread.maintainer_dispatches.append((target, dispatched_at))
 
 
 # --------------------------------------------------------------------------
 # Finding stuck work
 
 
+def freshness_state(thread: Thread) -> str:
+    """Summarise exact PR-head freshness relative to its current base ref."""
+    if thread.kind != "pr" or thread.behind_by is None:
+        return "unknown"
+    return "current" if thread.behind_by == 0 else f"behind {thread.behind_by}"
+
+
+def implementation_checks(thread: Thread) -> dict[str, str]:
+    """Checks that validate implementation, excluding merge-admission snapshots."""
+    return {
+        name: value for name, value in thread.checks.items() if name not in ADMISSION_CHECK_NAMES
+    }
+
+
 def checks_state(thread: Thread) -> str:
-    """Summarise head-commit checks as "failed", "pending", "passed" or "none"."""
-    if not thread.checks:
+    """Summarise implementation checks as "failed", "pending", "passed" or "none"."""
+    checks = implementation_checks(thread)
+    if not checks:
         return "none"
-    values = set(thread.checks.values())
+    values = set(checks.values())
     if values & FAILED_CONCLUSIONS:
         return "failed"
     if values <= PASSED_CONCLUSIONS:
@@ -405,6 +526,36 @@ def _has_codex_check(thread: Thread) -> bool:
     )
 
 
+_MAINTAINER_STATUS = re.compile(
+    r"^\s*(?:BLOCKED|DEFERRED|ЗАБЛОКИРОВАНО|ОТЛОЖЕНО)\s*:",
+    re.IGNORECASE,
+)
+
+
+def _maintainer_outcome_after(thread: Thread, since: datetime, target: str) -> bool:
+    for event in thread.events:
+        if event.agent != target or event.at <= since:
+            continue
+        if event.action == "запросил изменения":
+            return True
+        if event.kind == "commented":
+            body = event.action.removeprefix("комментарий:").strip()
+            if _MAINTAINER_STATUS.match(body):
+                return True
+    return False
+
+
+def _observer_passes_since(since: datetime, now: datetime, minute: int) -> int:
+    if now <= since:
+        return 0
+    boundary = since.replace(minute=minute, second=0, microsecond=0)
+    if boundary <= since:
+        boundary += timedelta(hours=1)
+    if boundary > now:
+        return 0
+    return int((now - boundary).total_seconds() // 3600) + 1
+
+
 def detect_findings(
     thread: Thread, now: datetime, limits: Thresholds = DEFAULT_LIMITS
 ) -> list[Finding]:
@@ -422,9 +573,45 @@ def detect_findings(
 
     if thread.kind == "pr":
         state = checks_state(thread)
+        maintainer_target, maintainer_since = max(
+            thread.maintainer_dispatches,
+            key=lambda item: item[1],
+            default=(None, None),
+        )
+        if (
+            maintainer_since is not None
+            and _observer_passes_since(
+                maintainer_since,
+                now,
+                limits.observer_minute,
+            )
+            >= limits.maintainer_passes
+            and not _maintainer_outcome_after(thread, maintainer_since, maintainer_target)
+        ):
+            found.append(
+                finding(
+                    "medium",
+                    "maintainer_stall",
+                    "maintainer handoff без merge, blocker/defer статуса или ответа backend",
+                )
+            )
+        if thread.behind_by is not None and thread.behind_by > 0:
+            stale_ci = state == "passed"
+            message = (
+                f"ветка отстаёт от {thread.base_ref or 'base'} на {thread.behind_by} commit(s); "
+                + (
+                    "зелёный CI относится к устаревшей базе и не является merge-evidence"
+                    if stale_ci
+                    else "нужна синхронизация до финального merge preflight"
+                )
+            )
+            found.append(finding("medium", "branch_stale", message))
+
         if state == "failed":
             failed = sorted(
-                name for name, value in thread.checks.items() if value in FAILED_CONCLUSIONS
+                name
+                for name, value in implementation_checks(thread).items()
+                if value in FAILED_CONCLUSIONS
             )
             found.append(finding("high", "ci_failed", "CI красный: " + ", ".join(failed)))
         elif (
@@ -433,6 +620,15 @@ def detect_findings(
             and now - thread.checks_started_at > limits.checks_pending
         ):
             found.append(finding("low", "checks_stuck", "проверки идут дольше обычного"))
+        readiness = thread.checks.get("Merge readiness snapshot")
+        if readiness in FAILED_CONCLUSIONS:
+            found.append(
+                finding(
+                    "medium",
+                    "readiness_blocked",
+                    "merge readiness не пройден; см. freshness/check/review причины",
+                )
+            )
         if thread.mergeable_state == "dirty":
             found.append(finding("high", "merge_conflict", "конфликт с master"))
 
@@ -440,20 +636,27 @@ def detect_findings(
             waiting = now - _ready_since(thread)
             if not _has_copilot_review(thread) and waiting > limits.review_wait:
                 found.append(finding("medium", "no_copilot_review", "нет ревью Copilot"))
-            if not _has_codex_check(thread) and waiting > limits.review_wait:
-                found.append(finding("low", "no_codex_check", "Codex ещё не проверял тесты"))
             if (
                 state == "passed"
                 and _has_copilot_review(thread)
                 and thread.mergeable_state in {"clean", "unstable", "has_hooks", ""}
+                and not (thread.behind_by is not None and thread.behind_by > 0)
                 and idle > limits.merge_wait
             ):
                 found.append(
                     finding("medium", "ready_to_merge", "зелёный и отревьюенный, ждёт мержа")
                 )
-            elif thread.mergeable_state == "behind" and idle > limits.merge_wait:
+            elif (
+                thread.behind_by is None
+                and thread.mergeable_state == "behind"
+                and idle > limits.merge_wait
+            ):
                 found.append(
-                    finding("low", "behind_base", "отстал от master, нужно обновить ветку")
+                    finding(
+                        "low",
+                        "behind_base",
+                        "GitHub сообщает behind, но точный behind_by не получен",
+                    )
                 )
 
         if idle > limits.stale:
@@ -564,13 +767,14 @@ def render_digest(
         kind = "PR" if thread.kind == "pr" else "Задача"
         draft = " · черновик" if thread.draft else ""
         ci = "" if thread.kind == "issue" else f" · CI: {checks_state(thread)}"
+        freshness = "" if thread.kind == "issue" else f" · freshness: {freshness_state(thread)}"
         links = (
             f" · PR {', '.join(f'#{n}' for n in thread.linked_prs)}" if thread.linked_prs else ""
         )
         owner = AGENT_LABELS.get(thread.owner_agent, thread.owner_agent)
         lines.append(
             f"<details><summary>{icon} {kind} #{thread.number} {_escape(thread.title)} · "
-            f"{owner}{draft}{ci}{links}</summary>"
+            f"{owner}{draft}{ci}{freshness}{links}</summary>"
         )
         lines.append("")
         lines.append(f"[Открыть на GitHub]({thread.url})")
@@ -676,16 +880,24 @@ def collect_threads(
         timeline = gh.paginate(gh.repo_path(f"/issues/{number}/timeline?per_page=100"), limit=500)
         pull = None
         runs: list[dict[str, Any]] = []
+        behind_by: int | None = None
         if "pull_request" in item:
             pull = gh.get(gh.repo_path(f"/pulls/{number}"))
             if item.get("state") == "open":
                 sha = pull["head"]["sha"]
+                base_ref = pull["base"]["ref"]
                 runs = gh.paginate(
                     gh.repo_path(f"/commits/{sha}/check-runs?per_page=100"),
                     key="check_runs",
                     limit=300,
                 )
-        return build_thread(item, timeline, pull, runs)
+                compare = gh.get(
+                    gh.repo_path(
+                        f"/compare/{urllib.parse.quote(base_ref, safe='')}...{urllib.parse.quote(sha, safe='')}"
+                    )
+                )
+                behind_by = int(compare["behind_by"])
+        return build_thread(item, timeline, pull, runs, behind_by=behind_by)
 
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="observer") as pool:
         return list(pool.map(load, items))
@@ -750,6 +962,27 @@ def run(
                 "state": t.state,
                 "agent": t.owner_agent,
                 "title": t.title,
+                "base_ref": t.base_ref or None,
+                "head_sha": t.head_sha or None,
+                "behind_by": t.behind_by,
+                "freshness": freshness_state(t) if t.kind == "pr" else None,
+                "dispatches": [
+                    {"agent": agent, "at": at.isoformat()} for agent, at in t.dispatches
+                ],
+                "trigger_eligible_dispatches": [
+                    {
+                        "agent": agent,
+                        "at": at.isoformat(),
+                        "maintainer_intent": maintainer_intent,
+                    }
+                    for agent, at, maintainer_intent in t.trigger_eligible_dispatches
+                ],
+                "executable_dispatches": [
+                    {"agent": agent, "at": at.isoformat()} for agent, at in t.executable_dispatches
+                ],
+                "maintainer_dispatches": [
+                    {"agent": agent, "at": at.isoformat()} for agent, at in t.maintainer_dispatches
+                ],
                 "events": [{**asdict(event), "at": event.at.isoformat()} for event in t.events],
             }
             for t in threads

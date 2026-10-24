@@ -5,7 +5,96 @@
 Для общего понимания структуры проекта и его компонентов ознакомьтесь с [README](README.md) и [архитектурой системы](architecture/overview.md).
 
 
-## 2026-09-29 — безопасность, CI, async runtime и Cloud.ru
+## 2026-10-10 — Cloud.ru acceptance deploy и persistent RDC
+
+- `cloudru-deploy.yml` `deploy` стал ограниченным платным acceptance-прогоном: бюджет 5 RUB / 900 с, job до 15 минут, idle timeout 60 с, cleanup под `always()` удаляет созданный сервис или восстанавливает прежний; `ALICE_DATABASE_URL` больше не передаётся ([#1002](https://github.com/maksimp6/Chat/pull/1002)).
+- Persistent RDC: профиль 0.2 vCPU / 512Mi, `install` принимает готовый digest образа и не собирает его, Git-ключ доставляется только через `POST /rdc/secrets` ([#1016](https://github.com/maksimp6/Chat/pull/1016), [#1017](https://github.com/maksimp6/Chat/pull/1017)).
+- Валидация RDC в PR больше не собирает образ ([#1015](https://github.com/maksimp6/Chat/pull/1015)); SSH-деплой RDC удалён ранее ([#861](https://github.com/maksimp6/Chat/pull/861)).
+
+## 2026-10-06 — Kristall Wave 1, Alice Dev worker, и ChatGPT OAuth
+
+### Kristall Wave 1: файловый бэкенд для conversation и user identity
+
+- Переведено управление conversation ownership на file-native storage вместо SQLite (issue #776):
+  [#920](https://github.com/maksimp6/Chat/pull/920).
+- Переведена user identity и GitHub mapping на file-native aggregate (issue #776):
+  [#921](https://github.com/maksimp6/Chat/pull/921).
+- После одноразового verified import из legacy SQL и migration marker runtime-операции ownership и identity больше не читают SQL.
+- Conversation metadata остаётся в SQL; дальнейшая миграция (sessions, runtime events, metadata) остаётся roadmap.
+- Миграция слоя памяти позволяет отделить conversation ownership lifecycle от centralized DB.
+
+### Alice Dev worker: отдельный coding worker
+
+- Lightweight HTTP MCP worker переименован из RDC в Alice Dev как отдельный coding worker со своим lifecycle `cloudru-rdc-mcp-candidate.yml` ([#919](https://github.com/maksimp6/Chat/pull/919)).
+- Легаси `cloudru-rdc.yml` (persistent RDC) и `production-deploy.yml` сохранены без изменений; Alice Dev не заменяет ни persistent RDC, ни deployment приложения Alice.
+- Добавлен one-shot credential handoff: login/password передаются воркеру один раз через авторизованный endpoint и сохраняются в файл с правами 0600, повторная запись отклоняется ([#933](https://github.com/maksimp6/Chat/pull/933)).
+- Добавлена поддержка ChatGPT OAuth discovery и PKCE flow для Alice Dev ([#925](https://github.com/maksimp6/Chat/pull/925)).
+- Добавлены immutable workers на каждый commit и удаление выведенных воркеров по tombstone-списку ([#930](https://github.com/maksimp6/Chat/pull/930)).
+- Добавлена обработка tombstone deletion и in-place worker updates ([#928](https://github.com/maksimp6/Chat/pull/928), [#931](https://github.com/maksimp6/Chat/pull/931)).
+- Cloud.ru HTTP 499 recovery для Alice Dev lookup ([#923](https://github.com/maksimp6/Chat/pull/923)).
+
+**Статус**: Alice Dev worker реализован; живая верификация и approved cutover persistent RDC/production-deploy.yml остаются в roadmap. Resource-scoped ownership, решение о замене и acceptance criteria — в [#869](https://github.com/maksimp6/Chat/issues/869#issuecomment-6023949684).
+
+### Secrets и authorization
+
+- Добавлена capability-only agent secret delivery: агент запрашивает разрешённое использование alias, plaintext агенту не возвращается ([#897](https://github.com/maksimp6/Chat/pull/897)).
+- Добавлен file import и ephemeral materialization для secrets ([#895](https://github.com/maksimp6/Chat/pull/895)).
+- Базовые pieces secrets infrastructure (#872–#874) интегрированы; consumer-by-consumer migration к canonical Secret Store #755 остаётся незавершённой.
+
+### CI и platform routing
+
+- Добавлен platform-aware CI routing: checks маршрутизируются по affected platform (backend, frontend, Android, CI changes) ([#935](https://github.com/maksimp6/Chat/pull/935)).
+- Добавлена документация: [`development/platform-ci-routing.md`](development/platform-ci-routing.md).
+- Performance improvement: reuse registry build cache между Alice Dev deployments ([#934](https://github.com/maksimp6/Chat/pull/934)).
+
+Это shipped-функционал, но live Alice Dev deployment verification всё ещё в progress.
+
+## 2026-09-29 — безопасность, CI, async runtime, Cloud.ru и repository development roles
+
+**Note**: Agent model settings (mini/Claude/mandatory-final-Codex) below are historical. Current [AGENTS.md](../AGENTS.md) specifies nano for routine work, excludes Claude execution from normal paths, and makes additional model review optional.
+
+### Repository role-based GitHub office
+
+- Добавлена role-first/provider-second модель для координации разработки:
+  [#560](https://github.com/maksimp6/Chat/pull/560).
+- Определены девять repository roles: Team Lead, Backend, Frontend, Android, Test, Infra, Security Reviewer, Docs Engineer, Release Manager.
+- Routine модели: GPT-5.4 mini, Docs Engineer/Codex default GPT-5.4 nano.
+- Claude Partner Agent / Sonnet как явная эскалация для сложной архитектурной работы.
+- `@claude-lite` workflow для Haiku с bounded turns для быстрых операций.
+- Copilot остаётся автоматическим reviewer; Codex запускается один раз перед merge.
+- Один primary owner и один focused PR на issue; стирание ownership или множественные PRs на issue не допускаются.
+- Safety/owner-approval boundaries для deployment, data changes и secrets не изменены.
+- Документация: [`docs/agents/role-based-agent-office.md`](agents/role-based-agent-office.md) и [`AGENTS.md`](../AGENTS.md).
+
+Это shipped repository policy в `master`. Skill-first agent runtime добавлен позже, 2026-09-30, отдельным PR [#566](https://github.com/maksimp6/Chat/pull/566).
+
+### 3D business и AI-first tools
+
+- Добавлен базовый 3D business slice: quote, owner-scoped orders, settlement и
+  фактический P&L без изменения Treasury paper balance:
+  [#553](https://github.com/maksimp6/Chat/pull/553).
+- Добавлены owner-scoped finance plan и расчёт фактической окупаемости:
+  [#555](https://github.com/maksimp6/Chat/pull/555).
+- Добавлен read-only AI-first tool `printing3d.finance.assess`, который принимает
+  неполные условия, использует сохранённый plan/фактическую прибыль как fallback
+  и возвращает `missing_fields` без выбора банка и без банковских действий:
+  [#556](https://github.com/maksimp6/Chat/pull/556).
+- Категория локальных инструментов `3d` включена в standard discovery при
+  отсутствии явного списка категорий:
+  [#557](https://github.com/maksimp6/Chat/pull/557).
+- Hosted `web_search` стал opt-out: при отсутствии настройки он доступен модели,
+  явный `enabled=false` его отключает; `tool_choice=auto` не изменён:
+  [#559](https://github.com/maksimp6/Chat/pull/559).
+- Browser approval переведён на action-level policy: read-only navigation/inspect
+  actions не требуют подтверждения только из-за browser tool, а `click`/`fill`
+  остаются approval-gated:
+  [#562](https://github.com/maksimp6/Chat/pull/562).
+
+Это shipped-контур в `master`, но не весь roadmap
+[#552](https://github.com/maksimp6/Chat/issues/552): printer adapters,
+production queue, 3D asset workflow, marketplace/delivery, CRM/dashboard,
+подтверждённый спрос, покупка оборудования и production rollout остаются
+отдельной работой.
 
 ### Безопасность и секреты
 
@@ -41,6 +130,15 @@
 - Добавлен информационный GitHub Actions `Merge readiness snapshot` на exact PR head с read-only permissions и bounded polling missing/pending checks до 15 минут:
   [#523](https://github.com/maksimp6/Chat/pull/523).
   Snapshot не синхронизирует ветку, не заменяет strict up-to-date branch protection и не является самостоятельным required merge gate.
+
+### Developer tooling
+
+- Добавлен deterministic read-only hot-file analyzer с прозрачным score по touches/churn/churn-LOC/authors/recency и JSON/Markdown CI report без автоматического refactor и без отдельного blocking gate:
+  [#534](https://github.com/maksimp6/Chat/pull/534).
+- Добавлен первый deterministic Python-only AST index slice: tracked Python files, symbols/imports/syntactic calls и эвристический reverse test map. Semantic resolution, JS/TS, incremental cache, query tool и автоматическая agent integration остаются roadmap:
+  [#540](https://github.com/maksimp6/Chat/pull/540).
+- Добавлен optional pre-commit hook, который использует только canonical `bash scripts/format.sh check`, не запускает полный pytest и не заменяет authoritative CI:
+  [#542](https://github.com/maksimp6/Chat/pull/542).
 
 ### Async/runtime validation
 

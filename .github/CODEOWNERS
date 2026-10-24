@@ -12,11 +12,15 @@ Dockerfile                         @maksimp6
 docker-compose.postgres.yml        @maksimp6
 
 # Данные и миграции
-/db.py                             @maksimp6
+/storage/db.py                     @maksimp6
 /db_backend.py                     @maksimp6
 
 # Android-клиент
 /android/                          @maksimp6
+
+# Real-provider acceptance is changed only through owner review.
+/tests/real_api/                   @maksimp6
+/tests/test_real_api_acceptance.py @maksimp6
 
 # Документация и правила репозитория
 /docs/                             @maksimp6
@@ -24,4 +28,3 @@ README.md                          @maksimp6
 CONTRIBUTING.md                    @maksimp6
 SECURITY.md                        @maksimp6
 AGENTS.md                          @maksimp6
-CLAUDE.md                          @maksimp6
