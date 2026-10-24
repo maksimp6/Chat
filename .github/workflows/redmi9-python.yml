@@ -1,0 +1,21 @@
+name: Redmi Python runner acceptance
+on:
+  push:
+    branches: [ops/redmi9-python-runner]
+permissions: {}
+jobs:
+  native:
+    runs-on: redmi9-python
+    timeout-minutes: 2
+    steps:
+      - name: Negative control - exit 17 must fail
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, platform, subprocess
+          model = subprocess.check_output(['/system/bin/getprop', 'ro.product.model'], text=True).strip()
+          assert model == 'Redmi 9', model
+          assert platform.machine() == 'aarch64'
+          print(json.dumps({'device': model, 'engine': 'python-native', 'run_id': os.environ['GITHUB_RUN_ID'], 'control': 'expected-failure', 'exit_code': 17}), flush=True)
+          raise SystemExit(17)
+          PY
