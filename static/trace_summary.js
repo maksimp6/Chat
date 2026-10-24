@@ -13,7 +13,9 @@
     return input && typeof input === "object" ? input : null;
   }
 
+  // Number(null) is 0, so a missing timestamp must be rejected before the conversion.
   function finite(value) {
+    if (value === null || value === undefined || value === "") return null;
     var number = Number(value);
     return Number.isFinite(number) ? number : null;
   }
