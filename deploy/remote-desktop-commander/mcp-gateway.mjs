@@ -6,6 +6,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { createOAuth } from "./oauth.mjs";
+import { createOAuthStateStore } from "./oauth-state.mjs";
 import { createCredentialHandoff } from "./credential-handoff.mjs";
 import { canonicalPublicOrigin } from "./request-origin.mjs";
 
@@ -41,11 +42,22 @@ export async function startGateway(options = {}) {
   const configuredPublicUrl = canonicalPublicOrigin(
     options.publicUrl ?? process.env.ALICE_DEV_PUBLIC_URL ?? "",
   );
+  const stateFile = options.oauthStateFile ?? process.env.ALICE_DEV_OAUTH_STATE_FILE ?? "/tmp/alice-dev-auth/oauth.json";
+  const ownerId = options.ownerId ?? process.env.ALICE_DEV_OWNER_ID ?? "owner";
+  const oauthStateStore = options.oauthStateStore ?? createOAuthStateStore({
+    stateFile, origin: configuredPublicUrl, ownerId,
+  });
+  if ((options.requireDurability ?? process.env.ALICE_DEV_OAUTH_REQUIRE_DURABILITY === "1") && !oauthStateStore.enabled) {
+    throw new Error("oauth_state_not_configured");
+  }
+  // Recovery must finish before OAuth loads its signing key or any HTTP/MCP
+  // listener is exposed. Restore failure is a startup failure, never fresh DCR.
+  await oauthStateStore.restore();
   const oauth = options.oauth ?? createOAuth({
     publicUrl: configuredPublicUrl,
     shortToken: token,
-    ownerId: options.ownerId ?? process.env.ALICE_DEV_OWNER_ID ?? "owner",
-    stateFile: options.oauthStateFile ?? process.env.ALICE_DEV_OAUTH_STATE_FILE,
+    ownerId, stateFile,
+    onPersist: () => oauthStateStore.persist(),
   });
   const credentialHandoff = options.credentialHandoff ?? createCredentialHandoff({
     token,
@@ -90,8 +102,9 @@ export async function startGateway(options = {}) {
     response.setHeader("Cache-Control", "no-store");
     response.setHeader("Referrer-Policy", "no-referrer");
     if (request.method === "GET" && request.url === "/healthz") {
-      response.writeHead(200, { "Content-Type": "application/json" })
-        .end('{"status":"ok","mode":"mcp-gateway"}');
+      const ready = oauth.available?.() ?? true;
+      response.writeHead(ready ? 200 : 503, { "Content-Type": "application/json" })
+        .end(JSON.stringify({ status: ready ? "ok" : "oauth_unavailable", mode: "mcp-gateway" }));
       return;
     }
     let requestUrl;
@@ -105,7 +118,7 @@ export async function startGateway(options = {}) {
     }
     if (await credentialHandoff.handle(request, response, requestUrl)) return;
     if (oauth?.enabled && await oauth.handle(request, response, requestUrl)) return;
-    if (requestUrl.pathname !== "/mcp" || request.method !== "POST") {
+    if (requestUrl.pathname !== "/mcp") {
       request.resume();
       response.writeHead(404, { "Content-Type": "application/json" })
         .end('{"status":"not_found"}');
@@ -119,6 +132,16 @@ export async function startGateway(options = {}) {
           ? oauth.challenge()
           : 'Bearer realm="alice-dev"',
       }).end('{"status":"unauthorized"}');
+      return;
+    }
+    if (request.method !== "POST") {
+      // This stateless gateway has no standalone SSE stream or DELETE session.
+      // Authentication still runs first so connector probes can discover OAuth.
+      request.resume();
+      response.writeHead(405, {
+        "Content-Type": "application/json",
+        Allow: "POST",
+      }).end(request.method === "HEAD" ? undefined : '{"status":"method_not_allowed"}');
       return;
     }
     try {

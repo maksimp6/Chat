@@ -1,4 +1,4 @@
-# Contributing to Alice Pro
+# Contributing to Logos
 
 All production changes follow the same reviewable flow:
 

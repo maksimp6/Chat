@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static policy validator for Alice Pro preview/runtime Python modules."""
+"""Static policy validator for Logos preview/runtime Python modules."""
 
 from __future__ import annotations
 

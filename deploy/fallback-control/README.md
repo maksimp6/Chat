@@ -1,6 +1,6 @@
 # Fallback control server (alice-lan-c17)
 
-Self-hosted command queue for controlling Alice Pro and the Redmi 9 when the
+Self-hosted command queue for controlling Logos and the Redmi 9 when the
 paid RDC, a vendor tunnel or an external control service is unavailable
 (#1178). One C17 source file, no dependencies beyond libc, no API keys.
 

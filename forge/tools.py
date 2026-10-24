@@ -1,4 +1,4 @@
-"""Universal local tools for the 3D-printing business domain."""
+"""Universal local tools for the Logos 3D-printing business domain."""
 
 from __future__ import annotations
 

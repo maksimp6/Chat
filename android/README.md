@@ -1,4 +1,4 @@
-# Alice Pro Android wrapper
+# Logos Android wrapper
 
 This module packages the existing Flask application in an Android shell using Chaquopy and a WebView. The backend source remains in the repository root and is staged into the Android Python source directory before packaging.
 
@@ -57,10 +57,21 @@ gradle :app:testDebugUnitTest
 `rootagent/` is the in-app replacement for the Termux Live Server: one foreground
 `RootAgentService` serving a loopback-only API on `127.0.0.1:8766`.
 
-- Started only from **Diagnostics → RootAgent: проверить**, which also runs an in-app
-  self-check (health + root probe; with root, also `/v1/status`, `/v1/screen/tree` and
-  `/v1/screen/capture`, reporting only the lock flag and HTTP codes, never screen content) and
-  shows the result; **RootAgent: остановить** stops it.
+- Open **Diagnostics → RootAgent: панель** for owner-operated diagnostics. Opening the
+  panel starts no service or request. Separate buttons start/stop the service, check
+  health/root/status/device metadata, parse a requested XML hierarchy, or decode and
+  preview a requested PNG. Screen requests are never included in the API/root check.
+  Only one panel operation runs at a time across Activity recreation. Leaving the panel
+  cancels and disconnects its HTTP client; total request deadlines also stop dripping
+  responses. Results have timestamps and can be copied without
+  screen content or credentials. The screenshot preview is protected from ordinary
+  Android screenshots and dismissed when the activity leaves the foreground.
+  Stop reports submission, not verified port closure. Unlock is explicitly unavailable:
+  there is no unlock endpoint or C-driver adapter in this build. No input or grants.
+  Host-side Robolectric tests exercise the actual Activity, native bitmap preview and
+  lifecycle with synthetic responses; they do not prove Redmi 9 behavior. Complete
+  PNG validation and post-capture Keyguard hardening remain a dependency on draft #1216;
+  this panel does not accept or merge that security change.
   The service is not exported and never starts on its own.
 - Routes: `GET /v1/health`, `GET /v1/device-info` (Build model/device/SDK), `GET /v1/status`
   (`{"keyguard_locked": bool}` from a root `dumpsys window`; missing or unexpected fields count as
@@ -80,7 +91,7 @@ gradle :app:testDebugUnitTest
 - JVM unit tests in `app/src/test/java/com/alicepro/mobile/rootagent/` cover the bounded shell,
   the HTTP boundary and the self-check client. Redmi 9 smoke (2026-10-13, #650): loopback-only
   listener, 401 without or with a wrong token, 403 with a foreign `Origin`, self-check
-  `root: true` once Magisk allows the app uid. Magisk must grant root to Alice Pro explicitly.
+  `root: true` once Magisk allows the app uid. Magisk must grant root to Logos explicitly.
 
 ## System insets
 
@@ -92,7 +103,7 @@ The resolver is unit-tested independently from Android rendering code. UI verifi
 
 ## CI APK updates
 
-The Android shell exposes an **Update APK** button in the header. In the updater you can choose a repository branch and then select one of the latest successful CI runs that produced the `alice-pro-debug-apk` artifact.
+The Android shell exposes an **Update APK** button in the header. In the updater you can choose a repository branch and then select one of the latest successful CI runs that produced the `alice-pro-debug-apk-<run_number>` artifact.
 
 The updater fetches public GitHub Actions metadata, validates the artifact SHA-256 digest, verifies package name and signing certificate, rejects APKs that are not newer than the installed build, and starts the Android package installer through a `FileProvider`.
 

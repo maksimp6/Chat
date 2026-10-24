@@ -72,7 +72,7 @@ def _limit_local_output(value: str | bytes | None, max_bytes: int = 1048576) -> 
 
 
 def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
-    """Execute a shell command on the host running the Alice Pro backend."""
+    """Execute a shell command on the host running the Logos backend."""
     command = str(args.get("command") or "").strip()
     if not command:
         raise ValueError("Command is required")
@@ -335,7 +335,7 @@ RUNTIME_TOOLS = {
     "local_runtime_exec": {
         "title": "Local Runtime Execute",
         "description": (
-            "Execute a shell command on the same Linux host that runs the Alice Pro backend. "
+            "Execute a shell command on the same Linux host that runs the Logos backend. "
             "Use this for server-local diagnostics, maintenance and repository commands without SSH."
         ),
         "parameters": {
@@ -370,7 +370,7 @@ RUNTIME_TOOLS = {
         "title": "SSH Runtime Execute",
         "description": (
             "Execute a shell command on a configured SSH target using the Linux user "
-            "mapped from the trusted Alice identity."
+            "mapped from the trusted Logos identity."
         ),
         "parameters": _schema(
             {
@@ -390,7 +390,7 @@ RUNTIME_TOOLS = {
     },
     "ssh_runtime_read_file": {
         "title": "SSH Runtime Read File",
-        "description": "Read a remote absolute path using the Linux user mapped from the trusted Alice identity.",
+        "description": "Read a remote absolute path using the Linux user mapped from the trusted Logos identity.",
         "parameters": _schema(
             {
                 "path": {"type": "string", "minLength": 1, "maxLength": 4096},
@@ -407,7 +407,7 @@ RUNTIME_TOOLS = {
     },
     "ssh_runtime_write_file": {
         "title": "SSH Runtime Write File",
-        "description": "Atomically write a remote file using the Linux user mapped from the trusted Alice identity.",
+        "description": "Atomically write a remote file using the Linux user mapped from the trusted Logos identity.",
         "parameters": _schema(
             {
                 "path": {"type": "string", "minLength": 1, "maxLength": 4096},

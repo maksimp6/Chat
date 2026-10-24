@@ -27,7 +27,7 @@ from provider_accounts.key_rotation import rotate_active_key
 from observability.trace_manager import traced_operation
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("alice_cloudru_provider_key_rotation")
+logger = logging.getLogger("logos_cloudru_provider_key_rotation")
 
 
 def _ttl() -> timedelta:

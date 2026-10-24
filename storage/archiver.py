@@ -1,4 +1,4 @@
-"""Explicit maintenance of the same native journal used by Alice."""
+"""Explicit maintenance of the same native journal used by Logos."""
 
 from __future__ import annotations
 import threading

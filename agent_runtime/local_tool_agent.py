@@ -1,4 +1,4 @@
-"""Client/runtime for a protected Alice Pro Local Tool Agent."""
+"""Client/runtime for a protected Logos Local Tool Agent."""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ def register_agent(
     bootstrap_token: str,
     *,
     agent_id: Optional[str] = None,
-    name: str = "Alice Pro Android Agent",
+    name: str = "Logos Android Agent",
     capabilities: Optional[list[str]] = None,
     version: str = "1.0",
 ) -> str:
@@ -190,7 +190,7 @@ def start_agent(
     bootstrap_token: str,
     *,
     agent_id: Optional[str] = None,
-    name: str = "Alice Pro Android Agent",
+    name: str = "Logos Android Agent",
     capabilities: Optional[list[str]] = None,
     version: str = "1.0",
 ) -> tuple[LocalToolAgent, str]:

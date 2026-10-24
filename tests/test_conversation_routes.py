@@ -71,13 +71,13 @@ def test_create_conversation_hides_provider_exception(monkeypatch):
             assert execution_trace is not None
             raise RuntimeError(internal_marker)
 
-    monkeypatch.setattr(mcp_routes, "AliceClient", lambda _config: FailingClient())
+    monkeypatch.setattr(mcp_routes, "LogosClient", lambda _config: FailingClient())
     monkeypatch.setattr(mcp_routes, "get_current_owner_id", lambda required=False: None)
 
     client = app_module.app.test_client()
     response = client.post(
         "/api/conversations",
-        json={"model": "aliceai-llm", "title": "Test"},
+        json={"model": "logos-runtime", "title": "Test"},
     )
 
     assert response.status_code == 502

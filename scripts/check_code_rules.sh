@@ -8,6 +8,8 @@ python scripts/check_filenames.py
 # Only absolute imports are allowed (TID252 with ban-relative-imports = all).
 python -m ruff check --select TID252 --no-cache --exclude node_modules .
 
+python scripts/check_exception_handling.py
+
 python -m pytest -q -p no:cacheprovider \
   tests/test_naming_conventions.py \
   tests/test_ci_platform_changes.py \
@@ -15,4 +17,5 @@ python -m pytest -q -p no:cacheprovider \
   tests/test_reliability_rules.py \
   tests/test_type_checking.py \
   tests/test_api_problem_details.py \
-  tests/test_filename_gate.py
+  tests/test_filename_gate.py \
+  tests/test_exception_handling_gate.py

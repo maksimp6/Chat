@@ -1,6 +1,6 @@
 # 3D Printing Business
 
-Alice Pro уже содержит первый рабочий business slice для 3D-печати. Это не полный
+Logos уже содержит первый рабочий business slice для 3D-печати. Это не полный
 контур из issue #552, а набор shipped-возможностей для расчёта заказов, фактической
 прибыли, финансирования и AI-first оценки покупки принтера.
 
@@ -8,7 +8,7 @@ Alice Pro уже содержит первый рабочий business slice д�
 
 - расчёт котировки с учётом материала, электричества, амортизации, упаковки,
   резерва брака, комиссии площадки и целевой маржи — через HTTP и как инструмент
-  Alice `printing3d.quote`; сохранение заказа из диалога — через
+  Logos `printing3d.quote`; сохранение заказа из диалога — через
   `printing3d.order.create` с approval;
 - owner-scoped заказы со статусами от lead до paid;
 - settlement с фактическими revenue/cost;
@@ -25,11 +25,13 @@ Alice Pro уже содержит первый рабочий business slice д�
 - [HTTP API](api/printing3d.md)
 - [Universal/MCP tools](mcp/printing3d-tools.md)
 
+Где продавать изделия: [каналы продаж](notes/printing3d/sales-channels.md).
+
 ## Модели как код
 
 Модели для печати хранятся в [`printing3d/models/`](../printing3d/models/README.md) как
 исходники OpenSCAD со сгенерированными STL и 3MF. Это просто файлы в
-репозитории, а не asset workflow приложения: Alice Pro их не читает и не
+репозитории, а не asset workflow приложения: Logos их не читает и не
 обрабатывает.
 
 ## Бизнес-границы
@@ -98,7 +100,7 @@ python -m printing3d.slicer model.stl model.gcode
 ## Структура модулей
 
 - `printing3d/` — самостоятельный домен: расчёт, заказы, финансы, слайсер. Не
-  импортирует модули Alice Pro (проверяется `tests/test_printing3d_standalone_boundary.py`).
+  импортирует модули Logos (проверяется `tests/test_printing3d_standalone_boundary.py`).
   Хранилище передаётся явно через протокол `printing3d.store.PrintStore`.
-- `forge/` — подключение к Alice Pro: HTTP-маршруты, инструменты Alice и
+- `forge/` — подключение к Logos: HTTP-маршруты, инструменты Logos и
   привязка к нативному хранилищу и владельцу.

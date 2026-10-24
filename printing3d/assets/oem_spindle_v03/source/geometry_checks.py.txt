@@ -1,0 +1,22 @@
+import json, tempfile, math
+from pathlib import Path
+import cadquery as cq
+import trimesh
+from alice_stock_spool_replacement_v03 import make_halves, snap_ring, fit_gauge, export_checked
+
+with tempfile.TemporaryDirectory() as td:
+    for core in [52.5, 55.0]:
+      for spindle in [18.,20.,22.,24.]:
+        a,b,c=make_halves(core,spindle)
+        for label,s in [('A',a),('B',b),('ring',snap_ring(core))]:
+          r=export_checked(s,Path(td)/(f'{core}-{spindle}-{label}.stl'))
+          assert r['fits_A1_mini'] and r['watertight'] and r['winding_consistent'] and r['components']==1
+        assert c['outer_bearing_diameter_mm']+0.8==core
+    for shaft in [18.,20.,22.,24.]:
+      r=export_checked(fit_gauge(shaft),Path(td)/f'gauge-{shaft}.stl')
+      assert r['fits_A1_mini'] and r['watertight']
+    try:
+       make_halves(60,22)
+       raise AssertionError('Missing rejection for oversize spool')
+    except ValueError:pass
+print('VALIDATED 8 variants x 3 printable bodies + 4 gauge variants; oversize guard OK')

@@ -1,7 +1,7 @@
 """RED-first acceptance tests for the standalone name/value commit API.
 
 Tests use only the public Kristall interface except for explicit OS fault
-injection. No Alice runtime, SQL, or historical backup data is required.
+injection. No Logos runtime, SQL, or historical backup data is required.
 """
 
 from __future__ import annotations

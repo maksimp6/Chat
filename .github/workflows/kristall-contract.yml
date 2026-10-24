@@ -23,17 +23,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
       - name: Install independent core tooling
         run: python -m pip install pytest==9.1.1 mypy==2.4.0
-      - name: Verify core without Alice or its test configuration
+      - name: Verify core without Logos or its test configuration
         run: |
           core_dir=$(mktemp -d)
           cp -R kristall "$core_dir/"
           mkdir "$core_dir/tests"
-          cp tests/test_memory_checkpoint.py tests/test_memory_value_bounds.py tests/test_memory_commit_safety.py tests/test_memory_explicit_commit_contract.py tests/test_memory_v1_acceptance.py tests/test_memory_store.py tests/test_memory_standalone_boundary.py tests/test_memory_type_annotations.py "$core_dir/tests/"
+          cp tests/test_memory_checkpoint.py tests/test_memory_value_bounds.py tests/test_memory_commit_safety.py tests/test_memory_explicit_commit_contract.py tests/test_memory_v1_acceptance.py tests/test_memory_store.py tests/test_memory_standalone_boundary.py tests/test_memory_type_annotations.py tests/test_memory_replication.py "$core_dir/tests/"
           cd "$core_dir"
           python -m mypy --strict kristall
           python -m pytest -q

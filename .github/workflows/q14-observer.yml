@@ -1,0 +1,61 @@
+name: Q14 read-only model observer
+
+on:
+  pull_request:
+    branches: [develop]
+    types: [synchronize, reopened, labeled]
+    paths:
+      - scripts/q14_observer.py
+      - tests/test_q14_observer.py
+      - .github/workflows/q14-observer.yml
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: q14-observer-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    if: >-
+      github.event.pull_request.number == 1425 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'feat/q14-ai-simulation' &&
+      (github.event.action != 'labeled' ||
+      (github.event.label.name == 'q14-observer-once' &&
+      github.event.sender.login == github.repository_owner && github.run_attempt == 1))
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test observer boundaries and original scenarios without credentials
+        run: python3 -m unittest discover -s tests -p 'test_q14*.py' -v
+      - name: Verify original evidence was not repaired by the observer author
+        run: |
+          git diff --exit-code a553e4c998297052596b5b82b6f83bd577adc638 HEAD -- \
+            .github/workflows/q14-simulation.yml scripts/q14_ai_review.py \
+            scripts/q14_simulation.py tests/test_q14_simulation.py docs/simulations/q14.md
+          echo "OBSERVER_HEAD=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: One bounded model execution with model-selected read-only tools
+        if: github.event.action == 'labeled' && github.event.label.name == 'q14-observer-once'
+        env:
+          YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+          YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 -m scripts.q14_observer
+      - name: Publish actual model answer
+        if: always()
+        run: test ! -f q14-observer/model-answer.md || cat q14-observer/model-answer.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && github.event.action == 'labeled' && github.event.label.name == 'q14-observer-once'
+        with:
+          name: q14-observer-${{ github.run_id }}-${{ github.run_attempt }}
+          path: q14-observer/
+          if-no-files-found: error
+          retention-days: 14

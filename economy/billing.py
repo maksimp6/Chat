@@ -6,7 +6,12 @@ models never become a confirmed zero-cost invocation.
 
 from typing import Any, Dict, Optional
 
-from core.config import ALL_MODELS, AUDIO_STT_PRICE_PER_SEC, AUDIO_TTS_PRICE_PER_SEC
+from core.config import (
+    ALL_MODELS,
+    AUDIO_STT_PRICE_PER_SEC,
+    AUDIO_TTS_PRICE_PER_SEC,
+    canonical_model_key,
+)
 
 PRICING_CURRENCY = "RUB"
 PRICING_VERSION = "config-v1"
@@ -46,7 +51,7 @@ def build_ai_billing_item(
         "output_tokens": output_tokens,
         "total_tokens": total_tokens,
     }
-    pricing = ALL_MODELS.get(model_key) if model_key else None
+    pricing = ALL_MODELS.get(canonical_model_key(model_key)) if model_key else None
     if pricing is None:
         item.update(
             {

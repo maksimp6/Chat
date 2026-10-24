@@ -1,4 +1,4 @@
-"""HTTP API for the 3D-printing business MVP."""
+"""HTTP API for the Logos 3D-printing business MVP."""
 
 from flask import Blueprint, jsonify, request
 

@@ -20,10 +20,10 @@ def default_handlers(check_run=None, run_issue=None):
         return run(["containers", "registries"])
 
     def alice_task(payload):
-        """Runs Alice headlessly on a task text with her sandboxed filesystem tools.
+        """Runs Logos headlessly on a task text with its sandboxed filesystem tools.
 
-        Alice never commits, pushes or runs commands, and stops at approval-gated tools
-        instead of running them; this handler never approves anything on her behalf.
+        Logos never commits, pushes or runs commands, and stops at approval-gated tools
+        instead of running them; this handler never approves anything on its behalf.
         """
         issue = payload.get("issue")
         title = payload.get("title")
@@ -42,7 +42,7 @@ def default_handlers(check_run=None, run_issue=None):
             raise TaskFailed("invalid_payload")
         run = run_issue
         if run is None:
-            from agent_runtime.alice_agent_runner import DEFAULT_MODEL, run_issue_task as run
+            from agent_runtime.issue_runner import DEFAULT_MODEL, run_issue_task as run
 
             model = model or DEFAULT_MODEL
         result = run(issue, title, body, model)
