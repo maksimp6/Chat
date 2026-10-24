@@ -252,7 +252,17 @@ def assess_financing(store: PrintStore, owner_id: str, data: dict[str, Any]) -> 
     setup_cost = resolve("setup_cost", 0)
     down_payment = resolve("down_payment")
     credit_principal = resolve("credit_principal")
-    credit_total_repayment = resolve("credit_total_repayment")
+    # A saved total repayment belongs to the saved loan. It is reused only while the loan terms it was
+    # computed from are unchanged; otherwise it is recomputed from the new terms.
+    loan_terms_given = any(
+        data.get(name) is not None for name in ("credit_principal", "monthly_payment", "term_months")
+    )
+    if data.get("credit_total_repayment") is not None:
+        credit_total_repayment = data.get("credit_total_repayment")
+    elif loan_terms_given:
+        credit_total_repayment = None
+    else:
+        credit_total_repayment = saved.get("credit_total_repayment")
     monthly_payment = resolve("monthly_payment")
     term_months = resolve("term_months")
     psk_percent = resolve("psk_percent")
