@@ -179,7 +179,8 @@ def departments_start_session(department_id: str):
     create_session(
         session_id,
         {
-            "department_id": department_id,
+            # The stored id is normalized; the URL spelling may differ in case.
+            "department_id": department["id"],
             "department_type": department["type"],
             "agent_id": department["agent_id"],
         },
@@ -194,6 +195,6 @@ def departments_session_status(department_id: str, session_id: str):
     if not department:
         return jsonify({"error": "department_not_found"}), 404
     session = get_session(session_id)
-    if not session or (session.get("metadata") or {}).get("department_id") != department_id:
+    if not session or (session.get("metadata") or {}).get("department_id") != department["id"]:
         return jsonify({"error": "session_not_found"}), 404
-    return jsonify({"session": session, "department_id": department_id})
+    return jsonify({"session": session, "department_id": department["id"]})
