@@ -32,7 +32,6 @@ jobs:
       backend: ${{ steps.classify.outputs.backend }}
       android: ${{ steps.classify.outputs.android }}
       infra: ${{ steps.classify.outputs.infra }}
-      database: ${{ steps.classify.outputs.database }}
       mcp: ${{ steps.classify.outputs.mcp }}
     steps:
       - name: Checkout
