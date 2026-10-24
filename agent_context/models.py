@@ -162,6 +162,10 @@ class ContextSlice:
         )
 
     def reusable_when(self, changed_components: tuple[str, ...]) -> bool:
+        # A slice that declares no dependencies cannot show it is still current, so a partial
+        # reuse of the previous packet does not carry it forward.
+        if not self.depends_on:
+            return False
         return not set(self.depends_on).intersection(changed_components)
 
     def as_dict(self) -> dict[str, Any]:
