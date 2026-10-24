@@ -1,20 +1,18 @@
 ---
 name: cloudru-management
-description: "Prepare and operate Alice Pro on Cloud.ru Evolution: EDS and Workflow Studio, Container Apps, external PostgreSQL, Cloud DNS, API Gateway, IAM identities and keys, Secret and Certificate Management, logs, Object Storage, and the optional Evolution AI service catalog. Alice's current AI backend remains Yandex Cloud / Yandex AI Studio. Use for configuration, read-only inventory, readiness checks, deployments, and troubleshooting."
+description: "Prepare and operate Logos on Cloud.ru Evolution: EDS and Workflow Studio, Container Apps, Cloud DNS, API Gateway, IAM identities and keys, Secret and Certificate Management, logs, Object Storage, and the optional Evolution AI service catalog. Logos's current AI backend remains Yandex Cloud / Yandex AI Studio. Use for configuration, read-only inventory, readiness checks, deployments, and troubleshooting."
 ---
 
-# Cloud.ru / Alice Pro
+# Cloud.ru / Logos
 
-Read repository `AGENTS.md` and the current issue first. Work from fresh `master`
-in a focused branch; publish a PR. Keep existing authorization in scope: do not
-ask again for authorized read-only discovery, code or configuration work. Apply
+Read repository `AGENTS.md` and the current issue first. Work from current `develop` HEAD in a focused branch; publish a PR, and all ordinary PRs target `develop` only. Keep existing authorization in scope: do not ask again for authorized read-only discovery, code or configuration work. Apply
 the repository's production/data/secret approval rules to actual live changes.
 
 ## Start here
 
 1. Identify the interface in the table below. Do not interchange keys.
 2. Read [EDS reference](references/eds.md) for CLI work, or the
-   [deployment runbook](../../../deploy/cloudru/README.md) for Alice rollout.
+   [deployment runbook](../../../deploy/cloudru/README.md) for Logos rollout.
 3. Read [Evolution service and identity reference](references/evolution-services.md)
    for DNS, Gateway, workflow, logs, users/keys, secrets/certificates and AI.
    For JSON stdout and cloud log-stream configuration, also read
@@ -27,7 +25,7 @@ the repository's production/data/secret approval rules to actual live changes.
 5. Complete templates and run `scripts/cloudru_deploy_preflight.py`. Its success
    validates configuration, not infrastructure, costs or deployment readiness.
 6. For rollout, record approved source SHA → image digest → deployment/revision
-   ID; verify authentication, database TLS and application behavior. Report
+   ID; verify authentication, remote TLS and application behavior. Report
    blockers precisely; never call prepared templates a completed deployment.
 
 ## Choose the interface
@@ -36,7 +34,7 @@ the repository's production/data/secret approval rules to actual live changes.
 |---|---|---|
 | `eds repo`, `eds wf` v0.4.0 | Repo and Workflow Studio | `EDS_API_KEY` as `X-API-KEY`, `EDS_PROJECT_ID` |
 | Evolution service APIs | Container Apps, IAM and other documented services | Service-specific auth; IAM Key ID/Key Secret where supported |
-| Existing Alice backend | IAM wizard, provider keys, S3, Container Apps | Existing provider adapters and redaction boundaries |
+| Existing Logos backend | IAM wizard, provider keys, S3, Container Apps | Existing provider adapters and redaction boundaries |
 | Cloud CLI Advanced | Advanced platform only | Its own AK/SK; not an Evolution IAM pair |
 
 EDS is **not** a universal infrastructure provisioner. It has no PostgreSQL,
@@ -46,18 +44,16 @@ not an immutable commit; enforce SHA/digest checks in the pipeline.
 
 ## Deployment constraints
 
-- Alice runs in Container Apps. Do not introduce a replacement VM/Kubernetes
+- Logos runs in Container Apps. Do not introduce a replacement VM/Kubernetes
   runtime, Remote Desktop Commander or Supabase into this task.
-- Target durable data: external PostgreSQL with a public endpoint, certificate
-  verification and verified narrow client CIDRs. Evolution Managed PostgreSQL
-  currently has private connectivity; Container Apps cannot connect directly.
+- Target durable data: the native Kristall store (`kristall.Kristall`), with no
+  SQL backend. Local, Termux and shared deployments use the same store, with
+  one writer per durable journal.
 - A stable Container Apps outbound address is **not established**. Do not treat
-  one observed IP as a guarantee or open PostgreSQL to the internet to bypass
-  this dependency. See [PostgreSQL runbook](../../../deploy/cloudru/postgres/README.md).
+  one observed IP as a guarantee or expose a data store to the public internet.
 - Keep scale at 0–1 initially. This does not prove absence of revision overlap
   or solve distributed background-job/migration coordination.
-- Object Storage holds objects/backups, not the live PostgreSQL data directory.
-  Preserve local/Termux SQLite compatibility.
+- Object Storage holds objects/backups, not the live Kristall journal.
 - Keep owner login, MCP OAuth, `InvocationContext` and `ExecutionTrace` intact.
   Gateway API keys do not replace application user identity or authorization.
 
@@ -69,14 +65,14 @@ not an immutable commit; enforce SHA/digest checks in the pipeline.
   Use an already authorized SSH setup or an approved credential helper instead.
 - Capture EDS output privately and publish only validated resource IDs/status.
   JSON formatting is not redaction. Job logs and HTTP errors may contain secrets.
-- Separate deployment IAM/EDS credentials from runtime DB, S3 and model keys.
+- Separate deployment IAM/EDS credentials from S3 and model keys.
   Preserve `ALICE_PROVIDER_CREDENTIAL_KEY` across redeploys and restore.
 - New secret/KMS integrations must use provider boundaries and redact before
   tracing. Do not assume an adapter or env variable exists until checked in code.
 
 ## Other Evolution tasks
 
-Use `cloudru_iam.py`, `cloudru_iam_routes.py` and `provider_key_rotation.py` for
+Use `cloud/cloudru/iam.py`, `cloud/cloudru/iam_routes.py` and `provider_key_rotation.py` for
 existing key flows. Consult `docs/integrations/cloudru-iam-wizard.md` and
 `docs/provider-key-rotation.md` before changing them.
 

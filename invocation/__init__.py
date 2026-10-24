@@ -1,5 +1,5 @@
 """Invocation lifecycle package."""
 
-from .context import InvocationContext
+from invocation.context import InvocationContext
 
 __all__ = ["InvocationContext"]

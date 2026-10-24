@@ -12,7 +12,7 @@ from cloud.cloudru.container_apps_client import (
     estimate_monthly_cost,
 )
 from cloud.cloudru.registry_client import CloudRuRegistryClient, ImageRef
-from cloudru_iam import CloudRuIamClient
+from cloud.cloudru.iam import CloudRuIamClient
 
 DIGEST = "sha256:" + "a" * 64
 
@@ -761,7 +761,7 @@ def test_deploy_verified_restores_whole_previous_configuration():
 
 
 def test_iam_failure_becomes_provider_error():
-    from cloudru_iam import CloudRuIamError
+    from cloud.cloudru.iam import CloudRuIamError
 
     iam = Mock()
     iam._token.side_effect = CloudRuIamError("invalid key")

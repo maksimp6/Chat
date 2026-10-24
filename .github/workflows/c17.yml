@@ -1,0 +1,22 @@
+name: C17 safety
+on:
+  pull_request:
+    paths:
+      - "**/*.c"
+      - "**/*.h"
+      - "scripts/check_c17.sh"
+      - "docs/development/c-standard.md"
+      - ".github/workflows/c17.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  c17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compile and exercise C17 fixture on GCC and Clang
+        run: bash scripts/check_c17.sh

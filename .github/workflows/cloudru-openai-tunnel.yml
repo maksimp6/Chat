@@ -1,0 +1,131 @@
+name: Cloud.ru OpenAI tunnel
+
+# Persistent Logos service with the OpenAI Secure MCP Tunnel client running
+# next to it (scripts/container_entrypoint.py). ChatGPT reaches Logos's /mcp
+# through the tunnel; the container needs no inbound MCP exposure for that.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit or branch on master to deploy
+        required: true
+        default: master
+        type: string
+      action:
+        description: What to do
+        required: true
+        default: deploy
+        type: choice
+        options:
+          - deploy
+          - status
+          - estimate
+
+concurrency:
+  group: alice-cloudru-openai-tunnel
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  OUT: ${{ runner.temp }}/ci-out/cloudru-openai-tunnel
+
+jobs:
+  tunnel:
+    name: OpenAI tunnel ${{ inputs.action }}
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
+      CLOUDRU_REGISTRY_NAME: ${{ vars.CLOUDRU_REGISTRY_NAME || 'alice-pro' }}
+      CLOUDRU_REPOSITORY_NAME: ${{ vars.CLOUDRU_REPOSITORY_NAME || 'alice-pro' }}
+      CLOUDRU_CONTAINER_NAME: alice-openai-tunnel
+      CLOUDRU_CONTAINER_CPU: "0.3"
+      CLOUDRU_MIN_INSTANCES: "1"
+      CLOUDRU_MAX_INSTANCES: "1"
+    steps:
+      - name: Check out ref
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+      - name: Require a commit on master
+        run: |
+          git fetch --no-tags origin master
+          git merge-base --is-ancestor HEAD FETCH_HEAD
+      - name: Validate configuration
+        if: inputs.action != 'estimate'
+        env:
+          CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
+          CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
+          ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
+          OPENAI_TUNNEL_ID: ${{ secrets.OPENAI_TUNNEL_ID }}
+          OPENAI_TUNNEL_API_KEY: ${{ secrets.OPENAI_TUNNEL_API_KEY }}
+          ACTION: ${{ inputs.action }}
+        run: |
+          required=(CLOUDRU_IAM_KEY_ID CLOUDRU_IAM_KEY_SECRET CLOUDRU_PROJECT_ID)
+          if [ "$ACTION" = deploy ]; then
+            required+=(ALICE_SHORT_TOKEN OPENAI_TUNNEL_ID OPENAI_TUNNEL_API_KEY)
+          fi
+          missing=()
+          for name in "${required[@]}"; do
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf '::error::Missing configuration: %s\n' "${missing[*]}"
+            exit 1
+          fi
+          echo 'Configuration validated; no secret values displayed.'
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Check the container entrypoint
+        if: inputs.action == 'deploy'
+        run: |
+          pip install -r requirements-dev.txt
+          python -m pytest -q -p no:cacheprovider tests/test_container_entrypoint.py
+      - name: Deploy
+        if: inputs.action == 'deploy'
+        env:
+          CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
+          CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
+          ALICE_REQUIRE_SHORT_TOKEN: "1"
+          ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
+          OPENAI_TUNNEL_ID: ${{ secrets.OPENAI_TUNNEL_ID }}
+          OPENAI_TUNNEL_API_KEY: ${{ secrets.OPENAI_TUNNEL_API_KEY }}
+          ALICE_MCP_USER_ID: ${{ vars.ALICE_MCP_USER_ID || 'maksim' }}
+        run: |
+          set -o pipefail
+          umask 077
+          # Logos and the tunnel client share this token inside the container only;
+          # a fresh one per deploy means there is nothing to store or rotate.
+          ALICE_MCP_BEARER_TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$ALICE_MCP_BEARER_TOKEN"
+          export ALICE_MCP_BEARER_TOKEN
+          python scripts/cloudru_deploy.py deploy --tag "$(git rev-parse HEAD)" \
+            --env ALICE_REQUIRE_SHORT_TOKEN --env ALICE_SHORT_TOKEN \
+            --env OPENAI_TUNNEL_ID --env OPENAI_TUNNEL_API_KEY \
+            --env ALICE_MCP_BEARER_TOKEN --env ALICE_MCP_USER_ID | tee "$OUT/deploy.json"
+          {
+            echo '### Cloud.ru OpenAI tunnel deploy'
+            echo '```json'
+            cat "$OUT/deploy.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          rm -f "$OUT/deploy.json"
+      - name: Status
+        if: inputs.action == 'status'
+        env:
+          CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
+          CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
+        run: python scripts/cloudru_deploy.py status
+      - name: Estimate
+        if: inputs.action == 'estimate'
+        run: python scripts/cloudru_deploy.py estimate
