@@ -50,6 +50,38 @@ provider_credentials_bp = Blueprint(
     url_prefix="/api/provider-credentials",
 )
 
+
+@provider_credentials_bp.get("/yandex/issuance-status")
+def yandex_issuance_status():
+    guard = _guard()
+    if guard:
+        return guard
+    from provider_accounts.issued_credentials import issuance_status
+    return jsonify(issuance_status()), 200, {"Cache-Control": "no-store"}
+
+
+@provider_credentials_bp.post("/yandex/issued")
+@traced_operation("yandex.import_issued_key", include_request=False)
+def import_runner_yandex_key():
+    guard = _guard()
+    if guard:
+        return guard
+    # JSON prevents cross-origin form posts to a local unauthenticated deployment.
+    if not request.is_json:
+        return jsonify({"error": "json_required"}), 415
+    if request.headers.get("Origin") not in (None, request.host_url.rstrip("/")):
+        return jsonify({"error": "origin_rejected"}), 403
+    from provider_accounts.issued_credentials import ImportRejected, import_yandex_key
+    try:
+        result = import_yandex_key(request.get_json(silent=True))
+        invalidate_model_discovery_cache()
+        return jsonify(result), 200, {"Cache-Control": "no-store"}
+    except ImportRejected as exc:
+        return jsonify({"error": exc.code}), exc.status
+    except Exception:
+        # Exception text may contain a secret; never log or return it.
+        return jsonify({"error": "credential_storage_failed"}), 503
+
 CLOUDRU_DEFAULT_TTL = timedelta(days=1)
 
 
@@ -674,3 +706,4 @@ def update_provider_credentials():
         invalidate_model_discovery_cache()
 
     return provider_credentials_status()
+
