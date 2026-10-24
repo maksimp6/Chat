@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from budget_controller import (
+from economy.budget_controller import (
     AccountType,
     AuthorizationRequired,
     BudgetAccount,

@@ -1,4 +1,8 @@
-from trace_timing import infer_response_start, request_timing_for_step, step_correlation_id
+from observability.trace_timing import (
+    infer_response_start,
+    request_timing_for_step,
+    step_correlation_id,
+)
 
 
 def test_step_correlation_id_is_stable():

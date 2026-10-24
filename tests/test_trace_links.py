@@ -1,4 +1,4 @@
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 def test_api_step_events_share_stable_correlation_id():

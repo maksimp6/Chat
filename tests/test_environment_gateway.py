@@ -1,22 +1,23 @@
+from agent_memory.client import close_memory_clients
 from pathlib import Path
 import subprocess
 import threading
 
 import pytest
 
-import db
+import storage.db as db
 from flask import Flask, Response, jsonify
 
-from environment_manager import (
+from remote_runtime.environments import (
     create_environment,
     delete_environment,
     init_environment_tables,
     start_environment,
     stop_environment,
 )
-import environment_routes
-import environment_manager
-from environment_routes import environment_bp, environment_gateway_bp
+import remote_runtime.environment_routes as environment_routes
+import remote_runtime.environments as environment_manager
+from remote_runtime.environment_routes import environment_bp, environment_gateway_bp
 from runtime import (
     current_runtime_base_path,
     current_runtime_data_root,
@@ -51,14 +52,7 @@ def _app():
 
     @app.post("/runtime-db/<value>")
     def runtime_db_write(value):
-        conn = db.get_conn()
-        try:
-            conn.execute("CREATE TABLE IF NOT EXISTS runtime_probe (value TEXT NOT NULL)")
-            conn.execute("DELETE FROM runtime_probe")
-            conn.execute("INSERT INTO runtime_probe (value) VALUES (?)", (value,))
-            conn.commit()
-        finally:
-            conn.close()
+        db.set_config("probe", value)
         return jsonify(
             {
                 "runtime_id": current_runtime_id(),
@@ -69,16 +63,12 @@ def _app():
 
     @app.get("/runtime-db")
     def runtime_db_read():
-        conn = db.get_conn()
-        try:
-            row = conn.execute("SELECT value FROM runtime_probe").fetchone()
-        finally:
-            conn.close()
+        value = db.get_config("probe")
         return jsonify(
             {
                 "runtime_id": current_runtime_id(),
                 "data_root": current_runtime_data_root(),
-                "value": row["value"],
+                "value": value,
             }
         )
 
@@ -167,8 +157,8 @@ def test_environment_gateway_rejects_stopped_runtime_without_transport(tmp_path,
 
 def test_environment_gateway_has_no_localhost_proxy_transport():
     root = Path(__file__).resolve().parents[1]
-    routes = (root / "environment_routes.py").read_text(encoding="utf-8")
-    manager = (root / "environment_manager.py").read_text(encoding="utf-8")
+    routes = (root / "remote_runtime" / "environment_routes.py").read_text(encoding="utf-8")
+    manager = (root / "remote_runtime" / "environments.py").read_text(encoding="utf-8")
     assert "import requests" not in routes
     assert "requests.request(" not in routes
     assert "http://127.0.0.1:" not in routes
@@ -220,7 +210,7 @@ def test_environment_gateway_maps_runtime_failures(monkeypatch, error, status_co
     assert response.get_json() == payload
 
 
-def test_environment_gateway_isolates_sqlite_per_runtime(tmp_path, monkeypatch):
+def test_environment_gateway_isolates_memory_per_runtime(tmp_path, monkeypatch):
     repo = _setup_repo(tmp_path)
     control_db = tmp_path / "control.db"
     runtime_root = tmp_path / "runtimes"
@@ -250,23 +240,14 @@ def test_environment_gateway_isolates_sqlite_per_runtime(tmp_path, monkeypatch):
         assert second_read["runtime_id"] == second["environment_id"]
         assert first_read["data_root"] != second_read["data_root"]
 
-        first_db = runtime_root / first["environment_id"] / "data" / "alice_pro.db"
-        second_db = runtime_root / second["environment_id"] / "data" / "alice_pro.db"
+        first_db = runtime_root / first["environment_id"] / "data" / "alice.memory"
+        second_db = runtime_root / second["environment_id"] / "data" / "alice.memory"
         assert first_db.is_file()
         assert second_db.is_file()
         assert first_db != second_db
 
-        control_conn = db.get_conn()
-        try:
-            tables = {
-                row["name"]
-                for row in control_conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type = 'table'"
-                ).fetchall()
-            }
-        finally:
-            control_conn.close()
-        assert "runtime_probe" not in tables
+        assert db.get_config("probe") is None
+
     finally:
         stop_environment(first["environment_id"])
         stop_environment(second["environment_id"])
