@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
+from provider_accounts.claude_catalog import CLAUDE_MODELS
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +200,7 @@ VOICE_MODELS = {
     },
 }
 
+TEXT_MODELS.update(CLAUDE_MODELS)
 ALL_MODELS = {**TEXT_MODELS, **VOICE_MODELS}
 AUDIO_STT_PRICE_PER_SEC = 0.0264
 AUDIO_TTS_PRICE_PER_SEC = 0.0203
@@ -251,6 +253,8 @@ def get_model_uri(project_id, model_key):
 
 def calculate_cost(model_key, input_tokens, output_tokens=0, cached_tokens=0, tool_tokens=0):
     m = get_model_info(model_key)
+    if m.get("pricing_status") == "unknown":
+        return None
     cost = (
         input_tokens * m["input"]
         + cached_tokens * m.get("cached", m["input"])
@@ -261,9 +265,11 @@ def calculate_cost(model_key, input_tokens, output_tokens=0, cached_tokens=0, to
 
 
 def calculate_full_cost(model_key, usage):
+    m = get_model_info(model_key)
+    if m.get("pricing_status") == "unknown":
+        return None
     if not usage:
         return 0.0
-    m = get_model_info(model_key)
     token_cost = (
         usage.get("input_tokens", 0) * m["input"]
         + usage.get("output_tokens", 0) * m.get("output", m["input"])

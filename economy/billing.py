@@ -52,7 +52,11 @@ def build_ai_billing_item(
         "total_tokens": total_tokens,
     }
     pricing = ALL_MODELS.get(canonical_model_key(model_key)) if model_key else None
-    if pricing is None:
+    if (pricing and pricing.get("provider") == "anthropic") or (
+        isinstance(model_key, str) and model_key.startswith("claude-")
+    ):
+        item.update(provider="anthropic", currency="USD", pricing_version=None)
+    if pricing is None or pricing.get("pricing_status") == "unknown":
         item.update(
             {
                 "cost_status": "unknown",
@@ -122,6 +126,12 @@ def aggregate_billing(items, context: Optional[Dict[str, Any]] = None) -> Dict[s
         "unknown_cost_items": unknown,
         "items": items,
     }
+    if items and all(item.get("provider") == "anthropic" for item in items):
+        result.update(provider="anthropic", currency="USD", pricing_version=None)
+        if not known:
+            result.update(cost_status="unknown", total_cost=None)
+    elif any(item.get("provider") == "anthropic" for item in items):
+        result["provider"] = "mixed"
     if context:
         for key in ("invocation_id", "session_id", "conversation_id", "trace_id", "owner_id"):
             if context.get(key) is not None:

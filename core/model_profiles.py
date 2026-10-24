@@ -38,7 +38,10 @@ def _validated_profiles(catalog: Any) -> dict[str, dict[str, Any]]:
     if not isinstance(catalog, dict) or catalog.get("schema_version") != CATALOG_SCHEMA_VERSION:
         raise ValueError("unsupported Ultra catalog schema")
     profiles = catalog.get("profiles")
-    if not isinstance(profiles, dict) or set(profiles) != set(ALL_MODELS):
+    yandex_models = {
+        key for key, model in ALL_MODELS.items() if model.get("provider", "yandex") == "yandex"
+    }
+    if not isinstance(profiles, dict) or set(profiles) != yandex_models:
         raise ValueError("Ultra catalog does not cover the model registry exactly")
     for key, profile in profiles.items():
         if not isinstance(profile, dict) or profile.get("model_key") != key:
