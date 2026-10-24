@@ -1,0 +1,397 @@
+{
+  "schema_version": 1,
+  "models": [
+    {
+      "archive": "alice_stock_spool_replacement_v03.zip",
+      "source_archive_sha256": "d9fd89a55b00315211cbf72c904672c6c5523ec09c6d1897bfedc0a6ddc9c6b1",
+      "name": "OEM A1 mini: широкий вал v0.3",
+      "status": "fit_blocked",
+      "license_status": "creator-stated original CAD, independent attribution not performed",
+      "assembly": "две половинки + 4 штифта + стопор; заводское крепление не меняется",
+      "quantity": {
+        "parts/a1mini_oem_wide_hub_HALF_A.stl": 1,
+        "parts/a1mini_oem_wide_hub_HALF_B.stl": 1,
+        "parts/alignment_pin_PRINT_4.stl": 4,
+        "parts/a1mini_oem_wide_hub_END_RETAINER.stl": 1
+      },
+      "members_manifest": [
+        {
+          "path": "printing3d/assets/oem_spindle_v03/source/alice_stock_spool_replacement_v03.py.txt",
+          "original_archive_member": "alice_stock_spool_replacement_v03.py",
+          "bytes": 13335,
+          "sha256": "d54d00b291a82d662535b93924ad301deeb31d7a2493b50befd4b294a01ff189"
+        },
+        {
+          "path": "printing3d/assets/oem_spindle_v03/source/geometry_checks.py.txt",
+          "original_archive_member": "geometry_checks.py",
+          "bytes": 1018,
+          "sha256": "e104c3fefd0a1f90b03c5796b47fc53532ce6a8aaf79c368a4e2a99faf5b72d6"
+        },
+        {
+          "path": "printing3d/assets/oem_spindle_v03/cad/half_shell_A.step",
+          "original_archive_member": "half_shell_A.step",
+          "bytes": 72773,
+          "sha256": "1e7950ff39914974689c2d53ee9683dbf438bcfb8b617f33025a7e1a1b98c9e9"
+        },
+        {
+          "path": "printing3d/assets/oem_spindle_v03/cad/half_shell_B.step",
+          "original_archive_member": "half_shell_B.step",
+          "bytes": 75132,
+          "sha256": "2ed138da3d125c1b42cb0d00bd97116f7341fed5f9bb2b44992f1850a05346eb"
+        },
+        {
+          "path": "printing3d/assets/oem_spindle_v03/cad/retainer.step",
+          "original_archive_member": "retainer.step",
+          "bytes": 18059,
+          "sha256": "9fc7bdb57e613afeb63ff1408c6b22b66acc3a28ba5068344dc7ccf2f296760d"
+        },
+        {
+          "path": "printing3d/assets/oem_spindle_v03/parts/a1mini_oem_wide_hub_HALF_A.stl",
+          "original_archive_member": "a1mini_oem_wide_hub_HALF_A.stl",
+          "bytes": 126284,
+          "sha256": "617e40eb88b46712f1a91cde02d8545c9709945a77b83863cf757289d399058b",
+          "geometry": {
+            "triangles": 2524,
+            "watertight": true,
+            "bounds_mm": [
+              82.0,
+              60.0,
+              29.25
+            ]
+          }
+        },
+        {
+          "path": "printing3d/assets/oem_spindle_v03/parts/a1mini_oem_wide_hub_HALF_B.stl",
+          "original_archive_member": "a1mini_oem_wide_hub_HALF_B.stl",
+          "bytes": 126284,
+          "sha256": "f69cec6a98cde018afbd5c53399d4b76744d5c367f048472de44f2727d24f6f1",
+          "geometry": {
+            "triangles": 2524,
+            "watertight": true,
+            "bounds_mm": [
+              82.0,
+              60.0,
+              29.25
+            ]
+          }
+        },
+        {
+          "path": "printing3d/assets/oem_spindle_v03/parts/a1mini_oem_wide_hub_END_RETAINER.stl",
+          "original_archive_member": "a1mini_oem_wide_hub_END_RETAINER.stl",
+          "bytes": 33484,
+          "sha256": "af1cf4643f9c9277642b5c7357cb64db53db772bc13ee1220733b5aae10e3888",
+          "geometry": {
+            "triangles": 668,
+            "watertight": true,
+            "bounds_mm": [
+              59.09,
+              60.0,
+              3.95
+            ]
+          }
+        },
+        {
+          "path": "printing3d/assets/oem_spindle_v03/parts/alignment_pin_PRINT_4.stl",
+          "original_archive_member": "alignment_pin_PRINT_4.stl",
+          "bytes": 49384,
+          "sha256": "449ec86150e60facbd28e57c61f678989e1fbfc1ad22c886620e31fcb384650e",
+          "geometry": {
+            "triangles": 986,
+            "watertight": true,
+            "bounds_mm": [
+              3.6,
+              3.6,
+              8.25
+            ]
+          }
+        },
+        {
+          "path": "printing3d/assets/oem_spindle_v03/gauges/fit_gauge_stock_spindle_18mm_HALF.stl",
+          "original_archive_member": "01_GAUGES_PRINT_FIRST/fit_gauge_stock_spindle_18mm_HALF.stl",
+          "bytes": 18284,
+          "sha256": "16cb7bb7135b26e6e6254dec2a59e676d5dbd3e4f5d792a8afc35ccb36783e90",
+          "geometry": {
+            "triangles": 364,
+            "watertight": true,
+            "bounds_mm": [
+              14.39,
+              28.8,
+              5.0
+            ]
+          }
+        },
+        {
+          "path": "printing3d/assets/oem_spindle_v03/gauges/fit_gauge_stock_spindle_20mm_HALF.stl",
+          "original_archive_member": "01_GAUGES_PRINT_FIRST/fit_gauge_stock_spindle_20mm_HALF.stl",
+          "bytes": 18284,
+          "sha256": "d9c13226ad2436e4a295257e77034da4555c9530bf1881ab7869751895309112",
+          "geometry": {
+            "triangles": 364,
+            "watertight": true,
+            "bounds_mm": [
+              15.39,
+              30.8,
+              5.0
+            ]
+          }
+        },
+        {
+          "path": "printing3d/assets/oem_spindle_v03/gauges/fit_gauge_stock_spindle_22mm_HALF.stl",
+          "original_archive_member": "01_GAUGES_PRINT_FIRST/fit_gauge_stock_spindle_22mm_HALF.stl",
+          "bytes": 18284,
+          "sha256": "e1e464f9f87983f542ffe8bbd7c4d3ff8092b84fe57749127a1dc4f681eab042",
+          "geometry": {
+            "triangles": 364,
+            "watertight": true,
+            "bounds_mm": [
+              16.39,
+              32.8,
+              5.0
+            ]
+          }
+        },
+        {
+          "path": "printing3d/assets/oem_spindle_v03/gauges/fit_gauge_stock_spindle_24mm_HALF.stl",
+          "original_archive_member": "01_GAUGES_PRINT_FIRST/fit_gauge_stock_spindle_24mm_HALF.stl",
+          "bytes": 18284,
+          "sha256": "09708605a6898f8e75514b483f4479f1588debf39439fc2cc6f26136696d0e33",
+          "geometry": {
+            "triangles": 364,
+            "watertight": true,
+            "bounds_mm": [
+              17.39,
+              34.8,
+              5.0
+            ]
+          }
+        },
+        {
+          "path": "printing3d/assets/oem_spindle_v03/README_RU.md",
+          "original_archive_member": "README_RU.md",
+          "bytes": 3270,
+          "sha256": "5ca744913b93e7a37781687563af115652612cfbab879bc60d7e8da054aa90e9"
+        },
+        {
+          "path": "printing3d/assets/oem_spindle_v03/report.json",
+          "original_archive_member": "report.json",
+          "bytes": 5694,
+          "sha256": "f9be5673aa24169a2e11b3c46196d27aee5a632515391a51178c46d943a7cffd"
+        }
+      ],
+      "id": "oem_spindle_v03",
+      "preview_path": "printing3d/assets/gallery/oem_spindle_v03.png",
+      "preview_sha256": "e533fa6111c84930fccd55904937763319b0d14412c4359623d546f8cc03df7b"
+    },
+    {
+      "archive": "alice_petg_spool_holder_v01.zip",
+      "source_archive_sha256": "d962f12a287d0d13eef1397343c3d7d6186c5e61e11880e25560699627c0c7c3",
+      "name": "Настольный держатель катушки v0.1",
+      "status": "dry_fit_needed",
+      "license_status": "creator-stated original CAD, independent attribution not performed",
+      "assembly": "основание ×1 + стойка ×2 + ось ×1",
+      "quantity": {
+        "parts/base_frame.stl": 1,
+        "parts/upright_A_print_twice.stl": 2,
+        "parts/axle_D_section.stl": 1
+      },
+      "members_manifest": [
+        {
+          "path": "printing3d/assets/desk_spool_v01/source/alice_pro_spool_holder_petg.py.txt",
+          "original_archive_member": "alice_pro_spool_holder_petg.py",
+          "bytes": 6326,
+          "sha256": "59007118feaf33bbd04d2ba4edd696d804d419b3755a5d21be63a07a0db661c2"
+        },
+        {
+          "path": "printing3d/assets/desk_spool_v01/parts/base_frame.stl",
+          "original_archive_member": "base_frame.stl",
+          "bytes": 6284,
+          "sha256": "01794175c431e85af2e8acfb6a022e91651cbd419c11be8004da866e06a85c76",
+          "geometry": {
+            "triangles": 124,
+            "watertight": true,
+            "bounds_mm": [
+              158.0,
+              136.0,
+              9.0
+            ]
+          }
+        },
+        {
+          "path": "printing3d/assets/desk_spool_v01/parts/upright_A_print_twice.stl",
+          "original_archive_member": "upright_A_print_twice.stl",
+          "bytes": 10884,
+          "sha256": "04fae68183e27b688d2ca0561f1e0142722196d62a7c3f728fa4b4ff3ceefad0",
+          "geometry": {
+            "triangles": 216,
+            "watertight": true,
+            "bounds_mm": [
+              151.0,
+              110.0,
+              12.0
+            ]
+          }
+        },
+        {
+          "path": "printing3d/assets/desk_spool_v01/parts/axle_D_section.stl",
+          "original_archive_member": "axle_D_section.stl",
+          "bytes": 40284,
+          "sha256": "0518998a2f416eae925dca52c1b1542d67df6ac22ac82bf948f0d825eabcc12d",
+          "geometry": {
+            "triangles": 804,
+            "watertight": true,
+            "bounds_mm": [
+              156.0,
+              34.0,
+              26.47
+            ]
+          }
+        },
+        {
+          "path": "printing3d/assets/desk_spool_v01/README_RU.txt",
+          "original_archive_member": "README_RU.txt",
+          "bytes": 2505,
+          "sha256": "08a402ce3e4fbe3ab10ed2323e7ae634091597bf646225eec6e6b1134e3267ce"
+        },
+        {
+          "path": "printing3d/assets/desk_spool_v01/manifest.json",
+          "original_archive_member": "manifest.json",
+          "bytes": 2074,
+          "sha256": "9d24a2744ebad91594107448ca0b7ecac2634333a05fd8f96aeea7d3109d17b8"
+        }
+      ],
+      "id": "desk_spool_v01",
+      "preview_path": "printing3d/assets/gallery/desk_spool_v01.png",
+      "preview_sha256": "072e0c4400915c9e61eb32c5b91bdb9078689afe18a887a0fac2fc3eb28569d6"
+    },
+    {
+      "archive": "alice_petg_spool_holder_v02.zip",
+      "source_archive_sha256": "54ae7342ad43376bd74879e7ac58639a53192ce364b1be25ded458cda6bf0885",
+      "name": "Центрирующие втулки катушки v0.2",
+      "status": "measure_spool_bore_first",
+      "license_status": "creator-stated original CAD, independent attribution not performed",
+      "assembly": "выбрать один диаметр отверстия катушки (36/52/55 мм), напечатать 2 одинаковые втулки + детали v0.1",
+      "quantity": {
+        "adapters/ring_for_spool_bore_36mm_PRINT_2.stl": 2,
+        "adapters/ring_for_spool_bore_52mm_PRINT_2.stl": 2,
+        "adapters/ring_for_spool_bore_55mm_PRINT_2.stl": 2
+      },
+      "members_manifest": [
+        {
+          "path": "printing3d/assets/desk_spool_v02/source/spool_centering_adapters_v02.py.txt",
+          "original_archive_member": "spool_centering_adapters_v02.py",
+          "bytes": 6589,
+          "sha256": "849415494300190ee84476a5bd4f74be0c3d9e6479b4a19ec0cfde661c2fd99d"
+        },
+        {
+          "path": "printing3d/assets/desk_spool_v02/adapters/ring_for_spool_bore_36mm_PRINT_2.stl",
+          "original_archive_member": "02_CHOOSE_ONE_SIZE_PRINT_TWICE/ring_for_spool_bore_36mm_PRINT_2.stl",
+          "bytes": 47484,
+          "sha256": "e6e69ae39ed5203e979d55a536358b2960f6a0d1756042d2a19bd010af70f815",
+          "geometry": {
+            "triangles": 948,
+            "watertight": true,
+            "bounds_mm": [
+              40.98,
+              40.99,
+              16.4
+            ]
+          }
+        },
+        {
+          "path": "printing3d/assets/desk_spool_v02/adapters/ring_for_spool_bore_52mm_PRINT_2.stl",
+          "original_archive_member": "02_CHOOSE_ONE_SIZE_PRINT_TWICE/ring_for_spool_bore_52mm_PRINT_2.stl",
+          "bytes": 73084,
+          "sha256": "6370624ef30b2b1d8d1cb199aa76527aee2e4f9bb48c8cd663d03b3576629d65",
+          "geometry": {
+            "triangles": 1460,
+            "watertight": true,
+            "bounds_mm": [
+              56.98,
+              56.99,
+              16.4
+            ]
+          }
+        },
+        {
+          "path": "printing3d/assets/desk_spool_v02/adapters/ring_for_spool_bore_55mm_PRINT_2.stl",
+          "original_archive_member": "02_CHOOSE_ONE_SIZE_PRINT_TWICE/ring_for_spool_bore_55mm_PRINT_2.stl",
+          "bytes": 73084,
+          "sha256": "9c393891a16fd4a2aa8ec47cc94b896d7d90724bd01f7997ed21e05d1dc28b9c",
+          "geometry": {
+            "triangles": 1460,
+            "watertight": true,
+            "bounds_mm": [
+              59.98,
+              59.99,
+              16.4
+            ]
+          }
+        },
+        {
+          "path": "printing3d/assets/desk_spool_v02/README_RU.md",
+          "original_archive_member": "README_RU.md",
+          "bytes": 4395,
+          "sha256": "83ab153637c2b65bd6208e13b2e06b1f9224efa421543f454c5b35a0a08c0cce"
+        },
+        {
+          "path": "printing3d/assets/desk_spool_v02/manifest_v02.json",
+          "original_archive_member": "manifest_v02.json",
+          "bytes": 3300,
+          "sha256": "76cd7eca1e848cbdcb23ea909ed590fa023da715677304cda98bbbd5fdd278b6"
+        }
+      ],
+      "id": "desk_spool_v02",
+      "preview_path": "printing3d/assets/gallery/desk_spool_v02.png",
+      "preview_sha256": "21fca161d268dafe73ae44f6c8d38be9addd54e1f11861bb59434a456578dc95"
+    }
+  ],
+  "gallery": {
+    "preview_basis": "Source SCAD rendered via OpenSCAD; STL/3MF geometry via VTK. The v0.1 assembly mesh is reconstructed from its original generator transformations; other compound models show real separate print parts.",
+    "source_code_executable": false,
+    "not_verified": [
+      "slicer",
+      "material actually loaded",
+      "fit",
+      "load strength",
+      "adhesion",
+      "printer acceptance"
+    ],
+    "files": [
+      {
+        "path": "printing3d/assets/gallery/desk_spool_v01.png",
+        "bytes": 30113,
+        "sha256": "072e0c4400915c9e61eb32c5b91bdb9078689afe18a887a0fac2fc3eb28569d6"
+      },
+      {
+        "path": "printing3d/assets/gallery/desk_spool_v02.png",
+        "bytes": 33860,
+        "sha256": "21fca161d268dafe73ae44f6c8d38be9addd54e1f11861bb59434a456578dc95"
+      },
+      {
+        "path": "printing3d/assets/gallery/oem_spindle_v03.png",
+        "bytes": 31194,
+        "sha256": "e533fa6111c84930fccd55904937763319b0d14412c4359623d546f8cc03df7b"
+      },
+      {
+        "path": "printing3d/assets/gallery/overview.png",
+        "bytes": 199995,
+        "sha256": "2ca98e66e67fcbadf4985e7cbc6daa50095c3257606c9ec02de4f07be78333c3"
+      },
+      {
+        "path": "printing3d/assets/gallery/phone_stand.png",
+        "bytes": 18874,
+        "sha256": "06e3b699e75b7199ea05749dd596f2810cb1b839bebdc9d3dfdcf4f71fba9f3d"
+      },
+      {
+        "path": "printing3d/assets/gallery/sauce_stand.png",
+        "bytes": 50514,
+        "sha256": "7315a068136820a981fce9024270cfdf248eaaa903d855cb5890dd9f845ce78c"
+      },
+      {
+        "path": "printing3d/assets/gallery/test_tube_holder.png",
+        "bytes": 43180,
+        "sha256": "36c5d2056af68374fa73c50f465c3900f8e2f9831e71f44ef547b6131b3f00c1"
+      }
+    ]
+  }
+}

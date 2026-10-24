@@ -12,7 +12,7 @@ from agent_context import CacheLookup
 from agent_memory import AgentMemoryStore, MemoryRecord
 from repository_index.provenance import snapshot_revision
 
-from .models import RetrievalBundle, RetrievalHit, RetrievalQuery
+from agent_retrieval.models import RetrievalBundle, RetrievalHit, RetrievalQuery
 
 
 _TOKEN_RE = re.compile(r"[\w./#:-]+", re.UNICODE)

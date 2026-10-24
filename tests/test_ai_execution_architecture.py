@@ -4,7 +4,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_cli_adapter_uses_canonical_backend_runtime():
-    source = (ROOT / "cli_agent.py").read_text(encoding="utf-8")
+    source = (ROOT / "agent_runtime" / "cli.py").read_text(encoding="utf-8")
 
     assert "/api/chat" in source
     assert "/api/conversations" in source

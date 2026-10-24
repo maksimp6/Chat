@@ -6,7 +6,7 @@ import requests
 
 from cloud.base import CloudProviderError
 from cloud.cloudru.client import CloudRuClient
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 def test_cloudru_network_error_never_captures_authorization_in_trace(monkeypatch):

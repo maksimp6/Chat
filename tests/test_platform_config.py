@@ -1,11 +1,11 @@
-"""Tests for Alice Platform config loading and validation."""
+"""Tests for Keel Platform config loading and validation."""
 
 import json
 import pytest
 import yaml
 from pathlib import Path
 
-from alice_platform.config import (
+from keel.config import (
     load_config,
     ConfigError,
 )

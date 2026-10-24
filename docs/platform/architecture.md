@@ -1,10 +1,10 @@
-# Alice Platform Architecture
+# Keel Platform Architecture
 
-Alice Platform is a configuration-driven deployment system that uses three layers:
+Keel Platform is a configuration-driven deployment system that uses three layers:
 
 1. **Documentation** (docs/platform/) — explains rules and principles
 2. **Configuration** (config/alice/) — contains desired state facts (YAML)
-3. **Code** (alice_platform/) — validates config and reconciles reality to desired state
+3. **Code** (keel/) — validates config and reconciles reality to desired state
 
 This document explains the platform structure and principles.
 
@@ -22,15 +22,15 @@ The existing **oauth** and **chrome** logical services remain during migration b
 Current control-plane services:
 
 ### OAuth
-- **Purpose**: OAuth 2.0 identity provider for Alice
+- **Purpose**: OAuth 2.0 identity provider for Logos
 - **Configuration**: `platform.yaml`, `domains.yaml`, `secrets.yaml`
 - **Deployment**: `production.yaml`, `test.yaml`
 - **Domain**: `oauth.maxxxpavlov.online` (production), test lane equivalent
 - **Dependencies**: None
 - **Sign-in method**: `github` (production), `passphrase` (test)
 
-### Chrome Worker (legacy logical name during migration)
-- **Purpose**: Browser automation and control for Alice Chat
+### Chrome Worker
+- **Purpose**: Browser automation and control for Logos Chat
 - **Configuration**: `platform.yaml`, `domains.yaml`, `storage.yaml`
 - **Persistent storage**: `/chrome-state` volume
 - **Domain**: `chrome.maxxxpavlov.online` (production), test lane equivalent
@@ -52,7 +52,7 @@ A **lane** is a deployment environment with its own configuration, secrets, and 
 - **Sign-in**: `passphrase` (development only)
 - **Secrets**: Test-scoped only (`alice/test/*`)
 - **Domain protocol**: HTTPS preferred, HTTP allowed
-- **Resources**: Minimal (0.1 CPU, 256MB memory per service)
+- **Resources**: Minimal (0.1 CPU, 256MB memory per service; RDC: 0.2 CPU, 512Mi)
 - **Approval**: No approval required for changes
 - **Purpose**: Development, testing, validation of changes
 
@@ -144,21 +144,21 @@ The config system enforces nine validation rules automatically:
 
 ### Validation
 ```bash
-python -m alice_platform validate [--config-dir config/alice]
+python -m keel validate [--config-dir config/alice]
 ```
 Checks all YAML files for schema, semantic, and policy violations.
 
 ### Planning
 ```bash
-python -m alice_platform plan test
-python -m alice_platform plan production
+python -m keel plan test
+python -m keel plan production
 ```
 Compares desired state (config) to observed state (cloud provider) and shows planned changes.
 
 ### Health Checks
 ```bash
-python -m alice_platform health test
-python -m alice_platform health production
+python -m keel health test
+python -m keel health production
 ```
 Lists URLs and expected authentication methods for each service in the lane.
 

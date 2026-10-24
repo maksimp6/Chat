@@ -1,6 +1,6 @@
 # Cloud Gateway и Local Tool Agent
 
-Alice Pro разделяет центральный Gateway и локальный исполнитель.
+Logos разделяет центральный Gateway и локальный исполнитель.
 
 ## Поток
 
@@ -9,7 +9,7 @@ ChatGPT / UI / Agent
         |
         | HTTPS / MCP
         v
-Cloud.ru Alice Pro Gateway
+Cloud.ru Logos Gateway
         |
         | persistent local-agent job queue
         v
@@ -45,7 +45,7 @@ Runtime token передаётся только в \`Authorization: Bearer ...\`
 
 Задание содержит имя универсального инструмента, аргументы, metadata и идентификаторы trace/invocation.
 
-Очередь сохраняется в SQLite, задания получают короткую lease. Если телефон исчезает, просроченное задание возвращается в \`queued\`.
+Очередь сохраняется в нативном Kristall journal, задания получают короткую lease. Если телефон исчезает, просроченное задание возвращается в \`queued\`.
 
 ## Безопасность
 

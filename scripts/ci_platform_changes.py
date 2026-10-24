@@ -10,7 +10,7 @@ import sys
 from typing import Mapping
 
 PLATFORMS = ("web", "backend", "android", "infra", "database", "mcp")
-JOBS = ("backend", "postgres", "android", "infra", "mcp")
+JOBS = ("backend", "infra", "mcp")
 SHARED_INPUTS = {
     ".github/workflows/ci.yml",
     ".python-version",
@@ -38,23 +38,16 @@ MCP_PREFIXES = (
 
 
 def _runtime_platforms(path: str) -> set[str]:
-    if (
-        path
-        in {
-            "db.py",
-            "db_backend.py",
-            "memory_db.py",
-            "provider_credentials.py",
-            "requirements-postgres.txt",
-        }
-        or path.startswith("migrations/")
-        or "postgres" in path.lower()
-    ):
+    if path in {
+        "storage/db.py",
+        "db_backend.py",
+        "storage/memory_db.py",
+        "provider_accounts/credentials.py",
+    } or path.startswith("migrations/"):
         return {"backend", "database"}
     if path.startswith("tests/") and path.endswith(".py"):
         return {"backend"}
     if path.endswith(".py"):
-        # Keep SQL compatibility coverage until the runtime migration is complete.
         return {"backend", "database"}
     if path.startswith(("docs/", ".github/ISSUE_TEMPLATE/", ".agents/")) or path.endswith(".md"):
         return set()
@@ -69,6 +62,8 @@ def _path_platforms(path: str) -> set[str]:
         or path in SHARED_INPUTS
     ):
         return set(PLATFORMS)
+    if path.startswith(("docs/", ".github/ISSUE_TEMPLATE/", ".agents/")) or path.endswith(".md"):
+        return set()
     if path.startswith("android/"):
         return {"android"}
     if (
@@ -86,7 +81,7 @@ def _path_platforms(path: str) -> set[str]:
                 "cloud/",
                 "scripts/cloudru_",
                 "scripts/ci_",
-                "alice_platform/",
+                "keel/",
                 "config/alice/",
                 ".github/workflows/",
             )
@@ -117,7 +112,7 @@ def validate_results(plan: Mapping[str, bool], results: Mapping[str, str]) -> No
         if results.get(job) != "success":
             raise ValueError(f"required check failed: {job}")
     for job in JOBS:
-        required = plan["database"] if job == "postgres" else plan[job]
+        required = plan[job]
         allowed = {"success"} if required else {"success", "skipped"}
         if results.get(job) not in allowed:
             raise ValueError(f"platform check missing, failed or unexpectedly skipped: {job}")
@@ -151,6 +146,11 @@ def main() -> int:
             print("All selected platform suites passed")
         elif mode == ["--all"]:
             print(json.dumps(dict.fromkeys(PLATFORMS, True), sort_keys=True))
+        elif len(mode) == 2 and mode[0] == "--platform" and mode[1] in PLATFORMS:
+            selected = {mode[1]}
+            if mode[1] == "web":
+                selected.update(("backend", "android", "database", "mcp"))
+            print(json.dumps({name: name in selected for name in PLATFORMS}, sort_keys=True))
         elif mode in ([], ["--null"]):
             data = sys.stdin.read()
             paths = data.split("\0") if mode else data.splitlines()
