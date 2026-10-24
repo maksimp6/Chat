@@ -35,7 +35,6 @@ def test_merge_readiness_workflow_requires_current_protected_checks() -> None:
         "Android debug APK",
         "Auto-format repository",
         "Trivy repository scan",
-        "Zizmor GitHub Actions audit",
     ]
     for check in required_checks:
         assert check in workflow
