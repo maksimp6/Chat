@@ -32,6 +32,10 @@ class YandexFileManagerMixin:
         self._log_request(method, url, **kwargs)
 
         delays = [0.0, 0.5, 1.5, 4.5]
+        # Only a read is repeated. A timed-out upload may already have been stored, so repeating it
+        # stores a second copy, and a repeated delete reports the file as not found.
+        if method.upper() not in {"GET", "HEAD", "OPTIONS"}:
+            delays = delays[:1]
         last_exc = None
         for attempt, delay in enumerate(delays):
             if delay > 0:
