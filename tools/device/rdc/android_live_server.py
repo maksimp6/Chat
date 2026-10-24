@@ -1,5 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/python
 """Loopback-only authenticated Android live server: screen and OCR/actions."""
+
 import json
 import hashlib
 import os
@@ -26,6 +27,7 @@ MAX_BODY = 2048
 ALLOWED = {"tap", "swipe", "back", "home", "open", "screenshot", "wake", "screen.unlock"}
 TRUSTED_TARGET = "Redmi_9"
 
+
 def ensure_token():
     BASE.mkdir(mode=0o700, parents=True, exist_ok=True)
     if not TOKEN_PATH.exists():
@@ -33,17 +35,21 @@ def ensure_token():
         TOKEN_PATH.chmod(0o600)
     return TOKEN_PATH.read_text().strip()
 
+
 TOKEN = ensure_token()
 FRAME_LOCK = threading.RLock()
 DETECTOR = DeltaDetector()
 CAPTURE_STATE = {"revision": 0, "frame_id": None}
 
+
 def execute(argv):
-    result = subprocess.run([sys.executable, *map(str, argv)], capture_output=True,
-                            text=True, timeout=25)
+    result = subprocess.run(
+        [sys.executable, *map(str, argv)], capture_output=True, text=True, timeout=25
+    )
     if result.returncode:
         raise RuntimeError("Operation failed")
     return json.loads(result.stdout)
+
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
@@ -67,19 +73,22 @@ class Handler(BaseHTTPRequestHandler):
 
     def bound_status(self):
         """Re-evaluate device binding on every request, keep identity private."""
-        status=execute([ACTIONS,"status"])
-        serial=status.get("device")
-        if (status.get("target")!=TRUSTED_TARGET
-            or not isinstance(serial,str) or not serial
-            or not isinstance(status.get("focus"),str)
-            or type(status.get("keyguard_locked")) is not bool):
+        status = execute([ACTIONS, "status"])
+        serial = status.get("device")
+        if (
+            status.get("target") != TRUSTED_TARGET
+            or not isinstance(serial, str)
+            or not serial
+            or not isinstance(status.get("focus"), str)
+            or type(status.get("keyguard_locked")) is not bool
+        ):
             return None
-        self._verified_serial=serial
+        self._verified_serial = serial
         return status
 
     def safe_screen(self):
         """No observation or generic actions while Keyguard is showing."""
-        status=self.bound_status()
+        status = self.bound_status()
         return status is not None and not status["keyguard_locked"]
 
     def do_GET(self):
@@ -88,7 +97,15 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             if path == "/health":
-                return self.send(200, {"ok": True, "modes": ["screen", "ocr", "actions"], "device_policy": "redmi9_bound", "commands": sorted(ALLOWED)})
+                return self.send(
+                    200,
+                    {
+                        "ok": True,
+                        "modes": ["screen", "ocr", "actions"],
+                        "device_policy": "redmi9_bound",
+                        "commands": sorted(ALLOWED),
+                    },
+                )
             if path == "/screen/capture":
                 params = parse_qs(urlparse(self.path).query)
                 since = params.get("since_revision", ["0"])[0]
@@ -108,13 +125,17 @@ class Handler(BaseHTTPRequestHandler):
                         CAPTURE_STATE["revision"] += 1
                         CAPTURE_STATE["frame_id"] = frame_hash
                     revision = CAPTURE_STATE["revision"]
-                    result = {"revision": revision, "frame_id": frame_hash,
-                              "changed_since_client": int(since) != revision,
-                              "image_changed": changed,
-                              "capture_start_monotonic_ns": started,
-                              "capture_end_monotonic_ns": finished,
-                              "capture_duration_ms": round((finished-started)/1e6, 2),
-                              "ocr_executed": False, "vsync_aligned": False}
+                    result = {
+                        "revision": revision,
+                        "frame_id": frame_hash,
+                        "changed_since_client": int(since) != revision,
+                        "image_changed": changed,
+                        "capture_start_monotonic_ns": started,
+                        "capture_end_monotonic_ns": finished,
+                        "capture_duration_ms": round((finished - started) / 1e6, 2),
+                        "ocr_executed": False,
+                        "vsync_aligned": False,
+                    }
                 return self.send(200, result)
             if path == "/screen/tree":
                 with FRAME_LOCK:
@@ -132,15 +153,32 @@ class Handler(BaseHTTPRequestHandler):
                     hierarchy = read_accessibility(self._verified_serial)
                     if not self.safe_screen():
                         return self.send(409, {"error": "screen_changed"})
-                roles = {role: sum(n["role"] == role for n in hierarchy["nodes"]) for role in ("button", "input", "text", "container")}
-                return self.send(200, {"source": "uiautomator", "count": hierarchy["count"], "roles": roles, "redacted": True})
+                roles = {
+                    role: sum(n["role"] == role for n in hierarchy["nodes"])
+                    for role in ("button", "input", "text", "container")
+                }
+                return self.send(
+                    200,
+                    {
+                        "source": "uiautomator",
+                        "count": hierarchy["count"],
+                        "roles": roles,
+                        "redacted": True,
+                    },
+                )
             if path == "/status":
-                result=self.bound_status()
+                result = self.bound_status()
                 if result is None:
-                    return self.send(403,{"error":"device_not_authorized"})
-                return self.send(200,{"target":TRUSTED_TARGET,"device_bound":True,
-                                      "keyguard_locked":result["keyguard_locked"],
-                                      "focus_present":bool(result["focus"])})
+                    return self.send(403, {"error": "device_not_authorized"})
+                return self.send(
+                    200,
+                    {
+                        "target": TRUSTED_TARGET,
+                        "device_bound": True,
+                        "keyguard_locked": result["keyguard_locked"],
+                        "focus_present": bool(result["focus"]),
+                    },
+                )
             if path == "/screen/changes":
                 with FRAME_LOCK:
                     if not self.safe_screen():
@@ -155,18 +193,33 @@ class Handler(BaseHTTPRequestHandler):
                 # Only return geometric roles without OCR labels or raw text.
                 with FRAME_LOCK:
                     if not self.safe_screen():
-                        return self.send(423,{"error":"screen_locked_or_unavailable"})
-                    execute([ACTIONS,"screenshot"])
-                    changed=DETECTOR.compare(IMAGE)
+                        return self.send(423, {"error": "screen_locked_or_unavailable"})
+                    execute([ACTIONS, "screenshot"])
+                    changed = DETECTOR.compare(IMAGE)
                     if not changed["changed"]:
-                        return self.send(200,{"changed":False,"sequence":changed["sequence"],
-                                              "redacted":True,"persistent":False})
-                    current=build_ocr_dom(IMAGE)
+                        return self.send(
+                            200,
+                            {
+                                "changed": False,
+                                "sequence": changed["sequence"],
+                                "redacted": True,
+                                "persistent": False,
+                            },
+                        )
+                    current = build_ocr_dom(IMAGE)
                     if not self.safe_screen():
-                        return self.send(409,{"error":"screen_changed"})
-                    tree=public_tree(current)
-                    return self.send(200,{"changed":True,"sequence":changed["sequence"],
-                                          "tree":tree,"redacted":True,"persistent":False})
+                        return self.send(409, {"error": "screen_changed"})
+                    tree = public_tree(current)
+                    return self.send(
+                        200,
+                        {
+                            "changed": True,
+                            "sequence": changed["sequence"],
+                            "tree": tree,
+                            "redacted": True,
+                            "persistent": False,
+                        },
+                    )
             if path == "/screen.jpg":
                 with FRAME_LOCK:
                     if not self.safe_screen():
@@ -231,20 +284,25 @@ class Handler(BaseHTTPRequestHandler):
                         raise ValueError()
                     argv.extend(["--package", val])
                 with FRAME_LOCK:
-                    status=self.bound_status()
+                    status = self.bound_status()
                     if status is None:
-                        return self.send(403,{"error":"device_not_authorized"})
-                    if status["keyguard_locked"] and command not in ("wake","status","screen.unlock"):
-                        return self.send(423,{"error":"screen_locked"})
-                    result=execute(argv)
+                        return self.send(403, {"error": "device_not_authorized"})
+                    if status["keyguard_locked"] and command not in (
+                        "wake",
+                        "status",
+                        "screen.unlock",
+                    ):
+                        return self.send(423, {"error": "screen_locked"})
+                    result = execute(argv)
                     if command == "screen.unlock":
                         return self.send(200 if result.get("verified") is True else 423, result)
-                    return self.send(200,result)
+                    return self.send(200, result)
             self.send(404, {"error": "not_found"})
         except (ValueError, TypeError, json.JSONDecodeError):
             self.send(400, {"error": "invalid_request"})
         except (OSError, RuntimeError, subprocess.SubprocessError):
             self.send(503, {"error": "operation_failed"})
+
 
 if __name__ == "__main__":
     ThreadingHTTPServer(("127.0.0.1", 8765), Handler).serve_forever()

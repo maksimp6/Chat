@@ -86,13 +86,13 @@ class WatchdogTests(unittest.TestCase):
     def test_single_command_contract(self):
         launcher = (ROOT / "termux-rdc.sh").read_text()
         self.assertIn('case "${1:-connect}" in', launcher)
-        self.assertIn('connect|start|follow)', launcher)
-        self.assertIn('start_agent', launcher)
-        self.assertIn('start_watchdog', launcher)
-        self.assertIn('flock -x 8', launcher)
-        self.assertIn('flock -x 7', launcher)
+        self.assertIn("connect|start|follow)", launcher)
+        self.assertIn("start_agent", launcher)
+        self.assertIn("start_watchdog", launcher)
+        self.assertIn("flock -x 8", launcher)
+        self.assertIn("flock -x 7", launcher)
         self.assertIn('nohup bash "$WATCHDOG_SCRIPT"', launcher)
-        self.assertIn('remote ONLINE not yet verified', launcher)
+        self.assertIn("remote ONLINE not yet verified", launcher)
 
 
 if __name__ == "__main__":

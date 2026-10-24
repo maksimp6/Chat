@@ -65,6 +65,7 @@ class SimulatedAndroid:
             raise RuntimeError("simulated capture failure")
         # Valid deterministic 1x1 PNG fixture, not a real screen capture.
         import base64
+
         return base64.b64decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC"
         )
@@ -167,10 +168,18 @@ def validate_png(data: bytes) -> bool:
 
 
 class AndroidShim:
-    def __init__(self, backend: Backend = Backend.SIMULATED, transport: AndroidTransport | None = None):
+    def __init__(
+        self, backend: Backend = Backend.SIMULATED, transport: AndroidTransport | None = None
+    ):
         self.backend = Backend(backend)
-        self.transport = transport if transport is not None else (
-            SimulatedAndroid() if self.backend == Backend.SIMULATED else UnconfiguredTransport(self.backend)
+        self.transport = (
+            transport
+            if transport is not None
+            else (
+                SimulatedAndroid()
+                if self.backend == Backend.SIMULATED
+                else UnconfiguredTransport(self.backend)
+            )
         )
         self.trace: list[dict[str, object]] = []
         self._lock = threading.RLock()

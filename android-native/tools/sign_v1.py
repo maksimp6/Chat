@@ -4,6 +4,7 @@ resources.arsc, .so и .bin пишутся без сжатия; .so и arsc вы
 Использование:
   sign_v1.py in.apk out.apk key.pem cert.pem [имя=путь ...] [--exact N --pad имя]
 --exact N: добавить файл-заполнитель --pad так, чтобы весь APK был ровно N байт."""
+
 import base64, hashlib, io, struct, subprocess, sys, tempfile, os, zipfile
 
 CREATED = "Created-By: 1.0 (alice-sign)"
@@ -53,8 +54,10 @@ def sign_bytes(entries, key, cert):
         manifest += sec
     manifest_bytes = manifest.encode("utf-8")
 
-    sf = ("Signature-Version: 1.0\r\n" + CREATED + "\r\n"
-          f"SHA-256-Digest-Manifest: {b64sha(manifest_bytes)}\r\n\r\n")
+    sf = (
+        "Signature-Version: 1.0\r\n" + CREATED + "\r\n"
+        f"SHA-256-Digest-Manifest: {b64sha(manifest_bytes)}\r\n\r\n"
+    )
     for name, _ in entries:
         sf += f"Name: {name}\r\nSHA-256-Digest: {b64sha(sections[name].encode('utf-8'))}\r\n\r\n"
     sf_bytes = sf.encode("utf-8")
@@ -65,10 +68,29 @@ def sign_bytes(entries, key, cert):
         with open(sf_path, "wb") as f:
             f.write(sf_bytes)
         subprocess.run(
-            ["openssl", "cms", "-sign", "-binary", "-noattr", "-md", "sha256",
-             "-in", sf_path, "-signer", cert, "-inkey", key,
-             "-outform", "DER", "-out", rsa_path],
-            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            [
+                "openssl",
+                "cms",
+                "-sign",
+                "-binary",
+                "-noattr",
+                "-md",
+                "sha256",
+                "-in",
+                sf_path,
+                "-signer",
+                cert,
+                "-inkey",
+                key,
+                "-outform",
+                "DER",
+                "-out",
+                rsa_path,
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
         with open(rsa_path, "rb") as f:
             rsa_bytes = f.read()
 
@@ -101,7 +123,7 @@ def sign(src, dst, key, cert, extra=(), exact=None, pad_name=None):
         if eocd < 0:
             sys.exit("end of central directory not found")
         data = bytearray(data)
-        data[eocd + 20:eocd + 22] = struct.pack("<H", n)
+        data[eocd + 20 : eocd + 22] = struct.pack("<H", n)
         data += b"\0" * n
         data = bytes(data)
     with open(dst, "wb") as f:
@@ -115,10 +137,10 @@ if __name__ == "__main__":
         i = args.index("--exact")
         exact = int(args[i + 1])
         pad = args[args.index("--pad") + 1]
-        args = args[:i] + args[i + 2:]
+        args = args[:i] + args[i + 2 :]
         if "--pad" in args:
             j = args.index("--pad")
-            args = args[:j] + args[j + 2:]
+            args = args[:j] + args[j + 2 :]
     if len(args) < 4:
         sys.exit(__doc__)
     extra = []

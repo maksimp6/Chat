@@ -1,4 +1,5 @@
 """Multiprocess fail-closed regression: independent shims share an attempted dispatch counter."""
+
 import multiprocessing
 import unittest
 
@@ -33,10 +34,7 @@ class AndroidShimMultiprocessTests(unittest.TestCase):
         start = ctx.Event()
         counter = ctx.Value("i", 0)
         result = ctx.Queue()
-        processes = [
-            ctx.Process(target=_worker, args=(start, counter, result))
-            for _ in range(4)
-        ]
+        processes = [ctx.Process(target=_worker, args=(start, counter, result)) for _ in range(4)]
         for process in processes:
             process.start()
         try:

@@ -2,6 +2,7 @@
 
 All ADB/input calls are mocked; no device interaction or token printing.
 """
+
 import importlib.util
 import json
 import os
@@ -48,7 +49,7 @@ class DeviceSelection(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="alice-live-unit-")
         self.addCleanup(self.temp.cleanup)
         policy = Path(self.temp.name) / "target.json"
-        policy.write_text(json.dumps({"model":"Redmi_9","device":"galahad"}))
+        policy.write_text(json.dumps({"model": "Redmi_9", "device": "galahad"}))
         self.policy_patch = patch.object(actions, "POLICY", policy)
         self.policy_patch.start()
         self.addCleanup(self.policy_patch.stop)
@@ -65,24 +66,33 @@ class DeviceSelection(unittest.TestCase):
                     actions.device()
 
     def test_tampered_policy_rejected_without_device_use(self):
-        actions.POLICY.write_text(json.dumps({"model":"25062RN2DY","device":"creek"}))
+        actions.POLICY.write_text(json.dumps({"model": "25062RN2DY", "device": "creek"}))
         with patch.object(actions, "adb") as a:
             with self.assertRaisesRegex(RuntimeError, "Unexpected device policy"):
                 actions.device()
             a.assert_not_called()
 
     def test_wake_uses_only_fixed_keycode_on_pinned_target(self):
-        with patch.object(actions, "device", return_value="redmi9-device"), patch.object(actions, "adb") as a:
+        with (
+            patch.object(actions, "device", return_value="redmi9-device"),
+            patch.object(actions, "adb") as a,
+        ):
             result = actions.action(SimpleNamespace(command="wake"))
             self.assertEqual(result["command"], "wake")
             self.assertFalse(result["verified"])
-            a.assert_called_once_with("-s","redmi9-device","shell","input","keyevent","KEYCODE_WAKEUP")
+            a.assert_called_once_with(
+                "-s", "redmi9-device", "shell", "input", "keyevent", "KEYCODE_WAKEUP"
+            )
 
 
 class ServerGuards(unittest.TestCase):
     def test_live_screen_accepts_any_app_if_device_is_pinned(self):
         h = object.__new__(server.Handler)
-        status = {"target": "Redmi_9", "device":"redmi9-device", "focus":"other.package/MainActivity"}
+        status = {
+            "target": "Redmi_9",
+            "device": "redmi9-device",
+            "focus": "other.package/MainActivity",
+        }
         previous = os.environ.get("ANDROID_SERIAL")
         try:
             with patch.object(server, "execute", return_value=status):
@@ -97,21 +107,21 @@ class ServerGuards(unittest.TestCase):
     def test_wrong_or_missing_device_fails_closed(self):
         h = object.__new__(server.Handler)
         for status in (
-            {"target":"25062RN2DY","device":"wrong","focus":"app"},
-            {"target":"Redmi_9","device":"","focus":"app"},
-            {"target":"Redmi_9","device":"any","focus":None},
+            {"target": "25062RN2DY", "device": "wrong", "focus": "app"},
+            {"target": "Redmi_9", "device": "", "focus": "app"},
+            {"target": "Redmi_9", "device": "any", "focus": None},
         ):
             with self.subTest(status=status), patch.object(server, "execute", return_value=status):
                 self.assertFalse(h.safe_screen())
 
     def test_no_game_allowlist_or_arbitrary_command(self):
-        content = (BASE/"android_live_server.py").read_text()
+        content = (BASE / "android_live_server.py").read_text()
         self.assertNotIn("SAFE_APP", content)
         self.assertNotIn("com.mobile.legends", content)
         self.assertIn('ThreadingHTTPServer(("127.0.0.1", 8765)', content)
         self.assertNotIn('"shell"', server.ALLOWED)
         self.assertNotIn('"power"', server.ALLOWED)
-        self.assertTrue({"tap","swipe","open","wake","screenshot"}.issubset(server.ALLOWED))
+        self.assertTrue({"tap", "swipe", "open", "wake", "screenshot"}.issubset(server.ALLOWED))
 
 
 if __name__ == "__main__":
