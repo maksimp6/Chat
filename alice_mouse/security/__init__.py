@@ -1,6 +1,6 @@
 """Alice Input security contract. Staging only; no root deployment."""
 
-from .grants import (
+from alice_mouse.security.grants import (
     AuthenticatedPrincipal,
     SessionAuthority,
     InputGrant,

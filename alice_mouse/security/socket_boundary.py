@@ -13,7 +13,7 @@ import stat
 import struct
 import threading
 from pathlib import Path
-from .grants import MAX_PACKET, GrantError, ProtectedVerifier
+from alice_mouse.security.grants import MAX_PACKET, GrantError, ProtectedVerifier
 
 
 class SocketBoundaryError(RuntimeError):
