@@ -15,7 +15,6 @@
     listScrollTop: 0,
     jsonDepth: 4,
   };
-  var ESC = "\u001b";
 
   function el(tag, attrs, text) {
     var node = document.createElement(tag);
@@ -507,7 +506,7 @@
         if (c && c.type === "output_text" && typeof c.text === "string") parts.push(c.text);
       });
     });
-    return parts.join("\\n").trim();
+    return parts.join("\n").trim();
   }
 
   function addJsonToolbar(content, rerender) {
@@ -804,7 +803,7 @@
     document.removeEventListener("keydown", onKey);
   }
   function onKey(e) {
-    if (e.key === ESC) close();
+    if (e.key === "Escape") close();
   }
 
   function open(input) {
