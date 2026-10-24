@@ -301,7 +301,8 @@ class CloudRuProvider:
                 f"Cloud.ru service '{service_name}' is not configured",
                 code="unsupported_capability",
             )
-        payload = self.client.request(service_name, "GET", f"{base_path.rstrip('/')}/{resource_id}")
+        safe_id = quote(_resource_id(resource_id), safe="")
+        payload = self.client.request(service_name, "GET", f"{base_path.rstrip('/')}/{safe_id}")
         return {
             "provider": self.name,
             "service": service_name,
