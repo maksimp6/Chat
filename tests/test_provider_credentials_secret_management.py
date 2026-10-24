@@ -7,7 +7,7 @@ import pytest
 
 from invocation.context import InvocationContext
 from invocation.trace import create_invocation_trace
-from provider_credentials import (
+from provider_accounts.credentials import (
     CredentialError,
     NoActiveCredentialError,
     get_secret_management_ref,
@@ -15,13 +15,18 @@ from provider_credentials import (
     rollback_secret_management_ref,
     set_secret_management_ref,
 )
-from trace_manager import ExecutionTrace, bind_current_trace, get_current_trace, reset_current_trace
+from observability.trace_manager import (
+    ExecutionTrace,
+    bind_current_trace,
+    get_current_trace,
+    reset_current_trace,
+)
 
 
 @pytest.fixture()
 def isolated_db(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    import db
+    import storage.db as db
 
     db.DB_PATH = str(tmp_path / "secrets.db")
     db.init_db()
@@ -293,7 +298,7 @@ def test_resolve_constructs_default_backend_client(isolated_db):
 
 
 def test_default_resolver_reuses_backend_scoped_client(isolated_db, monkeypatch):
-    import provider_credentials as credentials
+    import provider_accounts.credentials as credentials
 
     set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v1")
     fake = FakeSecretManagementClient({("secret-1", "v1"): "cached-client-value"})
@@ -318,7 +323,7 @@ def test_atomic_upsert_tracks_immediately_previous_version(isolated_db):
 
 
 def test_rollback_detects_stale_concurrent_update(isolated_db, monkeypatch):
-    import provider_credentials as credentials
+    import provider_accounts.credentials as credentials
 
     set_secret_management_ref(isolated_db, "purpose", "secret", "v1")
     set_secret_management_ref(isolated_db, "purpose", "secret", "v2")

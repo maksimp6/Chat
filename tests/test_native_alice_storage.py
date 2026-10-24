@@ -7,9 +7,10 @@ from types import SimpleNamespace
 import base64
 import pytest
 from flask import Flask
-import db
+import storage.db as db
 from agent_memory.client import close_memory_clients
-from memory_engine import MemoryStore, StoreError
+from kristall import Kristall, KristallError
+from forge.binding import printing_store
 
 
 def test_chat_repository_defaults_and_reset_are_durable(tmp_path, monkeypatch):
@@ -33,13 +34,13 @@ def test_chat_repository_defaults_and_reset_are_durable(tmp_path, monkeypatch):
 
 def test_native_delete_never_ignores_writer_failure_or_partial_state(tmp_path, monkeypatch):
     path = tmp_path / "values.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("saved", 1)
         store.commit()
-        with pytest.raises(StoreError, match="prefix"):
+        with pytest.raises(KristallError, match="prefix"):
             store.items(None)
         store.set("pending", 2)
-        with pytest.raises(StoreError, match="idle"):
+        with pytest.raises(KristallError, match="idle"):
             store.delete("saved")
         store.commit()
         store.delete("saved")
@@ -55,14 +56,14 @@ def test_native_delete_never_ignores_writer_failure_or_partial_state(tmp_path, m
         store.set("next", 3)
         with pytest.raises(MemoryError):
             store.commit()
-        with pytest.raises(StoreError, match="RAM publication"):
+        with pytest.raises(KristallError, match="RAM publication"):
             store.items()
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             store.delete("missing")
 
 
 def test_department_archive_is_persisted(monkeypatch):
-    import departments
+    import organization.departments as departments
 
     monkeypatch.setenv("ALICE_DEPARTMENTS_ADMIN_TOKEN", "test-admin")
     departments.upsert_department({"id": "test", "name": "Test"})
@@ -77,7 +78,7 @@ def test_department_archive_is_persisted(monkeypatch):
 
 
 def test_keys_keep_unique_identity_and_missing_keys_fail(monkeypatch):
-    import key_manager as keys
+    import secret_store.key_manager as keys
 
     monkeypatch.setenv("ALICE_KEY_MANAGER_KEY", base64.urlsafe_b64encode(b"1" * 32).decode())
     keys.create_schema(db.get_store())
@@ -96,7 +97,7 @@ def test_keys_keep_unique_identity_and_missing_keys_fail(monkeypatch):
 
 
 def test_partner_native_crud_and_status_authority():
-    import partner_relations as partners
+    import organization.partner_relations as partners
 
     ctx = {"_universal_context": {"call": SimpleNamespace(user_id="owner", metadata={})}}
     parent = partners.create_partner({"id": "parent", "name": "Original"}, ctx)
@@ -123,7 +124,7 @@ def test_partner_native_crud_and_status_authority():
 
 
 def test_partner_changed_or_foreign_records_never_acknowledge_mutation(monkeypatch):
-    import partner_relations as partners
+    import organization.partner_relations as partners
 
     ctx = {"_universal_context": {"call": SimpleNamespace(user_id="owner", metadata={})}}
     partners.create_partner({"id": "parent", "name": "Parent"}, ctx)
@@ -145,7 +146,7 @@ def test_partner_changed_or_foreign_records_never_acknowledge_mutation(monkeypat
 
 
 def test_provider_validation_and_iam_metadata_use_native_store():
-    import provider_credentials as credentials
+    import provider_accounts.credentials as credentials
 
     store = db.get_store()
     credentials.create_schema(store)
@@ -211,7 +212,7 @@ def test_provider_validation_and_iam_metadata_use_native_store():
 
 
 def test_quotas_require_valid_policy_and_preserve_disabled_authority():
-    import provider_quotas as quotas
+    import provider_accounts.quotas as quotas
 
     with pytest.raises(ValueError):
         quotas.upsert_policy("", period_seconds=1, max_requests=-1)
@@ -227,7 +228,7 @@ def test_quotas_require_valid_policy_and_preserve_disabled_authority():
 
 
 def test_treasury_rejects_invalid_financial_mutation():
-    import treasury
+    import economy.treasury as treasury
 
     before = db.get_store().last_commit
     with pytest.raises(ValueError):
@@ -236,8 +237,8 @@ def test_treasury_rejects_invalid_financial_mutation():
 
 
 def test_budget_controller_hydrates_confirmed_accounts_after_restart():
-    from budget_controller import AccountType, BudgetAccount, BudgetLimits, BudgetController
-    from budget_repository import BudgetRepository
+    from economy.budget_controller import AccountType, BudgetAccount, BudgetLimits, BudgetController
+    from economy.budget_repository import BudgetRepository
 
     def make(kind):
         return BudgetAccount(
@@ -269,8 +270,8 @@ def test_budget_controller_hydrates_confirmed_accounts_after_restart():
     "violation", ["account", "cooldown-argument", "single", "daily", "total", "locked"]
 )
 def test_native_budget_enforces_authoritative_financial_limits(violation):
-    from budget_controller import AccountType, BudgetAccount, BudgetLimits
-    from budget_repository import BudgetRepository, BudgetPersistenceError
+    from economy.budget_controller import AccountType, BudgetAccount, BudgetLimits
+    from economy.budget_repository import BudgetRepository, BudgetPersistenceError
 
     repo = BudgetRepository()
     account = BudgetAccount(
@@ -310,8 +311,8 @@ def test_native_budget_enforces_authoritative_financial_limits(violation):
 
 
 def test_native_budget_daily_rollover_and_cooldown_are_durable():
-    from budget_controller import AccountType, BudgetAccount, BudgetLimits
-    from budget_repository import BudgetRepository
+    from economy.budget_controller import AccountType, BudgetAccount, BudgetLimits
+    from economy.budget_repository import BudgetRepository
 
     repo = BudgetRepository()
     repo.configure(
@@ -342,7 +343,7 @@ def test_native_budget_daily_rollover_and_cooldown_are_durable():
 
 
 def test_local_agent_heartbeat_lease_recovery_and_result_authority(monkeypatch):
-    import local_agent_gateway as gateway
+    import agent_runtime.local_gateway as gateway
 
     monkeypatch.setenv("ALICE_LOCAL_AGENT_BOOTSTRAP_TOKEN", "bootstrap")
     app = Flask(__name__)
@@ -388,9 +389,9 @@ def test_local_agent_heartbeat_lease_recovery_and_result_authority(monkeypatch):
 
 def test_provider_clients_use_same_native_credential_writer(monkeypatch):
     from cryptography.fernet import Fernet
-    from provider_credentials import replace_active_credential
-    from credential_crypto import encrypt_secret
-    import provider_credentials_routes as routes
+    from provider_accounts.credentials import replace_active_credential
+    from secret_store.credential_crypto import encrypt_secret
+    import provider_accounts.credentials_routes as routes
     from yandex_client_modules.request_mixin import _resolve_global_provider_credential
 
     monkeypatch.setenv("ALICE_PROVIDER_CREDENTIAL_KEY", Fernet.generate_key().decode())
@@ -407,7 +408,7 @@ def test_provider_clients_use_same_native_credential_writer(monkeypatch):
 
 
 def test_government_rejects_changed_owner_at_publication(monkeypatch):
-    import government
+    import organization.government as government
 
     monkeypatch.setattr(government, "_current_owner", lambda: "owner")
     case = government.create_case(user_id="owner")
@@ -424,7 +425,7 @@ def test_government_rejects_changed_owner_at_publication(monkeypatch):
 def test_environment_failed_start_is_persisted_and_missing_metadata_is_not_acknowledged(
     monkeypatch,
 ):
-    import environment_manager as environments
+    import remote_runtime.environments as environments
 
     identity = "test-environment"
     record = {
@@ -463,15 +464,19 @@ def test_environment_failed_start_is_persisted_and_missing_metadata_is_not_ackno
 def test_concurrent_settlement_does_not_replace_confirmed_financials(monkeypatch):
     import printing3d.service as printing
 
-    order = printing.create_order("owner", {"title": "Order", "quoted_price": 10})
-    printing.settle_order("owner", order["id"], actual_revenue=10, actual_cost=2)
+    order = printing.create_order(printing_store(), "owner", {"title": "Order", "quoted_price": 10})
+    printing.settle_order(printing_store(), "owner", order["id"], actual_revenue=10, actual_cost=2)
     real = printing.get_order
-    stale = {**real("owner", order["id"]), "settled_at": None, "status": "ready"}
+    stale = {**real(printing_store(), "owner", order["id"]), "settled_at": None, "status": "ready"}
     monkeypatch.setattr(printing, "get_order", lambda *_args: dict(stale))
     with pytest.raises(ValueError, match="already settled"):
-        printing.settle_order("owner", order["id"], actual_revenue=20, actual_cost=2)
+        printing.settle_order(
+            printing_store(), "owner", order["id"], actual_revenue=20, actual_cost=2
+        )
     assert (
-        printing.settle_order("owner", order["id"], actual_revenue=10, actual_cost=2)["id"]
+        printing.settle_order(
+            printing_store(), "owner", order["id"], actual_revenue=10, actual_cost=2
+        )["id"]
         == order["id"]
     )
     with db.get_store().transaction() as tx:
@@ -480,14 +485,16 @@ def test_concurrent_settlement_does_not_replace_confirmed_financials(monkeypatch
             {**tx.get("printing/order/" + order["id"]), "status": "cancelled", "settled_at": None},
         )
     with pytest.raises(ValueError, match="cancelled"):
-        printing.settle_order("owner", order["id"], actual_revenue=10, actual_cost=2)
+        printing.settle_order(
+            printing_store(), "owner", order["id"], actual_revenue=10, actual_cost=2
+        )
     db.get_store().delete("printing/order/" + order["id"])
-    printing.settle_order("owner", order["id"], actual_revenue=10, actual_cost=2)
+    printing.settle_order(printing_store(), "owner", order["id"], actual_revenue=10, actual_cost=2)
     assert db.get_store().get("printing/order/" + order["id"]) is None
 
 
 def test_quota_disable_between_policy_read_and_admission_prevents_reservation(monkeypatch):
-    import provider_quotas as quotas
+    import provider_accounts.quotas as quotas
 
     quotas.upsert_policy("flipped", period_seconds=60, max_requests=1)
     quotas.assign_user_policy("owner", "flipped")
@@ -511,7 +518,7 @@ def test_implicit_startup_never_hides_existing_legacy_authority(tmp_path, monkey
     monkeypatch.setattr(db, "DB_PATH", str(path))
     evidence = b"legacy immutable evidence"
     path.write_bytes(evidence)
-    with pytest.raises(StoreError, match="explicit verified native activation"):
+    with pytest.raises(KristallError, match="explicit verified native activation"):
         db.init_db()
     assert path.read_bytes() == evidence
     assert not path.with_name("alice.memory").exists()

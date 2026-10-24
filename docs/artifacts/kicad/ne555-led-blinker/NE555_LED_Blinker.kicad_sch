@@ -1,0 +1,1396 @@
+(kicad_sch (version 20250114) (generator "eeschema") (generator_version "9.0") (uuid "d56a7691-2e10-4dd4-8258-2926fb2d44f1") (paper "A4") (title_block (title "NE555 - LED blinker / 5 V") (date "2026-10-09") (rev "1.0") (company "dot | KiCad demonstration") (comment 1 "Nominal 0.99 Hz | Low-voltage educational circuit") (comment 2 "Electrical rules checked; not physically built or tested."))
+(lib_symbols (symbol "Timer:NE555P"
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(property "Reference" "U"
+			(at -10.16 8.89 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "NE555P"
+			(at 2.54 8.89 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Package_DIP:DIP-8_W7.62mm"
+			(at 16.51 -10.16 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "http://www.ti.com/lit/ds/symlink/ne555.pdf"
+			(at 21.59 -10.16 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Precision Timers, 555 compatible,  PDIP-8"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "ki_keywords" "single timer 555"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "ki_fp_filters" "DIP*W7.62mm*"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(symbol "NE555P_0_0"
+			(pin power_in line
+				(at 0 10.16 270)
+				(length 2.54)
+				(name "VCC"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "8"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin power_in line
+				(at 0 -10.16 90)
+				(length 2.54)
+				(name "GND"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(symbol "NE555P_0_1"
+			(rectangle
+				(start -8.89 -7.62)
+				(end 8.89 7.62)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type background)
+				)
+			)
+			(rectangle
+				(start -8.89 -7.62)
+				(end 8.89 7.62)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type background)
+				)
+			)
+		)
+		(symbol "NE555P_1_1"
+			(pin input line
+				(at -12.7 5.08 0)
+				(length 3.81)
+				(name "TR"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin input line
+				(at -12.7 0 0)
+				(length 3.81)
+				(name "CV"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "5"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin input inverted
+				(at -12.7 -5.08 0)
+				(length 3.81)
+				(name "R"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "4"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin output line
+				(at 12.7 5.08 180)
+				(length 3.81)
+				(name "Q"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "3"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin input line
+				(at 12.7 0 180)
+				(length 3.81)
+				(name "DIS"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "7"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin input line
+				(at 12.7 -5.08 180)
+				(length 3.81)
+				(name "THR"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "6"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)
+(symbol "Device:R"
+		(pin_numbers
+			(hide yes)
+		)
+		(pin_names
+			(offset 0)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(property "Reference" "R"
+			(at 2.032 0 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "R"
+			(at 0 0 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at -1.778 0 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "ki_keywords" "R res resistor"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "ki_fp_filters" "R_*"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(symbol "R_0_1"
+			(rectangle
+				(start -1.016 -2.54)
+				(end 1.016 2.54)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+		(symbol "R_1_1"
+			(pin passive line
+				(at 0 3.81 270)
+				(length 1.27)
+				(name "~"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 -3.81 90)
+				(length 1.27)
+				(name "~"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)
+(symbol "Device:C"
+		(pin_numbers
+			(hide yes)
+		)
+		(pin_names
+			(offset 0.254)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(property "Reference" "C"
+			(at 0.635 2.54 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "C"
+			(at 0.635 -2.54 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 0.9652 -3.81 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Unpolarized capacitor"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "ki_keywords" "cap capacitor"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "ki_fp_filters" "C_*"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(symbol "C_0_1"
+			(polyline
+				(pts
+					(xy -2.032 0.762) (xy 2.032 0.762)
+				)
+				(stroke
+					(width 0.508)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy -2.032 -0.762) (xy 2.032 -0.762)
+				)
+				(stroke
+					(width 0.508)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+		(symbol "C_1_1"
+			(pin passive line
+				(at 0 3.81 270)
+				(length 2.794)
+				(name "~"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 -3.81 90)
+				(length 2.794)
+				(name "~"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)
+(symbol "Device:C_Polarized"
+		(pin_numbers
+			(hide yes)
+		)
+		(pin_names
+			(offset 0.254)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(property "Reference" "C"
+			(at 0.635 2.54 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "C_Polarized"
+			(at 0.635 -2.54 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 0.9652 -3.81 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Polarized capacitor"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "ki_keywords" "cap capacitor"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "ki_fp_filters" "CP_*"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(symbol "C_Polarized_0_1"
+			(rectangle
+				(start -2.286 0.508)
+				(end 2.286 1.016)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy -1.778 2.286) (xy -0.762 2.286)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy -1.27 2.794) (xy -1.27 1.778)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(rectangle
+				(start 2.286 -0.508)
+				(end -2.286 -1.016)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type outline)
+				)
+			)
+		)
+		(symbol "C_Polarized_1_1"
+			(pin passive line
+				(at 0 3.81 270)
+				(length 2.794)
+				(name "~"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 -3.81 90)
+				(length 2.794)
+				(name "~"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)
+(symbol "Device:LED"
+		(pin_numbers
+			(hide yes)
+		)
+		(pin_names
+			(offset 1.016)
+			(hide yes)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(property "Reference" "D"
+			(at 0 2.54 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "LED"
+			(at 0 -2.54 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Light emitting diode"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Sim.Pins" "1=K 2=A"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "ki_keywords" "LED diode"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "ki_fp_filters" "LED* LED_SMD:* LED_THT:*"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(symbol "LED_0_1"
+			(polyline
+				(pts
+					(xy -3.048 -0.762) (xy -4.572 -2.286) (xy -3.81 -2.286) (xy -4.572 -2.286) (xy -4.572 -1.524)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy -1.778 -0.762) (xy -3.302 -2.286) (xy -2.54 -2.286) (xy -3.302 -2.286) (xy -3.302 -1.524)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy -1.27 0) (xy 1.27 0)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy -1.27 -1.27) (xy -1.27 1.27)
+				)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 1.27 -1.27) (xy 1.27 1.27) (xy -1.27 0) (xy 1.27 -1.27)
+				)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+		(symbol "LED_1_1"
+			(pin passive line
+				(at -3.81 0 0)
+				(length 2.54)
+				(name "K"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 3.81 0 180)
+				(length 2.54)
+				(name "A"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)
+(symbol "Connector_Generic:Conn_01x02"
+		(pin_names
+			(offset 1.016)
+			(hide yes)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(property "Reference" "J"
+			(at 0 2.54 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "Conn_01x02"
+			(at 0 -5.08 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "ki_keywords" "connector"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "ki_fp_filters" "Connector*:*_1x??_*"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(symbol "Conn_01x02_1_1"
+			(rectangle
+				(start -1.27 1.27)
+				(end 1.27 -3.81)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type background)
+				)
+			)
+			(rectangle
+				(start -1.27 0.127)
+				(end 0 -0.127)
+				(stroke
+					(width 0.1524)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(rectangle
+				(start -1.27 -2.413)
+				(end 0 -2.667)
+				(stroke
+					(width 0.1524)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(pin passive line
+				(at -5.08 0 0)
+				(length 3.81)
+				(name "Pin_1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at -5.08 -2.54 0)
+				(length 3.81)
+				(name "Pin_2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)
+(symbol "power:+5V"
+		(power)
+		(pin_numbers
+			(hide yes)
+		)
+		(pin_names
+			(offset 0)
+			(hide yes)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(property "Reference" "#PWR"
+			(at 0 -3.81 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+5V"
+			(at 0 3.556 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+5V\""
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "ki_keywords" "global power"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(symbol "+5V_0_1"
+			(polyline
+				(pts
+					(xy -0.762 1.27) (xy 0 2.54)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 0 2.54) (xy 0.762 1.27)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 0 0) (xy 0 2.54)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+		(symbol "+5V_1_1"
+			(pin power_in line
+				(at 0 0 90)
+				(length 0)
+				(name "~"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)
+(symbol "power:GND"
+		(power)
+		(pin_numbers
+			(hide yes)
+		)
+		(pin_names
+			(offset 0)
+			(hide yes)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(property "Reference" "#PWR"
+			(at 0 -6.35 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 0 -3.81 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "ki_keywords" "global power"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(symbol "GND_0_1"
+			(polyline
+				(pts
+					(xy 0 0) (xy 0 -1.27) (xy 1.27 -1.27) (xy 0 -2.54) (xy -1.27 -1.27) (xy 0 -1.27)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+		(symbol "GND_1_1"
+			(pin power_in line
+				(at 0 0 270)
+				(length 0)
+				(name "~"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)
+(symbol "power:PWR_FLAG"
+		(power)
+		(pin_numbers
+			(hide yes)
+		)
+		(pin_names
+			(offset 0)
+			(hide yes)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(property "Reference" "#FLG"
+			(at 0 1.905 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "PWR_FLAG"
+			(at 0 3.81 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Special symbol for telling ERC where power comes from"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "ki_keywords" "flag power"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(symbol "PWR_FLAG_0_0"
+			(pin power_out line
+				(at 0 0 90)
+				(length 0)
+				(name "~"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(symbol "PWR_FLAG_0_1"
+			(polyline
+				(pts
+					(xy 0 0) (xy 0 1.27) (xy -1.016 1.905) (xy 0 2.54) (xy 1.016 1.905) (xy 0 1.27)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+		(embedded_fonts no)
+	))
+(symbol (lib_id "Connector_Generic:Conn_01x02") (at 50.8 66.04 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "68b7d304-c186-42b2-aa13-a826053597a1")(property "Reference" "J1" (at 48.26 58.42 0) (effects (font (size 1.27 1.27)) (justify left)))(property "Value" "5 V DC" (at 48.26 60.96 0) (effects (font (size 1.27 1.27)) (justify left)))(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" (at 50.8 66.04 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 50.8 66.04 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "J1") (unit 1)))) )
+(wire (pts (xy 45.72 66.04) (xy 40.64 66.04)) (stroke (width 0) (type default)) (uuid "52178806-fef3-4498-b5c5-9f4862873e5b"))
+(wire (pts (xy 40.64 66.04) (xy 40.64 63.5)) (stroke (width 0) (type default)) (uuid "5f213ee8-3126-4653-be81-4a04aa8245e9"))
+(symbol (lib_id "power:+5V") (at 40.64 63.5 0) (unit 1) (exclude_from_sim no) (in_bom no) (on_board no) (dnp no) (uuid "6e68a921-5690-4815-8b35-38f4da40cc9e")(property "Reference" "#PWR0001" (at 40.64 63.5 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Value" "+5V" (at 40.64 59.69 0) (effects (font (size 1.27 1.27)) ))(property "Footprint" "" (at 40.64 63.5 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 40.64 63.5 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "#PWR0001") (unit 1)))) )
+(wire (pts (xy 45.72 68.58) (xy 40.64 68.58)) (stroke (width 0) (type default)) (uuid "ea4a95d5-3bfc-4967-8f92-2a3e1d3aa358"))
+(wire (pts (xy 40.64 68.58) (xy 40.64 76.2)) (stroke (width 0) (type default)) (uuid "1d38a33f-ec71-4f2f-9efb-43c142ed685c"))
+(wire (pts (xy 40.64 76.2) (xy 40.64 80.01)) (stroke (width 0) (type default)) (uuid "ef57d919-d72a-4d45-82fd-44ee9e0db137"))
+(symbol (lib_id "power:GND") (at 40.64 80.01 0) (unit 1) (exclude_from_sim no) (in_bom no) (on_board no) (dnp no) (uuid "452ead83-ae2a-42a7-afbf-889e16c185e7")(property "Reference" "#PWR0002" (at 40.64 80.01 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Value" "GND" (at 40.64 83.82000000000001 0) (effects (font (size 1.27 1.27)) ))(property "Footprint" "" (at 40.64 80.01 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 40.64 80.01 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "#PWR0002") (unit 1)))) )
+(wire (pts (xy 40.64 66.04) (xy 33.02 66.04)) (stroke (width 0) (type default)) (uuid "75af6e16-7971-41d5-8153-28ca326e8ca1"))
+(symbol (lib_id "power:PWR_FLAG") (at 33.02 66.04 0) (unit 1) (exclude_from_sim no) (in_bom no) (on_board no) (dnp no) (uuid "ef8d65af-3f4f-4ba0-ac4e-9751c615e81e")(property "Reference" "#FLG0003" (at 33.02 66.04 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Value" "PWR_FLAG" (at 33.02 62.230000000000004 0) (effects (font (size 1.27 1.27)) ))(property "Footprint" "" (at 33.02 66.04 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 33.02 66.04 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "#FLG0003") (unit 1)))) )
+(junction (at 40.64 66.04) (diameter 0) (color 0 0 0 0) (uuid "fd57fe8d-97aa-4657-8f78-2997bf605a39"))
+(wire (pts (xy 40.64 76.2) (xy 33.02 76.2)) (stroke (width 0) (type default)) (uuid "ef6d35a0-c137-4093-8590-414e951014ea"))
+(symbol (lib_id "power:PWR_FLAG") (at 33.02 76.2 0) (unit 1) (exclude_from_sim no) (in_bom no) (on_board no) (dnp no) (uuid "b4a00ed2-bb66-4c2e-a02b-18722db934bc")(property "Reference" "#FLG0004" (at 33.02 76.2 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Value" "PWR_FLAG" (at 33.02 72.39 0) (effects (font (size 1.27 1.27)) ))(property "Footprint" "" (at 33.02 76.2 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 33.02 76.2 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "#FLG0004") (unit 1)))) )
+(junction (at 40.64 76.2) (diameter 0) (color 0 0 0 0) (uuid "ed526a8c-9206-42ba-94cc-f69e66133b47"))
+(symbol (lib_id "Device:C") (at 76.2 77.47 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "3bc48114-29ab-4e0f-8b7a-c4dce2477637")(property "Reference" "C1" (at 78.74000000000001 76.2 0) (effects (font (size 1.27 1.27)) (justify left)))(property "Value" "100 nF" (at 78.74000000000001 78.74 0) (effects (font (size 1.27 1.27)) (justify left)))(property "Footprint" "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm" (at 76.2 77.47 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 76.2 77.47 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "C1") (unit 1)))) )
+(symbol (lib_id "Device:C_Polarized") (at 96.52 77.47 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "235b6aa1-0811-449b-8fa4-c8822cc88bde")(property "Reference" "C2" (at 99.06 76.2 0) (effects (font (size 1.27 1.27)) (justify left)))(property "Value" "10 uF" (at 99.06 78.74 0) (effects (font (size 1.27 1.27)) (justify left)))(property "Footprint" "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm" (at 96.52 77.47 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 96.52 77.47 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "C2") (unit 1)))) )
+(wire (pts (xy 76.2 73.66) (xy 76.2 66.04)) (stroke (width 0) (type default)) (uuid "65b9c645-bb40-4170-bb72-275cfea20045"))
+(wire (pts (xy 76.2 66.04) (xy 96.52 66.04)) (stroke (width 0) (type default)) (uuid "398215e0-81e6-4904-aba0-a7ac71ec4fc5"))
+(wire (pts (xy 96.52 66.04) (xy 96.52 73.66)) (stroke (width 0) (type default)) (uuid "1f3402a0-2055-4d62-b9a2-2ce2938eb0e0"))
+(symbol (lib_id "power:+5V") (at 76.2 66.04 0) (unit 1) (exclude_from_sim no) (in_bom no) (on_board no) (dnp no) (uuid "9426b487-ba0a-41a3-9322-15ea3376d380")(property "Reference" "#PWR0005" (at 76.2 66.04 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Value" "+5V" (at 76.2 62.230000000000004 0) (effects (font (size 1.27 1.27)) ))(property "Footprint" "" (at 76.2 66.04 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 76.2 66.04 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "#PWR0005") (unit 1)))) )
+(wire (pts (xy 76.2 81.28) (xy 76.2 88.9)) (stroke (width 0) (type default)) (uuid "54f5943e-fbd0-4470-b2ab-cb5923c45c16"))
+(wire (pts (xy 76.2 88.9) (xy 96.52 88.9)) (stroke (width 0) (type default)) (uuid "254a8594-d9e8-42a2-8d46-0e56d03d7323"))
+(wire (pts (xy 96.52 88.9) (xy 96.52 81.28)) (stroke (width 0) (type default)) (uuid "a50bceb2-facd-4d5c-91cf-9ff2a89f4492"))
+(symbol (lib_id "power:GND") (at 76.2 88.9 0) (unit 1) (exclude_from_sim no) (in_bom no) (on_board no) (dnp no) (uuid "d1695516-897f-4725-8e7b-57eeb1efc7a5")(property "Reference" "#PWR0006" (at 76.2 88.9 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Value" "GND" (at 76.2 92.71000000000001 0) (effects (font (size 1.27 1.27)) ))(property "Footprint" "" (at 76.2 88.9 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 76.2 88.9 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "#PWR0006") (unit 1)))) )
+(symbol (lib_id "Timer:NE555P") (at 142.24 91.44 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "f055b2c7-d95e-4f66-9038-a399a6b26b25")(property "Reference" "U1" (at 146.05 73.66 0) (effects (font (size 1.27 1.27)) (justify left)))(property "Value" "NE555P" (at 146.05 76.2 0) (effects (font (size 1.27 1.27)) (justify left)))(property "Footprint" "Package_DIP:DIP-8_W7.62mm" (at 142.24 91.44 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "https://www.ti.com/lit/ds/symlink/ne555.pdf" (at 142.24 91.44 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "U1") (unit 1)))) )
+(wire (pts (xy 142.24 81.28) (xy 142.24 77.47)) (stroke (width 0) (type default)) (uuid "d7f2f4f7-3ba4-4ecb-a8ad-9e3f0478e0ee"))
+(symbol (lib_id "power:+5V") (at 142.24 77.47 0) (unit 1) (exclude_from_sim no) (in_bom no) (on_board no) (dnp no) (uuid "bad0dc4c-459f-46e0-b882-53f5eb308264")(property "Reference" "#PWR0007" (at 142.24 77.47 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Value" "+5V" (at 142.24 73.66 0) (effects (font (size 1.27 1.27)) ))(property "Footprint" "" (at 142.24 77.47 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 142.24 77.47 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "#PWR0007") (unit 1)))) )
+(wire (pts (xy 142.24 101.6) (xy 142.24 121.92)) (stroke (width 0) (type default)) (uuid "81361161-27fe-4749-8904-4141f76a86e0"))
+(symbol (lib_id "power:GND") (at 142.24 121.92 0) (unit 1) (exclude_from_sim no) (in_bom no) (on_board no) (dnp no) (uuid "115592df-fb8e-469b-8112-b424e814c97d")(property "Reference" "#PWR0008" (at 142.24 121.92 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Value" "GND" (at 142.24 125.73 0) (effects (font (size 1.27 1.27)) ))(property "Footprint" "" (at 142.24 121.92 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 142.24 121.92 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "#PWR0008") (unit 1)))) )
+(wire (pts (xy 129.54 86.36) (xy 120.65 86.36)) (stroke (width 0) (type default)) (uuid "2286b1b8-2be4-42ca-a517-5a9ae46f9feb"))
+(label "TIMING" (at 120.65 86.36 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "f1e8169d-c21a-4b38-abb3-bf3021631868"))
+(wire (pts (xy 129.54 96.52) (xy 120.65 96.52)) (stroke (width 0) (type default)) (uuid "96197b91-fc35-404b-bd00-a6b045788cd3"))
+(label "+5V" (at 120.65 96.52 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "76e548d9-c805-4aed-a742-ced446716e13"))
+(wire (pts (xy 129.54 91.44) (xy 113.03 91.44)) (stroke (width 0) (type default)) (uuid "20576a6c-bee7-4271-a8be-d118b8856c86"))
+(wire (pts (xy 113.03 91.44) (xy 113.03 106.68)) (stroke (width 0) (type default)) (uuid "7d0ca5a6-20b1-4088-8895-695cb63dfd45"))
+(symbol (lib_id "Device:C") (at 113.03 110.49 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "f7db315b-49a7-4dff-9778-3d22ad884a92")(property "Reference" "C4" (at 115.57000000000001 109.22 0) (effects (font (size 1.27 1.27)) (justify left)))(property "Value" "10 nF" (at 115.57000000000001 111.75999999999999 0) (effects (font (size 1.27 1.27)) (justify left)))(property "Footprint" "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm" (at 113.03 110.49 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 113.03 110.49 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "C4") (unit 1)))) )
+(wire (pts (xy 113.03 114.3) (xy 113.03 121.92)) (stroke (width 0) (type default)) (uuid "eee16780-e7c8-4b5a-b331-8b3f4e54a135"))
+(symbol (lib_id "power:GND") (at 113.03 121.92 0) (unit 1) (exclude_from_sim no) (in_bom no) (on_board no) (dnp no) (uuid "a5bcaf59-ff12-4659-a1b7-2e580835a765")(property "Reference" "#PWR0009" (at 113.03 121.92 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Value" "GND" (at 113.03 125.73 0) (effects (font (size 1.27 1.27)) ))(property "Footprint" "" (at 113.03 121.92 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 113.03 121.92 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "#PWR0009") (unit 1)))) )
+(symbol (lib_id "Device:R") (at 187.96 78.74 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "856562c4-2c68-4663-93bb-2e52dd04a1b8")(property "Reference" "R1" (at 190.5 77.47 0) (effects (font (size 1.27 1.27)) (justify left)))(property "Value" "10 k" (at 190.5 80.00999999999999 0) (effects (font (size 1.27 1.27)) (justify left)))(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal" (at 187.96 78.74 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 187.96 78.74 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "R1") (unit 1)))) )
+(symbol (lib_id "Device:R") (at 187.96 105.41 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "656ae37f-2054-42a3-b9f9-8a7b871f6fca")(property "Reference" "R2" (at 190.5 104.14 0) (effects (font (size 1.27 1.27)) (justify left)))(property "Value" "68 k" (at 190.5 106.67999999999999 0) (effects (font (size 1.27 1.27)) (justify left)))(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal" (at 187.96 105.41 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 187.96 105.41 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "R2") (unit 1)))) )
+(symbol (lib_id "Device:C_Polarized") (at 187.96 127 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "bb74130a-140b-4d1c-b9dd-7a8e6d37c7ad")(property "Reference" "C3" (at 190.5 125.73 0) (effects (font (size 1.27 1.27)) (justify left)))(property "Value" "10 uF" (at 190.5 128.27 0) (effects (font (size 1.27 1.27)) (justify left)))(property "Footprint" "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm" (at 187.96 127 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 187.96 127 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "C3") (unit 1)))) )
+(wire (pts (xy 187.96 74.93) (xy 187.96 66.04)) (stroke (width 0) (type default)) (uuid "647860d6-975e-4fcc-951a-e7ec0d72d05a"))
+(symbol (lib_id "power:+5V") (at 187.96 66.04 0) (unit 1) (exclude_from_sim no) (in_bom no) (on_board no) (dnp no) (uuid "451c4e94-fc60-42e5-ab40-fa8b4b8841f1")(property "Reference" "#PWR0010" (at 187.96 66.04 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Value" "+5V" (at 187.96 62.230000000000004 0) (effects (font (size 1.27 1.27)) ))(property "Footprint" "" (at 187.96 66.04 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 187.96 66.04 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "#PWR0010") (unit 1)))) )
+(wire (pts (xy 187.96 82.55) (xy 187.96 91.44)) (stroke (width 0) (type default)) (uuid "ca1cedb8-0f65-4041-ac88-07e16ed43f1a"))
+(wire (pts (xy 187.96 91.44) (xy 187.96 101.6)) (stroke (width 0) (type default)) (uuid "59cbe8ee-ca19-4e78-a06e-555e50098051"))
+(junction (at 187.96 91.44) (diameter 0) (color 0 0 0 0) (uuid "6eb3b501-a036-4726-a77a-387c6157021e"))
+(wire (pts (xy 154.94 91.44) (xy 187.96 91.44)) (stroke (width 0) (type default)) (uuid "d1774baa-e40d-45a7-8382-48b017a76180"))
+(wire (pts (xy 187.96 109.22) (xy 187.96 114.3)) (stroke (width 0) (type default)) (uuid "6ba644aa-0220-49da-9903-1bdf8088eb00"))
+(wire (pts (xy 187.96 114.3) (xy 187.96 123.19)) (stroke (width 0) (type default)) (uuid "20a6e661-7876-4026-81f6-4cd96d08cd72"))
+(junction (at 187.96 114.3) (diameter 0) (color 0 0 0 0) (uuid "1e9bddf4-b75a-4b4a-ac65-b0bc861022b8"))
+(wire (pts (xy 154.94 96.52) (xy 167.64 96.52)) (stroke (width 0) (type default)) (uuid "305a7f41-63d9-44df-aa6b-32ef6e33a39e"))
+(wire (pts (xy 167.64 96.52) (xy 167.64 114.3)) (stroke (width 0) (type default)) (uuid "3eead0a8-713d-4bbc-ac65-452dfc27788b"))
+(wire (pts (xy 167.64 114.3) (xy 187.96 114.3)) (stroke (width 0) (type default)) (uuid "3628fc1a-3840-4732-8f7a-51aa101c395a"))
+(wire (pts (xy 187.96 114.3) (xy 199.39 114.3)) (stroke (width 0) (type default)) (uuid "982e23e6-608c-418d-b590-7b2015de8f2b"))
+(label "TIMING" (at 199.39 114.3 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "6549d95c-b7e6-438f-af90-3371ee4c4da8"))
+(wire (pts (xy 187.96 130.81) (xy 187.96 135.89)) (stroke (width 0) (type default)) (uuid "7f4f3cca-3c53-4e1d-95d6-4413e3306982"))
+(symbol (lib_id "power:GND") (at 187.96 135.89 0) (unit 1) (exclude_from_sim no) (in_bom no) (on_board no) (dnp no) (uuid "03c46e6d-7d23-45bf-88d5-1d2fc024c353")(property "Reference" "#PWR0011" (at 187.96 135.89 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Value" "GND" (at 187.96 139.7 0) (effects (font (size 1.27 1.27)) ))(property "Footprint" "" (at 187.96 135.89 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 187.96 135.89 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "#PWR0011") (unit 1)))) )
+(wire (pts (xy 154.94 86.36) (xy 207.01 86.36)) (stroke (width 0) (type default)) (uuid "d49eb4ed-f394-4e5f-b94f-6bc55357a578"))
+(label "OUT" (at 199.39 86.36 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "33e5cf98-dd1f-4d06-842b-5ebb968fee7b"))
+(symbol (lib_id "Device:R") (at 210.82 86.36 90) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "da2a8570-533e-49dd-8a54-7d696cfc9919")(property "Reference" "R3" (at 208.28 80.01 90) (effects (font (size 1.27 1.27)) (justify left)))(property "Value" "1 k" (at 208.28 82.55 90) (effects (font (size 1.27 1.27)) (justify left)))(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal" (at 210.82 86.36 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 210.82 86.36 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "R3") (unit 1)))) )
+(wire (pts (xy 214.63 86.36) (xy 228.6 86.36)) (stroke (width 0) (type default)) (uuid "f775ffcc-2ac4-46e4-aa90-cdeb68d65a08"))
+(wire (pts (xy 228.6 86.36) (xy 228.6 96.52)) (stroke (width 0) (type default)) (uuid "e3df1c07-2bb9-48e5-bb3f-1d237dfe2598"))
+(symbol (lib_id "Device:LED") (at 228.6 100.33 90) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "7066625a-1e37-4ffa-86a3-716fa50f1186")(property "Reference" "D1" (at 242.57 99.06 90) (effects (font (size 1.27 1.27)) (justify left)))(property "Value" "RED LED" (at 247.65 102.87 90) (effects (font (size 1.27 1.27)) (justify left)))(property "Footprint" "LED_THT:LED_D5.0mm" (at 228.6 100.33 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 228.6 100.33 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "D1") (unit 1)))) )
+(wire (pts (xy 228.6 104.14) (xy 228.6 114.3)) (stroke (width 0) (type default)) (uuid "62984679-634f-4c2f-9c4c-1616cfa9385e"))
+(symbol (lib_id "power:GND") (at 228.6 114.3 0) (unit 1) (exclude_from_sim no) (in_bom no) (on_board no) (dnp no) (uuid "15f707b8-bc76-4977-a0a0-34653ef8602a")(property "Reference" "#PWR0012" (at 228.6 114.3 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Value" "GND" (at 228.6 118.11 0) (effects (font (size 1.27 1.27)) ))(property "Footprint" "" (at 228.6 114.3 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(property "Datasheet" "" (at 228.6 114.3 0) (effects (font (size 1.27 1.27)) (justify left) (hide yes)))(instances (project "NE555_LED_Blinker" (path "/d56a7691-2e10-4dd4-8258-2926fb2d44f1" (reference "#PWR0012") (unit 1)))) )
+(text "NE555  /  LED BLINKER" (at 33.02 25.4 0) (effects (font (size 3 3) (bold yes)) (justify left)) (uuid "6c3f30ca-142b-46ba-877d-04b2ab09c6e4"))
+(text "5 V DC   |   approx. 1 blink / second   |   through-hole parts" (at 33.02 34.29 0) (effects (font (size 1.65 1.65)) (justify left)) (uuid "5b72e466-3dec-4c36-908e-ba07ebeaa736"))
+(text "01   POWER & BYPASS" (at 33.02 49.53 0) (effects (font (size 1.65 1.65) (bold yes)) (justify left)) (uuid "a8fa0b1b-e3a3-4a68-a95e-3e65a7e4e9b0"))
+(text "02   ASTABLE TIMER" (at 120.65 49.53 0) (effects (font (size 1.65 1.65) (bold yes)) (justify left)) (uuid "7b633e9a-ed49-4243-96ce-43680e81e552"))
+(text "03   INDICATOR" (at 215.9 49.53 0) (effects (font (size 1.65 1.65) (bold yes)) (justify left)) (uuid "0ce054f1-92ba-4c24-80a7-cd18f010153e"))
+(text "C1: place close to U1 pins 8 / 1." (at 33.02 104.14 0) (effects (font (size 1.4 1.4)) (justify left)) (uuid "89058bdb-d047-4c00-9dc7-e3e69af0ac50"))
+(text "Use a regulated, isolated 5 V source.\nJ1 pin 1 = +5 V; pin 2 = GND.\nObserve C2 / C3 and LED polarity." (at 33.02 115.57 0) (effects (font (size 1.4 1.4)) (justify left)) (uuid "9f0d50f9-4dd9-481c-846f-43bd4fc97bc0"))
+(text "RESET held high.\nC4 filters control voltage." (at 109.22 135.89 0) (effects (font (size 1.4 1.4)) (justify left)) (uuid "8aa54be3-6846-4020-bcf0-6bb5b3c4f892"))
+(text "LED is ON when OUT is HIGH." (at 215.9 125.73 0) (effects (font (size 1.3 1.3)) (justify left)) (uuid "068710fa-969c-47b3-a719-feb6219d6a07"))
+(text "TIMING  |  calculated nominal values" (at 33.02 153.67 0) (effects (font (size 1.6 1.6) (bold yes)) (justify left)) (uuid "3ca7060c-9e90-4ece-b94b-cb857c52d058"))
+(text "T = 0.693 x (R1 + 2 x R2) x C3 = 1.012 s     f = 0.988 Hz\nLED on: 0.541 s    /    off: 0.471 s    /    duty: 53.4%" (at 33.02 164.59 0) (effects (font (size 1.4 1.4)) (justify left)) (uuid "a6cabc6d-e6c9-4d63-b249-0d93274ac53d"))
+(text "Timing varies with capacitor tolerance. Not physically tested.\nReference: Texas Instruments NE555 datasheet, astable operation." (at 33.02 179.07 0) (effects (font (size 1.25 1.25)) (justify left)) (uuid "b547830c-5ea8-47f5-bf53-ffd87db014ac"))
+(sheet_instances (path "/" (page "1"))) (embedded_fonts no))

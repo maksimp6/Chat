@@ -1,4 +1,4 @@
-"""Focused edge coverage for Alice Platform foundation."""
+"""Focused edge coverage for Keel Platform foundation."""
 
 import argparse
 import runpy
@@ -7,8 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
-from alice_platform.__main__ import cmd_health, cmd_validate, main
-from alice_platform.config import (
+from keel.__main__ import cmd_health, cmd_validate, main
+from keel.config import (
     ConfigError,
     load_config,
     validate_no_cycles,
@@ -19,15 +19,15 @@ from alice_platform.config import (
     validate_lane_invariants,
     _is_secret_pattern,
 )
-from alice_platform.health import generate_health_plan
-from alice_platform.planner import Action, ActionType, plan_actions
-from alice_platform.providers.cloudru import (
+from keel.health import generate_health_plan
+from keel.planner import Action, ActionType, plan_actions
+from keel.providers.cloudru import (
     CloudProviderUnavailable,
     create_container,
     delete_container,
     update_container,
 )
-from alice_platform.reconciler import reconcile
+from keel.reconciler import reconcile
 
 
 def _args(**values):
@@ -39,26 +39,26 @@ def test_cli_error_and_empty_paths(tmp_path, capsys):
     assert cmd_validate(_args(config_dir=str(missing))) == 1
     assert "Config error" in capsys.readouterr().err
 
-    with patch("alice_platform.__main__.load_config", side_effect=RuntimeError("boom")):
+    with patch("keel.__main__.load_config", side_effect=RuntimeError("boom")):
         assert cmd_validate(_args(config_dir="config/alice")) == 1
         assert "Error: boom" in capsys.readouterr().err
 
     with (
-        patch("alice_platform.__main__.load_config", return_value={}),
-        patch("alice_platform.__main__.generate_health_plan", return_value=[]),
+        patch("keel.__main__.load_config", return_value={}),
+        patch("keel.__main__.generate_health_plan", return_value=[]),
     ):
         assert cmd_health(_args(lane="test", config_dir="config/alice")) == 0
         assert "no health checks" in capsys.readouterr().out
 
-    with patch("alice_platform.__main__.load_config", side_effect=ConfigError("bad")):
+    with patch("keel.__main__.load_config", side_effect=ConfigError("bad")):
         assert cmd_health(_args(lane="test", config_dir="config/alice")) == 1
-    with patch("alice_platform.__main__.load_config", side_effect=RuntimeError("boom")):
+    with patch("keel.__main__.load_config", side_effect=RuntimeError("boom")):
         assert cmd_health(_args(lane="test", config_dir="config/alice")) == 1
 
 
 @pytest.mark.parametrize("command", ["plan", "reconcile"])
 def test_platform_cli_does_not_expose_unobserved_plan_or_reconcile(command):
-    with patch("sys.argv", ["alice_platform", command, "test"]):
+    with patch("sys.argv", ["keel", command, "test"]):
         with pytest.raises(SystemExit) as exc:
             main()
     assert exc.value.code == 2
@@ -67,9 +67,9 @@ def test_platform_cli_does_not_expose_unobserved_plan_or_reconcile(command):
 def test_module_main_exit_path():
     old = sys.argv[:]
     try:
-        sys.argv = ["alice_platform"]
+        sys.argv = ["keel"]
         with pytest.raises(SystemExit) as exc:
-            runpy.run_module("alice_platform.__main__", run_name="__main__")
+            runpy.run_module("keel.__main__", run_name="__main__")
         assert exc.value.code == 1
     finally:
         sys.argv = old
@@ -154,9 +154,9 @@ def test_cloudru_provider_fails_closed_and_reconciler_all_action_types(capsys):
     ]
     cfg = {"services": {name: {} for name in ["create", "update", "delete", "pending"]}}
     with (
-        patch("alice_platform.reconciler.create_container") as create,
-        patch("alice_platform.reconciler.update_container") as update,
-        patch("alice_platform.reconciler.delete_container") as delete,
+        patch("keel.reconciler.create_container") as create,
+        patch("keel.reconciler.update_container") as update,
+        patch("keel.reconciler.delete_container") as delete,
     ):
         reconcile("test", actions[:4], cfg)
         create.assert_called_once()

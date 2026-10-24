@@ -2,9 +2,13 @@ from flask import Flask, request, jsonify, render_template
 import os
 import logging
 import json
-from config import TEXT_MODELS, VOICE_MODELS, get_donation_url
-from model_discovery import ModelDiscoveryError, get_model_discovery, static_model_catalog
-from db import (
+from core.config import TEXT_MODELS, VOICE_MODELS, get_donation_url
+from provider_accounts.model_discovery import (
+    ModelDiscoveryError,
+    get_model_discovery,
+    static_model_catalog,
+)
+from storage.db import (
     init_db,
     get_conversations,
     create_conversation,
@@ -16,52 +20,57 @@ from db import (
     save_conv_settings,
     get_conv_settings,
 )
-from mcp_routes import mcp_bp
-from chatgpt_mcp import chatgpt_mcp_bp
-from file_routes import file_bp
-from runtime_api import runtime_bp
+from chat.mcp_routes import mcp_bp
+from mcp_server import chatgpt_mcp_bp
+from workspace.file_routes import file_bp
+from runtime.api import runtime_bp
 from runtime import current_runtime_base_path
-from local_agent_gateway import local_agent_bp, init_local_agent_tables
-from cloudru_iam_routes import cloudru_iam_bp
-from provider_credentials_routes import provider_credentials_bp
-from provider_quota_routes import provider_quota_bp
-from partner_relations import (
+from agent_runtime.local_gateway import local_agent_bp, init_local_agent_tables
+from cloud.cloudru.iam_routes import cloudru_iam_bp
+from provider_accounts.credentials_routes import provider_credentials_bp
+from provider_accounts.quota_routes import provider_quota_bp
+from organization.partner_relations import (
     partner_relations_bp,
     init_partner_relations_tables,
     ensure_partner_department,
 )
-from treasury import init_treasury_tables, get_account, demo_top_up
-from treasury_identity import TreasuryIdentityError, get_current_owner_id
-from user_identity import init_user_identity_table, register_anonymous_user
-from departments import departments_bp, init_department_tables
-from government import government_bp, init_government_tables, ensure_government_department
-from environment_routes import environment_bp, environment_gateway_bp
-from environment_manager import init_environment_tables
-from short_token_auth import install_short_token_auth
+from economy.treasury import init_treasury_tables, get_account, demo_top_up
+from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
+from identity.user_identity import init_user_identity_table, register_anonymous_user
+from organization.departments import departments_bp, init_department_tables
+from organization.government import (
+    government_bp,
+    init_government_tables,
+    ensure_government_department,
+)
+from remote_runtime.environment_routes import environment_bp, environment_gateway_bp
+from remote_runtime.environments import init_environment_tables
+from identity.short_token_auth import install_short_token_auth
 from rdc_connection.pairing import install_rdc_pairing
 from invocation.problems import problem
+from observability import system_log
 from identity.github_oauth import (
     current_github_login,
     github_auth_bp,
     github_login_enabled,
     login_path,
 )
-from user_identity import init_github_accounts_table
-from conversation_ownership import (
+from identity.user_identity import init_github_accounts_table
+from conversations.ownership import (
     init_conversation_ownership_table,
     check_access,
     delete_owner,
     get_owned_conversation,
 )
-from ssh_runtime_settings import public_settings, save_settings, test_connection
-from plugin_routes import plugin_bp
-from project_tree import project_tree_bp
-from voice_routes import voice_bp
-from printing3d import init_3d_printing_tables
-from printing3d.routes import printing3d_bp
+from remote_runtime.ssh_settings import public_settings, save_settings, test_connection
+from plugin_system.routes import plugin_bp
+from workspace.project_tree import project_tree_bp
+from chat.voice_routes import voice_bp
+from forge import init_printing_tables
+from forge.routes import printing3d_bp
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.DEBUG)
+system_log.configure()
 install_short_token_auth(app)
 install_rdc_pairing(app)
 
@@ -93,8 +102,8 @@ def _static_asset_version():
 
 STATIC_ASSET_VERSION = _static_asset_version()
 
-logger = logging.getLogger("alice_app")
-logger.info("[BOOT] hello: Alice Pro backend module loaded")
+logger = system_log.get_logger("app")
+logger.info("[BOOT] hello: Logos backend module loaded")
 
 app.register_blueprint(mcp_bp)
 app.register_blueprint(chatgpt_mcp_bp)
@@ -143,12 +152,12 @@ def _set_web_cache_headers(response):
 init_db()
 init_local_agent_tables()
 init_treasury_tables()
-init_3d_printing_tables()
+init_printing_tables()
 init_user_identity_table()
 init_github_accounts_table()
 init_conversation_ownership_table()
 init_department_tables()
-from provider_quotas import init_quota_tables
+from provider_accounts.quotas import init_quota_tables
 
 init_quota_tables()
 init_partner_relations_tables()
@@ -303,8 +312,8 @@ def save_dialog_settings(conv_id):
     return jsonify({"status": "ok"})
 
 
-from memory_manager import load_memory_config, save_memory_config, clear_global_memory
-from memory_extractor import list_global_memory_facts
+from agent_memory.manager import load_memory_config, save_memory_config, clear_global_memory
+from agent_memory.extractor import list_global_memory_facts
 
 
 @app.route("/api/memory/manage", methods=["GET"])

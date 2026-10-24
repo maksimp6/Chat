@@ -1,4 +1,4 @@
-"""Alice task/client acceptance through the standalone Memory DB API."""
+"""Logos task/client acceptance through the standalone Kristall API."""
 
 import json
 import subprocess
@@ -8,7 +8,7 @@ import pytest
 
 from agent_memory.client import close_memory_clients, get_memory_client
 from agent_shell.store import TaskStore
-from memory_engine import StoreError
+from kristall import KristallError
 
 
 @pytest.fixture(autouse=True)
@@ -27,7 +27,7 @@ def test_aliases_share_one_application_writer(tmp_path):
 
 
 def test_failed_claim_is_not_published_or_acknowledged(tmp_path, monkeypatch):
-    import memory_engine.store as engine
+    import kristall.store as engine
 
     path = tmp_path / "shell.memory"
     tasks = TaskStore(path)
@@ -37,11 +37,11 @@ def test_failed_claim_is_not_published_or_acknowledged(tmp_path, monkeypatch):
         raise OSError(28, "disk full")
 
     monkeypatch.setattr(engine.os, "fsync", fail)
-    with pytest.raises(StoreError, match="commit failed"):
+    with pytest.raises(KristallError, match="commit failed"):
         tasks.claim_next()
     assert tasks.get(task_id)["status"] == "queued"
     assert [event["stage"] for event in tasks.events(task_id)] == ["queued"]
-    with pytest.raises(StoreError, match="recovery required"):
+    with pytest.raises(KristallError, match="recovery required"):
         tasks.claim_next()
 
 
@@ -83,7 +83,7 @@ def test_legacy_database_is_not_overwritten_or_silently_retired(tmp_path):
     path = tmp_path / "legacy.sqlite3"
     original = b"SQLite format 3\x00legacy source"
     path.write_bytes(original)
-    with pytest.raises(StoreError):
+    with pytest.raises(KristallError):
         TaskStore(path)
     assert path.read_bytes() == original
 
@@ -117,7 +117,7 @@ def test_invalid_repository_state_fails_closed(tmp_path, fault):
     client.set(_STATE_KEY, state)
     client.commit()
     sequence = client.last_commit.sequence
-    with pytest.raises(StoreError, match="invalid task"):
+    with pytest.raises(KristallError, match="invalid task"):
         tasks.claim_next()
     assert client.last_commit.sequence == sequence
 

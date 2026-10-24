@@ -2,8 +2,8 @@
 
 import unittest
 from unittest.mock import patch
-from partial_output import extract_last_response_text, format_partial_output_message
-from trace_manager import ExecutionTrace
+from agent_runtime.partial_output import extract_last_response_text, format_partial_output_message
+from observability.trace_manager import ExecutionTrace
 
 
 class TestPartialOutputExtraction(unittest.TestCase):
@@ -283,7 +283,7 @@ class TestActiveChatRoute(unittest.TestCase):
 
     def test_partial_output_is_returned_and_persisted_when_pipeline_fails(self):
         from app import app
-        import mcp_routes
+        import chat.mcp_routes as mcp_routes
 
         captured = {}
         test_conversation_metadata = {"test_request": "true"}
@@ -322,7 +322,7 @@ class TestActiveChatRoute(unittest.TestCase):
             captured.update(conv_id=conv_id, role=role, content=content, trace=kwargs.get("trace"))
 
         with (
-            patch.object(mcp_routes, "AliceClient", lambda _config: fake_client),
+            patch.object(mcp_routes, "LogosClient", lambda _config: fake_client),
             patch.object(mcp_routes, "get_conv_settings", return_value={}),
             patch.object(mcp_routes, "add_message", side_effect=fake_add_message),
             patch.object(mcp_routes, "maybe_update_conversation_title", return_value=None),
@@ -334,7 +334,7 @@ class TestActiveChatRoute(unittest.TestCase):
                     json={
                         "conversation_id": "test-conv",
                         "message": "trigger failure",
-                        "model": "aliceai-llm",
+                        "model": "logos-runtime",
                         "params": {"conversation_metadata": test_conversation_metadata},
                     },
                 )

@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from typing import Any, Callable, Optional
 
-from agent_gateway import AgentGateway
-from conversation_ownership import check_access, get_owned_conversation, list_owned_conversations
-from db import get_messages
+from agent_runtime.gateway import AgentGateway
+from conversations.ownership import check_access, get_owned_conversation, list_owned_conversations
+from storage.db import get_messages
 from tool_providers.filesystem import grep_search, list_directory, read_file
 from invocation.api import get_invocation_status, get_invocation_trace
-from session_manager import get_session
-from tool_registry import registry
+from sessions.manager import get_session
+from tool_providers.registry import registry
 
-from .auth import _auth_mode
-from .protocol import MCP_PATH, SUPPORTED_PROTOCOL_VERSIONS, _server_info
-from .runtime_bridge import _authorize_invocation
+from mcp_server.auth import _auth_mode
+from mcp_server.protocol import MCP_PATH, SUPPORTED_PROTOCOL_VERSIONS, _server_info
+from mcp_server.runtime_bridge import _authorize_invocation
 
 
 def _tool(
@@ -38,7 +38,7 @@ def _tool(
 
 
 def _system_status(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
-    from config import ALL_MODELS
+    from core.config import ALL_MODELS
 
     categories = registry.get_available_categories()
     return {
@@ -208,7 +208,7 @@ def _register_project_read_tools() -> None:
         (
             "alice_list_project_files",
             "List project files",
-            "List files and directories inside the Alice Pro project.",
+            "List files and directories inside the Logos project.",
             {
                 "type": "object",
                 "properties": {"path": {"type": "string"}},
@@ -220,7 +220,7 @@ def _register_project_read_tools() -> None:
         (
             "alice_read_project_file",
             "Read project file",
-            "Read a bounded UTF-8 file from the Alice Pro project.",
+            "Read a bounded UTF-8 file from the Logos project.",
             {
                 "type": "object",
                 "properties": {
@@ -236,7 +236,7 @@ def _register_project_read_tools() -> None:
         (
             "alice_search_project",
             "Search project code",
-            "Search text inside the Alice Pro project.",
+            "Search text inside the Logos project.",
             {
                 "type": "object",
                 "properties": {
@@ -278,14 +278,14 @@ def _register_conversation_tools() -> None:
         (
             "alice_list_conversations",
             "List conversations",
-            "List conversations owned by the authenticated Alice Pro user.",
+            "List conversations owned by the authenticated Logos user.",
             {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
             _conversations,
         ),
         (
             "alice_get_conversation",
             "Get conversation",
-            "Read one conversation owned by the authenticated Alice Pro user.",
+            "Read one conversation owned by the authenticated Logos user.",
             {
                 "type": "object",
                 "properties": {"conversation_id": {"type": "string", "minLength": 1}},
@@ -359,21 +359,21 @@ def _register_bridge_tools() -> None:
         (
             "alice_get_system_status",
             "System status",
-            "Read-only Alice Pro runtime, MCP, model and local-tool status.",
+            "Read-only Logos runtime, MCP, model and local-tool status.",
             {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
             _system_status,
         ),
         (
             "alice_list_agents",
             "List agents",
-            "List AI agents currently registered in the Alice Pro Agent Gateway.",
+            "List AI agents currently registered in the Logos Agent Gateway.",
             {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
             _agents,
         ),
         (
             "alice_get_session",
             "Get session",
-            "Read-only lifecycle status for one Alice Pro runtime session.",
+            "Read-only lifecycle status for one Logos runtime session.",
             {
                 "type": "object",
                 "properties": {"session_id": {"type": "string", "minLength": 1}},
@@ -385,7 +385,7 @@ def _register_bridge_tools() -> None:
         (
             "alice_get_invocation",
             "Get invocation",
-            "Read-only status and safe metadata for one Alice Pro invocation.",
+            "Read-only status and safe metadata for one Logos invocation.",
             {
                 "type": "object",
                 "properties": {"invocation_id": {"type": "string", "minLength": 1}},
@@ -397,7 +397,7 @@ def _register_bridge_tools() -> None:
         (
             "alice_get_invocation_trace",
             "Get invocation trace",
-            "Read-only persisted ExecutionTrace for one Alice Pro invocation.",
+            "Read-only persisted ExecutionTrace for one Logos invocation.",
             {
                 "type": "object",
                 "properties": {"invocation_id": {"type": "string", "minLength": 1}},

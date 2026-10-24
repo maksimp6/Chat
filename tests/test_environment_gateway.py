@@ -5,19 +5,19 @@ import threading
 
 import pytest
 
-import db
+import storage.db as db
 from flask import Flask, Response, jsonify
 
-from environment_manager import (
+from remote_runtime.environments import (
     create_environment,
     delete_environment,
     init_environment_tables,
     start_environment,
     stop_environment,
 )
-import environment_routes
-import environment_manager
-from environment_routes import environment_bp, environment_gateway_bp
+import remote_runtime.environment_routes as environment_routes
+import remote_runtime.environments as environment_manager
+from remote_runtime.environment_routes import environment_bp, environment_gateway_bp
 from runtime import (
     current_runtime_base_path,
     current_runtime_data_root,
@@ -157,8 +157,8 @@ def test_environment_gateway_rejects_stopped_runtime_without_transport(tmp_path,
 
 def test_environment_gateway_has_no_localhost_proxy_transport():
     root = Path(__file__).resolve().parents[1]
-    routes = (root / "environment_routes.py").read_text(encoding="utf-8")
-    manager = (root / "environment_manager.py").read_text(encoding="utf-8")
+    routes = (root / "remote_runtime" / "environment_routes.py").read_text(encoding="utf-8")
+    manager = (root / "remote_runtime" / "environments.py").read_text(encoding="utf-8")
     assert "import requests" not in routes
     assert "requests.request(" not in routes
     assert "http://127.0.0.1:" not in routes
