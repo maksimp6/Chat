@@ -286,6 +286,10 @@ def local_agent_result(agent_id: str, job_id: str):
                 return jsonify({"error": "job_not_found"}), 404
             if row["status"] in {"completed", "failed"}:
                 return jsonify({"status": "ok", "idempotent": True})
+            # Only the job this agent claimed through poll may be completed. A queued job was never
+            # run, so a result for it would be invented.
+            if row["status"] != "running":
+                return jsonify({"error": "job_not_running"}), 409
             tx.set(
                 key,
                 {
