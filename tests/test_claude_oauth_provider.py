@@ -453,3 +453,19 @@ def test_model_substitution_cannot_execute_tools(offline, tool_registry):
             "test", MODEL, params={"active_tool_categories": ["fixture"]}
         )
     assert not tool_registry and len(offline.sent) == 1
+
+
+def test_ci_workflow_global_environment_uses_available_contexts():
+    """GitHub rejected the inherited runner.temp expression before any jobs ran."""
+    import re
+    from pathlib import Path
+
+    import yaml
+
+    workflow = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml").read_text()
+    )
+    allowed = {"github", "inputs", "vars", "secrets"}
+    for value in workflow.get("env", {}).values():
+        for expression in re.findall(r"\$\{\{(.*?)\}\}", str(value)):
+            assert set(re.findall(r"\b([A-Za-z_]\w*)\.", expression)) <= allowed
