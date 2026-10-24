@@ -1,9 +1,9 @@
-"""Tests for Alice Platform health checks (derived from config)."""
+"""Tests for Keel Platform health checks (derived from config)."""
 
 from urllib.parse import urlsplit
 
 import pytest
-from alice_platform.health import (
+from keel.health import (
     generate_health_plan,
     HealthCheck,
 )

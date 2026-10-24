@@ -1,7 +1,7 @@
 # Architecture integration coordination
 
 This document is the canonical architecture coordination guide for the active
-Alice Pro workstreams. Issue
+Logos workstreams. Issue
 [#350](https://github.com/maksimp6/Chat/issues/350) is authoritative for runtime
 and deployment architecture; issue
 [#343](https://github.com/maksimp6/Chat/issues/343) remains the umbrella
@@ -86,7 +86,7 @@ Before a pull request is marked ready:
    and two-runtime isolation where applicable.
 4. Run focused tests, the full backend suite, runtime/static validators, the
    formatter check, and required GitHub CI without lowering coverage gates.
-5. Validate both SQLite and PostgreSQL for schema changes and run the prescribed
+5. Validate the native Kristall journal for schema changes (SQLite and PostgreSQL are retired) and run the prescribed
    Android checks for Android changes.
 6. Record the exact commit, migration effects, and any overlap decision in the
    staging ledger. Do not merge to `master` without required review.

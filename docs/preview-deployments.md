@@ -1,12 +1,12 @@
 # Host-managed preview validation
 
-Preview validation uses the running Alice Pro host. It does **not** build or start a
+Preview validation uses the running Logos host. It does **not** build or start a
 per-preview container, Flask subprocess, localhost proxy, or runtime port.
 
 The GitHub workflow checks out and tests the exact requested commit, then follows
 this lifecycle:
 
-1. authenticate to the Alice Pro host;
+1. authenticate to the Logos host;
 2. create an environment for the branch and exact commit SHA;
 3. start the host-managed runtime through `EnvironmentManager`;
 4. exercise `/environments/<environment_id>/healthz` through the environment gateway;
@@ -40,4 +40,4 @@ the gateway can claim revision-specific behavior.
 Until those dependencies land, the workflow documents and tests the host API
 contract but remains gated by the `ALICE_HOST_PREVIEW_ENABLED` repository
 variable. Set it to `true` only after both dependencies are deployed. Threads
-are execution units for trusted Alice Pro code, not a sandbox for hostile Python.
+are execution units for trusted Logos code, not a sandbox for hostile Python.

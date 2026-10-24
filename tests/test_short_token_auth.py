@@ -2,7 +2,7 @@ import pytest
 
 from flask import Flask
 
-import short_token_auth
+import identity.short_token_auth as short_token_auth
 from secret_store.core import SecretRef
 from secret_store.fake import FakeSecretResolver
 

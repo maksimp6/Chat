@@ -1,8 +1,8 @@
-# Alice Pro Reasoning and Planning
+# Logos Reasoning and Planning
 
 ## Purpose
 
-@Рассуждение is the planning and analysis contour for Alice Pro. It produces explicit structured planning artifacts consumed by an execution controller.
+@Рассуждение is the planning and analysis contour for Logos. It produces explicit structured planning artifacts consumed by an execution controller.
 
 It is not an unrestricted executor and it does not persist a model's private chain-of-thought.
 
