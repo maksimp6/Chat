@@ -7,9 +7,11 @@ native Kristall. No SQL migration or compatibility layer is involved.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import re
 import secrets
+from contextlib import contextmanager
 from threading import RLock
 import time
 import uuid
@@ -31,6 +33,34 @@ _SENSITIVE_KEY_RE = re.compile(
     re.IGNORECASE,
 )
 _IDENTITY_LOCK = RLock()
+
+
+class InstallationClaimed(ValueError):
+    """The installation already has an account, and the caller did not present that account's secret."""
+
+
+@contextmanager
+def _locked():
+    """Serialize identity changes across threads and, where fcntl exists, across processes."""
+    with _IDENTITY_LOCK:
+        try:
+            import fcntl
+        except ImportError:
+            yield
+            return
+        with open(str(memory_file_path()) + ".identity.lock", "a+") as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+
+
+def _proves_secret(record: Mapping[str, Any], presented_token: Optional[str]) -> bool:
+    stored = record.get("auth_token_hash")
+    if not presented_token or not stored:
+        return False
+    return hmac.compare_digest(_hash_auth_token(presented_token), str(stored))
 
 
 def _now() -> int:
@@ -74,12 +104,12 @@ def _state() -> tuple[UserIdentityStore, IdentityState]:
 
 
 def init_user_identity_table() -> None:
-    with _IDENTITY_LOCK:
+    with _locked():
         _state()
 
 
 def init_github_accounts_table() -> None:
-    with _IDENTITY_LOCK:
+    with _locked():
         _state()
 
 
@@ -112,6 +142,8 @@ def _find_user_by_token_hash(
 def register_anonymous_user(
     installation_id: str,
     metadata: Optional[Mapping[str, Any]] = None,
+    *,
+    presented_token: Optional[str] = None,
 ) -> dict[str, Any]:
     installation_id = str(installation_id or "").strip()
     if not _INSTALLATION_RE.fullmatch(installation_id):
@@ -122,7 +154,7 @@ def register_anonymous_user(
     auth_token = _new_auth_token()
     auth_token_hash = _hash_auth_token(auth_token)
 
-    with _IDENTITY_LOCK:
+    with _locked():
         store, state = _state()
         existing = _find_user_by_installation(state, installation_id)
         if existing is None:
@@ -148,6 +180,10 @@ def register_anonymous_user(
         user_id, record = existing
         if record["status"] != "anonymous":
             raise ValueError("installation is linked to a signed-in account")
+        if not _proves_secret(record, presented_token):
+            # Re-registering used to issue a new secret and overwrite the old one, so anyone who knew
+            # the installation id could take over that account.
+            raise InstallationClaimed("installation is already registered")
 
         record["metadata_json"] = json.dumps(sanitized, ensure_ascii=False)
         record["auth_token_hash"] = auth_token_hash
@@ -173,14 +209,14 @@ def lookup_user_token(token: str) -> Optional[str]:
     if not token:
         return None
 
-    with _IDENTITY_LOCK:
+    with _locked():
         _store_object, state = _state()
         found = _find_user_by_token_hash(state, _hash_auth_token(token))
         return found[0] if found is not None else None
 
 
 def get_anonymous_user(user_id: str) -> Optional[dict[str, Any]]:
-    with _IDENTITY_LOCK:
+    with _locked():
         _store_object, state = _state()
         record = state["users"].get(str(user_id))
         if record is None:
@@ -226,7 +262,7 @@ def _link_github_account(
 ) -> tuple[str, bool]:
     now = _now()
 
-    with _IDENTITY_LOCK:
+    with _locked():
         store, state = _state()
         existing_link = state["github_accounts"].get(github_id)
         new_user = False
@@ -306,7 +342,7 @@ def sign_in_with_github(
 
 
 def get_github_login(user_id: str) -> Optional[str]:
-    with _IDENTITY_LOCK:
+    with _locked():
         _store_object, state = _state()
         links = [
             account

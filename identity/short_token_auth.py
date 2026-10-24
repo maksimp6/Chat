@@ -108,10 +108,20 @@ def _has_valid_session(token: str, value: Optional[str]) -> bool:
 
 
 def _request_path() -> str:
-    """Use the original URI when a trusted reverse proxy supplied it."""
-    forwarded_uri = request.headers.get("X-Forwarded-Uri", "")
-    if forwarded_uri.startswith("/"):
-        return urlsplit(forwarded_uri).path or "/"
+    """Use the forwarded URI only when the operator says the reverse proxy sets it.
+
+    Otherwise a client could send any path in the header and have it judged instead of the real one.
+    """
+    trusted = os.environ.get("LOGOS_TRUST_FORWARDED_URI", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if trusted:
+        forwarded_uri = request.headers.get("X-Forwarded-Uri", "")
+        if forwarded_uri.startswith("/"):
+            return urlsplit(forwarded_uri).path or "/"
     return request.path
 
 

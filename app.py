@@ -39,7 +39,11 @@ from organization.partner_relations import (
 )
 from economy.treasury import init_treasury_tables, get_account, demo_top_up
 from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
-from identity.user_identity import init_user_identity_table, register_anonymous_user
+from identity.user_identity import (
+    InstallationClaimed,
+    init_user_identity_table,
+    register_anonymous_user,
+)
 from organization.departments import departments_bp, init_department_tables
 from organization.government import (
     government_bp,
@@ -248,7 +252,12 @@ def bootstrap_anonymous_user():
             return jsonify({"error": "metadata must be an object"}), 400
 
     try:
-        identity = register_anonymous_user(data.get("installation_id"), metadata)
+        identity = register_anonymous_user(
+            data.get("installation_id"),
+            metadata,
+            presented_token=request.headers.get("X-Logos-User-Token")
+            or request.cookies.get("logos_user_token"),
+        )
         response = jsonify(identity)
         response.set_cookie(
             "logos_user_token",
@@ -259,6 +268,8 @@ def bootstrap_anonymous_user():
             path="/",
         )
         return response
+    except InstallationClaimed as exc:
+        return jsonify({"error": str(exc)}), 409
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 

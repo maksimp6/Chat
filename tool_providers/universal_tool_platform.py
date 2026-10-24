@@ -311,7 +311,8 @@ class UniversalToolExecutor:
                 trace_id=call.get("trace_id"),
                 invocation_id=call.get("invocation_id"),
                 user_id=call.get("user_id"),
-                approved=bool(call.get("approved")),
+                # A mapping never grants approval; the host sets it on UniversalToolCall.
+                approved=False,
                 metadata=dict(call.get("metadata") or {}),
             )
 
@@ -358,9 +359,10 @@ class UniversalToolExecutor:
             ).to_mapping()
 
         try:
-            if authorize is not None and authorize(definition, call) is False:
+            # Only an explicit True lets a call through: a hook that returns nothing must not allow it.
+            if authorize is not None and authorize(definition, call) is not True:
                 raise PermissionError("Tool authorization denied")
-            if policy is not None and policy(definition, call) is False:
+            if policy is not None and policy(definition, call) is not True:
                 raise PermissionError("Tool policy denied")
         except Exception as exc:
             return UniversalToolResult(
@@ -547,7 +549,7 @@ class UniversalToolExecutor:
                 }
             else:
                 data = raw_result.get("data")
-            error = raw_result.get("error")
+            error = None if success else raw_result.get("error")
             metadata = dict(raw_result.get("metadata") or {})
         elif isinstance(raw_result, Mapping) and raw_result.get("error"):
             success = False

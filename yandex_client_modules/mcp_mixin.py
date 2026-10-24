@@ -16,15 +16,26 @@ from tool_providers.universal_tool_platform import (
 )
 
 
+def _max_results(value: Any) -> int:
+    """File-search result count from settings, clamped to the provider's range."""
+    try:
+        return max(1, min(int(20 if value is None else value), 50))
+    except (TypeError, ValueError):
+        return 20
+
+
 class YandexMcpMixin:
     def _execute_single_tool(self, tc, all_servers, trace=None, *, execution_policy=None):
         import time as _t
 
-        name = tc.get("name") or tc.get("function", {}).get("name")
+        function = tc.get("function")
+        if not isinstance(function, dict):
+            function = {}
+        name = tc.get("name") or function.get("name")
         if name and "<|" in name:
             name = name.split("<|")[0].strip()
 
-        args = tc.get("arguments") or tc.get("function", {}).get("arguments", {})
+        args = tc.get("arguments") or function.get("arguments", {})
         if isinstance(args, str):
             try:
                 args = json.loads(args)
@@ -158,6 +169,8 @@ class YandexMcpMixin:
 
         if active_cats is None:
             active_cats = params.get("active_tool_categories")
+        if not isinstance(active_cats, list):
+            active_cats = None
         if active_cats is None:
             # Same default as the tools panel: every registered category. The
             # registry offers only tools this transport and host can execute.
@@ -166,6 +179,8 @@ class YandexMcpMixin:
         hosted_tools = []
         conv_settings = get_conv_settings(conversation_id) or {} if conversation_id else {}
         tools_config = (conv_settings or {}).get("tools_config") or params.get("tools_config") or {}
+        if not isinstance(tools_config, dict):
+            tools_config = {}
 
         raw_web_cfg = tools_config.get("web_search")
         web_cfg = raw_web_cfg if isinstance(raw_web_cfg, dict) else {}
@@ -220,7 +235,7 @@ class YandexMcpMixin:
                     {
                         "type": "file_search",
                         "vector_store_ids": vector_store_ids,
-                        "max_num_results": int(file_cfg.get("max_results", 20)),
+                        "max_num_results": _max_results(file_cfg.get("max_results")),
                     }
                 )
 

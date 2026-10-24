@@ -73,9 +73,24 @@ def _record(
     return True
 
 
+# Largest demo credit in one call. Without a bound a single request could mint any balance.
+DEMO_TOP_UP_LIMIT = 10_000.0
+
+
 def demo_top_up(owner_id: str, amount: Any, description: str = "Demo top-up") -> dict[str, Any]:
-    _record(owner_id, amount, description, "credit")
+    try:
+        value = float(amount)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("amount must be a number") from exc
+    if value > DEMO_TOP_UP_LIMIT:
+        raise ValueError(f"amount exceeds the demo top-up limit of {DEMO_TOP_UP_LIMIT:g}")
+    _record(owner_id, value, description, "credit")
     return get_account(owner_id)
+
+
+def post_expense(owner_id: str, amount: Any, description: str, reference: str) -> bool:
+    """Debit once per reference. Returns whether this call posted it, without reading the ledger."""
+    return _record(owner_id, amount, description, "debit", reference)
 
 
 def record_expense(
