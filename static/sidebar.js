@@ -37,7 +37,7 @@ function initSidebar() {
       window.isCreatingNewChat = true;
       if (typeof renderModelModal === "function") renderModelModal();
       var modal = document.getElementById("model-modal");
-      if (modal) modal.classList.add("visible");
+      if (modal) window.LogosCoreAPI.ui.modal.open(modal);
     });
   if (typeof renderSidebar === "function") renderSidebar();
   if (window.__logosSidebarHistoryBound !== true) {

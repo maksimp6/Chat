@@ -117,6 +117,11 @@ class ElementShim extends EventTargetShim {
     return null;
   }
 
+  get parentElement() {
+    const parent = this.parentNode;
+    return parent && parent.tagName !== "#DOCUMENT" ? parent : null;
+  }
+
   get id() {
     return this.attributes.id || "";
   }

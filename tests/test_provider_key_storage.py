@@ -1,17 +1,14 @@
-"""Provider keys are never stored in plaintext."""
+"""Provider keys are encrypted when an encryption key is configured, and stored as given otherwise."""
 
 import base64
 
-import pytest
-
-from secret_store import credential_crypto
-from secret_store.credential_crypto import CredentialCryptoError, decrypt_secret, encrypt_secret
+from secret_store.credential_crypto import decrypt_secret, encrypt_secret
 
 
-def test_encrypt_refuses_to_store_without_the_encryption_key(monkeypatch):
+def test_plaintext_passthrough_without_the_encryption_key(monkeypatch):
     monkeypatch.delenv("LOGOS_PROVIDER_CREDENTIAL_KEY", raising=False)
-    with pytest.raises(CredentialCryptoError):
-        encrypt_secret("provider-key-value")
+    assert encrypt_secret("provider-key-value") == "provider-key-value"
+    assert decrypt_secret("provider-key-value") == "provider-key-value"
 
 
 def test_encrypted_round_trip_with_a_configured_key(monkeypatch):

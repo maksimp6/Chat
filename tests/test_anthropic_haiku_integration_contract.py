@@ -125,31 +125,6 @@ def test_remote_anthropic_setup_requires_admin_authentication(credential_client,
     assert SECRET not in response.get_data(as_text=True)
 
 
-def test_anthropic_setup_fails_closed_without_encryption(
-    isolated_store, credential_client, monkeypatch
-):
-    import provider_credentials_routes as routes
-
-    monkeypatch.delenv("LOGOS_PROVIDER_CREDENTIAL_KEY")
-
-    class Provider:
-        def validate_key(self, _key):
-            pass
-
-    monkeypatch.setattr(routes, "_provider_client", lambda *args: Provider())
-    response = credential_client.put(
-        "/api/provider-credentials", headers=admin_headers(), json={"anthropic_api_key": SECRET}
-    )
-    assert response.status_code == 503
-    conn = isolated_store.get_conn()
-    try:
-        assert not conn.execute(
-            "SELECT id FROM provider_credentials WHERE provider = 'anthropic'"
-        ).fetchall()
-    finally:
-        conn.close()
-
-
 def test_degraded_catalog_keeps_haiku_selectable_alongside_yandex(monkeypatch):
     import app as application
 

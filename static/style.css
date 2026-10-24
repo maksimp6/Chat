@@ -1019,6 +1019,13 @@ body {
   font-size: 13px;
 }
 
+.logos-pro-app .memory-status {
+  min-height: 18px;
+  margin: 8px 0;
+  color: #e0a0a0;
+  font-size: 13px;
+}
+
 /* Progressive enhancement: state previously carried by inline styles. */
 .logos-pro-app .conv-empty {
   padding: 20px;

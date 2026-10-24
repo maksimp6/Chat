@@ -7,6 +7,7 @@
     var label = document.createElement("label");
     label.textContent = title;
     label.className = "provider-field-label";
+    label.htmlFor = id;
     var input = document.createElement("input");
     input.id = id;
     input.type = type || "password";
@@ -20,7 +21,6 @@
       wrap.appendChild(small);
     }
     var error = document.createElement("div");
-    error.className = "provider-field-error";
     error.className = "provider-field-error";
     wrap.appendChild(label);
     wrap.appendChild(input);
@@ -224,7 +224,13 @@
 
   window.LogosCoreAPI.ui.actions.register("provider-credentials.close", function (payload) {
     var modal = payload.element.closest(".modal");
-    if (modal) window.LogosCoreAPI.ui.modal.close(modal);
+    if (!modal) return;
+    // An unsent key must not survive the dialog that was holding it.
+    clearFieldErrors();
+    modal.querySelectorAll("input").forEach(function (input) {
+      input.value = "";
+    });
+    window.LogosCoreAPI.ui.modal.close(modal);
   });
 
   window.openProviderCredentialsModal = async function () {

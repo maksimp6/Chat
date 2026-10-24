@@ -11,7 +11,7 @@ const HTML =
   '<button id="close-sidebar-btn" type="button"></button>' +
   '<button id="new-chat-btn" type="button"></button>' +
   '<div id="conv-list"></div></div><div id="overlay"></div>' +
-  '<div id="chatbox"></div><div id="model-modal"></div>';
+  '<div id="chatbox"></div><div id="model-modal" class="modal" hidden aria-hidden="true"></div>';
 
 function reply(status, body) {
   return Promise.resolve({ ok: status >= 200 && status < 300, status, json: async () => body });
@@ -25,7 +25,6 @@ function boot({ conversations, currentConvId, responses = [], prompts = [] }) {
   const extra = {
     conversations,
     currentConvId,
-    LogosCoreAPI: { ui: { actions: { register: () => {} } } },
     LogosDispatcher: {
       request: (url, options = {}) => {
         requests.push({ url, method: options.method || "GET", body: options.body ? JSON.parse(options.body) : null });
@@ -38,7 +37,7 @@ function boot({ conversations, currentConvId, responses = [], prompts = [] }) {
     prompt: () => prompts.shift() || null,
     alert: () => {},
   };
-  const { document, window, context } = shim.load(["static/sidebar.js"], extra);
+  const { document, window, context } = shim.load(["static/core_api.js", "static/sidebar.js"], extra);
   return { document, window, context, requests, loaded };
 }
 

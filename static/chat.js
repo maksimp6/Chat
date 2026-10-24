@@ -345,7 +345,7 @@ function addMessage(
     usageBadge.className = "msg-meta-details";
     const usageSummary = document.createElement("summary");
     usageSummary.className = "msg-meta-summary";
-    usageSummary.textContent = `📊 Токены: ${usage.total_tokens || 0} (вход: ${usage.input_tokens}, выход: ${usage.output_tokens})`;
+    usageSummary.textContent = `📊 Токены: ${usage.total_tokens || 0} (вход: ${usage.input_tokens || 0}, выход: ${usage.output_tokens || 0})`;
     const usageDetails = document.createElement("div");
     usageDetails.className = "msg-meta-detail-list";
     [
@@ -499,8 +499,13 @@ function loadHistory(convId) {
   if (!chatbox) return;
   chatbox.replaceChildren();
   window.LogosDispatcher.request(`/api/conversations/${convId}/messages`)
-    .then((r) => r.json())
+    .then((r) => {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
     .then((data) => {
+      // The user may have switched conversations while this request was in flight.
+      if (convId !== currentConvId) return;
       try {
         let rendered = 0;
         (data.messages || []).forEach((msg) => {
@@ -533,6 +538,7 @@ function loadHistory(convId) {
       }
     })
     .catch((err) => {
+      if (convId !== currentConvId) return;
       console.error("[CHAT] Fetch history error:", err);
       const error = document.createElement("div");
       error.className = "empty-state error-state";
@@ -552,7 +558,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!currentConvId) {
       if (typeof renderModelModal === "function") renderModelModal();
       const modal = document.getElementById("model-modal");
-      if (modal) modal.classList.add("visible");
+      if (modal) window.LogosCoreAPI.ui.modal.open(modal);
       return;
     }
 

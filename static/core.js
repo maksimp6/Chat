@@ -71,7 +71,9 @@ window.changeModel = function (newModel, skipPatch) {
   newModel = LEGACY_MODEL_KEYS[newModel] || newModel;
   var textModels = modelsData.text || {};
   var voiceModels = modelsData.voice || {};
-  if (!textModels[newModel] && !voiceModels[newModel]) {
+  var catalogLoaded = Object.keys(textModels).length + Object.keys(voiceModels).length > 0;
+  // Without a catalog (offline or degraded) keep the requested key; the server validates it.
+  if (catalogLoaded && !textModels[newModel] && !voiceModels[newModel]) {
     console.warn("[CORE] Unknown model:", newModel, "-> fallback to logos-runtime");
     newModel = "logos-runtime";
   }

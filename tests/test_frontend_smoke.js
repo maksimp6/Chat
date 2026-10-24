@@ -128,7 +128,7 @@ function click(element) {
     assert.equal(document.getElementById("memoryModal").hidden, false);
     assert.equal(document.getElementById("memoryModal").classList.contains("visible"), true);
     assert.equal(document.getElementById("memEnabled").checked, true);
-    assert.equal(document.getElementById("memLimit").value, 7);
+    assert.equal(document.getElementById("memLimit").value, "7");
     assert.equal(document.getElementById("memCount").textContent, "1");
     assert.match(document.getElementById("memoryFactsList").textContent, /\[work\] Test fact/);
     assert.deepEqual(
