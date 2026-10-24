@@ -619,7 +619,11 @@ class CloudBudgetLimits:
         raw_limit = str(source.get("CLOUDRU_MONTHLY_BUDGET", "")).strip()
         raw_ratio = str(source.get("CLOUDRU_BUDGET_WARN_RATIO", "")).strip() or "0.80"
         currency = str(source.get("CLOUDRU_BILLING_CURRENCY", "")).strip() or "RUB"
-        return cls(_money(raw_limit) if raw_limit else None, Decimal(raw_ratio), currency)
+        try:
+            warn_ratio = Decimal(raw_ratio)
+        except DecimalInvalidOperation as exc:
+            raise ValueError("CLOUDRU_BUDGET_WARN_RATIO must be a number") from exc
+        return cls(_money(raw_limit) if raw_limit else None, warn_ratio, currency)
 
 
 def evaluate_cloud_spend(spent: Any, limits: CloudBudgetLimits) -> Dict[str, Any]:
