@@ -45,6 +45,17 @@ def write_op(func):
 PROJECT_DIR = os.path.realpath(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+def _allowed_roots(cfg: dict) -> list[str]:
+    # The same roots that relative repository names are searched under.
+    base_dir = cfg.get("repos_base_dir") or "/sdcard/repo"
+    return [os.path.realpath(p) for p in (base_dir, "/sdcard/repo", "/sdcard", os.getcwd())]
+
+
+def _inside(path: str, roots: list[str]) -> bool:
+    real = os.path.realpath(path)
+    return any(real == root or real.startswith(root.rstrip(os.sep) + os.sep) for root in roots)
+
+
 def _resolve_repo_path(repo_name: str = None, cfg: dict = None) -> str:
     cfg = cfg or {}
     base_dir = cfg.get("repos_base_dir") or "/sdcard/repo"
@@ -52,8 +63,11 @@ def _resolve_repo_path(repo_name: str = None, cfg: dict = None) -> str:
     if not target:
         return ""
 
-    if os.path.isabs(target) and os.path.isdir(target):
-        return target
+    # An absolute path is used only inside the repository roots; anywhere else is refused.
+    if os.path.isabs(target):
+        if os.path.isdir(target) and _inside(target, _allowed_roots(cfg)):
+            return target
+        return ""
 
     candidate = os.path.join(base_dir, target)
     if os.path.isdir(candidate):
