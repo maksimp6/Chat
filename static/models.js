@@ -67,7 +67,7 @@ function renderModelModal() {
       (key === currentModel ? " active" : "") +
       (unavailable ? " model-option-unavailable" : "");
     var priceText = "";
-    if (m.input && m.output) {
+    if (m.input != null && m.output != null) {
       priceText =
         m.currency === "USD" || m.price_unit === "per_million_tokens"
           ? m.input + " / " + m.output + " USD/1M"
@@ -99,11 +99,13 @@ function renderModelModal() {
     }
     div.addEventListener("click", function () {
       if (unavailable) return;
+      var creatingNewChat = window.isCreatingNewChat === true;
       if (typeof window.changeModel === "function") {
-        window.changeModel(key);
+        // A new chat must not rewrite the model of the conversation that is still current.
+        window.changeModel(key, creatingNewChat);
       }
       if (modelModal) window.LogosCoreAPI.ui.modal.close(modelModal);
-      if (window.isCreatingNewChat) {
+      if (creatingNewChat) {
         createConversation(key);
         window.isCreatingNewChat = false;
       }
@@ -142,7 +144,7 @@ function createConversation(modelKey) {
 function updateModelButton() {
   var btn = document.getElementById("model-btn");
   if (!btn) return;
-  var allModels = Object.assign({}, modelsData.text, modelsData.voice);
+  var allModels = Object.assign({}, modelsData.text || {}, modelsData.voice || {});
   var m = allModels[currentModel];
   if (m) {
     btn.textContent = "🤖";
