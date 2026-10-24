@@ -29,6 +29,9 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  OUT: ${{ runner.temp }}/ci-out/cloudru-openai-tunnel
+
 jobs:
   tunnel:
     name: OpenAI tunnel ${{ inputs.action }}
@@ -109,14 +112,14 @@ jobs:
           python scripts/cloudru_deploy.py deploy --tag "$(git rev-parse HEAD)" \
             --env ALICE_REQUIRE_SHORT_TOKEN --env ALICE_SHORT_TOKEN \
             --env OPENAI_TUNNEL_ID --env OPENAI_TUNNEL_API_KEY \
-            --env ALICE_MCP_BEARER_TOKEN --env ALICE_MCP_USER_ID | tee deploy.json
+            --env ALICE_MCP_BEARER_TOKEN --env ALICE_MCP_USER_ID | tee "$OUT/deploy.json"
           {
             echo '### Cloud.ru OpenAI tunnel deploy'
             echo '```json'
-            cat deploy.json
+            cat "$OUT/deploy.json"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          rm -f deploy.json
+          rm -f "$OUT/deploy.json"
       - name: Status
         if: inputs.action == 'status'
         env:
