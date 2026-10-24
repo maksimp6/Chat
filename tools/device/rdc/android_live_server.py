@@ -65,8 +65,9 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def authorized(self):
-        supplied = self.headers.get("Authorization", "")
-        if not secrets.compare_digest(supplied, "Bearer " + TOKEN):
+        # http.server decodes header bytes as ISO-8859-1. Compare bytes: compare_digest rejects non-ASCII str.
+        supplied = self.headers.get("Authorization", "").encode("iso-8859-1")
+        if not secrets.compare_digest(supplied, ("Bearer " + TOKEN).encode("utf-8")):
             self.send(401, {"error": "unauthorized"})
             return False
         return True
