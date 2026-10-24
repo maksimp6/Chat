@@ -20,8 +20,10 @@ from browser.capabilities import (
 
 # Worker error text can echo page content or request headers, so credentials are redacted and
 # the text is bounded before it reaches a trace, a log or the model.
+# The value runs to the end of the line: "Authorization: Bearer <key>" and a cookie list have more
+# than one token, and stopping at the first space would leave the credential in the text.
 _CREDENTIAL_ASSIGNMENT = re.compile(
-    r"(?i)\b(authorization|cookie|token|password|secret|api[_-]?key)\s*[:=]\s*\S+"
+    r"(?i)\b(authorization|cookie|token|password|secret|api[_-]?key)\s*[:=]\s*[^\r\n]+"
 )
 _MAX_ERROR_CHARS = 500
 
