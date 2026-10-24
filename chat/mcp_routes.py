@@ -99,18 +99,40 @@ class LogosClient(YandexResponsesClient):
         )
 
         calls = extract_function_calls(response)
+        # "pause" (default) hands an approval-gated batch to an interactive approver.
+        # "deny" serves unattended runs: the executor refuses each gated call, the
+        # rest of the batch runs and the model is told what was not executed.
+        deny_unapproved = (params or {}).get("approval_mode") == "deny"
         if calls:
-            approval_required = any(_tool_call_needs_approval(call) for call in calls)
+            approval_required = not deny_unapproved and any(
+                _tool_call_needs_approval(call) for call in calls
+            )
 
             if not approval_required:
                 tool_servers = mcp_storage.list_servers()
                 base_params = dict(params or {})
+                refused = []
 
                 def execute_tool(call):
                     result = self._execute_single_tool(call, tool_servers, trace=trace)
                     if result.get("error"):
-                        return {"error": result["error"], "tool": result.get("name")}
+                        output = {"error": result["error"], "tool": result.get("name")}
+                        if deny_unapproved and _tool_call_needs_approval(call):
+                            refused.append(result.get("name"))
+                            output.update(
+                                executed=False,
+                                reason="Owner approval is unavailable in this run; "
+                                "the call was not executed.",
+                            )
+                        return output
                     return result.get("result")
+
+                def should_pause(batch: list[dict[str, Any]]) -> bool:
+                    gated = [_tool_call_needs_approval(call) for call in batch]
+                    if deny_unapproved:
+                        # After a refusal, a batch of only gated calls makes no progress.
+                        return bool(refused) and all(gated)
+                    return any(gated)
 
                 def continue_request(input_items, previous_response):
                     continuation_params = dict(base_params)
@@ -129,9 +151,7 @@ class LogosClient(YandexResponsesClient):
                     execute_tool,
                     continue_request,
                     max_rounds=base_params.get("max_rounds", 16),
-                    should_pause=lambda batch: any(
-                        _tool_call_needs_approval(call) for call in batch
-                    ),
+                    should_pause=should_pause,
                 )
 
         if trace is not None:

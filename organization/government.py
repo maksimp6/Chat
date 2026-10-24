@@ -295,8 +295,16 @@ def _schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
 _CASE = {"case_id": {"type": "string", "minLength": 1, "maxLength": 128}}
 
 
+def _tool_approved(cfg: Optional[dict[str, Any]]) -> bool:
+    call = ((cfg or {}).get("_universal_context") or {}).get("call")
+    return bool(getattr(call, "approved", False))
+
+
 def _tool_create(args, cfg=None):
-    return create_case(args.get("case_type", "IP_REGISTRATION"), args.get("user_id"))
+    # Like the HTTP route: a trusted owner wins over a model-supplied user_id.
+    return create_case(
+        args.get("case_type") or "IP_REGISTRATION", _current_owner() or args.get("user_id")
+    )
 
 
 def _tool_requirements(args, cfg=None):
@@ -340,6 +348,10 @@ def _tool_archive(args, cfg=None):
 
 
 def _tool_submit(args, cfg=None):
+    # gov.submit always crosses the tool approval boundary: the user's approval of
+    # this exact call is the explicit confirmation that submit_case requires.
+    if _tool_approved(cfg) and not _require_case(args["case_id"]).get("user_approved"):
+        approve_case(args["case_id"])
     return submit_case(args["case_id"])
 
 

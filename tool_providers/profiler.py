@@ -12,11 +12,15 @@ from storage.db import memory_file_path
 
 logger = logging.getLogger("logos_profiler")
 
+SORT_KEYS = ("cumulative", "time", "calls")
+
 
 def profile_application_performance(arguments: dict, cfg: dict = None) -> dict:
     """Запускает экспресс-профайлинг ключевых компонентов системы."""
-    sort_by = arguments.get("sort", "cumulative")
-    lines_count = int(arguments.get("limit", 15))
+    sort_by = arguments.get("sort") or "cumulative"
+    if sort_by not in SORT_KEYS:
+        raise ValueError(f"sort must be one of {', '.join(SORT_KEYS)}")
+    lines_count = int(arguments.get("limit") or 15)
 
     pr = cProfile.Profile()
     pr.enable()
@@ -65,6 +69,9 @@ def inspect_app_internals(arguments: dict, cfg: dict = None) -> dict:
     }
 
 
+# Read-only diagnostics of this process: no approval boundary is crossed.
+_READ_ONLY = {"read_only": True, "requires_approval": False, "risk_level": "low"}
+
 TOOL_REGISTRY = {
     "profile_application_performance": {
         "func": profile_application_performance,
@@ -74,17 +81,25 @@ TOOL_REGISTRY = {
             "properties": {
                 "sort": {
                     "type": "string",
+                    "enum": list(SORT_KEYS),
                     "description": "Критерий сортировки (cumulative, time, calls)",
                 },
-                "limit": {"type": "integer", "description": "Количество строк отчета"},
+                "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 200,
+                    "description": "Количество строк отчета",
+                },
             },
             "required": [],
         },
+        **_READ_ONLY,
     },
     "inspect_app_internals": {
         "func": inspect_app_internals,
         "description": "Получить полную карту внутренних компонентов, модулей и состояния базы данных Logos.",
         "parameters": {"type": "object", "properties": {}, "required": []},
+        **_READ_ONLY,
     },
 }
 
