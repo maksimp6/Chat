@@ -1,6 +1,7 @@
 import json
 import time
 import requests
+from api.yandex_transport import yandex_request, validate_yandex_request
 
 from observability.trace_manager import ExecutionTrace
 from yandex_client_modules.errors import YandexClientError
@@ -9,8 +10,9 @@ from provider_accounts.quotas import ProviderQuotaExceeded, reserve_request
 
 class YandexPollingMixin:
     def _wait(self, task_id, timeout=180, execution_trace=None, trace_step=None):
-        start = time.time()
         url = self.responses_url + "/" + task_id
+        validate_yandex_request("GET", url, base_url=self.responses_url.removesuffix("/responses"))
+        start = time.time()
         delay = 0.5
         last_snapshot = None
         while time.time() - start < timeout:
@@ -50,7 +52,15 @@ class YandexPollingMixin:
                             },
                         )
                 self._log_request("GET", url)
-                resp = self._log_response(self.session.get(url, timeout=15))
+                resp = self._log_response(
+                    yandex_request(
+                        self.session.get,
+                        "GET",
+                        url,
+                        base_url=self.responses_url.removesuffix("/responses"),
+                        timeout=15,
+                    )
+                )
                 if resp.status_code == 404:
                     if execution_trace and isinstance(execution_trace, ExecutionTrace):
                         execution_trace.add_event(

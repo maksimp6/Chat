@@ -19,7 +19,8 @@ class FakeSession:
         self.response = response
         self.calls = []
 
-    def get(self, url, headers, timeout):
+    def get(self, url, headers, timeout, *, allow_redirects):
+        assert allow_redirects is False
         self.calls.append((url, headers, timeout))
         return self.response
 

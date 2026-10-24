@@ -46,6 +46,8 @@ from urllib.parse import quote, urlencode
 if __package__ in {None, ""}:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from api.yandex_transport import yandex_connection_request
+
 from agent_runtime.logos_launch_hold import NativeLogosLaunchBlocked, enforce_native_launch_hold
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat")
@@ -425,7 +427,7 @@ def yandex_call(
         "OpenAI-Project": project,
     }
     try:
-        conn.request("POST", "/v1/responses", body=body, headers=headers)
+        yandex_connection_request(conn, HOST, "POST", "/v1/responses", body=body, headers=headers)
         resp = conn.getresponse()
         raw = resp.read(MAX_RESPONSE_BYTES + 1)
         if resp.status != 200:
@@ -1252,7 +1254,7 @@ def yandex_api_request(
     if body is not None:
         headers["Content-Type"] = content_type
     try:
-        conn.request(method, "/v1" + path, body=body, headers=headers)
+        yandex_connection_request(conn, HOST, method, "/v1" + path, body=body, headers=headers)
         response = conn.getresponse()
         raw = response.read(max_response_bytes + 1)
         if len(raw) > max_response_bytes:

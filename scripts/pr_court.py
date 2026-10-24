@@ -10,6 +10,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from api.yandex_transport import is_yandex_api_url, yandex_urlopen
+
 from scripts.pr_court_evidence import validate_judgment
 
 API = "https://api.github.com"
@@ -26,7 +28,11 @@ def request(url: str, token: str, body: dict | None = None, *, provider=False):
     req = urllib.request.Request(
         url, data=json.dumps(body).encode() if body is not None else None, headers=headers
     )
-    with urllib.request.urlopen(req, timeout=90 if provider else 30) as response:
+    with (
+        yandex_urlopen(req, timeout=90)
+        if provider or is_yandex_api_url(url)
+        else urllib.request.urlopen(req, timeout=30)
+    ) as response:
         return json.load(response)
 
 

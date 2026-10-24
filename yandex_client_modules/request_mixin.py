@@ -4,6 +4,7 @@ import copy
 import os
 import math
 import requests
+from api.yandex_transport import yandex_request, validate_yandex_request
 from typing import Any, Callable
 
 from observability.trace_manager import ExecutionTrace
@@ -186,6 +187,31 @@ class YandexRequestMixin:
             params["store"] = True
 
         credential = _resolve_global_provider_credential(self, execution_trace)
+        yandex_conv_id = self._resolve_yandex_conv_id(conversation_id)
+
+        metadata = (
+            execution_trace.get_metadata()
+            if execution_trace and isinstance(execution_trace, ExecutionTrace)
+            else None
+        )
+
+        payload = build_response_payload(
+            project_id=credential.project_id,
+            model_key=model_key,
+            message=message,
+            params=params,
+            metadata=metadata,
+            conversation_id=conversation_id,
+            yandex_conv_id=yandex_conv_id,
+        )
+
+        validate_yandex_request(
+            "POST",
+            self.responses_url,
+            base_url=self.responses_url.removesuffix("/responses"),
+            json_body=payload,
+        )
+
         quota_user_id = _resolve_quota_user_id(execution_trace)
         try:
             quota_reservation = reserve_request(quota_user_id)
@@ -208,29 +234,18 @@ class YandexRequestMixin:
                     "period_reset_at": quota_reservation.period_reset_at,
                 },
             )
-        yandex_conv_id = self._resolve_yandex_conv_id(conversation_id)
-
-        metadata = (
-            execution_trace.get_metadata()
-            if execution_trace and isinstance(execution_trace, ExecutionTrace)
-            else None
-        )
-
-        payload = build_response_payload(
-            project_id=credential.project_id,
-            model_key=model_key,
-            message=message,
-            params=params,
-            metadata=metadata,
-            conversation_id=conversation_id,
-            yandex_conv_id=yandex_conv_id,
-        )
 
         trace_step_number = trace_step
         if isinstance(execution_trace, ExecutionTrace) and trace_step_number is None:
             trace_step_number = len(execution_trace.trace.get("api_requests", [])) + 1
 
         self._log_request("POST", self.responses_url, json=payload)
+        validate_yandex_request(
+            "POST",
+            self.responses_url,
+            base_url=self.responses_url.removesuffix("/responses"),
+            json_body=payload,
+        )
         _capture_request_input(execution_trace, payload, trace_step_number, on_provider_input)
         request_start_timestamp = time.time()
         request_start_perf = time.perf_counter()
@@ -255,7 +270,14 @@ class YandexRequestMixin:
         resp = None
         try:
             resp = self._log_response(
-                self.session.post(self.responses_url, json=payload, timeout=request_timeout)
+                yandex_request(
+                    self.session.post,
+                    "POST",
+                    self.responses_url,
+                    base_url=self.responses_url.removesuffix("/responses"),
+                    json=payload,
+                    timeout=request_timeout,
+                )
             )
             resp.raise_for_status()
         except requests.RequestException as e:

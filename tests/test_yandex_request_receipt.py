@@ -45,7 +45,8 @@ def transport(monkeypatch):
     trace = ExecutionTrace(trace_id="receipt-trace")
     posts = []
 
-    def post(url, *, json, timeout):
+    def post(url, *, json, timeout, allow_redirects):
+        assert allow_redirects is False
         # Capture the actual json= object exactly at the transport boundary. The
         # receipt must already exist before this fake replaces the network.
         posts.append(copy.deepcopy(json))

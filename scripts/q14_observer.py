@@ -9,6 +9,7 @@ import os
 import subprocess
 import time
 from pathlib import Path
+from api.yandex_transport import yandex_connection_request
 
 REPO = "maksimp6/Chat"
 BASELINE = "a553e4c998297052596b5b82b6f83bd577adc638"
@@ -83,7 +84,16 @@ def request(host: str, path: str, token: str, body: Json | None = None) -> Json:
     connection = http.client.HTTPSConnection(host, timeout=90)
     started = time.monotonic()
     try:
-        connection.request(
+        send = (
+            (
+                lambda method, path, **kw: yandex_connection_request(
+                    connection, host, method, path, **kw
+                )
+            )
+            if host == "ai.api.cloud.yandex.net"
+            else connection.request
+        )
+        send(
             "POST" if body is not None else "GET",
             path,
             body=json.dumps(body).encode() if body is not None else None,

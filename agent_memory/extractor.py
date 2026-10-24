@@ -9,6 +9,8 @@ import time
 from typing import Any
 
 import requests
+from api.contracts import ContractViolation
+from api.yandex_transport import yandex_request
 
 from agent_memory.client import get_memory_client
 from storage.db import memory_file_path
@@ -100,8 +102,8 @@ def extract_and_save_facts(dialog_messages: list) -> int:
         "completionOptions": {
             "temperature": 0.1,
             "maxTokens": "1000",
-            "responseFormat": {"type": "JSON_OBJECT", "jsonSchema": MEMORY_SCHEMA},
         },
+        "jsonSchema": {"schema": MEMORY_SCHEMA},
         "messages": [
             {
                 "role": "system",
@@ -111,7 +113,9 @@ def extract_and_save_facts(dialog_messages: list) -> int:
         ],
     }
     try:
-        response = requests.post(
+        response = yandex_request(
+            requests.post,
+            "POST",
             API_URL,
             headers={
                 "Authorization": f"Api-Key {os.environ['YANDEX_API_KEY']}",
@@ -127,6 +131,8 @@ def extract_and_save_facts(dialog_messages: list) -> int:
         if not isinstance(facts, list):
             return 0
         return save_global_memory_facts(facts, now=int(time.time()))
+    except ContractViolation:
+        raise
     except (KeyError, ValueError, TypeError, requests.RequestException):
         return 0
 

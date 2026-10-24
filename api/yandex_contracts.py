@@ -10,6 +10,7 @@ import json
 import math
 import re
 from copy import deepcopy
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,18 @@ from api.contracts import ContractViolation
 
 CATALOG = Path(__file__).resolve().parents[1] / "contracts/yandex/catalog.json"
 FORMATS = FormatChecker()
+
+
+@FORMATS.checks("date-time")
+def _date_time(value: Any) -> bool:
+    if not isinstance(value, str) or not re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})", value
+    ):
+        return False
+    try:
+        return datetime.fromisoformat(value).tzinfo is not None
+    except ValueError:
+        return False
 
 
 @FORMATS.checks("int64")
@@ -48,8 +61,10 @@ class IncompleteYandexContract(ContractViolation):
 
 @lru_cache(maxsize=1)
 def _catalog() -> dict[str, dict[str, Any]]:
+    from api.yandex_request_profiles import PROFILES
+
     data = json.loads(CATALOG.read_text())
-    return {entry["name"]: entry for entry in data["contracts"]}
+    return {**{entry["name"]: entry for entry in data["contracts"]}, **PROFILES}
 
 
 def get_yandex_contract(name: str) -> dict[str, Any]:
@@ -150,4 +165,10 @@ def validate_yandex_contract[PayloadT](
         raise ContractViolation(
             "Yandex payload violates " + name + " (" + str(error.validator) + ")"
         )
+    if name.startswith("yandex.runtime.") and part == "body" and isinstance(payload, dict):
+        chunking = payload.get("chunking_strategy")
+        if isinstance(chunking, dict) and chunking.get("type") == "static":
+            static = chunking["static"]
+            if static["chunk_overlap_tokens"] * 2 > static["max_chunk_size_tokens"]:
+                raise ContractViolation("chunk overlap exceeds half the chunk size")
     return payload

@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import requests
+from api.yandex_transport import yandex_request
 from flask import Blueprint, Response, jsonify, request, stream_with_context
 
 from core.config import Config, TEXT_MODELS
@@ -120,7 +121,9 @@ def _stt(audio: bytes, content_type: str = "application/octet-stream") -> str:
     if folder_id:
         data["folderId"] = folder_id
 
-    response = requests.post(
+    response = yandex_request(
+        requests.post,
+        "POST",
         _STT_URL,
         params=data,
         headers=_auth_headers(),
@@ -164,7 +167,9 @@ def _tts(text: str, voice: str) -> bytes:
     folder_id = _folder_id()
     if folder_id:
         data["folderId"] = folder_id
-    response = requests.post(
+    response = yandex_request(
+        requests.post,
+        "POST",
         _TTS_URL,
         headers=_auth_headers(),
         data=data,

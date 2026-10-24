@@ -12,6 +12,8 @@ import time
 from pathlib import Path
 from typing import Callable
 
+from api.yandex_transport import yandex_connection_request
+
 from scripts.q14_simulation import BASELINE_HEAD, CASES, run_cases
 
 HOST = "ai.api.cloud.yandex.net"
@@ -124,7 +126,7 @@ def make_transport(key: str, project: str) -> Transport:
         }
         started = time.monotonic()
         try:
-            connection.request(method, path, body=body, headers=headers)
+            yandex_connection_request(connection, HOST, method, path, body=body, headers=headers)
             response = connection.getresponse()
             raw = response.read(MAX_RESPONSE_BYTES + 1)
             request_id = safe_identifier(response.getheader("x-request-id", ""))

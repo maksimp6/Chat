@@ -7,6 +7,7 @@ import os
 from typing import Iterable, Optional
 
 import requests
+from api.yandex_transport import yandex_request
 
 
 class YandexApiKeyProvider:
@@ -82,7 +83,9 @@ class YandexApiKeyProvider:
         }
 
     def create_key(self, *, expires_at: datetime) -> tuple[str, str]:
-        response = requests.post(
+        response = yandex_request(
+            requests.post,
+            "POST",
             f"{self.endpoint}/iam/v1/apiKeys",
             headers=self._headers(),
             json={
@@ -108,7 +111,9 @@ class YandexApiKeyProvider:
             raise ValueError("Yandex API key is empty")
 
     def revoke_key(self, provider_key_id: str) -> None:
-        response = requests.delete(
+        response = yandex_request(
+            requests.delete,
+            "DELETE",
             f"{self.endpoint}/iam/v1/apiKeys/{provider_key_id}",
             headers=self._headers(),
             timeout=self.timeout,
