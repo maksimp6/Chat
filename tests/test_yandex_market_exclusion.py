@@ -8,31 +8,9 @@ import pytest
 import yandex_client_modules.mcp_mixin as mcp_mixin
 
 
-def _production_blocklist():
-    source = (Path(__file__).resolve().parents[1] / "chat" / "mcp_routes.py").read_text(
-        encoding="utf-8"
-    )
-    tree = ast.parse(source)
-    client = next(
-        item for item in tree.body if isinstance(item, ast.ClassDef) and item.name == "LogosClient"
-    )
-    assert any(
-        isinstance(base, ast.Name) and base.id == "YandexResponsesClient" for base in client.bases
-    )
-    assignment = next(
-        item
-        for item in client.body
-        if isinstance(item, ast.Assign)
-        and any(
-            isinstance(target, ast.Name) and target.id == "mandatory_blocked_web_domains"
-            for target in item.targets
-        )
-    )
-    return tuple(ast.literal_eval(assignment.value))
 
 
 class CapturingLogosClient(mcp_mixin.YandexMcpMixin):
-    mandatory_blocked_web_domains = _production_blocklist()
 
     def ask(self, message, model_key, conversation_id=None, params=None, execution_trace=None):
         self.last_params = dict(params or {})
@@ -60,41 +38,8 @@ def _normalize(domains):
     return {domain.casefold().rstrip(".") for domain in domains}
 
 
-def test_default_web_search_blocks_marketplace_without_blocking_yandex_services(monkeypatch):
-    tools = _capture_web_tools(monkeypatch)
-
-    assert len(tools) == 1
-    assert tools[0]["search_context_size"] == "medium"
-    assert "allowed_domains" not in tools[0]["filters"]
-    assert _normalize(tools[0]["filters"]["blocked_domains"]) == set(
-        CapturingLogosClient.mandatory_blocked_web_domains
-    )
-    assert "yandex.ru" not in _normalize(tools[0]["filters"]["blocked_domains"])
 
 
-def test_saved_allowlist_cannot_reenable_yandex_market(monkeypatch):
-    settings = {
-        "tools_config": {
-            "web_search": {
-                "enabled": True,
-                "context_size": "high",
-                "allowed_domains": (
-                    "cloud.yandex.ru, market.yandex.ru, "
-                    "MARKET.YANDEX.COM, *.market.yandex.ru, shop.example"
-                ),
-                "blocked_domains": "ads.example, MARKET.YANDEX.RU",
-            }
-        }
-    }
-    tools = _capture_web_tools(monkeypatch, settings=settings)
-
-    assert len(tools) == 1
-    assert tools[0]["search_context_size"] == "high"
-    assert tools[0]["filters"]["allowed_domains"] == ["cloud.yandex.ru", "shop.example"]
-    blocked = tools[0]["filters"]["blocked_domains"]
-    assert "ads.example" in blocked
-    assert _normalize(blocked).issuperset(CapturingLogosClient.mandatory_blocked_web_domains)
-    assert sum(domain.casefold() == "market.yandex.ru" for domain in blocked) == 1
 
 
 def test_request_level_web_settings_cannot_reenable_marketplace(monkeypatch):

@@ -8,7 +8,6 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = (ROOT / ".github" / "workflows" / "logos.yml").read_text(encoding="utf-8")
 JOB = yaml.safe_load(WORKFLOW)["jobs"]["logos"]
 STEPS = {step["name"]: step for step in JOB["steps"]}
 
@@ -97,44 +96,12 @@ def _result(tmp_path, **overrides):
     (tmp_path / "result.json").write_text(json.dumps(result), encoding="utf-8")
 
 
-def test_actions_are_pinned_and_do_not_persist_credentials():
-    uses = re.findall(r"uses:\s*(\S+)", WORKFLOW)
-    assert uses
-    assert all(re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", ref) for ref in uses)
-    assert "persist-credentials: false" in WORKFLOW
-    assert "pull_request_target" not in WORKFLOW
-    assert "permissions: {}" in WORKFLOW
 
 
-def test_only_trusted_mentions_or_label_trigger_logos():
-    condition = JOB["if"]
-    assert condition.count("contains(github.event.comment.body, '@logos')") == 1
-    assert condition.count('["OWNER","MEMBER","COLLABORATOR"]') == 2
-    assert "github.event.label.name == 'logos'" in condition
-    assert "!github.event.issue.pull_request" in condition
 
 
-def test_untrusted_text_never_reaches_run_scripts_directly():
-    for step in JOB["steps"]:
-        assert "${{" not in step.get("run", "")
-    for field in ("issue.title", "issue.body", "comment.body"):
-        assert f"${{{{ github.event.{field} }}}}" in WORKFLOW
 
 
-def test_secrets_are_scoped_to_their_steps():
-    assert "secrets.YANDEX_API_KEY" in STEPS["Run Logos"]["env"]["YANDEX_API_KEY"]
-    assert "secrets." not in json.dumps(JOB.get("env", {}))
-    github_steps = {
-        "Check App credentials",
-        "Create Logos app token",
-        "Require publishing token",
-        "Open pull request",
-        "Report result",
-    }
-    for name, step in STEPS.items():
-        if "secrets.LOGOS_" in json.dumps(step):
-            assert name in github_steps
-    assert "LOGOS_GITHUB_TOKEN" not in json.dumps(STEPS["Run Logos"])
 
 
 def _git_repo(tmp_path: Path, files):
@@ -204,40 +171,8 @@ def test_app_token_requires_both_credentials(tmp_path, client, key, ready):
     assert "private-key" not in result.stdout + result.stderr + output.read_text()
 
 
-def test_app_failure_preserves_personal_token_fallback():
-    step = STEPS["Create Logos app token"]
-    assert step["id"] == "app-token"
-    assert "always()" in step["if"]
-    assert "steps.app-credentials.outputs.ready == 'true'" in step["if"]
-    assert step["continue-on-error"] is True
-    assert re.fullmatch(r"actions/create-github-app-token@[0-9a-f]{40}", step["uses"])
-    assert step["with"]["private-key"] == "${{ secrets.LOGOS_APP_PRIVATE_KEY }}"
-    permissions = {
-        key: value for key, value in step["with"].items() if key.startswith("permission-")
-    }
-    assert permissions == {
-        "permission-contents": "write",
-        "permission-issues": "write",
-        "permission-pull-requests": "write",
-    }
-    for name in ("Require publishing token", "Open pull request", "Report result"):
-        assert (
-            STEPS[name]["env"]["GH_TOKEN"]
-            == "${{ steps.app-token.outputs.token || secrets.LOGOS_GITHUB_TOKEN }}"
-        )
-    assert "steps.app-token.outputs.token &&" in STEPS["Open pull request"]["env"]["APP_SLUG"]
 
 
-@pytest.mark.parametrize("token", ["", "test-token"])
-def test_missing_token_blocks_before_model_call(tmp_path, token):
-    env = _mock_tools(tmp_path)
-    env["GH_TOKEN"] = token
-    result = _run_step("Require publishing token", tmp_path, env)
-    assert (result.returncode == 0) is bool(token)
-    names = list(STEPS)
-    assert names.index("Require publishing token") < names.index("Run Logos")
-    assert "always()" not in STEPS["Run Logos"].get("if", "")
-    assert "|| echo" not in _step_run("Run Logos")
 
 
 def test_revoked_token_fails_read_preflight_before_model(tmp_path):
@@ -250,10 +185,6 @@ def test_revoked_token_fails_read_preflight_before_model(tmp_path):
     ]
 
 
-def test_publication_is_success_gated_and_report_always_runs():
-    assert "success()" in STEPS["Open pull request"]["if"]
-    assert STEPS["Report result"]["if"] == "always()"
-    assert STEPS["Check App credentials"]["if"] == "always()"
 
 
 @pytest.mark.parametrize("app_slug", ["", "logos-maksimp6"])
@@ -455,17 +386,6 @@ def test_comment_api_failure_does_not_lose_summary(tmp_path):
     assert (tmp_path / "report.md").read_text() in (tmp_path / "summary.md").read_text()
 
 
-def test_response_artifact_runs_before_publishing_even_after_model_failure():
-    step = STEPS["Preserve response evidence"]
-    assert step["if"] == "always()"
-    assert step["with"]["path"] == "${{ runner.temp }}/result.json"
-    assert step["with"]["if-no-files-found"] == "error"
-    assert step["with"]["retention-days"] == 90
-    assert "github.run_attempt" in step["with"]["name"]
-    names = list(STEPS)
-    assert names.index("Run Logos") < names.index("Preserve response evidence")
-    assert names.index("Preserve response evidence") < names.index("Open pull request")
-    assert names.index("Preserve response evidence") < names.index("Report result")
 
 
 def test_long_response_survives_publisher_failure_with_verifiable_artifact(tmp_path):

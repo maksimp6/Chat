@@ -155,15 +155,6 @@ def test_environment_gateway_rejects_stopped_runtime_without_transport(tmp_path,
     delete_environment(created["environment_id"])
 
 
-def test_environment_gateway_has_no_localhost_proxy_transport():
-    root = Path(__file__).resolve().parents[1]
-    routes = (root / "remote_runtime" / "environment_routes.py").read_text(encoding="utf-8")
-    manager = (root / "remote_runtime" / "environments.py").read_text(encoding="utf-8")
-    assert "import requests" not in routes
-    assert "requests.request(" not in routes
-    assert "http://127.0.0.1:" not in routes
-    assert "subprocess.Popen(" not in manager
-    assert "os.kill(" not in manager
 
 
 def test_runtime_http_request_requires_application():

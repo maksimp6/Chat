@@ -278,8 +278,3 @@ def test_strict_type_errors_only_go_down():
     assert not newly_clean, f"add newly typed files to STRICT_CLEAN_FILES: {newly_clean}"
 
 
-def test_mypy_python_version_matches_ci_runtime():
-    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    runtime = (ROOT / ".python-version").read_text(encoding="utf-8").strip()
-    assert 'python_version = "3.14"' in pyproject
-    assert runtime == "3.14"

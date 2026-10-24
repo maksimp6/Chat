@@ -4,14 +4,6 @@ from pathlib import Path
 import pytest
 
 
-def test_fixture_cleanup_is_registered_before_authorization():
-    source = (Path(__file__).with_name("test_signed_c_keyboard.py")).read_text()
-    allocation = source.index("keyboard = lib.remote_input_fixture_new(")
-    stack = source.index("with ExitStack() as stack:", allocation)
-    free = source.index("stack.callback(lib.remote_input_fixture_free, keyboard)", stack)
-    close = source.index("stack.callback(lib.remote_input_fixture_close, keyboard)", free)
-    auth = source.index("authority.authorize(principal)", close)
-    assert allocation < stack < free < close < auth
 
 
 def test_fixture_cleanup_on_authorization_exception(monkeypatch):

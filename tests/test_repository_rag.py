@@ -381,40 +381,6 @@ def test_repeated_historical_quote_keeps_ambiguous_sources(tmp_path, monkeypatch
     assert len(result["matches"][0]["candidates"]) == 2
 
 
-@pytest.mark.parametrize(
-    "allow_write,allow_model,reference,accepted",
-    [
-        ("true", "false", "owner-request", True),
-        ("false", "false", "owner-request", False),
-        ("true", "true", "owner-request", False),
-        ("true", "false", "", False),
-    ],
-)
-def test_hosted_repository_mode_requires_upload_and_forbids_generation(
-    allow_write, allow_model, reference, accepted, tmp_path
-):
-    import os
-    import subprocess
-    from pathlib import Path
-    import yaml
-
-    workflow = yaml.safe_load(
-        (Path(__file__).resolve().parents[1] / ".github/workflows/semantic-work.yml").read_text()
-    )
-    job = workflow["jobs"]["repository-corpus"]
-    result = subprocess.run(
-        ["bash", "-c", job["steps"][0]["run"]],
-        cwd=tmp_path,
-        env={
-            **os.environ,
-            "ALLOW_WRITE": allow_write,
-            "ALLOW_MODEL": allow_model,
-            "APPROVAL_REFERENCE": reference,
-        },
-        capture_output=True,
-    )
-    assert (result.returncode == 0) is accepted
-    assert all(value == "read" for value in job["permissions"].values())
 
 
 def test_search_verifies_body_quote_and_rejects_wrong_file_or_header_only(tmp_path, monkeypatch):

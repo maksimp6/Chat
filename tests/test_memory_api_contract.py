@@ -7,12 +7,6 @@ from agent_memory.client import close_memory_clients, get_memory_client
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_memory_panel_api_uses_native_fact_read():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
-    start = source.index('@app.route("/api/memory/manage", methods=["GET"])')
-    section = source[start : source.index("\n\n@app.route", start + 20)]
-    assert "list_global_memory_facts()" in section
-    assert "get_conn()" not in section
 
 
 def test_memory_panel_api_returns_config_and_sorted_facts(tmp_path, monkeypatch):

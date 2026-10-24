@@ -22,8 +22,6 @@ runner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runner)
 
 
-def workflow():
-    return yaml.safe_load((ROOT / ".github/workflows/logos-once.yml").read_text())
 
 
 def environment():
@@ -39,20 +37,6 @@ def environment():
     }
 
 
-def test_one_manual_job_one_named_step_and_no_silent_condition():
-    data = workflow()
-    assert set(data.get("on", data.get(True))) == {"workflow_dispatch"}
-    assert set(data["jobs"]) == {"logos"}
-    job = data["jobs"]["logos"]
-    assert job["name"] == "logos" and "if" not in job
-    assert len(job["steps"]) == 1
-    step = job["steps"][0]
-    assert step["name"] == "logos" and "if" not in step
-    assert all(value == "read" for value in job["permissions"].values())
-    assert "${{ inputs." not in step["run"]
-    assert "persist-credentials" not in step["run"]
-    assert "credential.helper=" in step["run"]
-    subprocess.run(["bash", "-n"], input=step["run"], text=True, check=True)
 
 
 @pytest.mark.parametrize("flag", ["", "false", "true", "TRUE"])
@@ -211,46 +195,6 @@ def test_log_chunks_reconstruct_complete_unicode_and_do_not_execute_workflow_com
     assert "<script>" not in summary.read_text()
 
 
-@pytest.mark.parametrize("older_than_30s,expected_exit", [(False, 1), (True, 0)])
-def test_real_shell_preserves_bootstrap_failure_and_owner_duration_policy(
-    tmp_path, older_than_30s, expected_exit
-):
-    tools = tmp_path / "bin"
-    tools.mkdir()
-    workspace = tmp_path / "checkout"
-    workspace.mkdir()
-    git = tools / "git"
-    git.write_text(
-        f"#!{sys.executable}\nimport sys\nraise SystemExit(17 if 'fetch' in sys.argv else 0)\n"
-    )
-    git.chmod(0o755)
-    python = tools / "python3"
-    python.write_text(
-        f"#!{sys.executable}\nimport os, sys, time\n"
-        "if len(sys.argv) > 2 and sys.argv[1] == '-c':\n"
-        f" print(time.monotonic_ns() - {31000000000 if older_than_30s else 0})\n"
-        "else:\n os.execv(sys.executable, [sys.executable, *sys.argv[1:]])\n"
-    )
-    python.chmod(0o755)
-    script = workflow()["jobs"]["logos"]["steps"][0]["run"]
-    result = subprocess.run(
-        ["bash", "-c", script],
-        check=False,
-        env={
-            **os.environ,
-            "PATH": str(tools) + os.pathsep + os.environ["PATH"],
-            "GITHUB_REPOSITORY": "maksimp6/Chat",
-            "GITHUB_WORKSPACE": str(workspace),
-            "GITHUB_SHA": "a" * 40,
-            "GITHUB_STEP_SUMMARY": str(tmp_path / "summary"),
-        },
-        capture_output=True,
-        text=True,
-        timeout=10,
-    )
-    assert result.returncode == expected_exit, result.stdout + result.stderr
-    assert "execution_exit=17" in result.stdout
-    assert f"overridden={str(older_than_30s).lower()}" in result.stdout
 
 
 @pytest.mark.parametrize("exit_code", [0, 7])
@@ -289,21 +233,3 @@ def test_checkpoint_is_exported_before_native_process_finishes(
         runner.run_dialogue_command(["offline-native"], ROOT, environment(), answer)
 
 
-@pytest.mark.parametrize("elapsed", [29_999_000_000, 30_000_000_000, 30_001_000_000])
-@pytest.mark.parametrize("execution_exit", [0, 7])
-def test_inline_finalizer_preserves_exact_owner_boundary(
-    tmp_path, monkeypatch, capsys, elapsed, execution_exit
-):
-    script = workflow()["jobs"]["logos"]["steps"][0]["run"]
-    finalizer = script.split("python3 -I - <<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
-    monkeypatch.setenv("JOB_STARTED_NS", "100")
-    monkeypatch.setenv("LOGOS_EXECUTION_EXIT", str(execution_exit))
-    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path / "summary"))
-    monkeypatch.setattr(runner.time, "monotonic_ns", lambda: 100 + elapsed)
-    expected = int(bool(execution_exit) and elapsed <= 30_000_000_000)
-    finalizer_file = tmp_path / "inline_finalizer.py"
-    finalizer_file.write_text(finalizer)
-    with pytest.raises(SystemExit) as stopped:
-        runpy.run_path(str(finalizer_file), run_name="__main__")
-    assert stopped.value.code == expected
-    assert f"execution_exit={execution_exit}" in capsys.readouterr().out

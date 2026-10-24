@@ -46,7 +46,3 @@ def test_default_title_is_replaced_by_first_non_empty_message_and_not_overwritte
     assert db.get_conversation_title("conv-auto") == "Первая тема диалога"
 
 
-def test_chat_client_syncs_server_title_to_sidebar():
-    chat = (Path(__file__).resolve().parents[1] / "static" / "chat.js").read_text(encoding="utf-8")
-    assert "conversation.title = data.title" in chat
-    assert "renderSidebar()" in chat

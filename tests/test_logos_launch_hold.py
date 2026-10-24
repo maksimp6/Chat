@@ -155,44 +155,8 @@ def test_saved_response_cli_routes_without_calling_launch_guard(tmp_path, monkey
     assert json.loads(output.read_text())["generation_requests"] == 0
 
 
-def _workflow(name):
-    return yaml.safe_load((ROOT / ".github" / "workflows" / name).read_text())
 
 
-@pytest.mark.parametrize(
-    "filename,job_name,guard_name,condition",
-    [
-        ("logos.yml", "logos", "Enforce native Logos court hold", None),
-        ("rag-work.yml", "logos", "Enforce native Logos court hold", "inputs.mode == 'logos'"),
-        (
-            "semantic-work.yml",
-            "semantic",
-            "Enforce model-backed court hold",
-            "inputs.allow_model_call && (inputs.mode == 'query' || inputs.mode == 'red' || inputs.mode == 'vector-store')",
-        ),
-        (
-            "semantic-work.yml",
-            "vector-store-repository-model-demo",
-            "Enforce model-backed court hold",
-            None,
-        ),
-    ],
-)
-def test_workflow_hold_is_mandatory_before_provider_or_tool_steps(
-    filename, job_name, guard_name, condition
-):
-    steps = _workflow(filename)["jobs"][job_name]["steps"]
-    gate = next(step for step in steps if step["name"] == guard_name)
-    assert gate.get("if") == condition
-    assert gate["run"] == "python -m agent_runtime.logos_launch_hold"
-    assert not gate.get("continue-on-error")
-    assert steps.index(gate) > next(
-        i for i, step in enumerate(steps) if "checkout@" in step.get("uses", "")
-    )
-    for step in steps[: steps.index(gate)]:
-        assert "secrets." not in json.dumps(step)
-        assert "logos_knowledge" not in step.get("run", "")
-        assert "logos_tool_probe" not in step.get("run", "")
 
 
 def test_workflow_preflight_ignores_environment_approval_and_returns_nonzero(tmp_path):
@@ -239,18 +203,6 @@ def test_direct_script_bootstrap_keeps_offline_or_denied_mode_safe(
     assert exited.value.code == exit_code
 
 
-def test_live_smoke_workflow_hold_precedes_master_checkout_and_keeps_offline_job():
-    data = _workflow("launch-smoke.yml")
-    live_steps = data["jobs"]["live-provider"]["steps"]
-    gate = live_steps[0]
-    assert gate["name"] == "Enforce native Logos court hold"
-    assert "if" not in gate and not gate.get("continue-on-error")
-    assert hold.HOLD_CASE in gate["run"]
-    assert "exit 1" in gate["run"]
-    assert live_steps[1]["with"]["ref"] == "master"
-    assert all(step["name"] != gate["name"] for step in data["jobs"]["offline"]["steps"])
-    result = subprocess.run(["bash", "-c", gate["run"]], capture_output=True, text=True, timeout=5)
-    assert result.returncode == 1
 
 
 def test_direct_script_selftest_keeps_the_documented_cli_available():

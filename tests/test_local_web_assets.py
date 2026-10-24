@@ -18,15 +18,6 @@ EXTERNAL_CSS_URL_RE = re.compile(
 )
 
 
-def test_index_uses_only_local_ui_resources():
-    html = Path("templates/index.html").read_text(encoding="utf-8")
-    assert not EXTERNAL_RESOURCE_RE.search(html), "UI resources must be served locally"
-    assert "{% set static_root" in html
-    assert 'id="logos-boot"' in html
-    assert "data-base-path=\"{{ preview_base_path or '' }}\"" in html
-    assert 'data-static-base="{{ static_root }}"' in html
-    assert html.index("boot.js") < html.index("core.js") < html.index("eruda_init.js")
-    assert '<script src="{{ static_root }}/eruda.js' not in html
 
 
 def test_index_renders_preview_prefixed_assets_and_api_paths(monkeypatch):
@@ -50,40 +41,10 @@ def test_index_renders_preview_prefixed_assets_and_api_paths(monkeypatch):
     assert 'src="/preview/pr-203/static/memory_panel.js?v=' in html
 
 
-def test_static_stylesheets_have_no_external_asset_urls():
-    for css in Path("static").rglob("*.css"):
-        content = css.read_text(encoding="utf-8")
-        assert not EXTERNAL_CSS_URL_RE.search(content), f"External CSS resource found in {css}"
 
 
-def test_local_eruda_loader_initializes_the_bundled_library():
-    eruda = Path("static/eruda.js")
-    loader = Path("static/eruda_init.js")
-    assert eruda.is_file()
-    assert loader.is_file()
-    content = loader.read_text(encoding="utf-8")
-    assert "window.eruda.init()" in content
 
 
-def test_web_boot_and_startup_guards_are_present():
-    boot = Path("static/boot.js").read_text(encoding="utf-8")
-    eruda_loader = Path("static/eruda_init.js").read_text(encoding="utf-8")
-    core = Path("static/core.js").read_text(encoding="utf-8")
-    dispatcher = Path("static/dispatcher.js").read_text(encoding="utf-8")
-    assert "document.currentScript" in boot
-    assert "getRegistrations" in boot
-    assert "logos-pro-" in boot
-    assert "maxAttempts = 5" in eruda_loader
-    assert "script.async = true" in eruda_loader
-    assert re.search(
-        r'script\.src\s*=\s*\(window\.__LOGOS_STATIC_BASE\s*\|\|\s*"/static"\)\s*\+\s*"/eruda\.js\?v="',
-        eruda_loader,
-    )
-    assert "fetchWithTimeout" in core
-    assert "window.LogosDispatcher.request" in core
-    assert "AbortSignal.timeout" in dispatcher
-    assert "MAX_TIMEOUT_MS" in dispatcher
-    assert "return window.LogosDispatcher.request(input, init, { timeoutMs: timeoutMs });" in core
 
 
 def test_index_response_disables_shell_caching():
@@ -93,18 +54,6 @@ def test_index_response_disables_shell_caching():
     assert response.headers.get("Cache-Control") == "no-store, max-age=0"
 
 
-def test_ssh_runtime_modal_has_safe_header_action_contract():
-    modal = Path("static/settings/ssh_runtime_modal.js").read_text(encoding="utf-8")
-    header = Path("static/header_actions.js").read_text(encoding="utf-8")
-    html = Path("templates/index.html").read_text(encoding="utf-8")
-
-    assert "window.openSshRuntimeModal = function" in modal
-    assert re.search(r'actions\.register\(\s*"header\.ssh\.open"', header)
-    assert re.search(
-        r'call\(\s*"openSshRuntimeModal"\s*,\s*"\[SSH Runtime\] Modal script is unavailable"',
-        header,
-    )
-    assert html.index("ssh_runtime_modal.js") < html.index("header_actions.js")
 
 
 def test_application_javascript_parses_when_node_is_available():

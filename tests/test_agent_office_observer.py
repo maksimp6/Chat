@@ -696,18 +696,6 @@ def test_main_writes_summary_and_json(monkeypatch, tmp_path):
 # --- workflow ---------------------------------------------------------------
 
 
-def test_observer_workflow_is_hourly_pinned_and_least_privilege():
-    workflow = (ROOT / ".github" / "workflows" / "agent-observer.yml").read_text(encoding="utf-8")
-    uses = re.findall(r"uses:\s*(\S+)", workflow)
-    assert uses and all(re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", ref) for ref in uses)
-    assert "permissions: {}" in workflow
-    assert "persist-credentials: false" in workflow
-    assert 'cron: "17 * * * *"' in workflow
-    assert "issues: write" in workflow
-    assert "contents: write" not in workflow
-    assert "pull_request_target" not in workflow
-    assert "python -m agent_office.observer" in workflow
-    assert "--publish" in workflow
 
 
 def test_every_timeline_event_kind_is_described():

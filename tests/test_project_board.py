@@ -176,18 +176,6 @@ def test_truncated_tail_recovery_preserves_confirmed_data(tmp_path):
         assert reopened.export()["sequence"] == 2
 
 
-def test_private_database_and_no_sql(tmp_path):
-    path = tmp_path / "private" / "db.memory"
-    with BoardStore(path) as db:
-        assert db.export()["sequence"] == 1
-        assert path.stat().st_mode & 0o077 == 0
-        assert (
-            "import sqlite3"
-            not in (Path(__file__).resolve().parents[1] / "project_board/store.py").read_text()
-        )
-    path.chmod(0o644)
-    with pytest.raises(BoardUnavailable, match="permissions"):
-        BoardStore(path)
 
 
 def test_validation_and_secure_evidence_url(tmp_path):

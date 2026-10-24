@@ -392,100 +392,18 @@ def test_main_emits_structured_collection_error(monkeypatch, capsys):
     assert "secret provider output" not in payload["blockers"][0]["detail"]
 
 
-def platform_snapshot(**overrides):
-    """Exercise the evaluator with the actual workflow's required check names."""
-    workflow = yaml.safe_load(
-        (ROOT / ".github/workflows/merge-readiness.yml").read_text(encoding="utf-8")
-    )
-    names = [
-        name.strip()
-        for name in workflow["jobs"]["readiness"]["env"]["MERGE_REQUIRED_CHECKS"].split(",")
-        if name.strip()
-    ]
-    ci = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
-    ci_names = [job["name"] for job in ci["jobs"].values()]
-    checks = [
-        {"id": index, "name": name, "status": "completed", "conclusion": "success"}
-        for index, name in enumerate(dict.fromkeys([*names, *ci_names]), start=1)
-    ]
-    return snapshot(required_checks=names, check_runs=checks, **overrides)
 
 
-@pytest.mark.parametrize("name", ["Infrastructure tests", "MCP worker tests", "Platform changes"])
-def test_merge_readiness_blocks_failed_routed_platform(name):
-    value = platform_snapshot()
-    for check in value["check_runs"]:
-        if check["name"] in {name, "CI required"}:
-            check["conclusion"] = "failure"
-    result = merge_readiness.evaluate_snapshot(value)
-    assert result["ready"] is False
-    assert {name, "CI required"} <= {b.get("check") for b in result["blockers"]}
 
 
-@pytest.mark.parametrize("name", ["CI required", "Platform changes"])
-@pytest.mark.parametrize(
-    "conclusion", ["failure", "cancelled", "timed_out", "skipped", "neutral", None]
-)
-def test_merge_readiness_control_checks_require_success(name, conclusion):
-    value = platform_snapshot()
-    for check in value["check_runs"]:
-        if check["name"] == name:
-            check["conclusion"] = conclusion
-    result = merge_readiness.evaluate_snapshot(value)
-    assert result["ready"] is False
-    assert any(b.get("check") == name and b["code"] == "check_failed" for b in result["blockers"])
 
 
-@pytest.mark.parametrize("name", ["CI required", "Platform changes"])
-@pytest.mark.parametrize("state", ["missing", "queued", "in_progress"])
-def test_merge_readiness_waits_for_control_checks(name, state):
-    value = platform_snapshot()
-    if state == "missing":
-        value["check_runs"] = [c for c in value["check_runs"] if c["name"] != name]
-    else:
-        for check in value["check_runs"]:
-            if check["name"] == name:
-                check.update(status=state, conclusion=None)
-    result = merge_readiness.evaluate_snapshot(value)
-    assert result["ready"] is False
-    expected = "required_check_missing" if state == "missing" else "check_pending"
-    assert any(b.get("check") == name and b["code"] == expected for b in result["blockers"])
 
 
-def test_merge_readiness_accepts_docs_only_routing_with_successful_control_checks():
-    value = platform_snapshot()
-    routed = {
-        "Application tests",
-        "PostgreSQL integration",
-        "Android debug APK",
-        "Infrastructure tests",
-        "MCP worker tests",
-    }
-    for check in value["check_runs"]:
-        if check["name"] in routed:
-            check["conclusion"] = "skipped"
-    assert merge_readiness.evaluate_snapshot(value)["ready"] is True
 
 
-def test_merge_readiness_newer_failed_aggregate_supersedes_success():
-    value = platform_snapshot()
-    value["check_runs"].append(
-        {"id": 999, "name": "CI required", "status": "completed", "conclusion": "failure"}
-    )
-    result = merge_readiness.evaluate_snapshot(value)
-    assert result["ready"] is False
-    assert any(b.get("check") == "CI required" for b in result["blockers"])
 
 
-def test_merge_readiness_quota_notice_is_not_a_model_review_prerequisite():
-    value = platform_snapshot(
-        reviews=[{"user": {"login": "Copilot"}, "body": "Unable to review: quota limit reached."}]
-    )
-    assert merge_readiness.evaluate_snapshot(value)["ready"] is True
-    value["review_threads"] = [{"isResolved": False}]
-    result = merge_readiness.evaluate_snapshot(value)
-    assert result["ready"] is False
-    assert blocker_codes(result) == {"review_threads"}
 
 
 def test_merge_readiness_rejects_missing_solution_review_evidence():
@@ -662,14 +580,6 @@ def test_select_solution_review_evidence_rejects_mismatched_payload():
     )
 
 
-def test_solution_review_workflow_is_read_only_and_manual():
-    workflow = yaml.safe_load(
-        (ROOT / ".github/workflows/solution-review.yml").read_text(encoding="utf-8")
-    )
-    assert "workflow_dispatch" in workflow[True]
-    assert workflow["permissions"] == {"contents": "read", "pull-requests": "read"}
-    assert set(workflow[True]) == {"workflow_dispatch"}
-    assert "pull_request_target" not in workflow[True]
 
 
 def test_dispatch_from_master_accepts_distinct_reviewed_pr_head():

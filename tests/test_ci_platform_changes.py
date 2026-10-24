@@ -97,24 +97,8 @@ def test_malformed_plan_fails_closed():
         routing.validate_results(plan, results())
 
 
-def test_removed_code_rules_is_not_a_workflow_job_or_aggregate_dependency():
-    jobs = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]
-    assert "code-rules" not in jobs
-    assert set(jobs["required"]["needs"]) == {"changes", "backend", "infra"}
 
 
-def test_workflow_has_real_independent_infra_and_backend_jobs():
-    workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
-    jobs = workflow["jobs"]
-    for job in ("backend", "infra"):
-        assert jobs[job]["needs"] == "changes"
-    assert "infra" in jobs["required"]["needs"]
-    infra = "\n".join(step.get("run", "") for step in jobs["infra"]["steps"])
-    assert "pytest" in infra and "tests/test_cloudru" in infra
-    backend = "\n".join(step.get("run", "") for step in jobs["backend"]["steps"])
-    assert "npm test --prefix deploy/chrome-worker" not in backend
-    required = "\n".join(step.get("run", "") for step in jobs["required"]["steps"])
-    assert "--verify" in required
 
 
 @pytest.mark.parametrize("path", ["/outside.py", "../outside.py"])

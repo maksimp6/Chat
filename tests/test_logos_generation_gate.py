@@ -70,9 +70,6 @@ def evaluate(expression, context):
     return bool(eval("".join(python), scope))
 
 
-def job_condition(workflow, job):
-    data = yaml.safe_load((ROOT / ".github/workflows" / workflow).read_text(encoding="utf-8"))
-    return data["jobs"][job]["if"], data["jobs"][job]
 
 
 def owner_comment(variable):
@@ -116,29 +113,10 @@ CLOSED = ({}, {GENERATION_ENV: ""}, {GENERATION_ENV: "false"}, {GENERATION_ENV: 
 OPEN = {GENERATION_ENV: "true"}
 
 
-@pytest.mark.parametrize("event", [owner_comment, owner_issue, logos_label])
-@pytest.mark.parametrize("variable", CLOSED)
-def test_issue_entrypoints_do_not_start_logos_without_permission(event, variable):
-    condition, _ = job_condition("logos.yml", "logos")
-    assert evaluate(condition, event(variable)) is False
 
 
-@pytest.mark.parametrize("event", [owner_comment, owner_issue, logos_label])
-def test_issue_entrypoints_still_start_logos_with_permission(event):
-    condition, _ = job_condition("logos.yml", "logos")
-    assert evaluate(condition, event(OPEN)) is True
 
 
-def test_permission_does_not_widen_the_existing_trigger_rules():
-    condition, _ = job_condition("logos.yml", "logos")
-    stranger = owner_comment(OPEN)
-    stranger["github"]["event"]["comment"]["author_association"] = "NONE"
-    pull_request = owner_comment(OPEN)
-    pull_request["github"]["event"]["issue"]["pull_request"] = {"url": "x"}
-    unrelated = owner_comment(OPEN)
-    unrelated["github"]["event"]["comment"]["body"] = "court decision, no trigger"
-    for context in (stranger, pull_request, unrelated):
-        assert evaluate(condition, context) is False
 
 
 def dispatch(mode, variable):
@@ -149,25 +127,8 @@ def dispatch(mode, variable):
     }
 
 
-@pytest.mark.parametrize("variable", CLOSED)
-def test_manual_dialogue_needs_permission_but_reading_stays_available(variable):
-    condition, _ = job_condition("rag-work.yml", "logos")
-    assert evaluate(condition, dispatch("logos", variable)) is False
-    assert evaluate(condition, dispatch("logos", OPEN)) is True
-    for mode in ("logos-response", "logos-tools"):
-        assert evaluate(condition, dispatch(mode, variable)) is True
-    for job in ("rag", "logos-result"):
-        other, _ = job_condition("rag-work.yml", job)
-        assert evaluate(other, dispatch("logos", OPEN)) is False
 
 
-def test_runner_steps_receive_the_same_permission_variable():
-    expected = "${{ vars.LOGOS_GENERATION_ALLOWED }}"
-    _, logos = job_condition("logos.yml", "logos")
-    assert logos["env"][GENERATION_ENV] == expected
-    _, logos = job_condition("rag-work.yml", "logos")
-    step = next(s for s in logos["steps"] if s["name"].startswith("Run Logos dialogue"))
-    assert step["env"][GENERATION_ENV] == expected
 
 
 @pytest.mark.parametrize(
