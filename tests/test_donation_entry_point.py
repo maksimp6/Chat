@@ -3,8 +3,7 @@ import re
 import pytest
 
 import app as app_module
-import config
-
+import core.config as config
 
 VALID_URL = "https://yoomoney.ru/fundraise/example-project"
 

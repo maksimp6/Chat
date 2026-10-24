@@ -263,7 +263,7 @@
     if (totalMs !== null) parts.push(formatDuration(totalMs));
 
     return {
-      title: "⚙️ Что сделала Alice" + (parts.length ? " · " + parts.join(" · ") : ""),
+      title: "⚙️ Что сделал Logos" + (parts.length ? " · " + parts.join(" · ") : ""),
       items: items,
       metrics: {
         api_requests: apiCount,

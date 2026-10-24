@@ -1,6 +1,6 @@
 # Мастер API-ключей Cloud.ru
 
-Alice Pro предоставляет backend- и UI-мастер для выпуска статических API-ключей Cloud.ru через IAM.
+Logos предоставляет backend- и UI-мастер для выпуска статических API-ключей Cloud.ru через IAM.
 
 ## Требования
 

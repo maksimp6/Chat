@@ -156,6 +156,69 @@ def test_copilot_assignment_and_alice_label_are_dispatches():
     assert labeled.dispatches == [("alice", NOW - timedelta(hours=3))]
 
 
+def test_logos_mention_is_an_alice_trigger_beside_the_alice_mention():
+    assert observer.mentioned_agents("@logos please take this") == ["alice"]
+    assert observer.executable_mentioned_agents("@Logos fix the failing test") == ["alice"]
+    assert observer.mentioned_agents("@alice please take this") == ["alice"]
+    assert observer.executable_mentioned_agents("@alice fix the failing test") == ["alice"]
+    assert observer.mentioned_agents("the logos of the company, mail@logos.example") == []
+    assert observer.executable_mentioned_agents("the logos are on the wall") == []
+
+    # The Logos workflow ignores pull request comments, so a PR thread never starts it.
+    timeline = [comment("maksimp6", "@logos fix the failing test", 3)]
+    thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
+    assert thread.dispatches == [("alice", NOW - timedelta(hours=3))]
+    assert thread.trigger_eligible_dispatches == []
+    assert thread.executable_dispatches == []
+
+    acknowledged = build_thread(
+        pr_item(),
+        [*timeline, comment("alice-pro-maksimp6[bot]", "Logos acknowledged", 2.5)],
+        pull(),
+        [run("tests", "success")],
+    )
+    assert acknowledged.dispatches == [("alice", NOW - timedelta(hours=3))]
+    assert acknowledged.executable_dispatches == []
+
+    issue_thread = build_thread(issue(), timeline)
+    assert issue_thread.trigger_eligible_dispatches == [("alice", NOW - timedelta(hours=3), False)]
+    assert issue_thread.executable_dispatches == []
+
+    issue_acknowledged = build_thread(
+        issue(),
+        [*timeline, comment("alice-pro-maksimp6[bot]", "Logos acknowledged", 2.5)],
+    )
+    assert issue_acknowledged.executable_dispatches == [("alice", NOW - timedelta(hours=3))]
+
+    unrelated = build_thread(issue(), [comment("maksimp6", "the logos are on the wall", 1)])
+    assert unrelated.dispatches == []
+    assert unrelated.owner_agent == "human"
+
+
+def test_logos_mention_in_issue_title_is_a_trigger_but_not_in_pull_request_title():
+    # logos.yml starts on issues.opened when the title or the body names @logos.
+    titled = issue()
+    titled["title"] = "@logos fix login"
+    titled["author_association"] = "OWNER"
+    thread = build_thread(titled, [])
+    assert thread.trigger_eligible_dispatches == [("alice", NOW - timedelta(hours=10), False)]
+    assert thread.owner_agent == "alice"
+
+    # Trigger eligibility still needs a maintainer-level author.
+    outsider = dict(titled, author_association="NONE")
+    outsider_thread = build_thread(outsider, [])
+    assert outsider_thread.dispatches == [("alice", NOW - timedelta(hours=10))]
+    assert outsider_thread.trigger_eligible_dispatches == []
+
+    # Pull requests never start the Logos workflow, so the same title records nothing.
+    pr = pr_item()
+    pr["title"] = "@logos fix login"
+    pr["author_association"] = "OWNER"
+    pr_thread = build_thread(pr, [], pull())
+    assert pr_thread.dispatches == []
+    assert pr_thread.trigger_eligible_dispatches == []
+
+
 # --- findings ---------------------------------------------------------------
 
 
@@ -470,7 +533,7 @@ def test_digest_groups_findings_and_neutralises_mentions():
     assert digest.startswith(observer.DIGEST_MARKER)
     assert digest.count("[#2]") == 1
     assert "CI красный: tests; конфликт с master" in digest
-    assert not re.search(r"@(claude|codex|alice)\b", digest)
+    assert not re.search(r"@(claude|codex|alice|logos)\b", digest)
     assert "<b>" not in digest
     assert "Задача #3" in digest
     assert "Задача #4" not in digest
@@ -776,7 +839,7 @@ def test_digest_escapes_actor_names():
     }
     bot_commit = dict(commit, author={"name": "claude[bot] <i>", "date": ts(1)})
     digest = render_digest([build_thread(issue(), [commit, bot_commit])], [], NOW, "o/r")
-    assert not re.search(r"@(claude|codex|alice)\b", digest)
+    assert not re.search(r"@(claude|codex|alice|logos)\b", digest)
     assert "<b>" not in digest and "<i>" not in digest
 
 

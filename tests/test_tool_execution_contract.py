@@ -1,9 +1,9 @@
 import unittest
 from unittest.mock import patch
 
-from trace_manager import ExecutionTrace
-from universal_tool_platform import UniversalToolDefinition
-from tool_registry import registry
+from observability.trace_manager import ExecutionTrace
+from tool_providers.universal_tool_platform import UniversalToolDefinition
+from tool_providers.registry import registry
 from yandex_client_modules.mcp_mixin import YandexMcpMixin
 
 

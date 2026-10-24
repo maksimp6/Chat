@@ -1,6 +1,6 @@
 # SSH Runtime settings
 
-Alice Pro keeps SSH Runtime configuration as a server-side structured setting under the `configs` table.
+Logos keeps SSH Runtime configuration as a server-side structured setting under the `configs` table.
 
 ## Configuration source
 
@@ -31,7 +31,7 @@ Command output is bounded by `max_output_bytes` to prevent an SSH call from exha
 
 `GET /api/ssh-runtime/settings`
 
-Returns the current structured SSH Runtime settings and the last connection-test result. The endpoint requires a trusted Alice owner identity.
+Returns the current structured SSH Runtime settings and the last connection-test result. The endpoint requires a trusted Logos owner identity.
 
 `PUT /api/ssh-runtime/settings`
 
@@ -45,7 +45,7 @@ Body:
 {"target":"preview"}
 ```
 
-The target must already exist in the saved configuration. The test executes only the fixed remote command `true`, using the trusted Alice identity mapping.
+The target must already exist in the saved configuration. The test executes only the fixed remote command `true`, using the trusted Logos identity mapping.
 
 ## Example
 

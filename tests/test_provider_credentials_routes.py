@@ -1,8 +1,9 @@
+from agent_memory.client import close_memory_clients
 from datetime import datetime, timezone
 
 import base64
 
-import provider_credentials_routes as routes
+import provider_accounts.credentials_routes as routes
 
 
 class FakeProvider:
@@ -16,7 +17,7 @@ class FakeProvider:
 
 def test_status_never_returns_secret(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    import db
+    import storage.db as db
 
     db.DB_PATH = str(tmp_path / "status.db")
     db.init_db()
@@ -29,8 +30,8 @@ def test_status_never_returns_secret(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
 
-    conn = db.get_conn()
-    from provider_credentials import replace_active_credential
+    conn = db.get_store()
+    from provider_accounts.credentials import replace_active_credential
 
     replace_active_credential(
         conn,
@@ -40,7 +41,7 @@ def test_status_never_returns_secret(monkeypatch, tmp_path):
         "yandex",
         provider_key_id="yandex-id",
     )
-    conn.close()
+    close_memory_clients()
 
     from flask import Flask
 
@@ -57,7 +58,7 @@ def test_status_never_returns_secret(monkeypatch, tmp_path):
 
 def test_status_without_active_credentials_does_not_use_removed_config_key(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    import db
+    import storage.db as db
 
     db.DB_PATH = str(tmp_path / "status-empty.db")
     db.init_db()
@@ -82,7 +83,7 @@ def test_status_without_active_credentials_does_not_use_removed_config_key(monke
 
 def test_update_validates_before_persisting_and_clears_frontend_contract(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    import db
+    import storage.db as db
 
     db.DB_PATH = str(tmp_path / "update.db")
     db.init_db()
@@ -120,7 +121,7 @@ def test_update_validates_before_persisting_and_clears_frontend_contract(monkeyp
 
 def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    import db
+    import storage.db as db
 
     db.DB_PATH = str(tmp_path / "reject.db")
     db.init_db()
@@ -146,15 +147,19 @@ def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_pat
         )
 
     assert response.status_code == 401
-    conn = db.get_conn()
-    rows = conn.execute("SELECT * FROM provider_credentials WHERE provider = 'yandex'").fetchall()
-    conn.close()
+    conn = db.get_store()
+    rows = [
+        row
+        for row in conn.items(prefix="provider/credential/").values()
+        if row["provider"] == "yandex"
+    ]
+    close_memory_clients()
     assert rows == []
 
 
 def test_provider_credentials_rejects_remote_without_admin_token(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    import db
+    import storage.db as db
 
     db.DB_PATH = str(tmp_path / "auth.db")
     db.init_db()
@@ -178,7 +183,7 @@ def test_provider_credentials_rejects_remote_without_admin_token(monkeypatch, tm
 
 def test_provider_credentials_accepts_explicit_admin_token(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    import db
+    import storage.db as db
 
     db.DB_PATH = str(tmp_path / "admin.db")
     db.init_db()
@@ -214,7 +219,7 @@ def test_provider_credentials_accepts_explicit_admin_token(monkeypatch, tmp_path
 
 def test_provider_credentials_status_check_requires_auth(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    import db
+    import storage.db as db
 
     db.DB_PATH = str(tmp_path / "check-auth.db")
     db.init_db()
@@ -238,7 +243,7 @@ def test_provider_credentials_status_check_requires_auth(monkeypatch, tmp_path):
 
 def test_cloudru_bootstrap_rejects_expired_master_key(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    import db
+    import storage.db as db
 
     db.DB_PATH = str(tmp_path / "expired-master.db")
     db.init_db()
@@ -267,7 +272,7 @@ def test_cloudru_bootstrap_rejects_expired_master_key(monkeypatch, tmp_path):
 
 def test_cloudru_bootstrap_requires_existing_service_account(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    import db
+    import storage.db as db
 
     db.DB_PATH = str(tmp_path / "service-account-required.db")
     db.init_db()
@@ -295,7 +300,7 @@ def test_cloudru_bootstrap_requires_existing_service_account(monkeypatch, tmp_pa
 
 def test_cloudru_bootstrap_does_not_enumerate_service_accounts(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    import db
+    import storage.db as db
 
     db.DB_PATH = str(tmp_path / "bootstrap.db")
     db.init_db()
@@ -356,7 +361,7 @@ def test_cloudru_bootstrap_does_not_enumerate_service_accounts(monkeypatch, tmp_
 
 def test_update_accepts_direct_cloudru_api_key(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    import db
+    import storage.db as db
 
     db.DB_PATH = str(tmp_path / "cloudru-direct.db")
     db.init_db()
@@ -393,11 +398,13 @@ def test_update_accepts_direct_cloudru_api_key(monkeypatch, tmp_path):
     statuses = {item["provider"]: item for item in payload["providers"]}
     assert statuses["cloudru"]["status"] == "connected"
 
-    conn = db.get_conn()
-    row = conn.execute(
-        "SELECT provider, project_id, status FROM provider_credentials WHERE provider = 'cloudru'"
-    ).fetchone()
-    conn.close()
+    conn = db.get_store()
+    row = next(
+        row
+        for row in conn.items(prefix="provider/credential/").values()
+        if row["provider"] == "cloudru"
+    )
+    close_memory_clients()
     assert row["provider"] == "cloudru"
     assert row["project_id"] == ""
     assert row["status"] == "active"
@@ -405,7 +412,7 @@ def test_update_accepts_direct_cloudru_api_key(monkeypatch, tmp_path):
 
 def test_update_accepts_yandex_and_cloudru_keys_together(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    import db
+    import storage.db as db
 
     db.DB_PATH = str(tmp_path / "both-providers.db")
     db.init_db()
@@ -493,7 +500,7 @@ def test_perform_health_check_classifies_provider_failures(monkeypatch):
         def close(self):
             pass
 
-    monkeypatch.setattr(routes, "get_conn", lambda: FakeConn())
+    monkeypatch.setattr(routes, "get_store", lambda: FakeConn())
     recorded = []
     monkeypatch.setattr(
         routes,
