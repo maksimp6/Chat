@@ -5,7 +5,11 @@
     return document.getElementById(id);
   }
 
-
+  // Errors stay visible in the panel; the console alone is not enough for the user.
+  function reportStatus(message) {
+    var status = byId("memoryStatus");
+    if (status) status.textContent = message || "";
+  }
 
   window.loadMemoryData = async function () {
     try {
@@ -17,10 +21,17 @@
       var count = byId("memCount");
       var list = byId("memoryFactsList");
       var facts = Array.isArray(data.facts) ? data.facts : [];
+      var config = data.config || {};
 
-      if (enabled) enabled.checked = Boolean(data.config && data.config.enabled);
-      if (limit) limit.value = (data.config && data.config.max_context_facts) || 15;
+      if (enabled) enabled.checked = Boolean(config.enabled);
+      // A stored 0 is a real limit (no facts in context), so only a missing value falls back.
+      if (limit) {
+        limit.value = String(
+          Number.isInteger(config.max_context_facts) ? config.max_context_facts : 15,
+        );
+      }
       if (count) count.textContent = facts.length;
+      reportStatus("");
       if (!list) return;
 
       list.replaceChildren();
@@ -44,25 +55,30 @@
       });
     } catch (error) {
       console.error("[Memory] Failed to load memory:", error);
+      reportStatus("Не удалось загрузить память.");
     }
   };
 
   window.updateMemoryConfig = async function () {
     var enabled = byId("memEnabled");
     var limit = byId("memLimit");
+    var maxFacts = parseInt(limit && limit.value, 10);
     try {
       var response = await window.LogosDispatcher.request("/api/memory/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           enabled: Boolean(enabled && enabled.checked),
-          max_context_facts: parseInt(limit && limit.value, 10) || 15,
+          max_context_facts: Number.isNaN(maxFacts) ? 15 : maxFacts,
         }),
       });
       if (!response.ok) throw new Error("HTTP " + response.status);
       await window.loadMemoryData();
     } catch (error) {
       console.error("[Memory] Failed to update config:", error);
+      // Re-read the server state so the controls show what was actually saved.
+      await window.loadMemoryData();
+      reportStatus("Не удалось сохранить настройки памяти.");
     }
   };
 
@@ -78,6 +94,7 @@
       await window.loadMemoryData();
     } catch (error) {
       console.error("[Memory] Failed to clear memory:", error);
+      reportStatus("Не удалось очистить память.");
     }
   };
 

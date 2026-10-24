@@ -384,7 +384,7 @@
           <label class="memory-config-option"
             ><input type="checkbox" id="memEnabled" /> Включить память</label
           ><label class="memory-config-option"
-            >Макс. фактов: <input type="number" id="memLimit" class="memory-limit" min="1" max="50"
+            >Макс. фактов: <input type="number" id="memLimit" class="memory-limit" min="0" max="100"
           /></label>
         </div>
         <div class="memory-clear">
@@ -392,6 +392,7 @@
             Очистить всю память
           </button>
         </div>
+        <p id="memoryStatus" class="memory-status" role="status"></p>
         <h3 class="memory-facts-title">Факты (<span id="memCount">0</span>)</h3>
         <div id="memoryFactsList" class="memory-facts-list"></div>
       </div>
