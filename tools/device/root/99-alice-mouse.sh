@@ -1,13 +1,13 @@
 #!/system/bin/sh
-# Alice Mouse boot watchdog v2, staged: no production install until approved gate.
-ROOT="${ALICE_MOUSE_ROOT:-/data/adb/alice-mouse}"
+# Remote input boot watchdog v2, staged: no production install until approved gate.
+ROOT="${REMOTE_INPUT_ROOT:?REMOTE_INPUT_ROOT is required}"
 BIN="$ROOT/mouse"
 BACKUP="$ROOT/staging/rollback-guard"
 PENDING="$ROOT/cutover.pending"
 LOG="$ROOT/last.log"
-TEST_MODE="${ALICE_MOUSE_TEST_MODE:-0}"
+TEST_MODE="${REMOTE_INPUT_TEST_MODE:-0}"
 
-alice_mouse_active() {
+remote_input_active() {
     if [ "$TEST_MODE" = "1" ]; then
         [ -e "$ROOT/synthetic_active" ]
         return $?
@@ -35,7 +35,7 @@ pending_is_stale() {
 restore_stale_cutover() {
     [ -f "$PENDING" ] || return 0
     pending_is_stale || return 1
-    alice_mouse_active && return 1
+    remote_input_active && return 1
     [ -f "$BACKUP" ] || return 1
     cp "$BACKUP" "$BIN.restore.tmp" || return 1
     chmod 700 "$BIN.restore.tmp" || return 1
@@ -52,7 +52,7 @@ one_cycle() {
     if [ "$TEST_MODE" = "1" ]; then
         return 0
     fi
-    if [ -c /dev/uinput ] && ! alice_mouse_active; then
+    if [ -c /dev/uinput ] && ! remote_input_active; then
         "$BIN" serve >>"$LOG" 2>&1
     fi
     return 0

@@ -45,10 +45,10 @@ def seed(path: str) -> dict[str, str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed one confirmed Alice Board incident")
-    parser.add_argument("--db", default=os.environ.get("ALICE_BOARD_DB"))
+    parser.add_argument("--db", default=os.environ.get("PROJECT_BOARD_DB"))
     arguments = parser.parse_args()
     if not arguments.db:
-        parser.error("--db or ALICE_BOARD_DB is required")
+        parser.error("--db or PROJECT_BOARD_DB is required")
     result = seed(arguments.db)
     print(f"Saved in Memory DB: {result['thread_id']}/{result['post_id']}")
 

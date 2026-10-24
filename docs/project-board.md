@@ -24,7 +24,7 @@
 ```text
 Browser (mobile) -> Alice Board HTTP loopback -> BoardStore
                                                -> FileMemoryDB append+fsync
-                                               -> /data/alice-board/board.memory
+                                               -> /data/project-board/board.memory
 ```
 
 - Код сервиса в `project_board/`, UI в `project_board/static/`.
@@ -40,8 +40,8 @@ Browser (mobile) -> Alice Board HTTP loopback -> BoardStore
 ## Запуск только в изолированной среде
 
 ```bash
-export ALICE_BOARD_DB=/data/alice-board/board.memory
-export ALICE_BOARD_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(36))')"
+export PROJECT_BOARD_DB=/data/project-board/board.memory
+export PROJECT_BOARD_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(36))')"
 python3 -m project_board.server
 ```
 
@@ -52,7 +52,7 @@ python3 -m project_board.server
 Запись текущего подтверждённого инцидента в новую доску, при **остановленном сервере**:
 
 ```bash
-python3 -m project_board.seed --db /data/alice-board/board.memory
+python3 -m project_board.seed --db /data/project-board/board.memory
 ```
 
 Повторная команда идемпотентна. Это локальная запись Alice Board,
@@ -60,7 +60,7 @@ python3 -m project_board.seed --db /data/alice-board/board.memory
 
 ## HTTP API
 
-Все `/api/` методы требуют `Authorization: Bearer <ALICE_BOARD_TOKEN>`.
+Все `/api/` методы требуют `Authorization: Bearer <PROJECT_BOARD_TOKEN>`.
 Без токена возвращается 401. Health `/healthz` анонимный, без пользовательских данных.
 
 | Метод | Маршрут | Назначение |

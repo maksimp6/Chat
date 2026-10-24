@@ -26,7 +26,7 @@ _DEFAULTS = {
 }
 DEFAULT_CONFIGS = {
     "local_git": {
-        "repo_path": "/sdcard/alice_pro",
+        "repo_path": "",
         "timeout": 15,
         "default_log_limit": 5,
         "allowed_commands": ["status", "log", "diff", "branch", "show"],

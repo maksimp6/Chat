@@ -209,7 +209,7 @@ def create_server(
     if host != "127.0.0.1":
         raise ValueError("Alice Board must bind to loopback behind a trusted proxy")
     if not isinstance(token, str) or len(token) < 32:
-        raise ValueError("ALICE_BOARD_TOKEN must be a high-entropy secret of 32+ characters")
+        raise ValueError("PROJECT_BOARD_TOKEN must be a high-entropy secret of 32+ characters")
 
     class BoundHandler(BoardHandler):
         _store = store
@@ -220,15 +220,17 @@ def create_server(
 
 def main() -> None:
     """Start only when a dedicated token and mounted persistent data root are configured."""
-    token = os.environ.get("ALICE_BOARD_TOKEN", "")
+    token = os.environ.get("PROJECT_BOARD_TOKEN", "")
     if len(token) < 32:
-        raise SystemExit("ALICE_BOARD_TOKEN (32+ characters) is required")
-    path = os.environ.get("ALICE_BOARD_DB", "/data/alice-board/board.memory")
-    port = int(os.environ.get("ALICE_BOARD_PORT", "8787"))
+        raise SystemExit("PROJECT_BOARD_TOKEN (32+ characters) is required")
+    path = os.environ.get("PROJECT_BOARD_DB", "")
+    if not path:
+        raise SystemExit("PROJECT_BOARD_DB is required")
+    port = int(os.environ.get("PROJECT_BOARD_PORT", "8787"))
     with BoardStore(path) as store:
         server = create_server(store, token, port=port)
         try:
-            print(f"Alice Board listening on 127.0.0.1:{port}", flush=True)
+            print(f"Project board listening on 127.0.0.1:{port}", flush=True)
             server.serve_forever()
         finally:
             server.server_close()

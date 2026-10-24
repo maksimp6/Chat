@@ -20,11 +20,11 @@ TOKEN = "test-owner-token-not-for-production-" + "a" * 24
 
 
 def key(suffix: str) -> str:
-    return "alice-board-test:" + suffix
+    return "project-board-test:" + suffix
 
 
 def test_bootstrap_persists_and_replay_is_idempotent(tmp_path):
-    path = tmp_path / "alice-board.memory"
+    path = tmp_path / "project-board.memory"
     with BoardStore(path) as db:
         initial = db.threads()
         assert len(initial) == 1

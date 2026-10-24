@@ -36,8 +36,9 @@ PROJECT_DIR = os.path.realpath(os.path.dirname(os.path.dirname(os.path.abspath(_
 def _resolve_repo_path(repo_name: str = None, cfg: dict = None) -> str:
     cfg = cfg or {}
     base_dir = cfg.get("repos_base_dir") or "/sdcard/repo"
-    explicit = repo_name or cfg.get("active_repo") or cfg.get("repo_path")
-    target = explicit or "alice_pro"
+    target = repo_name or cfg.get("active_repo") or cfg.get("repo_path")
+    if not target:
+        return ""
 
     if os.path.isabs(target) and os.path.isdir(target):
         return target
@@ -51,9 +52,6 @@ def _resolve_repo_path(repo_name: str = None, cfg: dict = None) -> str:
         if os.path.isdir(alt):
             return alt
 
-    # Off the Android device the default repository is Logos's own checkout.
-    if not explicit and os.path.exists(os.path.join(PROJECT_DIR, ".git")):
-        return PROJECT_DIR
     return candidate
 
 

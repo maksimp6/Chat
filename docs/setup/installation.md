@@ -69,9 +69,8 @@ python app.py
 ## Данные
 
 Локально `storage/db.py` использует нативный журнал относительно рабочего каталога:
-по умолчанию `alice.memory`; `ALICE_DB_PATH` задаёт его имя, `ALICE_MEMORY_PATH` —
-точный путь. Файл `alice_pro.db` — legacy SQLite-данные: runtime его не открывает, и
-при отсутствии журнала рядом с ним запуск остановится, а не создаст пустое хранилище
+без значения по умолчанию; `ALICE_DB_PATH` задаёт его имя, `ALICE_MEMORY_PATH` —
+точный путь. Файл `alice_pro.db` — legacy SQLite-данные: runtime его не открывает и не проверяет его наличие
 (см. [docs/database.md](../database.md)).
 SQLite backend выведен из эксплуатации. PostgreSQL backend выведен из эксплуатации (#1191): дополнительные зависимости
 не нужны, `ALICE_DATABASE_URL` не используется.

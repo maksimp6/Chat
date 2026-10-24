@@ -7,7 +7,7 @@ from flask import Blueprint, request, jsonify, Response
 from core.config import Config
 from yandex_client_modules.client import YandexResponsesClient, YandexClientError
 
-logger = logging.getLogger("alice_pro")
+logger = logging.getLogger(__name__)
 file_bp = Blueprint("file_manager", __name__)
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".csv", ".md", ".html", ".json", ".jsonl", ".txt"}

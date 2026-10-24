@@ -9,29 +9,20 @@ from typing import Any
 from runtime.request_context import current_runtime_data_root
 from kristall import Kristall, KristallError
 
-DB_PATH = os.getenv("ALICE_DB_PATH", "alice.memory")
+DB_PATH = os.getenv("ALICE_DB_PATH", "").strip()
 
 
 def memory_file_path() -> Path:
     root = current_runtime_data_root()
     if root:
-        path = Path(root).resolve() / "alice.memory"
-        _require_native_activation(path, path.with_name("alice_pro.db"))
-        return path
+        return Path(root).resolve() / "alice.memory"
     explicit = os.getenv("ALICE_MEMORY_PATH", "").strip()
     if explicit:
         return Path(explicit).expanduser().resolve()
+    if not DB_PATH:
+        raise KristallError("memory path is not configured: set ALICE_MEMORY_PATH or ALICE_DB_PATH")
     configured = Path(DB_PATH).expanduser().resolve()
-    path = configured if configured.suffix == ".memory" else configured.with_name("alice.memory")
-    legacy = configured if configured.suffix != ".memory" else path.with_name("alice_pro.db")
-    _require_native_activation(path, legacy)
-    return path
-
-
-def _require_native_activation(path: Path, legacy: Path) -> None:
-    """Never silently replace legacy authority with a new empty database."""
-    if not path.exists() and legacy.exists():
-        raise KristallError("legacy data exists; explicit verified native activation required")
+    return configured if configured.suffix == ".memory" else configured.with_name("alice.memory")
 
 
 def get_store() -> Kristall:

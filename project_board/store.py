@@ -32,7 +32,7 @@ class BoardUnavailable(RuntimeError):
     """A second writer or an uncertain durable write prevents operation."""
 
 
-PREFIX = "alice-board:v1:event:"
+PREFIX = "project-board:v1:event:"
 CATEGORIES = {"discussion", "shame", "decision"}
 STATUSES = {"backlog", "blocked", "ready", "in_progress", "review", "done"}
 IDEMPOTENCY = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._:-]{7,127}$")
@@ -123,7 +123,7 @@ class BoardStore:
                 "Доска позора",
                 "Подтверждённые ошибки Alice Pro и регрессионные проверки.",
                 "shame",
-                "bootstrap:alice-board:shame:v1",
+                "bootstrap:project-board:shame:v1",
                 actor="system",
             )
 

@@ -47,7 +47,7 @@ Durability and integrity:
 
 1. Inside a preview runtime, `<runtime data root>/alice.memory`.
 2. `ALICE_MEMORY_PATH`, when set, is used as the journal path.
-3. Otherwise `ALICE_DB_PATH` (default `alice.memory`). A name that does not end in
+3. Otherwise `ALICE_DB_PATH` (no default). A name that does not end in
    `.memory` maps to `alice.memory` in the same directory.
 
 `.env.example` sets `ALICE_MEMORY_PATH=./alice.memory`. Deployments set an explicit
@@ -83,11 +83,7 @@ filesystem under it change.
 
 ## Legacy SQLite data
 
-- `alice_pro.db` is legacy SQLite data. Kristall never opens it. The runtime only
-  checks whether it exists; the profiler tool reports the native journal, not this file.
-- If the native journal is missing and `alice_pro.db` exists beside it, startup
-  refuses to create an empty store (`legacy data exists; explicit verified native
-  activation required`).
+- `alice_pro.db` is legacy SQLite data. Kristall never opens it, and the runtime does not check for it.
 - Nothing imports legacy data automatically. Activation is a separate, verified step.
   Historical SQL data and backups are not changed by the runtime.
 

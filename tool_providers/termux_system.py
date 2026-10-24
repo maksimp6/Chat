@@ -195,7 +195,9 @@ def send_sms(args: dict, cfg: dict = None) -> dict:
 def take_photo(args: dict, cfg: dict = None) -> dict:
     """Сделать фото с камеры смартфона (0 = задняя, 1 = передняя)."""
     camera_id = str(args.get("camera_id", "0"))
-    out_file = args.get("output_path") or "/storage/emulated/0/alice_pro/captured_photo.jpg"
+    out_file = args.get("output_path")
+    if not out_file:
+        return {"error": "Параметр 'output_path' обязателен"}
     out_dir = os.path.dirname(out_file)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)

@@ -1,6 +1,6 @@
 // === PROMPTS: История и шаблоны промптов ===
 (function () {
-  const PROMPTS_KEY = "alice_pro_prompts";
+  const PROMPTS_KEY = "logos_prompts";
   const MAX_PROMPTS = 50;
 
   window.PromptsHistory = {
