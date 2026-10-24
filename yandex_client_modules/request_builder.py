@@ -5,7 +5,7 @@ It deliberately has no HTTP, database, tracing, or MCP side effects.
 """
 
 from core.config import upstream_model_id
-from core.model_profiles import ultra_request_defaults
+from core.model_profiles import ultra_reasoning_controllable, ultra_request_defaults
 from yandex_client_modules.metadata_validator import validate_metadata
 
 
@@ -82,7 +82,11 @@ def build_response_payload(
 
     if params.get("reasoning"):
         payload["reasoning"] = params["reasoning"]
-    elif params.get("reasoning_effort") and params["reasoning_effort"] != "disabled":
+    elif (
+        params.get("reasoning_effort")
+        and params["reasoning_effort"] != "disabled"
+        and ultra_reasoning_controllable(model_key)
+    ):
         payload["reasoning"] = {"effort": params["reasoning_effort"]}
 
     raw_tools = params.get("tools")

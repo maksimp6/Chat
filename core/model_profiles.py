@@ -101,6 +101,19 @@ def ultra_request_defaults(model_key: str) -> dict[str, Any]:
     return defaults
 
 
+def ultra_reasoning_controllable(model_key: str) -> bool:
+    """False when the Ultra profile says the model has no reasoning-depth control.
+
+    Such a model must not receive a ``reasoning`` field: the profile publishes no wire shape
+    for it, and a requested effort can spend the whole output budget on reasoning.
+    Models without a profile keep the caller's settings unchanged.
+    """
+    profile = ultra_profiles().get(model_key)
+    if profile is None:
+        return True
+    return (profile.get("reasoning") or {}).get("depth_control") is not False
+
+
 def completion_model_keys() -> set[str]:
     """Registry keys whose Ultra profile uses the completion API, not Responses."""
     return {
