@@ -161,6 +161,10 @@ def create_api_key():
         api_key = cloud_response.get("secret") or ""
         key_id = str(cloud_response.get("id") or "")
         if not api_key or not key_id:
+            if key_id:
+                # The key was issued, but no secret came back, so nobody can use it. Revoke it
+                # rather than leave a live credential behind.
+                _revoke_unstored_key(client, key_id)
             return jsonify({"error": "Cloud.ru did not return the API-key secret"}), 502
 
         try:
