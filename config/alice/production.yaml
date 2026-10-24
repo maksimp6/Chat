@@ -7,4 +7,6 @@ lanes:
     services:
       - oauth
       - chrome
+      - alice
+      - alice-browser
     owner_id: "293531601"

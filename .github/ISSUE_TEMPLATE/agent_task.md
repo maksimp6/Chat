@@ -1,6 +1,6 @@
 ---
 name: Agent task
-about: A focused task for an Alice Pro role agent or coding-agent backend
+about: A focused task for a Logos role agent or coding-agent backend
 title: "[Agent] "
 labels: "agent-task"
 ---

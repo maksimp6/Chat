@@ -1,7 +1,7 @@
-"""Deterministic task-context contracts and cache for Alice Pro agents."""
+"""Deterministic task-context contracts and cache for Logos agents."""
 
-from .cache import CacheLookup, TaskContextCache, record_context_cache_lookup
-from .models import ContextSlice, EvidenceRef, EvidenceVersion, TaskPacket, TaskScope
+from agent_context.cache import CacheLookup, TaskContextCache, record_context_cache_lookup
+from agent_context.models import ContextSlice, EvidenceRef, EvidenceVersion, TaskPacket, TaskScope
 
 __all__ = [
     "CacheLookup",

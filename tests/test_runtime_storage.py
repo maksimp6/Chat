@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from runtime import RuntimeDispatcher, RuntimeScopeViolation, RuntimeStorage
-from storage import (
+from storage.contracts import (
     LocalDirectoryStorage,
     StorageCredentialsMissing,
     StorageError,

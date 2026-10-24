@@ -15,6 +15,9 @@ if [[ "${ALICE_RDC_MODE:-}" == "cloud-rdc" ]]; then
   # POSIX home/profile directories are populated only after verified recovery.
   python3 /opt/desktop-commander/state-store.py restore >/dev/null
 fi
+# Git uses only the key delivered through the protected /rdc/secrets route and
+# only GitHub's published host keys.
+export GIT_SSH_COMMAND="ssh -i /home/node/.alice-secrets/rdc.git.ssh -o IdentitiesOnly=yes -o UserKnownHostsFile=/opt/desktop-commander/github_known_hosts -o StrictHostKeyChecking=yes"
 config_dir="/home/node/.claude-server-commander"
 auth_dir="/home/node/.desktop-commander-device"
 mkdir -p "$config_dir" "$auth_dir"

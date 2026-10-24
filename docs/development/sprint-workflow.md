@@ -1,6 +1,6 @@
 # Sprint workflow
 
-Alice Pro uses short, reviewable development iterations. The goal is a verified vertical increment, not a pile of closed checkboxes.
+Logos uses short, reviewable development iterations. The goal is a verified vertical increment, not a pile of closed checkboxes.
 
 ## Cadence
 
