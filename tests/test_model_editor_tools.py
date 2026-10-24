@@ -26,8 +26,8 @@ from model_editor.tools import (
     model_inspect,
 )
 from storage import LocalDirectoryStorage
-from tool_registry import ToolRegistry
-from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_providers.registry import ToolRegistry
+from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 
 
 class Caller:

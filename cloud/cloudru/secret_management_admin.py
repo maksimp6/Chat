@@ -15,7 +15,7 @@ import requests
 from cloud.base import CloudProviderError
 from cloud.cloudru.client import CloudRuClient
 from cloud.cloudru.secret_management import SECRET_PATH, VERSIONS_PATH
-from cloudru_iam import CloudRuIamClient, CloudRuIamError
+from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
 
 
 class CloudRuSecretManagementAdminClient:

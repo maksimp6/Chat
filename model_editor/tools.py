@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from storage import storage_provider_from_env
+from storage.contracts import storage_provider_from_env
 
 from .engine import add_primitive, edit_primitive, number, vector3
 from .store import ModelStore
@@ -22,7 +22,7 @@ def _store(cfg: dict[str, Any] | None = None) -> ModelStore:
         owner = str(user_id).strip()
     else:
         # Same trusted identity fallback used by 3D business tools.
-        from treasury_identity import get_current_owner_id
+        from economy.treasury_identity import get_current_owner_id
 
         resolved_owner = get_current_owner_id(required=True)
         if resolved_owner is None:

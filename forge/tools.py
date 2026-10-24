@@ -12,6 +12,7 @@ from economy.treasury_identity import get_current_owner_id
 
 from forge.binding import printing_store as _store
 from printing3d import finance, service
+from printing3d.plate import MAX_FILE_BYTES, inspect_archive
 
 QUOTE_REQUIRED_FIELDS = ("material_grams", "material_cost_per_kg", "print_hours")
 QUOTE_OPTIONAL_FIELDS = (
@@ -33,6 +34,47 @@ def _trusted_owner(cfg: Optional[dict[str, Any]] = None) -> str:
     if user_id and str(user_id).strip():
         return str(user_id).strip()
     return get_current_owner_id(required=True)
+
+
+PRINT_ARTIFACT_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\.(?:gcode\.)?3mf$")
+
+
+def plate_inspect(
+    arguments: Mapping[str, Any],
+    cfg: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """Read one owner's staged 3MF without arbitrary filesystem access."""
+    name = arguments.get("artifact_name")
+    if type(name) is not str or not PRINT_ARTIFACT_NAME.fullmatch(name):
+        raise ValueError("artifact_name must be one plain .3mf or .gcode.3mf filename")
+    root = os.environ.get("ALICE_3D_ARTIFACT_ROOT")
+    if not root:
+        return {"status": "needs_configuration", "missing_fields": ["ALICE_3D_ARTIFACT_ROOT"]}
+    # Owner identity comes ONLY from authenticated universal context, never
+    # the caller's arguments; hash it to prevent path traversal and PII leaks.
+    owner = _trusted_owner(cfg)
+    owner_folder = hashlib.sha256(owner.encode("utf-8")).hexdigest()
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+    try:
+        root_fd = os.open(root, flags | os.O_DIRECTORY)
+        try:
+            owner_fd = os.open(owner_folder, flags | os.O_DIRECTORY, dir_fd=root_fd)
+            try:
+                file_fd = os.open(name, flags | os.O_NONBLOCK, dir_fd=owner_fd)
+                with os.fdopen(file_fd, "rb") as handle:
+                    info = os.fstat(handle.fileno())
+                    if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_FILE_BYTES:
+                        return {"status": "blocked", "reason": "not a bounded regular file"}
+                    return inspect_archive(handle, name)
+            finally:
+                os.close(owner_fd)
+        finally:
+            os.close(root_fd)
+    except FileNotFoundError:
+        return {"status": "not_found", "artifact_name": name}
+    except OSError:
+        # Don't expose operator filesystem paths in model-facing diagnostics.
+        return {"status": "blocked", "reason": "artifact cannot be opened safely"}
 
 
 def get_treasury_summary(

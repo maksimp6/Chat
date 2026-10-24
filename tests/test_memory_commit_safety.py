@@ -9,6 +9,7 @@ import sys
 import pytest
 
 from kristall import Kristall, KristallError
+from kristall import Kristall as MemoryStore, KristallError as StoreError
 
 
 @pytest.mark.parametrize("mode", ["commit", "transaction"])
@@ -78,7 +79,7 @@ def test_interrupted_commit_blocks_retry_until_verified_reopen(
 @pytest.mark.parametrize("mode", ["commit", "transaction"])
 @pytest.mark.parametrize("phase", ["fsync", "after_append", "after_apply"])
 @pytest.mark.parametrize("interruption", [KeyboardInterrupt, SystemExit])
-def test_interrupted_commit_blocks_retry_until_verified_reopen(
+def test_interrupted_commit_blocks_retry_until_verified_reopen_after_publication(
     tmp_path, monkeypatch, mode, phase, interruption
 ):
     path = tmp_path / "state.memory"
@@ -142,7 +143,7 @@ def test_interrupted_commit_blocks_retry_until_verified_reopen(
 @pytest.mark.parametrize("mode", ["commit", "transaction"])
 @pytest.mark.parametrize("phase", ["fsync", "after_append", "after_apply"])
 @pytest.mark.parametrize("interruption", [KeyboardInterrupt, SystemExit])
-def test_interrupted_commit_blocks_retry_until_verified_reopen(
+def test_interrupted_commit_blocks_retry_until_verified_reopen_from_checkpoint(
     tmp_path, monkeypatch, mode, phase, interruption
 ):
     path = tmp_path / "state.memory"

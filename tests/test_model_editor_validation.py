@@ -16,7 +16,7 @@ from model_editor.engine import add_primitive, edit_primitive, export_stl, new_s
 from model_editor.store import ModelStore
 from model_editor.tools import _store, model_addcube
 from storage import LocalDirectoryStorage
-from tool_registry import ToolRegistry
+from tool_providers.registry import ToolRegistry
 
 MODEL_ID = "6f1c2a8e-3f0b-4c55-9a4e-2b7d6c1e9f00"
 PARENT = "a" * 64
@@ -187,10 +187,10 @@ class ToolIdentityTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     def test_falls_back_to_trusted_owner_and_fails_closed_without_one(self):
-        with patch("treasury_identity.get_current_owner_id", return_value="owner-1"):
+        with patch("economy.treasury_identity.get_current_owner_id", return_value="owner-1"):
             self.assertIsInstance(_store({}), ModelStore)
         with (
-            patch("treasury_identity.get_current_owner_id", return_value=None),
+            patch("economy.treasury_identity.get_current_owner_id", return_value=None),
             self.assertRaisesRegex(ValueError, "trusted owner identity"),
         ):
             _store({})
