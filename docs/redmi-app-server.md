@@ -28,11 +28,30 @@ data is never automatically replaced by a backup during rollback.
 
 The controller accepts `deploy`, `start`, `restart`, `status`, and `stop`. It signals
 only a process with the expected command and working directory and refuses an
-occupied untracked port. The existing launcher continues to select the bind
-address and port. The launch receipt is `runner-start.json`; application and
+occupied untracked port. The reviewed launcher reads the private bind-address settings and port. The launch receipt is `runner-start.json`; application and
 launcher logs stay in the private state directory.
 
 Readiness does not invoke a model or prove a model response. Automatic updates do
-not change RDC processes, boot schedules, dependency installations or network
-settings. Dependency installations and data-format migrations require their own
+not change RDC processes, boot schedules, dependency installations settings. Dependency installations and data-format migrations require their own
 reviewed changes; the updater does not manage them.
+
+## Wi-Fi readiness
+
+The server job requires a current IPv4 address on Android `wlan0`. Before reporting
+ready, the controller performs GET requests to that address for health, the Logos
+HTML shell and both required static assets, comparing their bytes with the local
+checkout. Missing Wi-Fi, connection refusal, redirects, an incorrect health body
+or mismatched assets fail readiness even when the loopback endpoint is healthy.
+
+The reviewed launcher is installed into the private state directory on the first
+Wi-Fi start, preserving its predecessor as `start-logos.py.before-wifi`. The
+non-secret `server-network.json` selects bind address `0.0.0.0` and requires Wi-Fi
+checks. This preserves loopback access for local runner operations while accepting
+requests to the phone's Wi-Fi address. Storage paths, encryption keys and native
+dependencies continue to come from the existing private state.
+
+The test receipt explicitly describes its scope as `server_wifi_address`, with
+`external_peer_verified: false`. A request to a device's own Wi-Fi address checks
+binding and responses; independent reachability from another phone also depends
+on that phone's network and access-point client isolation. It requires a separate
+client-side check and is never inferred from a loopback or same-device success.

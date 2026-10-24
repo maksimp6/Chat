@@ -40,7 +40,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         else: self.send_error(404); return
         self.send_response(200); self.end_headers(); self.wfile.write(body)
     def log_message(self, *args): pass
-http.server.HTTPServer(("127.0.0.1", int(os.environ["LOGOS_PORT"])), Handler).serve_forever()
+http.server.HTTPServer((os.environ.get("HOST", "127.0.0.1"), int(os.environ["LOGOS_PORT"])), Handler).serve_forever()
 ''')
     (state / "start-logos.py").write_text('''import os, pathlib, subprocess
 app = pathlib.Path(os.environ["LOGOS_APP_DIR"])
@@ -53,7 +53,7 @@ with (state / "backend.log").open("ab") as log:
     (state / "logos.memory").write_bytes(b"existing-persistent-data")
     (state / "provider-encryption.key").write_text("fixture-encryption-key")
     env = dict(os.environ, LOGOS_APP_DIR=str(app), LOGOS_STATE_DIR=str(state), LOGOS_PORT=str(port),
-               LOGOS_START_TIMEOUT="3", GH_TOKEN="must-not-reach-app", GITHUB_TOKEN="must-not-reach-app",
+               LOGOS_START_TIMEOUT="3", LOGOS_REQUIRE_WIFI="0", GH_TOKEN="must-not-reach-app", GITHUB_TOKEN="must-not-reach-app",
                ACTIONS_RUNTIME_TOKEN="must-not-reach-app", RUNNER_TRACKING_ID="must-not-reach-app")
     try:
         yield app, state, env
@@ -131,6 +131,20 @@ def test_wrong_static_content_fails_readiness(installation):
     result = run("start", env)
     assert result.returncode != 0
     assert not (state / "runner-start.json").exists()
+
+
+def test_launcher_uses_network_config_and_preserves_storage(installation):
+    app, state, env = installation
+    (state / "native-deps/site-packages/cryptography").mkdir(parents=True)
+    (state / "server-network.json").write_text('{"bind_host":"0.0.0.0"}')
+    (state / "start-logos.py").write_text((SCRIPT.parent / "redmi_app_launcher.py").read_text())
+    result = run("start", env)
+    assert result.returncode == 0, result.stderr
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    with opener.open("http://127.0.0.2:" + env["LOGOS_PORT"] + "/healthz", timeout=3) as response:
+        assert response.status == 200 and json.load(response) == {"status": "ok"}
+    assert (state / "logos.memory").read_bytes() == b"existing-persistent-data"
+    assert (state / "provider-encryption.key").read_text() == "fixture-encryption-key"
 
 
 def git(repo, *args):
@@ -280,4 +294,5 @@ def test_workflow_deploys_every_develop_push_in_one_serial_shell_step():
     job = workflow["jobs"]["server"]
     assert job["runs-on"] == "redmi9" and len(job["steps"]) == 1
     assert job["steps"][0]["name"] == "logos"
+    assert job["steps"][0]["env"]["LOGOS_REQUIRE_WIFI"] == "1"
     assert "bash scripts/redmi_app_server.sh deploy" in job["steps"][0]["run"]
