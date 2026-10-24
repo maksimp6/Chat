@@ -261,20 +261,21 @@ def init_repository(root: Path) -> Path:
     return root
 
 
-def test_git_defaults_to_the_logos_checkout_off_device_and_pushes_the_current_branch(
-    tmp_path, monkeypatch
-):
+def test_git_requires_an_explicit_repository_and_pushes_the_current_branch(tmp_path, monkeypatch):
     project = init_repository(tmp_path / "checkout")
     remote = tmp_path / "remote.git"
     subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
     subprocess.run(["git", "-C", str(project), "remote", "add", "origin", str(remote)], check=True)
-    monkeypatch.setattr(git_tools, "PROJECT_DIR", str(project))
     monkeypatch.chdir(tmp_path)
     no_device = {"repos_base_dir": str(tmp_path / "sdcard-missing")}
 
-    status = git_tools.git_status({}, no_device)
+    unconfigured = git_tools.git_status({}, no_device)
+    assert unconfigured["success"] is False
+    assert "Репозиторий не задан" in unconfigured["error"]
+
+    status = git_tools.git_status({"repo": str(project)}, no_device)
     assert status["success"] and "feature" in status["output"]
-    pushed = git_tools.git_push({}, no_device)
+    pushed = git_tools.git_push({"repo": str(project)}, no_device)
     assert pushed["success"], pushed
     heads = subprocess.check_output(["git", "-C", str(remote), "branch"], text=True)
     assert heads.split() == ["feature"]

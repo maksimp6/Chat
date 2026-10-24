@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 from werkzeug.exceptions import HTTPException
+from kristall import KristallError
 import os
 import logging
 import json
@@ -12,6 +13,7 @@ from provider_accounts.model_discovery import (
 )
 from storage.db import (
     init_db,
+    memory_file_path,
     create_conversation,
     update_conversation_title,
     update_conversation_model,
@@ -152,23 +154,49 @@ def _set_web_cache_headers(response):
     return response
 
 
-init_db()
-init_local_agent_tables()
-init_treasury_tables()
-init_printing_tables()
-init_user_identity_table()
-init_github_accounts_table()
-init_conversation_ownership_table()
-init_department_tables()
-from provider_accounts.quotas import init_quota_tables
+_storage_ready = False
 
-init_quota_tables()
-init_partner_relations_tables()
-ensure_partner_department()
-init_government_tables()
-ensure_government_department()
-init_environment_tables()
-logger.info("[BOOT] hello: database initialization completed")
+
+def _initialize_storage() -> None:
+    """Create durable tables once; runs at import when the memory path is configured."""
+    global _storage_ready
+    init_db()
+    init_local_agent_tables()
+    init_treasury_tables()
+    init_printing_tables()
+    init_user_identity_table()
+    init_github_accounts_table()
+    init_conversation_ownership_table()
+    init_department_tables()
+    from provider_accounts.quotas import init_quota_tables
+
+    init_quota_tables()
+    init_partner_relations_tables()
+    ensure_partner_department()
+    init_government_tables()
+    ensure_government_department()
+    init_environment_tables()
+    _storage_ready = True
+    logger.info("[BOOT] hello: database initialization completed")
+
+
+def _memory_path_configured() -> bool:
+    try:
+        memory_file_path()
+    except KristallError:
+        return False
+    return True
+
+
+if _memory_path_configured():
+    _initialize_storage()
+
+
+@app.before_request
+def _initialize_storage_on_first_request():
+    # Without a configured memory path the app still imports; the first data request fails.
+    if not _storage_ready and request.path != "/healthz":
+        _initialize_storage()
 
 
 @app.route("/")
