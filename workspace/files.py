@@ -66,15 +66,22 @@ class YandexFileManagerMixin:
         except Exception:
             err_msg = resp.text[:200] if resp.text else "unknown"
         api_logger.error(f"[FILES/VS] {context} failed: HTTP {status}: {err_msg}")
+        # The status travels with the error, so the route answers with it instead of a generic 500.
+        # A provider-side auth failure or server error is an upstream failure, reported as 502.
         if status == 404:
-            raise YandexClientError(f"{context}: Not found (404)")
+            raise YandexClientError(f"{context}: Not found (404)", status_code=404)
         if status == 413:
-            raise YandexClientError(f"{context}: File too large (max 128 MB) (413)")
+            raise YandexClientError(
+                f"{context}: File too large (max 128 MB) (413)", status_code=413
+            )
         if status in (401, 403):
-            raise YandexClientError(f"{context}: Auth failed ({status})")
+            raise YandexClientError(f"{context}: Auth failed ({status})", status_code=502)
         if status == 429:
-            raise YandexClientError(f"{context}: Rate limit (429): {err_msg}")
-        raise YandexClientError(f"{context} failed (HTTP {status}): {err_msg}")
+            raise YandexClientError(f"{context}: Rate limit (429): {err_msg}", status_code=429)
+        raise YandexClientError(
+            f"{context} failed (HTTP {status}): {err_msg}",
+            status_code=502 if status >= 500 else 400,
+        )
 
     # === Files API ===
 
