@@ -72,6 +72,8 @@ jobs:
           cache-dependency-path: requirements-dev.txt
       - name: Install pinned tooling
         run: pip install -r requirements-dev.txt
+      - name: Alice Input 2-second fault-emulation gate
+        run: timeout --signal=TERM --kill-after=1s 2s python3 tests/alice_input_security/fast_gate.py
       - name: Check naming, layout and reliability rules
         run: bash scripts/check_code_rules.sh
 
