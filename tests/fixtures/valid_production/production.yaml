@@ -1,0 +1,6 @@
+lanes:
+  production:
+    sign_in: github
+    services:
+      - oauth
+      - chrome

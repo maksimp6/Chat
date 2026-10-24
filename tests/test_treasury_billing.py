@@ -3,26 +3,24 @@ import pytest
 
 @pytest.fixture
 def treasury_db(tmp_path, monkeypatch):
-    import db
-    import invocation_manager
-    import runtime_migrations
-    import treasury
+    import storage.db as db
+    import economy.treasury as treasury
+    from agent_memory.client import close_memory_clients
 
     path = tmp_path / "treasury.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setattr(invocation_manager, "get_conn", db.get_conn)
-    monkeypatch.setattr(runtime_migrations, "get_conn", db.get_conn)
-    monkeypatch.setattr(treasury, "get_conn", db.get_conn)
-
+    monkeypatch.setenv("ALICE_MEMORY_PATH", str(tmp_path / "alice.memory"))
+    monkeypatch.setattr(treasury, "get_store", db.get_store)
+    close_memory_clients()
     db.init_db()
-    runtime_migrations.init_runtime_tables()
     treasury.init_treasury_tables()
-    return path
+    yield path
+    close_memory_clients()
 
 
 def test_calculated_billing_posts_once_and_keeps_trace_reference(treasury_db):
-    from billing import settle_billing_to_treasury
-    from treasury import demo_top_up, get_account
+    from economy.billing import settle_billing_to_treasury
+    from economy.treasury import demo_top_up, get_account
 
     owner_id = "user-1"
     demo_top_up(owner_id, 10)
@@ -47,8 +45,8 @@ def test_calculated_billing_posts_once_and_keeps_trace_reference(treasury_db):
 
 
 def test_partial_or_unknown_billing_is_never_posted(treasury_db):
-    from billing import settle_billing_to_treasury
-    from treasury import demo_top_up, get_account
+    from economy.billing import settle_billing_to_treasury
+    from economy.treasury import demo_top_up, get_account
 
     owner_id = "user-2"
     demo_top_up(owner_id, 10)
@@ -69,8 +67,8 @@ def test_partial_or_unknown_billing_is_never_posted(treasury_db):
 
 
 def test_billing_owner_is_bound_to_trusted_owner(treasury_db):
-    from billing import settle_billing_to_treasury
-    from treasury import demo_top_up
+    from economy.billing import settle_billing_to_treasury
+    from economy.treasury import demo_top_up
 
     demo_top_up("trusted-owner", 1)
     billing = {
@@ -85,7 +83,7 @@ def test_billing_owner_is_bound_to_trusted_owner(treasury_db):
 
 
 def test_mismatched_billing_owner_is_rejected(treasury_db):
-    from billing import settle_billing_to_treasury
+    from economy.billing import settle_billing_to_treasury
 
     with pytest.raises(ValueError, match="does not match"):
         settle_billing_to_treasury(
@@ -100,7 +98,7 @@ def test_mismatched_billing_owner_is_rejected(treasury_db):
 
 
 def test_missing_owner_identity_is_safe_skip(treasury_db):
-    from billing import settle_billing_to_treasury
+    from economy.billing import settle_billing_to_treasury
 
     result = settle_billing_to_treasury(
         {"cost_status": "calculated", "total_cost": 1, "trace_id": "trace-missing-owner"},
@@ -111,8 +109,8 @@ def test_missing_owner_identity_is_safe_skip(treasury_db):
 
 
 def test_insufficient_balance_does_not_create_debit(treasury_db):
-    from billing import settle_billing_to_treasury
-    from treasury import demo_top_up, get_account
+    from economy.billing import settle_billing_to_treasury
+    from economy.treasury import demo_top_up, get_account
 
     owner_id = "user-3"
     demo_top_up(owner_id, 1)
@@ -127,9 +125,9 @@ def test_insufficient_balance_does_not_create_debit(treasury_db):
 
 
 def test_invocation_user_id_flows_into_trace_billing_context(treasury_db):
-    from invocation_manager import create_invocation
-    from invocation_trace import create_invocation_trace
-    from session_manager import create_session
+    from invocation.manager import create_invocation
+    from invocation.trace import create_invocation_trace
+    from sessions.manager import create_session
 
     session = create_session()
     context = create_invocation(
@@ -155,7 +153,94 @@ def test_owner_identity_does_not_accept_client_body(treasury_db, monkeypatch):
         method="GET",
         json={"owner_id": "attacker"},
     ):
-        from treasury_identity import TreasuryIdentityError, get_current_owner_id
+        from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 
         with pytest.raises(TreasuryIdentityError):
             get_current_owner_id()
+
+
+def test_web_treasury_request_recovers_from_missing_identity(treasury_db):
+    from app import app
+
+    app.config.update(TESTING=True)
+    client = app.test_client()
+
+    unauthorized = client.get("/api/treasury/account")
+    assert unauthorized.status_code == 401
+    assert unauthorized.get_json()["error"] == "authenticated owner identity is required"
+
+    bootstrap = client.post(
+        "/api/users/bootstrap",
+        json={
+            "installation_id": "web-installation-treasury-recovery-123456",
+            "metadata": {"platform": "web"},
+        },
+    )
+    assert bootstrap.status_code == 200
+
+    account = client.get("/api/treasury/account")
+    assert account.status_code == 200
+    assert account.get_json()["owner_id"] == bootstrap.get_json()["user_id"]
+
+
+def test_bootstrap_authenticates_treasury_owner(treasury_db):
+    from app import app
+
+    app.config.update(TESTING=True)
+    client = app.test_client()
+
+    bootstrap = client.post(
+        "/api/users/bootstrap",
+        json={
+            "installation_id": "android-installation-auth-owner-123456",
+            "metadata": {"platform": "android"},
+        },
+    )
+
+    assert bootstrap.status_code == 200
+    identity = bootstrap.get_json()
+    assert identity["user_id"]
+    assert identity["auth_token"]
+    assert "alice_user_token=" in bootstrap.headers.get("Set-Cookie", "")
+
+    account = client.get("/api/treasury/account")
+    assert account.status_code == 200
+    assert account.get_json()["owner_id"] == identity["user_id"]
+
+
+def test_invalid_owner_token_is_rejected(treasury_db, monkeypatch):
+    from app import app
+
+    monkeypatch.delenv("ALICE_OWNER_ID", raising=False)
+    app.config.update(TESTING=True)
+    client = app.test_client()
+
+    response = client.get(
+        "/api/treasury/account",
+        headers={"X-Alice-User-Token": "not-a-valid-token"},
+    )
+
+    assert response.status_code == 401
+    assert response.get_json()["error"] == "invalid authenticated owner token"
+
+
+def test_authenticated_owner_ignores_client_owner_id(treasury_db):
+    from app import app
+
+    app.config.update(TESTING=True)
+    client = app.test_client()
+
+    bootstrap = client.post(
+        "/api/users/bootstrap",
+        json={"installation_id": "android-installation-owner-spoof-123456", "metadata": {}},
+    )
+    identity = bootstrap.get_json()
+    trusted_owner = identity["user_id"]
+
+    response = client.get(
+        "/api/treasury/account?owner_id=attacker-owner",
+        headers={"X-Alice-User-Token": identity["auth_token"]},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["owner_id"] == trusted_owner

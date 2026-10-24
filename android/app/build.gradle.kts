@@ -1,12 +1,15 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("com.chaquo.python")
 }
 
 android {
     namespace = "com.alicepro.mobile"
-    compileSdk = 35
+    compileSdk = 37
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -17,10 +20,14 @@ android {
         applicationId = "com.alicepro.mobile"
         minSdk = 26
         targetSdk = 35
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val buildNumber = providers.gradleProperty("aliceBuildNumber").orElse("1").get().toIntOrNull() ?: 1
         val commitHash = providers.gradleProperty("aliceCommitHash").orElse("unknown").get()
+        val resolvedVersionName = providers.gradleProperty("aliceVersionName")
+            .orElse("0.1.0-" + commitHash.take(7))
+            .get()
         versionCode = buildNumber
-        versionName = "0.1.0-${commitHash.take(7)}"
+        versionName = resolvedVersionName
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
@@ -77,14 +84,23 @@ chaquopy {
     defaultConfig {
         version = "3.13"
         pip {
-            install("-r", "../../requirements.txt")
+            install("-r", "../requirements.txt")
         }
     }
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.core:core-ktx:1.19.1")
+    implementation("androidx.appcompat:appcompat:1.8.0")
     implementation("androidx.webkit:webkit:1.12.1")
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    testImplementation("org.json:json:20240303")
+    testImplementation("org.robolectric:robolectric:4.17")
+}
+
+// AGP 9 exposes JVM arguments on Gradle Test tasks, not the Android unit-test DSL.
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    testLogging.events("passed", "failed", "skipped")
+    jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED", "--add-opens=java.base/java.util=ALL-UNNAMED", "--add-opens=java.base/java.io=ALL-UNNAMED", "--add-opens=java.base/java.net=ALL-UNNAMED", "--add-opens=java.base/java.security=ALL-UNNAMED", "--add-opens=java.base/java.text=ALL-UNNAMED")
 }

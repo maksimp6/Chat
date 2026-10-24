@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cloud.ru EDS / Logos"
+  short_description: "Deploy Logos across Cloud.ru Evolution"
+  default_prompt: "Use $cloudru-management to configure or verify Logos's EDS, networking, security, logs, AI, and deployment setup without exposing secrets."

@@ -14,3 +14,37 @@ api_debug.txt
 debug_response.json
 history_debug.json
 app.log
+
+# Runtime and local backup artifacts
+.safe_backups/
+execution_logs/
+alice_pro_files.tar.gz
+
+# Local tooling
+node_modules/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+app_logs.jsonl
+
+# Test coverage artifacts
+.coverage
+.coverage.*
+coverage.xml
+/coverage.json
+/coverage-js/
+/frontend-coverage.json
+/infra-coverage.xml
+htmlcov/
+
+agent_shell.sqlite3
+
+# Native runtime database files and local preview workers
+alice.memory
+alice.memory.lock
+.alice-environments/
+node_modules/
+
+/node_modules
+# Native build output (scripts/build_c17_server.sh)
+build/

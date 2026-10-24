@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from yandex_response_poller import wait_for_response
+from yandex_client_modules.response_poller import wait_for_response
 
 
 class FakeResponse:
@@ -30,7 +30,7 @@ class TraceStub:
 
 
 class YandexResponsePollerTests(unittest.TestCase):
-    @patch("yandex_response_poller.time.sleep")
+    @patch("yandex_client_modules.response_poller.time.sleep")
     def test_polls_until_completed_and_records_changed_snapshots(self, sleep):
         session = Mock()
         session.get.side_effect = [
@@ -56,14 +56,16 @@ class YandexResponsePollerTests(unittest.TestCase):
         self.assertTrue(any(event[0][0] == "api_poll_completed" for event in trace.events))
         self.assertTrue(sleep.called)
 
-    @patch("yandex_response_poller.time.sleep")
+    @patch("yandex_client_modules.response_poller.time.sleep")
     def test_failed_response_raises_client_error(self, sleep):
         session = Mock()
-        session.get.return_value = FakeResponse({
-            "id": "r1",
-            "status": "failed",
-            "error": {"message": "bad request"},
-        })
+        session.get.return_value = FakeResponse(
+            {
+                "id": "r1",
+                "status": "failed",
+                "error": {"message": "bad request"},
+            }
+        )
 
         with self.assertRaisesRegex(RuntimeError, "bad request"):
             wait_for_response(
@@ -75,12 +77,12 @@ class YandexResponsePollerTests(unittest.TestCase):
                 error_cls=RuntimeError,
             )
 
-    @patch("yandex_response_poller.time.time", side_effect=[0, 10])
+    @patch("yandex_client_modules.response_poller.time.time", side_effect=[0, 10])
     def test_timeout_raises(self, _time):
         session = Mock()
         session.get.return_value = FakeResponse({"id": "r1", "status": "in_progress"})
 
-        with patch("yandex_response_poller.time.sleep"):
+        with patch("yandex_client_modules.response_poller.time.sleep"):
             with self.assertRaisesRegex(RuntimeError, "Timeout"):
                 wait_for_response(
                     task_id="r1",

@@ -1,120 +1,170 @@
-# Alice Pro — AI-ассистент с MCP-инструментами
+# Logos
 
-Веб-приложение чата с Yandex AI Studio, поддержкой MCP-инструментов (Git-репозитории), Conversations API и PWA.
+Logos — self-hosted AI assistant platform around Yandex AI Studio, MCP/local tools, agent orchestration, execution traces, billing and an Android WebView client.
 
-## 🚀 Быстрый старт
+The repository is actively evolving. This README separates shipped behavior from open scope: Issues define implementation scope and acceptance criteria; docs define contracts and operating rules; Discussions capture questions and decisions.
 
-### 1. Подготовка окружения
+## Repository navigation
+
+| Need                                    | Location                                                                                                                    |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Run the backend                         | `app.py`, `start.sh`                                                                                                        |
+| Web interface                           | `static/`, `templates/`                                                                                                     |
+| Android client                          | `android/`                                                                                                                  |
+| Tests                                   | `tests/`                                                                                                                    |
+| Developer and diagnostic tools          | [scripts guide](scripts/README.md)                                                                                          |
+| Architecture and operating instructions | [docs index](docs/README.md)                                                                                                |
+| Python package map                      | [layout contract](docs/architecture/repository-layout.md), [remaining root files](docs/architecture/root-file-inventory.md) |
+| Logging and diagnostics                 | [Execution Trace and system log](docs/backend/logging.md)                                                                   |
+
+## What is shipped
+
+- **Yandex AI Studio Responses API** as the primary provider through the backend chat path.
+- **Unified tool execution** through `UniversalToolExecutor`, including MCP and local tools.
+- **Invocation context and execution trace** for provider requests, polling, tool calls, errors, timing, continuations and billing correlation.
+- **Deterministic trace lifecycle**: snapshots are read-only and finalization is idempotent; see [execution trace lifecycle](docs/execution-trace-lifecycle.md).
+- **Agent Gateway and RuntimeDispatcher** for runtime-scoped invocations. The target architecture is one Python process with managed threads/contexts; threads are not a hostile-code security boundary.
+- **Logos GitHub agent**: issue/label-triggered workflow, headless runner, filesystem-only sandboxed tools, draft PR output and CI/review gates. See [Logos GitHub agent](docs/agents/alice-github-agent.md).
+- **Compute energy accounting** based on measured CPU time and configured watts/price; if no electricity price is configured, the trace remains unpriced. See [compute energy billing](docs/compute-energy-billing.md).
+- **Treasury and billing controls**, internal usage accounting and demo balances.
+- **3D Printing Business**: quote calculation, owner-scoped orders and settlement, realized P&L, finance/payback tracking and AI-first purchase assessment. See [3D Printing Business](docs/printing3d.md).
+- **Files, knowledge and Departments** integrations with local Execution Trace persistence.
+- **Android debug client** with WebView integration, diagnostics, updates and a reproducible debug-build path.
+- **Native Kristall** for local/Termux and shared deployments, with one writer per durable journal.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    U[User / Android] --> O[Chat API / Orchestrator]
+    O --> C[InvocationContext]
+    C --> Y[Yandex Responses API]
+    C --> T[UniversalToolExecutor]
+    T --> M[MCP / Local Tools]
+    C --> R[RuntimeDispatcher]
+    R --> X[ExecutionTrace]
+    X --> B[Billing / Execution Trace]
+```
+
+Secrets are sanitized at the trace/log boundary. Provider requests, continuations and tool calls retain scoped correlation through `InvocationContext` and `ExecutionTrace`.
+
+## Current status
+
+As of 2026-10-06, `master` includes Kristall Wave 1 (conversation ownership and user identity migrated to file-native storage), Logos Dev worker as a separate coding worker, ChatGPT OAuth discovery with PKCE, platform-aware CI routing, and capability-only secret delivery. Earlier (2026-09-29): fail-closed merge gate, canonical formatter lifecycle, runner dependency caching and CI timing telemetry, deduplicated Python/frontend test execution, lazy PostgreSQL test reset, async runtime concurrency/cancellation/timeout coverage, Cloud.ru Secret Management hardening, and Container Apps v2 client contract ([changelog](docs/changelog.md)). Copilot review is automatic; maintainers request one final Codex review only after the current head is green and ready to merge.
+
+These are repository capabilities, not evidence that the public production deployment, external MCP connection, or live Cloud.ru Container Apps rollout has been verified. `develop` is the integration branch and the repository default; every PR targets it. A PR must be synchronized with current `develop`, required checks must be green on the exact current head, review threads must be resolved, and merge happens through the protected GitHub path (squash). `master` is the owner's personal branch and is not a PR target.
+
+The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440). Logos Dev worker is implemented as a separate coding worker; legacy cloudru-rdc.yml and production-deploy.yml remain unchanged. Resource-scoped ownership, replacement decision, and accepted cutover criteria are tracked in [#869](https://github.com/maksimp6/Chat/issues/869). Kristall Wave 1 is shipped; further migration of shared state (sessions, runtime events, conversation metadata) remains roadmap. Object Storage migration, durable background workers, and full production cutover remain separate work.
+
+Still experimental or roadmap unless the corresponding issue is complete:
+
+- advanced branch-aware preview/runtime isolation;
+- cloud and local browsing with Browser Emulator/BrowserShim self-testing;
+- per-user provider credentials, quotas and rate limits;
+- Government workflows, Partner Relations and Kwork integration;
+- richer theme/voice assistance;
+- resilient backup/failover providers;
+- public release automation and versioned Android releases.
+
+## Quick start
+
+### Prerequisites
+
+- Python: backend CI uses 3.14; Ruff targets 3.12.
+- Git.
+- For Android builds only: Android SDK API 37 and Gradle 9.5.0. CI runs Gradle with Java 25 and stages the embedded runtime with Python 3.13; the Android module declares JVM toolchain 17.
+
+### Backend
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-```
-
-### 2. Установка зависимостей
-```bash
-pip install flask requests python-dotenv
-```
-
-### 3. Настройка конфигурации
-Скопируйте `.env.example` в `.env` и заполните секреты локально:
-```bash
+python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Минимальная конфигурация:
-```env
-YANDEX_API_KEY=<your-yandex-api-key>
-YANDEX_PROJECT_ID=<your-yandex-project-id>
-YANDEX_BASE_URL=https://ai.api.cloud.yandex.net/v1
-HOST=0.0.0.0
-PORT=8080
-SECRET_KEY=<generate-a-random-secret>
-ALICE_OWNER_ID=<stable-owner-id>
-```
+Copy `.env.example` only for a fresh installation. Replace its placeholders and remove unused integration examples before starting. For local development, set `HOST=127.0.0.1` and configure a persistent `ALICE_PROVIDER_CREDENTIAL_KEY` before saving provider credentials.
 
-Для необязательного зеркала execution traces в Supabase добавьте на backend:
-```env
-SUPABASE_URL=https://<your-project-ref>.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
-```
+Start the backend with `python app.py`. Open `http://localhost:8080` when using the template's `PORT=8080`; without `PORT`, `app.py` defaults to `5000`. In **Провайдеры**, save the Yandex API key together with its Project ID. The current web runtime resolves both from the active database credential; environment-only `YANDEX_API_KEY` / `YANDEX_PROJECT_ID` values do not configure the chat. See the [installation guide](docs/setup/installation.md) and [provider-key lifecycle](docs/provider-key-rotation.md).
 
-`SUPABASE_SERVICE_ROLE_KEY` предназначен только для backend. Не передавайте его во frontend и не коммитьте реальное значение.
+Logos stores authoritative runtime data in `kristall.Kristall`; set `ALICE_MEMORY_PATH` to its journal on persistent storage. SQL drivers, SQL runtime adapters and the PostgreSQL CI lane are removed. Existing legacy data is preserved; deployment and production cutover still require explicit acceptance.
 
-**Никогда не коммитьте `.env`, API keys или другие credentials.**
-
-### 4. Запуск приложения
-```bash
-python app.py
-```
-
-### 5. Открытие в браузере
-Перейдите по адресу: http://localhost:8080
-
-## 🔐 Безопасность конфигурации
-
-Секреты читаются из переменных окружения. В репозитории разрешены только placeholders из `.env.example`.
-
-- `YANDEX_API_KEY` — API-ключ Yandex Cloud.
-- `YANDEX_PROJECT_ID` — ID проекта Yandex Cloud.
-- `YANDEX_BASE_URL` — базовый URL API.
-- `SUPABASE_URL` — URL проекта Supabase для серверного зеркала трейсов.
-- `SUPABASE_SERVICE_ROLE_KEY` — backend-only credential для записи в закрытую таблицу трейсов.
-- `SECRET_KEY` — секрет Flask-сессий, если используется приложением.
-
-### Глобальный Yandex API-ключ
-
-## 🌐 Веб-ресурсы
-
-Все ресурсы пользовательского интерфейса должны храниться локально в репозитории. Не используйте CDN или удалённые asset URL для JavaScript, CSS, шрифтов, иконок и изображений.
-
-Eruda и favicon подключаются только из `/static`. Правило проверяется регрессионным тестом `tests/test_local_web_assets.py`.
-
-Alice Pro использует один backend-owned API-ключ Yandex Cloud для всего
-развёртывания. Новый ключ создаётся на 12 часов, а ротация выполняется в
-последний час действия текущего ключа.
-
-Для зашифрованного хранения задайте `ALICE_PROVIDER_CREDENTIAL_KEY` как
-Fernet-ключ. Для worker-ротации задайте `YANDEX_IAM_TOKEN` и
-`YANDEX_SERVICE_ACCOUNT_ID`; области действия можно настроить через
-`YANDEX_API_KEY_SCOPES`. Worker запускайте не реже одного раза в час:
+### Android
 
 ```bash
-python3 scripts/rotate_provider_key.py
+cd android
+python scripts/stage_python.py
+gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
 ```
 
-Execution Trace подписывает каждый запрос безопасным идентификатором
-использованного ключа. Для ключа Yandex Cloud это resource ID, для bootstrap
-ключа без resource ID используется SHA-256 fingerprint. Сам API-ключ,
-IAM-токен и расшифрованный secret в trace не попадают.
+The debug APK is for development/testing. Release signing keys must never be committed.
 
-Зеркало Supabase является необязательным и должно быть best-effort: его сбои не должны ломать основной чатовый поток.
+## Configuration and security
 
-Если credential когда-либо попал в Git, считайте его скомпрометированным: отзовите/ротируйте его в соответствующем сервисе. Удаление строки из текущего файла не удаляет её из Git history.
+Use `.env` or a deployment secret manager. Never commit:
 
-CI выполняет автоматическую проверку репозитория на секреты.
+- Yandex API keys or IAM tokens;
+- Cloud.ru credentials or MCP bearer tokens;
+- signing keys/passwords;
+- user passwords or session secrets.
 
-## 📁 Структура проекта
+For security-sensitive reports, follow [SECURITY.md](SECURITY.md). Runtime tools must respect approval boundaries and the repository's sandbox rules; do not use browser profiles, cookies or hidden credentials as test fixtures.
 
-```text
-alice_pro/
-├── app.py
-├── config.py
-├── yandex_client.py
-├── supabase_trace_mirror.py
-├── supabase/
-│   └── migrations/
-├── templates/
-├── static/
-├── tests/
-├── docs/
-├── .env.example
-├── .gitignore
-└── README.md
+## Development workflow
+
+```
+Issue → branch → implementation → tests → PR → CI → review → merge → verification
 ```
 
-## 📄 Лицензия
+Open pull requests against `develop` and keep changes independently testable. Follow [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the [sprint workflow](docs/development/sprint-workflow.md). Issues are the canonical source for scope and acceptance; a Discussion is not a substitute for an issue or a passing CI check.
 
-MIT
+## Testing
 
----
-*README актуализирован: 2026-09-16*
+```bash
+python -m compileall -q .
+pytest -q
+cd android
+python scripts/stage_python.py
+gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
+```
+
+For frontend/runtime work, preserve the progressive-enhancement path and BrowserShim/VM tests. Do not introduce Playwright as a runtime dependency. Browser Emulator/self-testing work is tracked in [#409](https://github.com/maksimp6/Chat/issues/409).
+
+## Documentation map
+
+- [Documentation index](docs/README.md)
+- [Architecture overview](docs/architecture/overview.md)
+- [Integration coordination](docs/architecture/integration-coordination.md)
+- [Current scope](docs/integration/current-scope.md)
+- [API overview](docs/api/overview.md)
+- [MCP overview](docs/mcp/overview.md)
+- [3D Printing Business](docs/printing3d.md)
+- [Logos runtime agents](docs/agents/overview.md)
+- [Repository development roles](docs/agents/role-based-agent-office.md)
+- [Runtime Dispatcher policy](docs/runtime/runtime-dispatcher-policy.md)
+- [Logos GitHub agent](docs/agents/alice-github-agent.md)
+- [Compute energy billing](docs/compute-energy-billing.md)
+- [Execution trace lifecycle](docs/execution-trace-lifecycle.md)
+- [Provider key rotation](docs/provider-key-rotation.md)
+- [Security policy](SECURITY.md)
+- [Support](SUPPORT.md)
+
+## Active issues and expected work
+
+Cloud.ru migration is coordinated in [#440](https://github.com/maksimp6/Chat/issues/440); canonical AI execution and repository layout are tracked in [#433](https://github.com/maksimp6/Chat/issues/433) and [#430](https://github.com/maksimp6/Chat/issues/430). Earlier architecture coordination remains in [#343](https://github.com/maksimp6/Chat/issues/343). Related scope includes:
+
+- [#350](https://github.com/maksimp6/Chat/issues/350) — canonical one-process runtime architecture;
+- [#351](https://github.com/maksimp6/Chat/issues/351) — integration staging and dependency order;
+- [#227](https://github.com/maksimp6/Chat/issues/227) and [#223](https://github.com/maksimp6/Chat/issues/223) — frontend progressive enhancement;
+- [#326](https://github.com/maksimp6/Chat/issues/326) and [#238](https://github.com/maksimp6/Chat/issues/238) — MCP/ChatGPT compatibility;
+- [#254](https://github.com/maksimp6/Chat/issues/254) and [#256](https://github.com/maksimp6/Chat/issues/256) — plugin platform and autonomous development;
+- [#116](https://github.com/maksimp6/Chat/issues/116) — conversation agents;
+- [#195](https://github.com/maksimp6/Chat/issues/195) — Android/release safety;
+- [#104](https://github.com/maksimp6/Chat/issues/104) — public release;
+- [#409](https://github.com/maksimp6/Chat/issues/409) — cloud/local browsing and self-testing.
+
+Relevant Discussions include [Cloud.ru CLI Q&A #406](https://github.com/maksimp6/Chat/discussions/406) and [repository cleanup #393](https://github.com/maksimp6/Chat/discussions/393). They document open questions and decisions; they do not by themselves mark a feature complete.
+
+## License
+
+Logos is licensed under the MIT License. See [LICENSE](LICENSE).

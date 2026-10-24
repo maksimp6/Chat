@@ -1,6 +1,6 @@
 # Universal Tool Platform
 
-Alice Pro uses one provider-agnostic contract between a tool registry and every
+Logos uses one provider-agnostic contract between a tool registry and every
 transport adapter.
 
 ## Flow
@@ -80,6 +80,30 @@ read_only=false and requires_approval=true. Existing legacy execution through
 registry.execute remains backward compatible until the caller migrates to the
 UniversalToolExecutor.
 
+## What the model is offered
+
+The Responses adapter offers a tool only when it can actually run there:
+
+- its `supported_transports` include `responses_api` (MCP-only bridge tools
+  stay on MCP);
+- every executable named in `metadata.requires_executables` is on PATH. Termux:API
+  tools declare their Android helper, so an Ubuntu runner or server does not
+  offer them; calling one anyway returns an explicit "helper not found" error.
+
+Strict function schemas cannot express a free-form object such as
+`{"type": "object"}`: closing it would only admit `{}`. Such objects stay open and
+their tool is advertised with `strict: false`; the executor still validates the
+original schema.
+
+Approval is decided per call. `params["approval_mode"]` selects the behavior for
+a batch that contains gated calls:
+
+- `pause` (default, interactive chat): return the batch to the human approver;
+  nothing in it runs.
+- `deny` (unattended native runs): run the other calls, let the executor refuse
+  each unapproved gated call, and continue; the model receives
+  `{"executed": false, ...}` for it. Nothing is ever auto-approved.
+
 ## Remote Android execution
 
 A tool may declare:
@@ -101,15 +125,22 @@ The ChatGPT Apps SDK / MCP bridge now registers its read-only bridge tools in
 the same registry and calls UniversalToolExecutor. The bridge therefore owns
 protocol formatting only, not a second tool implementation.
 
-New tools should opt into MCP exposure explicitly with
-supported_transports=["mcp"]. This avoids accidentally publishing every
-legacy local tool while their metadata is still being audited.
+MCP is the complete external tool surface: every tool registered in the
+Universal Tool Registry is exposed through MCP. The registry preserves any
+existing transport declarations and automatically adds "mcp", so legacy tools
+do not need individual adapter implementations or duplicated handlers.
+
+MCP does not bypass the universal safety boundary. The same validation,
+authorization, policy and approval checks apply to MCP-originated calls.
+Tools marked read-only may execute directly; tools requiring approval remain
+blocked until the existing approval flow authorizes the call.
 
 ## Migration path
 
 1. Keep existing tool functions unchanged.
 2. Add metadata to the registry entry.
 3. Migrate callers from registry.execute to UniversalToolExecutor.
-4. Add transport support explicitly.
+4. Keep the tool registered in the Universal Tool Registry; MCP support is
+   added automatically.
 5. Add an agent target for tools that must execute on Android.
 6. Correlate the UniversalToolCall with ExecutionTrace in the caller.

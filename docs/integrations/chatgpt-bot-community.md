@@ -2,7 +2,7 @@
 
 ## Назначение
 
-Alice Pro выступает как единый контур координации для ChatGPT, внешних ботов, локальных Android-агентов, MCP-серверов и A2A-агентов.
+Logos выступает как единый контур координации для ChatGPT, внешних ботов, локальных Android-агентов, MCP-серверов и A2A-агентов.
 
 Главный принцип: протокол транспорта не должен становиться бизнес-логикой. ChatGPT, MCP и A2A используют один набор правил безопасности и один provider-agnostic Tool Registry.
 
@@ -13,7 +13,7 @@ ChatGPT
    |
    | MCP / HTTPS
    v
-Alice Pro MCP Gateway
+Logos MCP Gateway
    |
    +--> Universal Tool Registry --> Universal Tool Executor
    |                                 |
@@ -26,7 +26,7 @@ Alice Pro MCP Gateway
    +--> ExecutionTrace
 ```
 
-Для MCP-подключения нужен публичный HTTPS endpoint Alice Pro, например:
+Для MCP-подключения нужен публичный HTTPS endpoint Logos, например:
 
 `https://mcp.example.com/mcp`
 
@@ -34,7 +34,7 @@ Alice Pro MCP Gateway
 
 ## Настройка ChatGPT
 
-1. Разверните Alice Pro за HTTPS reverse proxy или другим безопасным публичным HTTPS-транспортом.
+1. Разверните Logos за HTTPS reverse proxy или другим безопасным публичным HTTPS-транспортом.
 2. Для production настройте OAuth 2.1 через внешний authorization server. Для приватной разработки допускается bearer token или явно включённый anonymous mode.
 3. В ChatGPT Developer Mode создайте подключение MCP с URL, оканчивающимся на `/mcp`.
 4. Проверьте `tools/list`, затем вызов read-only инструмента.
@@ -60,7 +60,7 @@ Alice Pro MCP Gateway
 }
 ```
 
-Для A2A используйте Agent Card для discovery и сообщения JSON-RPC по HTTPS. Alice Pro Gateway должен владеть провайдерной авторизацией и не передавать секреты в тело сообщения.
+Для A2A используйте Agent Card для discovery и сообщения JSON-RPC по HTTPS. Logos Gateway должен владеть провайдерной авторизацией и не передавать секреты в тело сообщения.
 
 MCP предназначен для доступа к инструментам и ресурсам. A2A предназначен для взаимодействия между независимыми агентами. Один бот может поддерживать оба транспорта.
 
@@ -92,9 +92,9 @@ discovery
 - frontend localStorage;
 - GitHub artifacts.
 
-API-ключи и другие credentials выдаются с минимально необходимыми правами, ограниченным сроком и возможностью отзыва. Хранение выполняется через менеджер криптографии/ключей Alice Pro или внешний secret manager.
+API-ключи и другие credentials выдаются с минимально необходимыми правами, ограниченным сроком и возможностью отзыва. Хранение выполняется через менеджер криптографии/ключей Logos или внешний secret manager.
 
-Никогда не передавайте GitHub, Supabase, Cloud.ru или provider secrets непосредственно ChatGPT для выполнения задач.
+Никогда не передавайте GitHub, Cloud.ru или provider secrets непосредственно ChatGPT для выполнения задач.
 
 ## Правила поведения ChatGPT-агента
 
@@ -121,7 +121,7 @@ API-ключи и другие credentials выдаются с минималь�
 }
 ```
 
-Alice Pro возвращает структурированный результат через MCP transport. При ошибке проверяйте HTTP status и JSON-RPC error, а не только текстовое сообщение.
+Logos возвращает структурированный результат через MCP transport. При ошибке проверяйте HTTP status и JSON-RPC error, а не только текстовое сообщение.
 
 ## Добавление нового бота
 
@@ -129,6 +129,6 @@ Alice Pro возвращает структурированный результ
 
 ## Cloud.ru
 
-Cloud.ru AI Agents документирует A2A и Public API для управления агентами и MCP-серверами. В Alice Pro provider-specific API management остаётся на backend-контуре, а Android получает только нужные результаты.
+Cloud.ru AI Agents документирует A2A и Public API для управления агентами и MCP-серверами. В Logos provider-specific API management остаётся на backend-контуре, а Android получает только нужные результаты.
 
 Документация Cloud.ru: https://cloud.ru/docs/ai-agents/ug/topics/concepts__protocols-a2a

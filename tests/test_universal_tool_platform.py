@@ -1,10 +1,11 @@
 import sys
 import types
 
-from universal_tool_platform import (
+from tool_providers.universal_tool_platform import (
     UniversalToolCall,
     UniversalToolExecutor,
     UniversalToolResult,
+    tool_call_requires_approval,
     validate_json_schema,
 )
 
@@ -137,7 +138,7 @@ def test_executor_accepts_approval_hook():
 def test_executor_remote_target_waits_for_gateway_result(monkeypatch):
     calls = []
 
-    fake_gateway = types.ModuleType("local_agent_gateway")
+    fake_gateway = types.ModuleType("agent_runtime.local_gateway")
 
     def enqueue(agent_id, tool_name, arguments, **kwargs):
         calls.append(("enqueue", agent_id, tool_name, arguments, kwargs))
@@ -154,7 +155,7 @@ def test_executor_remote_target_waits_for_gateway_result(monkeypatch):
 
     fake_gateway.enqueue_local_tool_job = enqueue
     fake_gateway.wait_for_local_tool_job = wait
-    monkeypatch.setitem(sys.modules, "local_agent_gateway", fake_gateway)
+    monkeypatch.setitem(sys.modules, "agent_runtime.local_gateway", fake_gateway)
 
     cfg = definition(
         supported_transports=["responses_api"],
@@ -173,3 +174,21 @@ def test_executor_remote_target_waits_for_gateway_result(monkeypatch):
     assert result["data"] == {"device": "android"}
     assert calls[0][0] == "enqueue"
     assert calls[1] == ("wait", "job-1", 7.0)
+
+
+def test_action_level_approval_helper_preserves_static_policy():
+    dynamic = definition(
+        requires_approval=False,
+        metadata={"approval_actions": ["click", "fill"]},
+    )
+
+    assert tool_call_requires_approval(dynamic, {"action": "click"}) is True
+    assert tool_call_requires_approval(dynamic, {"action": "fill"}) is True
+    assert tool_call_requires_approval(dynamic, {"action": "inspect"}) is False
+    assert tool_call_requires_approval(dynamic, {}) is False
+
+    static = definition(
+        requires_approval=True,
+        metadata={"approval_actions": ["click"]},
+    )
+    assert tool_call_requires_approval(static, {"action": "inspect"}) is True

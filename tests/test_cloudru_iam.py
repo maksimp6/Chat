@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 
-from cloudru_iam import CloudRuIamClient
-from cloudru_iam_routes import _parse_expiry, _validate_ips
+from cloud.cloudru.iam import CloudRuIamClient
+from cloud.cloudru.iam_routes import _parse_expiry, _validate_ips
 
 
 def test_cloudru_token_exchange_uses_service_account_key_pair():
@@ -12,7 +12,7 @@ def test_cloudru_token_exchange_uses_service_account_key_pair():
     response.content = b"{}"
     response.raise_for_status.return_value = None
 
-    with patch("cloudru_iam.requests.post", return_value=response) as post:
+    with patch("cloud.cloudru.iam.requests.post", return_value=response) as post:
         assert client._token() == "iam-token"
 
     assert post.call_args.kwargs["json"] == {"keyId": "id", "secret": "secret"}
@@ -66,3 +66,49 @@ def test_ip_validation_rejects_invalid_values():
         pass
     else:
         raise AssertionError("invalid IP should fail")
+
+
+def test_cloudru_reissue_api_key_uses_same_resource_endpoint():
+    client = CloudRuIamClient(key_id="id", key_secret="secret")
+    with patch.object(
+        client, "_request", return_value={"id": "key-1", "secret": "new-secret"}
+    ) as req:
+        response = client.reissue_api_key(
+            api_key_id="key-1",
+            expires_at="2026-10-01T00:00:00Z",
+        )
+
+    assert response["id"] == "key-1"
+    req.assert_called_once()
+    assert req.call_args.args == (
+        "POST",
+        "/api/v1/service-accounts/credentials/api-keys/key-1/reissue",
+    )
+    assert req.call_args.kwargs["json_body"] == {"expires_at": "2026-10-01T00:00:00Z"}
+
+
+def test_cloudru_service_account_management_uses_documented_resource():
+    client = CloudRuIamClient(key_id="id", key_secret="secret")
+    with patch.object(
+        client, "_request", return_value={"service_accounts": [{"id": "sa-1", "name": "Alice Pro"}]}
+    ) as req:
+        accounts = client.list_service_accounts()
+    assert accounts == [{"id": "sa-1", "name": "Alice Pro"}]
+    req.assert_called_once_with("GET", "/api/v1/service-accounts")
+
+    with patch.object(client, "_request", return_value={"id": "sa-2"}) as req:
+        response = client.create_service_account(
+            project_id="project-1",
+            name="Alice Pro",
+            description="Foundation Models runtime",
+        )
+    assert response["id"] == "sa-2"
+    req.assert_called_once_with(
+        "POST",
+        "/api/v1/service-accounts",
+        json_body={
+            "name": "Alice Pro",
+            "description": "Foundation Models runtime",
+            "target": {"project_id": "project-1"},
+        },
+    )

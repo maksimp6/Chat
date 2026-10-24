@@ -1,36 +1,48 @@
-# Рабочий процесс разработки Alice Pro
+# Рабочий процесс разработки Logos
 
-Этот документ фиксирует воспроизводимый цикл для изменений в Chat/Alice Pro.
+Этот документ фиксирует воспроизводимый цикл для изменений в Chat/Logos.
 
 ## 1. Типовой цикл
 
 ```text
 Issue
   ↓
-рабочая ветка от master
+рабочая ветка от develop (или канонического stack parent)
   ↓
 небольшое изменение
   ↓
 локальная проверка
   ↓
-PR
+PR в develop (или stack parent)
   ↓
 GitHub Actions / CI
   ↓
 review
   ↓
-merge в master
+защищённая интеграция в develop
+  ↓
+отдельный promotion PR develop → master
+  ↓
+exact-head CI / review / readiness для текущего master
+  ↓
+защищённый merge в master после разрешения владельца
   ↓
 проверка результата
 ```
 
 Рекомендуемый формат ветки: `issue-<номер>-<краткое-имя>`.
 
+Базовая ветка feature PR — `develop`; прямой hotfix в `master` требует явно
+зафиксированного исключения в задаче. Подробности: [интеграция develop](development/develop-integration.md).
+Запуск CI не доказывает принудительную защиту ветки. Актуальная проверка и план
+устранения расхождений находятся в [матрице защиты](development/branch-policy-alignment.md).
+Отключённый ruleset не разрешает обход правил работы или merge без разрешения.
+
 Одна ветка и один PR должны решать одну независимую часть задачи. Крупную issue следует разбивать на последовательные PR, чтобы каждый шаг можно было отдельно проверить и откатить.
 
 ## 2. Совместная работа человека и AI-разработчика
 
-Работа над Alice Pro организуется как сотрудничество владельца продукта и AI-разработчика.
+Работа над Logos организуется как сотрудничество владельца продукта и AI-разработчика.
 
 ### Роли
 
@@ -140,10 +152,58 @@ Production-баги и блокеры могут временно обрабат
 
 ## 5. Локальная проверка
 
+Канонические formatter entrypoints:
+
+```bash
+bash scripts/format.sh write
+bash scripts/format.sh check
+```
+
+
+Опциональный локальный pre-commit hook использует тот же canonical formatter и не создаёт отдельный набор правил:
+
+```bash
+bash scripts/install_git_hooks.sh
+```
+
+Hook выполняет только `bash scripts/format.sh check`. Если форматирование не проходит, он блокирует commit и показывает команду `bash scripts/format.sh write`. Существующий чужой `.git/hooks/pre-commit` installer не перезаписывает без явного `--force`. Полный pytest из hook не запускается; CI остаётся authoritative.
+
+### Hot-file modularity report
+
+Для поиска файлов с высокой исторической стоимостью изменений используется read-only анализатор:
+
+```bash
+python scripts/hot_file_metrics.py \
+  --commits 200 \
+  --top 20 \
+  --json-out hot-file-metrics.json \
+  --markdown-out hot-file-metrics.md
+```
+
+Команда читает Git history, поэтому для воспроизводимого результата нужна доступная история репозитория. В CI Application job делает checkout с `fetch-depth: 0`, запускает тот же анализ на окне 200 commits, печатает Markdown в log и GitHub Step Summary, а `hot-file-metrics.json` и `hot-file-metrics.md` входят в существующий artifact `coverage-<run_number>`.
+
+Score прозрачно комбинирует touches, churn, churn/LOC, число authors и recency. Результат классифицируется как `split_candidate`, `extract_shared_logic` или `watch`. Это **сигнал для архитектурного review**, а не merge gate и не команда на автоматический refactor. Текущие exclusions заданы в коде анализатора и пока не настраиваются отдельными CLI allow/deny rules.
+
+### Python AST repository map
+
+Первый deterministic AI-index slice строится вручную:
+
+```bash
+python scripts/build_ai_index.py \
+  --root . \
+  --output ai-index.json
+```
+
+Без `--output` JSON печатается в stdout; `--compact` меняет только форматирование. В Git working tree индексируются только tracked `*.py` через `git ls-files`. Для каждого файла сохраняются path/module, SHA-256, test flag, symbols с line/end_line, imports и синтаксические call names; также формируются summary и эвристический `tests_by_module`.
+
+Индекс не хранит исходный текст, env values или secrets и не содержит timestamps, поэтому при одинаковом дереве результат детерминирован. Граница текущего slice намеренно узкая: только Python AST. Call names не являются resolved cross-module call graph, `tests_by_module` не доказывает фактическое coverage, а JS/TS index, semantic resolution, routes/docs/issues/PR links, incremental cache, query API/tool и автоматическая agent integration пока не реализованы. #540 не добавляет отдельный CI artifact и не делает индекс обязательным gate.
+
 Минимальный backend-набор:
 
 ```bash
 python -m compileall -q .
+python tests/validate_frontend_modules.py
+python tests/validate_runtime_modules.py
 pytest -q
 ```
 
@@ -153,15 +213,32 @@ pytest -q
 pytest -q tests/test_responses_tool_loop.py test_partial_output.py tests/test_tool_execution_contract.py
 ```
 
-Для Android:
+Для Android CI-эквивалент выглядит так:
 
 ```bash
 cd android
 python scripts/stage_python.py
-gradle --no-daemon :app:assembleDebug
+gradle --no-daemon -PaliceBuildNumber=<run> -PaliceCommitHash=<sha> :app:testDebugUnitTest :app:assembleDebug
 ```
 
-CI выполняет полный pytest, компиляцию Python и сборку debug APK. Поэтому локальная проверка должна сначала ловить обычные ошибки, а CI является обязательным подтверждением перед merge.
+Основной GitHub Actions pipeline дополнительно выполняет:
+
+- frontend JavaScript regression suite с V8 coverage и единым `frontend-test.log`;
+- live Flask resource contract tests;
+- полный Python suite с `--durations=30`, line/branch coverage и 100% diff coverage для изменённых Python-строк;
+- полный PostgreSQL suite с `pytest --durations=30 -q`;
+- PostgreSQL backup/restore verification;
+- Android unit tests, debug APK build, verification и artifact upload;
+- dependency cache для pip/npm/Gradle и timing telemetry в GitHub Step Summary.
+
+Destructive PostgreSQL isolation в тестах разрешён только для disposable test databases. Для него одновременно обязательны:
+
+- `ALICE_PYTEST_POSTGRES_RESET=1`;
+- имя БД, заканчивающееся на `_test` или `_ci`.
+
+`tests/postgres_test_guard.py` fail-closed отклоняет любой другой target. Никогда не направлять этот режим на production/staging database.
+
+Локальная проверка должна ловить обычные ошибки как можно раньше, но обязательный CI на exact current PR head остаётся merge-gate.
 
 ## 6. Что должно быть в PR
 
@@ -197,7 +274,139 @@ PR должен содержать:
 - **CI** подтверждает техническую проверку.
 - **Комментарии** фиксируют решения и изменения направления.
 - **Документация** хранит устойчивые правила проекта.
-- **Execution Trace** служит техническим подтверждением поведения Alice Pro.
+- **Execution Trace** служит техническим подтверждением поведения Logos.
+
+## 8.1 API-контракты
+
+Любое взаимодействие через HTTP API выполняется по явному именованному
+контракту. Источник истины для формы request/response не должен быть размазан
+между route, frontend и тестами.
+
+Для нового или изменённого endpoint обязательно:
+
+- определить request, success-response и error-response contracts;
+- запрещать неизвестные поля, если они явно не разрешены контрактом;
+- валидировать типы, required/nullable поля и enum-значения;
+- проверять реальные Flask request/response против тех же production-контрактов;
+- иметь негативные тесты на missing/extra/wrong-type payloads;
+- не обходить общий contract boundary прямым чтением/сериализацией JSON.
+
+Подробные правила: [API Contracts](api/contracts.md).
+
+## 8.2 Read-only merge readiness
+
+После #516 и #523 в репозитории есть два read-only инструмента проверки готовности PR:
+
+- CLI `scripts/merge_readiness.py`;
+- GitHub Actions workflow `.github/workflows/merge-readiness.yml`.
+
+Они собирают и оценивают состояние PR, но **не выполняют merge, не синхронизируют ветку и не меняют branch protection**.
+
+### Ручной CLI
+
+Для запуска нужен установленный и аутентифицированный `gh` с read-доступом к PR, checks и review threads.
+
+Пример:
+
+```bash
+python scripts/merge_readiness.py \
+  --repo maksimp6/Chat \
+  --pr 123 \
+  --base master \
+  --required-check "Platform changes" \
+  --required-check "CI required" \
+  --required-check "Infrastructure tests" \
+  --required-check "MCP worker tests" \
+  --required-check "Code rules" \
+  --required-check "Application tests" \
+  --required-check "PostgreSQL integration" \
+  --required-check "Trivy repository scan" \
+  --pretty
+```
+
+Вместо повторяемых `--required-check` можно использовать переменную
+`MERGE_REQUIRED_CHECKS` со списком точных имён check-run через запятую.
+
+CLI печатает JSON с полями `ready`, `head_sha`, `behind_by` и `blockers`.
+Код завершения:
+
+- `0` — snapshot подтверждает `ready=true`;
+- `1` — есть blocker или snapshot не удалось собрать.
+
+Основные blocker codes:
+
+- `pull_request_not_open`;
+- `draft`;
+- `wrong_base`;
+- `snapshot_changed`;
+- `behind_master`;
+- `required_checks_unconfigured`;
+- `required_check_missing`;
+- `check_pending`;
+- `check_failed`;
+- `review_threads`;
+- `review_threads_truncated`;
+- `collection_error`.
+
+Проверка fail-closed: без явной конфигурации required checks readiness не считается доказанной.
+
+### GitHub Actions snapshot
+
+Workflow `Merge readiness snapshot` запускается для non-draft PR в `master` на:
+
+- `opened`, `synchronize`, `reopened`, `ready_for_review`;
+- review `submitted` / `dismissed`.
+
+Изменения отдельных review-comments не запускают повторный polling run.
+
+Он checkout'ит exact `pull_request.head.sha`, использует только read-permissions и проверяет:
+
+- `Platform changes`;
+- `CI required`;
+- `Infrastructure tests`;
+- `MCP worker tests`;
+- `Code rules`;
+- `Application tests`;
+- `PostgreSQL integration`;
+- `Trivy repository scan`.
+
+`Platform changes` и `CI required` должны завершиться именно `success`.
+Их `skipped` или `neutral` не являются доказательством успешного планирования
+и проверки результатов. Последняя попытка check-run имеет приоритет над старым успехом.
+
+Платформенные jobs могут быть `skipped`, когда они не выбраны routing plan.
+Агрегатор `CI required` проверяет этот план и требует `success` от каждой выбранной
+платформы. Поэтому docs-only PR не запускает лишние платформы, а падение infra/MCP
+или пропуск выбранной job не скрывается за успешными legacy checks.
+Изменения состава jobs в `ci.yml` должны сопровождаться обновлением этого контракта
+и регрессиями в `tests/test_merge_readiness.py`.
+
+Отсутствие model review и сообщение Copilot об исчерпанной квоте сами по себе
+не блокируют readiness и не требуют повторного запроса модели. Это не разрешение
+на merge: обязательные checks и отсутствие unresolved review threads по-прежнему
+проверяются, а текущая защита ветки и ручное решение владельца не обходятся.
+
+Для missing/pending checks workflow ждёт не более `180 × 5` секунд, то есть 15 минут.
+Результат JSON публикуется в job log и GitHub Step Summary.
+При новом событии того же PR устаревший snapshot run отменяется.
+
+### Ограничения snapshot
+
+Snapshot относится только к состоянию, которое было собрано в конкретном run.
+
+- обычное продвижение `master` само по себе не создаёт новый snapshot run для старого PR head;
+- resolve/unresolve review thread сам по себе не является workflow trigger;
+- после закрытия threads повторите существующую failed PR job через проверенный
+  [путь восстановления](development/branch-policy-alignment.md#recover-readiness-after-resolving-threads);
+- snapshot не обновляет ветку и не заменяет strict up-to-date policy ruleset;
+- snapshot сейчас информационный и не является самостоятельной заменой защищённого merge gate.
+
+Поэтому непосредственно перед merge всё равно проверяем:
+
+1. `behind master = 0`;
+2. required checks зелёные на exact current PR head;
+3. unresolved review threads отсутствуют;
+4. merge выполняется только защищённым GitHub-путём.
 
 ## 9. Проверка перед merge
 
@@ -206,7 +415,13 @@ PR должен содержать:
 - соответствие изменения исходной Issue;
 - отсутствие очевидных регрессий;
 - корректность Execution Trace, UI и данных в БД, если они затронуты;
-- наличие понятного rollback-пути.
+- наличие понятного rollback-пути;
+- `behind master = 0`;
+- required checks зелёные на exact current PR head;
+- нет unresolved review threads;
+- Copilot review используется автоматически и не триггерится вручную;
+
+После review-fix повторный model review не требуется: новый head должен пройти свежий CI, а исправленные threads должны оставаться закрытыми.
 
 ## 10. Rollback
 

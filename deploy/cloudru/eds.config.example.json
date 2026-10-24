@@ -1,0 +1,6 @@
+{
+  "api_url": "https://devtools.api.cloud.ru/repo/api/v1",
+  "git_host": "https://repo.cloud.ru/",
+  "workflow_api_url": "https://pipeline.cloud.ru/public-api/v1",
+  "project_id": "REPLACE_PROJECT_UUID"
+}

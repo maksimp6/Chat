@@ -1,0 +1,3 @@
+# cloud-cli-mirror-2026-09-27
+642d8b33afb113ffb36bd6e87fc1faf5add65fd01dae316cbd3f65c9d1c508ed  cloud-cli-linux-amd64.tar.gz
+e7b977bb41616acdc474671c76835f9cb529238fe6f39c0953a53854c19b63c3  cloud-cli-linux-arm64.tar.gz

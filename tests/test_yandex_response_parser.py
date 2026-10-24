@@ -1,6 +1,10 @@
 import unittest
 
-from yandex_response_parser import extract_reasoning_and_text, extract_text, extract_usage
+from yandex_client_modules.response_parser import (
+    extract_reasoning_and_text,
+    extract_text,
+    extract_usage,
+)
 
 
 class YandexResponseParserTests(unittest.TestCase):
@@ -8,7 +12,12 @@ class YandexResponseParserTests(unittest.TestCase):
         data = {
             "output": [
                 {"content": [{"type": "reasoning_text", "text": "Think"}]},
-                {"content": [{"type": "output_text", "text": "Hello"}, {"type": "text", "text": " world"}]},
+                {
+                    "content": [
+                        {"type": "output_text", "text": "Hello"},
+                        {"type": "text", "text": " world"},
+                    ]
+                },
             ]
         }
         self.assertEqual(extract_reasoning_and_text(data), ("Think", "Hello world"))

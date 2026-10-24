@@ -1,0 +1,10 @@
+{
+  "api_version": 1,
+  "id": "example",
+  "name": "Logos Example Plugin",
+  "version": "1.0.0",
+  "description": "Reference plugin demonstrating the local lifecycle contract.",
+  "capabilities": ["example"],
+  "permissions": [],
+  "config_schema": {}
+}

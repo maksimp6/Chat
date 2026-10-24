@@ -1,30 +1,421 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, initial-scale=1.0, viewport-fit=cover">
-    <title>Alice Pro</title>
-    <link rel="stylesheet" href="/static/style.css?v=13">
-    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-    <link rel="shortcut icon" href="/static/favicon.svg">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, initial-scale=1.0, viewport-fit=cover"
+    />
+    <title>Logos</title>
+    {% set static_root = (preview_base_path ~ "/static") if preview_base_path else "/static" %}
+    <link rel="stylesheet" href="{{ static_root }}/style.css?v={{ static_version }}" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="{{ static_root }}/favicon.svg?v={{ static_version }}"
+    />
+    <link rel="shortcut icon" href="{{ static_root }}/favicon.svg?v={{ static_version }}" />
 
-    <script src="/static/eruda.js" defer></script>
-    <script src="/static/eruda_init.js" defer></script>
-    <script src="/static/file_manager.js" defer></script>
-    <script src="/static/treasury.js" defer></script>
-    <script src="/static/settings/ui_helpers.js" defer></script><script src="/static/settings/settings_storage.js" defer></script><script src="/static/settings/settings_mcp.js" defer></script><script src="/static/settings/settings_params.js" defer></script><script src="/static/settings/settings_modal.js" defer></script><script src="/static/settings.js" defer></script><script src="/static/core.js" defer></script><script src="/static/sidebar.js" defer></script><script src="/static/models.js" defer></script><script src="/static/chat.js" defer></script><script src="/static/trace_viewer.js" defer></script><script src="/static/trace_viewer_timing_fix.js?v=1" defer></script><script src="/static/trace_viewer_error_ui.js?v=1" defer></script><script src="/static/trace_viewer_auto.js" defer></script><script src="/static/voice.js" defer></script>
-    <script src="/static/android_diagnostics.js" defer></script>
-</head>
-<body>
-<div id="app-root" class="alice-pro-app">
-<div id="sidebar"><div id="sidebar-header"><button id="new-chat-btn">+ Новый чат</button><button id="close-sidebar-btn">&times;</button></div><div id="conv-list"></div></div><div id="overlay"></div>
-<div id="main"><div id="header"><div class="header-row header-row-primary"><button id="menu-btn" class="header-btn">☰</button><button id="model-btn" class="header-btn model-btn" title="Выбор модели" aria-label="Выбор модели">🤖</button><button id="tools-btn" class="header-btn" title="Локальные инструменты" onclick="openToolsModal()">🧰</button></div><div id="header-actions-2" class="header-row header-row-secondary"><button id="mcp-btn" class="header-btn" title="Внешние MCP шлюзы" onclick="window.openMcpManagerModal()">🌐</button><button id="settings-btn" class="header-btn" title="Параметры генерации" onclick="openSettingsModal()">⚙️</button><button id="file-manager-btn" class="header-btn" title="Файловый менеджер" onclick="window.openFileManagerModal()">📁</button><button id="expenses-btn" class="header-btn" title="Расходы" onclick="window.openExpensesPanel()">💸</button><button id="top-up-btn" class="header-btn" title="Пополнение" onclick="window.openTreasuryPanel()">➕</button><button id="update-app-btn" class="header-btn" title="Обновить приложение" onclick="if(window.AliceAndroid){window.AliceAndroid.openUpdater();}else{alert('Обновление APK доступно только в Android-приложении.');}">⬆️</button><button id="cloudru-iam-btn" class="header-btn" title="Мастер API-ключей Cloud.ru" onclick="window.openCloudRuIamWizard && window.openCloudRuIamWizard()">🔑</button><button id="theme-toggle" class="header-btn">🌙</button></div></div>
-<div id="chatbox"><div class="empty-state">Начните диалог или выберите модель</div></div>
-<div id="voice-ui"><canvas id="waveform"></canvas><div id="voice-status"></div><button id="mic-btn">🎤</button></div>
-<div id="text-ui"><div id="response-mode-wrap" style="display:none;"><select id="response-mode-select"><option value="audio">🔊 Голос</option><option value="text">📝 Текст</option><option value="both">🔊+📝 Оба</option></select></div><button id="upload-image-btn" class="icon-btn" style="display:none;" onclick="window.uploadImage()">📷</button><button id="mic-btn-inline" class="icon-btn" style="display:none;">🎤</button><input id="msg-input" type="text" placeholder="Сообщение..." autocomplete="off"><button id="send-btn">➤</button></div></div>
-<div id="model-modal" class="modal"><div class="modal-content"><h3>Выбор модели</h3><button id="close-modal">&times;</button><div id="model-list"></div></div></div></div>
-<div id="memoryModal" style="display:none;position:fixed;z-index:100000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;"><div style="background:#1e1e1e;color:#fff;padding:20px;border-radius:8px;width:450px;max-height:80vh;overflow-y:auto;position:relative;font-family:sans-serif;box-shadow:0 4px 15px rgba(0,0,0,0.5);"><span onclick="closeMemoryModal()" style="position:absolute;right:15px;top:10px;font-size:24px;cursor:pointer;color:#aaa;">&times;</span><h2 style="margin-top:0;font-size:18px;border-bottom:1px solid #444;padding-bottom:8px;">Управление памятью</h2><div style="margin:15px 0;padding:10px;background:#2a2a2a;border-radius:5px;"><label style="display:block;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="memEnabled" onchange="updateMemoryConfig()"> Включить память</label><label style="display:block;cursor:pointer;">Макс. фактов: <input type="number" id="memLimit" style="width:60px;background:#333;color:#fff;border:1px solid #555;padding:3px;border-radius:4px;" min="1" max="50" onchange="updateMemoryConfig()"></label></div><div style="margin-bottom:15px;"><button onclick="clearMemory(null)" style="background:#d9534f;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;">Очистить всю память</button></div><h3 style="font-size:14px;margin-bottom:8px;">Факты (<span id="memCount">0</span>)</h3><div id="memoryFactsList" style="max-height:220px;overflow-y:auto;border-top:1px solid #444;padding-top:8px;"></div></div></div>
-<script>
-function openMemoryModal(){document.getElementById("memoryModal").style.display="flex";loadMemoryData();}function closeMemoryModal(){document.getElementById("memoryModal").style.display="none";}async function loadMemoryData(){try{let res=await fetch("/api/memory/manage");let data=await res.json();document.getElementById("memEnabled").checked=data.config.enabled;document.getElementById("memLimit").value=data.config.max_context_facts;document.getElementById("memCount").innerText=data.facts.length;let list=document.getElementById("memoryFactsList");list.innerHTML="";if(data.facts.length===0){list.innerHTML="<p style=\"color:#888;font-size:13px;\">Память пуста.</p>";return;}data.facts.forEach(f=>{let div=document.createElement("div");div.style.cssText="background:#2a2a2a;padding:8px;margin-bottom:6px;border-radius:4px;font-size:12px;";div.innerHTML=`<span style="color:#4da6ff;font-weight:bold;text-transform:uppercase;">[${f.category}]</span> ${f.fact}`;list.appendChild(div);});}catch(e){console.error(e);}}async function updateMemoryConfig(){let enabled=document.getElementById("memEnabled").checked;let limit=parseInt(document.getElementById("memLimit").value)||15;await fetch("/api/memory/config",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:enabled,max_context_facts:limit})});}async function clearMemory(cat){if(!confirm("Очистить память?"))return;await fetch("/api/memory/clear",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({category:cat})});loadMemoryData();}
-</script><script src="/static/memory_btn.js" defer></script><script src="/static/cloudru_iam.js" defer></script>
-</body></html>
+    <script
+      id="alice-boot"
+      src="{{ static_root }}/boot.js?v={{ static_version }}"
+      data-base-path="{{ preview_base_path or '' }}"
+      data-static-base="{{ static_root }}"
+      data-static-version="{{ static_version }}"
+    ></script>
+    <script
+      src="{{ static_root }}/core_api.js?v={{ static_version }}"
+      defer
+      data-critical-script="core-api"
+    ></script>
+    <script
+      src="{{ static_root }}/ui_runtime.js?v={{ static_version }}"
+      defer
+      data-critical-script="ui-runtime"
+    ></script>
+    <script
+      src="{{ static_root }}/dispatcher.js?v={{ static_version }}"
+      defer
+      data-critical-script="dispatcher"
+    ></script>
+    <script
+      src="{{ static_root }}/core.js?v={{ static_version }}"
+      defer
+      data-critical-script="core"
+    ></script>
+    <script src="{{ static_root }}/system_status.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/file_manager.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/treasury.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/settings/ui_helpers.js?v={{ static_version }}" defer></script>
+    <script
+      src="{{ static_root }}/settings/settings_storage.js?v={{ static_version }}"
+      defer
+    ></script>
+    <script src="{{ static_root }}/settings/settings_mcp.js?v={{ static_version }}" defer></script>
+    <script
+      src="{{ static_root }}/settings/settings_params.js?v={{ static_version }}"
+      defer
+    ></script>
+    <script
+      src="{{ static_root }}/settings/settings_modal.js?v={{ static_version }}"
+      defer
+    ></script>
+    <script src="{{ static_root }}/settings.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/project_tree.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/theme_assistant.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/sidebar.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/models.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/trace_summary.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/execution_surface.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/chat.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/trace_viewer.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/trace_viewer_timing.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/trace_viewer_error_ui.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/trace_viewer_bridge.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/voice.js?v={{ static_version }}" defer></script>
+    <script
+      src="{{ static_root }}/android_diagnostics.js?v={{ static_version }}"
+      defer
+      data-optional-script="true"
+    ></script>
+    <script
+      src="{{ static_root }}/eruda_init.js?v={{ static_version }}"
+      defer
+      data-optional-script="true"
+    ></script>
+    <link rel="stylesheet" href="{{ static_root }}/departments.css?v={{ static_version }}" />
+    <link rel="stylesheet" href="{{ static_root }}/environments.css?v={{ static_version }}" />
+    <script src="{{ static_root }}/departments.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/partner_relations.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/environments.js?v={{ static_version }}" defer></script>
+  </head>
+  <body>
+    <div id="app-root" class="alice-pro-app">
+      <div id="frontend-degraded-status" class="frontend-degraded-status" role="status" hidden>
+        Базовый интерфейс доступен. Дополнительные функции не загрузились; обновите страницу, чтобы
+        повторить попытку.
+      </div>
+      <noscript>
+        <div class="frontend-degraded-status" role="status">
+          Базовый интерфейс доступен без JavaScript. Интерактивные функции требуют JavaScript.
+        </div>
+      </noscript>
+      <div id="sidebar">
+        <div id="sidebar-header">
+          <button id="new-chat-btn" type="button" class="alice-btn" aria-label="Новый чат">
+            + Новый чат</button
+          ><button id="close-sidebar-btn" type="button" class="alice-btn" aria-label="Закрыть меню">
+            &times;
+          </button>
+        </div>
+        <div id="conv-list"></div>
+      </div>
+      <div id="overlay"></div>
+      <div id="main">
+        <div id="header">
+          <div class="header-row header-row-primary">
+            <button
+              id="menu-btn"
+              type="button"
+              class="header-btn alice-btn"
+              aria-label="Открыть меню"
+              aria-controls="sidebar"
+              aria-expanded="false"
+              data-action="sidebar.toggle"
+            >
+              ☰</button
+            ><button
+              id="system-status-btn"
+              type="button"
+              class="header-btn alice-btn"
+              title="Состояние системы"
+              aria-label="Состояние системы"
+              aria-haspopup="dialog"
+              aria-expanded="false"
+              data-action="system-status.toggle"
+            >
+              ●</button
+            ><button
+              id="model-btn"
+              type="button"
+              class="header-btn model-btn alice-btn"
+              title="Выбор модели"
+              aria-label="Выбор модели"
+              data-action="modal.open"
+              data-modal="model-modal"
+            >
+              🤖</button
+            ><button
+              id="tools-btn"
+              type="button"
+              class="header-btn alice-btn"
+              title="Локальные инструменты"
+              data-action="header.tools.open"
+            >
+              🧰</button
+            ><button
+              id="ssh-runtime-btn"
+              type="button"
+              class="header-btn alice-btn"
+              title="SSH Runtime"
+              aria-label="SSH Runtime"
+              data-action="header.ssh.open"
+            >
+              🔐
+            </button>
+          </div>
+          <div id="header-actions-2" class="header-row header-row-secondary">
+            <button
+              id="mcp-btn"
+              type="button"
+              class="header-btn alice-btn"
+              title="Внешние MCP шлюзы"
+              data-action="header.mcp.open"
+            >
+              🌐</button
+            ><button
+              id="settings-btn"
+              type="button"
+              class="header-btn alice-btn"
+              title="Параметры генерации"
+              data-action="header.settings.open"
+            >
+              ⚙️</button
+            ><button
+              id="file-manager-btn"
+              type="button"
+              class="header-btn alice-btn"
+              title="Файловый менеджер"
+              data-action="header.files.open"
+            >
+              📁</button
+            ><button
+              id="treasury-btn"
+              type="button"
+              class="header-btn alice-btn"
+              title="Казначейство"
+              aria-label="Казначейство"
+              data-action="header.treasury.open"
+            >
+              💰</button
+            ><button
+              id="dozzle-btn"
+              type="button"
+              class="header-btn alice-btn"
+              title="Логи Dozzle"
+              aria-label="Логи Dozzle"
+              data-action="header.dozzle.open"
+            >
+              🐳</button
+            ><button
+              id="project-tree-btn"
+              type="button"
+              class="header-btn alice-btn"
+              title="Структура проекта"
+              aria-label="Структура проекта"
+              data-action="project-tree.open"
+            >
+              🌳</button
+            ><button
+              id="departments-btn"
+              type="button"
+              class="header-btn alice-btn"
+              title="Departments"
+              data-action="header.departments.open"
+            >
+              🏢</button
+            ><button
+              id="update-app-btn"
+              type="button"
+              class="header-btn alice-btn"
+              title="Обновить приложение"
+              data-action="header.update.open"
+            >
+              ⬆️</button
+            ><button
+              id="provider-credentials-btn"
+              type="button"
+              class="header-btn alice-btn"
+              title="Ключи провайдеров"
+              aria-label="Ключи провайдеров"
+              data-action="header.credentials.open"
+            >
+              🔑</button
+            ><button
+              id="memory-btn"
+              type="button"
+              class="header-btn alice-btn"
+              title="Управление памятью"
+              aria-label="Управление памятью"
+              data-action="modal.open"
+              data-modal="memoryModal"
+            >
+              🧠</button
+            >{% if donation_url %}<a
+              id="donate-btn"
+              class="header-btn donate-btn"
+              href="{{ donation_url }}"
+              target="_blank"
+              rel="noopener noreferrer external"
+              title="Поддержать проект"
+              aria-label="Поддержать проект"
+              ><img
+                src="{{ static_root }}/icons/donate.svg?v={{ static_version }}"
+                alt=""
+                width="22"
+                height="22" /></a
+            >{% endif %}{% if github_login_enabled %}<a
+              id="github-login-btn"
+              class="header-btn github-login-btn"
+              href="{{ preview_base_path }}{{ github_login_url }}"
+              title="{{ ('GitHub: ' ~ github_login) if github_login else 'Войти через GitHub' }}"
+              aria-label="{{ ('GitHub: ' ~ github_login) if github_login else 'Войти через GitHub' }}"
+              ><svg viewBox="0 0 16 16" width="22" height="22" aria-hidden="true" focusable="false">
+                <path
+                  fill="currentColor"
+                  d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
+                /></svg></a
+            >{% endif %}<button
+              id="theme-toggle"
+              type="button"
+              class="header-btn alice-btn"
+              title="Цветовая схема"
+              aria-label="Цветовая схема"
+              data-action="theme.cycle"
+            >
+              🌙
+            </button>
+          </div>
+        </div>
+        <div id="chatbox">
+          {% if selected_conversation %}
+          <div
+            class="server-rendered-conversation"
+            data-conversation-id="{{ selected_conversation.id }}"
+            data-server-rendered="true"
+          >
+            <h2 class="server-conversation-title">{{ selected_conversation.title }}</h2>
+            {% for message in selected_messages %}
+            <article class="server-message server-message-{{ message.role }}">
+              <header class="server-message-role">
+                {{ "Вы" if message.role == "user" else "Logos" }}
+              </header>
+              <div class="server-message-content">{{ message.text }}</div>
+            </article>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="empty-state">Начните диалог или выберите модель</div>
+          {% endif %}
+        </div>
+        <div id="voice-ui">
+          <canvas id="waveform"></canvas>
+          <div id="voice-status"></div>
+          <button id="mic-btn" type="button" class="alice-btn">🎤</button>
+        </div>
+        <div id="text-ui">
+          <div id="response-mode-wrap" style="display: none">
+            <select id="response-mode-select">
+              <option value="audio">🔊 Голос</option>
+              <option value="text">📝 Текст</option>
+              <option value="both">🔊+📝 Оба</option>
+            </select>
+          </div>
+          <button id="upload-image-btn" type="button" class="icon-btn alice-btn">📷</button
+          ><button id="mic-btn-inline" type="button" class="icon-btn alice-btn">🎤</button
+          ><input id="msg-input" type="text" placeholder="Сообщение..." autocomplete="off" /><button
+            id="send-btn"
+            type="button"
+            class="alice-btn"
+          >
+            ➤
+          </button>
+        </div>
+      </div>
+      <div
+        id="alice-system-status"
+        class="alice-system-status-panel"
+        hidden
+        role="dialog"
+        aria-modal="false"
+        aria-labelledby="alice-system-status-title"
+      >
+        <div class="alice-system-status-content">
+          <div class="alice-system-status-header">
+            <h2 id="alice-system-status-title">Состояние системы</h2>
+            <button type="button" class="alice-btn alice-system-status-close" aria-label="Закрыть">
+              &times;
+            </button>
+          </div>
+          <div class="alice-system-status-list" aria-live="polite"></div>
+        </div>
+      </div>
+      <div
+        id="model-modal"
+        class="modal"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="model-modal-title"
+      >
+        <div class="modal-content">
+          <h3 id="model-modal-title">Выбор модели</h3>
+          <button
+            id="close-modal"
+            type="button"
+            class="alice-btn"
+            data-action="modal.close"
+            data-modal="model-modal"
+          >
+            &times;
+          </button>
+          <div id="model-list"></div>
+        </div>
+      </div>
+    </div>
+    <div
+      id="memoryModal"
+      class="modal memory-modal"
+      hidden
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="memoryModalTitle"
+    >
+      <div class="modal-content memory-modal-content">
+        <button
+          id="memoryCloseBtn"
+          class="memory-modal-close alice-btn"
+          type="button"
+          aria-label="Закрыть"
+          data-action="modal.close"
+          data-modal="memoryModal"
+        >
+          &times;
+        </button>
+        <h2 id="memoryModalTitle" class="memory-modal-title">Управление памятью</h2>
+        <div class="memory-config">
+          <label class="memory-config-option"
+            ><input type="checkbox" id="memEnabled" /> Включить память</label
+          ><label class="memory-config-option"
+            >Макс. фактов: <input type="number" id="memLimit" class="memory-limit" min="1" max="50"
+          /></label>
+        </div>
+        <div class="memory-clear">
+          <button id="memoryClearBtn" class="memory-clear-btn alice-btn" type="button">
+            Очистить всю память
+          </button>
+        </div>
+        <h3 class="memory-facts-title">Факты (<span id="memCount">0</span>)</h3>
+        <div id="memoryFactsList" class="memory-facts-list"></div>
+      </div>
+    </div>
+    <script
+      src="{{ static_root }}/settings/ssh_runtime_modal.js?v={{ static_version }}"
+      defer
+    ></script>
+    <script src="{{ static_root }}/header_actions.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/memory_panel.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/provider_credentials.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/dozzle.js?v={{ static_version }}" defer></script>
+  </body>
+</html>
