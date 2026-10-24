@@ -76,12 +76,17 @@ def _require_case(case_id: str) -> dict[str, Any]:
 
 
 def _save(case: dict[str, Any]) -> dict[str, Any]:
+    # The case was read before this write. Writing it back blindly lost any change made in
+    # between, so the write is refused unless the stored revision is still the one that was read.
     key = "government/case/" + case["case_id"]
+    read_revision = int(case.get("revision") or 0)
     with get_store().transaction() as tx:
         current = tx.get(key)
         if current is None or not _case_owned_by_current_user(current):
             raise ValueError("government case not found")
-        tx.set(key, {**case, "updated_at": _now()})
+        if int(current.get("revision") or 0) != read_revision:
+            raise ValueError("government case was changed concurrently; retry")
+        tx.set(key, {**case, "revision": read_revision + 1, "updated_at": _now()})
     return _require_case(case["case_id"])
 
 
