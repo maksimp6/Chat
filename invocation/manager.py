@@ -26,8 +26,11 @@ _VALUE_LIMIT_ERRORS = {
     "value structure exceeds limit",
     "journal frame exceeds size limit",
 }
+# "token" matches credential names such as access_token, but not usage counters such as
+# input_tokens, total_tokens or output_tokens, which the saved trace needs.
 _SENSITIVE_KEY_RE = re.compile(
-    r"(?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)",
+    r"(?:api[_-]?key|authorization|password|passwd|secret|credential|cookie|private[_-]?key"
+    r"|token(?!s(?![A-Za-z])))",
     re.IGNORECASE,
 )
 
