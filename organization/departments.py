@@ -78,28 +78,34 @@ def upsert_department(
     name = str(data.get("name") or "").strip()
     if not name:
         raise ValueError("department name is required")
-    record: dict[str, Any] = {
-        "id": ident,
-        "name": name,
-        "type": str(data.get("type") or "general"),
-        "description": str(data.get("description") or ""),
-        "agent_id": str(data.get("agent_id") or "").strip() or None,
-        "system_prompt": str(data.get("system_prompt") or ""),
-        "status": str(data.get("status") or "active"),
-        "updated_at": _now(),
-    }
-    for field in ("model_config", "policies", "knowledge_scope", "session_config", "metadata"):
-        value = data.get(field) or {}
-        if not isinstance(value, dict):
-            raise ValueError(f"{field} must be an object")
-        record[field] = dict(value)
-    for field in ("tools", "capabilities"):
-        value = data.get(field) or []
-        if not isinstance(value, list):
-            raise ValueError(f"{field} must be a list")
-        record[field] = list(value)
     with get_store().transaction() as tx:
         old = tx.get("department/" + ident)
+
+        def given(field: str) -> Any:
+            # A field the request leaves out keeps its stored value. Defaulting it made a PUT without
+            # "status" reactivate an archived department and a PUT without "policies" clear them.
+            return data.get(field) if field in data or old is None else old.get(field)
+
+        record: dict[str, Any] = {
+            "id": ident,
+            "name": name,
+            "type": str(given("type") or "general"),
+            "description": str(given("description") or ""),
+            "agent_id": str(given("agent_id") or "").strip() or None,
+            "system_prompt": str(given("system_prompt") or ""),
+            "status": str(given("status") or "active"),
+            "updated_at": _now(),
+        }
+        for field in ("model_config", "policies", "knowledge_scope", "session_config", "metadata"):
+            value = given(field) or {}
+            if not isinstance(value, dict):
+                raise ValueError(f"{field} must be an object")
+            record[field] = dict(value)
+        for field in ("tools", "capabilities"):
+            value = given(field) or []
+            if not isinstance(value, list):
+                raise ValueError(f"{field} must be a list")
+            record[field] = list(value)
         record["created_at"] = old["created_at"] if old else record["updated_at"]
         tx.set("department/" + ident, record)
     return record
