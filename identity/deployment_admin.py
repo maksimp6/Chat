@@ -40,7 +40,7 @@ def deployment_authorization_configured() -> bool:
     return _short_token_gate_enabled() or bool(_administrator_token())
 
 
-def _is_local_request() -> bool:
+def is_local_request() -> bool:
     # A reverse proxy makes every request arrive from loopback, so a forwarding header means
     # the request did not originate on this host.
     if any(request.headers.get(name) for name in _FORWARDING_HEADERS):
@@ -61,7 +61,7 @@ def deployment_admin_authorized() -> bool:
             token.encode("utf-8"), configured.encode("utf-8")
         )
 
-    return _is_local_request()
+    return is_local_request()
 
 
 def deployment_admin_denied():
@@ -85,7 +85,7 @@ def install_deployment_gate(app: Flask) -> None:
     def _refuse_remote_without_authorization():
         if request.path in _PUBLIC_PATHS or request.path.startswith(_PUBLIC_PREFIXES):
             return None
-        if deployment_authorization_configured() or _is_local_request():
+        if deployment_authorization_configured() or is_local_request():
             return None
         return (
             jsonify(

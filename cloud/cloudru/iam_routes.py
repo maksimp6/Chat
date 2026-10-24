@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import hmac
 import ipaddress
 import os
 from typing import Any
@@ -10,7 +11,8 @@ from typing import Any
 from flask import Blueprint, jsonify, request
 
 from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
-from secret_store.key_manager import store_secret
+from identity.deployment_admin import is_local_request
+from secret_store.key_manager import secret_storage_ready, store_secret
 
 cloudru_iam_bp = Blueprint("cloudru_iam", __name__, url_prefix="/api/cloudru/iam")
 
@@ -24,10 +26,13 @@ def _authorized() -> bool:
     if configured:
         auth = request.headers.get("Authorization", "")
         token = auth[7:].strip() if auth.startswith("Bearer ") else ""
-        return token == configured
+        return bool(token) and hmac.compare_digest(
+            token.encode("utf-8"), configured.encode("utf-8")
+        )
 
-    remote = request.remote_addr or ""
-    return remote in {"127.0.0.1", "::1"}
+    # Without a token only a request from this host counts. Checking the remote address alone
+    # would let every visitor through behind a reverse proxy, which connects from loopback.
+    return is_local_request()
 
 
 def _guard():
@@ -114,6 +119,21 @@ def create_api_key():
         products = [str(item).strip() for item in products if str(item).strip()]
         if not products:
             raise ValueError("At least one Cloud.ru service is required")
+
+        # Check the secret store before the key exists at Cloud.ru: a key issued and then
+        # not stored would leave a live credential whose secret nobody can see.
+        if not secret_storage_ready():
+            return (
+                jsonify(
+                    {
+                        "error": (
+                            "Хранилище секретов не настроено: ключ не выпущен. "
+                            "Задайте LOGOS_KEY_MANAGER_KEY (ключ Fernet)."
+                        )
+                    }
+                ),
+                503,
+            )
 
         client = CloudRuIamClient()
         cloud_response = client.create_api_key(

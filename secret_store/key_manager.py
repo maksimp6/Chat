@@ -80,6 +80,15 @@ def _fernet() -> Fernet:
         raise KeyManagerError("Invalid key-manager encryption key") from exc
 
 
+def secret_storage_ready() -> bool:
+    """True when managed secrets can be encrypted; checked before an issued key is stored."""
+    try:
+        _fernet()
+    except KeyManagerError:
+        return False
+    return True
+
+
 def _fingerprint(secret: str) -> str:
     return hashlib.sha256(secret.encode("utf-8")).hexdigest()
 
