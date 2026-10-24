@@ -19,6 +19,9 @@ permissions:
 env:
   PREVIEW_SSH_PORT: ${{ vars.PREVIEW_SSH_PORT || '22' }}
 
+env:
+  OUT: ${{ runner.temp }}/ci-out/production-deploy
+
 jobs:
   code-rules:
     name: Code rules
@@ -31,7 +34,7 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.ref }}
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
           cache: pip
@@ -42,7 +45,7 @@ jobs:
         run: bash scripts/check_code_rules.sh
 
   deploy:
-    name: Deploy Alice Pro production
+    name: Deploy Logos production
     needs: code-rules
     environment: production
     runs-on: ubuntu-latest
@@ -88,7 +91,7 @@ jobs:
           "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "mkdir -p \"$remote_dir/incoming\" \"$remote_dir/production\" \"$remote_dir/traefik\""
           echo "base_dir=$remote_dir" >> "$GITHUB_OUTPUT"
       - name: Build source archive
-        run: git archive --format=tar.gz --output=production.tar.gz HEAD
+        run: mkdir -p "$OUT" && git archive --format=tar.gz --output="$OUT/production.tar.gz" HEAD
       - name: Upload deployment files
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
@@ -96,7 +99,7 @@ jobs:
           scp_cmd=(scp -P "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10)
           "${scp_cmd[@]}" deploy/preview/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/server.sh"
           "${scp_cmd[@]}" deploy/production/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/production-server.sh"
-          "${scp_cmd[@]}" production.tar.gz "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/incoming/production.tar.gz"
+          "${scp_cmd[@]}" "$OUT/production.tar.gz" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/incoming/production.tar.gz"
       - name: Ensure shared Traefik HTTPS support
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}

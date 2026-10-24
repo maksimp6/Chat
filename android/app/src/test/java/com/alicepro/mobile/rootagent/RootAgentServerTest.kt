@@ -6,6 +6,7 @@ import java.net.Socket
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -17,12 +18,15 @@ class RootAgentServerTest {
     private var treeDump = RootShellResult(
         0, "<?xml version='1.0' ?><hierarchy rotation=\"0\"><node text=\"a\\\"b\" /></hierarchy>\n", false, false,
     )
-    private var shotDump = RootShellResult(0, "iVBORw0KGgoB\n", false, false)
+    private var shotDump = RootShellResult(0, "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==\n", false, false)
+    private var rootCalls = 0
+    private var treeCalls = 0
+    private var screenshotCalls = 0
     private val operations = RootOperations(
-        runRoot = { argv -> if (argv == RootOperations.STATUS_ARGV) statusDump else probe },
+        runRoot = { argv -> rootCalls++; if (argv == RootOperations.STATUS_ARGV) statusDump else probe },
         deviceInfo = { mapOf("model" to "Redmi 9", "sdk" to "29") },
-        runTree = { treeDump },
-        runScreenshot = { shotDump },
+        runTree = { treeCalls++; treeDump },
+        runScreenshot = { screenshotCalls++; shotDump },
     )
     private lateinit var server: RootAgentServer
     private var port = 0
@@ -55,6 +59,95 @@ class RootAgentServerTest {
     }
 
     private fun status(response: String): Int = response.substringAfter(' ').substringBefore(' ').toInt()
+
+    @Test
+    fun actualClientAndServerExchangeReadOnlyUtf8AndImagePayloads() {
+        statusDump = RootShellResult(0, "isKeyguardShowing=false\n", false, false)
+        val xml = "<?xml version=\"1.0\"?><hierarchy><node text=\"Ёж 🦔\"/></hierarchy>"
+        treeDump = RootShellResult(0, xml, false, false)
+        // Complete synthetic 1x1 PNG; no device screen is involved.
+        val png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+        shotDump = RootShellResult(0, png, false, false)
+        RootAgentClient(port) { token }.use { client ->
+            for ((endpoint, body) in listOf(
+                RootAgentClient.Endpoint.HEALTH to "{\"status\":\"ok\"}",
+                RootAgentClient.Endpoint.ROOT to "{\"root\":true}",
+                RootAgentClient.Endpoint.STATUS to "{\"keyguard_locked\":false}",
+                RootAgentClient.Endpoint.TREE to RootAgentServer.json(mapOf("xml" to xml)),
+                RootAgentClient.Endpoint.CAPTURE to "{\"format\":\"png\",\"png_base64\":\"$png\"}",
+            )) {
+                val result = client.request(endpoint)
+                assertEquals(endpoint.name, 200, result.code)
+                assertNull(result.error)
+                assertEquals(body, result.body)
+                assertFalse(result.toString().contains("Ёж"))
+                assertFalse(result.toString().contains(png))
+                assertFalse(result.toString().contains(token))
+            }
+        }
+        assertEquals(1, treeCalls)
+        assertEquals(1, screenshotCalls)
+    }
+
+    @Test
+    fun actualClientUnauthorizedRequestsNeverInvokeRootOrScreenOperations() {
+        RootAgentClient(port) { "wrong-synthetic-token" }.use { client ->
+            for (endpoint in RootAgentClient.Endpoint.entries) {
+                val result = client.request(endpoint)
+                assertEquals(endpoint.name, 401, result.code)
+                assertNull(result.error)
+                assertEquals("{\"error\":\"unauthorized\"}", result.body)
+                assertFalse(result.body.contains(token))
+            }
+        }
+        assertEquals(0, rootCalls)
+        assertEquals(0, treeCalls)
+        assertEquals(0, screenshotCalls)
+    }
+
+    @Test
+    fun actualClientLockedAndUnknownStatesNeverInvokeScreenOperations() {
+        RootAgentClient(port) { token }.use { client ->
+            for (dump in listOf(
+                RootShellResult(0, "isKeyguardShowing=true", false, false),
+                RootShellResult(0, "unrecognized-synthetic-state", false, false),
+                RootShellResult(1, "synthetic-secret", false, false),
+                RootShellResult(null, "synthetic-secret", true, false),
+            )) {
+                statusDump = dump
+                for (endpoint in listOf(RootAgentClient.Endpoint.TREE, RootAgentClient.Endpoint.CAPTURE)) {
+                    val result = client.request(endpoint)
+                    assertEquals(423, result.code)
+                    assertNull(result.error)
+                    assertEquals("{\"error\":\"device_locked\"}", result.body)
+                }
+            }
+        }
+        assertEquals(0, treeCalls)
+        assertEquals(0, screenshotCalls)
+    }
+
+    @Test
+    fun actualClientReceivesSanitizedCommandFailuresAndTimeouts() {
+        statusDump = RootShellResult(0, "isKeyguardShowing=false", false, false)
+        RootAgentClient(port) { token }.use { client ->
+            for ((dump, expectedCode) in listOf(
+                RootShellResult(1, "synthetic-secret", false, false) to 502,
+                RootShellResult(null, "synthetic-secret", true, false) to 504,
+            )) {
+                treeDump = dump
+                shotDump = dump
+                for (endpoint in listOf(RootAgentClient.Endpoint.TREE, RootAgentClient.Endpoint.CAPTURE)) {
+                    val result = client.request(endpoint)
+                    assertEquals(expectedCode, result.code)
+                    assertNull(result.error)
+                    assertFalse(result.body.contains("synthetic-secret"))
+                    assertFalse(result.body.contains(token))
+                    assertTrue(result.body.startsWith("{\"error\":"))
+                }
+            }
+        }
+    }
 
     @Test
     fun healthRequiresTheToken() {
@@ -104,6 +197,7 @@ class RootAgentServerTest {
 
     @Test
     fun screenTreeReturnsEscapedXml() {
+        statusDump = RootShellResult(0, "isKeyguardShowing=false\n", false, false)
         val ok = get("/v1/screen/tree")
         assertEquals(200, status(ok))
         assertTrue(ok, ok.endsWith("{\"xml\":\"<?xml version='1.0' ?><hierarchy rotation=\\\"0\\\"><node text=\\\"a\\\\\\\"b\\\" /></hierarchy>\"}"))
@@ -118,9 +212,10 @@ class RootAgentServerTest {
 
     @Test
     fun screenshotReturnsBase64Png() {
+        statusDump = RootShellResult(0, "isKeyguardShowing=false\n", false, false)
         val ok = get("/v1/screen/capture")
         assertEquals(200, status(ok))
-        assertTrue(ok, ok.endsWith("{\"format\":\"png\",\"png_base64\":\"iVBORw0KGgoB\"}"))
+        assertTrue(ok, ok.endsWith("{\"format\":\"png\",\"png_base64\":\"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==\"}"))
         shotDump = RootShellResult(1, "secret", false, false)
         val failed = get("/v1/screen/capture")
         assertEquals(502, status(failed))
@@ -128,6 +223,26 @@ class RootAgentServerTest {
         shotDump = RootShellResult(null, "", timedOut = true, truncated = false)
         assertEquals(504, status(get("/v1/screen/capture")))
         assertEquals(401, status(get("/v1/screen/capture", auth = null)))
+    }
+
+    @Test
+    fun screenContentIsRefusedWhileLockedOrUnknown() {
+        treeDump = RootShellResult(0, "<?xml ?><hierarchy><node text=\"secret\"/></hierarchy>", false, false)
+        shotDump = RootShellResult(0, "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==\n", false, false)
+        val lockedOrUnknown = listOf(
+            RootShellResult(0, "isKeyguardShowing=true\n", false, false),
+            RootShellResult(null, "", timedOut = true, truncated = false),
+            RootShellResult(1, "", false, false),
+        )
+        for (dump in lockedOrUnknown) {
+            statusDump = dump
+            for (path in listOf("/v1/screen/tree", "/v1/screen/capture")) {
+                val response = get(path)
+                assertEquals("$path with $dump", 423, status(response))
+                assertTrue(response.endsWith("{\"error\":\"device_locked\"}"))
+                assertFalse(response.contains("secret"))
+            }
+        }
     }
 
     @Test

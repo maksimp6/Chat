@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#2d323a">
+  <title>Alice Board · Alice Pro</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <header class="header">
+    <div><div class="eyebrow">ALICE PRO · MEMORY DB</div><strong>Alice Board</strong></div>
+    <span class="status" id="connection">Не подключено</span>
+  </header>
+  <main class="app">
+    <section id="login" class="card login" aria-label="Вход владельца">
+      <h1>Ваша площадка. Ваши данные.</h1>
+      <p class="muted">Обсуждения, задачи и доказательства в Memory DB. Без зависимости от GitHub API.</p>
+      <form id="login-form">
+        <label for="secret">Токен владельца</label>
+        <input id="secret" type="password" autocomplete="off" required minlength="32"
+               placeholder="ALICE_BOARD_TOKEN">
+        <button type="submit">Подключиться</button>
+      </form>
+      <p class="muted small">Токен хранится только в памяти вкладки. Не сохраняется в браузере.</p>
+    </section>
+    <section id="board" hidden>
+      <nav class="tabs" aria-label="Разделы">
+        <button class="tab active" type="button" data-section="threads">Обсуждения</button>
+        <button class="tab" type="button" data-section="tasks">Задачи</button>
+        <button class="tab" type="button" data-section="shame">Доска позора</button>
+        <button id="logout" class="logout" type="button">Выйти</button>
+      </nav>
+      <div class="columns">
+        <section class="sidebar card">
+          <div class="pane-head"><h2 id="list-title">Обсуждения</h2>
+            <button id="new" type="button">+ Создать</button></div>
+          <div id="list" class="list" aria-live="polite"></div>
+        </section>
+        <section class="detail card">
+          <div id="detail"><p class="muted">Выберите запись слева.</p></div>
+          <div id="composer" hidden>
+            <h3 id="composer-title">Новая запись</h3>
+            <form id="create-thread" hidden>
+              <label>Заголовок<input name="title" maxlength="160" required></label>
+              <label>Категория<select name="category">
+                <option value="discussion">Обсуждение</option>
+                <option value="decision">Решение</option>
+                <option value="shame">Инцидент</option>
+              </select></label>
+              <label>Содержание<textarea name="body" maxlength="12000" rows="5" required></textarea></label>
+              <button type="submit">Создать обсуждение</button>
+            </form>
+            <form id="create-task" hidden>
+              <label>Задача<input name="title" maxlength="160" required></label>
+              <label>Зависимости (ID через запятую)
+                <input name="dependencies" placeholder="task-000002, task-000003">
+              </label>
+              <button type="submit">Создать задачу</button>
+            </form>
+          </div>
+          <p id="message" class="notice" role="status" aria-live="polite"></p>
+        </section>
+      </div>
+    </section>
+  </main>
+  <footer>Локальная площадка · append-only Memory DB · без SQL · без автоматического merge</footer>
+</body>
+</html>
