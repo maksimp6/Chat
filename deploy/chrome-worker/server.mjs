@@ -5,6 +5,7 @@ import { createIdpAuth } from "./idp-auth.mjs";
 import { createPlaywrightMcp } from "./mcp.mjs";
 import { createOAuth } from "./oauth.mjs";
 import { createChromeStateStore } from "./state.mjs";
+import { createTakeover } from "./takeover.mjs";
 
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_TEXT_CHARS = 32 * 1024;
@@ -82,7 +83,7 @@ export function createWorker(options = {}) {
     stateDir: options.stateDir ?? process.env.CHROME_STATE_DIR,
     authDir,
   });
-  // Central Alice IdP (optional): verifies its tokens for the MCP endpoint only.
+  // Central Logos IdP (optional): verifies its tokens for the MCP endpoint only.
   const publicUrl = options.publicUrl ?? process.env.BROWSER_PUBLIC_URL ?? "";
   const idp = createIdpAuth({
     issuer: process.env.BROWSER_IDP_ISSUER,
@@ -91,8 +92,12 @@ export function createWorker(options = {}) {
     requiredScopes: ["browser.control"],
     ...options.idp,
   });
+  const takeoverEnabled = options.takeoverEnabled ?? process.env.BROWSER_TAKEOVER_ENABLED === "1";
+  const secretResolver = options.secretResolver;
+  const takeover = options.takeoverRuntime ?? createTakeover(options.takeover);
   let oauth;
   const ready = (async () => {
+    if (takeoverEnabled) takeover.startDisplay();
     await stateStore.restore();
     oauth = createOAuth({
       ...options.oauth,
@@ -111,41 +116,138 @@ export function createWorker(options = {}) {
   let page;
   let state = "sleeping";
   let generation = 0;
+  const idleSleepMs = Number(options.idleSleepMs ?? process.env.BROWSER_IDLE_SLEEP_MS ?? 300000);
+  const minimumIdleSleepMs = options.idleSleepMs === undefined ? 1000 : 10;
+  if (!Number.isFinite(idleSleepMs) || idleSleepMs < minimumIdleSleepMs) throw new Error("invalid_browser_idle_sleep_ms");
+  let idleTimer;
+  let closing = false;
+  // True only while the persistent context is closing; the page is already cleared at that point.
+  let browserClosing = false;
+  let activeOperations = 0;
+
+  function cancelIdleSleep() {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = undefined;
+  }
+
+  // Idle sleep never interrupts a running operation or a human takeover. A connected noVNC websocket
+  // counts as takeover activity, so an open human session keeps Chrome awake until its grant ends it.
+  function idleSleepAllowed() {
+    if (activeOperations > 0) return false;
+    if (takeoverEnabled && (takeover.status?.().active || takeover.openConnectionCount?.() > 0)) return false;
+    return true;
+  }
+
+  function scheduleIdleSleep() {
+    cancelIdleSleep();
+    if (!context || closing) return;
+    idleTimer = setTimeout(() => {
+      idleTimer = undefined;
+      // Busy or taken-over workers re-arm the timer here; a settling operation re-arms it too.
+      if (!idleSleepAllowed()) {
+        scheduleIdleSleep();
+        return;
+      }
+      sleepWhenIdle().catch(() => {
+        process.stderr.write('{"event":"browser_idle_sleep_failed"}\n');
+      });
+    }, idleSleepMs);
+    idleTimer.unref?.();
+  }
+
+  // Queued in the lifecycle so it sees activity that arrived while an earlier transition was running.
+  function sleepWhenIdle() {
+    return transition(async () => {
+      if (!idleSleepAllowed()) {
+        scheduleIdleSleep();
+        return;
+      }
+      await mcp.close();
+      // Activity may have started while MCP sessions were closing; Chrome stays up for it.
+      if (!idleSleepAllowed()) {
+        scheduleIdleSleep();
+        return;
+      }
+      await closeBrowser();
+    });
+  }
+
+  function trackActivity(operation) {
+    activeOperations += 1;
+    cancelIdleSleep();
+    return operation.finally(() => {
+      activeOperations -= 1;
+      scheduleIdleSleep();
+    });
+  }
 
   async function wake() {
     await ready;
     return transition(async () => {
       if (context) return;
       const chromium = options.chromium ?? (await import("playwright-core")).chromium;
-      context = await chromium.launchPersistentContext(profileDir, {
+      const launched = await chromium.launchPersistentContext(profileDir, {
         executablePath: options.executablePath ?? process.env.CHROME_EXECUTABLE_PATH ?? "/usr/bin/google-chrome-stable",
-        headless: process.env.CHROME_HEADLESS !== "0",
+        headless: takeoverEnabled ? false : process.env.CHROME_HEADLESS !== "0",
         chromiumSandbox: false,
         args: ["--disable-dev-shm-usage", "--no-first-run", "--no-default-browser-check"],
       });
-      context.on?.("close", () => {
+      context = launched;
+      launched.on?.("close", () => {
+        // A late close event from an earlier context must not clear a newer one.
+        if (context !== launched) return;
         context = undefined;
         page = undefined;
         state = "sleeping";
       });
-      page = context.pages()[0] ?? (await context.newPage());
+      page = launched.pages()[0] ?? (await launched.newPage());
       generation += 1;
       state = "awake";
+      scheduleIdleSleep();
     });
+  }
+
+  // The page is cleared before the close is awaited, so requests that arrive while Chrome closes
+  // see browser_sleeping (409) instead of operating on a closing page.
+  async function closeBrowser() {
+    const closingContext = context;
+    const closingPage = page;
+    const closingState = state;
+    context = undefined;
+    page = undefined;
+    state = "sleeping";
+    cancelIdleSleep();
+    if (closingContext) {
+      browserClosing = true;
+      // Promise.resolve().then() also turns a synchronous throw from close() into a rejection.
+      await Promise.resolve()
+        .then(() => closingContext.close())
+        .catch((error) => {
+          // A failed close keeps the persistent context, so the failure stays retriable and the next wake
+          // reuses it instead of launching a second context on the same profile. The checkpoint is skipped.
+          context = closingContext;
+          page = closingPage;
+          state = closingState;
+          scheduleIdleSleep();
+          throw error;
+        })
+        .finally(() => {
+          browserClosing = false;
+        });
+    }
+    await stateStore.checkpoint();
   }
 
   async function sleep() {
     await ready;
-    return transition(async () => {
-      if (context) await context.close();
-      context = undefined;
-      page = undefined;
-      state = "sleeping";
-      await stateStore.checkpoint();
-    });
+    return transition(() => closeBrowser());
   }
 
-  async function callTool(name, args = {}) {
+  function callTool(name, args = {}) {
+    return trackActivity(runTool(name, args));
+  }
+
+  async function runTool(name, args = {}) {
     await ready;
     if (name === "browser_status") {
       return { state, generation, url: page?.url() ?? null, title: page ? await page.title() : null, profile: stateStore.status() };
@@ -158,7 +260,13 @@ export function createWorker(options = {}) {
       await sleep();
       return { state, generation, profile: stateStore.status() };
     }
-    if (!page) throw Object.assign(new Error("browser_sleeping"), { status: 409 });
+    if (!page) {
+      // The next browser call wakes a sleeping browser, as the MCP path does. A call that arrives while
+      // Chrome is closing still gets browser_sleeping instead of queueing behind the close.
+      if (browserClosing) throw Object.assign(new Error("browser_sleeping"), { status: 409 });
+      await wake();
+      if (!page) throw Object.assign(new Error("browser_sleeping"), { status: 409 });
+    }
     if (name === "navigate") {
       await page.goto(safeUrl(args.url, allowedHosts), { waitUntil: "domcontentloaded" });
       return { url: page.url(), title: await page.title() };
@@ -169,6 +277,28 @@ export function createWorker(options = {}) {
     }
     if (name === "type") {
       await page.locator(String(args.locator ?? "")).fill(String(args.text ?? ""));
+      return { ok: true };
+    }
+    if (name === "secret_fill") {
+      const alias = String(args.alias ?? "");
+      const locator = String(args.locator ?? "");
+      const purpose = String(args.purpose ?? "");
+      if (!alias || !locator || !purpose.startsWith("browser.")) {
+        throw Object.assign(new Error("invalid_secret_fill_request"), { status: 400 });
+      }
+      if (typeof secretResolver !== "function") {
+        throw Object.assign(new Error("secret_resolver_unavailable"), { status: 503 });
+      }
+      let secret;
+      try {
+        secret = await secretResolver(alias, purpose);
+        if (typeof secret !== "string" || !secret) throw new Error("invalid_secret_value");
+        await page.locator(locator).fill(secret);
+      } catch {
+        throw Object.assign(new Error("secret_fill_failed"), { status: 503 });
+      } finally {
+        secret = undefined;
+      }
       return { ok: true };
     }
     if (name === "extract") {
@@ -189,11 +319,13 @@ export function createWorker(options = {}) {
     ["POST /browser/v1/navigate", ["navigate", true]],
     ["POST /browser/v1/click", ["click", true]],
     ["POST /browser/v1/type", ["type", true]],
+    ["POST /browser/v1/secret/fill", ["secret_fill", true]],
     ["POST /browser/v1/extract", ["extract", true]],
     ["POST /browser/v1/screenshot", ["screenshot", true]],
   ]);
 
-  const mcp = createPlaywrightMcp(async () => {
+  const createMcp = options.createMcp ?? createPlaywrightMcp;
+  const mcp = createMcp(async () => {
     await wake();
     return context;
   }, `${profileDir}/mcp-output`);
@@ -217,6 +349,38 @@ export function createWorker(options = {}) {
         return json(response, 200, idp.resourceMetadata());
       }
       if (await oauth.handle(request, response, url)) return;
+      if (takeoverEnabled && request.method === "GET" && pathname === "/browser/v1/takeover") {
+        if (!oauth.ownerAuthorize?.(request)) {
+          response.writeHead(200, {
+            "content-type": "text/html; charset=utf-8",
+            "cache-control": "no-store",
+            "content-security-policy": "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+            "referrer-policy": "no-referrer",
+            "x-content-type-options": "nosniff",
+          });
+          response.end('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Chrome takeover</title><h1>Войти в браузер</h1><p>Введите short token владельца. Пароль сайта затем вводится уже непосредственно в Chrome.</p><form method="post" action="/browser/oauth/owner-session"><input type="password" name="password" autocomplete="current-password" required autofocus><button type="submit">Открыть Chrome</button></form></html>');
+          return;
+        }
+        await wake();
+        let grant;
+        try { grant = takeover.start(); }
+        catch (error) {
+          if (error.message !== "takeover_already_active") throw error;
+          takeover.stop();
+          grant = takeover.start();
+        }
+        response.writeHead(303, {
+          location: `/browser/v1/takeover/vnc.html?autoconnect=1&resize=scale&path=${encodeURIComponent(`browser/v1/takeover/websockify?takeover_token=${grant.token}`)}&takeover_token=${grant.token}`,
+          "cache-control": "no-store",
+          "referrer-policy": "no-referrer",
+        });
+        response.end();
+        return;
+      }
+      if (takeoverEnabled && request.method === "GET" && pathname.startsWith("/browser/v1/takeover/")) {
+        if (await takeover.proxyHttp(request, response, url)) return;
+        return json(response, 401, { error: "unauthorized" });
+      }
       const isMcp = pathname === "/browser/v1/mcp";
       const idpGrant = isMcp && idp.enabled ? await idp.authorize(request) : false;
       const idpControlAccess = Boolean(idpGrant && idpGrant.scopes.includes("browser.control"));
@@ -227,8 +391,31 @@ export function createWorker(options = {}) {
         return json(response, 401, { error: "unauthorized" });
       }
       if (pathname === "/browser/v1/mcp") {
+        // A standing GET SSE stream lasts as long as the MCP session. Only request-bound work (the
+        // handshake, tool-call POSTs, DELETE) counts as browser activity, so the stream cannot hold Chrome awake.
+        if (request.method === "GET") {
+          await mcp.handle(request, response, undefined);
+          return;
+        }
         const message = request.method === "POST" ? await body(request) : undefined;
-        return await mcp.handle(request, response, message);
+        await trackActivity(mcp.handle(request, response, message));
+        return;
+      }
+      if (takeoverEnabled && request.method === "POST" && pathname === "/browser/v1/takeover/start") {
+        await wake();
+        const grant = takeover.start();
+        const origin = publicUrl ? new URL(publicUrl).origin : `http://${request.headers.host}`;
+        return json(response, 200, {
+          url: `${origin}/browser/v1/takeover/vnc.html?autoconnect=1&resize=scale&path=${encodeURIComponent(`browser/v1/takeover/websockify?takeover_token=${grant.token}`)}&takeover_token=${grant.token}`,
+          expiresAt: grant.expiresAt,
+        });
+      }
+      if (takeoverEnabled && request.method === "POST" && pathname === "/browser/v1/takeover/stop") {
+        takeover.stop();
+        return json(response, 200, { active: false });
+      }
+      if (takeoverEnabled && request.method === "GET" && pathname === "/browser/v1/takeover/status") {
+        return json(response, 200, takeover.status());
       }
       const operation = routeTools.get(`${request.method} ${pathname}`);
       if (!operation) return json(response, 404, { error: "not_found" });
@@ -240,13 +427,15 @@ export function createWorker(options = {}) {
     }
   }
 
-  return { handler, callTool, ready, async close() { await mcp.close(); await sleep(); } };
+  return { handler, callTool, ready, takeover, async close() { closing = true; cancelIdleSleep(); await mcp.close(); await sleep(); takeover.close(); } };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const worker = createWorker();
   await worker.ready;
-  const server = createServer(worker.handler).listen(Number(process.env.PORT ?? 8080), "0.0.0.0");
+  const server = createServer(worker.handler);
+  server.on("upgrade", (request, socket, head) => worker.takeover.proxyUpgrade(request, socket, head));
+  server.listen(Number(process.env.PORT ?? 8080), "0.0.0.0");
   let stopping = false;
   async function stop() {
     if (stopping) return;

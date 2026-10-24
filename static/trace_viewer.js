@@ -1,4 +1,4 @@
-/* Alice Pro Execution Trace viewer. Mobile master-detail with readable JSON depth control. */
+/* Logos Execution Trace viewer. Mobile master-detail with readable JSON depth control. */
 (function () {
   "use strict";
 

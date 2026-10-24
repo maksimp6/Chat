@@ -1,17 +1,15 @@
 # Role-based GitHub agent office
 
-Alice Pro treats AI providers as execution backends and repository agents as roles.
+Logos treats repository roles as the stable contract and execution mechanisms as replaceable infrastructure.
 
 ## Layers
 
 1. **Role** — the job to be done: backend, frontend, Android, testing, infrastructure,
    security review, documentation, release management, or coordination.
-2. **Agent runtime** — GitHub Copilot custom agent, GitHub Partner Agent, or the
-   repository Claude Lite workflow.
-3. **Model** — the smallest model that is reliable for the task.
+2. **Execution runtime** — deterministic GitHub Actions and approved repository tools.
+3. **Optional model assistance** — supplementary, never required for execution or merge.
 
-This keeps prompts, permissions and expertise stable even when model vendors or model
-versions change.
+This keeps prompts, permissions and expertise stable even when model vendors or model versions change.
 
 ## Default routing
 
@@ -28,21 +26,13 @@ versions change.
 | Merge/release preparation | Release Manager | GPT-5.4 mini |
 | Cross-agent non-convergence observation | Operations Observer | GPT-5.4 mini |
 | Process-gap diagnosis and correction | Process Governor | GPT-5.4 mini |
-| Architecture-heavy or ambiguous work | Anthropic Claude Partner Agent | Claude Sonnet 4.6 |
-| Bounded repository maintenance | Claude Lite workflow | Claude Sonnet 4.6 |
-| Focused Codex session | OpenAI Codex Partner Agent | GPT-5.4 nano |
 
 ## Dispatch rules
 
 Prefer a repository role from the GitHub Agents UI for normal development. Team Lead
 can delegate to other custom agents with the custom-agent tool.
 
-Use provider agents as escalation/backends, not as permanent job titles:
-
-- assign the Anthropic Claude Partner Agent for architecture-heavy or multi-domain work;
-- use the OpenAI Codex Partner Agent for focused code/test tasks;
-- use `@claude-lite` for short bounded repository maintenance;
-- keep native Copilot automatic PR review enabled, but do not retrigger it manually.
+Repository roles execute through approved deterministic tools and GitHub workflows. Optional external model assistance may be used ad hoc, but no model provider is a required executor or merge gate. Keep native Copilot automatic PR review enabled, but do not retrigger it manually.
 
 One issue has one primary owner. Split an issue only when independent deliverables can
 be reviewed and merged separately.
@@ -63,7 +53,7 @@ the analogy does not require a separate human or agent for every checkpoint.
 | Issuing permission to prepare the workplace and admit workers | Authorized coordinator verifies permissions and stage prerequisites, including an isolated branch for file changes. | Do not invent a permanent role or require a separate issuer on every routine task. |
 | Admitting worker | Before execution, the dispatching owner checks the actual backend/tool profile and stage-specific evidence against the intended task. | Contract and contract-review use issue criteria; accepted-contract evidence is required from implementation onward. |
 | Responsible leader and work producer | Name one implementation owner; for complex or risky work, name a coordinating lead and explicit handoffs. | The lead is conditional; a reviewer cannot silently become the implementation owner. |
-| Observer and crew | Specialists work within their assigned scope; Operations Observer watches coordination signals under its own read-mostly policy. | The statutory electrical observer has a specific crew-safety purpose and is **not** Alice's Operations Observer. |
+| Observer and crew | Specialists work within their assigned scope; Operations Observer watches coordination signals under its own read-mostly policy. | The statutory electrical observer has a specific crew-safety purpose and is **not** Logos's Operations Observer. |
 
 Apply these checkpoints in the canonical issue and its current task handoff.
 Issues #634/#637 own TaskPacket implementation; #685/#686 own profile metadata
@@ -76,7 +66,7 @@ machine or changing workflow permissions.
    budget, approval boundary, and explicit pause conditions. A small routine
    task needs a compact record, not a new sign-off ceremony. Link accepted
    contract provenance when the stage reaches implementation or later.
-2. **Prepare and admit.** For a write stage, check the current `master`/PR head
+2. **Prepare and admit.** For a write stage, check the current `develop`/PR head
    and isolated branch. For read-only observation or review, check the relevant
    issue/PR and head when one exists. Check the role/backend, selected profile
    and skill versions, actual callable tools, inputs, and required approval.
@@ -126,8 +116,7 @@ Role profiles restrict tools where useful. Security Reviewer is read-mostly. Tea
 does not edit code. Production deployment, destructive database changes, secrets,
 CODEOWNERS and branch protection still require the owner's explicit approval.
 
-Use the lightest configured model by default. Escalation must have a concrete reason,
-not merely a preference for a larger model.
+Prefer deterministic tools first. Optional model assistance must have a concrete reason and must not become a required workflow dependency.
 
 
 ## Skill layer
@@ -135,7 +124,7 @@ not merely a preference for a larger model.
 Roles describe responsibility; repository skills describe repeatable procedures.
 Canonical skills live under `.agents/skills/<name>/SKILL.md`.
 
-Alice exposes a compact skill catalog and loads the full body only for skills selected
+Logos exposes a compact skill catalog and loads the full body only for skills selected
 for one invocation. The selected skill name, source and content version are recorded in
 Execution Trace, while the full skill prompt is not copied into the trace.
 

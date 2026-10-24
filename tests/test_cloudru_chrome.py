@@ -9,7 +9,7 @@ import pytest
 
 from cloud.base import CloudProviderError
 from scripts import cloudru_chrome as chrome
-from storage import StorageObjectNotFound
+from storage.contracts import StorageObjectNotFound
 
 PROJECT = "22706bfa-6066-4047-90d9-9ad15f242b1f"
 IDENTIFIER = "1440c7da-b147-4ed1-87fb-f0bdf2ec5b77"
@@ -25,8 +25,6 @@ def environment(**overrides):
         SHA,
         {
             "ALICE_SHORT_TOKEN": "test-private-token",
-            "ALICE_GITHUB_CLIENT_ID": "test-client",
-            "ALICE_GITHUB_CLIENT_SECRET": "test-client-secret",
             "BROWSER_PUBLIC_URL": MCP_ORIGIN,
             **overrides,
         },
@@ -52,6 +50,7 @@ def test_runtime_passes_only_browser_secrets_and_local_profile_paths():
     assert values["BROWSER_OAUTH_STATE_FILE"] == "/tmp/chrome-auth/oauth.json"
     assert values["CHROME_PROFILE_DIR"] == "/tmp/chrome-profile"
     assert values["CHROME_STATE_DIR"] == "/chrome-state"
+    assert values["BROWSER_IDLE_SLEEP_MS"] == "300000"
     assert "never-forward" not in json.dumps(values)
     assert environment(BROWSER_API_TOKEN="dedicated")["BROWSER_API_TOKEN"] == "dedicated"
 
@@ -155,33 +154,51 @@ def test_summary_contains_endpoint_digest_and_no_private_values():
     assert value["digest"] == "sha256:" + "b" * 64
     assert "gateway_deployed" not in value
     assert value["ingress"] == "public_worker_auth"
+    assert value["service_state"] == "running"
+    assert value["resources"] == {"cpu": "0.5", "memory": "1024Mi"}
+    assert value["scaling"] == {
+        "min_instances": 0,
+        "max_instances": 1,
+        "idle_timeout": "900s",
+        "scale_to_zero_configured": True,
+    }
+    assert value["browser_idle_sleep_ms"] == 300000
     assert "test-private-token" not in json.dumps(value)
     assert "test-client-secret" not in json.dumps(value)
 
 
-def test_failed_update_restores_previous_full_config_after_stopping_new_revision(monkeypatch):
+@pytest.mark.parametrize(
+    "value",
+    [
+        "²",  # superscript two: str.isdigit() is True, int() raises ValueError
+        "٣٠٠٠٠٠",  # Arabic-Indic digits: int() accepts, the Node worker rejects
+        "3e5",
+        " 300000",
+        "",
+    ],
+)
+def test_summary_reports_non_ascii_or_malformed_idle_sleep_as_unknown(value):
+    summary_record = record()
+    for item in summary_record["template"]["containers"][0]["env"]:
+        if item["name"] == "BROWSER_IDLE_SLEEP_MS":
+            item["value"] = value
+    assert chrome.summary(summary_record)["browser_idle_sleep_ms"] is None
+
+
+def test_failed_hot_update_rolls_back_without_stopping_running_worker(monkeypatch):
     old = record(OLD_IMAGE)
-    new = record()
     calls = []
     apps = SimpleNamespace(
         project_id=PROJECT,
         restore=Mock(side_effect=lambda *args: calls.append(("restore", args[1]))),
         start=Mock(side_effect=lambda *args: calls.append(("start", args[0]))),
     )
-    monkeypatch.setattr(chrome, "owned_record", Mock(side_effect=[old, new]))
+    monkeypatch.setattr(chrome, "owned_record", Mock(side_effect=[old, record()]))
     monkeypatch.setattr(chrome, "prepare_bucket", Mock())
     monkeypatch.setattr(
-        chrome, "checkpoint", Mock(side_effect=lambda *args: calls.append(("checkpoint", None)))
+        chrome, "checkpoint", Mock(side_effect=lambda *args: calls.append(("checkpoint", 7)) or 7)
     )
-    monkeypatch.setattr(
-        chrome,
-        "stop_owned",
-        Mock(
-            side_effect=lambda *args: calls.append(
-                ("stop", args[1]["template"]["containers"][0]["image"])
-            )
-        ),
-    )
+    monkeypatch.setattr(chrome, "stop_owned", Mock())
     monkeypatch.setattr(
         chrome,
         "wait_ready",
@@ -190,17 +207,10 @@ def test_failed_update_restores_previous_full_config_after_stopping_new_revision
     with pytest.raises(CloudProviderError) as error:
         chrome.deploy(apps, Mock(), {}, IMAGE, environment())
     assert error.value.code == "chrome_readiness_timeout"
-    assert [item[0] for item in calls] == [
-        "checkpoint",
-        "stop",
-        "restore",
-        "start",
-        "stop",
-        "restore",
-        "start",
-    ]
-    assert calls[4][1] == IMAGE
-    assert calls[5][1] == old
+    assert [item[0] for item in calls] == ["checkpoint", "restore", "restore"]
+    assert calls[2][1] == old
+    chrome.stop_owned.assert_not_called()
+    apps.start.assert_not_called()
 
 
 def test_failed_first_install_suspends_only_new_container_and_preserves_bucket(monkeypatch):
@@ -258,7 +268,7 @@ def test_first_install_binds_oauth_to_the_same_single_container(monkeypatch):
     assert result["mcp_url"] == ORIGIN + "/browser/v1/mcp"
 
 
-def test_update_reuses_existing_container_and_never_creates_another(monkeypatch):
+def test_update_reuses_existing_container_without_stop_or_start(monkeypatch):
     old = record(OLD_IMAGE)
     apps = SimpleNamespace(
         project_id=PROJECT, client=SimpleNamespace(request=Mock()), restore=Mock(), start=Mock()
@@ -273,8 +283,40 @@ def test_update_reuses_existing_container_and_never_creates_another(monkeypatch)
     chrome.deploy(apps, Mock(), {}, IMAGE, initial)
     apps.client.request.assert_not_called()
     apps.restore.assert_called_once()
+    chrome.stop_owned.assert_not_called()
+    apps.start.assert_not_called()
     env = apps.restore.call_args.args[1]["template"]["containers"][0]["env"]
     assert {"name": "BROWSER_PUBLIC_URL", "value": ORIGIN} in env
+
+
+def test_hot_update_orchestration_budget_is_ten_seconds():
+    assert chrome.HOT_UPDATE_ORCHESTRATION_BUDGET_SECONDS == 10.0
+
+
+def test_hot_update_eligibility_requires_running_worker_and_verified_generation():
+    assert chrome.hot_update_eligible(record(), 1) is True
+    assert chrome.hot_update_eligible(record(status="suspended"), 1) is False
+    assert chrome.hot_update_eligible(record(), None) is False
+    assert chrome.hot_update_eligible(record(), 0) is False
+
+
+def test_suspended_worker_uses_safe_stop_restore_start_path(monkeypatch):
+    old = record(OLD_IMAGE, status="suspended")
+    apps = SimpleNamespace(project_id=PROJECT, restore=Mock(), start=Mock())
+    monkeypatch.setattr(chrome, "owned_record", Mock(return_value=old))
+    monkeypatch.setattr(chrome, "prepare_bucket", Mock())
+    monkeypatch.setattr(chrome, "checkpoint", Mock())
+    monkeypatch.setattr(chrome, "stop_owned", Mock())
+    monkeypatch.setattr(chrome, "wait_ready", Mock(return_value=record()))
+    monkeypatch.setattr(chrome, "request_worker", Mock(return_value={"state": "awake"}))
+    monkeypatch.setattr(chrome, "verify_restored", Mock())
+    monkeypatch.setattr(chrome, "checkpoint", Mock(return_value=7))
+
+    chrome.deploy(apps, Mock(), {}, IMAGE, environment())
+
+    chrome.stop_owned.assert_called()
+    apps.restore.assert_called()
+    apps.start.assert_called()
 
 
 def test_duplicate_named_containers_stop_before_any_mutation():
@@ -346,13 +388,32 @@ def test_deployed_origin_is_exported_for_live_acceptance(tmp_path):
         chrome.export_public_url("https://evil.example", {"GITHUB_ENV": str(target)})
 
 
-def test_deploy_summary_shows_only_public_connector_and_callback_urls(tmp_path):
+def test_deploy_summary_shows_only_the_public_connector_url(tmp_path):
     summary = tmp_path / "summary"
     chrome.export_public_url(ORIGIN, {"GITHUB_STEP_SUMMARY": str(summary)})
     text = summary.read_text()
-    assert ORIGIN + "/browser/v1/mcp" in text
-    assert ORIGIN + "/browser/oauth/github/callback" in text
+    assert text.splitlines()[0] == "## Chrome MCP"
+    assert f"- ChatGPT connector URL: `{ORIGIN}/browser/v1/mcp`" in text.splitlines()
+    assert "\\n" not in text
     assert "token" not in text.lower()
+    assert "github" not in text.lower()
+    assert "callback" not in text.lower()
+
+
+def test_runtime_env_needs_only_the_token_and_never_forwards_github_client_credentials():
+    result = chrome.runtime_env(
+        SHA,
+        {
+            "ALICE_SHORT_TOKEN": "test-private-token",
+            "ALICE_GITHUB_CLIENT_ID": "client",
+            "ALICE_GITHUB_CLIENT_SECRET": "client-secret",
+        },
+    )
+    assert result["BROWSER_API_TOKEN"] == "test-private-token"
+    assert not any("GITHUB_CLIENT" in key for key in result)
+    with pytest.raises(CloudProviderError) as error:
+        chrome.runtime_env(SHA, {})
+    assert error.value.code == "auth_not_configured"
 
 
 def test_bucket_with_unknown_owner_is_not_adopted(monkeypatch):
@@ -414,15 +475,14 @@ def test_workflow_uses_reviewed_master_production_and_fixed_credentials():
     assert "git merge-base --is-ancestor HEAD FETCH_HEAD" in workflow
     assert "environment: production" in workflow
     assert "secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN" in workflow
-    assert "secrets.BROWSER_GITHUB_CLIENT_ID || secrets.ALICE_GITHUB_CLIENT_ID" in workflow
-    assert "secrets.BROWSER_GITHUB_CLIENT_SECRET || secrets.ALICE_GITHUB_CLIENT_SECRET" in workflow
+    assert "GITHUB_CLIENT" not in workflow
     assert "CLOUDRU_STORAGE_TENANT_ID" in workflow
     assert 'python scripts/cloudru_chrome.py "$ACTION" --sha "$SOURCE_SHA"' in workflow
     assert "ALICE_DATABASE_URL" not in workflow
-    seed = workflow.index("node deploy/chrome-worker/live-smoke.mjs seed")
-    restart = workflow.index('python scripts/cloudru_chrome.py restart --sha "$SOURCE_SHA"')
-    verify = workflow.index("node deploy/chrome-worker/live-smoke.mjs verify")
-    assert seed < restart < verify
+    assert "node deploy/chrome-worker/live-smoke.mjs seed" not in workflow
+    assert 'python scripts/cloudru_chrome.py restart --sha "$SOURCE_SHA"' not in workflow
+    assert "node deploy/chrome-worker/live-smoke.mjs verify" not in workflow
+    assert "node deploy/chrome-worker/live-smoke.mjs smoke" in workflow
     assert 'node-version: "22.22.2"' in workflow
 
 
@@ -479,8 +539,6 @@ def test_cli_actions_respect_read_only_and_checkpoint_boundaries(monkeypatch, ca
         "CLOUDRU_IAM_KEY_SECRET": "test-key-secret",
         "CLOUDRU_STORAGE_TENANT_ID": IDENTIFIER,
         "ALICE_SHORT_TOKEN": "test-private-token",
-        "ALICE_GITHUB_CLIENT_ID": "test-client",
-        "ALICE_GITHUB_CLIENT_SECRET": "test-client-secret",
     }.items():
         monkeypatch.setenv(key, value)
     monkeypatch.delenv("BROWSER_PUBLIC_URL", raising=False)
@@ -646,6 +704,21 @@ def test_ambiguous_create_failure_never_reports_successful_rollback(monkeypatch)
     assert error.value.code == "chrome_rollback_failed"
 
 
+def test_legacy_github_auth_env_is_recognized_only_for_in_place_migration():
+    legacy = record()
+    legacy["template"]["containers"][0]["env"].extend(
+        [
+            {"name": "ALICE_GITHUB_CLIENT_ID", "value": "legacy-client"},
+            {"name": "ALICE_GITHUB_CLIENT_SECRET", "value": "legacy-secret"},
+        ]
+    )
+    apps = SimpleNamespace(project_id=PROJECT, list=Mock(return_value=[legacy]))
+    assert chrome.owned_record(apps) == legacy
+    legacy["template"]["containers"][0]["env"].append({"name": "UNEXPECTED_SECRET", "value": "no"})
+    with pytest.raises(CloudProviderError):
+        chrome.owned_record(apps)
+
+
 def test_legacy_always_on_revision_is_still_recognized_for_in_place_update():
     legacy = record()
     legacy["template"]["containers"][0]["resources"] = {"cpu": "1", "memory": "4096Mi"}
@@ -775,6 +848,37 @@ def test_worker_call_retries_provider_timeouts_during_cold_start():
         apps, record(), "t", "/browser/v1/wake", method="POST", sleep=clock.sleep, clock=clock.now
     )
     assert result == {"state": "awake"} and request.call_count == 3
+
+
+def test_worker_call_retries_client_timeouts_while_a_scaled_to_zero_replica_starts():
+    # requests raises a timeout with no response while Chrome cold-starts and
+    # restores its profile; the worker operation is idempotent, so keep trying.
+    clock = _Clock()
+    ok = {"statusCode": 200, "body": json.dumps({"state": "sleeping"})}
+    request = Mock(
+        side_effect=[
+            CloudProviderError("timeout", code="provider_http_error", http_status=None),
+            CloudProviderError("timeout", code="provider_http_error", http_status=None),
+            ok,
+        ]
+    )
+    apps = SimpleNamespace(project_id=PROJECT, client=SimpleNamespace(request=request))
+    result = chrome.request_worker(
+        apps, record(), "t", "/browser/v1/sleep", method="POST", sleep=clock.sleep, clock=clock.now
+    )
+    assert result == {"state": "sleeping"} and request.call_count == 3
+    apps.client.request = Mock(
+        side_effect=CloudProviderError("timeout", code="provider_http_error", http_status=None)
+    )
+    with pytest.raises(CloudProviderError):
+        chrome.request_worker(
+            apps, record(), "t", "/healthz", timeout=12, sleep=clock.sleep, clock=clock.now
+        )
+    assert apps.client.request.call_count == 4
+    apps.client.request = Mock(side_effect=CloudProviderError("not a transport error"))
+    with pytest.raises(CloudProviderError):
+        chrome.request_worker(apps, record(), "t", "/healthz", sleep=clock.sleep, clock=clock.now)
+    assert apps.client.request.call_count == 1
 
 
 def test_worker_call_does_not_retry_other_errors_or_past_deadline():

@@ -1,7 +1,11 @@
+import hashlib
 import importlib.util
 import json
 import sys
 from pathlib import Path
+
+import pytest
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,6 +53,26 @@ def snapshot(**overrides):
                 "conclusion": "skipped",
             },
         ],
+        "solution_review": {
+            "schema_version": 2,
+            "task": "pr:123",
+            "outcome": "ACCEPTED",
+            "reviewed_head_sha": "abc123",
+            "reviewed_base_sha": "base123",
+            "reviewer_role": "team-lead",
+            "reviewer_session": "review-session-1",
+            "implementation_role": "backend-engineer",
+            "implementation_session": "implementation-session-1",
+            "provenance": "github-actions:solution-review",
+            "verification": "hmac-sha256-verified",
+            "review_report_sha256": "a" * 64,
+            "review_report": {
+                "outcome": "ACCEPTED",
+                "reviewed_files": ["scripts/merge_readiness.py"],
+                "rationale": "Detailed review",
+                "risk_assessment": "No residual critical risk",
+            },
+        },
         "review_threads": [{"isResolved": True}],
         "review_threads_truncated": False,
     }
@@ -254,6 +278,8 @@ def test_collect_snapshot_uses_exact_head_and_propagates_thread_truncation(monke
                     }
                 ]
             }
+        if "/actions/workflows/solution-review.yml/runs" in joined:
+            return {"workflow_runs": []}
         if args and args[0] == "graphql":
             return {
                 "data": {
@@ -262,7 +288,7 @@ def test_collect_snapshot_uses_exact_head_and_propagates_thread_truncation(monke
                             "reviewThreads": {
                                 "nodes": [{"isResolved": True}],
                                 "pageInfo": {"hasNextPage": True},
-                            }
+                            },
                         }
                     }
                 }
@@ -313,6 +339,8 @@ def test_collect_snapshot_marks_changed_head_or_base(monkeypatch):
             return {"behind_by": 0}
         if "/commits/head-1/check-runs?per_page=100" in joined:
             return {"check_runs": []}
+        if "/actions/workflows/solution-review.yml/runs" in joined:
+            return {"workflow_runs": []}
         if args and args[0] == "graphql":
             return {
                 "data": {
@@ -321,7 +349,7 @@ def test_collect_snapshot_marks_changed_head_or_base(monkeypatch):
                             "reviewThreads": {
                                 "nodes": [],
                                 "pageInfo": {"hasNextPage": False},
-                            }
+                            },
                         }
                     }
                 }
@@ -362,3 +390,367 @@ def test_main_emits_structured_collection_error(monkeypatch, capsys):
     assert payload["ready"] is False
     assert blocker_codes(payload) == {"collection_error"}
     assert "secret provider output" not in payload["blockers"][0]["detail"]
+
+
+def platform_snapshot(**overrides):
+    """Exercise the evaluator with the actual workflow's required check names."""
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/merge-readiness.yml").read_text(encoding="utf-8")
+    )
+    names = [
+        name.strip()
+        for name in workflow["jobs"]["readiness"]["env"]["MERGE_REQUIRED_CHECKS"].split(",")
+        if name.strip()
+    ]
+    ci = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    ci_names = [job["name"] for job in ci["jobs"].values()]
+    checks = [
+        {"id": index, "name": name, "status": "completed", "conclusion": "success"}
+        for index, name in enumerate(dict.fromkeys([*names, *ci_names]), start=1)
+    ]
+    return snapshot(required_checks=names, check_runs=checks, **overrides)
+
+
+@pytest.mark.parametrize("name", ["Infrastructure tests", "MCP worker tests", "Platform changes"])
+def test_merge_readiness_blocks_failed_routed_platform(name):
+    value = platform_snapshot()
+    for check in value["check_runs"]:
+        if check["name"] in {name, "CI required"}:
+            check["conclusion"] = "failure"
+    result = merge_readiness.evaluate_snapshot(value)
+    assert result["ready"] is False
+    assert {name, "CI required"} <= {b.get("check") for b in result["blockers"]}
+
+
+@pytest.mark.parametrize("name", ["CI required", "Platform changes"])
+@pytest.mark.parametrize(
+    "conclusion", ["failure", "cancelled", "timed_out", "skipped", "neutral", None]
+)
+def test_merge_readiness_control_checks_require_success(name, conclusion):
+    value = platform_snapshot()
+    for check in value["check_runs"]:
+        if check["name"] == name:
+            check["conclusion"] = conclusion
+    result = merge_readiness.evaluate_snapshot(value)
+    assert result["ready"] is False
+    assert any(b.get("check") == name and b["code"] == "check_failed" for b in result["blockers"])
+
+
+@pytest.mark.parametrize("name", ["CI required", "Platform changes"])
+@pytest.mark.parametrize("state", ["missing", "queued", "in_progress"])
+def test_merge_readiness_waits_for_control_checks(name, state):
+    value = platform_snapshot()
+    if state == "missing":
+        value["check_runs"] = [c for c in value["check_runs"] if c["name"] != name]
+    else:
+        for check in value["check_runs"]:
+            if check["name"] == name:
+                check.update(status=state, conclusion=None)
+    result = merge_readiness.evaluate_snapshot(value)
+    assert result["ready"] is False
+    expected = "required_check_missing" if state == "missing" else "check_pending"
+    assert any(b.get("check") == name and b["code"] == expected for b in result["blockers"])
+
+
+def test_merge_readiness_accepts_docs_only_routing_with_successful_control_checks():
+    value = platform_snapshot()
+    routed = {
+        "Application tests",
+        "PostgreSQL integration",
+        "Android debug APK",
+        "Infrastructure tests",
+        "MCP worker tests",
+    }
+    for check in value["check_runs"]:
+        if check["name"] in routed:
+            check["conclusion"] = "skipped"
+    assert merge_readiness.evaluate_snapshot(value)["ready"] is True
+
+
+def test_merge_readiness_newer_failed_aggregate_supersedes_success():
+    value = platform_snapshot()
+    value["check_runs"].append(
+        {"id": 999, "name": "CI required", "status": "completed", "conclusion": "failure"}
+    )
+    result = merge_readiness.evaluate_snapshot(value)
+    assert result["ready"] is False
+    assert any(b.get("check") == "CI required" for b in result["blockers"])
+
+
+def test_merge_readiness_quota_notice_is_not_a_model_review_prerequisite():
+    value = platform_snapshot(
+        reviews=[{"user": {"login": "Copilot"}, "body": "Unable to review: quota limit reached."}]
+    )
+    assert merge_readiness.evaluate_snapshot(value)["ready"] is True
+    value["review_threads"] = [{"isResolved": False}]
+    result = merge_readiness.evaluate_snapshot(value)
+    assert result["ready"] is False
+    assert blocker_codes(result) == {"review_threads"}
+
+
+def test_merge_readiness_rejects_missing_solution_review_evidence():
+    result = merge_readiness.evaluate_snapshot(snapshot(solution_review=None))
+
+    assert result["ready"] is False
+    assert blocker_codes(result) == {"solution_review_missing"}
+
+
+@pytest.mark.parametrize(
+    ("override", "expected"),
+    [
+        ({"outcome": "CHANGES_REQUESTED"}, "solution_review_changes_requested"),
+        ({"outcome": "BLOCKED"}, "solution_review_blocked"),
+        ({"outcome": "LGTM"}, "solution_review_invalid"),
+        ({"reviewed_head_sha": "old-head"}, "solution_review_stale"),
+        ({"reviewed_base_sha": "old-base"}, "solution_review_stale"),
+        ({"reviewer_role": "backend-engineer"}, "solution_review_not_independent"),
+        (
+            {"reviewer_session": "implementation-session-1"},
+            "solution_review_not_independent",
+        ),
+        ({"provenance": ""}, "solution_review_invalid"),
+        ({"task": ""}, "solution_review_invalid"),
+    ],
+)
+def test_merge_readiness_rejects_invalid_solution_review_evidence(override, expected):
+    evidence = dict(snapshot()["solution_review"])
+    evidence.update(override)
+    if "outcome" in override:
+        # The authenticated report must agree with the evidence outcome.
+        evidence["review_report"] = {
+            **evidence["review_report"],
+            "outcome": override["outcome"],
+        }
+    result = merge_readiness.evaluate_snapshot(snapshot(solution_review=evidence))
+
+    assert result["ready"] is False
+    assert blocker_codes(result) == {expected}
+
+
+def test_merge_readiness_accepts_independent_role_session_on_same_github_owner():
+    evidence = dict(snapshot()["solution_review"])
+    evidence.update(
+        reviewer_role="team-lead",
+        reviewer_session="review-session-2",
+        implementation_role="backend-engineer",
+        implementation_session="implementation-session-1",
+    )
+
+    result = merge_readiness.evaluate_snapshot(snapshot(solution_review=evidence))
+
+    assert result["ready"] is True
+    assert result["blockers"] == []
+
+
+def test_owner_github_identity_is_not_used_as_solution_review_independence():
+    value = snapshot(
+        solution_review=None,
+        reviews=[
+            {
+                "state": "APPROVED",
+                "commit": {"oid": "abc123"},
+                "author": {"login": "someone-else"},
+            }
+        ],
+    )
+
+    result = merge_readiness.evaluate_snapshot(value)
+
+    assert result["ready"] is False
+    assert blocker_codes(result) == {"solution_review_missing"}
+
+
+def signed_test_evidence(run_id=3):
+    value = dict(snapshot()["solution_review"], workflow_run_id=run_id, runner_sha="master-sha")
+    report = dict(value["review_report"])
+    report.update(
+        {
+            "task": value["task"],
+            "reviewed_head_sha": value["reviewed_head_sha"],
+            "reviewed_base_sha": value["reviewed_base_sha"],
+            "reviewer_role": value["reviewer_role"],
+            "reviewer_session": value["reviewer_session"],
+            "implementation_role": value["implementation_role"],
+            "implementation_session": value["implementation_session"],
+        }
+    )
+    value["review_report"] = report
+    value["review_report_sha256"] = hashlib.sha256(
+        json.dumps(report, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    ).hexdigest()
+    return value
+
+
+def test_select_solution_review_evidence_accepts_only_exact_successful_run():
+    runs = [
+        {
+            "id": 1,
+            "head_sha": "old-master-sha",
+            "path": ".github/workflows/solution-review.yml",
+            "event": "workflow_dispatch",
+            "head_branch": "master",
+            "status": "completed",
+            "conclusion": "success",
+        },
+        {
+            "id": 2,
+            "head_sha": "master-sha",
+            "path": ".github/workflows/solution-review.yml",
+            "event": "workflow_dispatch",
+            "head_branch": "master",
+            "status": "completed",
+            "conclusion": "failure",
+        },
+        {
+            "id": 3,
+            "head_sha": "master-sha",
+            "path": ".github/workflows/solution-review.yml",
+            "event": "workflow_dispatch",
+            "head_branch": "master",
+            "status": "completed",
+            "conclusion": "success",
+        },
+    ]
+    artifacts = {
+        3: [
+            {
+                "id": 88,
+                "name": "solution-review-pr-123-abc123",
+                "expired": False,
+                "evidence": signed_test_evidence(3),
+            }
+        ]
+    }
+
+    evidence = merge_readiness.select_solution_review_evidence(
+        runs, artifacts, 123, "abc123", "base123"
+    )
+
+    assert evidence["workflow_run_id"] == 3
+
+
+def test_select_solution_review_evidence_rejects_mismatched_payload():
+    run = {
+        "id": 3,
+        "head_sha": "master-sha",
+        "path": ".github/workflows/solution-review.yml",
+        "event": "workflow_dispatch",
+        "head_branch": "master",
+        "status": "completed",
+        "conclusion": "success",
+    }
+    bad = dict(signed_test_evidence(3), task="pr:999")
+
+    assert (
+        merge_readiness.select_solution_review_evidence(
+            [run],
+            {
+                3: [
+                    {
+                        "id": 88,
+                        "name": "solution-review-pr-123-abc123",
+                        "expired": False,
+                        "evidence": bad,
+                    }
+                ]
+            },
+            123,
+            "abc123",
+            "base123",
+        )
+        is None
+    )
+
+
+def test_solution_review_workflow_is_read_only_and_manual():
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/solution-review.yml").read_text(encoding="utf-8")
+    )
+    assert "workflow_dispatch" in workflow[True]
+    assert workflow["permissions"] == {"contents": "read", "pull-requests": "read"}
+    assert set(workflow[True]) == {"workflow_dispatch"}
+    assert "pull_request_target" not in workflow[True]
+
+
+def test_dispatch_from_master_accepts_distinct_reviewed_pr_head():
+    run = {
+        "id": 500,
+        "event": "workflow_dispatch",
+        "head_branch": "master",
+        "head_sha": "master-sha",
+        "path": ".github/workflows/solution-review.yml",
+        "status": "completed",
+        "conclusion": "success",
+    }
+    report = signed_test_evidence(500)
+    artifact = {
+        "id": 44,
+        "name": "solution-review-pr-123-abc123",
+        "expired": False,
+        "evidence": report,
+    }
+    assert (
+        merge_readiness.select_solution_review_evidence(
+            [run], {500: [artifact]}, 123, "abc123", "base123"
+        )
+        == report
+    )
+
+
+@pytest.mark.parametrize("revision", ["head", "base"])
+def test_signed_evidence_cannot_be_reused_after_revision_change(revision):
+    run = {
+        "id": 500,
+        "event": "workflow_dispatch",
+        "head_branch": "master",
+        "head_sha": "master-sha",
+        "path": ".github/workflows/solution-review.yml",
+        "status": "completed",
+        "conclusion": "success",
+    }
+    evidence = signed_test_evidence(500)
+    artifact = {
+        "id": 44,
+        "name": "solution-review-pr-123-abc123",
+        "expired": False,
+        "evidence": evidence,
+    }
+    head = "next-head" if revision == "head" else "abc123"
+    base = "next-base" if revision == "base" else "base123"
+    assert (
+        merge_readiness.select_solution_review_evidence([run], {500: [artifact]}, 123, head, base)
+        is None
+    )
+
+
+def test_unconfirmed_accepted_is_rejected():
+    value = dict(snapshot()["solution_review"])
+    value.pop("verification")
+    value["outcome"] = "ACCEPTED"
+    result = merge_readiness.evaluate_snapshot(snapshot(solution_review=value))
+    assert "solution_review_invalid" in blocker_codes(result)
+
+
+def test_review_run_from_feature_branch_not_trusted():
+    run = {
+        "id": 500,
+        "event": "workflow_dispatch",
+        "head_branch": "feature",
+        "head_sha": "abc123",
+        "path": ".github/workflows/solution-review.yml",
+        "status": "completed",
+        "conclusion": "success",
+    }
+    evidence = signed_test_evidence(500)
+    artifact = {
+        "id": 44,
+        "name": "solution-review-pr-123-abc123",
+        "expired": False,
+        "evidence": evidence,
+    }
+    assert (
+        merge_readiness.select_solution_review_evidence(
+            [run], {500: [artifact]}, 123, "abc123", "base123"
+        )
+        is None
+    )

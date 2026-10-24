@@ -2,7 +2,7 @@
 
 const fs = require("fs");
 const vm = require("vm");
-const { DocumentShim, WindowShim } = require("./browser_dom");
+const { DocumentShim, WindowShim } = require("../browser/emulator/browser_dom");
 
 const html = fs.readFileSync("templates/index.html", "utf8");
 const document = new DocumentShim(html);

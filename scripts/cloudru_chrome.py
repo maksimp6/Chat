@@ -5,9 +5,8 @@ The worker is served directly from its stable Container Apps origin. Evolution A
 Gateway has no public management API, so the service does not depend on it; the
 worker is the access boundary. Anonymous routes are ``/healthz`` and the
 protocol-required OAuth surface (discovery, dynamic registration, authorize,
-GitHub callback, token, revoke), which issues tokens only to the allowed GitHub
-account. Browser control and MCP require the worker bearer token or such an OAuth
-token, and deployment verifies that refusal on the public origin.
+short-token authorization, token and revoke). Browser control and MCP require the
+worker bearer token or an OAuth token issued after the owner enters that short token, and deployment verifies that refusal on the public origin.
 """
 
 from __future__ import annotations
@@ -44,7 +43,7 @@ from scripts.cloudru_browser_probe import (  # noqa: E402
 )
 from scripts.cloudru_deploy import _export_commit, _load_cloudru_credentials  # noqa: E402
 from scripts.cloudru_rdc import application_origin, verify_private_acl  # noqa: E402
-from storage import StorageObjectNotFound  # noqa: E402
+from storage.contracts import StorageObjectNotFound  # noqa: E402
 
 REGISTRY = "alice-chrome-browser"
 REPOSITORY = "chrome-worker"
@@ -55,11 +54,14 @@ DESCRIPTION = "Alice persistent Google Chrome Playwright MCP; issue 751"
 # SIGTERM); a cold start on the next request is accepted for cost.
 CPU = "0.5"
 IDLE_TIMEOUT = "900s"
+BROWSER_IDLE_SLEEP_MS = "300000"
+HOT_UPDATE_ORCHESTRATION_BUDGET_SECONDS = 10.0
 # Earlier always-on revisions that deploy may still update in place.
 ACCEPTED_RESOURCES = ({"cpu": CPU, "memory": "1024Mi"}, {"cpu": "1", "memory": "4096Mi"})
 VOLUME = "chrome-state"
 MOUNT = "/chrome-state"
 IMAGE_RE = re.compile(re.escape(f"{REGISTRY}.cr.cloud.ru/{REPOSITORY}@sha256:") + "[0-9a-f]{64}")
+LEGACY_AUTH_ENV = frozenset({"ALICE_GITHUB_CLIENT_ID", "ALICE_GITHUB_CLIENT_SECRET"})
 APP_ENV = frozenset(
     {
         "BROWSER_API_TOKEN",
@@ -68,12 +70,11 @@ APP_ENV = frozenset(
         "BROWSER_DEPLOYMENT_SHA",
         "BROWSER_OAUTH_STATE_DIR",
         "BROWSER_OAUTH_STATE_FILE",
-        "ALICE_GITHUB_CLIENT_ID",
-        "ALICE_GITHUB_CLIENT_SECRET",
         "ALICE_GITHUB_ALLOWED_IDS",
         "CHROME_PROFILE_DIR",
         "CHROME_STATE_DIR",
         "CHROME_STATE_REQUIRE_MOUNT",
+        "BROWSER_IDLE_SLEEP_MS",
     }
 )
 SAFE_ERRORS = frozenset(
@@ -186,8 +187,7 @@ def idp_issuer(value):
 
 def runtime_env(sha, env=os.environ):
     token = env.get("BROWSER_API_TOKEN") or env.get("ALICE_SHORT_TOKEN", "")
-    required = ("ALICE_GITHUB_CLIENT_ID", "ALICE_GITHUB_CLIENT_SECRET")
-    if not token or any(not env.get(key) for key in required):
+    if not token:
         fail("auth_not_configured")
     owner = env.get("ALICE_GITHUB_ALLOWED_IDS") or "293531601"
     if not re.fullmatch(r"[1-9][0-9]*", owner) or not re.fullmatch(r"[0-9a-f]{40}", sha):
@@ -195,12 +195,11 @@ def runtime_env(sha, env=os.environ):
     result = {
         "BROWSER_API_TOKEN": token,
         "BROWSER_DEPLOYMENT_SHA": sha,
-        "ALICE_GITHUB_CLIENT_ID": env["ALICE_GITHUB_CLIENT_ID"],
-        "ALICE_GITHUB_CLIENT_SECRET": env["ALICE_GITHUB_CLIENT_SECRET"],
         "ALICE_GITHUB_ALLOWED_IDS": owner,
         "CHROME_PROFILE_DIR": "/tmp/chrome-profile",
         "CHROME_STATE_DIR": MOUNT,
         "CHROME_STATE_REQUIRE_MOUNT": "1",
+        "BROWSER_IDLE_SLEEP_MS": BROWSER_IDLE_SLEEP_MS,
         "BROWSER_OAUTH_STATE_DIR": "/tmp/chrome-auth",
         "BROWSER_OAUTH_STATE_FILE": "/tmp/chrome-auth/oauth.json",
     }
@@ -283,7 +282,7 @@ def owned_record(apps, *, identifier=None):
             and IMAGE_RE.fullmatch(container["image"])
             and container.get("resources") in ACCEPTED_RESOURCES
             and len(variables) == len(environment)
-            and not (set(environment) - APP_ENV)
+            and not (set(environment) - APP_ENV - LEGACY_AUTH_ENV)
             and environment.get("CHROME_PROFILE_DIR") == "/tmp/chrome-profile"
             and environment.get("CHROME_STATE_DIR") == MOUNT
             and environment.get("CHROME_STATE_REQUIRE_MOUNT") == "1"
@@ -495,7 +494,10 @@ def request_worker(
             )
             break
         except CloudProviderError as exc:
-            if exc.http_status not in RETRY_STATUSES or clock() >= deadline:
+            # No status means the HTTP client timed out: a scaled-to-zero replica
+            # is still cold-starting Chrome and restoring its profile.
+            timed_out = exc.code == "provider_http_error" and exc.http_status is None
+            if not (timed_out or exc.http_status in RETRY_STATUSES) or clock() >= deadline:
                 raise
             sleep(5)
     if (
@@ -653,22 +655,42 @@ def summary(record):
     environment = {item["name"]: item["value"] for item in container["env"]}
     origin = application_origin(record)
     public = public_origin(environment["BROWSER_PUBLIC_URL"])
+    scaling = record["template"]["scaling"]
+    resources = container["resources"]
+    service_state = str(record.get("status", "")).lower()
     return {
-        "status": "CHROME_PRIVATE_RUNNING"
-        if str(record.get("status", "")).lower() == "running"
-        else "CHROME_STOPPED",
+        "status": "CHROME_PRIVATE_RUNNING" if service_state == "running" else "CHROME_STOPPED",
+        "service_state": service_state,
         "container_name": record["name"],
         "container_id": uuid(record["id"]),
         "image": container["image"],
         "digest": container["image"].split("@", 1)[1],
         "provider_url": origin,
         "mcp_url": public + "/browser/v1/mcp",
-        "oauth_callback_url": public + "/browser/oauth/github/callback",
         "ingress": "provider_iam"
         if record["configuration"]["ingress"]["accessSettings"]["enableAuth"]
         else "public_worker_auth",
+        "resources": resources,
+        "scaling": {
+            "min_instances": scaling.get("minInstanceCount"),
+            "max_instances": scaling.get("maxInstanceCount"),
+            "idle_timeout": record["template"].get("idleTimeout"),
+            "scale_to_zero_configured": scaling.get("minInstanceCount") == 0,
+        },
+        "browser_idle_sleep_ms": int(environment["BROWSER_IDLE_SLEEP_MS"])
+        if re.fullmatch(r"[0-9]+", environment.get("BROWSER_IDLE_SLEEP_MS", ""))
+        else None,
         "cost_floor": estimate_monthly_cost(CPU, 0),
     }
+
+
+def hot_update_eligible(record, generation):
+    return (
+        record is not None
+        and str(record.get("status", "")).lower() == "running"
+        and type(generation) is int
+        and generation >= 1
+    )
 
 
 def deploy(apps, store, credentials, image, environment):
@@ -690,7 +712,8 @@ def deploy(apps, store, credentials, image, environment):
                 json.dumps({"stage": "chrome_test_checkpoint_skipped", **safe_error(exc)}),
                 flush=True,
             )
-    if previous:
+    hot_update = hot_update_eligible(previous, generation)
+    if previous and not hot_update:
         stop_owned(apps, previous)
     attempted = False
     identifier = previous["id"] if previous else None
@@ -700,22 +723,39 @@ def deploy(apps, store, credentials, image, environment):
         start_requested = time.perf_counter()
         if previous:
             provider(apps.restore, previous["name"], body)
-            provider(apps.start, previous["name"])
+            if not hot_update:
+                provider(apps.start, previous["name"])
         else:
             operation = apps.client.request(
                 "container_apps", "POST", "/v2/containers", json_body=body
             )
             if operation.get("resourceId"):
                 identifier = uuid(operation["resourceId"])
+        orchestration_seconds = time.perf_counter() - start_requested
         print(
             json.dumps(
                 {
-                    "stage": "chrome_container_start",
-                    "seconds": time.perf_counter() - start_requested,
+                    "stage": "chrome_container_patch" if hot_update else "chrome_container_start",
+                    "seconds": orchestration_seconds,
+                    "hot_update": hot_update,
+                    "budget_seconds": (
+                        HOT_UPDATE_ORCHESTRATION_BUDGET_SECONDS if hot_update else None
+                    ),
                 }
             ),
             flush=True,
         )
+        if hot_update and orchestration_seconds > HOT_UPDATE_ORCHESTRATION_BUDGET_SECONDS:
+            print(
+                json.dumps(
+                    {
+                        "stage": "chrome_hot_update_budget_exceeded",
+                        "seconds": orchestration_seconds,
+                        "budget_seconds": HOT_UPDATE_ORCHESTRATION_BUDGET_SECONDS,
+                    }
+                ),
+                flush=True,
+            )
         record = wait_ready(apps, identifier=identifier, image=image)
         if generation is not None:
             verify_restored(apps, record, generation)
@@ -745,21 +785,30 @@ def deploy(apps, store, credentials, image, environment):
         if attempted:
             try:
                 current = owned_record(apps, identifier=identifier)
-                if current is not None:
-                    stop_owned(apps, current)
                 if previous:
+                    if not hot_update and current is not None:
+                        stop_owned(apps, current)
                     provider(apps.restore, previous["name"], previous)
                     if str(previous.get("status", "")).lower() == "running":
-                        provider(apps.start, previous["name"])
+                        if not hot_update:
+                            provider(apps.start, previous["name"])
                         wait_ready(
                             apps,
                             identifier=previous["id"],
                             image=previous["template"]["containers"][0]["image"],
                         )
                     print(
-                        json.dumps({"stage": "chrome_rollback", "status": "RESTORED"}), flush=True
+                        json.dumps(
+                            {
+                                "stage": "chrome_rollback",
+                                "status": "RESTORED",
+                                "hot_update": hot_update,
+                            }
+                        ),
+                        flush=True,
                     )
                 elif current is not None:
+                    stop_owned(apps, current)
                     print(
                         json.dumps(
                             {"stage": "chrome_rollback", "status": "NEW_CONTAINER_SUSPENDED"}
@@ -802,14 +851,10 @@ def export_public_url(origin, env=os.environ):
     if env.get("GITHUB_ENV"):
         with open(env["GITHUB_ENV"], "a", encoding="utf-8") as stream:
             stream.write("BROWSER_PUBLIC_URL=" + origin + "\n")
-    # The owner only needs these two URLs: the ChatGPT connector and the OAuth callback.
+    # The owner only needs the ChatGPT connector URL.
     if env.get("GITHUB_STEP_SUMMARY"):
         with open(env["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as stream:
-            stream.write(
-                "## Chrome MCP\n\n"
-                f"- ChatGPT connector URL: `{origin}/browser/v1/mcp`\n"
-                f"- GitHub OAuth callback: `{origin}/browser/oauth/github/callback`\n"
-            )
+            stream.write(f"## Chrome MCP\n\n- ChatGPT connector URL: `{origin}/browser/v1/mcp`\n")
 
 
 def main(argv=None):

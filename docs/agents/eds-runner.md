@@ -1,4 +1,4 @@
-# EDS in the Claude-Lite task runner
+# EDS runner
 
 The task-execution job in `claude-lite.yml` installs the official EDS v0.4.0
 release with `scripts/install_eds.py`. The installer verifies the pinned SHA-256
@@ -18,7 +18,7 @@ GitHub's secret form. Do not put them in issues, commits, logs, or chat. Cloud.r
 IAM Key ID/Key Secret and model-provider keys are different credentials.
 
 The secrets are injected only into the fixed read-only check in
-`eds-runner.yml`. Neither the general Claude-Lite task action nor the tool-free
+`eds-runner.yml`. The tool-free
 persistent dialogue receives EDS credentials. A production DevServices key can
 authorize destructive operations, so it must not be exposed to model-controlled
 Python or shell subprocesses. Keys are not installed into a config file or

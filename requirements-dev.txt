@@ -5,7 +5,11 @@ pytest==9.1.1
 pytest-asyncio==1.4.0
 pytest-cov==7.1.0
 pytest-xdist==3.8.0
-coverage==7.16.1
-ruff==0.16.9
-diff-cover==10.6.0
+coverage==7.16.2
+ruff==0.17.0
+mypy==2.4.0
 PyYAML==6.0.3
+# Real offline mesh/video regression fixtures (FFmpeg/ffprobe are OS tools).
+numpy==2.3.5
+matplotlib==3.10.8
+trimesh==4.9.0

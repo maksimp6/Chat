@@ -75,3 +75,10 @@ Relevant test paths are preserved when the index knows them.
 
 This telemetry is intended for the Work Coordinator and Operations Observer to measure
 whether retrieval actually avoids repeated context work.
+
+## Immutable repository snapshots
+
+The opt-in [revision index](repository-revision-index.md) reads a fixed Git commit,
+reuses unchanged AST entries, and supplies commit-specific source links. Embedded
+snapshot provenance must match the query as well as the external index labels.
+Legacy working-tree indexes and default retrieval ordering are unchanged.

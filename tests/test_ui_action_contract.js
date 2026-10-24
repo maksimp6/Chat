@@ -1,4 +1,4 @@
-const { BrowserShim } = require("./browser_dom");
+const { BrowserShim } = require("../browser/emulator/browser_dom");
 
 const shim = new BrowserShim();
 const { window, document } = shim.load(["static/core_api.js"]);

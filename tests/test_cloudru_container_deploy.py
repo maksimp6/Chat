@@ -12,7 +12,7 @@ from cloud.cloudru.container_apps_client import (
     estimate_monthly_cost,
 )
 from cloud.cloudru.registry_client import CloudRuRegistryClient, ImageRef
-from cloudru_iam import CloudRuIamClient
+from cloud.cloudru.iam import CloudRuIamClient
 
 DIGEST = "sha256:" + "a" * 64
 
@@ -163,8 +163,8 @@ def test_build_and_push_passes_secret_on_stdin_and_pins_digest():
     assert login_argv[:3] == ["docker", "login", "alice-pro.cr.cloud.ru"]
     assert "key-secret" not in login_argv
     assert login_kwargs["input"] == "key-secret"
-    assert [argv[1] for argv, _ in runs] == ["login", "build", "push", "push"]
-    assert runs[2][0][2] == "alice-pro.cr.cloud.ru/alice-pro:abc123"
+    assert [argv[1] for argv, _ in runs] == ["login", "pull", "build", "push", "push"]
+    assert runs[3][0][2] == "alice-pro.cr.cloud.ru/alice-pro:abc123"
     assert ref == ImageRef("alice-pro.cr.cloud.ru", "alice-pro", "abc123", DIGEST)
     assert ref.pinned == f"alice-pro.cr.cloud.ru/alice-pro@{DIGEST}"
 
@@ -184,8 +184,9 @@ def test_build_reuses_and_refreshes_registry_layer_cache():
     # A failed cache refresh never fails a deploy whose pinned image was pushed.
     ref = reg.build_and_push(registry_name="alice-pro", repository="alice-pro", tag="abc")
     assert ref.pinned == f"alice-pro.cr.cloud.ru/alice-pro@{DIGEST}"
-    build = runs[1]
     cache = "alice-pro.cr.cloud.ru/alice-pro:buildcache"
+    assert runs[1] == ["docker", "pull", cache]
+    build = runs[2]
     assert build[build.index("--cache-from") + 1] == cache
     assert "BUILDKIT_INLINE_CACHE=1" in build
     assert [build[i + 1] for i, item in enumerate(build) if item == "-t"] == [
@@ -760,7 +761,7 @@ def test_deploy_verified_restores_whole_previous_configuration():
 
 
 def test_iam_failure_becomes_provider_error():
-    from cloudru_iam import CloudRuIamError
+    from cloud.cloudru.iam import CloudRuIamError
 
     iam = Mock()
     iam._token.side_effect = CloudRuIamError("invalid key")
@@ -902,28 +903,6 @@ def test_control_plane_secrets_rejected_before_any_provider_calls(monkeypatch, c
     registry.assert_not_called()
 
 
-@pytest.mark.parametrize("database_url", [None, "", "sqlite:///alice.db"])
-def test_deploy_requires_postgres_before_provider_calls(monkeypatch, capsys, database_url):
-    monkeypatch.delenv("ALICE_DATABASE_URL", raising=False)
-    env = {"ALICE_REQUIRE_SHORT_TOKEN": "1", "ALICE_SHORT_TOKEN": "private-test-value"}
-    argv = [
-        "deploy",
-        "--tag",
-        SHA,
-        "--env",
-        "ALICE_REQUIRE_SHORT_TOKEN",
-        "--env",
-        "ALICE_SHORT_TOKEN",
-    ]
-    if database_url is not None:
-        env["ALICE_DATABASE_URL"] = database_url
-        argv += ["--env", "ALICE_DATABASE_URL"]
-    code, output = _run_deploy(monkeypatch, capsys, argv, **env)
-    assert code == 1
-    assert "durable PostgreSQL" in output
-    assert "private-test-value" not in output
-
-
 def test_successful_deploy_passes_app_configuration_only(monkeypatch):
     import argparse
 
@@ -955,9 +934,9 @@ def test_successful_deploy_passes_app_configuration_only(monkeypatch):
     [
         ("preflight", None, False, True),
         ("deploy", "CLOUDRU_IAM_KEY_SECRET", False, False),
-        ("preflight", "ALICE_DATABASE_URL", False, False),
+        ("preflight", "ALICE_DATABASE_URL", False, True),
         ("deploy", "ALICE_GITHUB_CLIENT_SECRET", False, False),
-        ("preflight", None, True, False),
+        ("preflight", None, True, True),
         ("status", "ALICE_DATABASE_URL", False, True),
         ("inventory", "ALICE_DATABASE_URL", False, True),
     ],
@@ -1046,7 +1025,7 @@ def test_registry_timings_separate_build_push_and_cache_refresh_without_secrets(
     import json
     from cloud.cloudru import registry_client
 
-    ticks = iter([1.0, 1.125, 2.0, 2.25, 3.0, 3.0625])
+    ticks = iter([0.0, 0.05, 1.0, 1.125, 2.0, 2.25, 3.0, 3.0625])
     monkeypatch.setattr(registry_client.time, "perf_counter", lambda: next(ticks))
 
     def runner(argv, **kwargs):
@@ -1069,11 +1048,299 @@ def test_registry_timings_separate_build_push_and_cache_refresh_without_secrets(
     output = capsys.readouterr().out
     records = [json.loads(line) for line in output.splitlines()]
     assert [r["stage"] for r in records] == [
+        "registry_cache_pull",
         "registry_build",
         "registry_push",
         "registry_cache_refresh",
     ]
-    assert [r["seconds"] for r in records] == [0.125, 0.25, 0.0625]
-    assert records[0]["cached_steps"] == 2
+    assert [r["seconds"] for r in records] == [0.05, 0.125, 0.25, 0.0625]
+    assert records[1]["cached_steps"] == 2
     assert records[-1]["returncode"] == 1
     assert "key-secret" not in output and "secret-source" not in output
+
+
+def test_find_for_deploy_retries_499_then_returns_direct_get():
+    sleeps = []
+    client = RecordingClient(
+        [
+            CloudProviderError("transient", http_status=499),
+            _app(),
+        ]
+    )
+    apps = CloudRuContainerAppsClient(
+        project_id="p1",
+        client=client,
+        sleep=lambda seconds: sleeps.append(seconds),
+    )
+
+    assert apps.find_for_deploy("alice-pro")["id"] == "c-1"
+    assert sleeps == [1.0]
+    assert [call[2] for call in client.calls] == [
+        "/v2/containers/alice-pro",
+        "/v2/containers/alice-pro",
+    ]
+
+
+def test_find_for_deploy_falls_back_to_strict_inventory_after_499():
+    client = RecordingClient(
+        [
+            CloudProviderError("transient", http_status=499),
+            CloudProviderError("transient", http_status=499),
+            CloudProviderError("transient", http_status=499),
+            {"data": [], "total": 0},
+        ]
+    )
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client, sleep=lambda _: None)
+
+    assert apps.find_for_deploy("alice-pro") is None
+    assert client.calls[-1][2] == "/v2/containers"
+    assert client.calls[-1][3] == {"projectId": "p1", "pageSize": 100}
+
+
+def test_find_for_deploy_inventory_can_prove_existing_service():
+    existing = _app()
+    existing["name"] = "alice-pro"
+    client = RecordingClient(
+        [
+            CloudProviderError("transient", http_status=499),
+            CloudProviderError("transient", http_status=499),
+            CloudProviderError("transient", http_status=499),
+            {"data": [existing], "total": 1},
+        ]
+    )
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client, sleep=lambda _: None)
+
+    assert apps.find_for_deploy("alice-pro")["id"] == "c-1"
+
+
+def test_find_for_deploy_reraises_non_499_errors_without_inventory():
+    client = RecordingClient([CloudProviderError("boom", http_status=500)])
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client)
+
+    with pytest.raises(CloudProviderError, match="boom"):
+        apps.find_for_deploy("alice-pro")
+
+    assert len(client.calls) == 1
+
+
+def test_find_for_deploy_rejects_invalid_attempt_count():
+    apps = CloudRuContainerAppsClient(project_id="p1", client=RecordingClient())
+
+    with pytest.raises(CloudProviderError, match="transient_attempts"):
+        apps.find_for_deploy("alice-pro", transient_attempts=0)
+
+
+def test_find_for_deploy_rejects_duplicate_inventory_names():
+    duplicate = _app()
+    duplicate["name"] = "alice-pro"
+    client = RecordingClient(
+        [
+            CloudProviderError("transient", http_status=499),
+            {"data": [duplicate, duplicate], "total": 2},
+        ]
+    )
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client, sleep=lambda _: None)
+
+    with pytest.raises(CloudProviderError, match="duplicate name"):
+        apps.find_for_deploy("alice-pro", transient_attempts=1)
+
+
+def test_update_from_current_reuses_verified_snapshot_without_second_get():
+    current = _app()
+    client = RecordingClient([{"operationId": "update-op"}])
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client)
+    spec = ContainerSpec(name="alice-pro", image="registry/new@sha256:" + "b" * 64)
+
+    result = apps.update_from_current(spec, current)
+
+    assert result == {"operationId": "update-op"}
+    assert len(client.calls) == 1
+    _, method, path, _, body = client.calls[0]
+    assert (method, path) == ("PATCH", "/v2/containers/alice-pro")
+    assert body["template"]["containers"][0]["image"] == spec.image
+
+
+def test_missing_registry_cache_does_not_block_cold_build():
+    runs = []
+
+    def runner(argv, **kwargs):
+        runs.append(argv)
+        if argv[1] == "pull":
+            return subprocess.CompletedProcess(argv, 1, stdout="", stderr="not found")
+        stdout = f"digest: {DIGEST}" if argv[1] == "push" else ""
+        return subprocess.CompletedProcess(argv, 0, stdout=stdout, stderr="")
+
+    reg = CloudRuRegistryClient(
+        project_id="p1", client=RecordingClient(), iam_client=_iam(), runner=runner
+    )
+
+    ref = reg.build_and_push(registry_name="alice-pro", repository="alice-pro", tag="cold")
+
+    assert ref.pinned == f"alice-pro.cr.cloud.ru/alice-pro@{DIGEST}"
+    assert runs[1] == ["docker", "pull", "alice-pro.cr.cloud.ru/alice-pro:buildcache"]
+    assert runs[2][1] == "build"
+
+
+def test_deploy_no_longer_requires_postgres_before_provider_calls(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    monkeypatch.delenv("ALICE_DATABASE_URL", raising=False)
+    monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "1")
+    monkeypatch.setenv("ALICE_SHORT_TOKEN", "test-token")
+    registry, apps = Mock(), Mock()
+    registry.build_and_push.return_value = ImageRef("registry", "alice", SHA, DIGEST)
+    apps.deploy_verified.return_value = {"action": "create"}
+    monkeypatch.setattr(script, "CloudRuRegistryClient", lambda: registry)
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+    monkeypatch.setattr(script, "_export_commit", Mock())
+
+    result = script.cmd_deploy(
+        argparse.Namespace(
+            env=["ALICE_REQUIRE_SHORT_TOKEN", "ALICE_SHORT_TOKEN"],
+            tag=SHA,
+            context=".",
+            timeout=30,
+        )
+    )
+    assert result["image"].endswith(DIGEST)
+
+
+def test_cleanup_refuses_to_delete_preexisting_container(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    apps = Mock()
+    apps.get.return_value = {"name": "alice-pro", "id": "preexisting"}
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+
+    with pytest.raises(CloudProviderError, match="created by this acceptance run"):
+        script.cmd_delete(argparse.Namespace(yes=True, acceptance_created=False))
+    apps.delete.assert_not_called()
+
+
+def test_cleanup_deletes_only_resource_created_by_acceptance_run(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    apps = Mock()
+    apps.get.return_value = {"name": "alice-pro", "id": "created-by-run"}
+    apps.delete.return_value = {"done": True}
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+
+    result = script.cmd_delete(argparse.Namespace(yes=True, acceptance_created=True))
+    assert result["deleted"] == "alice-pro"
+    apps.delete.assert_called_once_with("alice-pro")
+
+
+def test_acceptance_cleanup_restores_preexisting_container_snapshot(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    snapshot = {
+        "name": "alice-pro",
+        "configuration": {"ingress": {"publiclyAccessible": True}},
+        "template": {
+            "scaling": {"minInstanceCount": 0, "maxInstanceCount": 1},
+            "containers": [{"name": "alice-pro", "image": "old@sha256:abc"}],
+        },
+    }
+    apps = Mock()
+    apps.restore.return_value = {"done": True}
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+
+    result = script.cmd_cleanup(
+        argparse.Namespace(
+            yes=True,
+            acceptance_created=False,
+            acceptance_updated=True,
+            snapshot=snapshot,
+        )
+    )
+    assert result["restored"] == "alice-pro"
+    apps.restore.assert_called_once_with("alice-pro", snapshot)
+    apps.delete.assert_not_called()
+
+
+def test_acceptance_cleanup_fails_closed_without_snapshot(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    apps = Mock()
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+
+    with pytest.raises(CloudProviderError, match="snapshot"):
+        script.cmd_cleanup(
+            argparse.Namespace(
+                yes=True,
+                acceptance_created=False,
+                acceptance_updated=True,
+                snapshot=None,
+            )
+        )
+    apps.delete.assert_not_called()
+    apps.restore.assert_not_called()
+
+
+def test_failed_create_cleanup_deletes_only_matching_acceptance_image(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    apps = Mock()
+    apps.get.return_value = {
+        "name": "alice-pro",
+        "template": {"containers": [{"image": "registry/alice@sha256:acceptance"}]},
+    }
+    apps.delete.return_value = {"done": True}
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+
+    result = script.cmd_cleanup_failed_create(
+        argparse.Namespace(
+            yes=True,
+            preexisting=False,
+            expected_image="registry/alice@sha256:acceptance",
+        )
+    )
+    assert result["deleted"] == "alice-pro"
+    apps.delete.assert_called_once_with("alice-pro")
+
+
+def test_failed_create_cleanup_refuses_unknown_or_foreign_image(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    apps = Mock()
+    apps.get.return_value = {
+        "name": "alice-pro",
+        "template": {"containers": [{"image": "registry/alice@sha256:foreign"}]},
+    }
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+
+    with pytest.raises(CloudProviderError, match="ownership"):
+        script.cmd_cleanup_failed_create(
+            argparse.Namespace(
+                yes=True,
+                preexisting=False,
+                expected_image="registry/alice@sha256:acceptance",
+            )
+        )
+    apps.delete.assert_not_called()
+
+
+def test_failed_create_cleanup_is_noop_when_provider_has_no_container(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    apps = Mock()
+    apps.get.return_value = None
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+
+    result = script.cmd_cleanup_failed_create(
+        argparse.Namespace(
+            yes=True,
+            preexisting=False,
+            expected_image="registry/alice@sha256:acceptance",
+        )
+    )
+    assert result["status"] == "NOOP"
+    apps.delete.assert_not_called()

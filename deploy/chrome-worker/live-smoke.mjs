@@ -18,44 +18,13 @@ export function evaluationResult(result) {
   catch { throw Object.assign(new Error("evaluation_result_invalid"), { smokeCode: "evaluation_result_invalid" }); }
 }
 
-async function oauthDiscovery(origin, fetchHttp) {
-  const readJson = async (url, init) => {
-    const response = await fetchHttp(url, { ...init, redirect: "manual", signal: AbortSignal.timeout(30_000) });
-    requireCheck(response.ok, "oauth_discovery_http_failed");
-    return response.json();
-  };
-  const resource = await readJson(`${origin}/.well-known/oauth-protected-resource/browser/v1/mcp`);
-  requireCheck(resource.resource === `${origin}/browser/v1/mcp`, "oauth_resource_mismatch");
-  requireCheck(resource.authorization_servers?.length === 1 && resource.authorization_servers[0] === `${origin}/browser/oauth`, "oauth_issuer_mismatch");
-  const metadata = await readJson(`${origin}/.well-known/oauth-authorization-server/browser/oauth`);
-  requireCheck(metadata.issuer === resource.authorization_servers[0] && metadata.code_challenge_methods_supported?.includes("S256"), "oauth_metadata_mismatch");
-  for (const field of ["registration_endpoint", "authorization_endpoint", "token_endpoint"]) requireCheck(new URL(metadata[field]).origin === origin, "oauth_endpoint_mismatch");
-  const redirectUri = "https://chatgpt.com/connector_platform_oauth_redirect";
-  const registered = await readJson(metadata.registration_endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ client_name: "Chrome deployment acceptance", redirect_uris: [redirectUri], token_endpoint_auth_method: "none", grant_types: ["authorization_code", "refresh_token"], response_types: ["code"] }) });
-  requireCheck(typeof registered.client_id === "string", "oauth_registration_failed");
-  const verifier = randomBytes(32).toString("base64url");
-  const authorize = new URL(metadata.authorization_endpoint);
-  authorize.search = new URLSearchParams({ client_id: registered.client_id, redirect_uri: redirectUri, response_type: "code", resource: resource.resource, scope: "browser", state: randomBytes(24).toString("hex"), code_challenge: createHash("sha256").update(verifier).digest("base64url"), code_challenge_method: "S256" }).toString();
-  const consent = await fetchHttp(authorize, { redirect: "manual", signal: AbortSignal.timeout(30_000) });
-  requireCheck(consent.status === 200, "oauth_consent_failed");
-  const cookie = consent.headers.get("set-cookie") ?? "";
-  requireCheck(/HttpOnly/i.test(cookie) && /SameSite=Lax/i.test(cookie) && (origin.startsWith("http:") || /Secure/i.test(cookie)), "oauth_cookie_missing");
-  const transaction = (await consent.text()).match(/name="transaction" value="([A-Za-z0-9_-]+)"/)?.[1];
-  requireCheck(Boolean(transaction), "oauth_consent_transaction_missing");
-  const login = await fetchHttp(authorize.origin + authorize.pathname, { method: "POST", redirect: "manual", signal: AbortSignal.timeout(30_000), headers: { "content-type": "application/x-www-form-urlencoded", cookie: cookie.split(";")[0] }, body: new URLSearchParams({ transaction }) });
-  requireCheck(login.status === 302, "oauth_browser_cookie_not_forwarded");
-  const github = new URL(login.headers.get("location") ?? "about:blank");
-  requireCheck(github.origin === "https://github.com" && github.pathname === "/login/oauth/authorize" && github.searchParams.get("redirect_uri") === `${origin}/browser/oauth/github/callback` && github.searchParams.get("code_challenge_method") === "S256" && github.searchParams.get("state") === transaction && /^[A-Za-z0-9_-]{43}$/.test(github.searchParams.get("code_challenge") ?? ""), "oauth_github_redirect_mismatch");
-  // This proves discovery/DCR/cookie/redirect transport, not the user's GitHub consent.
-}
-
 export async function runLiveSmoke(options = {}) {
   const phase = options.phase ?? process.argv[2];
   const endpoint = new URL(options.endpoint ?? `${process.env.BROWSER_PUBLIC_URL ?? ""}/browser/v1/mcp`);
   const token = options.token ?? process.env.BROWSER_API_TOKEN ?? "";
   const marker = options.marker ?? process.env.BROWSER_SMOKE_MARKER ?? "";
-  requireCheck(["seed", "verify"].includes(phase), "invalid_smoke_phase");
-  if (typeof marker !== "string" || !/^[a-f0-9]{32}$/.test(marker)) {
+  requireCheck(["smoke", "seed", "verify"].includes(phase), "invalid_smoke_phase");
+  if (phase !== "smoke" && (typeof marker !== "string" || !/^[a-f0-9]{32}$/.test(marker))) {
     throw Object.assign(new Error("invalid_smoke_marker"), { smokeCode: "invalid_smoke_marker" });
   }
   requireCheck(Boolean(token), "smoke_token_missing");
@@ -90,13 +59,17 @@ export async function runLiveSmoke(options = {}) {
     requireCheck(Boolean(transport.sessionId), "mcp_session_missing");
     const tools = await client.listTools();
     for (const name of ["browser_tabs", "browser_navigate", "browser_snapshot", "browser_type", "browser_click", "browser_evaluate", "browser_take_screenshot"]) requireCheck(tools.tools.some((tool) => tool.name === name), `smoke_tool_missing_${name}`);
-    if (options.checkOAuth !== false && phase === "seed") await oauthDiscovery(endpoint.origin, fetchHttp);
     await call("browser_tabs", { action: "new" });
     tabOpened = true;
     // Carry test data in a URL fragment, never in executable JavaScript source.
     // The fragment is not sent to example.com's HTTP server.
-    await call("browser_navigate", { url: `https://example.com/#${marker}` });
-    if (phase === "seed") {
+    await call("browser_navigate", { url: phase === "smoke" ? "https://example.com/" : `https://example.com/#${marker}` });
+    if (phase === "smoke") {
+      const snapshot = await call("browser_snapshot");
+      requireCheck(JSON.stringify(snapshot).includes("Example Domain"), "smoke_snapshot_missing");
+      const screenshot = await call("browser_take_screenshot", { type: "png" });
+      requireCheck(screenshot.content.some((item) => item.type === "image"), "smoke_screenshot_missing");
+    } else if (phase === "seed") {
       const seeded = await evaluate(`() => {
         if (location.origin !== "https://example.com") return { origin: location.origin };
         const marker = location.hash.slice(1);
@@ -122,14 +95,14 @@ export async function runLiveSmoke(options = {}) {
       const screenshot = await call("browser_take_screenshot", { type: "png" });
       requireCheck(screenshot.content.some((item) => item.type === "image"), "smoke_screenshot_missing");
     }
-    const persisted = await evaluate(`() => {
+    const persisted = phase === "smoke" ? null : await evaluate(`() => {
       if (location.origin !== "https://example.com") return { origin: location.origin };
       const marker = location.hash.slice(1);
       if (!/^[a-f0-9]{32}$/.test(marker)) throw new Error("invalid_smoke_fragment");
       const key = "alice_mcp_smoke_" + marker;
       return { origin: location.origin, marker, storage: localStorage.getItem(key), cookie: document.cookie.split('; ').find(value => value.startsWith(key + "="))?.slice(key.length + 1) ?? null };
     }`);
-    requireCheck(persisted.origin === "https://example.com" && persisted.marker === marker && persisted.storage === marker && persisted.cookie === marker, phase === "seed" ? "smoke_seed_marker_missing" : "smoke_persistent_profile_marker_mismatch");
+    if (phase !== "smoke") requireCheck(persisted.origin === "https://example.com" && persisted.marker === marker && persisted.storage === marker && persisted.cookie === marker, phase === "seed" ? "smoke_seed_marker_missing" : "smoke_persistent_profile_marker_mismatch");
     if (phase === "verify") {
       const cleaned = await evaluate(`() => {
         if (location.origin !== "https://example.com") return { origin: location.origin };
@@ -146,7 +119,7 @@ export async function runLiveSmoke(options = {}) {
     await call("browser_tabs", { action: "close" });
     tabOpened = false;
     await transport.terminateSession();
-    return { status: "passed", phase, tool_count: tools.tools.length, calls, transport_headers: "passed", oauth: options.checkOAuth !== false && phase === "seed" ? "discovery_and_github_redirect_passed" : "not_exercised" };
+    return { status: "passed", phase, tool_count: tools.tools.length, calls, transport_headers: "passed", oauth: "covered_by_short_token_oauth_test" };
   } finally {
     if (tabOpened) await call("browser_tabs", { action: "close" }).catch(() => {});
     if (transport.sessionId) await transport.terminateSession().catch(() => {});

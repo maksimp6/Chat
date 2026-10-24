@@ -1,5 +1,5 @@
 const fs = require("node:fs");
-const { BrowserShim } = require("./browser_dom");
+const { BrowserShim } = require("../browser/emulator/browser_dom");
 
 const template = fs.readFileSync("templates/index.html", "utf8");
 const shim = new BrowserShim(template);
@@ -63,7 +63,7 @@ const modelRuntime = modelShim.load(
   ["static/core_api.js", "static/ui_runtime.js", "static/models.js"],
   {
     modelsData: { text: {}, voice: {} },
-    currentModel: "aliceai-llm",
+    currentModel: "logos-runtime",
     conversations: [],
   },
 );

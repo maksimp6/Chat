@@ -139,45 +139,66 @@ def test_compose_isolated_mounts_and_no_host_control():
     assert defaults["telemetryEnabled"] is False
 
 
-def test_workflow_master_only_and_no_pairing_logs():
-    workflow = yaml.safe_load(
-        (DEPLOY.parents[1] / ".github/workflows/remote-desktop-commander.yml").read_text()
-    )
-    job = workflow["jobs"]["deploy"]
-    assert job["environment"] == "production"
-    gate = job["if"]
-    assert "github.ref == 'refs/heads/master'" in gate
-    assert "github.event_name == 'workflow_dispatch'" in gate
-    assert "github.event.issue.number == 409" in gate
-    assert "github.event.comment.author_association == 'OWNER'" in gate
-    assert "github.event.comment.user.login == github.repository_owner" in gate
-    assert (
-        json.dumps(["/rdc preflight", "/rdc install", "/rdc status"], separators=(",", ":")) in gate
-    )
-    assert job["steps"][0]["with"]["ref"] == "${{ github.sha }}"
-    assert "github.event.comment.body" not in "\n".join(
-        step.get("run", "") for step in job["steps"]
-    )
+def test_legacy_workflow_is_validation_only_and_has_no_deploy_credentials():
+    path = DEPLOY.parents[1] / ".github/workflows/remote-desktop-commander.yml"
+    source = path.read_text()
+    workflow = yaml.safe_load(source)
+
+    assert set(workflow["jobs"]) == {"validate-image"}
+    job = workflow["jobs"]["validate-image"]
+    assert job["runs-on"] == "ubuntu-latest"
     assert workflow["permissions"] == {"contents": "read"}
+    assert (
+        workflow["concurrency"]["group"]
+        == "alice-rdc-validation-${{ github.event.pull_request.number }}"
+    )
+    assert workflow["concurrency"]["cancel-in-progress"] is True
+
+    assert "issue_comment:" not in source
+    assert "workflow_dispatch:" not in source
+    assert "PREVIEW_SSH_" not in source
+    assert "/rdc preflight" not in source
+    assert "/rdc install" not in source
+    assert "/rdc status" not in source
+    assert "environment: production" not in source
+    assert "StrictHostKeyChecking=yes" not in source
+    assert "--browser-smoke-test" not in source
+    assert "ALICE_RDC_MODE=cloud-probe" not in source
+
     scripts = "\n".join(step.get("run", "") for step in job["steps"])
-    assert "StrictHostKeyChecking=yes" in scripts
     assert "docker compose logs" not in scripts
     assert "device.json" not in scripts
-    assert "${{ inputs." not in scripts
     assert "${{ secrets." not in scripts
+    assert "timeout 15s" in scripts
+    assert "Dockerfile.base" not in scripts
+    assert "docker build" not in scripts
+    assert "docker compose" in scripts
+    assert "desktop-session.test.cjs" in scripts
+    assert "pairing-handoff.test.cjs" in scripts
+    assert "Logos Dev" not in source
+    assert "oauth" not in scripts.lower()
+    assert "browser-smoke-test" not in scripts
+    assert "chromium" not in scripts.lower()
 
 
 def test_image_uses_frozen_dependency_graph():
     package = json.loads((DEPLOY / "package.json").read_text())
     lock = json.loads((DEPLOY / "package-lock.json").read_text())
-    assert package["dependencies"] == {"@wonderwhy-er/desktop-commander": "0.2.52"}
+    assert package["dependencies"] == {
+        "@modelcontextprotocol/sdk": "1.32.1",
+        "@wonderwhy-er/desktop-commander": "0.2.52",
+    }
     assert package["overrides"] == {"sharp": "0.35.4", "exceljs": {"uuid": "11.1.1"}}
     assert lock["packages"][""]["dependencies"] == package["dependencies"]
     assert lock["packages"]["node_modules/@wonderwhy-er/desktop-commander"]["version"] == "0.2.52"
-    dockerfile = (DEPLOY / "Dockerfile").read_text()
-    assert "npm ci --omit=dev --ignore-scripts" in dockerfile
-    assert "npm install" not in dockerfile
-    assert "chromium fonts-liberation" in dockerfile
+    base = (DEPLOY / "Dockerfile").read_text()
+    assert "RDC_BASE_IMAGE" not in base
+    assert not (DEPLOY / "Dockerfile.base").exists()
+    assert "npm ci --omit=dev --ignore-scripts" in base
+    assert "npm install" not in base
+    assert "python3-minimal" not in base
+    for package in ("git", "openssh-client", "python3"):
+        assert package in base
 
 
 def test_failed_browser_readiness_restores_previous_compose_and_image(tmp_path):
@@ -199,3 +220,26 @@ def test_failed_browser_readiness_restores_previous_compose_and_image(tmp_path):
     assert "compose down --remove-orphans" in commands
     assert "tag alice-remote-desktop-commander:rollback-" in commands
     assert commands.count("compose up -d --no-build") == 2
+
+
+def test_rdc_base_contains_runtime_dependencies_for_state_and_git_key_handoff() -> None:
+    base = (DEPLOY / "Dockerfile").read_text()
+
+    for package in ("git", "openssh-client", "python3"):
+        assert package in base
+    assert "python3-minimal" not in base
+
+
+def test_git_uses_only_delivered_key_and_pinned_github_host_keys() -> None:
+    entrypoint = (DEPLOY / "entrypoint.sh").read_text()
+    assert "-i /home/node/.alice-secrets/rdc.git.ssh" in entrypoint
+    assert "IdentitiesOnly=yes" in entrypoint
+    assert "StrictHostKeyChecking=yes" in entrypoint
+    assert "UserKnownHostsFile=/opt/desktop-commander/github_known_hosts" in entrypoint
+    hosts = (DEPLOY / "github_known_hosts").read_text().splitlines()
+    assert (
+        "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
+        in hosts
+    )
+    assert all(line.startswith("github.com ") for line in hosts)
+    assert "github_known_hosts" in (DEPLOY / "Dockerfile").read_text()

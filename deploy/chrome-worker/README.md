@@ -16,9 +16,7 @@ requests carrying an `Mcp-Session-Id`.
 The advertised tools are Playwright MCP's standard tools, including
 `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, and
 `browser_take_screenshot`. This replaces the earlier hand-written JSON-RPC
-adapter. A tool call starts Chrome on demand. MCP clients share the worker's
-browser context and profile; they are not isolated browser users. MCP sessions
-are process-local, so keep a single worker replica or use sticky routing.
+adapter. A tool call starts Chrome on demand. MCP clients share the worker's browser context and profile; they are not isolated browser users. The first successful MCP `initialize` binds the worker to that session immediately. While that session is active, every second client initialization is rejected with HTTP 409. An explicit session DELETE releases the binding so a new client can connect. MCP sessions are process-local, so keep a single worker replica or use sticky routing.
 
 The existing REST operations remain available, including
 `POST /browser/v1/sleep` and `POST /browser/v1/wake`. Sleep closes Chrome and
@@ -38,6 +36,16 @@ bearer_token_env_var = "BROWSER_API_TOKEN"
 Set the token through the client's environment/secret store. In a remote setup,
 replace the local URL with the deployed endpoint. No live URL
 or credentials are embedded in this repository.
+
+## Human takeover
+
+The production Chrome image runs its persistent profile on a private Xvfb display. The VNC server and noVNC/websockify listener bind only to loopback and are never exposed as container ports.
+
+An authenticated owner may call `POST /browser/v1/takeover/start`. The worker wakes the same persistent Chrome context used by Playwright and returns a short-lived noVNC URL. Only one takeover grant may be active at once. The grant expires after 10 minutes by default and can be ended early with `POST /browser/v1/takeover/stop`.
+
+The human types passwords and second-factor codes directly into Chrome's framebuffer. Those values do not pass through the worker JSON API, MCP messages, Execution Trace, or GitHub Actions. The initial takeover URL carries an ephemeral random grant; after the first page load it is also held in an HttpOnly, Secure, SameSite=Strict cookie for noVNC assets. Raw VNC, websockify and Chrome DevTools ports remain private.
+
+Closing or expiring takeover removes remote human access and destroys any open noVNC websocket, but does not close Chrome. Playwright MCP can continue using the same cookies, localStorage and authenticated profile. While a grant is active, or a noVNC websocket is still connected, the in-container idle sleep is deferred so Chrome cannot close under the human. Worker shutdown closes Chrome first, checkpoints the profile, then stops the private display services.
 
 ## Run and check
 
@@ -65,26 +73,56 @@ are exposed.
 
 ## ChatGPT OAuth
 
-For ChatGPT, configure `BROWSER_PUBLIC_URL` to the deployed HTTPS origin and use
-GitHub OAuth with `BROWSER_GITHUB_CLIENT_ID`, `BROWSER_GITHUB_CLIENT_SECRET`, and the
-single permitted GitHub account ID in `BROWSER_GITHUB_ALLOWED_ID` (or
-`ALICE_GITHUB_ALLOWED_IDS`). The existing `ALICE_GITHUB_CLIENT_ID` and
-`ALICE_GITHUB_CLIENT_SECRET` names remain supported as a fallback. The OAuth
-application's callback is:
+For ChatGPT, configure `BROWSER_PUBLIC_URL` to the deployed HTTPS origin.
+The OAuth consent page asks the owner for the existing short token
+(`BROWSER_API_TOKEN`, with `ALICE_SHORT_TOKEN` as the deployment fallback).
+The short token is compared in memory, is never written into OAuth state, and
+never leaves the worker. A successful check completes the authorization-code
+flow with PKCE S256 and rotating refresh tokens.
 
-`<BROWSER_PUBLIC_URL>/browser/oauth/github/callback`
+No GitHub OAuth application, callback registration, Logos deployment, or custom
+DNS is required for this temporary owner-authentication path. ChatGPT connects
+to `<BROWSER_PUBLIC_URL>/browser/v1/mcp` and enters the short token when the
+authorization page opens.
 
-The server publishes MCP protected-resource and OAuth authorization-server
-metadata, dynamic client registration, authorization-code flow with PKCE S256,
-and rotating refresh tokens. The GitHub sign-in must match the configured
-account. ChatGPT connects to `<BROWSER_PUBLIC_URL>/browser/v1/mcp` using OAuth.
-`BROWSER_API_TOKEN` remains available only for machine/operations clients.
+The token is the only gate to a browser with saved logins, so use a long random value.
+After 5 wrong tokens within 15 minutes the consent page answers
+`429 too_many_attempts` until the oldest failure ages out, even for the correct token;
+a successful sign-in resets the count. The counter is in memory, so a restart clears
+it. Rotating the token does not revoke grants that were already issued; they expire
+on their own or can be revoked.
 
-Use a dedicated GitHub OAuth App if Alice's app has a different callback domain.
-Register the exact callback above and put its client ID and secret in the
-production GitHub Actions secrets; never put them in the plugin archive or logs.
-Having nonempty credentials does not establish that the callback is registered.
-The final acceptance step requires the owner's real GitHub sign-in from ChatGPT.
+### Mobile consent regression
+
+The consent page uses the device viewport, a labelled password field, touch targets
+of at least 48 CSS pixels, wrapping client metadata and nonce-protected styles.
+Browser zoom remains enabled. The password is never reflected into the HTML.
+This changes presentation only: client registration, callback allowlists, PKCE,
+cookie binding, scopes and token lifetimes are unchanged.
+
+`npm run test:browser --prefix deploy/chrome-worker` includes the mobile consent
+regression at 320x640, 393x873 and 844x393. It checks layout, an actual touch submit,
+the cross-origin callback, PKCE token exchange and bearer authorization in a real
+Chromium browser. All owner credentials are synthetic and the provider is bound
+to loopback. The test intercepts every request hop through Chromium Fetch,
+including redirects, fulfills a synthetic ChatGPT callback and rejects other
+external requests. It verifies the callback page and rejects console errors;
+an external error page at the right URL cannot count as success.
+
+For the focused check, point `CHROME_EXECUTABLE_PATH` to an installed executable:
+
+```bash
+CHROME_EXECUTABLE_PATH=/usr/bin/chromium BROWSER_LIVE_SMOKE_TEST=1 \
+  node --test deploy/chrome-worker/mobile-oauth.browser.test.mjs
+```
+
+Set `MOBILE_OAUTH_SCREENSHOT_DIR` to an optional local artifact directory to save
+screenshots before any credential is entered. These are synthetic mobile browser
+checks, not native ChatGPT Android acceptance. A saved plugin release and a passing
+layout test do not prove that ChatGPT can discover authenticated tools. Native
+acceptance still requires an owner-approved rollout, the host connection flow,
+and an actual harmless browser tool call from ChatGPT Android. An `invalid_client`
+error must be investigated separately; changing viewport markup cannot fix it.
 
 ## Cloud.ru runtime state
 
@@ -100,8 +138,8 @@ cannot send a Cloud.ru IAM token. The worker itself is the access boundary:
 
 - Anonymous: `GET /healthz` and the protocol-required OAuth surface (protected
   resource and authorization server metadata, dynamic client registration,
-  authorize, GitHub callback, token and revoke). Tokens are issued only after
-  GitHub sign-in by the single allowed account.
+  authorize, token and revoke). Authorization codes are issued only after the
+  owner enters the short token.
 - Authenticated: browser control (`/browser/v1/*`) and MCP (`/browser/v1/mcp`)
   require `BROWSER_API_TOKEN` or such an OAuth access token.
 
@@ -139,7 +177,20 @@ fixed CPU/memory pairs; Chrome measured about 340 MiB idle and 800 MiB on a heav
 page, so this is the economical size. The service scales from zero: Cloud.ru
 stops the replica after 15 minutes without requests (the profile is saved on
 SIGTERM) and starts it on the next request, so the first call after idle waits
-for a cold start. The container is found by its fixed
+for a cold start.
+
+Inside the container, Chrome also sleeps on its own. After
+`BROWSER_IDLE_SLEEP_MS` without browser operations the worker closes bound MCP
+sessions, closes Chrome and checkpoints the persistent profile; the next MCP or
+REST browser call wakes it again. Production sets `BROWSER_IDLE_SLEEP_MS=300000`
+(5 minutes), which is shorter than the platform's 15-minute scale-to-zero, so
+Chrome can sleep while the replica stays up. The value is in milliseconds; the
+minimum accepted value is 1000 (1 second) and an invalid or smaller value stops
+the worker at startup. Running operations and active human takeover, including
+a connected noVNC websocket, defer the sleep. The replica still scales to zero
+only after the platform idle timeout.
+
+The container is found by its fixed
 name; an existing one is checkpointed, stopped and updated in place, two
 containers with that name stop the run, and a new one is created only when none
 exists. On first install the provider assigns the origin, and `BROWSER_PUBLIC_URL`
@@ -147,16 +198,15 @@ is then bound to that same container before the restart check, so OAuth metadata
 and callbacks use it. A rollout failure restores the prior configuration, or
 suspends only the new container on first install.
 
-The workflow then runs the official MCP SDK against the deployed origin: client
-registration and consent redirects, navigation, a synthetic form interaction,
-and a screenshot. It writes a temporary cookie/localStorage marker on
-`example.com`, restarts the container, verifies both values through MCP
-and removes the marker. This checks transport and profile recovery without
-claiming that the owner has completed GitHub or ChatGPT consent.
+The workflow then runs the official MCP SDK against the deployed origin with the
+worker token: navigation, a synthetic form interaction, and a screenshot. It writes a temporary cookie/localStorage marker on `example.com`,
+restarts the container, verifies both values through MCP and removes the marker.
+This checks transport and profile recovery. It does not exercise the OAuth consent
+page; the short-token sign-in is covered by `oauth.test.mjs` and
+`short-token-oauth.test.mjs`.
 
-After the first deploy, register `<provider_url>/browser/oauth/github/callback`
-(from the deploy output) as the GitHub OAuth App callback, then add
-`<provider_url>/browser/v1/mcp` in ChatGPT.
+After the deploy, add `<provider_url>/browser/v1/mcp` in ChatGPT as a connector that
+uses OAuth. ChatGPT opens the consent page, where the owner enters the short token.
 
 The `restart` and `stop` workflow actions checkpoint the current profile before
 stopping the worker. Status output contains resource IDs and readiness evidence,

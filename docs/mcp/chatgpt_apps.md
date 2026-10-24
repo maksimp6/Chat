@@ -1,6 +1,6 @@
 # ChatGPT Apps SDK / MCP
 
-Alice Pro exposes a separate MCP endpoint for connection from ChatGPT. The MCP surface is conversation-first: ChatGPT can discover owned conversations, read conversation messages, and inspect the execution trace associated with those conversations. Project/diagnostic tools and the existing Git tool set remain available; Git write operations stay protected by the Universal Tool Executor approval boundary.
+Logos exposes a separate MCP endpoint for connection from ChatGPT. The MCP surface is conversation-first: ChatGPT can discover owned conversations, read conversation messages, and inspect the execution trace associated with those conversations. Project/diagnostic tools and the existing Git tool set remain available; Git write operations stay protected by the Universal Tool Executor approval boundary.
 
 ## Endpoint
 
@@ -12,13 +12,13 @@ The service uses MCP Streamable HTTP. The endpoint supports the current `2026-07
 
 MCP authentication is enforced unless local anonymous mode is explicitly enabled with `ALICE_MCP_ALLOW_ANONYMOUS=true`. Bearer mode uses `ALICE_MCP_BEARER_TOKEN` plus `ALICE_MCP_USER_ID`; introspection mode resolves the user ID from an RFC 7662-style introspection response.
 
-The HTTP transport remains stateless. Each `tools/call` creates a short-lived Alice Pro `Invocation` with a persisted `ExecutionTrace`; the response returns the `invocation_id` and `trace_id` for correlation. This keeps MCP connection state out of the web process while retaining an auditable application-level execution record.
+The HTTP transport remains stateless. Each `tools/call` creates a short-lived Logos `Invocation` with a persisted `ExecutionTrace`; the response returns the `invocation_id` and `trace_id` for correlation. This keeps MCP connection state out of the web process while retaining an auditable application-level execution record.
 
 ## Runtime-scoped calls
 
 Clients targeting a preview runtime put `alice/runtime_id` in the `tools/call`
 `params._meta` object. If the resource is runtime-owned, they also provide
-`alice/resource_runtime_id`. Alice validates the authenticated owner and equal
+`alice/resource_runtime_id`. Logos validates the authenticated owner and equal
 caller/resource scopes through `RuntimeDispatcher` before the existing
 `UniversalToolExecutor` boundary runs the tool. Missing connectors, owner
 mismatches, and cross-runtime attempts return the same credential-free error;
@@ -57,7 +57,7 @@ The MCP endpoint exposes the following audited tools through the Universal Tool 
 | `git_pull` | Pull and merge changes | approval required |
 | `git_fetch` | Fetch remote changes | approval required |
 
-The Git functions are the existing implementations from `git_mcp_tools.py`; ChatGPT access adds no duplicate Git implementations. Any tool marked approval-required is rejected by `UniversalToolExecutor` until the existing Alice Pro approval flow supplies an approved call.
+The Git functions are the existing implementations from `tool_providers/git.py`; ChatGPT access adds no duplicate Git implementations. Any tool marked approval-required is rejected by `UniversalToolExecutor` until the existing Logos approval flow supplies an approved call.
 
 Tool results use MCP `structuredContent` plus text `content`. No custom widget is required for the initial integration.
 
@@ -86,7 +86,7 @@ ALICE_MCP_INTROSPECTION_CLIENT_ID=<id>
 ALICE_MCP_INTROSPECTION_CLIENT_SECRET=<secret>
 ```
 
-Alice Pro publishes:
+Logos publishes:
 
 `GET /.well-known/oauth-protected-resource`
 
@@ -108,6 +108,34 @@ The production service must be reachable over HTTPS. In ChatGPT developer mode, 
 
 For local development, expose the Flask service through a public HTTPS tunnel such as an approved development tunnel. Do not publish provider API keys or backend-only credentials.
 
+### Through OpenAI Secure MCP Tunnel
+
+The container entrypoint (`scripts/container_entrypoint.py`) can run
+[openai/tunnel-client](https://github.com/openai/tunnel-client) next to Logos.
+The client polls OpenAI over outbound HTTPS and forwards ChatGPT's MCP requests
+to `http://127.0.0.1:$PORT/mcp`, adding `Authorization: Bearer
+$ALICE_MCP_BEARER_TOKEN` itself, so the connector in ChatGPT needs no
+authentication of its own. The tunnel starts only when all of
+`OPENAI_TUNNEL_ID`, `OPENAI_TUNNEL_API_KEY`, `ALICE_MCP_BEARER_TOKEN` and
+`ALICE_MCP_USER_ID` are set; a partial set stops the container. Each process
+gets only its own secrets, and if either exits the container exits.
+
+Setup:
+
+1. Create a tunnel and a runtime API key at
+   `https://platform.openai.com/settings/organization/tunnels` (needs Tunnels
+   Read + Manage + Use) and associate the tunnel with your ChatGPT workspace.
+2. Store them as `OPENAI_TUNNEL_ID` and `OPENAI_TUNNEL_API_KEY` secrets of the
+   `production` GitHub environment.
+3. Run the **Cloud.ru OpenAI tunnel** workflow (`cloudru-openai-tunnel.yml`)
+   with action `deploy`. It deploys the `alice-openai-tunnel` service with one
+   always-on instance and generates the internal MCP bearer token per deploy.
+4. In ChatGPT: Plugins, **+**, **Add custom MCP server**, Connection
+   **Tunnel**, pick the tunnel.
+
+The pinned client is v0.0.14 (`tunnel-client-runtime`, linux-amd64), verified
+by SHA-256 in the `Dockerfile`.
+
 ## Validation
 
 The contract is covered by `tests/test_chatgpt_mcp.py`, including:
@@ -125,4 +153,4 @@ The contract is covered by `tests/test_chatgpt_mcp.py`, including:
 
 ## Next expansion
 
-The next integration step is the production OAuth authorization server or trusted OAuth proxy, plus wiring the existing approval UI/API to approved MCP-originated write calls. This keeps Governance/Policy inside Alice Pro.
+The next integration step is the production OAuth authorization server or trusted OAuth proxy, plus wiring the existing approval UI/API to approved MCP-originated write calls. This keeps Governance/Policy inside Logos.

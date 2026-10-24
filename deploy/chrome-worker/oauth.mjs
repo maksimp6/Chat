@@ -3,6 +3,15 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSy
 import { dirname } from "node:path";
 
 const SCOPE = "browser";
+const SUPPORTED_SCOPES = ["browser", "offline_access"];
+function normalizeScopes(value = SCOPE) {
+  const requested = [...new Set(String(value).trim().split(/\s+/).filter(Boolean))];
+  if (!requested.includes(SCOPE) || requested.some((scope) => !SUPPORTED_SCOPES.includes(scope))) return null;
+  return SUPPORTED_SCOPES.filter((scope) => requested.includes(scope)).join(" ");
+}
+function includesScope(value, expected) {
+  return String(value).split(/\s+/).includes(expected);
+}
 // ChatGPT caches its dynamically registered client and reuses the client_id on
 // later attempts; a short expiry made retries fail with invalid_client. Anonymous
 // registrations are bounded: a week of validity, and at capacity the oldest
@@ -11,7 +20,10 @@ const SCOPE = "browser";
 const PROVISIONAL_CLIENT_SECONDS = 7 * 24 * 3600;
 const MAX_CLIENTS = 1000;
 const COOKIE = "browser_oauth_transaction";
+const OWNER_COOKIE = "browser_owner_session";
 const OAUTH_PATH = "/browser/oauth";
+const MAX_FAILURES = 5;
+const FAILURE_WINDOW = 900;
 const MAX_BODY = 16 * 1024;
 const ACCESS_TTL = 15 * 60;
 const REFRESH_TTL = 30 * 24 * 60 * 60;
@@ -62,21 +74,19 @@ async function body(request, type) {
   return Object.fromEntries(params);
 }
 
-/** Single-owner OAuth bridge; GitHub access tokens are used once and never saved. */
+/** Single-owner OAuth bridge authenticated by the existing short token. */
 export function createOAuth(options = {}) {
   const env = options.env ?? process.env;
   const publicUrl = options.publicUrl ?? env.BROWSER_PUBLIC_URL ?? "";
-  const githubClientId = options.githubClientId ?? env.BROWSER_GITHUB_CLIENT_ID ?? env.ALICE_GITHUB_CLIENT_ID ?? "";
-  const githubClientSecret = options.githubClientSecret ?? env.BROWSER_GITHUB_CLIENT_SECRET ?? env.ALICE_GITHUB_CLIENT_SECRET ?? "";
-  const ownerId = String(options.ownerId ?? env.BROWSER_GITHUB_ALLOWED_ID ?? env.ALICE_GITHUB_ALLOWED_IDS ?? "").trim();
-  const enabled = Boolean(publicUrl && githubClientId && githubClientSecret && /^\d+$/.test(ownerId));
+  const shortToken = options.shortToken ?? env.BROWSER_API_TOKEN ?? env.ALICE_SHORT_TOKEN ?? "";
+  const ownerId = String(options.ownerId ?? env.BROWSER_GITHUB_ALLOWED_ID ?? env.ALICE_GITHUB_ALLOWED_IDS ?? "owner").trim();
+  const enabled = Boolean(publicUrl && shortToken && ownerId);
   if (!enabled) return { enabled: false, handle: async () => false, authorize: () => false, challenge: () => "Bearer", metadata: null };
   if (!validRedirect(publicUrl)) throw new Error("invalid_browser_public_url");
   const origin = new URL(publicUrl).origin;
   if (new URL(publicUrl).pathname !== "/" || new URL(publicUrl).search) throw new Error("browser_public_url_must_be_origin");
   const issuer = `${origin}${OAUTH_PATH}`;
   const resource = `${origin}/browser/v1/mcp`;
-  const callback = `${issuer}/github/callback`;
   const metadataUrl = `${origin}/.well-known/oauth-protected-resource/browser/v1/mcp`;
   const stateFile = options.stateFile ?? env.BROWSER_OAUTH_STATE_FILE ?? "/tmp/chrome-auth/oauth.json";
   const now = () => Math.floor((options.now?.() ?? Date.now()) / 1000);
@@ -101,22 +111,46 @@ export function createOAuth(options = {}) {
     // once their owner has actually authorized them, as ChatGPT reuses that client ID.
     for (const [key, client] of Object.entries(state.clients)) if (client.provisional_expires && client.provisional_expires <= now()) delete state.clients[key];
   }
-  function save() {
-    // Serialize BOTH local replacement and remote checkpoint. A later request may
-    // update the in-memory snapshot, but cannot replace the file while it is archived.
-    // Never return a newly issued credential before its snapshot is durable.
+  function save({ checkpoint = true } = {}) {
+    // Serialize local replacement for every state mutation. Credential endpoints also
+    // wait for the remote checkpoint; redirect-only authorization may checkpoint in
+    // the background so a slow archive cannot strand the browser before redirect.
     durability = durability.catch(() => {}).then(async () => {
       prune();
       const temporary = `${stateFile}.tmp`;
       writeFileSync(temporary, JSON.stringify(state), { mode: 0o600 });
       chmodSync(temporary, 0o600);
       renameSync(temporary, stateFile);
-      await options.onPersist?.();
+      if (checkpoint) await options.onPersist?.();
+      else Promise.resolve(options.onPersist?.()).catch(() => {});
     });
     return durability;
   }
   const sign = (value) => `${value}.${createHmac("sha256", state.signingKey).update(value).digest("base64url")}`;
   const cookie = (transaction, clear = false) => `${COOKIE}=${clear ? "" : sign(transaction)}; ${cookieFlags}Max-Age=${clear ? 0 : 600}`;
+  const ownerCookie = (value, clear = false) => `${OWNER_COOKIE}=${clear ? "" : sign(value)}; HttpOnly; SameSite=Strict; Path=/browser/v1/takeover; ${origin.startsWith("https:") ? "Secure; " : ""}Max-Age=${clear ? 0 : 600}`;
+  function ownerAuthorize(request) {
+    const supplied = (request.headers.cookie ?? "").split(";").map((part) => part.trim()).find((part) => part.startsWith(`${OWNER_COOKIE}=`))?.slice(OWNER_COOKIE.length + 1);
+    if (typeof supplied !== "string") return false;
+    const dot = supplied.lastIndexOf(".");
+    if (dot <= 0) return false;
+    const value = supplied.slice(0, dot);
+    const expires = Number(value);
+    return Number.isInteger(expires) && expires > now() && equal(supplied, sign(value));
+  }
+  async function ownerSession(request, response) {
+    const input = await body(request, "application/x-www-form-urlencoded");
+    while (failures.length && failures[0] <= now() - FAILURE_WINDOW) failures.shift();
+    if (failures.length >= MAX_FAILURES) return json(response, 429, { error: "too_many_attempts" }, { "retry-after": String(failures[0] + FAILURE_WINDOW - now()) });
+    if (typeof input.password !== "string" || !equal(input.password, shortToken)) {
+      failures.push(now());
+      return json(response, 403, { error: "access_denied" });
+    }
+    failures.length = 0;
+    const expires = now() + 600;
+    response.writeHead(303, { location: "/browser/v1/takeover", "cache-control": "no-store", "set-cookie": ownerCookie(String(expires)) });
+    response.end();
+  }
   function browserBound(request, transaction) {
     const supplied = (request.headers.cookie ?? "").split(";").map((part) => part.trim()).find((part) => part.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1);
     return typeof supplied === "string" && equal(supplied, sign(transaction));
@@ -134,14 +168,14 @@ export function createOAuth(options = {}) {
     revocation_endpoint_auth_methods_supported: ["none"],
     code_challenge_methods_supported: ["S256"],
     authorization_response_iss_parameter_supported: true,
-    scopes_supported: [SCOPE],
+    scopes_supported: SUPPORTED_SCOPES,
   };
 
   function authorize(request) {
     const header = request.headers.authorization;
     if (typeof header !== "string" || !header.startsWith("Bearer ") || header.length > 4096) return false;
     const token = state.access[digest(header.slice(7))];
-    return Boolean(token && token.expires > now() && token.owner === ownerId && token.resource === resource && token.scope === SCOPE);
+    return Boolean(token && token.expires > now() && token.owner === ownerId && token.resource === resource && includesScope(token.scope, SCOPE));
   }
 
   function revokeFamily(family) {
@@ -150,13 +184,13 @@ export function createOAuth(options = {}) {
     }
   }
 
-  function issue(client, family = random()) {
+  function issue(client, family = random(), scope = SCOPE) {
     const access = random();
     const refresh = random();
-    const shared = { client, family, owner: ownerId, resource, scope: SCOPE };
+    const shared = { client, family, owner: ownerId, resource, scope };
     state.access[digest(access)] = { ...shared, expires: now() + ACCESS_TTL };
     state.refresh[digest(refresh)] = { ...shared, expires: now() + REFRESH_TTL, used: false };
-    return { access_token: access, token_type: "Bearer", expires_in: ACCESS_TTL, refresh_token: refresh, scope: SCOPE };
+    return { access_token: access, token_type: "Bearer", expires_in: ACCESS_TTL, refresh_token: refresh, scope };
   }
 
   async function register(request, response) {
@@ -165,14 +199,15 @@ export function createOAuth(options = {}) {
     registrations.push(now());
     const input = await body(request, "application/json");
     if (!Array.isArray(input.redirect_uris) || !input.redirect_uris.length || input.redirect_uris.length > 10 || !input.redirect_uris.every((uri) => typeof uri === "string" && uri.length <= 2048 && validRedirect(uri))) return json(response, 400, { error: "invalid_redirect_uri" });
-    if ((input.token_endpoint_auth_method && input.token_endpoint_auth_method !== "none") || (input.grant_types && (!Array.isArray(input.grant_types) || input.grant_types.some((grant) => !metadata.grant_types_supported.includes(grant)))) || (input.response_types && (!Array.isArray(input.response_types) || input.response_types.some((type) => type !== "code"))) || (input.scope && input.scope !== SCOPE)) return json(response, 400, { error: "invalid_client_metadata" });
+    const registeredScope = normalizeScopes(input.scope ?? SUPPORTED_SCOPES.join(" "));
+    if ((input.token_endpoint_auth_method && input.token_endpoint_auth_method !== "none") || (input.grant_types && (!Array.isArray(input.grant_types) || input.grant_types.some((grant) => !metadata.grant_types_supported.includes(grant)))) || (input.response_types && (!Array.isArray(input.response_types) || input.response_types.some((type) => type !== "code"))) || !registeredScope) return json(response, 400, { error: "invalid_client_metadata" });
     if (Object.keys(state.clients).length >= MAX_CLIENTS) {
       const oldest = Object.entries(state.clients).filter(([, entry]) => entry.provisional_expires).sort((a, b) => a[1].provisional_expires - b[1].provisional_expires)[0];
       if (!oldest) return json(response, 429, { error: "registration_limit" });
       delete state.clients[oldest[0]];
     }
     const clientId = random();
-    const client = { client_id: clientId, client_id_issued_at: now(), client_name: String(input.client_name ?? "MCP client").slice(0, 100), redirect_uris: [...new Set(input.redirect_uris)], token_endpoint_auth_method: "none", grant_types: metadata.grant_types_supported, response_types: ["code"], scope: SCOPE };
+    const client = { client_id: clientId, client_id_issued_at: now(), client_name: String(input.client_name ?? "MCP client").slice(0, 100), redirect_uris: [...new Set(input.redirect_uris)], token_endpoint_auth_method: "none", grant_types: metadata.grant_types_supported, response_types: ["code"], scope: registeredScope };
     state.clients[clientId] = { ...client, provisional_expires: now() + PROVISIONAL_CLIENT_SECONDS };
     await save();
     json(response, 201, client);
@@ -183,66 +218,82 @@ export function createOAuth(options = {}) {
     const params = Object.fromEntries(url.searchParams);
     const client = Object.hasOwn(state.clients, params.client_id) ? state.clients[params.client_id] : null;
     if (!client || !client.redirect_uris.includes(params.redirect_uri)) return json(response, 400, { error: "invalid_client" });
-    if (params.response_type !== "code" || params.resource !== resource || (params.scope && params.scope !== SCOPE) || params.code_challenge_method !== "S256" || !/^[A-Za-z0-9_-]{43}$/.test(params.code_challenge ?? "") || (params.state?.length ?? 0) > 1024) return json(response, 400, { error: "invalid_request" });
+    const requestedScope = normalizeScopes(params.scope ?? SCOPE);
+    const registeredScopes = new Set(client.scope.split(/\s+/));
+    if (params.response_type !== "code" || params.resource !== resource || !requestedScope || requestedScope.split(/\s+/).some((scope) => !registeredScopes.has(scope)) || params.code_challenge_method !== "S256" || !/^[A-Za-z0-9_-]{43}$/.test(params.code_challenge ?? "") || (params.state?.length ?? 0) > 1024) return json(response, 400, { error: "invalid_request" });
+    params.scope = requestedScope;
     if (Object.keys(state.pending).length >= 1000) return json(response, 429, { error: "authorization_limit" });
     const transaction = random();
     state.pending[digest(transaction)] = { ...params, expires: now() + 600, started: false };
     await save();
+    const redirectOrigin = new URL(params.redirect_uri).origin;
+    const styleNonce = random();
     response.writeHead(200, {
       "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "set-cookie": cookie(transaction),
-      "content-security-policy": "default-src 'none'; form-action 'self' https://github.com; frame-ancestors 'none'; base-uri 'none'",
+      "content-security-policy": `default-src 'none'; style-src 'nonce-${styleNonce}'; form-action 'self' ${redirectOrigin}; frame-ancestors 'none'; base-uri 'none'`,
       "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
     });
-    response.end(`<!doctype html><html lang="ru"><meta charset="utf-8"><title>Подключить Chrome к ChatGPT</title><h1>Доступ к вашему браузеру</h1><p>Приложение: ${escape(client.client_name)}.</p><p>Адрес возврата: ${escape(new URL(params.redirect_uri).origin)}.</p><p>Подключение разрешит управление Chrome и доступ к сайтам вашего сохранённого профиля. Вход доступен только владельцу через GitHub.</p><form method="post" action="${OAUTH_PATH}/authorize"><input type="hidden" name="transaction" value="${transaction}"><button type="submit">Разрешить и войти через GitHub</button></form></html>`);
+    response.end(`<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Подключить Chrome к ChatGPT</title>
+<style nonce="${styleNonce}">
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px; background: #eef0f2; color: #20252b; font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 30rem; margin: 0 auto; padding: 24px; background: #f9fafb; border: 1px solid #c8cdd2; border-radius: 16px; overflow-wrap: anywhere; }
+  h1 { margin: 0 0 16px; font-size: 1.5rem; line-height: 1.25; }
+  p { margin: 0 0 16px; }
+  label { display: block; margin-bottom: 8px; font-weight: 600; }
+  input[type="password"], button { width: 100%; min-width: 0; min-height: 48px; padding: 12px; border: 1px solid #707780; border-radius: 8px; font: inherit; }
+  input[type="password"] { background: #fff; color: #20252b; }
+  button { margin-top: 16px; background: #303b46; color: #fff; font-weight: 600; cursor: pointer; }
+  input:focus-visible, button:focus-visible { outline: 3px solid #2264a5; outline-offset: 3px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Доступ к твоему браузеру</h1>
+<p>Приложение: <strong>${escape(client.client_name)}</strong>.</p>
+<p>Адрес возврата: ${escape(new URL(params.redirect_uri).origin)}.</p>
+<p id="access-notice">Подключение разрешит управление облачным Chrome и доступ к сайтам его сохранённого профиля. Введи код доступа владельца только на этой странице, не в чате.</p>
+<form method="post" action="${OAUTH_PATH}/authorize">
+<input type="hidden" name="transaction" value="${transaction}">
+<label for="owner-token">Код доступа владельца</label>
+<input id="owner-token" type="password" name="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" aria-describedby="access-notice" required>
+<button type="submit">Разрешить</button>
+</form>
+</main>
+</body>
+</html>`);
   }
 
-  async function githubLogin(request, response) {
+  // Wrong short tokens seen recently, in memory only. Registration is anonymous, so
+  // without a global cap a caller could guess the token with unlimited transactions.
+  const failures = [];
+  async function ownerLogin(request, response) {
     const input = await body(request, "application/x-www-form-urlencoded");
     const transaction = input.transaction ?? "";
     const pending = state.pending[digest(transaction)];
     if (!pending || pending.expires <= now() || pending.started || !browserBound(request, transaction)) return json(response, 400, { error: "invalid_request" });
+    while (failures.length && failures[0] <= now() - FAILURE_WINDOW) failures.shift();
+    if (failures.length >= MAX_FAILURES) return json(response, 429, { error: "too_many_attempts" }, { "retry-after": String(failures[0] + FAILURE_WINDOW - now()) });
+    if (typeof input.password !== "string" || !equal(input.password, shortToken)) {
+      failures.push(now());
+      return json(response, 403, { error: "access_denied" });
+    }
+    failures.length = 0;
     pending.started = true;
-    // Bind the upstream GitHub authorization code to this same browser transaction.
-    pending.github_verifier = random();
-    await save();
-    const target = new URL("https://github.com/login/oauth/authorize");
-    target.search = new URLSearchParams({ client_id: githubClientId, redirect_uri: callback, scope: "read:user", state: transaction, code_challenge: digest(pending.github_verifier), code_challenge_method: "S256", allow_signup: "false" }).toString();
-    redirect(response, target.href);
-  }
-
-  async function githubCallback(request, response, url) {
-    const transaction = url.searchParams.get("state") ?? "";
-    const pending = state.pending[digest(transaction)];
-    if (!pending || !pending.started || pending.expires <= now() || !browserBound(request, transaction)) return json(response, 400, { error: "invalid_oauth_state" });
     delete state.pending[digest(transaction)];
-    await save();
+    if (!Object.hasOwn(state.clients, pending.client_id)) return json(response, 400, { error: "invalid_client" });
+    delete state.clients[pending.client_id].provisional_expires;
+    const authorizationCode = random();
+    state.codes[digest(authorizationCode)] = { client: pending.client_id, redirect: pending.redirect_uri, challenge: pending.code_challenge, resource, owner: ownerId, scope: pending.scope ?? SCOPE, expires: now() + 300, used: false };
+    await save({ checkpoint: false });
     const target = new URL(pending.redirect_uri);
     target.searchParams.set("iss", issuer);
     if (pending.state) target.searchParams.set("state", pending.state);
-    const deny = () => { target.searchParams.set("error", "access_denied"); redirect(response, target.href, cookie("", true)); };
-    const code = url.searchParams.get("code");
-    if (!code || url.searchParams.has("error")) return deny();
-    let account;
-    try {
-      const tokenResponse = await fetchRemote("https://github.com/login/oauth/access_token", {
-        method: "POST", redirect: "error", signal: AbortSignal.timeout(10_000),
-        headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ client_id: githubClientId, client_secret: githubClientSecret, code, redirect_uri: callback, code_verifier: pending.github_verifier }),
-      });
-      const token = await tokenResponse.json();
-      if (!tokenResponse.ok || typeof token.access_token !== "string") return deny();
-      const userResponse = await fetchRemote("https://api.github.com/user", {
-        redirect: "error", signal: AbortSignal.timeout(10_000),
-        headers: { accept: "application/vnd.github+json", authorization: `Bearer ${token.access_token}`, "x-github-api-version": "2022-11-28", "user-agent": "Alice-Chrome-MCP" },
-      });
-      account = await userResponse.json();
-      if (!userResponse.ok || !equal(String(account.id), ownerId)) return deny();
-    } catch { return deny(); }
-    if (!Object.hasOwn(state.clients, pending.client_id)) return deny();
-    delete state.clients[pending.client_id].provisional_expires;
-    const authorizationCode = random();
-    state.codes[digest(authorizationCode)] = { client: pending.client_id, redirect: pending.redirect_uri, challenge: pending.code_challenge, resource, owner: ownerId, expires: now() + 300, used: false };
-    await save();
     target.searchParams.set("code", authorizationCode);
     redirect(response, target.href, cookie("", true));
   }
@@ -250,14 +301,15 @@ export function createOAuth(options = {}) {
   async function token(request, response) {
     const input = await body(request, "application/x-www-form-urlencoded");
     if (!Object.hasOwn(state.clients, input.client_id)) return json(response, 401, { error: "invalid_client" });
-    if (input.resource !== resource || (input.scope && input.scope !== SCOPE)) return json(response, 400, { error: "invalid_target" });
+    if (input.resource !== resource) return json(response, 400, { error: "invalid_target" });
     if (input.grant_type === "authorization_code") {
       const code = state.codes[digest(input.code ?? "")];
-      if (!code || code.client !== input.client_id || code.redirect !== input.redirect_uri || code.owner !== ownerId || code.resource !== resource || code.expires <= now() || !/^[A-Za-z0-9._~-]{43,128}$/.test(input.code_verifier ?? "") || !equal(digest(input.code_verifier), code.challenge)) return json(response, 400, { error: "invalid_grant" });
+      const requestedScope = input.scope ? normalizeScopes(input.scope) : code?.scope;
+      if (!code || !requestedScope || requestedScope !== code.scope || code.client !== input.client_id || code.redirect !== input.redirect_uri || code.owner !== ownerId || code.resource !== resource || code.expires <= now() || !/^[A-Za-z0-9._~-]{43,128}$/.test(input.code_verifier ?? "") || !equal(digest(input.code_verifier), code.challenge)) return json(response, 400, { error: "invalid_grant" });
       if (code.used) { revokeFamily(code.family); await save(); return json(response, 400, { error: "invalid_grant" }); }
       code.used = true;
       code.family = random();
-      const result = issue(input.client_id, code.family);
+      const result = issue(input.client_id, code.family, code.scope);
       await save();
       return json(response, 200, result);
     }
@@ -266,7 +318,7 @@ export function createOAuth(options = {}) {
       if (!refresh || refresh.client !== input.client_id || refresh.owner !== ownerId || refresh.resource !== resource || refresh.expires <= now()) return json(response, 400, { error: "invalid_grant" });
       if (refresh.used) { revokeFamily(refresh.family); await save(); return json(response, 400, { error: "invalid_grant" }); }
       refresh.used = true;
-      const result = issue(input.client_id, refresh.family);
+      const result = issue(input.client_id, refresh.family, refresh.scope);
       await save();
       return json(response, 200, result);
     }
@@ -289,12 +341,12 @@ export function createOAuth(options = {}) {
     if (!path.startsWith(`${OAUTH_PATH}/`) && !resourcePaths.includes(path) && !issuerPaths.includes(path)) return false;
     try {
       prune();
-      if (request.method === "GET" && resourcePaths.includes(path)) json(response, 200, { resource, authorization_servers: [issuer], scopes_supported: [SCOPE], bearer_methods_supported: ["header"] });
+      if (request.method === "GET" && resourcePaths.includes(path)) json(response, 200, { resource, authorization_servers: [issuer], scopes_supported: SUPPORTED_SCOPES, bearer_methods_supported: ["header"] });
       else if (request.method === "GET" && issuerPaths.includes(path)) json(response, 200, metadata);
       else if (request.method === "POST" && path === `${OAUTH_PATH}/register`) await register(request, response);
       else if (request.method === "GET" && path === `${OAUTH_PATH}/authorize`) await begin(request, response, url);
-      else if (request.method === "POST" && path === `${OAUTH_PATH}/authorize`) await githubLogin(request, response);
-      else if (request.method === "GET" && path === `${OAUTH_PATH}/github/callback`) await githubCallback(request, response, url);
+      else if (request.method === "POST" && path === `${OAUTH_PATH}/authorize`) await ownerLogin(request, response);
+      else if (request.method === "POST" && path === "/browser/oauth/owner-session") await ownerSession(request, response);
       else if (request.method === "POST" && path === `${OAUTH_PATH}/token`) await token(request, response);
       else if (request.method === "POST" && path === `${OAUTH_PATH}/revoke`) await revoke(request, response);
       else json(response, 404, { error: "not_found" });
@@ -309,5 +361,5 @@ export function createOAuth(options = {}) {
     return true;
   }
 
-  return { enabled, handle, authorize, challenge, metadata };
+  return { enabled, handle, authorize, ownerAuthorize, ownerSession, challenge, metadata };
 }
