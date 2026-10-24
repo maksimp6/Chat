@@ -148,6 +148,20 @@
       throw new Error("Не удалось завершить голосовую сессию: HTTP " + response.status);
   }
 
+  // Best effort: a session the server opened must not stay open when recording never started.
+  function closeServerSession() {
+    if (!sessionId) return;
+    var id = sessionId;
+    sessionId = null;
+    request("/api/voice/close", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: id }),
+    }).catch(function (err) {
+      log("Session close failed: " + err.message);
+    });
+  }
+
   async function startRecording() {
     try {
       mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -156,6 +170,7 @@
     } catch (err) {
       setStatus("Ошибка микрофона: " + err.message);
       isConnecting = false;
+      closeServerSession();
       return;
     }
 
