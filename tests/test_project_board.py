@@ -1,4 +1,4 @@
-"""Full-file Memory DB and real HTTP E2E for the isolated Alice Board."""
+"""Full-file Memory DB and real HTTP E2E for the isolated Logos Board."""
 
 import json
 import os
@@ -146,7 +146,7 @@ def test_sigkill_after_ack_preserves_confirmed_event(tmp_path):
         "import os,signal,sys;"
         "from project_board.store import BoardStore;"
         "db=BoardStore(sys.argv[1]);"
-        "db.create_thread('durable','ACK was seen','discussion','alice:test:sigkill');"
+        "db.create_thread('durable','ACK was seen','discussion','logos:test:sigkill');"
         "print('ACK',flush=True);"
         "os.kill(os.getpid(),signal.SIGKILL)"
     )
@@ -243,7 +243,7 @@ def test_real_http_auth_csp_and_content_limits(board_http):
     assert http(base, "POST", "/api/threads", {"title": "X"}, token=None)[0] == 401
     assert http(base, "GET", "/api/threads", token="invalid")[0] == 401
     code, headers, html = http(base, "GET", "/", token=None)
-    assert code == 200 and b"Alice Board" in html
+    assert code == 200 and b"Logos Board" in html
     assert "default-src 'none'" in headers["Content-Security-Policy"]
     assert "no-store" in headers["Cache-Control"]
     code, _, js = http(base, "GET", "/static/app.js", token=None)

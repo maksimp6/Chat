@@ -140,7 +140,7 @@ def test_search_does_not_follow_file_symlink_outside_checkout(tools):
 
 
 @pytest.mark.parametrize(
-    "name", ["untracked.txt", ".env", "credentials.json", "private.key", "alice.memory"]
+    "name", ["untracked.txt", ".env", "credentials.json", "private.key", "logos.memory"]
 )
 def test_source_scope_denies_untracked_or_sensitive_files(tools, name):
     _, executor, root = tools
@@ -203,13 +203,13 @@ def test_worker_store_guard_runs_before_app_and_client_initialization(
 ):
     _, _, root = tools
     if configuration == "missing":
-        monkeypatch.delenv("ALICE_MEMORY_PATH", raising=False)
+        monkeypatch.delenv("LOGOS_MEMORY_PATH", raising=False)
     else:
         location = root / "private.memory"
         if configuration == "symlink":
             location = root.parent / "linked.memory"
             location.symlink_to(root / "private.memory")
-        monkeypatch.setenv("ALICE_MEMORY_PATH", str(location))
+        monkeypatch.setenv("LOGOS_MEMORY_PATH", str(location))
     touched = []
     import builtins
 
@@ -237,7 +237,7 @@ def test_headless_worker_rejects_runtime_storage_override_before_initialization(
     tools, monkeypatch, with_data_root
 ):
     _, _, root = tools
-    monkeypatch.setenv("ALICE_MEMORY_PATH", str(root.parent / "external.memory"))
+    monkeypatch.setenv("LOGOS_MEMORY_PATH", str(root.parent / "external.memory"))
     touched = []
     with bind_runtime_request(
         "synthetic-runtime", "/runtime/fixture", data_root=str(root) if with_data_root else None

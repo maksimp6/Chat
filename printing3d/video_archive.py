@@ -1,7 +1,7 @@
 """Private, quota-aware Google Drive archive for printer video files.
 
 Video bytes never belong in a public Git repository or Execution Trace.
-The OAuth token provider must come from Alice's server-side SecretProvider.
+The OAuth token provider must come from Logos's server-side SecretProvider.
 """
 
 from __future__ import annotations

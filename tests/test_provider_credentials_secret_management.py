@@ -51,13 +51,13 @@ class FakeSecretManagementClient:
 
 
 def test_set_and_get_ref_round_trips(isolated_db):
-    ref = set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v1")
-    assert ref.purpose == "alice_short_token"
+    ref = set_secret_management_ref(isolated_db, "logos_short_token", "secret-1", "v1")
+    assert ref.purpose == "logos_short_token"
     assert ref.secret_id == "secret-1"
     assert ref.pinned_version_id == "v1"
     assert ref.previous_version_id is None
 
-    fetched = get_secret_management_ref(isolated_db, "alice_short_token")
+    fetched = get_secret_management_ref(isolated_db, "logos_short_token")
     assert fetched == ref
 
 
@@ -84,23 +84,23 @@ def test_switching_to_a_different_secret_id_does_not_offer_rollback(isolated_db)
 
 
 def test_rollback_restores_prior_pinned_version(isolated_db):
-    set_secret_management_ref(isolated_db, "alice_database_url", "secret-1", "v1")
-    set_secret_management_ref(isolated_db, "alice_database_url", "secret-1", "v2")
+    set_secret_management_ref(isolated_db, "logos_database_url", "secret-1", "v1")
+    set_secret_management_ref(isolated_db, "logos_database_url", "secret-1", "v2")
 
-    rolled_back = rollback_secret_management_ref(isolated_db, "alice_database_url")
+    rolled_back = rollback_secret_management_ref(isolated_db, "logos_database_url")
     assert rolled_back.pinned_version_id == "v1"
     assert rolled_back.previous_version_id == "v2"
 
     # Rollback is itself explicit and reversible: rolling back again returns to v2.
-    rolled_back_again = rollback_secret_management_ref(isolated_db, "alice_database_url")
+    rolled_back_again = rollback_secret_management_ref(isolated_db, "logos_database_url")
     assert rolled_back_again.pinned_version_id == "v2"
     assert rolled_back_again.previous_version_id == "v1"
 
 
 def test_rollback_without_prior_version_fails_closed(isolated_db):
-    set_secret_management_ref(isolated_db, "alice_database_url", "secret-1", "v1")
+    set_secret_management_ref(isolated_db, "logos_database_url", "secret-1", "v1")
     with pytest.raises(CredentialError):
-        rollback_secret_management_ref(isolated_db, "alice_database_url")
+        rollback_secret_management_ref(isolated_db, "logos_database_url")
 
 
 def test_rollback_without_any_ref_fails_closed(isolated_db):
@@ -110,27 +110,27 @@ def test_rollback_without_any_ref_fails_closed(isolated_db):
 
 def test_resolve_requires_a_configured_ref(isolated_db):
     with pytest.raises(NoActiveCredentialError):
-        resolve_secret_management_value(isolated_db, "alice_short_token")
+        resolve_secret_management_value(isolated_db, "logos_short_token")
 
 
 def test_resolve_fetches_the_pinned_version_only(isolated_db):
-    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v2")
+    set_secret_management_ref(isolated_db, "logos_short_token", "secret-1", "v2")
     client = FakeSecretManagementClient({("secret-1", "v2"): "the-plaintext-token"})
 
-    value = resolve_secret_management_value(isolated_db, "alice_short_token", client=client)
+    value = resolve_secret_management_value(isolated_db, "logos_short_token", client=client)
 
     assert value == "the-plaintext-token"
     assert client.calls == [("secret-1", "v2")]
 
 
 def test_resolve_after_rollback_uses_restored_version(isolated_db):
-    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v1")
-    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v2")
-    rollback_secret_management_ref(isolated_db, "alice_short_token")
+    set_secret_management_ref(isolated_db, "logos_short_token", "secret-1", "v1")
+    set_secret_management_ref(isolated_db, "logos_short_token", "secret-1", "v2")
+    rollback_secret_management_ref(isolated_db, "logos_short_token")
 
     client = FakeSecretManagementClient({("secret-1", "v1"): "rolled-back-value"})
     assert (
-        resolve_secret_management_value(isolated_db, "alice_short_token", client=client)
+        resolve_secret_management_value(isolated_db, "logos_short_token", client=client)
         == "rolled-back-value"
     )
 
@@ -148,18 +148,18 @@ def test_rollback_round_trips_whole_second_aware_timestamps(isolated_db):
 
     assert (
         set_secret_management_ref(
-            isolated_db, "alice_short_token", "secret-1", "v1", now=first
+            isolated_db, "logos_short_token", "secret-1", "v1", now=first
         ).updated_at
         == first
     )
-    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v2", now=second)
-    ref = rollback_secret_management_ref(isolated_db, "alice_short_token", now=restored)
+    set_secret_management_ref(isolated_db, "logos_short_token", "secret-1", "v2", now=second)
+    ref = rollback_secret_management_ref(isolated_db, "logos_short_token", now=restored)
 
     assert ref.pinned_version_id == "v1"
     assert ref.updated_at == restored
     client = FakeSecretManagementClient({("secret-1", "v1"): "rolled-back-value"})
     assert (
-        resolve_secret_management_value(isolated_db, "alice_short_token", client=client)
+        resolve_secret_management_value(isolated_db, "logos_short_token", client=client)
         == "rolled-back-value"
     )
 
@@ -192,7 +192,7 @@ def test_ref_table_only_ever_stores_identifiers_not_a_value_column(isolated_db):
 
 def test_secret_value_never_reaches_trace_even_when_a_later_error_is_recorded(isolated_db):
     """Regression for issue #477: nested errors after resolution must not leak."""
-    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v1")
+    set_secret_management_ref(isolated_db, "logos_short_token", "secret-1", "v1")
     client = FakeSecretManagementClient({("secret-1", "v1"): "must-not-leak-anywhere"})
     context = InvocationContext("session", "conversation", "invocation", "secret-trace")
     trace = create_invocation_trace(context)
@@ -200,7 +200,7 @@ def test_secret_value_never_reaches_trace_even_when_a_later_error_is_recorded(is
     assert get_current_trace() is trace
 
     try:
-        opaque = resolve_secret_management_value(isolated_db, "alice_short_token", client=client)
+        opaque = resolve_secret_management_value(isolated_db, "logos_short_token", client=client)
         assert opaque == "must-not-leak-anywhere"
         trace.add_event("opaque_value", {"value": opaque})
 
@@ -261,10 +261,10 @@ def test_trace_redacts_long_secret_before_repr_truncation():
 
 
 def test_repinning_current_version_preserves_rollback_target(isolated_db):
-    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v1")
-    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v2")
+    set_secret_management_ref(isolated_db, "logos_short_token", "secret-1", "v1")
+    set_secret_management_ref(isolated_db, "logos_short_token", "secret-1", "v2")
 
-    repeated = set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v2")
+    repeated = set_secret_management_ref(isolated_db, "logos_short_token", "secret-1", "v2")
 
     assert repeated.pinned_version_id == "v2"
     assert repeated.previous_version_id == "v1"
@@ -274,8 +274,8 @@ def test_repinning_current_version_preserves_rollback_target(isolated_db):
     "purpose,secret_id,version_id",
     [
         ("", "secret-1", "v1"),
-        ("alice_short_token", "", "v1"),
-        ("alice_short_token", "secret-1", ""),
+        ("logos_short_token", "", "v1"),
+        ("logos_short_token", "secret-1", ""),
     ],
 )
 def test_set_ref_rejects_missing_identifiers(isolated_db, purpose, secret_id, version_id):
@@ -284,13 +284,13 @@ def test_set_ref_rejects_missing_identifiers(isolated_db, purpose, secret_id, ve
 
 
 def test_resolve_constructs_default_backend_client(isolated_db):
-    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v1")
+    set_secret_management_ref(isolated_db, "logos_short_token", "secret-1", "v1")
     fake = FakeSecretManagementClient({("secret-1", "v1"): "resolved-default"})
     with patch(
         "cloud.cloudru.secret_management.CloudRuSecretManagementClient",
         return_value=fake,
     ) as client_type:
-        value = resolve_secret_management_value(isolated_db, "alice_short_token")
+        value = resolve_secret_management_value(isolated_db, "logos_short_token")
 
     assert value == "resolved-default"
     client_type.assert_called_once_with()
@@ -300,23 +300,23 @@ def test_resolve_constructs_default_backend_client(isolated_db):
 def test_default_resolver_reuses_backend_scoped_client(isolated_db, monkeypatch):
     import provider_accounts.credentials as credentials
 
-    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v1")
+    set_secret_management_ref(isolated_db, "logos_short_token", "secret-1", "v1")
     fake = FakeSecretManagementClient({("secret-1", "v1"): "cached-client-value"})
     monkeypatch.setattr(credentials, "_SECRET_MANAGEMENT_CLIENT", fake)
 
     assert (
-        resolve_secret_management_value(isolated_db, "alice_short_token") == "cached-client-value"
+        resolve_secret_management_value(isolated_db, "logos_short_token") == "cached-client-value"
     )
     assert (
-        resolve_secret_management_value(isolated_db, "alice_short_token") == "cached-client-value"
+        resolve_secret_management_value(isolated_db, "logos_short_token") == "cached-client-value"
     )
     assert fake.calls == [("secret-1", "v1"), ("secret-1", "v1")]
 
 
 def test_atomic_upsert_tracks_immediately_previous_version(isolated_db):
-    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v1")
-    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v2")
-    latest = set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v3")
+    set_secret_management_ref(isolated_db, "logos_short_token", "secret-1", "v1")
+    set_secret_management_ref(isolated_db, "logos_short_token", "secret-1", "v2")
+    latest = set_secret_management_ref(isolated_db, "logos_short_token", "secret-1", "v3")
 
     assert latest.pinned_version_id == "v3"
     assert latest.previous_version_id == "v2"

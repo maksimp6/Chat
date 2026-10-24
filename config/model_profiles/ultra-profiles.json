@@ -49,11 +49,11 @@
     "logos-runtime": {
       "profile_id": "ultra-logos-runtime",
       "model_key": "logos-runtime",
-      "upstream_id": "aliceai-llm",
+      "upstream_id": "logosai-llm",
       "kind": "text",
       "status": "prepared_not_activated",
       "transport": "responses",
-      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/aliceai-llm/latest",
+      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/logosai-llm/latest",
       "lifecycle": {
         "state": "listed",
         "stop_and_recheck_on": null,
@@ -352,11 +352,11 @@
     "logos-runtime-flash": {
       "profile_id": "ultra-logos-runtime-flash",
       "model_key": "logos-runtime-flash",
-      "upstream_id": "aliceai-llm-flash",
+      "upstream_id": "logosai-llm-flash",
       "kind": "text",
       "status": "prepared_not_activated",
       "transport": "responses",
-      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/aliceai-llm-flash/latest",
+      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/logosai-llm-flash/latest",
       "lifecycle": {
         "state": "listed",
         "stop_and_recheck_on": null,

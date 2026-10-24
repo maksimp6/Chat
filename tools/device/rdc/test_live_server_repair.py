@@ -25,8 +25,8 @@ def import_local(name: str, path: Path):
     return module
 
 
-actions = import_local("alice_actions_test", BASE / "android_actions.py")
-server = import_local("alice_live_server_test", BASE / "android_live_server.py")
+actions = import_local("logos_actions_test", BASE / "android_actions.py")
+server = import_local("logos_live_server_test", BASE / "android_live_server.py")
 
 TWO = """List of devices attached
 192.168.31.109:42125 device product:creek_n_ru model:25062RN2DY device:creek transport_id:3
@@ -46,7 +46,7 @@ one offline model:Redmi_9 device:galahad
 
 class DeviceSelection(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="alice-live-unit-")
+        self.temp = tempfile.TemporaryDirectory(prefix="logos-live-unit-")
         self.addCleanup(self.temp.cleanup)
         policy = Path(self.temp.name) / "target.json"
         policy.write_text(json.dumps({"model": "Redmi_9", "device": "galahad"}))

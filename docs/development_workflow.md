@@ -217,7 +217,7 @@ pytest -q tests/test_responses_tool_loop.py test_partial_output.py tests/test_to
 
 Destructive PostgreSQL isolation в тестах разрешён только для disposable test databases. Для него одновременно обязательны:
 
-- `ALICE_PYTEST_POSTGRES_RESET=1`;
+- `LOGOS_PYTEST_POSTGRES_RESET=1`;
 - имя БД, заканчивающееся на `_test` или `_ci`.
 
 `tests/postgres_test_guard.py` fail-closed отклоняет любой другой target. Никогда не направлять этот режим на production/staging database.

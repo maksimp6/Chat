@@ -11,7 +11,7 @@ static int fixture_closes=0;
 static int fixture_frees=0;
 
 remote_input_keyboard_fixture *remote_input_fixture_new(void *ctx,
-        alice_key_emit_fn emit, alice_key_clock_fn clock) {
+        logos_key_emit_fn emit, logos_key_clock_fn clock) {
     remote_input_keyboard_fixture *fixture=calloc(1,sizeof(*fixture));
     if(!fixture)return NULL;
     if(remote_input_keyboard_init(&fixture->keyboard,ctx,emit,clock)!=0) {

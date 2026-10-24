@@ -21,7 +21,7 @@ from a1mini_pla_cube_slice import (
 )
 
 SOURCE_SHA = "21fe9c783b15d00421dfb39dd0c79666ac1fe6f8bb672eaec1c0e86decdbbf84"
-OUTPUT = "Alice_OEM_Spindle_v03_A1mini_PLA_FIT_PROTOTYPE.gcode.3mf"
+OUTPUT = "Logos_OEM_Spindle_v03_A1mini_PLA_FIT_PROTOTYPE.gcode.3mf"
 
 
 def _load_source_parts(src: Path):
@@ -99,7 +99,7 @@ def _triangle_record(a, b, c) -> bytes:
 def make_stl(src: Path, out: Path):
     objects, items = _load_source_parts(src)
     meshes = _read_meshes(objects)
-    blob = bytearray(b"Alice OEM spindle v03 PLA fit prototype".ljust(80, b" "))
+    blob = bytearray(b"Logos OEM spindle v03 PLA fit prototype".ljust(80, b" "))
     blob.extend(struct.pack("<I", 9660))
     xs, ys, zs = [], [], []
     for item in items:

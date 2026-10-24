@@ -11,7 +11,7 @@ case $- in
   *x*) _codex_cloudru_xtrace=1; set +x ;;
 esac
 
-_codex_cloudru_state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/alice-pro"
+_codex_cloudru_state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/logos-pro"
 _codex_cloudru_state_file="$_codex_cloudru_state_dir/cloudru-codex.json"
 
 _codex_cloudru_key_id="${CLOUDRU_IAM_KEY_ID:-${CLOUDRU_KEY_ID:-}}"

@@ -24,7 +24,7 @@ def test_problem_builds_rfc9457_body(flask_app):
     assert response.status_code == 404
     assert response.mimetype == PROBLEM_MIMETYPE
     assert response.get_json() == {
-        "type": "https://alice.pro/problems/conversation_not_found",
+        "type": "https://logos.pro/problems/conversation_not_found",
         "title": "Диалог не найден",
         "status": 404,
         "error": "conversation_not_found",
@@ -51,7 +51,7 @@ def test_unhandled_errors_use_problem_details(flask_app):
     assert response.status_code == 500
     assert response.mimetype == PROBLEM_MIMETYPE
     body = response.get_json()
-    assert body["type"] == "https://alice.pro/problems/internal_server_error"
+    assert body["type"] == "https://logos.pro/problems/internal_server_error"
     assert body["error"] == "internal_server_error"
     assert body["code"] == "UNHANDLED_EXCEPTION"
     assert "secret-internal-detail" not in response.get_data(as_text=True)

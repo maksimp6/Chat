@@ -1,4 +1,4 @@
-"""Isolated, peer-checked signed-input socket for Alice Input.
+"""Isolated, peer-checked signed-input socket for Logos Input.
 
 Not a root daemon or a production launcher. An authorized privileged owner
 must provide the private directory, key and provisioned verifier. No plaintext

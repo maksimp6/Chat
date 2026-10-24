@@ -30,7 +30,7 @@
 
   async function loadProjectTree() {
     log("load_started");
-    var response = await window.AliceDispatcher.request("/api/project-tree", {
+    var response = await window.LogosDispatcher.request("/api/project-tree", {
       credentials: "same-origin",
       cache: "no-store",
     });
@@ -53,7 +53,7 @@
     var existing = document.getElementById("project-tree-modal");
     if (existing) existing.remove();
 
-    var UI = window.AliceCoreAPI.ui;
+    var UI = window.LogosCoreAPI.ui;
     var body = document.createElement("div");
     body.className = "project-tree-state";
     body.textContent = "Загрузка...";
@@ -64,7 +64,7 @@
       closeAction: "project-tree.close",
       body: body,
     });
-    (document.querySelector(".alice-pro-app") || document.body).appendChild(modal);
+    (document.querySelector(".logos-pro-app") || document.body).appendChild(modal);
     UI.modal.open(modal);
 
     var state = body;
@@ -91,7 +91,7 @@
 
   window.ProjectTree = { load: loadProjectTree, open: openTree };
 
-  var actions = window.AliceCoreAPI.ui.actions;
+  var actions = window.LogosCoreAPI.ui.actions;
   actions.register("project-tree.close", function (payload) {
     var modal = payload.element.closest(".modal");
     if (modal) modal.remove();

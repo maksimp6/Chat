@@ -1,4 +1,4 @@
-"""Safe Alice Mouse staging tests. Never touches Android input devices."""
+"""Safe Logos Mouse staging tests. Never touches Android input devices."""
 
 import concurrent.futures
 import json
@@ -193,7 +193,7 @@ def test_resize_invalidates_position_and_hides(mouse):
 
 def test_physical_transport_is_off_by_default():
     with pytest.raises(MouseError):
-        RootSocketBackend("/data/adb/alice-mouse/control.sock")
+        RootSocketBackend("/data/adb/logos-mouse/control.sock")
 
 
 def test_packet_huge_or_malformed_denied(mouse):

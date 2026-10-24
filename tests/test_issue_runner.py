@@ -15,7 +15,7 @@ def repo(tmp_path, monkeypatch):
     monkeypatch.setattr(issue_runner, "enforce_native_launch_hold", lambda: None)
     import storage.db as db
 
-    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "logos.db"))
     root = tmp_path / "repo"
     root.mkdir()
     (root / "AGENTS.md").write_text("Use the smallest change.\n", encoding="utf-8")
@@ -153,7 +153,7 @@ def test_seed_stores_encrypted_credential(tmp_path, monkeypatch):
     from provider_accounts.credentials import get_active_credential
 
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "creds.db"))
-    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIAL_KEY", "ci-run-key")
+    monkeypatch.setenv("LOGOS_PROVIDER_CREDENTIAL_KEY", "ci-run-key")
     monkeypatch.setenv("YANDEX_API_KEY", "test-api-key")
     monkeypatch.setenv("YANDEX_PROJECT_ID", "test-project")
 
@@ -185,7 +185,7 @@ def test_cli_writes_result_file(repo, tmp_path, monkeypatch):
         return {"status": "no_changes", "changed_files": []}
 
     monkeypatch.setattr(issue_runner, "run_issue_task", fake_run)
-    monkeypatch.setenv("ALICE_AGENT_MODEL", "yandexgpt-5-pro")
+    monkeypatch.setenv("LOGOS_AGENT_MODEL", "yandexgpt-5-pro")
 
     code = issue_runner.main(
         ["--issue", "3", "--title-file", str(title), "--body-file", str(body), "--out", str(out)]

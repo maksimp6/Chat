@@ -16,7 +16,7 @@ protected `master`. Open a promotion PR only when the branches have an actual di
 | Local launch smoke | All | None | None | None |
 | Remote Desktop Commander validation | All | None | None | RDC sources and its workflow |
 | Merge readiness snapshot | Non-draft PRs into master | None | None | None |
-| Host-managed preview validation | All; job requires ALICE_HOST_PREVIEW_ENABLED | All branches | None | None |
+| Host-managed preview validation | All; job requires LOGOS_HOST_PREVIEW_ENABLED | All branches | None | None |
 
 Security previously filtered PRs to `master`. Removing that PR filter
 lets develop and stacked PRs receive the same scans without changing the jobs,

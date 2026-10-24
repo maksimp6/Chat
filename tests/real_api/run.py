@@ -130,10 +130,10 @@ def runtime_environment(
         HOST="127.0.0.1",
         PORT=str(port),
         FLASK_DEBUG="0",
-        ALICE_MEMORY_PATH=str(work / "alice.memory"),
-        ALICE_REQUIRE_SHORT_TOKEN="0",
-        ALICE_PROVIDER_CREDENTIAL_KEY=encryption_key,
-        ALICE_PROVIDER_CREDENTIALS_TOKEN=admin_token,
+        LOGOS_MEMORY_PATH=str(work / "logos.memory"),
+        LOGOS_REQUIRE_SHORT_TOKEN="0",
+        LOGOS_PROVIDER_CREDENTIAL_KEY=encryption_key,
+        LOGOS_PROVIDER_CREDENTIALS_TOKEN=admin_token,
         YANDEX_BASE_URL="https://ai.api.cloud.yandex.net/v1",
     )
     return env
@@ -371,7 +371,7 @@ def parse_args(argv=None):
         "--installed-build", help="Operator-observed installed build; not a verified source SHA."
     )
     parser.add_argument(
-        "--model", required=True, help="Explicit Yandex model slug, e.g. aliceai-llm-flash."
+        "--model", required=True, help="Explicit Yandex model slug, e.g. logosai-llm-flash."
     )
     parser.add_argument(
         "--state-root",

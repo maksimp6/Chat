@@ -59,7 +59,7 @@ cause was fixed. Admission for changed attempts still belongs to the host TaskPa
 ## Coverage, limitations and rollout
 
 All provider identities, including ChatGPT, use identical checks **if** their tools
-are routed through this host boundary. ChatGPT tools outside Alice Pro, direct CLI,
+are routed through this host boundary. ChatGPT tools outside Logos Pro, direct CLI,
 GitHub partner agents and other bypass paths are not currently intercepted. No
 account-wide or universal enforcement is claimed. No global enforcement switch is
 added, and the candidate is not constructed by the production application.

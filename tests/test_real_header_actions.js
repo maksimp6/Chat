@@ -6,7 +6,7 @@ const shim = new BrowserShim(template);
 if (!shim.document.getElementById("header")) throw new Error("real header not found in index.html");
 const { window, document } = shim.load(["static/core_api.js", "static/ui_runtime.js"]);
 
-const UI = window.AliceCoreAPI.ui;
+const UI = window.LogosCoreAPI.ui;
 const buttons = document.querySelectorAll("#header button[data-action]");
 if (!buttons.length) throw new Error("real header action inventory is empty");
 
@@ -97,7 +97,7 @@ const memoryShim = new BrowserShim(template);
 const memoryRuntime = memoryShim.load(
   ["static/core_api.js", "static/ui_runtime.js", "static/memory_panel.js"],
   {
-    AliceDispatcher: {
+    LogosDispatcher: {
       request: async function () {
         return {
           ok: true,
@@ -163,7 +163,7 @@ if (settingsOpenCalls !== 1) {
 console.log("Real settings dispatcher click lifecycle passed");
 
 const toolsShim = new BrowserShim(template);
-toolsShim.window.AliceDispatcher = {
+toolsShim.window.LogosDispatcher = {
   request: async function () {
     return {
       ok: true,
@@ -184,7 +184,7 @@ const toolsRuntime = toolsShim.load(
     "static/header_actions.js",
   ],
   {
-    AliceDispatcher: toolsShim.window.AliceDispatcher,
+    LogosDispatcher: toolsShim.window.LogosDispatcher,
   },
 );
 const toolsButton = toolsRuntime.document.getElementById("tools-btn");
@@ -202,7 +202,7 @@ if (
   throw new Error("tools modal close must use generic modal.close dispatcher contract");
 }
 if (!toolsModal.parentNode || toolsModal.parentNode.id !== "app-root") {
-  throw new Error("real tools modal must mount inside .alice-pro-app");
+  throw new Error("real tools modal must mount inside .logos-pro-app");
 }
 if (toolsModal.hidden || !toolsModal.classList.contains("visible")) {
   throw new Error("real tools button click must open tools modal");
@@ -229,7 +229,7 @@ mcpShim.window.SettingsUI = {
     return value ? String(value).split(",") : [];
   },
 };
-mcpShim.window.AliceDispatcher = {
+mcpShim.window.LogosDispatcher = {
   request: async function () {
     return {
       ok: true,
@@ -249,7 +249,7 @@ const mcpRuntime = mcpShim.load(
   ],
   {
     SettingsUI: mcpShim.window.SettingsUI,
-    AliceDispatcher: mcpShim.window.AliceDispatcher,
+    LogosDispatcher: mcpShim.window.LogosDispatcher,
   },
 );
 const mcpButton = mcpRuntime.document.getElementById("mcp-btn");
@@ -261,7 +261,7 @@ if (!mcpModal || !mcpClose) {
   throw new Error("real MCP modal controls must be created after click");
 }
 if (!mcpModal.parentNode || mcpModal.parentNode.id !== "app-root") {
-  throw new Error("real MCP modal must mount inside .alice-pro-app");
+  throw new Error("real MCP modal must mount inside .logos-pro-app");
 }
 if (
   mcpClose.dataset.action !== "mcp-manager.close" ||
@@ -290,7 +290,7 @@ filesShim.window.SettingsUI = {
     return String(value || "");
   },
 };
-filesShim.window.AliceDispatcher = {
+filesShim.window.LogosDispatcher = {
   request: async function () {
     return {
       ok: true,
@@ -310,7 +310,7 @@ const filesRuntime = filesShim.load(
   ],
   {
     SettingsUI: filesShim.window.SettingsUI,
-    AliceDispatcher: filesShim.window.AliceDispatcher,
+    LogosDispatcher: filesShim.window.LogosDispatcher,
   },
 );
 const filesButton = filesRuntime.document.getElementById("file-manager-btn");
@@ -322,7 +322,7 @@ if (!filesModal || !filesClose) {
   throw new Error("real file manager modal controls must be created after click");
 }
 if (!filesModal.parentNode || filesModal.parentNode.id !== "app-root") {
-  throw new Error("real file manager modal must mount inside .alice-pro-app");
+  throw new Error("real file manager modal must mount inside .logos-pro-app");
 }
 if (
   filesClose.dataset.action !== "file-manager.close" ||
@@ -346,7 +346,7 @@ if (filesModal.getAttribute("aria-hidden") !== "true") {
 console.log("Real file manager modal click lifecycle passed");
 
 const treasuryShim = new BrowserShim(template);
-treasuryShim.window.AliceDispatcher = {
+treasuryShim.window.LogosDispatcher = {
   request: async function (url) {
     if (url === "/api/treasury/account") {
       return {
@@ -363,7 +363,7 @@ treasuryShim.window.AliceDispatcher = {
 const treasuryRuntime = treasuryShim.load(
   ["static/core_api.js", "static/ui_runtime.js", "static/treasury.js", "static/header_actions.js"],
   {
-    AliceDispatcher: treasuryShim.window.AliceDispatcher,
+    LogosDispatcher: treasuryShim.window.LogosDispatcher,
   },
 );
 const treasuryButton = treasuryRuntime.document.getElementById("treasury-btn");
@@ -375,7 +375,7 @@ if (!treasuryModal || !treasuryClose) {
   throw new Error("real treasury modal controls must be created after click");
 }
 if (!treasuryModal.parentNode || treasuryModal.parentNode.id !== "app-root") {
-  throw new Error("real treasury modal must mount inside .alice-pro-app");
+  throw new Error("real treasury modal must mount inside .logos-pro-app");
 }
 if (
   treasuryClose.dataset.action !== "treasury.close" ||
@@ -399,7 +399,7 @@ if (treasuryModal.getAttribute("aria-hidden") !== "true") {
 console.log("Real treasury modal click lifecycle passed");
 
 const credentialsShim = new BrowserShim(template);
-credentialsShim.window.AliceDispatcher = {
+credentialsShim.window.LogosDispatcher = {
   request: async function (url) {
     if (url === "/api/provider-credentials/status") {
       return {
@@ -421,7 +421,7 @@ const credentialsRuntime = credentialsShim.load(
     "static/header_actions.js",
   ],
   {
-    AliceDispatcher: credentialsShim.window.AliceDispatcher,
+    LogosDispatcher: credentialsShim.window.LogosDispatcher,
   },
 );
 const credentialsButton = credentialsRuntime.document.getElementById("provider-credentials-btn");
@@ -456,7 +456,7 @@ if (credentialsModal.getAttribute("aria-hidden") !== "true") {
 console.log("Real provider credentials modal click lifecycle passed");
 
 const departmentsShim = new BrowserShim(template);
-departmentsShim.window.AliceDispatcher = {
+departmentsShim.window.LogosDispatcher = {
   request: async function (url) {
     if (url === "/api/departments") {
       return {
@@ -478,7 +478,7 @@ const departmentsRuntime = departmentsShim.load(
     "static/header_actions.js",
   ],
   {
-    AliceDispatcher: departmentsShim.window.AliceDispatcher,
+    LogosDispatcher: departmentsShim.window.LogosDispatcher,
   },
 );
 const departmentsButton = departmentsRuntime.document.getElementById("departments-btn");
@@ -490,7 +490,7 @@ if (!departmentsModal || !departmentsClose) {
   throw new Error("real departments modal controls must be created after click");
 }
 if (!departmentsModal.parentNode || departmentsModal.parentNode.id !== "app-root") {
-  throw new Error("real departments modal must mount inside .alice-pro-app");
+  throw new Error("real departments modal must mount inside .logos-pro-app");
 }
 if (
   departmentsClose.dataset.action !== "departments.close" ||
@@ -540,7 +540,7 @@ if (
 console.log("Real Dozzle click lifecycle passed");
 
 const sshShim = new BrowserShim(template);
-sshShim.window.AliceDispatcher = {
+sshShim.window.LogosDispatcher = {
   request: async function () {
     return {
       ok: true,
@@ -560,7 +560,7 @@ const sshRuntime = sshShim.load(
     "static/header_actions.js",
   ],
   {
-    AliceDispatcher: sshShim.window.AliceDispatcher,
+    LogosDispatcher: sshShim.window.LogosDispatcher,
   },
 );
 const sshButton = sshRuntime.document.getElementById("ssh-runtime-btn");
@@ -572,7 +572,7 @@ if (!sshModal || !sshClose) {
   throw new Error("real SSH runtime modal controls must be created after click");
 }
 if (!sshModal.parentNode || sshModal.parentNode.id !== "app-root") {
-  throw new Error("real SSH runtime modal must mount inside .alice-pro-app");
+  throw new Error("real SSH runtime modal must mount inside .logos-pro-app");
 }
 if (
   sshClose.dataset.action !== "modal.close" ||

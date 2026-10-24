@@ -12,7 +12,7 @@ class SSHRuntimeSettingsTests(unittest.TestCase):
         "allow_command_execution": True,
         "allow_write_operations": True,
         "max_output_bytes": 8192,
-        "known_hosts": "/srv/alice/ssh/known_hosts",
+        "known_hosts": "/srv/logos/ssh/known_hosts",
         "command_allowlist": [r"id(?:\s+-un)?", r"cat(?:\s+--)?\s+.*", r"sudo\s+.*"],
         "allow_privileged_operations": False,
         "approval_required_for_write": True,
@@ -21,11 +21,11 @@ class SSHRuntimeSettingsTests(unittest.TestCase):
             "preview": {
                 "host": "preview.example",
                 "port": 22,
-                "default_user": "alice-agent",
-                "allowed_users": ["alice-agent"],
-                "identity_map": {"owner-1": "alice-agent"},
-                "workspace_root": "/srv/alice",
-                "identity_file": "/srv/alice/keys/preview",
+                "default_user": "logos-agent",
+                "allowed_users": ["logos-agent"],
+                "identity_map": {"owner-1": "logos-agent"},
+                "workspace_root": "/srv/logos",
+                "identity_file": "/srv/logos/keys/preview",
                 "connect_timeout_seconds": 5,
                 "command_timeout_seconds": 30,
                 "max_output_bytes": 8192,
@@ -180,7 +180,7 @@ class SSHRuntimeSettingsTests(unittest.TestCase):
         set_config.side_effect = write
         settings = save_settings(self.BASE)
         self.assertEqual(settings["targets"]["preview"]["host"], "preview.example")
-        self.assertEqual(get_settings()["targets"]["preview"]["default_user"], "alice-agent")
+        self.assertEqual(get_settings()["targets"]["preview"]["default_user"], "logos-agent")
 
 
 if __name__ == "__main__":

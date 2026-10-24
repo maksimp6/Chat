@@ -206,7 +206,7 @@ def _project_search(args: dict, _user: Optional[str] = None) -> dict:
 def _register_project_read_tools() -> None:
     tools = [
         (
-            "alice_list_project_files",
+            "logos_list_project_files",
             "List project files",
             "List files and directories inside the Logos project.",
             {
@@ -218,7 +218,7 @@ def _register_project_read_tools() -> None:
             _project_list,
         ),
         (
-            "alice_read_project_file",
+            "logos_read_project_file",
             "Read project file",
             "Read a bounded UTF-8 file from the Logos project.",
             {
@@ -234,7 +234,7 @@ def _register_project_read_tools() -> None:
             _project_read,
         ),
         (
-            "alice_search_project",
+            "logos_search_project",
             "Search project code",
             "Search text inside the Logos project.",
             {
@@ -276,14 +276,14 @@ _register_project_read_tools()
 def _register_conversation_tools() -> None:
     tools = [
         (
-            "alice_list_conversations",
+            "logos_list_conversations",
             "List conversations",
             "List conversations owned by the authenticated Logos user.",
             {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
             _conversations,
         ),
         (
-            "alice_get_conversation",
+            "logos_get_conversation",
             "Get conversation",
             "Read one conversation owned by the authenticated Logos user.",
             {
@@ -295,7 +295,7 @@ def _register_conversation_tools() -> None:
             _conversation,
         ),
         (
-            "alice_get_conversation_messages",
+            "logos_get_conversation_messages",
             "Get conversation messages",
             "Read messages and persisted ExecutionTrace data for one owned conversation.",
             {
@@ -307,7 +307,7 @@ def _register_conversation_tools() -> None:
             _conversation_messages,
         ),
         (
-            "alice_get_execution",
+            "logos_get_execution",
             "Get execution",
             "Read one authenticated execution through the user-facing execution abstraction.",
             {
@@ -319,7 +319,7 @@ def _register_conversation_tools() -> None:
             _execution,
         ),
         (
-            "alice_get_execution_trace",
+            "logos_get_execution_trace",
             "Get execution trace",
             "Read sanitized ExecutionTrace for one authenticated execution.",
             {
@@ -357,21 +357,21 @@ _register_conversation_tools()
 def _register_bridge_tools() -> None:
     bridge_tools = [
         (
-            "alice_get_system_status",
+            "logos_get_system_status",
             "System status",
             "Read-only Logos runtime, MCP, model and local-tool status.",
             {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
             _system_status,
         ),
         (
-            "alice_list_agents",
+            "logos_list_agents",
             "List agents",
             "List AI agents currently registered in the Logos Agent Gateway.",
             {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
             _agents,
         ),
         (
-            "alice_get_session",
+            "logos_get_session",
             "Get session",
             "Read-only lifecycle status for one Logos runtime session.",
             {
@@ -383,7 +383,7 @@ def _register_bridge_tools() -> None:
             _session,
         ),
         (
-            "alice_get_invocation",
+            "logos_get_invocation",
             "Get invocation",
             "Read-only status and safe metadata for one Logos invocation.",
             {
@@ -395,7 +395,7 @@ def _register_bridge_tools() -> None:
             _invocation,
         ),
         (
-            "alice_get_invocation_trace",
+            "logos_get_invocation_trace",
             "Get invocation trace",
             "Read-only persisted ExecutionTrace for one Logos invocation.",
             {

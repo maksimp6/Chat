@@ -29,7 +29,7 @@ def test_chat_approval_and_metadata_use_owned_css_classes():
         "msg-meta-step",
         "msg-technical-details",
         "msg-technical-step",
-        "alice-trace-open-viewer",
+        "logos-trace-open-viewer",
     ):
         assert css_class in source
 
@@ -39,10 +39,10 @@ def test_trace_summary_module_loads_before_chat():
     assert "trace_summary.js" in template
     assert template.index("trace_summary.js") < template.index("chat.js")
     source = read("static/chat.js")
-    assert "window.AliceTraceSummary.build(traceObj)" in source
+    assert "window.LogosTraceSummary.build(traceObj)" in source
 
 
 def test_execution_surface_module_loads_before_chat():
     template = read("templates/index.html")
     assert template.index("execution_surface.js") < template.index("chat.js")
-    assert "window.AliceExecutionSurface.project(traceObj)" in read("static/chat.js")
+    assert "window.LogosExecutionSurface.project(traceObj)" in read("static/chat.js")

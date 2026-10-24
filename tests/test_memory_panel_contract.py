@@ -49,7 +49,7 @@ def test_memory_panel_is_idempotent_and_owns_bindings():
 
 def test_memory_panel_uses_dispatcher_for_all_transport():
     js = (ROOT / "static" / "memory_panel.js").read_text(encoding="utf-8")
-    assert "window.AliceDispatcher.request(" in js
+    assert "window.LogosDispatcher.request(" in js
     assert not re.search(r"(?<![A-Za-z0-9_.])fetch\s*\(", js)
 
 
@@ -63,5 +63,5 @@ def test_memory_button_has_real_binding_path():
     assert 'id="memoryModal"' in html
     assert 'data-action="modal.close"' in html
     assert "header.memory.open" not in header
-    assert "alice:modal:before-open" in panel
+    assert "logos:modal:before-open" in panel
     assert "window.loadMemoryData" in panel

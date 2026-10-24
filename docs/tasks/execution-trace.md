@@ -1,4 +1,4 @@
-# Alice Pro: единый Execution Trace и metadata
+# Logos Pro: единый Execution Trace и metadata
 
 ## Цель
 Реализовать современную систему трассировки выполнения `/api/chat`.

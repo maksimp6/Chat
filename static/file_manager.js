@@ -1,5 +1,5 @@
 window.fetchVectorStores = function () {
-  return window.AliceDispatcher.request("/api/vector-stores")
+  return window.LogosDispatcher.request("/api/vector-stores")
     .then(function (r) {
       return r
         .json()
@@ -53,7 +53,7 @@ window.fetchVectorStores = function () {
     var existing = document.getElementById("file-manager-modal");
     if (existing) existing.remove();
 
-    var CoreUI = window.AliceCoreAPI.ui;
+    var CoreUI = window.LogosCoreAPI.ui;
     var body = document.createElement("div");
     body.className = "file-manager-body";
     var ov = CoreUI.modal.create({
@@ -79,8 +79,8 @@ window.fetchVectorStores = function () {
       '        <h3 style="margin:0;font-size:15px;color:var(--m-text,#222);">Vector Stores</h3>',
       '        <div style="display:flex;gap:8px;">',
       '            <input id="vs-name-input" type="text" placeholder="Название..." style="padding:6px 10px;border:1px solid var(--m-border,#ddd);border-radius:4px;font-size:12px;background:var(--m-input-bg,#fff);color:var(--m-text,#222);width:160px;">',
-      '            <button id="btn-create-vs" type="button" class="alice-btn file-manager-vs-create-btn">+ Создать</button>',
-      '            <button id="btn-refresh-vs" type="button" class="alice-btn file-manager-vs-refresh-btn">Обновить</button>',
+      '            <button id="btn-create-vs" type="button" class="logos-btn file-manager-vs-create-btn">+ Создать</button>',
+      '            <button id="btn-refresh-vs" type="button" class="logos-btn file-manager-vs-refresh-btn">Обновить</button>',
       "        </div>",
       "    </div>",
       '    <div id="vs-manager-list" style="max-height:200px;overflow-y:auto;"></div>',
@@ -92,7 +92,7 @@ window.fetchVectorStores = function () {
       "</div>",
     ].join("");
 
-    (document.querySelector(".alice-pro-app") || document.body).appendChild(ov);
+    (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 
     function formatBytes(bytes) {
@@ -157,14 +157,14 @@ window.fetchVectorStores = function () {
 
         var addBtn = document.createElement("button");
         addBtn.type = "button";
-        addBtn.className = "alice-btn vs-add-files-btn file-manager-secondary-btn";
+        addBtn.className = "logos-btn vs-add-files-btn file-manager-secondary-btn";
         addBtn.dataset.id = vs.id || "";
         addBtn.dataset.name = vs.name || "";
         addBtn.textContent = "+ Файлы";
 
         var deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
-        deleteBtn.className = "alice-btn vs-delete-btn file-manager-danger-btn";
+        deleteBtn.className = "logos-btn vs-delete-btn file-manager-danger-btn";
         deleteBtn.dataset.id = vs.id || "";
         deleteBtn.textContent = "Удалить";
 
@@ -181,7 +181,7 @@ window.fetchVectorStores = function () {
           var original = this.textContent;
           this.textContent = "скопировано!";
           var self = this;
-          window.AliceCoreAPI.scheduler.defer(function () {
+          window.LogosCoreAPI.scheduler.defer(function () {
             self.textContent = original;
           }, 1500);
         });
@@ -200,7 +200,7 @@ window.fetchVectorStores = function () {
           if (!confirm("Удалить векторное хранилище?")) return;
           button.disabled = true;
           button.textContent = "...";
-          window.AliceDispatcher.request("/api/vector-stores/" + encodeURIComponent(vsId), {
+          window.LogosDispatcher.request("/api/vector-stores/" + encodeURIComponent(vsId), {
             method: "DELETE",
           })
             .then(function (response) {
@@ -242,7 +242,7 @@ window.fetchVectorStores = function () {
             '<div style="margin-bottom:8px;word-break:break-word;">' +
             window.SettingsUI.escapeHtml(message) +
             "</div>" +
-            '<button class="alice-btn file-manager-vs-refresh-btn" id="btn-retry-vs">Повторить</button>' +
+            '<button class="logos-btn file-manager-vs-refresh-btn" id="btn-retry-vs">Повторить</button>' +
             "</div>";
           var retry = document.getElementById("btn-retry-vs");
           if (retry) retry.addEventListener("click", loadVsList);
@@ -258,7 +258,7 @@ window.fetchVectorStores = function () {
       }
       this.disabled = true;
       this.innerText = "...";
-      window.AliceDispatcher.request("/api/vector-stores", {
+      window.LogosDispatcher.request("/api/vector-stores", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name }),
@@ -307,13 +307,13 @@ window.fetchVectorStores = function () {
       var confirm = document.createElement("button");
       confirm.type = "button";
       confirm.id = "vs-add-confirm";
-      confirm.className = "alice-btn file-manager-primary-btn";
+      confirm.className = "logos-btn file-manager-primary-btn";
       confirm.textContent = "Добавить выбранные файлы";
 
       panel.appendChild(header);
       panel.appendChild(fileListEl);
       panel.appendChild(confirm);
-      (document.querySelector(".alice-pro-app") || document.body).appendChild(bg);
+      (document.querySelector(".logos-pro-app") || document.body).appendChild(bg);
       CoreUI.modal.open(bg);
 
       function renderAddFilesState(message, isError) {
@@ -326,7 +326,7 @@ window.fetchVectorStores = function () {
 
       renderAddFilesState("Загрузка...", false);
 
-      window.AliceDispatcher.request("/api/files")
+      window.LogosDispatcher.request("/api/files")
         .then(function (r) {
           return r.json().then(function (data) {
             if (!r.ok) throw new Error((data && data.error) || "HTTP " + r.status);
@@ -380,7 +380,7 @@ window.fetchVectorStores = function () {
         confirm.disabled = true;
         confirm.textContent = "Добавление...";
 
-        window.AliceDispatcher.request(
+        window.LogosDispatcher.request(
           "/api/vector-stores/" + encodeURIComponent(vsId) + "/files",
           {
             method: "POST",
@@ -433,7 +433,7 @@ window.fetchVectorStores = function () {
           UI.escapeHtml(file.id.substring(0, 12)) +
           "...</code></div>",
         "</div>",
-        '<button class="alice-btn fm-delete-btn" data-id="' +
+        '<button class="logos-btn fm-delete-btn" data-id="' +
           UI.escapeHtml(file.id) +
           '">Удалить</button>',
       ].join("");
@@ -447,7 +447,7 @@ window.fetchVectorStores = function () {
           var orig = this.textContent;
           this.textContent = "скопировано!";
           var self = this;
-          window.AliceCoreAPI.scheduler.defer(function () {
+          window.LogosCoreAPI.scheduler.defer(function () {
             self.textContent = orig;
           }, 1500);
         });
@@ -459,7 +459,7 @@ window.fetchVectorStores = function () {
       list.innerHTML =
         '<div style="padding:20px;text-align:center;color:var(--m-muted,#999);">Загрузка списка файлов...</div>';
 
-      window.AliceDispatcher.request("/api/files")
+      window.LogosDispatcher.request("/api/files")
         .then(function (r) {
           return r.json();
         })
@@ -480,7 +480,7 @@ window.fetchVectorStores = function () {
               if (!confirm("Удалить файл? Он будет удалён из всех хранилищ.")) return;
               this.disabled = true;
               this.innerText = "...";
-              window.AliceDispatcher.request("/api/files/" + fileId, { method: "DELETE" })
+              window.LogosDispatcher.request("/api/files/" + fileId, { method: "DELETE" })
                 .then(function (r) {
                   return r.json();
                 })
@@ -541,7 +541,7 @@ window.fetchVectorStores = function () {
           formData.append("file", file);
           formData.append("purpose", "assistants");
 
-          window.AliceDispatcher.request("/api/files", { method: "POST", body: formData })
+          window.LogosDispatcher.request("/api/files", { method: "POST", body: formData })
             .then(function (r) {
               if (!r.ok)
                 return r.json().then(function (err) {
@@ -575,12 +575,12 @@ window.fetchVectorStores = function () {
     loadVsList();
     loadFiles();
   };
-  window.AliceCoreAPI.ui.actions.register("file-manager.close", function (payload) {
+  window.LogosCoreAPI.ui.actions.register("file-manager.close", function (payload) {
     var modal = payload.element.closest(".modal");
-    if (modal) window.AliceCoreAPI.ui.modal.close(modal);
+    if (modal) window.LogosCoreAPI.ui.modal.close(modal);
   });
-  window.AliceCoreAPI.ui.actions.register("file-manager.add.close", function (payload) {
+  window.LogosCoreAPI.ui.actions.register("file-manager.add.close", function (payload) {
     var modal = payload.element.closest(".modal");
-    if (modal) window.AliceCoreAPI.ui.modal.close(modal);
+    if (modal) window.LogosCoreAPI.ui.modal.close(modal);
   });
 })();

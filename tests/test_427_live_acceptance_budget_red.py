@@ -10,13 +10,13 @@ from pathlib import Path
 
 import pytest
 
-from alice_platform.config import load_config
+from logos_platform.config import load_config
 
 
 EXPECTED_IDLE_SECONDS = {
-    "alice": 60,
-    "alice-lab": 30,
-    "alice-browser": 30,
+    "logos": 60,
+    "logos-lab": 30,
+    "logos-browser": 30,
 }
 
 

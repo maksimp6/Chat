@@ -40,7 +40,7 @@ def test_hot_file_metric_ranks_repeated_source_churn_above_single_touch(tmp_path
     (repo / "hot.py").write_text("value = 1\n", encoding="utf-8")
     (repo / "tests").mkdir()
     (repo / "tests" / "test_hot.py").write_text("assert True\n", encoding="utf-8")
-    _commit(repo, "initial", "Alice", "alice@example.test")
+    _commit(repo, "initial", "Logos", "logos@example.test")
 
     for index in range(4):
         with (repo / "hot.py").open("a", encoding="utf-8") as handle:
@@ -52,7 +52,7 @@ def test_hot_file_metric_ranks_repeated_source_churn_above_single_touch(tmp_path
         _commit(
             repo,
             f"touch hot {index}",
-            "Alice" if index < 2 else "Codex",
+            "Logos" if index < 2 else "Codex",
             "agent@example.test",
         )
 
@@ -78,7 +78,7 @@ def test_hot_file_report_is_json_serializable(tmp_path):
     repo.mkdir()
     _git(repo, "init")
     (repo / "module.py").write_text("print('ok')\n", encoding="utf-8")
-    _commit(repo, "initial", "Alice", "alice@example.test")
+    _commit(repo, "initial", "Logos", "logos@example.test")
 
     report = analyze_repository(repo, commits=5)
 
@@ -108,7 +108,7 @@ def test_large_hot_file_is_split_candidate(tmp_path):
     _git(repo, "init")
     large = repo / "large.py"
     large.write_text("\n".join(f"value_{i} = {i}" for i in range(350)) + "\n", encoding="utf-8")
-    _commit(repo, "initial", "Alice", "alice@example.test")
+    _commit(repo, "initial", "Logos", "logos@example.test")
 
     for index in range(3):
         with large.open("a", encoding="utf-8") as handle:
@@ -130,12 +130,12 @@ def test_hot_file_metric_preserves_history_across_rename(tmp_path):
 
     old = repo / "old_name.py"
     old.write_text("\n".join(f"value_{i} = {i}" for i in range(320)) + "\n", encoding="utf-8")
-    _commit(repo, "initial old file", "Alice", "alice@example.test")
+    _commit(repo, "initial old file", "Logos", "logos@example.test")
 
     for index in range(3):
         with old.open("a", encoding="utf-8") as handle:
             handle.write(f"before_rename_{index} = {index}\n")
-        _commit(repo, f"touch old {index}", "Alice", "alice@example.test")
+        _commit(repo, f"touch old {index}", "Logos", "logos@example.test")
 
     _git(repo, "mv", "old_name.py", "new_name.py")
     _commit(repo, "rename hot file", "Codex", "codex@example.test")
@@ -167,7 +167,7 @@ def test_android_test_sources_are_excluded(tmp_path):
         "class MainInstrumentedTest\n",
         encoding="utf-8",
     )
-    _commit(repo, "android sources", "Alice", "alice@example.test")
+    _commit(repo, "android sources", "Logos", "logos@example.test")
 
     report = analyze_repository(repo, commits=5)
     paths = {row["path"] for row in report["files"]}

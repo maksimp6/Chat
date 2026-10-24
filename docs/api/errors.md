@@ -14,7 +14,7 @@ return problem(404, "conversation_not_found", "Диалог не найден")
 
 | Member | Meaning |
 |---|---|
-| `type` | `https://alice.pro/problems/<code>`; identifies the problem class |
+| `type` | `https://logos.pro/problems/<code>`; identifies the problem class |
 | `title` | Short Russian summary for people |
 | `status` | HTTP status, repeated in the body |
 | `detail` | Optional fixed explanation of what to do next |

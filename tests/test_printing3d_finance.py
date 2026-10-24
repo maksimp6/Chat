@@ -197,7 +197,7 @@ def test_month_profit_filters_currency_and_month(finance_db):
 
 @pytest.fixture
 def finance_client(finance_db, monkeypatch):
-    monkeypatch.setenv("ALICE_OWNER_ID", "finance-route-owner")
+    monkeypatch.setenv("LOGOS_OWNER_ID", "finance-route-owner")
     from app import app
 
     app.config.update(TESTING=True)
@@ -229,7 +229,7 @@ def test_finance_routes_cover_plan_status_and_errors(finance_client):
 
 
 def test_finance_routes_require_owner(finance_db, monkeypatch):
-    monkeypatch.delenv("ALICE_OWNER_ID", raising=False)
+    monkeypatch.delenv("LOGOS_OWNER_ID", raising=False)
     from app import app
 
     app.config.update(TESTING=True)

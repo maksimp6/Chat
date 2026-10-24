@@ -53,14 +53,14 @@ docs/notes/cloudru/
 ├── README.md
 ├── workflow-studio.md
 ├── container-apps.md
-├── deployment-for-alice.md
+├── deployment-for-logos.md
 └── ...
 ```
 
 На Google Drive:
 
 ```text
-Alice Pro/
+Logos Pro/
 └── Cloud.ru/
     ├── Конспекты/
     └── 90 — Markdown Mirror/

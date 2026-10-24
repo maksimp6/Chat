@@ -16,7 +16,7 @@
   }
 
   async function request(path, options = {}) {
-    const response = await window.AliceDispatcher.request(path, {
+    const response = await window.LogosDispatcher.request(path, {
       headers: { "Content-Type": "application/json", ...(options.headers || {}) },
       ...options,
     });
@@ -29,13 +29,13 @@
     let node = document.getElementById("environments-modal");
     if (node) return node;
 
-    const UI = window.AliceCoreAPI.ui;
+    const UI = window.LogosCoreAPI.ui;
     const body = document.createElement("div");
     body.className = "environments-body";
     body.innerHTML = [
       '<div class="environments-head"><div><p>Immutable branch runtimes</p></div>',
-      '<button class="alice-btn environments-refresh" type="button">Обновить</button></div>',
-      '<form class="environments-create"><input name="branch" placeholder="feature/my-branch" autocomplete="off" required><button class="alice-btn" type="submit">Создать</button></form>',
+      '<button class="logos-btn environments-refresh" type="button">Обновить</button></div>',
+      '<form class="environments-create"><input name="branch" placeholder="feature/my-branch" autocomplete="off" required><button class="logos-btn" type="submit">Создать</button></form>',
       '<div class="environments-status" aria-live="polite" hidden></div><div class="environments-list"></div>',
     ].join("");
 
@@ -47,7 +47,7 @@
       closeAction: "environments.close",
       body: body,
     });
-    (document.querySelector(".alice-pro-app") || document.body).appendChild(node);
+    (document.querySelector(".logos-pro-app") || document.body).appendChild(node);
     node.querySelector(".environments-refresh").onclick = load;
     node.querySelector(".environments-create").onsubmit = async (event) => {
       event.preventDefault();
@@ -101,17 +101,17 @@
               '<a href="',
               esc(env.url),
               '" target="_blank" rel="noopener">Открыть</a>',
-              '<button class="alice-btn" data-op="',
+              '<button class="logos-btn" data-op="',
               action,
               '" data-id="',
               esc(env.environment_id),
               '">',
               label,
               "</button>",
-              '<button class="alice-btn" data-op="restart" data-id="',
+              '<button class="logos-btn" data-op="restart" data-id="',
               esc(env.environment_id),
               '">Перезапуск</button>',
-              '<button class="alice-btn" data-op="delete" data-id="',
+              '<button class="logos-btn" data-op="delete" data-id="',
               esc(env.environment_id),
               '">Удалить</button>',
               "</div></article>",
@@ -149,13 +149,13 @@
   }
 
   function open() {
-    window.AliceCoreAPI.ui.modal.open(modal());
+    window.LogosCoreAPI.ui.modal.open(modal());
     load();
   }
 
-  window.AliceCoreAPI.ui.actions.register("environments.close", function (payload) {
+  window.LogosCoreAPI.ui.actions.register("environments.close", function (payload) {
     const node = payload.element.closest(".modal");
-    if (node) window.AliceCoreAPI.ui.modal.close(node);
+    if (node) window.LogosCoreAPI.ui.modal.close(node);
   });
 
   window.LogosEnvironments = { open, load };
@@ -165,7 +165,7 @@
     if (!header || document.getElementById("environments-btn")) return;
     const button = document.createElement("button");
     button.id = "environments-btn";
-    button.className = "alice-btn header-btn";
+    button.className = "logos-btn header-btn";
     button.title = "Environments";
     button.setAttribute("aria-label", "Environments");
     button.textContent = "🌿";

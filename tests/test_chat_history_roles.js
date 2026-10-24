@@ -21,7 +21,7 @@ function boot(routes = {}) {
       '<button id="mic-btn" type="button"></button>',
   );
   const { document, window } = browser;
-  window.AliceDispatcher = {
+  window.LogosDispatcher = {
     request: (url) => {
       const value = routes[url];
       if (value instanceof Error) return Promise.reject(value);
@@ -36,7 +36,7 @@ function boot(routes = {}) {
     window,
     document,
     console,
-    fetch: window.AliceDispatcher.request,
+    fetch: window.LogosDispatcher.request,
     localStorage: window.localStorage,
     setTimeout,
     clearTimeout,

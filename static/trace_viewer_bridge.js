@@ -34,7 +34,7 @@
       );
       var button = document.createElement("button");
       button.type = "button";
-      button.className = "alice-btn trace-viewer-auto-button";
+      button.className = "logos-btn trace-viewer-auto-button";
       button.textContent = isError ? "🔍 Трейс ошибки" : summaryText;
       button.title = isError ? "Открыть Execution Trace ошибки" : "Открыть Execution Trace viewer";
       button.onclick = function (event) {
@@ -71,7 +71,7 @@
 (function () {
   "use strict";
   var script = document.createElement("script");
-  script.src = (window.__ALICE_STATIC_BASE || "/static") + "/trace_download.js";
+  script.src = (window.__LOGOS_STATIC_BASE || "/static") + "/trace_download.js";
   script.defer = false;
   (document.head || document.documentElement).appendChild(script);
 })();

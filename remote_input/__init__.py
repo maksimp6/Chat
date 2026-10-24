@@ -1,4 +1,4 @@
-"""Alice Mouse isolated control module. No automatic root access."""
+"""Logos Mouse isolated control module. No automatic root access."""
 
 from remote_input.core import (
     Command,

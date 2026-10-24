@@ -40,21 +40,21 @@ _DEFAULTS = {
 
 
 def _env_bootstrap() -> dict[str, Any]:
-    raw = os.getenv("ALICE_SSH_TARGETS_JSON", "").strip()
+    raw = os.getenv("LOGOS_SSH_TARGETS_JSON", "").strip()
     targets: dict[str, Any] = {}
     if raw:
         try:
             parsed = json.loads(raw)
         except json.JSONDecodeError as exc:
-            raise SSHRuntimeError("ALICE_SSH_TARGETS_JSON is not valid JSON") from exc
+            raise SSHRuntimeError("LOGOS_SSH_TARGETS_JSON is not valid JSON") from exc
         if not isinstance(parsed, dict):
-            raise SSHRuntimeError("ALICE_SSH_TARGETS_JSON must be an object")
+            raise SSHRuntimeError("LOGOS_SSH_TARGETS_JSON must be an object")
         targets = parsed
 
     return {
         **copy.deepcopy(_DEFAULTS),
         "enabled": bool(targets),
-        "known_hosts": os.getenv("ALICE_SSH_KNOWN_HOSTS") or None,
+        "known_hosts": os.getenv("LOGOS_SSH_KNOWN_HOSTS") or None,
         "targets": targets,
     }
 

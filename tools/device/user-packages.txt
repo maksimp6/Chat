@@ -1,7 +1,7 @@
 # Пользовательские пакеты Redmi 9 (2026-10-14)
 # Источник: pm list packages -3; системных всего 328, отключённых 1
-com.alicepro.mobile
-com.alicepro.mobile.test
+com.logospro.mobile
+com.logospro.mobile.test
 com.beemdevelopment.aegis
 com.deepseek.chat
 com.github.andreyasadchy.xtra
@@ -16,14 +16,14 @@ com.termux.boot
 com.uptodown
 com.valvesoftware.android.steam.community
 com.valvesoftware.android.steam.friendsui
-com.yandex.aliceapp
+com.yandex.logosapp
 com.yandex.browser
 dedeadend.killmyapps
 io.github.forkmaintainers.iceraven
 io.github.romanvht.byedpi
 juloo.keyboard2
 me.biplobsd.rsm
-org.alice.pet
+org.logos.pet
 org.fdroid.fdroid
 org.telegram.messenger
 ru.agc.whosenumber

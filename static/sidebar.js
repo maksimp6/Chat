@@ -25,7 +25,7 @@ function initSidebar() {
       sidebar ? (sidebar.classList.contains("open") ? "true" : "false") : "false",
     );
     menuBtn.setAttribute("aria-controls", "sidebar");
-    window.AliceCoreAPI.ui.actions.register("sidebar.toggle", function () {
+    window.LogosCoreAPI.ui.actions.register("sidebar.toggle", function () {
       if (!sidebar) return;
       sidebar.classList.contains("open") ? closeSidebar() : openSidebar();
     });
@@ -40,9 +40,9 @@ function initSidebar() {
       if (modal) modal.classList.add("visible");
     });
   if (typeof renderSidebar === "function") renderSidebar();
-  if (window.__aliceSidebarHistoryBound !== true) {
+  if (window.__logosSidebarHistoryBound !== true) {
     window.addEventListener("popstate", handleHistoryNavigation);
-    window.__aliceSidebarHistoryBound = true;
+    window.__logosSidebarHistoryBound = true;
   }
 }
 
@@ -78,7 +78,7 @@ function renderSidebar() {
       e.stopPropagation();
       var newName = prompt("Новое имя диалога:", conv.title);
       if (newName && newName.trim() !== "") {
-        window.AliceDispatcher.request("/api/conversations/" + conv.id, {
+        window.LogosDispatcher.request("/api/conversations/" + conv.id, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title: newName.trim() }),
@@ -104,12 +104,12 @@ function renderSidebar() {
     });
 
     var delBtn = document.createElement("button");
-    delBtn.className = "alice-btn delete-btn";
+    delBtn.className = "logos-btn delete-btn";
     delBtn.textContent = "×";
     delBtn.addEventListener("click", function (e) {
       e.stopPropagation();
       if (confirm("Удалить этот диалог?")) {
-        window.AliceDispatcher.request("/api/conversations/" + conv.id, { method: "DELETE" })
+        window.LogosDispatcher.request("/api/conversations/" + conv.id, { method: "DELETE" })
           .then((r) => {
             if (!r.ok) throw new Error("Network response was not ok");
             deleteConv(conv.id);

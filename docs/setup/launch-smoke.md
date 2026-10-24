@@ -59,8 +59,8 @@ For the real provider path, inject the two values through the environment. Do
 not put them in shell history, Issues, pull requests, screenshots or artifacts.
 
 ```bash
-export ALICE_LAUNCH_SMOKE_YANDEX_API_KEY='...'
-export ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID='...'
+export LOGOS_LAUNCH_SMOKE_YANDEX_API_KEY='...'
+export LOGOS_LAUNCH_SMOKE_YANDEX_PROJECT_ID='...'
 python scripts/local_launch_smoke.py
 ```
 
@@ -68,7 +68,7 @@ The script uses a temporary native Kristall journal by default. To inspect persi
 against an explicit local path:
 
 ```bash
-python scripts/local_launch_smoke.py --offline --db-path /tmp/alice-launch-smoke.db
+python scripts/local_launch_smoke.py --offline --db-path /tmp/logos-launch-smoke.db
 ```
 
 ## GitHub Actions
@@ -84,8 +84,8 @@ when a manual workflow dispatch sets `live_provider=true`, checks out
 protected `master`, and maps the repository's existing Actions secrets into
 the smoke-only environment variable names:
 
-- `YANDEX_API_KEY` → `ALICE_LAUNCH_SMOKE_YANDEX_API_KEY`
-- `YANDEX_PROJECT_ID` → `ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID`
+- `YANDEX_API_KEY` → `LOGOS_LAUNCH_SMOKE_YANDEX_API_KEY`
+- `YANDEX_PROJECT_ID` → `LOGOS_LAUNCH_SMOKE_YANDEX_PROJECT_ID`
 
 Those secret names are already used by `.github/workflows/logos.yml`; this
 workflow does not create a second credential source. The secret mappings are

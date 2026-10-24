@@ -22,7 +22,7 @@ def test_status_never_returns_secret(monkeypatch, tmp_path):
     db.DB_PATH = str(tmp_path / "status.db")
     db.init_db()
     monkeypatch.setenv(
-        "ALICE_PROVIDER_CREDENTIAL_KEY",
+        "LOGOS_PROVIDER_CREDENTIAL_KEY",
         base64.urlsafe_b64encode(b"1" * 32).decode("ascii"),
     )
     monkeypatch.setattr(
@@ -62,8 +62,8 @@ def test_status_without_active_credentials_does_not_use_removed_config_key(monke
 
     db.DB_PATH = str(tmp_path / "status-empty.db")
     db.init_db()
-    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
-    monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "true")
+    monkeypatch.delenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", raising=False)
+    monkeypatch.setenv("LOGOS_REQUIRE_SHORT_TOKEN", "true")
     monkeypatch.delattr(routes.config, "API_KEY", raising=False)
 
     from flask import Flask
@@ -88,7 +88,7 @@ def test_update_validates_before_persisting_and_clears_frontend_contract(monkeyp
     db.DB_PATH = str(tmp_path / "update.db")
     db.init_db()
     monkeypatch.setenv(
-        "ALICE_PROVIDER_CREDENTIAL_KEY",
+        "LOGOS_PROVIDER_CREDENTIAL_KEY",
         base64.urlsafe_b64encode(b"2" * 32).decode("ascii"),
     )
     monkeypatch.setattr(
@@ -126,7 +126,7 @@ def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_pat
     db.DB_PATH = str(tmp_path / "reject.db")
     db.init_db()
     monkeypatch.setenv(
-        "ALICE_PROVIDER_CREDENTIAL_KEY",
+        "LOGOS_PROVIDER_CREDENTIAL_KEY",
         base64.urlsafe_b64encode(b"3" * 32).decode("ascii"),
     )
     monkeypatch.setattr(
@@ -163,8 +163,8 @@ def test_provider_credentials_rejects_remote_without_admin_token(monkeypatch, tm
 
     db.DB_PATH = str(tmp_path / "auth.db")
     db.init_db()
-    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
-    monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "false")
+    monkeypatch.delenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", raising=False)
+    monkeypatch.setenv("LOGOS_REQUIRE_SHORT_TOKEN", "false")
 
     from flask import Flask
 
@@ -187,9 +187,9 @@ def test_provider_credentials_accepts_explicit_admin_token(monkeypatch, tmp_path
 
     db.DB_PATH = str(tmp_path / "admin.db")
     db.init_db()
-    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "admin-test-token")
+    monkeypatch.setenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", "admin-test-token")
     monkeypatch.setenv(
-        "ALICE_PROVIDER_CREDENTIALS_KEY",
+        "LOGOS_PROVIDER_CREDENTIALS_KEY",
         base64.urlsafe_b64encode(b"4" * 32).decode("ascii"),
     )
     monkeypatch.setattr(
@@ -198,7 +198,7 @@ def test_provider_credentials_accepts_explicit_admin_token(monkeypatch, tmp_path
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
     monkeypatch.setattr(routes.config, "CLOUDRU_API_KEY", "", raising=False)
     monkeypatch.setenv(
-        "ALICE_PROVIDER_CREDENTIAL_KEY",
+        "LOGOS_PROVIDER_CREDENTIAL_KEY",
         base64.urlsafe_b64encode(b"4" * 32).decode("ascii"),
     )
 
@@ -223,8 +223,8 @@ def test_provider_credentials_status_check_requires_auth(monkeypatch, tmp_path):
 
     db.DB_PATH = str(tmp_path / "check-auth.db")
     db.init_db()
-    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
-    monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "false")
+    monkeypatch.delenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", raising=False)
+    monkeypatch.setenv("LOGOS_REQUIRE_SHORT_TOKEN", "false")
 
     from flask import Flask
 
@@ -247,7 +247,7 @@ def test_cloudru_bootstrap_rejects_expired_master_key(monkeypatch, tmp_path):
 
     db.DB_PATH = str(tmp_path / "expired-master.db")
     db.init_db()
-    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "admin-test-token")
+    monkeypatch.setenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", "admin-test-token")
 
     from flask import Flask
 
@@ -276,7 +276,7 @@ def test_cloudru_bootstrap_requires_existing_service_account(monkeypatch, tmp_pa
 
     db.DB_PATH = str(tmp_path / "service-account-required.db")
     db.init_db()
-    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "admin-test-token")
+    monkeypatch.setenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", "admin-test-token")
 
     from flask import Flask
 
@@ -304,9 +304,9 @@ def test_cloudru_bootstrap_does_not_enumerate_service_accounts(monkeypatch, tmp_
 
     db.DB_PATH = str(tmp_path / "bootstrap.db")
     db.init_db()
-    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "admin-test-token")
+    monkeypatch.setenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", "admin-test-token")
     monkeypatch.setenv(
-        "ALICE_PROVIDER_CREDENTIAL_KEY",
+        "LOGOS_PROVIDER_CREDENTIAL_KEY",
         base64.urlsafe_b64encode(b"5" * 32).decode("ascii"),
     )
 
@@ -366,7 +366,7 @@ def test_update_accepts_direct_cloudru_api_key(monkeypatch, tmp_path):
     db.DB_PATH = str(tmp_path / "cloudru-direct.db")
     db.init_db()
     monkeypatch.setenv(
-        "ALICE_PROVIDER_CREDENTIAL_KEY",
+        "LOGOS_PROVIDER_CREDENTIAL_KEY",
         base64.urlsafe_b64encode(b"6" * 32).decode("ascii"),
     )
 
@@ -417,7 +417,7 @@ def test_update_accepts_yandex_and_cloudru_keys_together(monkeypatch, tmp_path):
     db.DB_PATH = str(tmp_path / "both-providers.db")
     db.init_db()
     monkeypatch.setenv(
-        "ALICE_PROVIDER_CREDENTIAL_KEY",
+        "LOGOS_PROVIDER_CREDENTIAL_KEY",
         base64.urlsafe_b64encode(b"7" * 32).decode("ascii"),
     )
     validated = []

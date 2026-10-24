@@ -2,7 +2,7 @@
 # Independent Termux supervisor. No stop/restart of live RDC.
 set -euo pipefail
 umask 077
-RDC_HOME="${RDC_HOME:-$HOME/.alice-rdc}"
+RDC_HOME="${RDC_HOME:-$HOME/.logos-rdc}"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RDC_SCRIPT="${RDC_SCRIPT:-$SOURCE_DIR/termux-rdc.sh}"
 INTERVAL="${RDC_WATCHDOG_INTERVAL:-30}"

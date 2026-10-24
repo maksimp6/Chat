@@ -11,8 +11,8 @@ from agent_memory.client import close_memory_clients, get_memory_client
 
 
 def _configure(monkeypatch, tmp_path):
-    path = tmp_path / "alice.memory"
-    monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))
+    path = tmp_path / "logos.memory"
+    monkeypatch.setenv("LOGOS_MEMORY_PATH", str(path))
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "unused.db"))
     close_memory_clients()
     return path
@@ -87,13 +87,13 @@ def test_owned_conversations_are_filtered_by_owner(monkeypatch, tmp_path):
 
 
 def test_runtime_data_root_is_preserved(monkeypatch, tmp_path):
-    monkeypatch.delenv("ALICE_MEMORY_PATH", raising=False)
-    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "fallback" / "alice.db"))
+    monkeypatch.delenv("LOGOS_MEMORY_PATH", raising=False)
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "fallback" / "logos.db"))
     from runtime.request_context import bind_runtime_request
 
     root = tmp_path / "runtime"
     with bind_runtime_request("runtime-a", "/runtime-a", data_root=str(root)):
-        assert db.memory_file_path() == root / "alice.memory"
+        assert db.memory_file_path() == root / "logos.memory"
 
 
 def test_module_contains_no_sql_call():

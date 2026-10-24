@@ -110,7 +110,7 @@ def adapter(server, **kwargs):
     session = requests.Session()
     session.trust_env = False  # never route the local fake through an HTTP proxy
     return CloudRuObjectStorage(
-        "alice-bucket", endpoint=f"http://{host}:{port}/", session=session, **kwargs
+        "logos-bucket", endpoint=f"http://{host}:{port}/", session=session, **kwargs
     )
 
 
@@ -136,7 +136,7 @@ def test_sigv4_matches_aws_documented_example():
 
 
 def test_upload_download_and_list_round_trip(fake_s3):
-    storage = adapter(fake_s3, prefix="alice/files", clock=lambda: FIXED_NOW)
+    storage = adapter(fake_s3, prefix="logos/files", clock=lambda: FIXED_NOW)
 
     saved = storage.upload("reports/итог 1.txt", b"result", credentials=CREDS)
     storage.upload("reports/b.txt", b"bb", credentials=CREDS)
@@ -147,8 +147,8 @@ def test_upload_download_and_list_round_trip(fake_s3):
     assert saved.object_id == "reports/итог 1.txt"
     assert saved.name == "итог 1.txt"
     assert saved.size == 6
-    assert saved.location == "s3://alice-bucket/alice/files/reports/итог 1.txt"
-    assert ("alice-bucket", "alice/files/reports/итог 1.txt") in fake_s3.objects
+    assert saved.location == "s3://logos-bucket/logos/files/reports/итог 1.txt"
+    assert ("logos-bucket", "logos/files/reports/итог 1.txt") in fake_s3.objects
     assert storage.download("reports/итог 1.txt", credentials=CREDS) == b"result"
     assert [item.object_id for item in storage.list("reports", credentials=CREDS)] == [
         "reports/b.txt",
@@ -171,7 +171,7 @@ def test_upload_download_and_list_round_trip(fake_s3):
 
 def test_bucket_without_prefix_skips_directory_markers(fake_s3):
     storage = adapter(fake_s3)
-    fake_s3.objects[("alice-bucket", "folder/")] = b""
+    fake_s3.objects[("logos-bucket", "folder/")] = b""
     storage.upload(
         "folder/a.txt",
         b"a",
@@ -181,7 +181,7 @@ def test_bucket_without_prefix_skips_directory_markers(fake_s3):
     listed = storage.list(credentials=CREDS)
 
     assert [item.object_id for item in listed] == ["folder/a.txt"]
-    assert listed[0].location == "s3://alice-bucket/folder/a.txt"
+    assert listed[0].location == "s3://logos-bucket/folder/a.txt"
 
 
 def test_missing_object_and_rejected_credentials(fake_s3):
@@ -381,7 +381,7 @@ def test_dispatcher_uses_cloudru_adapter_with_resolved_credentials(fake_s3):
 
 
 def test_storage_provider_from_env(tmp_path, monkeypatch):
-    local = storage_provider_from_env({"ALICE_STORAGE_LOCAL_ROOT": str(tmp_path / "a")})
+    local = storage_provider_from_env({"LOGOS_STORAGE_LOCAL_ROOT": str(tmp_path / "a")})
     assert isinstance(local, LocalDirectoryStorage)
     assert (tmp_path / "a").is_dir()
 
@@ -391,8 +391,8 @@ def test_storage_provider_from_env(tmp_path, monkeypatch):
 
     cloud = storage_provider_from_env(
         {
-            "ALICE_STORAGE_PROVIDER": " CloudRU ",
-            "CLOUDRU_STORAGE_BUCKET": "alice",
+            "LOGOS_STORAGE_PROVIDER": " CloudRU ",
+            "CLOUDRU_STORAGE_BUCKET": "logos",
             "CLOUDRU_STORAGE_S3_ENDPOINT": "https://s3.example.test/",
             "CLOUDRU_STORAGE_REGION": "ru-test-1",
             "CLOUDRU_STORAGE_PREFIX": "prod",
@@ -404,13 +404,13 @@ def test_storage_provider_from_env(tmp_path, monkeypatch):
     assert cloud._prefix == "prod"
 
     with pytest.raises(StorageProviderUnavailable):
-        storage_provider_from_env({"ALICE_STORAGE_PROVIDER": "cloudru"})
+        storage_provider_from_env({"LOGOS_STORAGE_PROVIDER": "cloudru"})
     with pytest.raises(StorageProviderUnavailable):
-        storage_provider_from_env({"ALICE_STORAGE_PROVIDER": "gdrive"})
+        storage_provider_from_env({"LOGOS_STORAGE_PROVIDER": "gdrive"})
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("ALICE_STORAGE_PROVIDER", raising=False)
-    monkeypatch.delenv("ALICE_STORAGE_LOCAL_ROOT", raising=False)
+    monkeypatch.delenv("LOGOS_STORAGE_PROVIDER", raising=False)
+    monkeypatch.delenv("LOGOS_STORAGE_LOCAL_ROOT", raising=False)
     monkeypatch.setenv("CLOUDRU_STORAGE_BUCKET", "from-process")
     assert isinstance(storage_provider_from_env(), LocalDirectoryStorage)
     assert (tmp_path / "data" / "storage").is_dir()

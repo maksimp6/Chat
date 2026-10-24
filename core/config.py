@@ -33,23 +33,23 @@ def get_donation_url():
     Only absolute http/https URLs without embedded credentials are accepted so
     the header button can never be turned into a script or credential carrier.
     """
-    raw = (os.getenv("ALICE_DONATION_URL") or "").strip()
+    raw = (os.getenv("LOGOS_DONATION_URL") or "").strip()
     if not raw:
         return None
     if any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in raw):
-        logger.warning("ALICE_DONATION_URL ignored: contains whitespace or control characters")
+        logger.warning("LOGOS_DONATION_URL ignored: contains whitespace or control characters")
         return None
     try:
         parts = urlsplit(raw)
         hostname = parts.hostname
     except ValueError:
-        logger.warning("ALICE_DONATION_URL ignored: malformed URL")
+        logger.warning("LOGOS_DONATION_URL ignored: malformed URL")
         return None
     if parts.scheme.lower() not in {"http", "https"} or not hostname:
-        logger.warning("ALICE_DONATION_URL ignored: only absolute http/https URLs are allowed")
+        logger.warning("LOGOS_DONATION_URL ignored: only absolute http/https URLs are allowed")
         return None
     if parts.username is not None or parts.password is not None:
-        logger.warning("ALICE_DONATION_URL ignored: URLs with embedded credentials are not allowed")
+        logger.warning("LOGOS_DONATION_URL ignored: URLs with embedded credentials are not allowed")
         return None
     return raw
 
@@ -60,7 +60,7 @@ PORT = 8080
 TEXT_MODELS = {
     "logos-runtime": {
         "name": "Logos Runtime",
-        "upstream": "aliceai-llm",
+        "upstream": "logosai-llm",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.50,
@@ -97,7 +97,7 @@ TEXT_MODELS = {
     },
     "logos-runtime-flash": {
         "name": "Logos Runtime Flash",
-        "upstream": "aliceai-llm-flash",
+        "upstream": "logosai-llm-flash",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.10,
@@ -217,8 +217,8 @@ class Config:
 
 # Keys renamed in #1316. Stored conversations and older clients may still send them.
 LEGACY_MODEL_KEYS = {
-    "aliceai-llm": "logos-runtime",
-    "aliceai-llm-flash": "logos-runtime-flash",
+    "logosai-llm": "logos-runtime",
+    "logosai-llm-flash": "logos-runtime-flash",
 }
 
 

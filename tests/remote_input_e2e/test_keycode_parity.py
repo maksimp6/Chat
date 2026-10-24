@@ -1,4 +1,4 @@
-"""Cross-language keycode parity contract for combined Alice Input checkout.
+"""Cross-language keycode parity contract for combined Logos Input checkout.
 
 Requires Security #1090 and Keyboard #1091 to be integrated in this checkout.
 No Android device, root permissions, or actual input events are used.
@@ -29,7 +29,7 @@ def test_signed_verifier_and_c_keyboard_have_identical_keycode_policy():
 
     from remote_input.security.grants import GrantError, _validate_action_payload
 
-    with tempfile.TemporaryDirectory(prefix="alice-key-parity-") as directory:
+    with tempfile.TemporaryDirectory(prefix="logos-key-parity-") as directory:
         probe = Path(directory) / "keycodes.c"
         executable = Path(directory) / "keycodes"
         probe.write_text(

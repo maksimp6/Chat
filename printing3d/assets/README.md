@@ -1,8 +1,8 @@
-# Alice Pro · 3D-модели и исходники
+# Logos Pro · 3D-модели и исходники
 
 > **Галерея реальной геометрии**, созданная из сохранённых STL/3MF и исходных SCAD (не AI-картинки). [Issue #1112](https://github.com/maksimp6/Chat/issues/1112). **Пока только CAD-прототипы.**
 
-![Галерея шести моделей Alice Pro](gallery/overview.png)
+![Галерея шести моделей Logos Pro](gallery/overview.png)
 
 Каждая модель ниже имеет отдельное превью и ссылку на исходники. Используй каталог `models_manifest.json` для проверенных SHA-256 и учёта количества деталей. Исходные CAD-файлы из архивов сохранены без изменения байтов; файлы генераторов хранятся как `.py.txt`, чтобы Ruff не переформатировал оригинал. Для воспроизведения вне каталога скопируй и переименуй их обратно в `.py` в доверенном изолированном окружении. **Не запускай чужой CAD-код автоматически.**
 
@@ -12,7 +12,7 @@
 
 Это **не замена крепления принтера**. Печатный вал собирается из двух половинок, четырёх штифтов и внешнего стопора вокруг существующего штока. Номинал отверстия катушки 52,5 мм, контактный диаметр оси 51,7 мм, условный диаметр штатного штока 22 мм. **Все три значения требуют физического измерения перед печатью.**
 
-[Исходный генератор](oem_spindle_v03/source/alice_stock_spool_replacement_v03.py.txt) · [STEP CAD](oem_spindle_v03/cad/half_shell_A.step) · [STL-половинки](oem_spindle_v03/parts/a1mini_oem_wide_hub_HALF_A.stl) · [все детали](oem_spindle_v03/parts) · [калибры 18–24 мм](oem_spindle_v03/gauges) · [Инструкция](oem_spindle_v03/README_RU.md).
+[Исходный генератор](oem_spindle_v03/source/logos_stock_spool_replacement_v03.py.txt) · [STEP CAD](oem_spindle_v03/cad/half_shell_A.step) · [STL-половинки](oem_spindle_v03/parts/a1mini_oem_wide_hub_HALF_A.stl) · [все детали](oem_spindle_v03/parts) · [калибры 18–24 мм](oem_spindle_v03/gauges) · [Инструкция](oem_spindle_v03/README_RU.md).
 
 **Не путать:** существующий [PR #1110](https://github.com/maksimp6/Chat/pull/1110) содержит его отдельную неслайсенную сборку `.3mf`; бинарник не продублирован здесь. Тестирование фиксатора и нагрузки катушки **BLOCKED**.
 
@@ -22,7 +22,7 @@
 
 Это **отдельная настольная стойка**, а не накладка A1 mini. Нужны: основание ×1, А-образная опора ×2, ось ×1. Изображена сборка геометрии по исходным преобразованиям CAD. Корректность посадки и работа с полной катушкой до сих пор не проверены.
 
-[Исходник](desk_spool_v01/source/alice_pro_spool_holder_petg.py.txt) · [основание STL](desk_spool_v01/parts/base_frame.stl) · [опора STL](desk_spool_v01/parts/upright_A_print_twice.stl) · [ось STL](desk_spool_v01/parts/axle_D_section.stl) · [Инструкция](desk_spool_v01/README_RU.txt).
+[Исходник](desk_spool_v01/source/logos_pro_spool_holder_petg.py.txt) · [основание STL](desk_spool_v01/parts/base_frame.stl) · [опора STL](desk_spool_v01/parts/upright_A_print_twice.stl) · [ось STL](desk_spool_v01/parts/axle_D_section.stl) · [Инструкция](desk_spool_v01/README_RU.txt).
 
 ## 3. Центрирующие втулки для стойки · PETG v0.2
 
@@ -58,7 +58,7 @@
 
 ## Версии, проверка и границы
 
-- [catalog.json](catalog.json) — общий перечень 3D-наработок Alice Pro, расположение и дубли.
+- [catalog.json](catalog.json) — общий перечень 3D-наработок Logos Pro, расположение и дубли.
 - [models_manifest.json](models_manifest.json) — каждое сохранённое исходное имя, SHA-256, исходный архив, размеры STL и реальные превью.
 - Проверка: `python -m pytest -q tests/test_printing3d_asset_catalog.py tests/test_printing3d_asset_sources.py`.
 - `.scad`, `.step`, `.py.txt`, `.stl` и обычный `.3mf` — **не команды на печать**. Для принтера после слайсера нужен один проверенный `.gcode.3mf`, а запуск — только по отдельному явному разрешению.

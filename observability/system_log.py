@@ -20,7 +20,7 @@ from pathlib import Path
 
 from observability.trace_manager import get_current_trace
 
-ROOT_LOGGER_NAME = "alice"
+ROOT_LOGGER_NAME = "logos"
 DEFAULT_LOG_FILE = "system.jsonl"
 _MAX_BYTES = 5 * 1024 * 1024
 _BACKUPS = 3
@@ -29,7 +29,7 @@ _mirroring = threading.local()
 
 
 def log_dir() -> Path:
-    return Path(os.environ.get("ALICE_LOG_DIR", "logs"))
+    return Path(os.environ.get("LOGOS_LOG_DIR", "logs"))
 
 
 class TraceContextFilter(logging.Filter):
@@ -91,9 +91,9 @@ def configure(level: int | str | None = None, *, directory: Path | None = None) 
     """Install file, console and trace handlers once; safe to call repeatedly."""
     root = logging.getLogger(ROOT_LOGGER_NAME)
     with _lock:
-        if getattr(root, "_alice_configured", False):
+        if getattr(root, "_logos_configured", False):
             return root
-        resolved = level or os.environ.get("ALICE_LOG_LEVEL", "INFO")
+        resolved = level or os.environ.get("LOGOS_LOG_LEVEL", "INFO")
         root.setLevel(resolved)
         root.propagate = False
         formatter = JsonFormatter()
@@ -122,7 +122,7 @@ def configure(level: int | str | None = None, *, directory: Path | None = None) 
         mirror = TraceMirrorHandler()
         mirror.addFilter(context_filter)
         root.addHandler(mirror)
-        root._alice_configured = True  # type: ignore[attr-defined]
+        root._logos_configured = True  # type: ignore[attr-defined]
     return root
 
 

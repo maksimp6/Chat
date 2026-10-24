@@ -57,9 +57,9 @@ async function main() {
   };
 
   browser.load([path.join(ROOT, "static", "voice.js")], {
-    AliceDispatcher: dispatcher,
+    LogosDispatcher: dispatcher,
     fetch: () => {
-      throw new Error("voice.js must use AliceDispatcher instead of fetch");
+      throw new Error("voice.js must use LogosDispatcher instead of fetch");
     },
     Blob,
     MediaRecorder: FakeMediaRecorder,

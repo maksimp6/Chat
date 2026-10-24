@@ -27,7 +27,7 @@ class WatchdogTests(unittest.TestCase):
             home = Path(tmp)
             boot = home / ".termux" / "boot"
             boot.mkdir(parents=True)
-            original = boot / "20-alice-rdc"
+            original = boot / "20-logos-rdc"
             original.write_text("keep")
             env = dict(os.environ, HOME=tmp)
             result = subprocess.run(
@@ -38,7 +38,7 @@ class WatchdogTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 3)
             self.assertEqual(original.read_text(), "keep")
-            self.assertFalse((boot / "20-alice-rdc-watchdog").exists())
+            self.assertFalse((boot / "20-logos-rdc-watchdog").exists())
 
     def test_installer_is_idempotent(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -46,7 +46,7 @@ class WatchdogTests(unittest.TestCase):
             cmd = ["bash", str(ROOT / "install-rdc-watchdog.sh")]
             first = subprocess.run(cmd, env=env, capture_output=True)
             self.assertEqual(first.returncode, 0)
-            hook = Path(tmp) / ".termux" / "boot" / "20-alice-rdc-watchdog"
+            hook = Path(tmp) / ".termux" / "boot" / "20-logos-rdc-watchdog"
             contents = hook.read_bytes()
             second = subprocess.run(cmd, env=env, capture_output=True)
             self.assertEqual(second.returncode, 0)

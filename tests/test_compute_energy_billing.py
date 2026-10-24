@@ -8,8 +8,8 @@ from economy.compute_resources import build_compute_billing_item, get_energy_pri
 
 @pytest.fixture(autouse=True)
 def _clear_energy_env(monkeypatch):
-    monkeypatch.delenv("ALICE_CPU_WATTS_PER_CORE", raising=False)
-    monkeypatch.delenv("ALICE_ELECTRICITY_PRICE_RUB_PER_KWH", raising=False)
+    monkeypatch.delenv("LOGOS_CPU_WATTS_PER_CORE", raising=False)
+    monkeypatch.delenv("LOGOS_ELECTRICITY_PRICE_RUB_PER_KWH", raising=False)
 
 
 def test_energy_is_cpu_seconds_times_watts():
@@ -46,8 +46,8 @@ def test_unmeasured_cpu_time_is_not_billed():
 
 @pytest.mark.parametrize("raw", ["abc", "-1", "nan", "inf"])
 def test_invalid_env_values_are_ignored(monkeypatch, raw):
-    monkeypatch.setenv("ALICE_CPU_WATTS_PER_CORE", raw)
-    monkeypatch.setenv("ALICE_ELECTRICITY_PRICE_RUB_PER_KWH", raw)
+    monkeypatch.setenv("LOGOS_CPU_WATTS_PER_CORE", raw)
+    monkeypatch.setenv("LOGOS_ELECTRICITY_PRICE_RUB_PER_KWH", raw)
 
     assert get_energy_pricing() == {"watts_per_core": 15.0, "price_per_kwh": None}
 
@@ -112,7 +112,7 @@ def test_cpu_work_is_measured_at_recorded_work():
 
 
 def test_repeated_finalize_bills_compute_once(monkeypatch):
-    monkeypatch.setenv("ALICE_ELECTRICITY_PRICE_RUB_PER_KWH", "6")
+    monkeypatch.setenv("LOGOS_ELECTRICITY_PRICE_RUB_PER_KWH", "6")
     from observability.trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
@@ -126,7 +126,7 @@ def test_repeated_finalize_bills_compute_once(monkeypatch):
 
 
 def test_reading_snapshots_is_not_billed(monkeypatch):
-    monkeypatch.setenv("ALICE_ELECTRICITY_PRICE_RUB_PER_KWH", "6")
+    monkeypatch.setenv("LOGOS_ELECTRICITY_PRICE_RUB_PER_KWH", "6")
     from observability.trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()

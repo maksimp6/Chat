@@ -33,7 +33,7 @@ int remote_input_uinput_create(remote_input_uinput_device *d,const remote_input_
     setup.id.bustype=BUS_VIRTUAL;
     setup.id.vendor=0x1A11;
     setup.id.product=0x0002;
-    strncpy(setup.name,"Alice Virtual Keyboard",sizeof(setup.name)-1);
+    strncpy(setup.name,"Logos Virtual Keyboard",sizeof(setup.name)-1);
     if(ops->ioctl_device(ops->ctx,fd,UI_DEV_SETUP,&setup)<0)goto fail;
     if(ops->ioctl_device(ops->ctx,fd,UI_DEV_CREATE,NULL)<0)goto fail;
     d->created=1;

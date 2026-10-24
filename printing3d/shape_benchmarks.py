@@ -149,7 +149,7 @@ def _samples() -> dict[str, Coupon]:
 def encode_binary_stl(triangles: list[Triangle]) -> bytes:
     if len(triangles) > FACET_LIMIT:
         raise ValueError("too many facets")
-    data = bytearray(b"Alice Print Test geometry in mm; source-only".ljust(80, b"\0"))
+    data = bytearray(b"Logos Print Test geometry in mm; source-only".ljust(80, b"\0"))
     data += struct.pack("<I", len(triangles))
     for tri in triangles:
         a, b, c = tri

@@ -28,12 +28,12 @@ function renderApprovalCard(toolCall, origMsg) {
 
   const approveBtn = document.createElement("button");
   approveBtn.type = "button";
-  approveBtn.className = "alice-btn approval-btn approval-btn-approve";
+  approveBtn.className = "logos-btn approval-btn approval-btn-approve";
   approveBtn.textContent = "✓ Разрешить";
 
   const rejectBtn = document.createElement("button");
   rejectBtn.type = "button";
-  rejectBtn.className = "alice-btn approval-btn approval-btn-reject";
+  rejectBtn.className = "logos-btn approval-btn approval-btn-reject";
   rejectBtn.textContent = "✗ Отклонить";
 
   actions.appendChild(approveBtn);
@@ -56,10 +56,10 @@ function renderApprovalCard(toolCall, origMsg) {
       approval_token: toolCall.approval_token,
       original_message: origMsg,
     };
-    if (toolCall.name === "set_ui_theme" && window.AliceTheme) {
-      approvalPayload.current_theme = window.AliceTheme.getStored();
+    if (toolCall.name === "set_ui_theme" && window.LogosTheme) {
+      approvalPayload.current_theme = window.LogosTheme.getStored();
     }
-    window.AliceDispatcher.request("/api/mcp/execute-approved", {
+    window.LogosDispatcher.request("/api/mcp/execute-approved", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(approvalPayload),
@@ -325,14 +325,14 @@ function addMessage(
   msg.appendChild(bubble);
 
   const copyBtn = document.createElement("button");
-  copyBtn.className = "alice-btn copy-btn";
+  copyBtn.className = "logos-btn copy-btn";
   copyBtn.textContent = "📋";
   copyBtn.title = "Копировать";
 
   copyBtn.addEventListener("click", function () {
     navigator.clipboard.writeText(text).then(() => {
       copyBtn.textContent = "✅";
-      window.AliceCoreAPI.scheduler.defer(() => (copyBtn.textContent = "📋"), 2000);
+      window.LogosCoreAPI.scheduler.defer(() => (copyBtn.textContent = "📋"), 2000);
     });
   });
   msg.appendChild(copyBtn);
@@ -417,12 +417,12 @@ function addMessage(
       }
     }
     if (traceObj && typeof traceObj === "object" && Object.keys(traceObj).length > 0) {
-      if (window.AliceExecutionSurface) {
-        const surface = window.AliceExecutionSurface.project(traceObj);
-        if (surface) metaWrap.appendChild(window.AliceExecutionSurface.render(surface));
+      if (window.LogosExecutionSurface) {
+        const surface = window.LogosExecutionSurface.project(traceObj);
+        if (surface) metaWrap.appendChild(window.LogosExecutionSurface.render(surface));
       }
-      if (window.AliceTraceSummary && typeof window.AliceTraceSummary.build === "function") {
-        const technical = window.AliceTraceSummary.build(traceObj);
+      if (window.LogosTraceSummary && typeof window.LogosTraceSummary.build === "function") {
+        const technical = window.LogosTraceSummary.build(traceObj);
         if (technical && technical.items && technical.items.length > 0) {
           const technicalEl = document.createElement("details");
           technicalEl.className = "msg-meta-details msg-technical-details";
@@ -470,7 +470,7 @@ function addMessage(
       traceEl.dataset.traceViewerDirect = "1";
       const openTraceBtn = document.createElement("button");
       openTraceBtn.type = "button";
-      openTraceBtn.className = "alice-btn alice-trace-open-viewer";
+      openTraceBtn.className = "logos-btn logos-trace-open-viewer";
       openTraceBtn.textContent = "🔍 Открыть Trace Viewer";
       openTraceBtn.title = "Открыть Execution Trace viewer";
 
@@ -498,7 +498,7 @@ function loadHistory(convId) {
   const chatbox = document.getElementById("chatbox");
   if (!chatbox) return;
   chatbox.replaceChildren();
-  window.AliceDispatcher.request(`/api/conversations/${convId}/messages`)
+  window.LogosDispatcher.request(`/api/conversations/${convId}/messages`)
     .then((r) => r.json())
     .then((data) => {
       try {
@@ -562,7 +562,7 @@ document.addEventListener("DOMContentLoaded", function () {
       typeof window.getResponsesParams === "function" ? window.getResponsesParams() : {};
     const t0 = performance.now();
 
-    window.AliceDispatcher.request("/api/chat", {
+    window.LogosDispatcher.request("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -21,17 +21,17 @@
 | cloud | cloud/tools.py | 14 | cloud.resources.list/get, cloud.compute.list/status/start/stop/reboot, cloud.costs.summary, cloud.budget.status, cloud.metrics.query, cloud.logs.query, cloud.backup.create, cloud.ssh.exec, cloud.capabilities |
 | forge | forge/tools.py | 6 | printing3d.quote, printing3d.finance.assess/status/plan.set, printing3d.order.create, printing3d.orders.list, printing3d.treasury.summary |
 
-## Bridge-инструменты MCP-сервера (alice_*)
+## Bridge-инструменты MCP-сервера (logos_*)
 
 Определены в `mcp_server/tools.py`, доступны через MCP-эндпоинт Logos (streamable-http):
 
-- alice_get_system_status — статус рантайма, MCP, моделей и локальных тула;
-- alice_list_agents — агенты Agent Gateway (A2A);
-- alice_get_session — жизненный цикл сессии рантайма;
-- alice_get_invocation / alice_get_invocation_trace — статус и трассировка вызова;
-- alice_get_execution / alice_get_execution_trace — выполнение и трассировка;
-- alice_list_conversations / alice_get_conversation / alice_get_conversation_messages — переписки;
-- alice_list_project_files / alice_read_project_file / alice_search_project — файлы проекта (read-only).
+- logos_get_system_status — статус рантайма, MCP, моделей и локальных тула;
+- logos_list_agents — агенты Agent Gateway (A2A);
+- logos_get_session — жизненный цикл сессии рантайма;
+- logos_get_invocation / logos_get_invocation_trace — статус и трассировка вызова;
+- logos_get_execution / logos_get_execution_trace — выполнение и трассировка;
+- logos_list_conversations / logos_get_conversation / logos_get_conversation_messages — переписки;
+- logos_list_project_files / logos_read_project_file / logos_search_project — файлы проекта (read-only).
 
 ## Внешние MCP-серверы (deploy/)
 

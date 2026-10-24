@@ -1,7 +1,7 @@
 # External RDC call budget
 
 Refs #650 and #1131; on-demand observation belongs to #1088. This is an
-external connector budget, separate from Alice's Cloud.ru service health.
+external connector budget, separate from Logos's Cloud.ru service health.
 
 ## Evidence, 2026-10-11
 

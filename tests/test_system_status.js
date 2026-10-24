@@ -8,11 +8,11 @@ const ROOT = require("path").resolve(__dirname, "..");
 async function main() {
   const browser = new BrowserShim(
     '<button id="system-status-btn" type="button" data-action="system-status.toggle"></button>' +
-      '<div id="alice-system-status" hidden role="dialog">' +
-      '<div class="alice-system-status-content">' +
-      '<button class="alice-btn alice-system-status-close" type="button"></button>' +
-      '<h2 id="alice-system-status-title"></h2>' +
-      '<div class="alice-system-status-list"></div>' +
+      '<div id="logos-system-status" hidden role="dialog">' +
+      '<div class="logos-system-status-content">' +
+      '<button class="logos-btn logos-system-status-close" type="button"></button>' +
+      '<h2 id="logos-system-status-title"></h2>' +
+      '<div class="logos-system-status-list"></div>' +
       "</div></div>",
   );
   let requests = 0;
@@ -26,10 +26,10 @@ async function main() {
   browser.load(sourcePaths, { fetch: mockFetch, URL });
 
   const button = browser.document.getElementById("system-status-btn");
-  const panel = browser.document.getElementById("alice-system-status");
-  const close = panel.querySelector(".alice-system-status-close");
+  const panel = browser.document.getElementById("logos-system-status");
+  const close = panel.querySelector(".logos-system-status-close");
 
-  const core = browser.window.AliceCoreAPI;
+  const core = browser.window.LogosCoreAPI;
   assert.strictEqual(core.apiVersion, "1");
 
   const moduleContext = core.module.register({
@@ -80,7 +80,7 @@ async function main() {
   assert.strictEqual(panel.hasAttribute("hidden"), true);
   assert.strictEqual(button.getAttribute("aria-expanded"), "false");
 
-  const response = await browser.window.AliceDispatcher.request("/api/status");
+  const response = await browser.window.LogosDispatcher.request("/api/status");
   assert.strictEqual(response.status, 200);
   assert.strictEqual(requests, 1);
   assert.ok(JSON.stringify(core.status.snapshot()).includes("network"));

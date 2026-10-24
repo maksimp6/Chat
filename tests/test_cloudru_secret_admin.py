@@ -45,7 +45,7 @@ def test_admin_client_create_encodes_secret_without_returning_plaintext(monkeypa
 
     monkeypatch.setattr("requests.request", request)
     secret_id, version_id = client().create_secret(
-        name="alice-github",
+        name="logos-github",
         value="synthetic-secret",
     )
 

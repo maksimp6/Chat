@@ -1,6 +1,6 @@
 """Regression tests for agent_runtime/cli.py after retiring the Logos class names (#1316).
 
-The class names are internal, so they change. The wire model key and the ALICE_*
+The class names are internal, so they change. The wire model key and the LOGOS_*
 environment variables are compatibility contracts, so they must not change. The
 error-path tests cover every changed line, because CI requires 100% diff coverage.
 """
@@ -41,7 +41,7 @@ class _FakeClient:
         self._create_error = create_error
         self._send_error = send_error
 
-    def create_conversation(self, *, title="Alice Pro CLI"):
+    def create_conversation(self, *, title="Logos Pro CLI"):
         if self._create_error is not None:
             raise self._create_error
         return "conv-1"
@@ -63,8 +63,8 @@ def _client(response=None, error=None):
 def test_cli_classes_use_neutral_names():
     assert issubclass(cli.CliError, RuntimeError)
     assert isinstance(cli.CliClient, type)
-    assert not hasattr(cli, "AliceCliError")
-    assert not hasattr(cli, "AliceCliClient")
+    assert not hasattr(cli, "LogosCliError")
+    assert not hasattr(cli, "LogosCliClient")
 
 
 def test_default_model_key_is_unchanged_for_the_backend_contract():
@@ -72,7 +72,7 @@ def test_default_model_key_is_unchanged_for_the_backend_contract():
 
 
 def test_backend_receives_the_unchanged_model_key(monkeypatch):
-    monkeypatch.delenv("ALICE_MODEL", raising=False)
+    monkeypatch.delenv("LOGOS_MODEL", raising=False)
     session = _Session(_Response(200, {"id": "conv-1"}))
     client = cli.CliClient(base_url="http://backend.test", session=session)
 
@@ -82,9 +82,9 @@ def test_backend_receives_the_unchanged_model_key(monkeypatch):
 
 
 def test_logos_environment_variables_still_configure_the_client(monkeypatch):
-    monkeypatch.setenv("ALICE_BASE_URL", "http://env.test/")
-    monkeypatch.setenv("ALICE_SHORT_TOKEN", "  env-token  ")
-    monkeypatch.setenv("ALICE_MODEL", "env-model")
+    monkeypatch.setenv("LOGOS_BASE_URL", "http://env.test/")
+    monkeypatch.setenv("LOGOS_SHORT_TOKEN", "  env-token  ")
+    monkeypatch.setenv("LOGOS_MODEL", "env-model")
 
     client = cli.CliClient()
 
@@ -133,7 +133,7 @@ def test_missing_conversation_id_is_rejected():
 
 
 def test_main_reports_startup_failure(monkeypatch, capsys):
-    monkeypatch.delenv("ALICE_CONVERSATION_ID", raising=False)
+    monkeypatch.delenv("LOGOS_CONVERSATION_ID", raising=False)
     monkeypatch.setattr(cli, "CliClient", lambda: _FakeClient(create_error=cli.CliError("down")))
 
     cli.main()
@@ -142,7 +142,7 @@ def test_main_reports_startup_failure(monkeypatch, capsys):
 
 
 def test_main_reports_request_failure_and_exits_on_exit_command(monkeypatch, capsys):
-    monkeypatch.setenv("ALICE_CONVERSATION_ID", "conv-1")
+    monkeypatch.setenv("LOGOS_CONVERSATION_ID", "conv-1")
     monkeypatch.setattr(cli, "CliClient", lambda: _FakeClient(send_error=cli.CliError("nope")))
     answers = iter(["hello", "exit"])
     monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))

@@ -12,11 +12,11 @@ const fixtures = {
   const report = new BrowserShimScenarioRunner(fixtures).run([
     { action: "navigate", target: "composer" },
     { action: "inspect", target: "#message" },
-    { action: "fill", target: "#message", value: "Hello Alice" },
+    { action: "fill", target: "#message", value: "Hello Logos" },
     {
       action: "assert_state",
       target: "#message",
-      value: JSON.stringify({ exists: true, value: "Hello Alice", hidden: false }),
+      value: JSON.stringify({ exists: true, value: "Hello Logos", hidden: false }),
     },
     { action: "click", target: "#send" },
   ]);
@@ -24,7 +24,7 @@ const fixtures = {
   assert.equal(report.success, true);
   assert.equal(report.steps.length, 5);
   assert.equal(report.steps[0].data.url, "fixture://composer");
-  assert.equal(report.steps[3].data.value, "Hello Alice");
+  assert.equal(report.steps[3].data.value, "Hello Logos");
 })();
 
 (function testMissingTargetIsReported() {

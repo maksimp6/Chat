@@ -47,9 +47,9 @@ def plate_inspect(
     name = arguments.get("artifact_name")
     if type(name) is not str or not PRINT_ARTIFACT_NAME.fullmatch(name):
         raise ValueError("artifact_name must be one plain .3mf or .gcode.3mf filename")
-    root = os.environ.get("ALICE_3D_ARTIFACT_ROOT")
+    root = os.environ.get("LOGOS_3D_ARTIFACT_ROOT")
     if not root:
-        return {"status": "needs_configuration", "missing_fields": ["ALICE_3D_ARTIFACT_ROOT"]}
+        return {"status": "needs_configuration", "missing_fields": ["LOGOS_3D_ARTIFACT_ROOT"]}
     # Owner identity comes ONLY from authenticated universal context, never
     # the caller's arguments; hash it to prevent path traversal and PII leaks.
     owner = _trusted_owner(cfg)

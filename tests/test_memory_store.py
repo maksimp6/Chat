@@ -16,7 +16,7 @@ def _attempt_second_writer(path, result):
 
 
 def test_committed_values_survive_reopen(tmp_path):
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     with Kristall(path) as db:
         db.set("chats", "1", {"text": "hello"})
         assert db.last_commit.sequence == 1
@@ -25,7 +25,7 @@ def test_committed_values_survive_reopen(tmp_path):
 
 
 def test_transaction_rollback_does_not_persist(tmp_path):
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     with Kristall(path) as db:
         db.set("items", "safe", 1)
         with pytest.raises(ValueError):
@@ -39,7 +39,7 @@ def test_transaction_rollback_does_not_persist(tmp_path):
 
 
 def test_transaction_is_one_commit(tmp_path):
-    with Kristall(tmp_path / "alice.memory") as db:
+    with Kristall(tmp_path / "logos.memory") as db:
         with db.transaction() as tx:
             tx.set("items", "a", 1)
             tx.set("items", "b", 2)
@@ -48,7 +48,7 @@ def test_transaction_is_one_commit(tmp_path):
 
 
 def test_torn_journal_fails_closed(tmp_path):
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     with Kristall(path) as db:
         db.set("items", "a", 1)
     with path.open("ab") as stream:
@@ -58,7 +58,7 @@ def test_torn_journal_fails_closed(tmp_path):
 
 
 def test_second_process_cannot_write(tmp_path):
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     with Kristall(path):
         ctx = multiprocessing.get_context("spawn")
         result = ctx.Queue()
@@ -70,7 +70,7 @@ def test_second_process_cannot_write(tmp_path):
 
 
 def test_mutable_read_cannot_change_store(tmp_path):
-    with Kristall(tmp_path / "alice.memory") as db:
+    with Kristall(tmp_path / "logos.memory") as db:
         db.set("items", "a", {"x": [1]})
         copy = db.get("items", "a")
         copy["x"].append(2)
@@ -78,7 +78,7 @@ def test_mutable_read_cannot_change_store(tmp_path):
 
 
 def test_transaction_handle_is_closed_after_commit(tmp_path):
-    with Kristall(tmp_path / "alice.memory") as db:
+    with Kristall(tmp_path / "logos.memory") as db:
         with db.transaction() as tx:
             tx.set("items", "a", 1)
         with pytest.raises(KristallError, match="transaction is closed"):
@@ -89,7 +89,7 @@ def test_transaction_handle_is_closed_after_commit(tmp_path):
 
 
 def test_nested_transaction_is_rejected(tmp_path):
-    with Kristall(tmp_path / "alice.memory") as db:
+    with Kristall(tmp_path / "logos.memory") as db:
         with db.transaction() as outer:
             with pytest.raises(KristallError, match="nested transactions"):
                 with db.transaction():
@@ -99,7 +99,7 @@ def test_nested_transaction_is_rejected(tmp_path):
 
 
 def test_direct_mutation_cannot_overwrite_active_transaction(tmp_path):
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     with Kristall(path) as db:
         with db.transaction() as tx:
             tx.set("items", "transaction", 1)
@@ -118,7 +118,7 @@ def test_direct_mutation_cannot_overwrite_active_transaction(tmp_path):
 def test_journal_records_only_changed_values(tmp_path):
     import json
 
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     with Kristall(path) as db:
         db.set("items", "large", "x" * 10000)
         db.set("items", "small", "ok")
@@ -135,7 +135,7 @@ def test_journal_records_only_changed_values(tmp_path):
 
 
 def test_delta_transaction_delete_and_replay(tmp_path):
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     with Kristall(path) as db:
         db.set("items", "remove", 1)
         with db.transaction() as tx:
@@ -152,7 +152,7 @@ def test_commit_does_not_copy_complete_ram_state(tmp_path, monkeypatch):
     import kristall.store as memory_module
     from copy import deepcopy as original_deepcopy
 
-    with Kristall(tmp_path / "alice.memory") as db:
+    with Kristall(tmp_path / "logos.memory") as db:
         db.set("items", "large", ["x" * 128] * 100)
         committed = db._state
         seen = []
@@ -180,7 +180,7 @@ def test_json_encoder_failure_is_reported_as_kristall_error(tmp_path, monkeypatc
     def failing_dumps(*_args, **_kwargs):
         raise ValueError("encoder rejected value")
 
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     with Kristall(path) as db:
         monkeypatch.setattr(store_module.json, "dumps", failing_dumps)
         with pytest.raises(KristallError, match="unsupported JSON value") as info:
@@ -189,7 +189,7 @@ def test_json_encoder_failure_is_reported_as_kristall_error(tmp_path, monkeypatc
 
 
 def test_invalid_json_value_does_not_poison_writer(tmp_path):
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     with Kristall(path) as db:
         with pytest.raises(KristallError, match="unsupported JSON value"):
             db.set("items", "bad", object())
@@ -206,7 +206,7 @@ def test_failed_fsync_does_not_acknowledge_or_publish(tmp_path, monkeypatch):
     """A failed sync has an uncertain disk outcome: block further writes."""
     import kristall.store as memory_module
 
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     with Kristall(path) as db:
         db.set("items", "safe", 1)
 
@@ -224,7 +224,7 @@ def test_failed_fsync_does_not_acknowledge_or_publish(tmp_path, monkeypatch):
 
 
 def test_close_during_transaction_cannot_release_writer_lock(tmp_path):
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     db = Kristall(path)
     with db.transaction() as tx:
         with pytest.raises(KristallError, match="cannot close during active transaction"):
@@ -239,7 +239,7 @@ def test_close_during_transaction_cannot_release_writer_lock(tmp_path):
 
 
 def test_original_mapping_remains_immutable_until_commit(tmp_path):
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     with Kristall(path) as db:
         db.set("items", "a", {"nested": [1]})
         with db.transaction() as tx:
@@ -339,7 +339,7 @@ def test_backup_destination_creation_race_does_not_overwrite(tmp_path, monkeypat
     ],
 )
 def test_malformed_journal_fails_closed(tmp_path, malformed):
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     path.write_bytes(malformed)
     with pytest.raises(KristallError, match="corrupt committed journal"):
         Kristall(path)

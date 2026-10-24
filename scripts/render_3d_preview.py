@@ -391,7 +391,7 @@ def render_preview(mesh: Mesh) -> bytes:
     """Render three orthographic views; no printability inference."""
     image = Image.new("RGB", (1240, 490), (246, 248, 251))
     draw = ImageDraw.Draw(image)
-    draw.text((20, 16), "ALICE PRO   /   3D GEOMETRY PREVIEW", fill=(36, 49, 64))
+    draw.text((20, 16), "LOGOS PRO   /   3D GEOMETRY PREVIEW", fill=(36, 49, 64))
     for camera, x in (("ISOMETRIC", 20), ("TOP", 424), ("SIDE", 828)):
         _card(draw, mesh, camera, x)
     size = tuple(round(mesh.maximum[i] - mesh.minimum[i], 2) for i in range(3))

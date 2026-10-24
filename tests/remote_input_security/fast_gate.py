@@ -1,4 +1,4 @@
-"""Fast (<2s) fail-closed Alice Input emulation; never touches /dev/uinput.
+"""Fast (<2s) fail-closed Logos Input emulation; never touches /dev/uinput.
 
 This is an early developer feedback gate. The full pytest/C/SELinux
 acceptance suite remains mandatory and must not be replaced by this script.
@@ -294,7 +294,7 @@ def main() -> int:
     assert elapsed <= BUDGET_SECONDS, (
         f"2s fast gate exceeded: {elapsed:.3f}s; do not skip any security emulations"
     )
-    print(f"ALICE_INPUT_FAST PASS {checks} checks {elapsed:.3f}s (budget {BUDGET_SECONDS:.1f}s)")
+    print(f"LOGOS_INPUT_FAST PASS {checks} checks {elapsed:.3f}s (budget {BUDGET_SECONDS:.1f}s)")
     return 0
 
 

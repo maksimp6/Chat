@@ -18,7 +18,7 @@ import sys
 import tempfile
 import time
 
-HOME = Path.home() / ".alice-rdc"
+HOME = Path.home() / ".logos-rdc"
 CODE_FILE = HOME / "state" / "bambu-camera-code"
 PIN_FILE = HOME / "state" / "bambu-camera-cert.sha256"
 OUTPUT = HOME / "screenshots" / "a1-mini-latest.jpg"

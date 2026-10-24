@@ -35,7 +35,7 @@ def init_department_tables() -> None:
 
 
 def _admin_ok() -> bool:
-    expected = os.getenv("ALICE_DEPARTMENTS_ADMIN_TOKEN", "").strip()
+    expected = os.getenv("LOGOS_DEPARTMENTS_ADMIN_TOKEN", "").strip()
     supplied = request.headers.get("X-Department-Admin-Token", "").strip()
     return bool(expected and supplied and secrets.compare_digest(expected, supplied))
 

@@ -36,7 +36,7 @@ if __name__ == "__main__":
     ROOT = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(ROOT))
     fixture = Path(tempfile.mkdtemp(prefix="logos_probe_", dir=ROOT))
-    os.environ["ALICE_MEMORY_PATH"] = str(fixture / "audit.memory")
+    os.environ["LOGOS_MEMORY_PATH"] = str(fixture / "audit.memory")
     backup_dir = ROOT / ".safe_backups"
     backup_existed = backup_dir.exists()
     server = None

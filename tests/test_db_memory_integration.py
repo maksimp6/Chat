@@ -6,10 +6,10 @@ def setup_function():
 
 
 def test_memory_backend_core_persistence(monkeypatch):
-    monkeypatch.setenv("ALICE_DB_BACKEND", "memory")
+    monkeypatch.setenv("LOGOS_DB_BACKEND", "memory")
     db.init_db()
 
-    db.create_conversation("c1", "Новый чат", "alice-lite")
+    db.create_conversation("c1", "Новый чат", "logos-lite")
     db.add_message("c1", "user", "Привет 👋", timings=[{"name": "db"}], trace={"trace_id": "t1"})
     db.save_conv_settings("c1", {"temperature": 0.2})
     db.set_config("feature", {"enabled": True})
@@ -21,13 +21,13 @@ def test_memory_backend_core_persistence(monkeypatch):
     assert db.get_config("feature") == {"enabled": True}
 
     db.update_conversation_title("c1", "  Новое   имя  ")
-    db.update_conversation_model("c1", "alice-pro")
+    db.update_conversation_model("c1", "logos-pro")
     assert db.get_conversations()[0]["title"] == "Новое имя"
-    assert db.get_conversations()[0]["model"] == "alice-pro"
+    assert db.get_conversations()[0]["model"] == "logos-pro"
 
 
 def test_memory_backend_delete_conversation(monkeypatch):
-    monkeypatch.setenv("ALICE_DB_BACKEND", "memory")
+    monkeypatch.setenv("LOGOS_DB_BACKEND", "memory")
     db.init_db()
     db.create_conversation("c1", "Chat", "model")
     db.add_message("c1", "user", "text")
@@ -45,7 +45,7 @@ def test_memory_backend_does_not_expose_sql_connection(monkeypatch):
 
 
 def test_memory_backend_title_logic_and_config_string(monkeypatch):
-    monkeypatch.setenv("ALICE_DB_BACKEND", "memory")
+    monkeypatch.setenv("LOGOS_DB_BACKEND", "memory")
     db.init_db()
     db.create_conversation("c1", "Новый чат", "model")
 

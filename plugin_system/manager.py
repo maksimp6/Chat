@@ -99,7 +99,7 @@ class PluginRecord:
 
 class PluginManager:
     def __init__(self, root: str | os.PathLike[str] | None = None):
-        configured = root or os.environ.get("ALICE_PLUGIN_DIR", "plugins")
+        configured = root or os.environ.get("LOGOS_PLUGIN_DIR", "plugins")
         self.root = Path(configured).expanduser().resolve()
         self.records: dict[str, PluginRecord] = {}
 

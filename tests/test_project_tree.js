@@ -6,7 +6,7 @@ const { BrowserShim } = require("../browser/emulator/browser_dom");
   const loaded = shim.load(["static/core_api.js", "static/project_tree.js"], {
     fetch: async () => ({ ok: true, json: async () => ({ nodes: [] }) }),
   });
-  loaded.window.AliceDispatcher = {
+  loaded.window.LogosDispatcher = {
     request: async () => ({ ok: true, json: async () => ({ nodes: [] }) }),
   };
 
@@ -17,7 +17,7 @@ const { BrowserShim } = require("../browser/emulator/browser_dom");
   const loader = loaded.window.ProjectTree.load;
   await loader();
 
-  loaded.window.AliceDispatcher.request = async () => ({ ok: false, status: 503 });
+  loaded.window.LogosDispatcher.request = async () => ({ ok: false, status: 503 });
   await assert.rejects(loader, /HTTP 503/);
 
   console.log("project tree regression checks passed");

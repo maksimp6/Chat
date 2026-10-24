@@ -4,7 +4,7 @@ Implement GitHub issue #417 in this branch.
 
 ## Objective
 
-Build a first-class Cloud.ru provider for Alice Pro that manages Cloud.ru as a platform, not merely as a VM host.
+Build a first-class Cloud.ru provider for Logos Pro that manages Cloud.ru as a platform, not merely as a VM host.
 
 Do not create a VM-only integration. The design must support multiple Cloud.ru service domains and future cloud providers.
 
@@ -15,7 +15,7 @@ Create a provider-neutral cloud abstraction with a Cloud.ru implementation.
 Suggested structure:
 
 ```
-alice_app/providers/cloud/
+logos_app/providers/cloud/
 ├── base.py
 ├── registry.py
 ├── models.py
@@ -57,7 +57,7 @@ Implement a useful foundation covering:
 - Snapshot/backup entry point where supported.
 - Cost/usage summary where supported by available API.
 - SSH execution for commands inside VMs, clearly separated from infrastructure management.
-- Agent/tool exposure compatible with the current Alice tool loop.
+- Agent/tool exposure compatible with the current Logos tool loop.
 - Execution Trace integration.
 - Tests.
 - Documentation.

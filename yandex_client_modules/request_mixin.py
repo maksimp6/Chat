@@ -126,9 +126,9 @@ def _resolve_global_provider_credential(client, execution_trace=None):
     """Refresh auth from the deployment-wide credential store for each request."""
     if decrypt_secret is None or encrypt_secret is None:
         raise YandexClientError("Provider credential encryption is unavailable")
-    if not os.getenv("ALICE_PROVIDER_CREDENTIAL_KEY", "").strip():
+    if not os.getenv("LOGOS_PROVIDER_CREDENTIAL_KEY", "").strip():
         raise YandexClientError(
-            "ALICE_PROVIDER_CREDENTIAL_KEY is required for provider credentials"
+            "LOGOS_PROVIDER_CREDENTIAL_KEY is required for provider credentials"
         )
 
     conn = get_store()

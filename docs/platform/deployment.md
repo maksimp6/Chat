@@ -75,11 +75,11 @@ Set approval in environment:
 - name: Deploy production
   if: github.ref == 'refs/heads/master'
   env:
-    ALICE_APPROVE: ${{ secrets.ALICE_APPROVE }}
+    LOGOS_APPROVE: ${{ secrets.LOGOS_APPROVE }}
   run: python -m keel deploy --lane production
 ```
 
-The `ALICE_APPROVE` token is issued by:
+The `LOGOS_APPROVE` token is issued by:
 - Manual approval via GitHub
 - Automated approval system (if configured)
 - Deployment service (with restricted permissions)

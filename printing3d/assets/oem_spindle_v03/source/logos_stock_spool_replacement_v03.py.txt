@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Alice Pro A1 mini: temporary OEM holder wide-spindle conversion v0.3.
+"""Logos Pro A1 mini: temporary OEM holder wide-spindle conversion v0.3.
 
 Three printable components: two half-shells, one sprung outer locking collar
 and four optional alignment pins. Reuses factory mount and spindle.
@@ -143,7 +143,7 @@ def main():
     cli=argparse.ArgumentParser()
     cli.add_argument('--spool-bore',type=float,default=52.5)
     cli.add_argument('--spindle-od',type=float,default=22.0)
-    cli.add_argument('--out',type=Path,default=Path('/mnt/data/alice_stock_spool_replacement_v03'))
+    cli.add_argument('--out',type=Path,default=Path('/mnt/data/logos_stock_spool_replacement_v03'))
     args=cli.parse_args();out=args.out;out.mkdir(parents=True,exist_ok=True)
     halves1,halves2,geom=make_halves(args.spool_bore,args.spindle_od)
     shapes={
@@ -165,7 +165,7 @@ def main():
             cq.exporters.export(shape,str(out/(name+'.step')))
         except Exception as exc:print('STEP_SKIPPED',name,str(exc)[:100])
     report={
-        'name':'Alice Pro A1 mini stock holder wide hub conversion v0.3',
+        'name':'Logos Pro A1 mini stock holder wide hub conversion v0.3',
         'scope':'Temporary replacement of NARROW CONTACT SHAFT; OEM bracket and spindle retained',
         'material':'PETG', 'extruder_nozzle_mm':0.4,'unit':'mm',
         'fit_status':'UNVERIFIED - dimensional inputs must be measured on physical OEM holder and spool',
@@ -185,7 +185,7 @@ def main():
                           'Slicing PETG Bambu Studio not verified'],
     }
     (out/'report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
-    (out/'README_RU.md').write_text(f'''# Alice Pro: широкая ось на комплектном держателе A1 mini (PETG v0.3)
+    (out/'README_RU.md').write_text(f'''# Logos Pro: широкая ось на комплектном держателе A1 mini (PETG v0.3)
 
 Это **временная модернизация комплектного держателя**, НЕ замена заводской
 двухвинтовой монтажной пластины. Существующий шток и крепление остаются на принтере.
@@ -226,16 +226,16 @@ PETG, 0,2 мм слой, 4–5 стенок, 35–45% gyroid, широкая п�
 
 ## Лицензия и источники
 
-Параметрическая конструкция оригинальная для Alice Pro.
+Параметрическая конструкция оригинальная для Logos Pro.
 Монтажные свойства заводского крепления подтверждены официальной
 инструкцией Bambu Lab и карточкой запчасти; диаметры штока необходимо
 сверить физически.
 ''')
-    archive=out.parent/'alice_stock_spool_replacement_v03.zip'
+    archive=out.parent/'logos_stock_spool_replacement_v03.zip'
     with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
         for path in sorted(out.rglob('*')):
             if path.is_file():z.write(path,path.relative_to(out))
-        z.write(__file__,'alice_stock_spool_replacement_v03.py')
+        z.write(__file__,'logos_stock_spool_replacement_v03.py')
     print('OUTPUT_ZIP',archive,archive.stat().st_size,flush=True)
 
 if __name__=='__main__':main()

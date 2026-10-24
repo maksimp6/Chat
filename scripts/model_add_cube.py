@@ -1,4 +1,4 @@
-"""Deterministic, side-effect-limited 3D cube tool for Alice Pro.
+"""Deterministic, side-effect-limited 3D cube tool for Logos Pro.
 
 A geometry engine MVP: no printer calls, network, or arbitrary code execution.
 """
@@ -56,7 +56,7 @@ def model_addcube(size_mm: float = 20.0, *, output_dir: str | Path) -> CubeResul
         (3, 0, 4),
         (3, 4, 7),
     ]
-    body = bytearray(b"Alice Pro model.addcube".ljust(80, b" "))
+    body = bytearray(b"Logos Pro model.addcube".ljust(80, b" "))
     body.extend(struct.pack("<I", len(faces)))
     for face in faces:
         a, b, c = (vertices[i] for i in face)
@@ -73,7 +73,7 @@ def model_addcube(size_mm: float = 20.0, *, output_dir: str | Path) -> CubeResul
     digest = hashlib.sha256(body).hexdigest()
     directory = Path(output_dir)
     directory.mkdir(parents=True, exist_ok=True)
-    path = directory / ("alice_cube_" + str(size_mm).replace(".", "_") + "mm.stl")
+    path = directory / ("logos_cube_" + str(size_mm).replace(".", "_") + "mm.stl")
     path.write_bytes(body)
     if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
         raise OSError("STL verification failed")

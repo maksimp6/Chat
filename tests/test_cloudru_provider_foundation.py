@@ -62,7 +62,7 @@ def test_cloudru_client_maps_http_error_to_provider_error(monkeypatch):
 
 def test_cloudru_provider_lists_iam_service_accounts():
     iam = Mock()
-    iam.list_service_accounts.return_value = [{"id": "sa-1", "name": "Alice"}]
+    iam.list_service_accounts.return_value = [{"id": "sa-1", "name": "Logos"}]
 
     provider = CloudRuProvider(iam_client=iam)
     result = provider.list_resources(service="iam")
@@ -101,7 +101,7 @@ def test_cloudru_provider_parses_iam_api_keys_enabled_string_filter():
 
 def test_cloudru_provider_get_iam_service_account_by_id():
     iam = Mock()
-    iam.list_service_accounts.return_value = [{"id": "sa-1", "name": "Alice"}]
+    iam.list_service_accounts.return_value = [{"id": "sa-1", "name": "Logos"}]
     provider = CloudRuProvider(iam_client=iam)
     result = provider.get_resource(
         service="iam", resource_type="service_account", resource_id="sa-1"

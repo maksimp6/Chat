@@ -12,7 +12,7 @@ import struct
 import subprocess
 
 ENV = dict(os.environ, TMPDIR="/data/data/com.termux/files/usr/tmp")
-DEFAULT_IMAGE = Path.home() / ".alice-rdc/screenshots/latest.jpg"
+DEFAULT_IMAGE = Path.home() / ".logos-rdc/screenshots/latest.jpg"
 
 
 def recognize(image: Path, minimum: float = 60.0) -> list[dict]:

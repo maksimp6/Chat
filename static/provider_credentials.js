@@ -105,7 +105,7 @@
   async function fetchStatus(output) {
     output.textContent = "Проверка…";
     try {
-      var response = await window.AliceDispatcher.request("/api/provider-credentials/status", {
+      var response = await window.LogosDispatcher.request("/api/provider-credentials/status", {
         cache: "no-store",
         credentials: "same-origin",
       });
@@ -119,7 +119,7 @@
 
   function build() {
     if (document.getElementById("provider-credentials-modal")) return;
-    var UI = window.AliceCoreAPI.ui;
+    var UI = window.LogosCoreAPI.ui;
     var body = document.createElement("div");
     body.className = "provider-credentials-body";
     var modal = UI.modal.create({
@@ -153,7 +153,7 @@
     actions.className = "provider-credentials-actions";
     var save = document.createElement("button");
     save.textContent = "Подключить";
-    save.className = "alice-btn btn-primary";
+    save.className = "logos-btn btn-primary";
     save.addEventListener("click", async function () {
       var y = document.getElementById("provider-yandex-key").value.trim();
       var project = document.getElementById("provider-yandex-project").value.trim();
@@ -181,7 +181,7 @@
           body.yandex_project_id = project;
         }
         if (cloudru) body.cloudru_api_key = cloudru;
-        var response = await window.AliceDispatcher.request("/api/provider-credentials", {
+        var response = await window.LogosDispatcher.request("/api/provider-credentials", {
           method: "PUT",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
@@ -218,19 +218,19 @@
     output.id = "provider-credentials-status";
     output.className = "provider-credentials-status";
     box.appendChild(output);
-    var app = document.querySelector(".alice-pro-app");
+    var app = document.querySelector(".logos-pro-app");
     (app || document.body).appendChild(modal);
   }
 
-  window.AliceCoreAPI.ui.actions.register("provider-credentials.close", function (payload) {
+  window.LogosCoreAPI.ui.actions.register("provider-credentials.close", function (payload) {
     var modal = payload.element.closest(".modal");
-    if (modal) window.AliceCoreAPI.ui.modal.close(modal);
+    if (modal) window.LogosCoreAPI.ui.modal.close(modal);
   });
 
   window.openProviderCredentialsModal = async function () {
     build();
     var modal = document.getElementById("provider-credentials-modal");
-    window.AliceCoreAPI.ui.modal.open(modal);
+    window.LogosCoreAPI.ui.modal.open(modal);
     var output = document.getElementById("provider-credentials-status");
     await fetchStatus(output);
   };

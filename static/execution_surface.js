@@ -3,7 +3,7 @@
 
   // Read-only projection of a sanitized ExecutionTrace. Only whitelisted metadata
   // is copied out: never prompts, payloads, tool arguments or credentials.
-  var SCHEMA = "alice.execution_surface.v1";
+  var SCHEMA = "logos.execution_surface.v1";
 
   var STATE_LABELS = {
     working: "⏳ Выполняется",
@@ -242,7 +242,7 @@
     return root;
   }
 
-  window.AliceExecutionSurface = Object.freeze({
+  window.LogosExecutionSurface = Object.freeze({
     SCHEMA: SCHEMA,
     project: project,
     render: render,

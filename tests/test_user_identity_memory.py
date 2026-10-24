@@ -10,8 +10,8 @@ from kristall.store import KristallError
 
 
 def _configure(monkeypatch, tmp_path):
-    path = tmp_path / "alice.memory"
-    monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))
+    path = tmp_path / "logos.memory"
+    monkeypatch.setenv("LOGOS_MEMORY_PATH", str(path))
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "unused.db"))
     close_memory_clients()
     return path

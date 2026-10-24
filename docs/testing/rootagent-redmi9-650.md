@@ -11,7 +11,7 @@ Hardware observations, through the existing authorized RDC channel:
 - Termux `su -c 'id -u'` and explicitly quoted ADB `shell "su -c 'id -u'"` returned `0`.
 - Root command lookup found `/system/bin/uiautomator`, `screencap`, `base64`, `dumpsys`.
 - `dumpsys window` reported `isKeyguardShowing=true`. No screen capture or UI hierarchy was requested while locked.
-- `pm list packages`, `pm path com.alicepro.mobile`, and `dumpsys package com.alicepro.mobile` show that Alice Pro is not installed. Thus there is no installed Alice version or APK commit to attest.
+- `pm list packages`, `pm path com.logospro.mobile`, and `dumpsys package com.logospro.mobile` show that Logos Pro is not installed. Thus there is no installed Logos version or APK commit to attest.
 - RootAgent port 8766 has no listener. Curl status `000` is a connection failure, not an HTTP response from RootAgent.
 - Existing Live Server PID 19175 stayed running. Authenticated `/health` and `/status` returned 200; anonymous `/health` returned 401. RDC was not restarted.
 
@@ -51,8 +51,8 @@ First identify the built artifact's source SHA, versionCode, versionName, signin
 adb -s <existing-redmi9-transport> shell am instrument -w \
   -e expectedVersionName <exact-apk-version-name> \
   -e expectedVersionCode <exact-apk-version-code> \
-  -e class com.alicepro.mobile.rootagent.RootAgentHardwareTest#testAuthorizationAndReadOnlyMetadata \
-  com.alicepro.mobile.test/androidx.test.runner.AndroidJUnitRunner
+  -e class com.logospro.mobile.rootagent.RootAgentHardwareTest#testAuthorizationAndReadOnlyMetadata \
+  com.logospro.mobile.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
 Run the same command with `#testLockedScreenReturns423WithoutContent` when already locked and `#testUnlockedXmlAndDecodedPng` when already unlocked by the owner. A wrong state fails; it is not skipped and does not trigger input. Do not run the whole class as one acceptance pass: locked and unlocked tests require different physical states.

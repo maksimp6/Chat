@@ -10,11 +10,11 @@ import secrets
 import subprocess
 import sys
 
-ROOT = pathlib.Path.home() / ".alice-rdc" / "screenshots"
+ROOT = pathlib.Path.home() / ".logos-rdc" / "screenshots"
 ENV = dict(os.environ, TMPDIR="/data/data/com.termux/files/usr/tmp")
 POLICY = pathlib.Path(
     os.environ.get(
-        "ALICE_LIVE_DEVICE_POLICY", str(pathlib.Path.home() / ".alice-rdc" / "live-device.json")
+        "LOGOS_LIVE_DEVICE_POLICY", str(pathlib.Path.home() / ".logos-rdc" / "live-device.json")
     )
 )
 

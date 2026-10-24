@@ -7,7 +7,7 @@ Every hour `.github/workflows/agent-observer.yml` runs it. It:
 
 1. reads open issues and pull requests, plus the ones closed in the last day;
 2. builds one chronological thread per item from its GitHub timeline, naming the
-   agent behind each step (bot logins, `claude/`/`codex/`/`copilot/`/`alice/`
+   agent behind each step (bot logins, `claude/`/`codex/`/`copilot/`/`logos/`
    branch prefixes, and the Claude Code footer on posts made with the owner's
    token);
 3. flags stuck work: red CI, merge conflicts, a ready PR without a Copilot review

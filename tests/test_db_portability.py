@@ -12,7 +12,7 @@ def native_store(tmp_path, monkeypatch):
     import storage.db as db
 
     path = tmp_path / "native.memory"
-    monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))
+    monkeypatch.setenv("LOGOS_MEMORY_PATH", str(path))
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "unused.db"))
     close_memory_clients()
     yield path

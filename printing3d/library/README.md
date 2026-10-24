@@ -1,4 +1,4 @@
-# Alice 3D Model Library
+# Logos 3D Model Library
 
 Versioned catalog of printable 3D models. No binaries or models are invented by this index.
 

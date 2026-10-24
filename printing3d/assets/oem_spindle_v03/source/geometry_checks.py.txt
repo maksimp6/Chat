@@ -2,7 +2,7 @@ import json, tempfile, math
 from pathlib import Path
 import cadquery as cq
 import trimesh
-from alice_stock_spool_replacement_v03 import make_halves, snap_ring, fit_gauge, export_checked
+from logos_stock_spool_replacement_v03 import make_halves, snap_ring, fit_gauge, export_checked
 
 with tempfile.TemporaryDirectory() as td:
     for core in [52.5, 55.0]:

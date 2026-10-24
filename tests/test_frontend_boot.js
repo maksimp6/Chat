@@ -54,7 +54,7 @@ vm.runInNewContext(source, context, { filename: "static/boot.js" });
 assert(logs.some((item) => item[0] === "info" && String(item[1]).includes("hello")));
 assert.equal(typeof listeners.error, "function");
 assert.equal(typeof listeners.unhandledrejection, "function");
-assert.equal(typeof context.window.AliceBoot.markShellReady, "function");
+assert.equal(typeof context.window.LogosBoot.markShellReady, "function");
 
 let diagnostic;
 context.window.dispatchEvent = (event) => {
@@ -77,13 +77,13 @@ assert.equal(diagnostic.detail.message, "promise boom");
 listeners.error({ target: { dataset: { criticalScript: "dispatcher" } } });
 assert.equal(diagnostic.detail.event, "critical_script_failed");
 assert.equal(diagnostic.detail.script, "dispatcher");
-assert.deepEqual(Array.from(context.window.AliceBoot.failedCriticalScripts()), ["dispatcher"]);
-assert.equal(context.window.AliceBoot.markShellReady(), false);
+assert.deepEqual(Array.from(context.window.LogosBoot.failedCriticalScripts()), ["dispatcher"]);
+assert.equal(context.window.LogosBoot.markShellReady(), false);
 assert.equal(statusElement.hidden, false);
 assert.equal(rootAttributes["data-enhancement-state"], "degraded");
 
 listeners.error({ error: new Error("core crashed"), filename: "/static/core.js?v=1" });
-assert.deepEqual(Array.from(context.window.AliceBoot.failedCriticalScripts()), [
+assert.deepEqual(Array.from(context.window.LogosBoot.failedCriticalScripts()), [
   "dispatcher",
   "core",
 ]);

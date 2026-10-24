@@ -58,7 +58,7 @@ def _now() -> int:
 
 
 def _repo_root() -> Path:
-    return Path(os.environ.get("ALICE_ENV_REPO_ROOT") or os.getcwd()).resolve()
+    return Path(os.environ.get("LOGOS_ENV_REPO_ROOT") or os.getcwd()).resolve()
 
 
 def _run_git(*args: str, cwd: Optional[Path] = None) -> str:
@@ -162,7 +162,7 @@ def _require(environment_id: str, owner_id: Optional[str] = None) -> Dict[str, A
 
 
 def _public_url(environment_id: str) -> str:
-    base = os.environ.get("ALICE_ENV_PUBLIC_BASE_URL", "").rstrip("/")
+    base = os.environ.get("LOGOS_ENV_PUBLIC_BASE_URL", "").rstrip("/")
     if base:
         return f"{base}/environments/{environment_id}/"
     return f"/environments/{environment_id}/"
@@ -286,7 +286,7 @@ class EnvironmentRuntime:
         self.environment = environment
         self.runtime_id = environment["environment_id"]
         self.root = Path(
-            os.environ.get("ALICE_ENV_RUNTIME_ROOT") or ".alice-environments"
+            os.environ.get("LOGOS_ENV_RUNTIME_ROOT") or ".logos-environments"
         ).resolve()
         self.worktree = self.root / self.runtime_id / "source"
         self.data_dir = self.root / self.runtime_id / "data"
@@ -299,7 +299,7 @@ class EnvironmentRuntime:
         self._jobs: queue.Queue = queue.Queue()
         self._thread = threading.Thread(
             target=self._run,
-            name=f"alice-runtime-{self.runtime_id[:8]}",
+            name=f"logos-runtime-{self.runtime_id[:8]}",
             daemon=True,
         )
         self._stream_lock = threading.RLock()
@@ -367,7 +367,7 @@ class EnvironmentRuntime:
             _RUNTIME_DISPATCHER.unregister_runtime(self.runtime_id)
             from agent_memory.client import close_memory_clients
 
-            close_memory_clients(self.data_dir / "alice.memory")
+            close_memory_clients(self.data_dir / "logos.memory")
             raise
 
     def submit(
@@ -440,7 +440,7 @@ class EnvironmentRuntime:
         _RUNTIME_DISPATCHER.unregister_runtime(self.runtime_id)
         from agent_memory.client import close_memory_clients
 
-        close_memory_clients(self.data_dir / "alice.memory")
+        close_memory_clients(self.data_dir / "logos.memory")
 
     def remove(self) -> None:
         if self.worktree.exists():

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "models": [
     {
-      "archive": "alice_stock_spool_replacement_v03.zip",
+      "archive": "logos_stock_spool_replacement_v03.zip",
       "source_archive_sha256": "d9fd89a55b00315211cbf72c904672c6c5523ec09c6d1897bfedc0a6ddc9c6b1",
       "name": "OEM A1 mini: широкий вал v0.3",
       "status": "fit_blocked",
@@ -16,8 +16,8 @@
       },
       "members_manifest": [
         {
-          "path": "printing3d/assets/oem_spindle_v03/source/alice_stock_spool_replacement_v03.py.txt",
-          "original_archive_member": "alice_stock_spool_replacement_v03.py",
+          "path": "printing3d/assets/oem_spindle_v03/source/logos_stock_spool_replacement_v03.py.txt",
+          "original_archive_member": "logos_stock_spool_replacement_v03.py",
           "bytes": 13335,
           "sha256": "d54d00b291a82d662535b93924ad301deeb31d7a2493b50befd4b294a01ff189"
         },
@@ -183,7 +183,7 @@
       "preview_sha256": "e533fa6111c84930fccd55904937763319b0d14412c4359623d546f8cc03df7b"
     },
     {
-      "archive": "alice_petg_spool_holder_v01.zip",
+      "archive": "logos_petg_spool_holder_v01.zip",
       "source_archive_sha256": "d962f12a287d0d13eef1397343c3d7d6186c5e61e11880e25560699627c0c7c3",
       "name": "Настольный держатель катушки v0.1",
       "status": "dry_fit_needed",
@@ -196,8 +196,8 @@
       },
       "members_manifest": [
         {
-          "path": "printing3d/assets/desk_spool_v01/source/alice_pro_spool_holder_petg.py.txt",
-          "original_archive_member": "alice_pro_spool_holder_petg.py",
+          "path": "printing3d/assets/desk_spool_v01/source/logos_pro_spool_holder_petg.py.txt",
+          "original_archive_member": "logos_pro_spool_holder_petg.py",
           "bytes": 6326,
           "sha256": "59007118feaf33bbd04d2ba4edd696d804d419b3755a5d21be63a07a0db661c2"
         },
@@ -264,7 +264,7 @@
       "preview_sha256": "072e0c4400915c9e61eb32c5b91bdb9078689afe18a887a0fac2fc3eb28569d6"
     },
     {
-      "archive": "alice_petg_spool_holder_v02.zip",
+      "archive": "logos_petg_spool_holder_v02.zip",
       "source_archive_sha256": "54ae7342ad43376bd74879e7ac58639a53192ce364b1be25ded458cda6bf0885",
       "name": "Центрирующие втулки катушки v0.2",
       "status": "measure_spool_bore_first",

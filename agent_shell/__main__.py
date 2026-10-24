@@ -14,7 +14,7 @@ from agent_shell.store import TaskStore
 
 def main(argv=None, handlers=None):
     parser = argparse.ArgumentParser(prog="agent_shell", description=__doc__)
-    parser.add_argument("--db", default=os.environ.get("ALICE_SHELL_DB", "agent_shell.memory"))
+    parser.add_argument("--db", default=os.environ.get("LOGOS_SHELL_DB", "agent_shell.memory"))
     commands = parser.add_subparsers(dest="command", required=True)
     add = commands.add_parser("add")
     add.add_argument("--role", required=True)

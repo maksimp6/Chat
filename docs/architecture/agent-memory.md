@@ -73,7 +73,7 @@ The store does not automatically overwrite current GitHub facts with remembered 
 
 ## Storage
 
-`AgentMemoryStore` stores its records in the native Kristall journal under the `agent_memory:` key prefix. SQLite and PostgreSQL are retired: `ALICE_DATABASE_URL` is not read (see [docs/database.md](../database.md)).
+`AgentMemoryStore` stores its records in the native Kristall journal under the `agent_memory:` key prefix. SQLite and PostgreSQL are retired: `LOGOS_DATABASE_URL` is not read (see [docs/database.md](../database.md)).
 
 The schema stores structured metadata as deterministic JSON text, so correctness does
 not depend on a vector database or external retrieval service.

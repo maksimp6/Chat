@@ -9,20 +9,20 @@ from typing import Any
 from runtime.request_context import current_runtime_data_root
 from kristall import Kristall, KristallError
 
-DB_PATH = os.getenv("ALICE_DB_PATH", "").strip()
+DB_PATH = os.getenv("LOGOS_DB_PATH", "").strip()
 
 
 def memory_file_path() -> Path:
     root = current_runtime_data_root()
     if root:
-        return Path(root).resolve() / "alice.memory"
-    explicit = os.getenv("ALICE_MEMORY_PATH", "").strip()
+        return Path(root).resolve() / "logos.memory"
+    explicit = os.getenv("LOGOS_MEMORY_PATH", "").strip()
     if explicit:
         return Path(explicit).expanduser().resolve()
     if not DB_PATH:
-        raise KristallError("memory path is not configured: set ALICE_MEMORY_PATH or ALICE_DB_PATH")
+        raise KristallError("memory path is not configured: set LOGOS_MEMORY_PATH or LOGOS_DB_PATH")
     configured = Path(DB_PATH).expanduser().resolve()
-    return configured if configured.suffix == ".memory" else configured.with_name("alice.memory")
+    return configured if configured.suffix == ".memory" else configured.with_name("logos.memory")
 
 
 def get_store() -> Kristall:

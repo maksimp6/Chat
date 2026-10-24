@@ -12,7 +12,7 @@ def test_trace_viewer_has_correlation_navigation():
 
 def test_chat_has_direct_trace_viewer_action():
     source = (ROOT / "static" / "chat.js").read_text(encoding="utf-8")
-    assert "alice-trace-open-viewer" in source
+    assert "logos-trace-open-viewer" in source
     assert "window.openTraceViewer(traceObj)" in source
     assert "traceViewerDirect" in source
 

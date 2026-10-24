@@ -44,7 +44,7 @@ def test_api_key_creation_route_stores_secret_once(monkeypatch, tmp_path):
             "/api/cloudru/iam/api-keys",
             json={
                 "service_account_id": "sa-1",
-                "name": "Alice Pro",
+                "name": "Logos Pro",
                 "products": ["monaas"],
                 "confirm": True,
             },

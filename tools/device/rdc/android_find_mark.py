@@ -98,9 +98,9 @@ def find_and_mark(image, query, output, min_conf):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--image", type=Path, default=Path.home() / ".alice-rdc/screenshots/latest.jpg")
+    p.add_argument("--image", type=Path, default=Path.home() / ".logos-rdc/screenshots/latest.jpg")
     p.add_argument("--text", required=True)
-    p.add_argument("--output", type=Path, default=Path.home() / ".alice-rdc/screenshots/marked.png")
+    p.add_argument("--output", type=Path, default=Path.home() / ".logos-rdc/screenshots/marked.png")
     p.add_argument("--min-confidence", type=float, default=50)
     a = p.parse_args()
     if not a.text.strip() or not 0 <= a.min_confidence <= 100:

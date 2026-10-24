@@ -20,8 +20,8 @@ async function createRuntime(handler) {
   };
   const runtime = shim.load([], {
     console: quietConsole,
-    AliceDispatcher: { request: handler },
-    AliceCoreAPI: {
+    LogosDispatcher: { request: handler },
+    LogosCoreAPI: {
       ui: { actions: { register() {} } },
       status: { set() {} },
     },
@@ -51,7 +51,7 @@ function response(payload, status = 200) {
     return Promise.resolve(next());
   });
 
-  await runtime.window.AliceModelCatalog.load();
+  await runtime.window.LogosModelCatalog.load();
   assert.deepEqual(
     events.slice(-2).map((entry) => entry.event),
     ["request_start", "success"],
@@ -66,7 +66,7 @@ function response(payload, status = 200) {
     [() => response("not an object"), "invalid_response"],
   ]) {
     next = factory;
-    await assert.rejects(runtime.window.AliceModelCatalog.load());
+    await assert.rejects(runtime.window.LogosModelCatalog.load());
     assert.equal(
       events.some((entry) => entry.event === expected),
       true,
@@ -77,11 +77,11 @@ function response(payload, status = 200) {
   next = () => {
     throw new TypeError("offline");
   };
-  await assert.rejects(runtime.window.AliceModelCatalog.load());
+  await assert.rejects(runtime.window.LogosModelCatalog.load());
   assert.equal(events.at(-1).event, "network_error");
 
   next = () => response({ text: { recovered: { name: "Recovered" } }, voice: {} });
-  await runtime.window.AliceModelCatalog.load();
+  await runtime.window.LogosModelCatalog.load();
   assert.equal(events.at(-1).event, "success");
   assert.equal(vm.runInContext("modelsData.text.recovered.name", runtime.context), "Recovered");
 
@@ -95,7 +95,7 @@ function response(payload, status = 200) {
       response({ text: { recovered: { name: "Recovered model" } }, voice: {} }),
     );
   });
-  await assert.rejects(retry.runtime.window.AliceModelCatalog.load());
+  await assert.rejects(retry.runtime.window.LogosModelCatalog.load());
   // core.js also loads the catalog on startup; let that request settle first.
   for (let i = 0; i < 10; i += 1) await new Promise((resolve) => setImmediate(resolve));
 

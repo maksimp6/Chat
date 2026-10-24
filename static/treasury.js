@@ -1,5 +1,5 @@
 (function () {
-  const IDENTITY_STORAGE_KEY = "alice_web_installation_id";
+  const IDENTITY_STORAGE_KEY = "logos_web_installation_id";
 
   function getInstallationId() {
     let installationId = localStorage.getItem(IDENTITY_STORAGE_KEY);
@@ -16,7 +16,7 @@
   }
 
   async function bootstrapIdentity() {
-    const response = await window.AliceDispatcher.request("/api/users/bootstrap", {
+    const response = await window.LogosDispatcher.request("/api/users/bootstrap", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
@@ -44,7 +44,7 @@
 
   async function requestTreasury(path, options, fallbackMessage) {
     const requestOptions = Object.assign({ credentials: "same-origin" }, options || {});
-    let response = await window.AliceDispatcher.request(path, requestOptions);
+    let response = await window.LogosDispatcher.request(path, requestOptions);
     let data = {};
 
     try {
@@ -60,7 +60,7 @@
     ) {
       await bootstrapIdentity();
 
-      response = await window.AliceDispatcher.request(path, requestOptions);
+      response = await window.LogosDispatcher.request(path, requestOptions);
       try {
         data = await response.json();
       } catch (error) {
@@ -85,7 +85,7 @@
   function ensureTreasuryModal() {
     if (treasuryModal) return;
 
-    const UI = window.AliceCoreAPI.ui;
+    const UI = window.LogosCoreAPI.ui;
     const body = document.createElement("div");
     body.className = "treasury-modal-body";
 
@@ -151,7 +151,7 @@
     treasuryStatus.setAttribute("role", "status");
 
     body.append(balanceCard, topUpSection, expensesSection, treasuryStatus);
-    document.querySelector(".alice-pro-app").appendChild(treasuryModal);
+    document.querySelector(".logos-pro-app").appendChild(treasuryModal);
   }
 
   function setTreasuryStatus(message, isError) {
@@ -230,13 +230,13 @@
 
   function closeTreasuryModal() {
     if (!treasuryModal) return;
-    window.AliceCoreAPI.ui.modal.close(treasuryModal);
+    window.LogosCoreAPI.ui.modal.close(treasuryModal);
     document.removeEventListener("keydown", treasuryModal._escapeHandler);
   }
 
   async function openTreasuryPanel() {
     ensureTreasuryModal();
-    window.AliceCoreAPI.ui.modal.open(treasuryModal);
+    window.LogosCoreAPI.ui.modal.open(treasuryModal);
     setTreasuryStatus("Загрузка…");
     treasuryBalance.textContent = "…";
     treasuryExpenses.textContent = "Загрузка…";
@@ -257,8 +257,8 @@
     }
   }
 
-  window.AliceCoreAPI.ui.actions.register("treasury.close", closeTreasuryModal);
-  window.AliceCoreAPI.ui.actions.register("treasury.top-up", performTreasuryTopUp);
+  window.LogosCoreAPI.ui.actions.register("treasury.close", closeTreasuryModal);
+  window.LogosCoreAPI.ui.actions.register("treasury.top-up", performTreasuryTopUp);
 
   window.openTreasuryPanel = openTreasuryPanel;
 })();

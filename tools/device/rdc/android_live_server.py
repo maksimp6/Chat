@@ -17,9 +17,9 @@ from android_screen_dom import build as build_ocr_dom
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
-BASE = Path.home() / ".alice-rdc"
+BASE = Path.home() / ".logos-rdc"
 TOKEN_PATH = BASE / "live-token"
-ACTIONS = Path(os.environ.get("ALICE_LIVE_ACTIONS", str(BASE / "android_actions.py")))
+ACTIONS = Path(os.environ.get("LOGOS_LIVE_ACTIONS", str(BASE / "android_actions.py")))
 OCR = BASE / "android_find_mark.py"
 DOM = BASE / "android_screen_dom.py"
 IMAGE = BASE / "screenshots" / "latest.jpg"

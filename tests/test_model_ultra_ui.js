@@ -36,7 +36,7 @@ const RETIRED = {
 function modalAwareRuntime(html) {
   const shim = new BrowserShim(html);
   return shim.load([], {
-    AliceCoreAPI: {
+    LogosCoreAPI: {
       ui: { actions: { register() {} }, modal: { close() {} }, status: { set() {} } },
       status: { set() {} },
     },
@@ -60,17 +60,17 @@ async function loadCatalogThroughApi(payload) {
     '<div id="app-root"></div><div id="model-list"></div><div id="model-modal"></div>',
   ).load([], {
     console: { log() {}, warn() {}, info() {}, error() {} },
-    AliceDispatcher: {
+    LogosDispatcher: {
       request: () => Promise.resolve({ ok: true, status: 200, json: async () => payload }),
     },
-    AliceCoreAPI: {
+    LogosCoreAPI: {
       ui: { actions: { register() {} }, modal: { close() {} } },
       status: { set() {} },
     },
   });
   vm.runInContext(coreSource, runtime.context, { filename: "static/core.js" });
   vm.runInContext(modelsSource, runtime.context, { filename: "static/models.js" });
-  await runtime.window.AliceModelCatalog.load();
+  await runtime.window.LogosModelCatalog.load();
   return runtime;
 }
 

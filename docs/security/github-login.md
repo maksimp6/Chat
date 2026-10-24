@@ -16,7 +16,7 @@ It is off until a GitHub OAuth App is configured.
    A user already backed by GitHub never gains a second GitHub account. The
    promoted user's installation id is retired, so anonymous bootstrap can no
    longer mint tokens for it.
-4. The browser gets a fresh `alice_user_token` cookie. When the short-token
+4. The browser gets a fresh `logos_user_token` cookie. When the short-token
    gate is on and the account id is allowlisted, it also gets the gate session, so
    GitHub sign-in replaces the secret URL.
 
@@ -28,16 +28,16 @@ clears both cookies. With the gate on, a browser opening a gated page sees a
 
 | Variable | Meaning |
 | --- | --- |
-| `ALICE_GITHUB_CLIENT_ID` | OAuth App client id |
-| `ALICE_GITHUB_CLIENT_SECRET` | OAuth App client secret |
-| `ALICE_GITHUB_REDIRECT_URI` | Registered callback, default `https://maxxxpavlov.ru/auth/github/callback` in production |
-| `ALICE_GITHUB_ALLOWED_IDS` | Comma-separated numeric GitHub account ids allowed while the gate is on (ids, because logins can be renamed and reassigned) |
+| `LOGOS_GITHUB_CLIENT_ID` | OAuth App client id |
+| `LOGOS_GITHUB_CLIENT_SECRET` | OAuth App client secret |
+| `LOGOS_GITHUB_REDIRECT_URI` | Registered callback, default `https://maxxxpavlov.ru/auth/github/callback` in production |
+| `LOGOS_GITHUB_ALLOWED_IDS` | Comma-separated numeric GitHub account ids allowed while the gate is on (ids, because logins can be renamed and reassigned) |
 
 Production reads the client id and secret from the repository secrets
-`ALICE_GITHUB_CLIENT_ID` and `ALICE_GITHUB_CLIENT_SECRET`, and the allowlist from
-the repository variable `ALICE_GITHUB_ALLOWED_IDS` (default `293531601`, the
+`LOGOS_GITHUB_CLIENT_ID` and `LOGOS_GITHUB_CLIENT_SECRET`, and the allowlist from
+the repository variable `LOGOS_GITHUB_ALLOWED_IDS` (default `293531601`, the
 account id of `maksimp6`). They
-reach the server over the deploy SSH session's stdin, like `ALICE_SHORT_TOKEN`.
+reach the server over the deploy SSH session's stdin, like `LOGOS_SHORT_TOKEN`.
 
 The OAuth App must use the homepage `https://maxxxpavlov.ru` and the callback
 `https://maxxxpavlov.ru/auth/github/callback`. Visitors on `maxxxpavlov.online`

@@ -4,8 +4,8 @@
 
 ## Конфигурация
 
-`ALICE_DEV_PUBLIC_URL` задаётся deployment-кодом, не пользователем. Это не секрет.
-Для commit-worker желаемый origin: `https://alice-dev-<project12>-<sha8>.containerapps.ru`.
+`LOGOS_DEV_PUBLIC_URL` задаётся deployment-кодом, не пользователем. Это не секрет.
+Для commit-worker желаемый origin: `https://logos-dev-<project12>-<sha8>.containerapps.ru`.
 До принятия контейнера код сверяет этот адрес с `publicUri` из Cloud.ru и проверяет
 provider UUID. Несовпадение останавливает rollout. `Host` и `X-Forwarded-*` не
 используются для выбора OAuth issuer или resource. Неизвестная/неверная конфигурация
@@ -67,7 +67,7 @@ gateway не предоставляет отдельный SSE-поток; HEAD 
 
 ## Durable OAuth runtime contract (#939)
 
-The Alice Dev gateway can persist its complete OAuth file as closed snapshots in
+The Logos Dev gateway can persist its complete OAuth file as closed snapshots in
 an explicitly provisioned private Object Storage mount. It does not use the Chrome
 profile store, SQL, a remote browser profile, or last-writer-wins recovery.
 
@@ -75,14 +75,14 @@ Runtime configuration:
 
 | Variable | Contract |
 | --- | --- |
-| `ALICE_DEV_OAUTH_DURABLE_DIR` | Exact mount root dedicated to this OAuth origin/owner. Runtime checks `/proc/self/mountinfo`; an ordinary directory is not an accepted production mount. |
-| `ALICE_DEV_OAUTH_STATE_FILE` | Disposable local POSIX cache; default `/tmp/alice-dev-auth/oauth.json`. Must be outside the mount. |
-| `ALICE_DEV_OAUTH_REQUIRE_DURABILITY=1` | Refuse startup when no durable store is configured. |
-| `ALICE_DEV_PUBLIC_URL` | Canonical origin, equal to the mount's owner marker. |
-| `ALICE_DEV_OWNER_ID` | Owner marker binding; defaults to `owner`. |
+| `LOGOS_DEV_OAUTH_DURABLE_DIR` | Exact mount root dedicated to this OAuth origin/owner. Runtime checks `/proc/self/mountinfo`; an ordinary directory is not an accepted production mount. |
+| `LOGOS_DEV_OAUTH_STATE_FILE` | Disposable local POSIX cache; default `/tmp/logos-dev-auth/oauth.json`. Must be outside the mount. |
+| `LOGOS_DEV_OAUTH_REQUIRE_DURABILITY=1` | Refuse startup when no durable store is configured. |
+| `LOGOS_DEV_PUBLIC_URL` | Canonical origin, equal to the mount's owner marker. |
+| `LOGOS_DEV_OWNER_ID` | Owner marker binding; defaults to `owner`. |
 
 Provisioning must explicitly create `owner.json` with exactly `schema: 1`,
-`purpose: "alice-dev-oauth"`, `origin` and `owner_id`. The application never creates
+`purpose: "logos-dev-oauth"`, `origin` and `owner_id`. The application never creates
 or adopts an unowned mount. Existing local-only registrations require a deliberate,
 quiesced migration; they are not silently imported. Changing the origin constitutes
 a different OAuth issuer, not a transparent registration migration.

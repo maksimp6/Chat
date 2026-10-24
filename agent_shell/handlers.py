@@ -12,7 +12,7 @@ MAX_BODY = 8000
 
 
 def default_handlers(check_run=None, run_issue=None):
-    def alice_task(payload):
+    def logos_task(payload):
         """Runs Logos headlessly on a task text with its sandboxed filesystem tools.
 
         Logos never commits, pushes or runs commands, and stops at approval-gated tools
@@ -45,4 +45,4 @@ def default_handlers(check_run=None, run_issue=None):
             raise TaskFailed("needs_approval", result)
         return result
 
-    return {"alice_task": alice_task}
+    return {"logos_task": logos_task}

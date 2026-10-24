@@ -16,7 +16,7 @@ yet start a model; handlers are plain Python functions registered by task kind.
   that touched a secret cannot leak it.
 - `agent_shell/handlers.py`: built-in task kinds. The first, `cloudru_status`, is read-only
   and reuses `scripts/cloudru_check.py`.
-- `alice_task`: runs Logos headlessly (`issue_runner.run_issue_task`) on a task text:
+- `logos_task`: runs Logos headlessly (`issue_runner.run_issue_task`) on a task text:
   `{"issue": 7, "title": "...", "body": "...", "model": "logos-runtime"}` (model optional).
   Logos only has its sandboxed filesystem tools and never commits, pushes or runs commands.
   If it stops at an approval-gated tool the task fails with `needs_approval` (never
@@ -34,12 +34,12 @@ python -m agent_shell list
 python -m agent_shell show 1        # result and event trace
 ```
 
-`ALICE_SHELL_DB` (or `--db`) selects the database file. After a crash, run
+`LOGOS_SHELL_DB` (or `--db`) selects the database file. After a crash, run
 `python -m agent_shell recover`: tasks left `running` are marked failed, never re-run.
 
 ## Not done yet
 
-- Only registered handlers run inside a task; `alice_task` is the first one that uses a model.
+- Only registered handlers run inside a task; `logos_task` is the first one that uses a model.
 - No per-task timeout: a handler that hangs blocks its runner.
 - No scheduler: tasks are created by hand. A cron-style trigger should create tasks, not
   run agents directly.

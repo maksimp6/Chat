@@ -3,7 +3,7 @@ set -euo pipefail
 
 RELEASE_TAG="cloud-cli-mirror-2026-09-27"
 INSTALL_DIR="${CLOUD_CLI_INSTALL_DIR:-$HOME/.local/bin}"
-CACHE_DIR="${CLOUD_CLI_CACHE_DIR:-$HOME/.cache/alice-pro/cloud-cli}"
+CACHE_DIR="${CLOUD_CLI_CACHE_DIR:-$HOME/.cache/logos-pro/cloud-cli}"
 
 case "$(uname -m)" in
   x86_64|amd64)

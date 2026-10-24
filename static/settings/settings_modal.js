@@ -4,7 +4,7 @@
   // === 1. Модальное окно локальных инструментов (Tools) с немедленным сохранением в БД ===
   window.openToolsModal = function () {
     var UI = window.SettingsUI;
-    var CoreUI = window.AliceCoreAPI.ui;
+    var CoreUI = window.LogosCoreAPI.ui;
     var Storage = window.SettingsStorage;
     var currentConvId = typeof window.currentConvId !== "undefined" ? window.currentConvId : null;
     var settings = Storage.load(currentConvId);
@@ -81,7 +81,7 @@
         "</div>",
       '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">Эти инструменты выполняются на стороне Yandex AI Studio. Они независимы от MCP и локального Tool Registry.</div>',
       '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;border-top:1px solid var(--m-border,#ddd);padding-top:12px;">',
-      ' <button class="alice-btn settings-contract-btn" id="tools-save-btn">Сохранить инструменты</button>',
+      ' <button class="logos-btn settings-contract-btn" id="tools-save-btn">Сохранить инструменты</button>',
       "</div>",
     ].join("");
     var ov = CoreUI.modal.create({
@@ -94,7 +94,7 @@
     var modalContent = ov.querySelector(".modal-content");
     modalContent.style.cssText =
       "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;width:94%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
-    (document.querySelector(".alice-pro-app") || document.body).appendChild(ov);
+    (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 
     function closeModal() {
@@ -114,11 +114,11 @@
     };
 
     Promise.all([
-      window.AliceDispatcher.request("/api/tools/categories").then(function (r) {
+      window.LogosDispatcher.request("/api/tools/categories").then(function (r) {
         return r.json();
       }),
       currentConvId
-        ? window.AliceDispatcher.request("/api/conversations/" + currentConvId + "/tools").then(
+        ? window.LogosDispatcher.request("/api/conversations/" + currentConvId + "/tools").then(
             function (r) {
               return r.json();
             },
@@ -184,7 +184,7 @@
         },
       };
       var localSave = currentConvId
-        ? window.AliceDispatcher.request("/api/conversations/" + currentConvId + "/tools", {
+        ? window.LogosDispatcher.request("/api/conversations/" + currentConvId + "/tools", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ active_tool_categories: selected }),
@@ -218,14 +218,14 @@
     var tabsHeader = [
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">',
       '    <h2 style="margin:0;font-size:18px;color:var(--m-text,#222);">⚙️ Конфигурация LLM & Responses API</h2>',
-      '    <button class="alice-btn settings-contract-btn" id="set-close-btn">&times;</button>',
+      '    <button class="logos-btn settings-contract-btn" id="set-close-btn">&times;</button>',
       "</div>",
       '<div style="display:flex;gap:6px;border-bottom:1px solid var(--m-border,#ddd);margin-bottom:14px;overflow-x:auto;">',
-      '    <button class="alice-btn llm-tab-btn active settings-contract-btn" data-tab="tab-gen">Сэмплинг</button>',
-      '    <button class="alice-btn llm-tab-btn settings-contract-btn" data-tab="tab-output">Формат вывода</button>',
-      '    <button class="alice-btn llm-tab-btn settings-contract-btn" data-tab="tab-routing">Маршрутизация вызовов</button>',
-      '    <button class="alice-btn llm-tab-btn settings-contract-btn" data-tab="tab-adv">Промпты & Кэш</button>',
-      '    <button class="alice-btn llm-tab-btn settings-contract-btn" data-tab="tab-theme">Оформление</button>',
+      '    <button class="logos-btn llm-tab-btn active settings-contract-btn" data-tab="tab-gen">Сэмплинг</button>',
+      '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-output">Формат вывода</button>',
+      '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-routing">Маршрутизация вызовов</button>',
+      '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-adv">Промпты & Кэш</button>',
+      '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-theme">Оформление</button>',
       "</div>",
     ].join("");
 
@@ -450,9 +450,9 @@
       "</div>",
     ].join("");
 
-    var activeTheme = window.AliceTheme ? window.AliceTheme.getStored() : "light";
+    var activeTheme = window.LogosTheme ? window.LogosTheme.getStored() : "light";
     var themeOptions = Object.keys(
-      (window.AliceTheme && window.AliceTheme.themes) || {
+      (window.LogosTheme && window.LogosTheme.themes) || {
         light: "Светлая",
         dark: "Тёмная",
         dim: "Приглушённая",
@@ -460,7 +460,7 @@
       },
     )
       .map(function (key) {
-        var label = (window.AliceTheme.themes || {})[key] || key;
+        var label = (window.LogosTheme.themes || {})[key] || key;
         return (
           '<option value="' +
           UI.escapeHtml(key) +
@@ -486,8 +486,8 @@
 
     var footer = [
       '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;border-top:1px solid var(--m-border,#ddd);padding-top:14px;">',
-      '    <button class="alice-btn settings-contract-btn" id="set-reset-btn">Сброс</button>',
-      '    <button class="alice-btn settings-contract-btn" id="set-save-btn">Сохранить параметры</button>',
+      '    <button class="logos-btn settings-contract-btn" id="set-reset-btn">Сброс</button>',
+      '    <button class="logos-btn settings-contract-btn" id="set-save-btn">Сохранить параметры</button>',
       "</div>",
     ].join("");
 
@@ -528,7 +528,7 @@
     var themeSelect = document.getElementById("set-theme");
     if (themeSelect) {
       themeSelect.addEventListener("change", function () {
-        if (window.AliceTheme) window.AliceTheme.apply(this.value, true);
+        if (window.LogosTheme) window.LogosTheme.apply(this.value, true);
       });
     }
 

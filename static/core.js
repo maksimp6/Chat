@@ -17,37 +17,37 @@ if (urlConvId) {
   currentConvId = localStorage.getItem("current_conv_id") || null;
 }
 
-const ALICE_THEMES = {
+const LOGOS_THEMES = {
   light: "Светлая",
   dark: "Тёмная",
   dim: "Приглушённая",
   "high-contrast": "Высокий контраст",
 };
 
-function normalizeAliceTheme(value) {
-  return Object.prototype.hasOwnProperty.call(ALICE_THEMES, value) ? value : "light";
+function normalizeLogosTheme(value) {
+  return Object.prototype.hasOwnProperty.call(LOGOS_THEMES, value) ? value : "light";
 }
 
-window.AliceTheme = {
-  themes: ALICE_THEMES,
+window.LogosTheme = {
+  themes: LOGOS_THEMES,
   getStored: function () {
-    return normalizeAliceTheme(localStorage.getItem("theme") || "light");
+    return normalizeLogosTheme(localStorage.getItem("theme") || "light");
   },
   apply: function (value, persist) {
-    var theme = normalizeAliceTheme(value);
+    var theme = normalizeLogosTheme(value);
     document.documentElement.setAttribute("data-theme", theme);
     if (persist !== false) localStorage.setItem("theme", theme);
     var button = document.getElementById("theme-toggle");
     if (button) {
       var icon = theme === "dark" ? "☀️" : theme === "light" ? "🌙" : "🎨";
       button.textContent = icon;
-      button.title = "Цветовая схема: " + ALICE_THEMES[theme];
-      button.setAttribute("aria-label", "Цветовая схема: " + ALICE_THEMES[theme]);
+      button.title = "Цветовая схема: " + LOGOS_THEMES[theme];
+      button.setAttribute("aria-label", "Цветовая схема: " + LOGOS_THEMES[theme]);
     }
     return theme;
   },
   cycle: function () {
-    var themes = Object.keys(ALICE_THEMES);
+    var themes = Object.keys(LOGOS_THEMES);
     var current = this.getStored();
     var next = themes[(themes.indexOf(current) + 1) % themes.length];
     return this.apply(next, true);
@@ -56,15 +56,15 @@ window.AliceTheme = {
 
 // Keys renamed in #1316; stored conversations may still carry the old names.
 const LEGACY_MODEL_KEYS = {
-  "aliceai-llm": "logos-runtime",
-  "aliceai-llm-flash": "logos-runtime-flash",
+  "logosai-llm": "logos-runtime",
+  "logosai-llm-flash": "logos-runtime-flash",
 };
 
-const savedTheme = window.AliceTheme.getStored();
-window.AliceTheme.apply(savedTheme, false);
+const savedTheme = window.LogosTheme.getStored();
+window.LogosTheme.apply(savedTheme, false);
 
 function fetchWithTimeout(input, init, timeoutMs) {
-  return window.AliceDispatcher.request(input, init, { timeoutMs: timeoutMs });
+  return window.LogosDispatcher.request(input, init, { timeoutMs: timeoutMs });
 }
 
 window.changeModel = function (newModel, skipPatch) {
@@ -80,7 +80,7 @@ window.changeModel = function (newModel, skipPatch) {
   localStorage.setItem("current_model", currentModel);
 
   if (!skipPatch && currentConvId) {
-    window.AliceDispatcher.request("/api/conversations/" + currentConvId, {
+    window.LogosDispatcher.request("/api/conversations/" + currentConvId, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: newModel }),
@@ -99,11 +99,11 @@ window.changeModel = function (newModel, skipPatch) {
 };
 
 function initializeShell() {
-  window.AliceTheme.apply(savedTheme, false);
+  window.LogosTheme.apply(savedTheme, false);
 
   if (!window.__logosThemeActionRegistered) {
-    window.AliceCoreAPI.ui.actions.register("theme.cycle", function () {
-      window.AliceTheme.cycle();
+    window.LogosCoreAPI.ui.actions.register("theme.cycle", function () {
+      window.LogosTheme.cycle();
     });
     window.__logosThemeActionRegistered = true;
   }
@@ -193,7 +193,7 @@ async function loadModels() {
   }
 }
 
-window.AliceModelCatalog = { load: loadModels };
+window.LogosModelCatalog = { load: loadModels };
 
 async function enhanceCore() {
   if (coreEnhancementStarted) return;
@@ -251,13 +251,13 @@ async function enhanceCore() {
       updateModelButton();
     }
     if (typeof updateUIForModel === "function") updateUIForModel();
-    if (window.AliceCoreAPI && window.AliceCoreAPI.status) {
-      window.AliceCoreAPI.status.set("core", "ready", "Ядро готово", { revocable: false });
+    if (window.LogosCoreAPI && window.LogosCoreAPI.status) {
+      window.LogosCoreAPI.status.set("core", "ready", "Ядро готово", { revocable: false });
     }
   } catch (error) {
     console.error("[CORE] Enhancement initialization error:", error);
-    if (window.AliceCoreAPI && window.AliceCoreAPI.status) {
-      window.AliceCoreAPI.status.set(
+    if (window.LogosCoreAPI && window.LogosCoreAPI.status) {
+      window.LogosCoreAPI.status.set(
         "core",
         "degraded",
         "Расширенная инициализация завершилась ошибкой",
@@ -275,8 +275,8 @@ function initCore() {
   coreInitialized = true;
 
   console.log("[CORE] Shell initialization. currentConvId:", currentConvId);
-  if (window.AliceCoreAPI && window.AliceCoreAPI.status) {
-    window.AliceCoreAPI.status.set("core", "running", "Ядро выполняет инициализацию", {
+  if (window.LogosCoreAPI && window.LogosCoreAPI.status) {
+    window.LogosCoreAPI.status.set("core", "running", "Ядро выполняет инициализацию", {
       revocable: false,
     });
   }
@@ -284,8 +284,8 @@ function initCore() {
   applyConversationCache();
   if (typeof updateUIForModel === "function") updateUIForModel();
   if (typeof updateModelButton === "function") updateModelButton();
-  if (window.AliceBoot && typeof window.AliceBoot.markShellReady === "function") {
-    window.AliceBoot.markShellReady();
+  if (window.LogosBoot && typeof window.LogosBoot.markShellReady === "function") {
+    window.LogosBoot.markShellReady();
   }
 
   // Network/API enhancement is deliberately separate from shell startup.
@@ -309,7 +309,7 @@ function saveMessages(id, msgs) {
 }
 
 window.updateUIForModel = function () {
-  var root = document.querySelector(".alice-pro-app");
+  var root = document.querySelector(".logos-pro-app");
   var micBtn = document.getElementById("mic-btn");
   var uploadBtn = document.getElementById("upload-image-btn");
   var modeWrap = document.getElementById("response-mode-wrap");
@@ -323,8 +323,8 @@ window.updateUIForModel = function () {
 
   if (!root) return;
 
-  root.classList.toggle("alice-model-voice", isVoice);
-  root.classList.toggle("alice-model-multimodal", isMultimodal);
+  root.classList.toggle("logos-model-voice", isVoice);
+  root.classList.toggle("logos-model-multimodal", isMultimodal);
 
   if (micBtn) micBtn.setAttribute("aria-hidden", isVoice ? "false" : "true");
   if (uploadBtn) uploadBtn.setAttribute("aria-hidden", isMultimodal ? "false" : "true");

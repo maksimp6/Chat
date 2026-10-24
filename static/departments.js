@@ -14,7 +14,7 @@
 
   function close() {
     if (!modal) return;
-    window.AliceCoreAPI.ui.modal.close(modal);
+    window.LogosCoreAPI.ui.modal.close(modal);
   }
 
   function open() {
@@ -23,22 +23,22 @@
       modal = null;
     }
 
-    var UI = window.AliceCoreAPI.ui;
-    var list = el("div", { class: "alice-dept-list" }, "Загрузка…");
+    var UI = window.LogosCoreAPI.ui;
+    var list = el("div", { class: "logos-dept-list" }, "Загрузка…");
     modal = UI.modal.create({
       id: "departments-modal",
       title: "Departments",
       titleTag: "h3",
-      className: "alice-dept-overlay",
-      contentClassName: "alice-dept-card",
+      className: "logos-dept-overlay",
+      contentClassName: "logos-dept-card",
       closeAction: "departments.close",
       body: list,
     });
 
-    (document.querySelector(".alice-pro-app") || document.body).appendChild(modal);
+    (document.querySelector(".logos-pro-app") || document.body).appendChild(modal);
     UI.modal.open(modal);
 
-    window.AliceDispatcher.request("/api/departments", { headers: { Accept: "application/json" } })
+    window.LogosDispatcher.request("/api/departments", { headers: { Accept: "application/json" } })
       .then(function (response) {
         if (!response.ok) throw new Error("HTTP " + response.status);
         return response.json();
@@ -46,7 +46,7 @@
       .then(function (data) {
         list.textContent = "";
         (data.departments || []).forEach(function (department) {
-          var row = el("button", { class: "alice-dept-row" });
+          var row = el("button", { class: "logos-dept-row" });
           row.appendChild(el("strong", {}, department.name));
           row.appendChild(
             el("span", {}, (department.description || department.type || "").slice(0, 120)),
@@ -60,7 +60,7 @@
               window.openPartnerRelationsModal();
               return;
             }
-            window.AliceDispatcher.request(
+            window.LogosDispatcher.request(
               "/api/departments/" + encodeURIComponent(department.id) + "/sessions",
               { method: "POST", headers: { Accept: "application/json" } },
             )
@@ -88,7 +88,7 @@
       });
   }
 
-  window.AliceCoreAPI.ui.actions.register("departments.close", close);
+  window.LogosCoreAPI.ui.actions.register("departments.close", close);
   window.openDepartmentsModal = open;
   window.closeDepartmentsModal = close;
 })();

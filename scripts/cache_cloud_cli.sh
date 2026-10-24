@@ -3,7 +3,7 @@
 # Normal installations must use install_cloud_cli.sh and never call this source.
 set -euo pipefail
 
-CACHE_DIR="${CLOUD_CLI_CACHE_DIR:-$HOME/.cache/alice-pro/cloud-cli}"
+CACHE_DIR="${CLOUD_CLI_CACHE_DIR:-$HOME/.cache/logos-pro/cloud-cli}"
 OFFICIAL_BASE_URL="https://sbc-cli.obs.ru-moscow-1.hc.sbercloud.ru/cli/latest"
 force=false
 

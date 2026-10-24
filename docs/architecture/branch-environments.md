@@ -149,7 +149,7 @@ implementation.
 
 The target external routing model is preferably:
 
-`env-<stable-environment-token>.alicepro.dev`
+`env-<stable-environment-token>.logospro.dev`
 
 The token must be derived from environment identity, not directly from an
 untrusted branch name.

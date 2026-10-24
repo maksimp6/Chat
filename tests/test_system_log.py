@@ -10,10 +10,10 @@ from observability.trace_manager import ExecutionTrace, bind_current_trace, rese
 @pytest.fixture
 def configured(tmp_path):
     root = logging.getLogger(system_log.ROOT_LOGGER_NAME)
-    saved = (list(root.handlers), getattr(root, "_alice_configured", False))
+    saved = (list(root.handlers), getattr(root, "_logos_configured", False))
     for handler in list(root.handlers):
         root.removeHandler(handler)
-    root._alice_configured = False
+    root._logos_configured = False
     system_log.configure("DEBUG", directory=tmp_path)
     yield tmp_path / system_log.DEFAULT_LOG_FILE
     for handler in list(root.handlers):
@@ -21,7 +21,7 @@ def configured(tmp_path):
         root.removeHandler(handler)
     for handler in saved[0]:
         root.addHandler(handler)
-    root._alice_configured = saved[1]
+    root._logos_configured = saved[1]
 
 
 def _records(path):
@@ -89,10 +89,10 @@ def test_unwritable_log_dir_falls_back_to_console(tmp_path):
     blocker = tmp_path / "not-a-dir"
     blocker.write_text("x", encoding="utf-8")
     root = logging.getLogger(system_log.ROOT_LOGGER_NAME)
-    saved = (list(root.handlers), getattr(root, "_alice_configured", False))
+    saved = (list(root.handlers), getattr(root, "_logos_configured", False))
     for handler in list(root.handlers):
         root.removeHandler(handler)
-    root._alice_configured = False
+    root._logos_configured = False
     try:
         system_log.configure("INFO", directory=blocker)
         assert not any(h.__class__.__name__ == "RotatingFileHandler" for h in root.handlers)
@@ -102,4 +102,4 @@ def test_unwritable_log_dir_falls_back_to_console(tmp_path):
             root.removeHandler(handler)
         for handler in saved[0]:
             root.addHandler(handler)
-        root._alice_configured = saved[1]
+        root._logos_configured = saved[1]

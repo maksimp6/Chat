@@ -12,7 +12,7 @@ class YandexMetadataValidatorTests(unittest.TestCase):
         self.assertIs(validate_metadata(metadata), metadata)
 
     def test_valid_metadata_is_returned_unchanged(self):
-        metadata = {"trace_id": "trace-1", "source": "alice-pro"}
+        metadata = {"trace_id": "trace-1", "source": "logos-pro"}
         self.assertIs(validate_metadata(metadata), metadata)
 
     def test_non_object_is_rejected(self):

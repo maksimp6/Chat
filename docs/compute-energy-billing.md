@@ -7,9 +7,9 @@ consumed and converts it to energy and, optionally, money.
 
 ```
 cpu_seconds = billable_cpu_ms / 1000   # thread CPU at the last recorded work
-energy_J    = cpu_seconds * ALICE_CPU_WATTS_PER_CORE
+energy_J    = cpu_seconds * LOGOS_CPU_WATTS_PER_CORE
 energy_Wh   = energy_J / 3600
-cost_RUB    = energy_Wh / 1000 * ALICE_ELECTRICITY_PRICE_RUB_PER_KWH
+cost_RUB    = energy_Wh / 1000 * LOGOS_ELECTRICITY_PRICE_RUB_PER_KWH
 ```
 
 ## Billable boundary
@@ -29,8 +29,8 @@ local CPU, and the provider's own compute is already billed through tokens.
 
 | Variable                              | Default | Meaning                                                                                                                            |
 | ------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `ALICE_CPU_WATTS_PER_CORE`            | `15`    | Power of one fully busy core, W. Server core ≈ 10–20 W, phone (Termux) ≈ 2–5 W. Include cooling/PSU overhead (PUE) here if needed. |
-| `ALICE_ELECTRICITY_PRICE_RUB_PER_KWH` | unset   | Electricity price. When unset, energy is recorded with `cost_status: not_billed` and nothing is charged.                           |
+| `LOGOS_CPU_WATTS_PER_CORE`            | `15`    | Power of one fully busy core, W. Server core ≈ 10–20 W, phone (Termux) ≈ 2–5 W. Include cooling/PSU overhead (PUE) here if needed. |
+| `LOGOS_ELECTRICITY_PRICE_RUB_PER_KWH` | unset   | Electricity price. When unset, energy is recorded with `cost_status: not_billed` and nothing is charged.                           |
 
 Invalid, negative or non-finite values are ignored with a warning.
 

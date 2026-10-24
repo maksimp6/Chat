@@ -2,7 +2,7 @@
 set -u
 SERIAL=192.168.31.109:42125
 BASE=/data/misc/perfetto-traces
-LOG="$HOME/.alice-rdc/continuous-perfetto.log"
+LOG="$HOME/.logos-rdc/continuous-perfetto.log"
 echo "START $(date -Is) serial=$SERIAL" >> "$LOG"
 while :; do
   if ! adb -s "$SERIAL" get-state 2>/dev/null | grep -qx device; then

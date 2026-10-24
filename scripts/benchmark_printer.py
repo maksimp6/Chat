@@ -60,7 +60,7 @@ def benchmarks() -> dict[str, Callable[[], object]]:
 
 def run(iterations: int = 1000, rounds: int = 7) -> dict:
     return {
-        "schema": "alice-printer-benchmark-v1",
+        "schema": "logos-printer-benchmark-v1",
         "unit": "microseconds",
         "mode": "mock-no-network",
         "results": {

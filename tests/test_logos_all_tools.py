@@ -100,8 +100,8 @@ def test_real_mcp_only_and_termux_tools_are_withheld_from_responses(monkeypatch)
 
     monkeypatch.setattr(registry_module.shutil, "which", lambda name: None)
     offered = {tool["name"] for tool in registry.get_definitions()}
-    assert "alice_read_project_file" in registry._tools
-    assert not {name for name in offered if name.startswith("alice_")}
+    assert "logos_read_project_file" in registry._tools
+    assert not {name for name in offered if name.startswith("logos_")}
     assert not {name for name in offered if name.startswith("termux_")}
     assert {"remove_file", "git_status", "wikipedia_search", "read_file"} <= offered
 
@@ -368,7 +368,7 @@ def test_termux_tool_off_device_reports_the_missing_helper(monkeypatch):
 
 
 def test_approved_government_submission_completes_the_case(monkeypatch):
-    monkeypatch.setenv("ALICE_OWNER_ID", "owner-1")
+    monkeypatch.setenv("LOGOS_OWNER_ID", "owner-1")
     executor = UniversalToolExecutor(registry)
 
     def run(name, arguments, approved=False):

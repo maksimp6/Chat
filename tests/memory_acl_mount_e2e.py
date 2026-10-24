@@ -31,7 +31,7 @@ def main() -> None:
         (root / "memory_engine").chmod(0o755)
         owner_probe = (
             "import os,sys; sys.path.insert(0,sys.argv[2]); "
-            "os.environ['ALICE_MEMORY_TRUSTED_ROOT']='1'; "
+            "os.environ['LOGOS_MEMORY_TRUSTED_ROOT']='1'; "
             "from memory_engine import MemoryStore; MemoryStore(sys.argv[1])"
         )
         private = root / "private"

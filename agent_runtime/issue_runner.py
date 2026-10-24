@@ -362,7 +362,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--issue", type=int, required=True)
     parser.add_argument("--title-file", type=Path, required=True)
     parser.add_argument("--body-file", type=Path, required=True)
-    parser.add_argument("--model", default=os.getenv("ALICE_AGENT_MODEL") or DEFAULT_MODEL)
+    parser.add_argument("--model", default=os.getenv("LOGOS_AGENT_MODEL") or DEFAULT_MODEL)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
 

@@ -102,11 +102,11 @@ def owner_issue(variable):
     }
 
 
-def alice_label(variable):
+def logos_label(variable):
     return {
         "github": {
             "event_name": "issues",
-            "event": {"action": "labeled", "issue": {}, "label": {"name": "alice"}},
+            "event": {"action": "labeled", "issue": {}, "label": {"name": "logos"}},
         },
         "vars": variable,
     }
@@ -116,21 +116,21 @@ CLOSED = ({}, {GENERATION_ENV: ""}, {GENERATION_ENV: "false"}, {GENERATION_ENV: 
 OPEN = {GENERATION_ENV: "true"}
 
 
-@pytest.mark.parametrize("event", [owner_comment, owner_issue, alice_label])
+@pytest.mark.parametrize("event", [owner_comment, owner_issue, logos_label])
 @pytest.mark.parametrize("variable", CLOSED)
 def test_issue_entrypoints_do_not_start_logos_without_permission(event, variable):
-    condition, _ = job_condition("logos.yml", "alice")
+    condition, _ = job_condition("logos.yml", "logos")
     assert evaluate(condition, event(variable)) is False
 
 
-@pytest.mark.parametrize("event", [owner_comment, owner_issue, alice_label])
+@pytest.mark.parametrize("event", [owner_comment, owner_issue, logos_label])
 def test_issue_entrypoints_still_start_logos_with_permission(event):
-    condition, _ = job_condition("logos.yml", "alice")
+    condition, _ = job_condition("logos.yml", "logos")
     assert evaluate(condition, event(OPEN)) is True
 
 
 def test_permission_does_not_widen_the_existing_trigger_rules():
-    condition, _ = job_condition("logos.yml", "alice")
+    condition, _ = job_condition("logos.yml", "logos")
     stranger = owner_comment(OPEN)
     stranger["github"]["event"]["comment"]["author_association"] = "NONE"
     pull_request = owner_comment(OPEN)
@@ -163,8 +163,8 @@ def test_manual_dialogue_needs_permission_but_reading_stays_available(variable):
 
 def test_runner_steps_receive_the_same_permission_variable():
     expected = "${{ vars.LOGOS_GENERATION_ALLOWED }}"
-    _, alice = job_condition("logos.yml", "alice")
-    assert alice["env"][GENERATION_ENV] == expected
+    _, logos = job_condition("logos.yml", "logos")
+    assert logos["env"][GENERATION_ENV] == expected
     _, logos = job_condition("rag-work.yml", "logos")
     step = next(s for s in logos["steps"] if s["name"].startswith("Run Logos dialogue"))
     assert step["env"][GENERATION_ENV] == expected

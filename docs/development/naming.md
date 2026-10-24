@@ -35,11 +35,11 @@ allowlist: rename an entry, then delete it from the list.
   own (`trace_viewer.js`). A file name never describes a patch: no `_fix`,
   `_new`, `_old`, `_v2`, `_tmp`, `_auto`. Merge such code into the feature
   module or name the feature it adds.
-- Public browser globals are `window.Alice<Feature>` in PascalCase
-  (`AliceTraceSummary`, `AliceExecutionSurface`). Globals renamed by the Logos
+- Public browser globals are `window.Logos<Feature>` in PascalCase
+  (`LogosTraceSummary`, `LogosExecutionSurface`). Globals renamed by the Logos
   rename use the Logos prefix, `window.Logos<Feature>` (`LogosUIRuntime` and
-  `LogosEnvironments`, previously `window.AliceUIRuntime` and
-  `window.AliceEnvironments`). Everything else stays inside the module IIFE.
+  `LogosEnvironments`, previously `window.LogosUIRuntime` and
+  `window.LogosEnvironments`). Everything else stays inside the module IIFE.
 - Functions and variables use `camelCase`. Constants use `UPPER_SNAKE_CASE`.
 - DOM `id` and CSS classes use `kebab-case` and name what the element is
   (`model-modal`, `msg-meta`). No positional or numbered names such as

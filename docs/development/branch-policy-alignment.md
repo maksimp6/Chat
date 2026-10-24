@@ -6,7 +6,7 @@ and prepares settings; it does not merge, deploy, or claim settings were applied
 
 ## Verified gap — 2026-10-12
 
-The report `Alice_Pro_Review_50000_words.md` identifies the native enforcement gap.
+The report `Logos_Pro_Review_50000_words.md` identifies the native enforcement gap.
 Both rulesets were reread through GitHub REST before preparing this change.
 
 | Control | Live master #23532452 | Live develop #24841115 | Proposed change |

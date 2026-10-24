@@ -21,7 +21,7 @@ def test_memory_panel_api_returns_config_and_sorted_facts(tmp_path, monkeypatch)
     from agent_memory.extractor import save_global_memory_facts
 
     path = tmp_path / "facts.memory"
-    monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))
+    monkeypatch.setenv("LOGOS_MEMORY_PATH", str(path))
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "unused.db"))
     close_memory_clients()
     save_global_memory_facts(
@@ -49,7 +49,7 @@ def test_fact_deduplication_and_targeted_deletion(tmp_path, monkeypatch):
     from agent_memory.extractor import list_global_memory_facts, save_global_memory_facts
 
     path = tmp_path / "native.memory"
-    monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))
+    monkeypatch.setenv("LOGOS_MEMORY_PATH", str(path))
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "unused.db"))
     close_memory_clients()
     assert (

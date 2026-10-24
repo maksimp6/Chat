@@ -8,7 +8,7 @@ from runtime import RuntimeDispatcher, RuntimeLoadError, RuntimeLoader
 
 def _write_revision(root, marker):
     root.mkdir()
-    (root / "alice_runtime.py").write_text(
+    (root / "logos_runtime.py").write_text(
         f'''STATE = []
 class Application:
     def __init__(self, host):
@@ -65,7 +65,7 @@ def test_two_revision_loaders_do_not_share_modules_or_state(tmp_path):
 def test_loader_rejects_imports_instead_of_claiming_thread_isolation(tmp_path):
     root = tmp_path / "revision"
     root.mkdir()
-    (root / "alice_runtime.py").write_text("import shared_branch_module\n", encoding="utf-8")
+    (root / "logos_runtime.py").write_text("import shared_branch_module\n", encoding="utf-8")
     dispatcher = RuntimeDispatcher()
     dispatcher.register_runtime("runtime")
     loader = RuntimeLoader(
@@ -108,7 +108,7 @@ def test_loader_reports_digest_and_missing_entrypoint(tmp_path):
 def test_loader_rejects_unreadable_entrypoint(tmp_path, monkeypatch):
     root = tmp_path / "revision"
     root.mkdir()
-    (root / "alice_runtime.py").write_text("def create_runtime(host): pass\n", encoding="utf-8")
+    (root / "logos_runtime.py").write_text("def create_runtime(host): pass\n", encoding="utf-8")
     dispatcher = RuntimeDispatcher()
     dispatcher.register_runtime("runtime")
     loader = RuntimeLoader(
@@ -138,7 +138,7 @@ def test_loader_rejects_unreadable_entrypoint(tmp_path, monkeypatch):
 def test_loader_rejects_invalid_runtime_contracts(tmp_path, source, message):
     root = tmp_path / "revision"
     root.mkdir()
-    (root / "alice_runtime.py").write_text(source, encoding="utf-8")
+    (root / "logos_runtime.py").write_text(source, encoding="utf-8")
     dispatcher = RuntimeDispatcher()
     dispatcher.register_runtime("runtime")
     loader = RuntimeLoader(

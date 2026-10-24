@@ -2,8 +2,8 @@
 
 Issue: #537
 
-`static/execution_surface.js` (`window.AliceExecutionSurface`) projects a
-sanitized ExecutionTrace into one read-only schema, `alice.execution_surface.v1`.
+`static/execution_surface.js` (`window.LogosExecutionSurface`) projects a
+sanitized ExecutionTrace into one read-only schema, `logos.execution_surface.v1`.
 The frontend keeps no execution state of its own. The projection holds:
 
 - `state`: `working`, `blocked`, `done`, `partial`, `error`, `timeout` or
@@ -23,4 +23,4 @@ prompts, payloads, tool arguments or credentials. `tests/test_execution_surface.
 enforces this with a canary.
 
 Chat replies that carry a trace show the compact view (`.execution-surface`)
-above the existing detailed timeline (`AliceTraceSummary`).
+above the existing detailed timeline (`LogosTraceSummary`).

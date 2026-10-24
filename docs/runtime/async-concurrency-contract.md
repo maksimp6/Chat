@@ -103,7 +103,7 @@ store.
 
 Tests that claim transaction coverage must exercise the real native Kristall store
 in a temporary journal, not a substitute, and must not reintroduce
-`ALICE_DATABASE_URL`.
+`LOGOS_DATABASE_URL`.
 
 ## Task cleanup
 

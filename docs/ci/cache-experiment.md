@@ -10,7 +10,7 @@ only Dockerfile, requirements.txt, requirements-dev.txt and package.json.
 Existing tags are retained; updates to moving upstream dependencies require an
 explicit environment-input change. Record the registry digest with measurements.
 
-L1: immutable GHCR content tag. L2: `type=gha,scope=alice-ci-image` layers.
+L1: immutable GHCR content tag. L2: `type=gha,scope=logos-ci-image` layers.
 L3: pip/npm BuildKit cache mounts. GHA exports layers, **not cache mounts**.
 L3 probes reuse the same live builder after changing an install-layer input.
 They do not establish persistence of downloaded packages across runner VMs.
@@ -58,7 +58,7 @@ ancestry checks. Measure setup, Docker build, immutable push, cache refresh,
 container start/readiness, seed, restart, verify separately. Production timings
 are historical evidence, not permission to deploy production during experiments.
 Use the existing registry cache for cold/warm/source/worker-JS/dependency trials;
-do not add a second cache. A shared alice-base remains a later measured experiment.
+do not add a second cache. A shared logos-base remains a later measured experiment.
 
 SQLite xdist workers select a separate temporary default database before test
 collection imports db/app modules. Explicit per-test database overrides remain

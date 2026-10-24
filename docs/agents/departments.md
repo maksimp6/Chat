@@ -12,7 +12,7 @@ The repository provides a persistent registry, stored in the native Kristall jou
 - POST /api/departments/:id/sessions
 - GET /api/departments/:id/sessions/:session
 
-Mutating endpoints require the backend-only ALICE_DEPARTMENTS_ADMIN_TOKEN. Discovery and session launch are read-only operations from the web UI.
+Mutating endpoints require the backend-only LOGOS_DEPARTMENTS_ADMIN_TOKEN. Discovery and session launch are read-only operations from the web UI.
 
 Department sessions are represented by the existing Invocation/ExecutionTrace infrastructure. Agents and tools must still pass through the Agent Gateway and Universal Tool Executor. Departments do not get a bypass path.
 

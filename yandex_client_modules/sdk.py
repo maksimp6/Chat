@@ -8,7 +8,7 @@ import json
 from core.config import upstream_model_id
 
 
-class AliceSDK:
+class LogosSDK:
     """SDK для работы с Yandex AI Studio API"""
 
     def __init__(self, api_key, project_id, base_url="https://ai.api.cloud.yandex.net/v1"):
@@ -57,7 +57,7 @@ class AliceSDK:
 if __name__ == "__main__":
     import os
 
-    sdk = AliceSDK(os.environ["YANDEX_API_KEY"], os.environ["YANDEX_PROJECT_ID"])
+    sdk = LogosSDK(os.environ["YANDEX_API_KEY"], os.environ["YANDEX_PROJECT_ID"])
 
     # Создать диалог
     conv = sdk.create_conversation()

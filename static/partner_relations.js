@@ -18,9 +18,9 @@
   function openPartnerRelationsModal() {
     closeModal();
 
-    var overlay = h("div", { id: "partner-relations-modal", class: "alice-dept-overlay" });
-    var card = h("div", { class: "alice-dept-card" });
-    var head = h("div", { class: "alice-dept-head" });
+    var overlay = h("div", { id: "partner-relations-modal", class: "logos-dept-overlay" });
+    var card = h("div", { class: "logos-dept-card" });
+    var head = h("div", { class: "logos-dept-head" });
     head.appendChild(h("h3", {}, "Partner Relations"));
     var close = h("button", { type: "button", "aria-label": "Закрыть" }, "×");
     close.onclick = closeModal;
@@ -49,14 +49,14 @@
     });
     card.appendChild(form);
 
-    var list = h("div", { class: "alice-dept-list" });
+    var list = h("div", { class: "logos-dept-list" });
     list.textContent = "Загрузка…";
     card.appendChild(list);
     overlay.appendChild(card);
     document.body.appendChild(overlay);
 
     function load() {
-      return window.AliceDispatcher.request("/api/partners", {
+      return window.LogosDispatcher.request("/api/partners", {
         headers: { Accept: "application/json" },
       })
         .then(function (r) {
@@ -73,7 +73,7 @@
             return;
           }
           partners.forEach(function (partner) {
-            var row = h("button", { type: "button", class: "alice-dept-row" });
+            var row = h("button", { type: "button", class: "logos-dept-row" });
             row.appendChild(h("strong", {}, partner.name));
             row.appendChild(
               h(
@@ -83,7 +83,7 @@
               ),
             );
             row.onclick = function () {
-              window.AliceDispatcher.request("/api/partners/" + encodeURIComponent(partner.id), {
+              window.LogosDispatcher.request("/api/partners/" + encodeURIComponent(partner.id), {
                 headers: { Accept: "application/json" },
               })
                 .then(function (r) {
@@ -123,7 +123,7 @@
       );
       var statusButton = h("button", { type: "button" }, "Сохранить статус");
       statusButton.onclick = function () {
-        window.AliceDispatcher.request(
+        window.LogosDispatcher.request(
           "/api/partners/" + encodeURIComponent(partner.id) + "/status",
           {
             method: "POST",
@@ -200,7 +200,7 @@
         if (followup.status === "open") {
           var done = h("button", { type: "button" }, "Готово");
           done.onclick = function () {
-            window.AliceDispatcher.request(
+            window.LogosDispatcher.request(
               "/api/partners/followups/" + encodeURIComponent(followup.id) + "/complete",
               {
                 method: "POST",
@@ -230,7 +230,7 @@
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       create.disabled = true;
-      window.AliceDispatcher.request("/api/partners", {
+      window.LogosDispatcher.request("/api/partners", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

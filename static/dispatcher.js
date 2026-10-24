@@ -16,15 +16,15 @@
   }
 
   function beginRequestTrace(input) {
-    if (!window.AliceCoreAPI || !window.AliceCoreAPI.trace) return null;
-    return window.AliceCoreAPI.trace.begin("dispatcher", "http.request", {
+    if (!window.LogosCoreAPI || !window.LogosCoreAPI.trace) return null;
+    return window.LogosCoreAPI.trace.begin("dispatcher", "http.request", {
       path: requestPath(input),
     });
   }
 
   function setNetworkStatus(status, message) {
-    if (!window.AliceCoreAPI || !window.AliceCoreAPI.status) return;
-    window.AliceCoreAPI.status.set("network", status, message, {
+    if (!window.LogosCoreAPI || !window.LogosCoreAPI.status) return;
+    window.LogosCoreAPI.status.set("network", status, message, {
       activeRequests: activeRequests,
       revocable: false,
     });
@@ -81,7 +81,7 @@
     return request(data.input, data.init, data.options);
   }
 
-  window.AliceDispatcher = Object.freeze({
+  window.LogosDispatcher = Object.freeze({
     request,
     dispatch,
   });

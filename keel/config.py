@@ -38,9 +38,9 @@ def _validate_no_plaintext_secrets(
     """Recursively check for plaintext secrets in config."""
     for key, value in data.items():
         if isinstance(value, dict):
-            # Secret refs are OK: {"ref": "alice/prod/..."}
+            # Secret refs are OK: {"ref": "logos/prod/..."}
             if "ref" in value and isinstance(value.get("ref"), str):
-                if not value["ref"].startswith("alice/"):
+                if not value["ref"].startswith("logos/"):
                     raise ConfigError(f"Invalid secret ref pattern at {path}.{key}: {value['ref']}")
                 continue
 
@@ -52,7 +52,7 @@ def _validate_no_plaintext_secrets(
                     _validate_no_plaintext_secrets(item, f"{path}.{key}[{i}]", is_secrets_file)
         elif isinstance(value, str):
             # In secrets section, only refs are allowed
-            if is_secrets_file and not value.startswith("alice/"):
+            if is_secrets_file and not value.startswith("logos/"):
                 raise ConfigError(f"Plaintext secret detected at {path}.{key}")
             # Everywhere, check for secret patterns
             elif _is_secret_pattern(value):
@@ -250,17 +250,17 @@ def validate_lane_invariants(lanes: Dict[str, Dict[str, Any]]) -> None:
             for key, value in lane_config.items():
                 if isinstance(value, str):
                     # Check for prod secrets in test lane
-                    if value.startswith("alice/prod/"):
+                    if value.startswith("logos/prod/"):
                         raise ConfigError(
                             f"Test lane cannot reference production secrets: {key} = {value}"
                         )
                     # Track secret references
-                    if value.startswith("alice/"):
+                    if value.startswith("logos/"):
                         lane_secret_refs[lane_name].add(value)
         else:
             # For non-test lanes, still track secret references
             for key, value in lane_config.items():
-                if isinstance(value, str) and value.startswith("alice/"):
+                if isinstance(value, str) and value.startswith("logos/"):
                     lane_secret_refs[lane_name].add(value)
 
     # Check that lanes don't share secret references

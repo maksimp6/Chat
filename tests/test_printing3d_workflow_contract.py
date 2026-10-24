@@ -15,7 +15,7 @@ from printing3d.video_archive import ArchiveError, GoogleDriveResumableClient, V
 
 SHA = "a" * 64
 REPORT = "b" * 64
-FILENAME = "Alice_test_PETG_A1mini.gcode.3mf"
+FILENAME = "Logos_test_PETG_A1mini.gcode.3mf"
 
 
 class PrintWorkflowTests(unittest.TestCase):
@@ -24,7 +24,7 @@ class PrintWorkflowTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.store = FileJobStore(Path(self.tmp.name))
         self.workflow = PrintWorkflow(self.store)
-        self.owner = "trusted:alice-user"
+        self.owner = "trusted:logos-user"
         self.job = self.store.create(self.owner, "artifact:allowed", SHA, "PETG")
         self.id = self.job["job_id"]
 

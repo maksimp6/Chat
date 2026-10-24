@@ -43,7 +43,7 @@ class TestChatMemoryStoreIntegration(unittest.TestCase):
             db_path = os.path.join(tmpdir, "integration.memory")
             with (
                 patch.object(db, "DB_PATH", db_path),
-                patch.dict(os.environ, {"ALICE_MEMORY_PATH": db_path}),
+                patch.dict(os.environ, {"LOGOS_MEMORY_PATH": db_path}),
                 patch.object(mcp_routes, "LogosClient", lambda _config: FakeClient()),
             ):
                 db.init_db()

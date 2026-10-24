@@ -87,9 +87,9 @@ def _app():
 
 def test_environment_gateway_runs_request_in_matching_runtime_thread(tmp_path, monkeypatch):
     repo = _setup_repo(tmp_path)
-    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
-    monkeypatch.setenv("ALICE_ENV_REPO_ROOT", str(repo))
-    monkeypatch.setenv("ALICE_ENV_RUNTIME_ROOT", str(tmp_path / "runtimes"))
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "logos.db"))
+    monkeypatch.setenv("LOGOS_ENV_REPO_ROOT", str(repo))
+    monkeypatch.setenv("LOGOS_ENV_RUNTIME_ROOT", str(tmp_path / "runtimes"))
     db.init_db()
     init_environment_tables()
 
@@ -118,9 +118,9 @@ def test_environment_gateway_runs_request_in_matching_runtime_thread(tmp_path, m
 
 def test_environment_gateway_preserves_streaming_from_runtime_thread(tmp_path, monkeypatch):
     repo = _setup_repo(tmp_path)
-    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
-    monkeypatch.setenv("ALICE_ENV_REPO_ROOT", str(repo))
-    monkeypatch.setenv("ALICE_ENV_RUNTIME_ROOT", str(tmp_path / "runtimes"))
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "logos.db"))
+    monkeypatch.setenv("LOGOS_ENV_REPO_ROOT", str(repo))
+    monkeypatch.setenv("LOGOS_ENV_RUNTIME_ROOT", str(tmp_path / "runtimes"))
     db.init_db()
     init_environment_tables()
 
@@ -140,9 +140,9 @@ def test_environment_gateway_preserves_streaming_from_runtime_thread(tmp_path, m
 
 def test_environment_gateway_rejects_stopped_runtime_without_transport(tmp_path, monkeypatch):
     repo = _setup_repo(tmp_path)
-    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
-    monkeypatch.setenv("ALICE_ENV_REPO_ROOT", str(repo))
-    monkeypatch.setenv("ALICE_ENV_RUNTIME_ROOT", str(tmp_path / "runtimes"))
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "logos.db"))
+    monkeypatch.setenv("LOGOS_ENV_REPO_ROOT", str(repo))
+    monkeypatch.setenv("LOGOS_ENV_RUNTIME_ROOT", str(tmp_path / "runtimes"))
     db.init_db()
     init_environment_tables()
 
@@ -215,8 +215,8 @@ def test_environment_gateway_isolates_memory_per_runtime(tmp_path, monkeypatch):
     control_db = tmp_path / "control.db"
     runtime_root = tmp_path / "runtimes"
     monkeypatch.setattr(db, "DB_PATH", str(control_db))
-    monkeypatch.setenv("ALICE_ENV_REPO_ROOT", str(repo))
-    monkeypatch.setenv("ALICE_ENV_RUNTIME_ROOT", str(runtime_root))
+    monkeypatch.setenv("LOGOS_ENV_REPO_ROOT", str(repo))
+    monkeypatch.setenv("LOGOS_ENV_RUNTIME_ROOT", str(runtime_root))
     db.init_db()
     init_environment_tables()
 
@@ -240,8 +240,8 @@ def test_environment_gateway_isolates_memory_per_runtime(tmp_path, monkeypatch):
         assert second_read["runtime_id"] == second["environment_id"]
         assert first_read["data_root"] != second_read["data_root"]
 
-        first_db = runtime_root / first["environment_id"] / "data" / "alice.memory"
-        second_db = runtime_root / second["environment_id"] / "data" / "alice.memory"
+        first_db = runtime_root / first["environment_id"] / "data" / "logos.memory"
+        second_db = runtime_root / second["environment_id"] / "data" / "logos.memory"
         assert first_db.is_file()
         assert second_db.is_file()
         assert first_db != second_db
@@ -258,7 +258,7 @@ def test_environment_gateway_isolates_memory_per_runtime(tmp_path, monkeypatch):
 def test_environment_gateway_rejects_cross_owner_before_runtime_dispatch(monkeypatch):
     app = Flask(__name__)
     app.register_blueprint(environment_gateway_bp)
-    monkeypatch.setattr(environment_routes, "_owner", lambda: "alice")
+    monkeypatch.setattr(environment_routes, "_owner", lambda: "logos")
 
     def reject(_environment_id, _owner_id):
         raise environment_routes.RuntimeOwnerViolation("runtime-b")
@@ -285,7 +285,7 @@ def test_authorize_environment_runtime_preserves_missing_runtime(monkeypatch):
     monkeypatch.setattr(environment_manager, "_get", lambda _environment_id: None)
 
     with pytest.raises(environment_manager.RuntimeNotFound):
-        environment_manager.authorize_environment_runtime("missing", "alice")
+        environment_manager.authorize_environment_runtime("missing", "logos")
 
 
 def test_authorize_environment_runtime_rejects_cross_owner_stopped_runtime(monkeypatch):
@@ -304,4 +304,4 @@ def test_authorize_environment_runtime_rejects_cross_owner_stopped_runtime(monke
     )
 
     with pytest.raises(environment_manager.RuntimeOwnerViolation):
-        environment_manager.authorize_environment_runtime("runtime-b", "alice")
+        environment_manager.authorize_environment_runtime("runtime-b", "logos")

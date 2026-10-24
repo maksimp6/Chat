@@ -1,4 +1,4 @@
-"""Small on-device, supervised *shape-template* vision model for Alice CAD previews.
+"""Small on-device, supervised *shape-template* vision model for Logos CAD previews.
 
 Actual inference uses foreground pixels and calibrated component signatures.
 It is NOT a general-purpose image model or a physical-photo accuracy claim.
@@ -21,7 +21,7 @@ from PIL import Image
 from scripts.visual_object_benchmark import _crop_image, _safe_image
 from scripts.visual_object_contract import intersection_over_union, load_cases
 
-SCHEMA = "alice-shape-template-v1"
+SCHEMA = "logos-shape-template-v1"
 GRID = 12
 MAX_EDGE = 512
 MAX_PIXELS = 12_000_000

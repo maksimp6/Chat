@@ -163,8 +163,8 @@ def run_native(root: Path, temporary: Path, environ: dict[str, str]) -> tuple[di
             ),
         ]
         child_env = dict(environ)
-        child_env["ALICE_MEMORY_PATH"] = str(temporary / "logos-dialogue.memory")
-        child_env["ALICE_PROVIDER_CREDENTIAL_KEY"] = secrets.token_urlsafe(32)
+        child_env["LOGOS_MEMORY_PATH"] = str(temporary / "logos-dialogue.memory")
+        child_env["LOGOS_PROVIDER_CREDENTIAL_KEY"] = secrets.token_urlsafe(32)
         for phase, command in commands:
             print("logos phase=" + phase, flush=True)
             stage_env = {
@@ -180,7 +180,7 @@ def run_native(root: Path, temporary: Path, environ: dict[str, str]) -> tuple[di
                     "GITHUB_TOKEN",
                     "YANDEX_API_KEY",
                     "YANDEX_PROJECT_ID",
-                    "ALICE_PROVIDER_CREDENTIAL_KEY",
+                    "LOGOS_PROVIDER_CREDENTIAL_KEY",
                 ),
             }.get(phase, ())
             stage_env.update(

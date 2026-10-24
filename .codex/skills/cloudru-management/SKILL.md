@@ -66,7 +66,7 @@ not an immutable commit; enforce SHA/digest checks in the pipeline.
 - Capture EDS output privately and publish only validated resource IDs/status.
   JSON formatting is not redaction. Job logs and HTTP errors may contain secrets.
 - Separate deployment IAM/EDS credentials from S3 and model keys.
-  Preserve `ALICE_PROVIDER_CREDENTIAL_KEY` across redeploys and restore.
+  Preserve `LOGOS_PROVIDER_CREDENTIAL_KEY` across redeploys and restore.
 - New secret/KMS integrations must use provider boundaries and redact before
   tracing. Do not assume an adapter or env variable exists until checked in code.
 

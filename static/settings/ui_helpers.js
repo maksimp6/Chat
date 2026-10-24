@@ -138,7 +138,7 @@
     var variant = bg === "accent" || bg === "success" || bg === "danger" ? bg : "default";
     var extraClass = extra ? " settings-btn-extra" : "";
     return (
-      '<button class="alice-btn settings-btn settings-btn-' +
+      '<button class="logos-btn settings-btn settings-btn-' +
       variant +
       extraClass +
       '" id="' +

@@ -22,15 +22,15 @@ def test_runtime_database_scope_is_private_and_context_is_restored(tmp_path):
     assert current_runtime_id() is None and current_runtime_data_root() is None
     assert db.get_config("probe") == "host"
     close_memory_clients()
-    with Kristall(first / "alice.memory") as store:
+    with Kristall(first / "logos.memory") as store:
         assert store.get("config/probe") == {"value": "alpha"}
-    with Kristall(second / "alice.memory") as store:
+    with Kristall(second / "logos.memory") as store:
         assert store.get("config/probe") == {"value": "beta"}
 
 
 @pytest.mark.parametrize("fail_runtime", [False, True])
 def test_host_scope_restored_after_runtime_error(tmp_path, monkeypatch, fail_runtime):
-    monkeypatch.setenv("ALICE_DATABASE_URL", "postgresql://unused.invalid/retired")
+    monkeypatch.setenv("LOGOS_DATABASE_URL", "postgresql://unused.invalid/retired")
     host = db.get_store()
     root = tmp_path / "runtime"
 
@@ -47,4 +47,4 @@ def test_host_scope_restored_after_runtime_error(tmp_path, monkeypatch, fail_run
     else:
         work()
     assert db.get_store() is host
-    assert Path(root / "alice.memory").is_file()
+    assert Path(root / "logos.memory").is_file()

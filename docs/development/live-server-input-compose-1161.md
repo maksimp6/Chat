@@ -1,8 +1,8 @@
-# Alice Live Server input composition — staging only
+# Logos Live Server input composition — staging only
 
 Refs #1161 #650 #1082 #1085 #1087 #1089.
 
-**Scope:** reproducible single-checkout assembly of four independently owned staging branches for offline security, mouse, keyboard, and synthetic integration tests. This change **does not control a phone** and must **not** be used as an alternative to Alice Pro Live Server. No RDC, Termux, ADB or direct root-shell device E2E is authorized.
+**Scope:** reproducible single-checkout assembly of four independently owned staging branches for offline security, mouse, keyboard, and synthetic integration tests. This change **does not control a phone** and must **not** be used as an alternative to Logos Pro Live Server. No RDC, Termux, ADB or direct root-shell device E2E is authorized.
 
 ## Exact source provenance
 
@@ -23,9 +23,9 @@ The C and signed socket fixtures use mocked/synthetic input. **A green result is
 
 ## Hard NO-MERGE / NO-CUTOVER gates
 
-1. Connect **only** Alice Pro Live Server's authenticated owner session to an independently root-owned C verifier. No direct `su`, ADB, RDC, Termux or alternative input transport from the assistant/client.
+1. Connect **only** Logos Pro Live Server's authenticated owner session to an independently root-owned C verifier. No direct `su`, ADB, RDC, Termux or alternative input transport from the assistant/client.
 2. Prove on Redmi 9, **through Live Server**, a signed mouse click, keyboard chord with key release, and Unicode copy → clipboard → paste, with bounded per-action trace and resulting on-screen evidence (no user secrets published).
 3. Prove wrong-device/role, forged session, replay, TTL expiry, backend crash, timeout and `UI_DEV_DESTROY` fail closed; test clipboard consent and secret redaction.
 4. Exact-head required CI and independent review; then explicit user acceptance. No merge/cutover until all evidence is real.
 
-**Excluded from this project:** Twitch/Xtra/Dota 2 stream playback. This was the user's personal activity, not an Alice input blocker.
+**Excluded from this project:** Twitch/Xtra/Dota 2 stream playback. This was the user's personal activity, not an Logos input blocker.

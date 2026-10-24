@@ -20,7 +20,7 @@ from secret_store.key_manager import (
 
 def setup_env(monkeypatch):
     monkeypatch.setenv(
-        "ALICE_KEY_MANAGER_KEY",
+        "LOGOS_KEY_MANAGER_KEY",
         base64.urlsafe_b64encode(b"0" * 32).decode("ascii"),
     )
 
@@ -105,7 +105,7 @@ def test_expired_key_is_not_readable(isolated_db):
 
 
 def test_invalid_encryption_key_fails_closed(isolated_db, monkeypatch):
-    monkeypatch.setenv("ALICE_KEY_MANAGER_KEY", "not-a-fernet-key")
+    monkeypatch.setenv("LOGOS_KEY_MANAGER_KEY", "not-a-fernet-key")
     with pytest.raises(KeyManagerError):
         store_secret(
             secret="secret",

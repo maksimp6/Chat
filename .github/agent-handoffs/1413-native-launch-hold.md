@@ -22,7 +22,7 @@ separately authorized code change must meet the court's return conditions.
 
 | Entry | Trigger / path | Enforcement |
 | --- | --- | --- |
-| `logos.yml` | Trusted Issue open/mention/comment, `alice` label; retries rerun this job | Mandatory early preflight after checkout, before credentials; `run_issue_task` also denies before `app`, files, invocation or client initialization. |
+| `logos.yml` | Trusted Issue open/mention/comment, `logos` label; retries rerun this job | Mandatory early preflight after checkout, before credentials; `run_issue_task` also denies before `app`, files, invocation or client initialization. |
 | `rag-work.yml`, `mode=logos` | Manual native dialogue | Early mode-specific preflight before context/upload/runtime; `run_dialogue` and `_ask` guard before native generation/tool loop. |
 | `semantic-work.yml` | Approved query/red/vector model branch; historical repository model demo | Early model-branch preflight; semantic CLI, direct vector model demo and `yandex_call` guard before external model work. |
 | `launch-smoke.yml`, `live_provider=true` | Optional real provider test | Unconditional first live-job failure before protected-master checkout; runtime full smoke denies before credentials/server. Offline job is unchanged. |
@@ -35,7 +35,7 @@ The live-smoke workflow preflight is self-contained because its protected-master
 checkout may not yet contain the new guard module. Its ref, environment and
 permissions are unchanged.
 
-`alice-awakening.yml` emits a scheduled signal; it does not call a model. Its
+`logos-awakening.yml` emits a scheduled signal; it does not call a model. Its
 schedule and permissions were not changed. `rag_pipeline.yandex_embeddings` is
 a latent optional function, not invoked by its current CLI. Ordinary application
 UI/HTTP routes, `agent_runtime.cli`, `crl.sh` and `test_api.sh` are outside this

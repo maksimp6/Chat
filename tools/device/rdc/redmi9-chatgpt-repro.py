@@ -2,7 +2,7 @@
 import subprocess, time, re, csv, os
 
 serial = "192.168.31.29:35087"
-out = os.path.expanduser("~/.alice-rdc/redmi9-chatgpt-repro-20261011.csv")
+out = os.path.expanduser("~/.logos-rdc/redmi9-chatgpt-repro-20261011.csv")
 
 
 def sh(s):

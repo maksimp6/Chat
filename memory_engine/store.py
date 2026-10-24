@@ -189,7 +189,7 @@ def _open_directory_nofollow(directory: Path, *, trusted: bool | None = None) ->
     absolute = Path(os.path.abspath(directory))
     fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
     if trusted is None:
-        trusted = os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1"
+        trusted = os.environ.get("LOGOS_MEMORY_TRUSTED_ROOT") == "1"
     try:
         if trusted:
             _verify_trusted_ancestor(fd)
@@ -273,7 +273,7 @@ def _open_journal_nofollow(
         if not stat.S_ISREG(os.fstat(fd).st_mode):
             raise StoreError("journal must be a regular file")
         if trusted is None:
-            trusted = os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1"
+            trusted = os.environ.get("LOGOS_MEMORY_TRUSTED_ROOT") == "1"
         if trusted:
             _verify_private_file(fd)
         return fd
@@ -294,7 +294,7 @@ class _JournalStore:
 
     def __init__(self, path: str | Path, *, trusted: bool | None = None) -> None:
         self._trusted = (
-            (os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1") if trusted is None else trusted
+            (os.environ.get("LOGOS_MEMORY_TRUSTED_ROOT") == "1") if trusted is None else trusted
         )
         self._pid = os.getpid()
         self.path = Path(path)
@@ -615,7 +615,7 @@ class _JournalStore:
             source_fd = _open_journal_nofollow(
                 source_dir, source.name, os.O_RDONLY, trusted=trusted
             )
-            temp_name = ".alice-copy-" + os.urandom(16).hex()
+            temp_name = ".logos-copy-" + os.urandom(16).hex()
             temp_fd = _open_journal_nofollow(
                 target_dir, temp_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, trusted=trusted
             )

@@ -95,7 +95,7 @@ def _install_callbacks(
         else:
             from .bambu_requests import encode_pushall, request_topic
 
-            _client.publish(request_topic(serial), encode_pushall("alice_status_1"), qos=0)
+            _client.publish(request_topic(serial), encode_pushall("logos_status_1"), qos=0)
 
     def on_message(_client: Any, _userdata: Any, message: Any) -> None:
         try:

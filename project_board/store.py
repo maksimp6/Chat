@@ -1,4 +1,4 @@
-"""Private durable Alice Board, backed by the existing append-only FileMemoryDB.
+"""Private durable Logos Board, backed by the existing append-only FileMemoryDB.
 
 One process owns the board. Each event is one checksummed/fsynced Memory DB put.
 No SQL, GitHub API, timers or production cutover.
@@ -121,7 +121,7 @@ class BoardStore:
         if not any(t["category"] == "shame" for t in self.threads()):
             self.create_thread(
                 "Доска позора",
-                "Подтверждённые ошибки Alice Pro и регрессионные проверки.",
+                "Подтверждённые ошибки Logos Pro и регрессионные проверки.",
                 "shame",
                 "bootstrap:project-board:shame:v1",
                 actor="system",

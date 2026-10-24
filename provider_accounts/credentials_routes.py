@@ -35,7 +35,7 @@ from yandex_client_modules.api_key_provider import YandexApiKeyProvider
 from provider_accounts.model_discovery import invalidate_model_discovery_cache
 
 
-logger = logging.getLogger("alice.provider_credentials")
+logger = logging.getLogger("logos.provider_credentials")
 
 
 provider_credentials_bp = Blueprint(
@@ -49,7 +49,7 @@ CLOUDRU_DEFAULT_TTL = timedelta(days=1)
 
 def _authorized() -> bool:
     """Authorize provider-credential administration without exposing secrets publicly."""
-    configured = os.getenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "").strip()
+    configured = os.getenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", "").strip()
     if configured:
         auth = request.headers.get("Authorization", "")
         token = auth[7:].strip() if auth.startswith("Bearer ") else ""
@@ -58,7 +58,7 @@ def _authorized() -> bool:
     # When the application's short-token gate is enabled, its before_request
     # middleware has already authenticated this request. Reuse that session
     # rather than introducing a second browser credential.
-    if os.getenv("ALICE_REQUIRE_SHORT_TOKEN", "").strip().lower() in {"1", "true", "yes", "on"}:
+    if os.getenv("LOGOS_REQUIRE_SHORT_TOKEN", "").strip().lower() in {"1", "true", "yes", "on"}:
         return True
 
     # Fail closed for remote deployments when no explicit admin token is set.
@@ -85,7 +85,7 @@ def _guard():
                 "error": "provider_credential_admin_authentication_required",
                 "detail": (
                     "Request rejected before provider API-key validation. "
-                    "Configure ALICE_PROVIDER_CREDENTIALS_TOKEN and send "
+                    "Configure LOGOS_PROVIDER_CREDENTIALS_TOKEN and send "
                     "Authorization: Bearer <token>, or enable the authenticated "
                     "short-token session."
                 ),
@@ -414,8 +414,8 @@ def bootstrap_cloudru():
         expires_at = datetime.now(timezone.utc) + _cloudru_ttl()
         key = management.create_api_key(
             service_account_id=service_account_id,
-            name="Alice Pro Foundation Models",
-            description="Managed by Alice Pro; rotated daily",
+            name="Logos Pro Foundation Models",
+            description="Managed by Logos Pro; rotated daily",
             products=["foundation-models"],
             expires_at=expires_at.isoformat().replace("+00:00", "Z"),
         )

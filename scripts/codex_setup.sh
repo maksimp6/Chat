@@ -2,7 +2,7 @@
 set -euxo pipefail
 umask 077
 
-INSTALL_DIR="$HOME/.local/lib/alice-pro"
+INSTALL_DIR="$HOME/.local/lib/logos-pro"
 BIN_DIR="$HOME/.local/bin"
 
 mkdir -p "$INSTALL_DIR" "$BIN_DIR"

@@ -1,5 +1,5 @@
-#ifndef ALICE_KEYBOARD_UINPUT_DEVICE_H
-#define ALICE_KEYBOARD_UINPUT_DEVICE_H
+#ifndef LOGOS_KEYBOARD_UINPUT_DEVICE_H
+#define LOGOS_KEYBOARD_UINPUT_DEVICE_H
 #include "keyboard.h"
 #include <sys/types.h>
 typedef struct {

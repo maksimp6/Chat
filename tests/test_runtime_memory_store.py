@@ -7,7 +7,7 @@ from kristall.store import KristallError
 
 
 def test_registry_owns_one_native_engine_and_reopens(tmp_path):
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     first = get_memory_client(path)
     assert first is get_memory_client(path)
     first.set("a", 1)

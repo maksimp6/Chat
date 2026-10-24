@@ -5,7 +5,7 @@ description: Inspect or prepare a single Bambu A1 mini 3MF artifact; verify that
 
 ## Purpose
 
-Move from STL/OBJ/3MF (and approved game assets) to **one** verified, printer-targeted `.gcode.3mf` artifact and a traceable preflight report. For Alice Pro's Bambu Lab A1 mini, confirm printer, filament, 0.4 mm nozzle profile, and actual sliced G-code before proposing a print.
+Move from STL/OBJ/3MF (and approved game assets) to **one** verified, printer-targeted `.gcode.3mf` artifact and a traceable preflight report. For Logos Pro's Bambu Lab A1 mini, confirm printer, filament, 0.4 mm nozzle profile, and actual sliced G-code before proposing a print.
 
 ## Non-goals
 
@@ -23,7 +23,7 @@ Move from STL/OBJ/3MF (and approved game assets) to **one** verified, printer-ta
 
 ## Tools
 
-- `printing3d.plate.inspect`: local Universal Tool Executor, read-only, owner-scoped; requires operator-configured `ALICE_3D_ARTIFACT_ROOT` and an owner-staged filename.
+- `printing3d.plate.inspect`: local Universal Tool Executor, read-only, owner-scoped; requires operator-configured `LOGOS_3D_ARTIFACT_ROOT` and an owner-staged filename.
 - `python -m printing3d.plate path/to/file.gcode.3mf`: local offline preflight of a supplied artifact; no network, upload or printer actions.
 - Existing `printing3d.quote` for material/time/cost **only after** slicer or provided evidence supplies non-missing drivers.
 - Approved STL/mesh/CAD conversion and Bambu Studio/OrcaSlicer only if actually available; do not pretend conversion/slicing occurred.

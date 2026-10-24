@@ -1,4 +1,4 @@
-"""Loopback-only HTTP API for Alice Board with explicit owner Bearer authorization."""
+"""Loopback-only HTTP API for Logos Board with explicit owner Bearer authorization."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def _fields(data: dict[str, Any], *, allowed: set[str], required: set[str]) -> N
 class BoardHandler(BaseHTTPRequestHandler):
     _store: BoardStore
     _owner_token: str
-    server_version = "AliceBoard/0.1"
+    server_version = "LogosBoard/0.1"
     sys_version = ""
 
     def setup(self) -> None:
@@ -207,7 +207,7 @@ def create_server(
 ) -> ThreadingHTTPServer:
     """Create a single-process board API; never expose it to a network interface."""
     if host != "127.0.0.1":
-        raise ValueError("Alice Board must bind to loopback behind a trusted proxy")
+        raise ValueError("Logos Board must bind to loopback behind a trusted proxy")
     if not isinstance(token, str) or len(token) < 32:
         raise ValueError("PROJECT_BOARD_TOKEN must be a high-entropy secret of 32+ characters")
 

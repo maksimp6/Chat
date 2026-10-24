@@ -1,4 +1,4 @@
-# Alice Mouse — модуль управления указателем (staging)
+# Logos Mouse — модуль управления указателем (staging)
 
 Версия: модуль для интеграции, **не развернут в root-сервисе**. Issue #650 / PR #1082.
 
@@ -12,7 +12,7 @@
 | `Cursor` | Ограничение координат, смена ориентации/разрешения |
 | `RecordingBackend` | Безопасный тестовый backend без реального ввода |
 | `RootSocketBackend` | Опциональный Unix transport; **не разрешён к включению в production** |
-| `tests/alice_mouse_stage/` | C v10, fault injection, HTTP/C verifier и визуальный Alice Pet |
+| `tests/logos_mouse_stage/` | C v10, fault injection, HTTP/C verifier и визуальный Logos Pet |
 
 ## Пример безопасного использования
 
@@ -55,8 +55,8 @@ Authenticated Live Server
 
 ```sh
 python -m pytest -q tests/test_remote_input_module.py \
-  tests/alice_mouse_stage/test_alice_mouse_signed_broker_v4_candidate.py \
-  tests/alice_mouse_stage/test_cursor_stage.py
+  tests/logos_mouse_stage/test_logos_mouse_signed_broker_v4_candidate.py \
+  tests/logos_mouse_stage/test_cursor_stage.py
 ```
 
-C fault harness, BTN/SYN tests и teardown — отдельно в `tests/alice_mouse_stage`.
+C fault harness, BTN/SYN tests и teardown — отдельно в `tests/logos_mouse_stage`.

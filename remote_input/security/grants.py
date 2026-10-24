@@ -1,4 +1,4 @@
-"""Versioned Alice Input grant protocol; isolated, no real input.
+"""Versioned Logos Input grant protocol; isolated, no real input.
 
 SECURITY MODEL: AuthenticatedPrincipal can only be minted by trusted Live
 Server code after owner authentication. Root process must independently verify

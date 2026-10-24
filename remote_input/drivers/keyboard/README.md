@@ -1,4 +1,4 @@
-# Alice Keyboard: C evdev core (staging)
+# Logos Keyboard: C evdev core (staging)
 
 Issue #1087; parent #650. Hardware-keyboard behavior is implemented as a small C state machine that emits EV_KEY + SYN_REPORT through an injected callback. This commit **does not create** a /dev/uinput device and does not send keys to Android.
 
@@ -12,10 +12,10 @@ Issue #1087; parent #650. Hardware-keyboard behavior is implemented as a small C
 ## Test on Termux
 
 ```sh
-clang -std=gnu11 -Wall -Wextra -Werror -O2 -pthread -Ialice_mouse/drivers/keyboard \
+clang -std=gnu11 -Wall -Wextra -Werror -O2 -pthread -Ilogos_mouse/drivers/keyboard \
  remote_input/drivers/keyboard/keyboard.c tests/remote_input_keyboard/test_keyboard.c \
- -o /data/data/com.termux/files/usr/tmp/alice-keyboard-test
-/data/data/com.termux/files/usr/tmp/alice-keyboard-test
+ -o /data/data/com.termux/files/usr/tmp/logos-keyboard-test
+/data/data/com.termux/files/usr/tmp/logos-keyboard-test
 ```
 
 Required before cutover: independently protected root key/session, uinput setup + UI_DEV_DESTROY, real Android InputReader recognition, physical chord/key-up/fault/restart E2E, Unicode IME, CI and owner acceptance. No SELinux changes, no live daemon replacement, no merge.

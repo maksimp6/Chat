@@ -27,7 +27,7 @@ def test_offline_probe_reports_native_contracts_and_cleans_owned_files(tmp_path)
         cwd=ROOT,
         env={
             **os.environ,
-            "ALICE_MEMORY_PATH": str(parent_memory),
+            "LOGOS_MEMORY_PATH": str(parent_memory),
             "HTTP_PROXY": "http://127.0.0.1:1",
             "HTTPS_PROXY": "http://127.0.0.1:1",
             "NO_PROXY": "127.0.0.1,localhost",

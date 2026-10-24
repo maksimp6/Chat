@@ -1,4 +1,4 @@
-"""Regression checks for the Alice Pro marketplace exclusion policy."""
+"""Regression checks for the Logos Pro marketplace exclusion policy."""
 
 import ast
 from pathlib import Path
@@ -31,7 +31,7 @@ def _production_blocklist():
     return tuple(ast.literal_eval(assignment.value))
 
 
-class CapturingAliceClient(mcp_mixin.YandexMcpMixin):
+class CapturingLogosClient(mcp_mixin.YandexMcpMixin):
     mandatory_blocked_web_domains = _production_blocklist()
 
     def ask(self, message, model_key, conversation_id=None, params=None, execution_trace=None):
@@ -44,10 +44,10 @@ def _capture_web_tools(monkeypatch, settings=None, params=None):
     monkeypatch.setattr(mcp_mixin, "get_conv_settings", lambda conversation_id: settings)
     monkeypatch.setattr(mcp_mixin.registry, "get_tools_by_category", lambda category: [])
 
-    client = CapturingAliceClient()
+    client = CapturingLogosClient()
     client.ask_with_mcp(
         "Find PETG nozzles",
-        "aliceai-llm",
+        "logosai-llm",
         conversation_id="marketplace-policy",
         params=params,
     )
@@ -67,7 +67,7 @@ def test_default_web_search_blocks_marketplace_without_blocking_yandex_services(
     assert tools[0]["search_context_size"] == "medium"
     assert "allowed_domains" not in tools[0]["filters"]
     assert _normalize(tools[0]["filters"]["blocked_domains"]) == set(
-        CapturingAliceClient.mandatory_blocked_web_domains
+        CapturingLogosClient.mandatory_blocked_web_domains
     )
     assert "yandex.ru" not in _normalize(tools[0]["filters"]["blocked_domains"])
 
@@ -93,7 +93,7 @@ def test_saved_allowlist_cannot_reenable_yandex_market(monkeypatch):
     assert tools[0]["filters"]["allowed_domains"] == ["cloud.yandex.ru", "shop.example"]
     blocked = tools[0]["filters"]["blocked_domains"]
     assert "ads.example" in blocked
-    assert _normalize(blocked).issuperset(CapturingAliceClient.mandatory_blocked_web_domains)
+    assert _normalize(blocked).issuperset(CapturingLogosClient.mandatory_blocked_web_domains)
     assert sum(domain.casefold() == "market.yandex.ru" for domain in blocked) == 1
 
 

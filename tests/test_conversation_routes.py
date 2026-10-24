@@ -52,7 +52,7 @@ def test_list_conversations_rejects_invalid_owner_token(monkeypatch):
     client = app_module.app.test_client()
     response = client.get(
         "/api/conversations",
-        headers={"X-Alice-User-Token": "not-a-valid-token"},
+        headers={"X-Logos-User-Token": "not-a-valid-token"},
     )
 
     assert response.status_code == 401

@@ -20,8 +20,8 @@ from urllib import error, parse, request
 from scripts.render_3d_preview import PreviewError
 from scripts.render_3d_worker import bounded_render
 
-MARKER = "<!-- alice-3d-preview:v1 -->"
-PREVIEW_BRANCH = "alice-3d-previews"
+MARKER = "<!-- logos-3d-preview:v1 -->"
+PREVIEW_BRANCH = "logos-3d-previews"
 INPUT_PREFIX = "printing3d/models/"
 INPUT_PREFIXES = (INPUT_PREFIX, "printing3d/assets/")
 OUTPUT_PREFIX = "printing3d/previews/"
@@ -62,7 +62,7 @@ class Github:
             "Accept": "application/vnd.github+json",
             "Authorization": "Bearer " + self.token,
             "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "alice-pro-3d-preview/1",
+            "User-Agent": "logos-pro-3d-preview/1",
         }
         if raw is not None:
             headers["Content-Type"] = "application/json"
@@ -253,8 +253,8 @@ def render_report(
     """Publish successful PNGs and return the bot-owned Markdown comment body."""
     summary = [
         MARKER,
-        f"<!-- alice-3d-preview:head:{_sha(sha)} -->",
-        "### 3D model previews · Alice Pro",
+        f"<!-- logos-3d-preview:head:{_sha(sha)} -->",
+        "### 3D model previews · Logos Pro",
         rf"PR head: `{_sha(sha)[:12]}` · *geometry only, not print approval*.",
     ]
     artifact_pngs = []
@@ -365,7 +365,7 @@ def run(
     if (
         not refresh
         and prior is not None
-        and f"<!-- alice-3d-preview:head:{head_sha} -->" in prior.get("body", "")
+        and f"<!-- logos-3d-preview:head:{head_sha} -->" in prior.get("body", "")
     ):
         return "unchanged"
     return _publish_current_report(

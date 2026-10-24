@@ -8,7 +8,7 @@ A **secret** is sensitive data (API keys, passwords, signing keys) that:
 
 - Never appears in config files or code
 - Lives in secure external storage (e.g., HashiCorp Vault, AWS Secrets Manager)
-- Is referenced by a canonical path (e.g., `alice/prod/oauth-client-secret`)
+- Is referenced by a canonical path (e.g., `logos/prod/oauth-client-secret`)
 - Is injected at runtime by the deployment system
 
 ## Secret References
@@ -19,8 +19,8 @@ Configuration files reference secrets by path, never by value:
 # config/platform/secrets.yaml
 secrets:
   oauth:
-    client_secret: alice/prod/oauth-client-secret
-    signing_key: alice/prod/oauth-signing-key
+    client_secret: logos/prod/oauth-client-secret
+    signing_key: logos/prod/oauth-signing-key
 ```
 
 The actual secret values are:
@@ -31,21 +31,21 @@ The actual secret values are:
 
 ## Path Structure
 
-Secret paths follow a pattern: `alice/<lane>/<service>/<secret-name>`
+Secret paths follow a pattern: `logos/<lane>/<service>/<secret-name>`
 
 Examples:
-- `alice/prod/oauth-client-secret` — OAuth client secret in production
-- `alice/test/oauth-client-secret` — OAuth client secret for testing
-- `alice/prod/chrome-signing-key` — Chrome worker signing key in production
+- `logos/prod/oauth-client-secret` — OAuth client secret in production
+- `logos/test/oauth-client-secret` — OAuth client secret for testing
+- `logos/prod/chrome-signing-key` — Chrome worker signing key in production
 
 ### Lane Scoping
 
 Secrets are scoped to lanes to prevent accidental cross-lane mixing:
 
-- `alice/prod/*` — Production secrets, high-security requirements
-- `alice/test/*` — Test secrets, development-only values
+- `logos/prod/*` — Production secrets, high-security requirements
+- `logos/test/*` — Test secrets, development-only values
 
-The platform enforces: **Test lane cannot reference production secrets** (`alice/prod/*`).
+The platform enforces: **Test lane cannot reference production secrets** (`logos/prod/*`).
 
 This prevents:
 - Accidentally using production credentials in tests
@@ -75,16 +75,16 @@ Example test secret setup:
 
 ```bash
 # Create test secrets
-vault kv put secret/alice/test/oauth-client-secret value="test-client-secret-12345678901234567890"
-vault kv put secret/alice/test/oauth-signing-key value="test-key-12345678901234567890123456"
+vault kv put secret/logos/test/oauth-client-secret value="test-client-secret-12345678901234567890"
+vault kv put secret/logos/test/oauth-signing-key value="test-key-12345678901234567890123456"
 ```
 
 ## Validation Rules
 
 The configuration validator checks:
 
-1. **Valid paths**: All secret refs match `alice/<lane>/<...>` pattern
-2. **Lane consistency**: Test lane doesn't reference `alice/prod/*`
+1. **Valid paths**: All secret refs match `logos/<lane>/<...>` pattern
+2. **Lane consistency**: Test lane doesn't reference `logos/prod/*`
 3. **No plaintext secrets**: No actual credential values in YAML
 4. **No secret patterns**: Rejects strings that look like secrets (base64, PEM keys, etc) outside the secrets section
 5. **Service references**: Only defined services can have secrets
@@ -134,7 +134,7 @@ Production secret access is also:
 
 ### Creating a new secret
 
-1. Decide the path: `alice/<lane>/<service>/<name>`
+1. Decide the path: `logos/<lane>/<service>/<name>`
 2. Generate a secure random value
 3. Store in secret storage with access controls
 4. Add reference to `config/platform/secrets.yaml`

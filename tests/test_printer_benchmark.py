@@ -26,7 +26,7 @@ def test_invalid_measurement_parameters(iterations, rounds):
 
 def test_machine_readable_report():
     result = run(iterations=5, rounds=3)
-    assert result["schema"] == "alice-printer-benchmark-v1"
+    assert result["schema"] == "logos-printer-benchmark-v1"
     assert result["mode"] == "mock-no-network"
     assert set(result["results"]) == {
         "frame_decode",

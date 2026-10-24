@@ -11,7 +11,7 @@ def test_core_initialization_is_named_and_idempotent():
     assert "function initCore()" in source
     assert "coreInitialized" in source
     assert "initCore();" in source
-    assert "window.AliceBoot.markShellReady()" in source
+    assert "window.LogosBoot.markShellReady()" in source
 
 
 def test_core_remote_enhancement_isolated_from_shell_initialization():
@@ -25,7 +25,7 @@ def test_core_remote_enhancement_isolated_from_shell_initialization():
 def test_core_model_ui_uses_state_classes_instead_of_inline_display():
     source = read("static/core.js")
 
-    assert "alice-model-voice" in source
-    assert "alice-model-multimodal" in source
+    assert "logos-model-voice" in source
+    assert "logos-model-multimodal" in source
     assert "style.display = isVoice" not in source
     assert "style.display = isMultimodal" not in source

@@ -12,7 +12,7 @@ import secrets
 import shutil
 import sys
 
-BASE = Path.home() / ".alice-rdc"
+BASE = Path.home() / ".logos-rdc"
 DEST = BASE / "hardening-v1"
 EXPECTED = {
     "android_live_server.py": "d65962c0b1320e02e0b2a8d0185c0d825d4608bc6cbdddebda3f63fdc39ebd8e",
@@ -36,8 +36,8 @@ def build_actions(s):
     )
     s = replace(
         s,
-        'POLICY = pathlib.Path.home() / ".alice-rdc" / "live-device.json"',
-        'POLICY = pathlib.Path(os.environ.get("ALICE_LIVE_DEVICE_POLICY", str(pathlib.Path.home() / ".alice-rdc" / "live-device.json")))',
+        'POLICY = pathlib.Path.home() / ".logos-rdc" / "live-device.json"',
+        'POLICY = pathlib.Path(os.environ.get("LOGOS_LIVE_DEVICE_POLICY", str(pathlib.Path.home() / ".logos-rdc" / "live-device.json")))',
         "policy path",
     )
     start = s.index("def device():")
@@ -114,7 +114,7 @@ def build_accessibility(s):
     """
     if not isinstance(serial,str) or not re.fullmatch(r"[A-Za-z0-9._:-]{5,100}",serial):
         raise RuntimeError("Untrusted accessibility device")
-    temporary="/data/local/tmp/alice-live-ui-"+secrets.token_hex(12)+".xml"
+    temporary="/data/local/tmp/logos-live-ui-"+secrets.token_hex(12)+".xml"
     prefix=["adb","-s",serial]
     try:
         result=subprocess.run(prefix+["shell","uiautomator","dump",temporary],
@@ -150,7 +150,7 @@ def build_server(s):
     s = replace(
         s,
         'ACTIONS = BASE / "android_actions.py"',
-        'ACTIONS = Path(os.environ.get("ALICE_LIVE_ACTIONS", str(BASE / "android_actions.py")))',
+        'ACTIONS = Path(os.environ.get("LOGOS_LIVE_ACTIONS", str(BASE / "android_actions.py")))',
         "candidate actions override",
     )
     s = replace(

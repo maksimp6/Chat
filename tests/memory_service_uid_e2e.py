@@ -48,7 +48,7 @@ def main() -> None:
         socket_dir.chmod(0o755)
         sock = socket_dir / "service.sock"
         env = os.environ.copy()
-        env["ALICE_MEMORY_TRUSTED_ROOT"] = "1"
+        env["LOGOS_MEMORY_TRUSTED_ROOT"] = "1"
         env["PYTHONPATH"] = str(root)
         proc = subprocess.Popen(
             [

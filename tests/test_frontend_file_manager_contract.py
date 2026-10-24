@@ -19,7 +19,7 @@ def test_file_manager_modal_shell_uses_canonical_modal_api():
 
 def test_file_manager_overlays_are_scoped_to_app_shell():
     source = read("static/file_manager.js")
-    assert 'document.querySelector(".alice-pro-app") || document.body' in source
+    assert 'document.querySelector(".logos-pro-app") || document.body' in source
 
 
 def test_vector_store_rendering_uses_owned_dom_and_css():

@@ -128,7 +128,7 @@ or overwritten. Each file remains bounded by the documented 128 MB limit.
 After indexing, the runner makes one direct `vector_stores.search` request with
 the maximum 50 results. It verifies exact search excerpts against Issue content
 or repository-file text when the source path is present in the indexed chunk.
-When `--allow-model-call` is also enabled, one `aliceai-llm-flash` request to
+When `--allow-model-call` is also enabled, one `logosai-llm-flash` request to
 Yandex's Responses API receives at most 12 retrieved excerpts, each capped at
 2,500 characters. The input is bounded to 60,000 characters, output to 4,096
 tokens, and the call is synchronous, non-stored and not retried. The model may

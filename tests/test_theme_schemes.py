@@ -27,8 +27,8 @@ def test_theme_presets_and_persistence_are_defined():
 
 def test_theme_value_is_normalized_before_dom_attribute_is_set():
     core = _read("static/core.js")
-    assert "normalizeAliceTheme" in core
-    assert "Object.prototype.hasOwnProperty.call(ALICE_THEMES, value)" in core
+    assert "normalizeLogosTheme" in core
+    assert "Object.prototype.hasOwnProperty.call(LOGOS_THEMES, value)" in core
 
 
 def _parse_hex(value):

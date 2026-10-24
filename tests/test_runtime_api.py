@@ -14,7 +14,7 @@ def client(tmp_path, monkeypatch):
 
     path = tmp_path / "api.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setenv("ALICE_MEMORY_PATH", str(tmp_path / "alice.memory"))
+    monkeypatch.setenv("LOGOS_MEMORY_PATH", str(tmp_path / "logos.memory"))
     close_memory_clients()
     db.init_db()
     app_module.app.config["TESTING"] = True

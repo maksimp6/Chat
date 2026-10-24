@@ -12,9 +12,9 @@ from invocation.trace import create_invocation_trace
 
 @pytest.fixture()
 def client(monkeypatch):
-    monkeypatch.setenv("ALICE_MCP_ALLOW_ANONYMOUS", "true")
-    monkeypatch.delenv("ALICE_MCP_BEARER_TOKEN", raising=False)
-    monkeypatch.delenv("ALICE_MCP_INTROSPECTION_URL", raising=False)
+    monkeypatch.setenv("LOGOS_MCP_ALLOW_ANONYMOUS", "true")
+    monkeypatch.delenv("LOGOS_MCP_BEARER_TOKEN", raising=False)
+    monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_URL", raising=False)
 
     app = Flask(__name__)
     app.register_blueprint(chatgpt_mcp.chatgpt_mcp_bp)
@@ -97,8 +97,8 @@ def test_protocol_version_defaults_to_latest_when_header_is_absent(client):
 
 
 def test_mcp_bearer_auth_is_enforced_even_when_anonymous_mode_was_enabled(client, monkeypatch):
-    monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "test-token")
-    monkeypatch.setenv("ALICE_MCP_USER_ID", "user-1")
+    monkeypatch.setenv("LOGOS_MCP_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("LOGOS_MCP_USER_ID", "user-1")
     response = mcp_request(client, "tools/list")
     assert response.status_code == 401
     assert "WWW-Authenticate" in response.headers
@@ -113,15 +113,15 @@ def test_mcp_bearer_auth_is_enforced_even_when_anonymous_mode_was_enabled(client
 
 
 def test_mcp_unauthorized_challenge_includes_protected_resource_metadata(client, monkeypatch):
-    monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "test-token")
-    monkeypatch.setenv("ALICE_MCP_USER_ID", "user-1")
-    monkeypatch.setenv("ALICE_MCP_PUBLIC_URL", "https://alice.example")
+    monkeypatch.setenv("LOGOS_MCP_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("LOGOS_MCP_USER_ID", "user-1")
+    monkeypatch.setenv("LOGOS_MCP_PUBLIC_URL", "https://logos.example")
     response = mcp_request(client, "tools/list")
     assert response.status_code == 401
     challenge = response.headers["WWW-Authenticate"]
     assert challenge.startswith("Bearer ")
     assert (
-        'resource_metadata="https://alice.example/.well-known/oauth-protected-resource"'
+        'resource_metadata="https://logos.example/.well-known/oauth-protected-resource"'
         in challenge
     )
 
@@ -130,8 +130,8 @@ def test_tools_call_returns_structured_content(client):
     response = mcp_request(
         client,
         "tools/call",
-        {"name": "alice_get_system_status", "arguments": {}},
-        name="alice_get_system_status",
+        {"name": "logos_get_system_status", "arguments": {}},
+        name="logos_get_system_status",
     )
     assert response.status_code == 200
 
@@ -141,7 +141,7 @@ def test_tools_call_returns_structured_content(client):
     assert result["status"] == "ok"
     assert result["mcp"]["transport"] == "streamable-http"
     assert "local_tools" in result
-    assert result["server"]["name"] == "Alice Pro"
+    assert result["server"]["name"] == "Logos Pro"
 
 
 def test_tools_call_rejects_malformed_params(client):
@@ -151,7 +151,7 @@ def test_tools_call_rejects_malformed_params(client):
 
 
 def test_runtime_scoped_tool_call_executes_through_dispatcher(client, monkeypatch):
-    monkeypatch.setenv("ALICE_MCP_USER_ID", "owner-a")
+    monkeypatch.setenv("LOGOS_MCP_USER_ID", "owner-a")
     runtime_id = "mcp-test-runtime-success"
     chatgpt_mcp.mcp_runtime_dispatcher.register_runtime(runtime_id, owner_id="owner-a")
     try:
@@ -159,11 +159,11 @@ def test_runtime_scoped_tool_call_executes_through_dispatcher(client, monkeypatc
             client,
             "tools/call",
             {
-                "name": "alice_get_system_status",
+                "name": "logos_get_system_status",
                 "arguments": {},
                 "_meta": {
-                    "alice/runtime_id": runtime_id,
-                    "alice/resource_runtime_id": runtime_id,
+                    "logos/runtime_id": runtime_id,
+                    "logos/resource_runtime_id": runtime_id,
                 },
             },
         )
@@ -175,7 +175,7 @@ def test_runtime_scoped_tool_call_executes_through_dispatcher(client, monkeypatc
 
 
 def test_runtime_scoped_tool_call_denies_cross_runtime_access(client, monkeypatch):
-    monkeypatch.setenv("ALICE_MCP_USER_ID", "owner-a")
+    monkeypatch.setenv("LOGOS_MCP_USER_ID", "owner-a")
     caller = "mcp-test-runtime-a"
     target = "mcp-test-runtime-b"
     chatgpt_mcp.mcp_runtime_dispatcher.register_runtime(caller, owner_id="owner-a")
@@ -185,11 +185,11 @@ def test_runtime_scoped_tool_call_denies_cross_runtime_access(client, monkeypatc
             client,
             "tools/call",
             {
-                "name": "alice_get_system_status",
+                "name": "logos_get_system_status",
                 "arguments": {},
                 "_meta": {
-                    "alice/runtime_id": caller,
-                    "alice/resource_runtime_id": target,
+                    "logos/runtime_id": caller,
+                    "logos/resource_runtime_id": target,
                 },
             },
         )
@@ -206,14 +206,14 @@ def test_runtime_scoped_tool_call_denies_cross_runtime_access(client, monkeypatc
 
 
 def test_runtime_scoped_tool_call_hides_unavailable_runtime(client, monkeypatch):
-    monkeypatch.setenv("ALICE_MCP_USER_ID", "owner-a")
+    monkeypatch.setenv("LOGOS_MCP_USER_ID", "owner-a")
     response = mcp_request(
         client,
         "tools/call",
         {
-            "name": "alice_get_system_status",
+            "name": "logos_get_system_status",
             "arguments": {},
-            "_meta": {"alice/runtime_id": "missing-runtime"},
+            "_meta": {"logos/runtime_id": "missing-runtime"},
         },
     )
 
@@ -241,19 +241,19 @@ def test_project_read_tools_are_exposed_and_read_only(client):
     response = mcp_request(client, "tools/list")
     assert response.status_code == 200
     tools = {tool["name"]: tool for tool in response.get_json()["result"]["tools"]}
-    assert {"alice_list_project_files", "alice_read_project_file", "alice_search_project"} <= set(
+    assert {"logos_list_project_files", "logos_read_project_file", "logos_search_project"} <= set(
         tools
     )
-    for name in ("alice_list_project_files", "alice_read_project_file", "alice_search_project"):
+    for name in ("logos_list_project_files", "logos_read_project_file", "logos_search_project"):
         assert tools[name]["_meta"]["read_only"] is True
         assert tools[name]["_meta"]["requires_approval"] is False
 
 
 def test_project_tools_execute_through_mcp(client):
     cases = [
-        ("alice_list_project_files", {"path": "."}),
-        ("alice_read_project_file", {"path": "app.py", "length": 1024}),
-        ("alice_search_project", {"query": "UniversalToolExecutor", "file_pattern": "*.py"}),
+        ("logos_list_project_files", {"path": "."}),
+        ("logos_read_project_file", {"path": "app.py", "length": 1024}),
+        ("logos_search_project", {"query": "UniversalToolExecutor", "file_pattern": "*.py"}),
     ]
     for name, arguments in cases:
         response = mcp_request(
@@ -356,8 +356,8 @@ def test_project_read_path_traversal_is_rejected_by_filesystem_layer(client):
     response = mcp_request(
         client,
         "tools/call",
-        {"name": "alice_read_project_file", "arguments": {"path": "../../etc/passwd"}},
-        name="alice_read_project_file",
+        {"name": "logos_read_project_file", "arguments": {"path": "../../etc/passwd"}},
+        name="logos_read_project_file",
     )
     assert response.status_code == 400
     assert response.get_json()["error"]["code"] == -32602
@@ -365,17 +365,17 @@ def test_project_read_path_traversal_is_rejected_by_filesystem_layer(client):
     response = mcp_request(
         client,
         "tools/call",
-        {"name": "alice_read_project_file", "arguments": {"path": "../outside.txt"}},
-        name="alice_read_project_file",
+        {"name": "logos_read_project_file", "arguments": {"path": "../outside.txt"}},
+        name="logos_read_project_file",
     )
     assert response.status_code == 400
     assert response.get_json()["error"]["code"] == -32602
 
 
 def test_mcp_requires_auth_when_not_configured(monkeypatch):
-    monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
-    monkeypatch.delenv("ALICE_MCP_BEARER_TOKEN", raising=False)
-    monkeypatch.delenv("ALICE_MCP_INTROSPECTION_URL", raising=False)
+    monkeypatch.delenv("LOGOS_MCP_ALLOW_ANONYMOUS", raising=False)
+    monkeypatch.delenv("LOGOS_MCP_BEARER_TOKEN", raising=False)
+    monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_URL", raising=False)
 
     from flask import Flask
 
@@ -392,8 +392,8 @@ def test_mcp_requires_auth_when_not_configured(monkeypatch):
 def test_mcp_conversation_tools_are_owner_scoped(client, monkeypatch, tmp_path):
     import storage.db as db
 
-    monkeypatch.setenv("ALICE_MCP_USER_ID", "user-a")
-    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
+    monkeypatch.setenv("LOGOS_MCP_USER_ID", "user-a")
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "logos.db"))
     db.init_db()
 
     from conversations.ownership import init_conversation_ownership_table, set_owner
@@ -413,8 +413,8 @@ def test_mcp_conversation_tools_are_owner_scoped(client, monkeypatch, tmp_path):
     response = mcp_request(
         client,
         "tools/call",
-        {"name": "alice_list_conversations", "arguments": {}},
-        name="alice_list_conversations",
+        {"name": "logos_list_conversations", "arguments": {}},
+        name="logos_list_conversations",
     )
     assert response.status_code == 200
     conversations = response.get_json()["result"]["structuredContent"]["conversations"]
@@ -424,10 +424,10 @@ def test_mcp_conversation_tools_are_owner_scoped(client, monkeypatch, tmp_path):
         client,
         "tools/call",
         {
-            "name": "alice_get_conversation",
+            "name": "logos_get_conversation",
             "arguments": {"conversation_id": "conversation-a"},
         },
-        name="alice_get_conversation",
+        name="logos_get_conversation",
     )
     assert response.status_code == 200
     assert response.get_json()["result"]["structuredContent"]["conversation"]["title"] == "A"
@@ -436,10 +436,10 @@ def test_mcp_conversation_tools_are_owner_scoped(client, monkeypatch, tmp_path):
         client,
         "tools/call",
         {
-            "name": "alice_get_conversation_messages",
+            "name": "logos_get_conversation_messages",
             "arguments": {"conversation_id": "conversation-b"},
         },
-        name="alice_get_conversation_messages",
+        name="logos_get_conversation_messages",
     )
     assert response.status_code == 404
     assert response.get_json()["error"]["code"] == -32602
@@ -448,10 +448,10 @@ def test_mcp_conversation_tools_are_owner_scoped(client, monkeypatch, tmp_path):
         client,
         "tools/call",
         {
-            "name": "alice_get_conversation_messages",
+            "name": "logos_get_conversation_messages",
             "arguments": {"conversation_id": "conversation-a"},
         },
-        name="alice_get_conversation_messages",
+        name="logos_get_conversation_messages",
     )
     assert response.status_code == 200
     messages = response.get_json()["result"]["structuredContent"]["messages"]
@@ -464,11 +464,11 @@ def test_mcp_conversation_tools_are_advertised(client):
     assert response.status_code == 200
     names = {item["name"] for item in response.get_json()["result"]["tools"]}
     assert {
-        "alice_list_conversations",
-        "alice_get_conversation",
-        "alice_get_conversation_messages",
-        "alice_get_execution",
-        "alice_get_execution_trace",
+        "logos_list_conversations",
+        "logos_get_conversation",
+        "logos_get_conversation_messages",
+        "logos_get_execution",
+        "logos_get_execution_trace",
     }.issubset(names)
 
 
@@ -478,16 +478,16 @@ def test_mcp_initialize_handshake_is_supported(client):
     result = response.get_json()["result"]
     assert result["protocolVersion"] == chatgpt_mcp.DEFAULT_PROTOCOL_VERSION
     assert result["capabilities"]["tools"] == {}
-    assert result["serverInfo"]["name"] == "Alice Pro"
+    assert result["serverInfo"]["name"] == "Logos Pro"
 
 
 def test_mcp_tool_call_is_persisted_in_execution_trace(monkeypatch, tmp_path):
     import storage.db as db
 
-    monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
-    monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "trace-token")
-    monkeypatch.setenv("ALICE_MCP_USER_ID", "trace-user")
-    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
+    monkeypatch.delenv("LOGOS_MCP_ALLOW_ANONYMOUS", raising=False)
+    monkeypatch.setenv("LOGOS_MCP_BEARER_TOKEN", "trace-token")
+    monkeypatch.setenv("LOGOS_MCP_USER_ID", "trace-user")
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "logos.db"))
     db.init_db()
 
     from flask import Flask
@@ -500,8 +500,8 @@ def test_mcp_tool_call_is_persisted_in_execution_trace(monkeypatch, tmp_path):
         response = mcp_request(
             test_client,
             "tools/call",
-            {"name": "alice_get_system_status", "arguments": {}},
-            name="alice_get_system_status",
+            {"name": "logos_get_system_status", "arguments": {}},
+            name="logos_get_system_status",
             Authorization="Bearer trace-token",
         )
 
@@ -514,10 +514,10 @@ def test_mcp_tool_call_is_persisted_in_execution_trace(monkeypatch, tmp_path):
             test_client,
             "tools/call",
             {
-                "name": "alice_get_invocation_trace",
+                "name": "logos_get_invocation_trace",
                 "arguments": {"invocation_id": meta["invocation_id"]},
             },
-            name="alice_get_invocation_trace",
+            name="logos_get_invocation_trace",
             Authorization="Bearer trace-token",
         )
 
@@ -526,6 +526,6 @@ def test_mcp_tool_call_is_persisted_in_execution_trace(monkeypatch, tmp_path):
         assert trace["trace_id"] == meta["trace_id"]
         assert trace["context"]["user_id"] == "trace-user"
         assert any(
-            call.get("tool_name") == "alice_get_system_status" for call in trace["tool_calls"]
+            call.get("tool_name") == "logos_get_system_status" for call in trace["tool_calls"]
         )
         assert any(event.get("type") == "mcp_tool_call_completed" for event in trace["events"])

@@ -38,7 +38,7 @@ int remote_input_keyboard_allowed(unsigned short k) {
     }
 }
 int remote_input_keyboard_init(remote_input_keyboard *kb, void *ctx,
-                        alice_key_emit_fn emit, alice_key_clock_fn clock) {
+                        logos_key_emit_fn emit, logos_key_clock_fn clock) {
     if (!kb || !emit || !clock) return -EINVAL;
     memset(kb,0,sizeof(*kb));
     kb->ctx=ctx; kb->emit=emit; kb->now_ms=clock;
@@ -81,10 +81,10 @@ int remote_input_keyboard_down(remote_input_keyboard *kb,unsigned short key) {
     if(!kb || !remote_input_keyboard_allowed(key))return -EINVAL;
     if(kb->faulted || kb->destroyed)return -EIO;
     if(locate(kb,key)>=0)return -EALREADY;
-    if(kb->held_count==ALICE_KEY_MAX_HELD)return -ENOSPC;
+    if(kb->held_count==LOGOS_KEY_MAX_HELD)return -ENOSPC;
     /* Track before emitting, so partial writes can be released. */
     kb->held[kb->held_count++]=key;
-    kb->deadline_ms=kb->now_ms(kb->ctx)+ALICE_KEY_LEASE_MS;
+    kb->deadline_ms=kb->now_ms(kb->ctx)+LOGOS_KEY_LEASE_MS;
     if(kb->emit(kb->ctx,EV_KEY,key,1)<0 || emit_syn(kb)<0) {
         kb->faulted=1;
         remote_input_keyboard_release_all(kb);

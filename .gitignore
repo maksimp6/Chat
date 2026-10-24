@@ -4,7 +4,7 @@ __pycache__/
 project_dump.txt
 project_files.txt
 analysis.txt
-alice_pro.zip
+logos_pro.zip
 *.db
 iam_key.json
 .env
@@ -18,7 +18,7 @@ app.log
 # Runtime and local backup artifacts
 .safe_backups/
 execution_logs/
-alice_pro_files.tar.gz
+logos_pro_files.tar.gz
 
 # Local tooling
 node_modules/
@@ -40,9 +40,9 @@ htmlcov/
 agent_shell.sqlite3
 
 # Native runtime database files and local preview workers
-alice.memory
-alice.memory.lock
-.alice-environments/
+logos.memory
+logos.memory.lock
+.logos-environments/
 node_modules/
 
 /node_modules

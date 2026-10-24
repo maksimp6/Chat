@@ -1,4 +1,4 @@
-# Alice Print Test — FDM shape capability protocol v0.1
+# Logos Print Test — FDM shape capability protocol v0.1
 
 **Issue:** [#1152](https://github.com/maksimp6/Chat/issues/1152). Parent #1079. Scope: dimensional *benchmark* only, not authorization to print and not functional spindle fit. Ownership: geometry and measurement here; model catalog #1112/PR #1114; slicing/FTPS/approval #1096; sliced G-code audit PR #1140. Reuse existing interfaces and do not open duplicate printer-command lanes.
 
@@ -30,7 +30,7 @@ This rule supersedes all earlier calibration-coupon print suggestions.
 
 ## Artifact contract
 
-Run `python -m printing3d.shape_benchmarks --out /tmp/alice-shape-coupons` from repo root. It only writes six source-only binary STL files and a deterministic SHA-256 `manifest.json`, in declared **millimetres** (STL itself has no units). No printer access, slicing, heating or G-code is performed. The generator uses 96 polygon segments for circular walls; the discretization is a manufacturing input, not a claim that the physically printed object is perfectly circular. Generated shapes are single-shell, oriented and manifold; max coupon bounding axis = 170 mm (conservative fixture-only guard, not a full plate layout safety check).
+Run `python -m printing3d.shape_benchmarks --out /tmp/logos-shape-coupons` from repo root. It only writes six source-only binary STL files and a deterministic SHA-256 `manifest.json`, in declared **millimetres** (STL itself has no units). No printer access, slicing, heating or G-code is performed. The generator uses 96 polygon segments for circular walls; the discretization is a manufacturing input, not a claim that the physically printed object is perfectly circular. Generated shapes are single-shell, oriented and manifold; max coupon bounding axis = 170 mm (conservative fixture-only guard, not a full plate layout safety check).
 
 | Digital fixture (never print for calibration) | Nominal specification | Comparable feature on a useful, separately approved printed part | Main risk |
 | --- | --- | --- | --- |
@@ -108,7 +108,7 @@ guard-band rule is **project-local**, not an ISO-mandated tolerance.
 
 ```
 python -m unittest discover -s tests -p 'test_printing3d_shape_benchmarks.py' -v
-python -m printing3d.shape_benchmarks --out /tmp/alice-shape-coupons
+python -m printing3d.shape_benchmarks --out /tmp/logos-shape-coupons
 ```
 
 Test contract covers deterministic hashes, topology, exact source bbox, hole topology, bad normals/winding, NaN, degenerate triangles, duplicate facets, missing faces, malformed lengths, invalid dimensions and out-of-range bounding box. It does **not** validate slicer material, nozzle/bed temperature, printable overhang, FTPS communication, surface roughness, load strength or true roundness. Every unmeasured physical feature remains **UNVERIFIED**. None of the six fixtures may be printed, staged, uploaded or used to spend filament without new specific user authorization.

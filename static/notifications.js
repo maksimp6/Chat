@@ -27,8 +27,8 @@
 
       const notification = new Notification(title, {
         body: body,
-        icon: icon || (window.__ALICE_STATIC_BASE || "/static") + "/icon-192.png",
-        tag: "alice-pro",
+        icon: icon || (window.__LOGOS_STATIC_BASE || "/static") + "/icon-192.png",
+        tag: "logos-pro",
       });
 
       notification.onclick = function () {
@@ -36,8 +36,8 @@
         notification.close();
       };
 
-      if (window.AliceCoreAPI && window.AliceCoreAPI.scheduler) {
-        window.AliceCoreAPI.scheduler.defer(function () {
+      if (window.LogosCoreAPI && window.LogosCoreAPI.scheduler) {
+        window.LogosCoreAPI.scheduler.defer(function () {
           notification.close();
         }, 5000);
       } else {

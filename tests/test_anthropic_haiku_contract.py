@@ -1,4 +1,4 @@
-"""Contract tests for Anthropic Haiku 5.5 as an optional Alice model provider."""
+"""Contract tests for Anthropic Haiku 5.5 as an optional Logos model provider."""
 
 import importlib.util
 import sqlite3
@@ -72,13 +72,13 @@ def test_haiku_catalog_entry_keeps_anthropic_model_and_usd_pricing_explicit():
 
 def test_messages_client_builds_anthropic_messages_api_request():
     spec = importlib.util.find_spec("anthropic_haiku_provider")
-    assert spec is not None, "Alice needs a dedicated Anthropic Haiku provider adapter"
+    assert spec is not None, "Logos needs a dedicated Anthropic Haiku provider adapter"
     from anthropic_haiku_provider import build_messages_request
 
     request = build_messages_request(
         api_key=API_KEY,
         messages=[{"role": "user", "content": "hello"}],
-        system="You are Alice.",
+        system="You are Logos.",
         max_tokens=128,
     )
     assert request["url"] == "https://api.anthropic.com/v1/messages"
@@ -86,13 +86,13 @@ def test_messages_client_builds_anthropic_messages_api_request():
     assert request["headers"]["anthropic-version"]
     assert request["json"]["model"] == MODEL_KEY
     assert request["json"]["max_tokens"] == 128
-    assert request["json"]["system"] == "You are Alice."
+    assert request["json"]["system"] == "You are Logos."
     assert request["json"]["messages"] == [{"role": "user", "content": "hello"}]
 
 
 def test_anthropic_response_tool_use_normalizes_without_bypassing_approval():
     spec = importlib.util.find_spec("anthropic_haiku_provider")
-    assert spec is not None, "Alice needs an Anthropic tool-use adapter"
+    assert spec is not None, "Logos needs an Anthropic tool-use adapter"
     from anthropic_haiku_provider import normalize_message_response
     from partner_relations import PARTNER_TOOLS
     from responses_tool_loop import extract_function_calls
@@ -140,7 +140,7 @@ def test_billing_marks_anthropic_usage_as_usd_estimate_and_never_records_api_key
 
 def test_missing_anthropic_credential_does_not_fall_back_to_yandex():
     spec = importlib.util.find_spec("model_provider_registry")
-    assert spec is not None, "Alice needs explicit provider routing by model"
+    assert spec is not None, "Logos needs explicit provider routing by model"
     from model_provider_registry import create_model_client
 
     def unavailable(provider):

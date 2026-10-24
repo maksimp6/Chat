@@ -1,4 +1,4 @@
-"""Fast, dependency-free integrity checks for versioned Alice 3D source assets."""
+"""Fast, dependency-free integrity checks for versioned Logos 3D source assets."""
 
 import hashlib
 import json

@@ -57,11 +57,11 @@ environment_events.
 
 ## Runtime configuration
 
-- ALICE_ENV_REPO_ROOT: repository root, default current working directory.
-- ALICE_ENV_RUNTIME_ROOT: isolated runtime storage, default .alice-environments.
-- ALICE_ENV_RUNTIME_COMMAND: command inside the immutable worktree, default
+- LOGOS_ENV_REPO_ROOT: repository root, default current working directory.
+- LOGOS_ENV_RUNTIME_ROOT: isolated runtime storage, default .logos-environments.
+- LOGOS_ENV_RUNTIME_COMMAND: command inside the immutable worktree, default
   python app.py.
-- ALICE_ENV_PUBLIC_BASE_URL: public origin used to construct environment URLs.
+- LOGOS_ENV_PUBLIC_BASE_URL: public origin used to construct environment URLs.
 
 Runtime configuration is server-side. Git input is passed as argument arrays and
 never through a shell command.

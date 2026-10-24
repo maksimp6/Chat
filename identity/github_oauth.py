@@ -2,14 +2,14 @@
 
 Configuration (all runtime environment variables):
 
-- ALICE_GITHUB_CLIENT_ID / ALICE_GITHUB_CLIENT_SECRET: the GitHub OAuth App.
+- LOGOS_GITHUB_CLIENT_ID / LOGOS_GITHUB_CLIENT_SECRET: the GitHub OAuth App.
   GitHub sign-in is disabled unless both are set.
-- ALICE_GITHUB_REDIRECT_URI: the callback URL registered in the OAuth App, e.g.
+- LOGOS_GITHUB_REDIRECT_URI: the callback URL registered in the OAuth App, e.g.
   https://maxxxpavlov.ru/auth/github/callback. Defaults to this host's
   /auth/github/callback.
-- ALICE_GITHUB_ALLOWED_IDS: comma-separated numeric GitHub account ids (not
+- LOGOS_GITHUB_ALLOWED_IDS: comma-separated numeric GitHub account ids (not
   logins, which can be renamed and reassigned). When the short-token gate is on
-  (ALICE_REQUIRE_SHORT_TOKEN), only these accounts may sign in, and signing in
+  (LOGOS_REQUIRE_SHORT_TOKEN), only these accounts may sign in, and signing in
   also opens the gate. When the gate is off, any GitHub account may sign in.
 
 The GitHub access token is used once to read the account id and login and is
@@ -32,15 +32,15 @@ from identity.short_token_auth import _enabled as short_token_required
 from identity.short_token_auth import grant_short_token_session
 from identity.user_identity import get_github_login, lookup_user_token, sign_in_with_github
 
-logger = logging.getLogger("alice_github_auth")
+logger = logging.getLogger("logos_github_auth")
 
 github_auth_bp = Blueprint("github_auth", __name__)
 
 AUTHORIZE_URL = "https://github.com/login/oauth/authorize"
 TOKEN_URL = "https://github.com/login/oauth/access_token"
 USER_URL = "https://api.github.com/user"
-STATE_COOKIE = "alice_github_oauth_state"
-USER_TOKEN_COOKIE = "alice_user_token"
+STATE_COOKIE = "logos_github_oauth_state"
+USER_TOKEN_COOKIE = "logos_user_token"
 STATE_MAX_AGE = 10 * 60
 HTTP_TIMEOUT = 10
 CALLBACK_PATH = "/auth/github/callback"
@@ -48,11 +48,11 @@ LOGIN_PATH = "/auth/github/login"
 
 
 def _client_id() -> str:
-    return os.environ.get("ALICE_GITHUB_CLIENT_ID", "").strip()
+    return os.environ.get("LOGOS_GITHUB_CLIENT_ID", "").strip()
 
 
 def _client_secret() -> str:
-    return os.environ.get("ALICE_GITHUB_CLIENT_SECRET", "").strip()
+    return os.environ.get("LOGOS_GITHUB_CLIENT_SECRET", "").strip()
 
 
 def github_login_enabled() -> bool:
@@ -64,7 +64,7 @@ def login_path() -> str:
 
 
 def _allowed_ids() -> set[str]:
-    raw = os.environ.get("ALICE_GITHUB_ALLOWED_IDS", "")
+    raw = os.environ.get("LOGOS_GITHUB_ALLOWED_IDS", "")
     return {item.strip() for item in raw.split(",") if item.strip()}
 
 
@@ -75,7 +75,7 @@ def _account_allowed(github_id) -> bool:
 
 
 def _redirect_uri() -> str:
-    configured = os.environ.get("ALICE_GITHUB_REDIRECT_URI", "").strip()
+    configured = os.environ.get("LOGOS_GITHUB_REDIRECT_URI", "").strip()
     if configured:
         return configured
     return request.host_url.rstrip("/") + CALLBACK_PATH
@@ -95,9 +95,9 @@ def _page(message: str, status: int):
 
 
 def _current_user_id() -> str | None:
-    # Only this request's own token counts. The single-user ALICE_OWNER_ID
+    # Only this request's own token counts. The single-user LOGOS_OWNER_ID
     # fallback must never decide whose account a browser signs in to.
-    token = request.headers.get("X-Alice-User-Token") or request.cookies.get(USER_TOKEN_COOKIE)
+    token = request.headers.get("X-Logos-User-Token") or request.cookies.get(USER_TOKEN_COOKIE)
     return lookup_user_token(token) if token else None
 
 

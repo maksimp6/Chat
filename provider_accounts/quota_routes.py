@@ -19,7 +19,7 @@ provider_quota_bp = Blueprint(
 
 
 def _admin_ok() -> bool:
-    expected = os.getenv("ALICE_QUOTA_ADMIN_TOKEN", "").strip()
+    expected = os.getenv("LOGOS_QUOTA_ADMIN_TOKEN", "").strip()
     supplied = request.headers.get("X-Provider-Quota-Admin-Token", "").strip()
     return bool(expected and supplied and secrets.compare_digest(expected, supplied))
 

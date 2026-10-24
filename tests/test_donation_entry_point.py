@@ -10,16 +10,16 @@ VALID_URL = "https://yoomoney.ru/fundraise/example-project"
 
 def _render_index(monkeypatch, value):
     if value is None:
-        monkeypatch.delenv("ALICE_DONATION_URL", raising=False)
+        monkeypatch.delenv("LOGOS_DONATION_URL", raising=False)
     else:
-        monkeypatch.setenv("ALICE_DONATION_URL", value)
+        monkeypatch.setenv("LOGOS_DONATION_URL", value)
     response = app_module.app.test_client().get("/")
     assert response.status_code == 200
     return response.get_data(as_text=True)
 
 
 def test_donation_url_disabled_when_unset(monkeypatch):
-    monkeypatch.delenv("ALICE_DONATION_URL", raising=False)
+    monkeypatch.delenv("LOGOS_DONATION_URL", raising=False)
     assert config.get_donation_url() is None
 
 
@@ -27,12 +27,12 @@ def test_donation_url_disabled_when_unset(monkeypatch):
     "value",
     [
         VALID_URL,
-        "http://example.org/donate?utm=alice",
+        "http://example.org/donate?utm=logos",
         f"  {VALID_URL}  ",
     ],
 )
 def test_donation_url_accepts_absolute_http_urls(monkeypatch, value):
-    monkeypatch.setenv("ALICE_DONATION_URL", value)
+    monkeypatch.setenv("LOGOS_DONATION_URL", value)
     assert config.get_donation_url() == value.strip()
 
 
@@ -55,17 +55,17 @@ def test_donation_url_accepts_absolute_http_urls(monkeypatch, value):
     ],
 )
 def test_donation_url_rejects_unsafe_values(monkeypatch, value):
-    monkeypatch.setenv("ALICE_DONATION_URL", value)
+    monkeypatch.setenv("LOGOS_DONATION_URL", value)
     assert config.get_donation_url() is None
 
 
 def test_rejected_donation_url_is_not_logged(monkeypatch, caplog):
     secret_url = "https://user:very-secret@example.org/donate"
-    monkeypatch.setenv("ALICE_DONATION_URL", secret_url)
+    monkeypatch.setenv("LOGOS_DONATION_URL", secret_url)
     with caplog.at_level("WARNING"):
         assert config.get_donation_url() is None
     assert "very-secret" not in caplog.text
-    assert "ALICE_DONATION_URL ignored" in caplog.text
+    assert "LOGOS_DONATION_URL ignored" in caplog.text
 
 
 def test_index_hides_donation_button_when_not_configured(monkeypatch):

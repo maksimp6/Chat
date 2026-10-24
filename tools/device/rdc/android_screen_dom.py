@@ -72,8 +72,8 @@ def build(image):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--image", type=Path, default=Path.home() / ".alice-rdc/screenshots/latest.jpg")
-    p.add_argument("--output", type=Path, default=Path.home() / ".alice-rdc/screen-dom.json")
+    p.add_argument("--image", type=Path, default=Path.home() / ".logos-rdc/screenshots/latest.jpg")
+    p.add_argument("--output", type=Path, default=Path.home() / ".logos-rdc/screen-dom.json")
     a = p.parse_args()
     dom = build(a.image)
     a.output.parent.mkdir(parents=True, exist_ok=True)

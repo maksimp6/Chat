@@ -18,9 +18,9 @@ def mcp_app():
 
 @pytest.fixture()
 def mcp_client(mcp_app, monkeypatch):
-    monkeypatch.setenv("ALICE_MCP_ALLOW_ANONYMOUS", "true")
-    monkeypatch.delenv("ALICE_MCP_BEARER_TOKEN", raising=False)
-    monkeypatch.delenv("ALICE_MCP_INTROSPECTION_URL", raising=False)
+    monkeypatch.setenv("LOGOS_MCP_ALLOW_ANONYMOUS", "true")
+    monkeypatch.delenv("LOGOS_MCP_BEARER_TOKEN", raising=False)
+    monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_URL", raising=False)
     return mcp_app.test_client()
 
 
@@ -108,62 +108,62 @@ def test_auth_helpers_cover_permission_modes_and_challenge(monkeypatch, mcp_app)
     )
     assert auth._permission_error_message(PermissionError("nope\nextra")) == "nope"
 
-    monkeypatch.setenv("ALICE_MCP_INTROSPECTION_URL", "https://issuer.example/introspect")
-    monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "token")
-    monkeypatch.setenv("ALICE_MCP_ALLOW_ANONYMOUS", "true")
+    monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_URL", "https://issuer.example/introspect")
+    monkeypatch.setenv("LOGOS_MCP_BEARER_TOKEN", "token")
+    monkeypatch.setenv("LOGOS_MCP_ALLOW_ANONYMOUS", "true")
     assert auth._auth_mode() == "introspection"
 
-    monkeypatch.delenv("ALICE_MCP_INTROSPECTION_URL", raising=False)
+    monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_URL", raising=False)
     assert auth._auth_mode() == "bearer"
 
-    monkeypatch.delenv("ALICE_MCP_BEARER_TOKEN", raising=False)
+    monkeypatch.delenv("LOGOS_MCP_BEARER_TOKEN", raising=False)
     assert auth._auth_mode() == "anonymous"
 
-    monkeypatch.setenv("ALICE_MCP_PUBLIC_URL", "https://alice.example/")
+    monkeypatch.setenv("LOGOS_MCP_PUBLIC_URL", "https://logos.example/")
     assert (
         auth._protected_resource_url()
-        == "https://alice.example/.well-known/oauth-protected-resource"
+        == "https://logos.example/.well-known/oauth-protected-resource"
     )
     assert auth._www_authenticate().startswith("Bearer ")
     assert (
-        'resource_metadata="https://alice.example/.well-known/oauth-protected-resource"'
+        'resource_metadata="https://logos.example/.well-known/oauth-protected-resource"'
         in auth._www_authenticate()
     )
 
-    monkeypatch.delenv("ALICE_MCP_PUBLIC_URL", raising=False)
+    monkeypatch.delenv("LOGOS_MCP_PUBLIC_URL", raising=False)
     monkeypatch.setattr(protocol, "PUBLIC_BASE_URL", "")
     assert auth._www_authenticate() == "Bearer"
 
     with mcp_app.test_request_context("/mcp"):
-        monkeypatch.setenv("ALICE_MCP_ALLOW_ANONYMOUS", "true")
-        monkeypatch.setenv("ALICE_MCP_USER_ID", "anon-user")
+        monkeypatch.setenv("LOGOS_MCP_ALLOW_ANONYMOUS", "true")
+        monkeypatch.setenv("LOGOS_MCP_USER_ID", "anon-user")
         assert auth._auth_user_from_request() == "anon-user"
 
     with mcp_app.test_request_context("/mcp", headers={"Authorization": "Bearer   "}):
-        monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
+        monkeypatch.delenv("LOGOS_MCP_ALLOW_ANONYMOUS", raising=False)
         with pytest.raises(PermissionError, match="Bearer access token required"):
             auth._auth_user_from_request()
 
     with mcp_app.test_request_context("/mcp", headers={"Authorization": "Bearer " + "supplied"}):
-        monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "expected")
-        monkeypatch.delenv("ALICE_MCP_USER_ID", raising=False)
+        monkeypatch.setenv("LOGOS_MCP_BEARER_TOKEN", "expected")
+        monkeypatch.delenv("LOGOS_MCP_USER_ID", raising=False)
         with pytest.raises(PermissionError, match="not fully configured"):
             auth._auth_user_from_request()
 
-        monkeypatch.setenv("ALICE_MCP_USER_ID", "user-1")
+        monkeypatch.setenv("LOGOS_MCP_USER_ID", "user-1")
         with pytest.raises(PermissionError, match="Invalid bearer token"):
             auth._auth_user_from_request()
 
-        monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "supplied")
+        monkeypatch.setenv("LOGOS_MCP_BEARER_TOKEN", "supplied")
         assert auth._auth_user_from_request() == "user-1"
 
-        monkeypatch.setenv("ALICE_MCP_INTROSPECTION_URL", "https://issuer.example/introspect")
+        monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_URL", "https://issuer.example/introspect")
         monkeypatch.setattr(auth, "_introspect_token", lambda token: f"introspected:{token}")
         assert auth._auth_user_from_request() == "introspected:supplied"
 
-        monkeypatch.delenv("ALICE_MCP_INTROSPECTION_URL", raising=False)
-        monkeypatch.delenv("ALICE_MCP_BEARER_TOKEN", raising=False)
-        monkeypatch.delenv("ALICE_MCP_USER_ID", raising=False)
+        monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_URL", raising=False)
+        monkeypatch.delenv("LOGOS_MCP_BEARER_TOKEN", raising=False)
+        monkeypatch.delenv("LOGOS_MCP_USER_ID", raising=False)
         with pytest.raises(PermissionError, match="not configured"):
             auth._auth_user_from_request()
 
@@ -179,7 +179,7 @@ def test_require_auth_wraps_permission_errors(monkeypatch):
 
 
 def test_introspect_token_covers_configuration_scopes_and_subject(monkeypatch):
-    monkeypatch.delenv("ALICE_MCP_INTROSPECTION_URL", raising=False)
+    monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_URL", raising=False)
     with pytest.raises(PermissionError, match="not configured"):
         auth._introspect_token("token")
 
@@ -207,10 +207,10 @@ def test_introspect_token_covers_configuration_scopes_and_subject(monkeypatch):
     ]
 
     monkeypatch.setattr(requests, "post", fake_post)
-    monkeypatch.setenv("ALICE_MCP_INTROSPECTION_URL", "https://issuer.example/introspect")
-    monkeypatch.setenv("ALICE_MCP_INTROSPECTION_CLIENT_ID", "client")
-    monkeypatch.setenv("ALICE_MCP_INTROSPECTION_CLIENT_SECRET", "secret")
-    monkeypatch.setenv("ALICE_MCP_INTROSPECTION_TIMEOUT", "7.5")
+    monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_URL", "https://issuer.example/introspect")
+    monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_CLIENT_ID", "client")
+    monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_CLIENT_SECRET", "secret")
+    monkeypatch.setenv("LOGOS_MCP_INTROSPECTION_TIMEOUT", "7.5")
     monkeypatch.setattr(auth, "OAUTH_SCOPE", protocol.OAUTH_SCOPE)
 
     with pytest.raises(PermissionError, match="inactive"):
@@ -228,8 +228,8 @@ def test_introspect_token_covers_configuration_scopes_and_subject(monkeypatch):
 
     calls.clear()
     fake_post.payloads = [{"active": True, "scope": protocol.OAUTH_SCOPE, "sub": "user-4"}]
-    monkeypatch.delenv("ALICE_MCP_INTROSPECTION_CLIENT_ID", raising=False)
-    monkeypatch.delenv("ALICE_MCP_INTROSPECTION_CLIENT_SECRET", raising=False)
+    monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_CLIENT_ID", raising=False)
+    monkeypatch.delenv("LOGOS_MCP_INTROSPECTION_CLIENT_SECRET", raising=False)
     assert auth._introspect_token("token-4") == "user-4"
     assert "auth" not in calls[0][1]
 
@@ -527,8 +527,8 @@ def test_tools_helpers_cover_lookup_validation_and_wrappers(monkeypatch):
 
 
 def test_transport_routes_cover_public_metadata_and_non_post_methods(monkeypatch, mcp_client):
-    monkeypatch.setenv("ALICE_MCP_OAUTH_ISSUER", "https://issuer.example/")
-    monkeypatch.delenv("ALICE_MCP_PUBLIC_URL", raising=False)
+    monkeypatch.setenv("LOGOS_MCP_OAUTH_ISSUER", "https://issuer.example/")
+    monkeypatch.delenv("LOGOS_MCP_PUBLIC_URL", raising=False)
     response = mcp_client.get("/.well-known/oauth-protected-resource")
     assert response.status_code == 200
     assert response.get_json() == {
@@ -544,7 +544,7 @@ def test_transport_routes_cover_public_metadata_and_non_post_methods(monkeypatch
     response = mcp_client.get("/mcp")
     assert response.status_code == 405
     assert response.headers["Allow"] == "POST, OPTIONS"
-    assert response.get_data(as_text=True) == "Alice Pro MCP endpoint accepts POST requests only."
+    assert response.get_data(as_text=True) == "Logos Pro MCP endpoint accepts POST requests only."
 
     assert transport._client_error_message(Exception(), "fallback") == "fallback"
     assert (
@@ -602,19 +602,19 @@ def test_transport_post_covers_protocol_errors_and_helper_methods(monkeypatch, m
     assert response.status_code == 400
     assert response.get_json()["error"]["message"] == "tools/call _meta must be an object"
 
-    response = _mcp_post(mcp_client, "tools/call", params={"_meta": {"alice/runtime_id": "   "}})
+    response = _mcp_post(mcp_client, "tools/call", params={"_meta": {"logos/runtime_id": "   "}})
     assert response.status_code == 400
-    assert response.get_json()["error"]["message"] == "alice/runtime_id must be a non-empty string"
+    assert response.get_json()["error"]["message"] == "logos/runtime_id must be a non-empty string"
 
     response = _mcp_post(
         mcp_client,
         "tools/call",
-        params={"_meta": {"alice/resource_runtime_id": "   "}},
+        params={"_meta": {"logos/resource_runtime_id": "   "}},
     )
     assert response.status_code == 400
     assert (
         response.get_json()["error"]["message"]
-        == "alice/resource_runtime_id must be a non-empty string"
+        == "logos/resource_runtime_id must be a non-empty string"
     )
 
 

@@ -2,7 +2,7 @@ function initModels() {
   if (document.documentElement.dataset.modelsInitialized === "true") return;
   document.documentElement.dataset.modelsInitialized = "true";
 
-  document.addEventListener("alice:modal:before-open", function (event) {
+  document.addEventListener("logos:modal:before-open", function (event) {
     var detail = event && event.detail;
     if (!detail || detail.modalId !== "model-modal") return;
     window.isCreatingNewChat = false;
@@ -47,10 +47,10 @@ function renderModelModal() {
     if (state.status === "error") {
       var retry = document.createElement("button");
       retry.type = "button";
-      retry.className = "alice-btn model-option-retry";
+      retry.className = "logos-btn model-option-retry";
       retry.textContent = "Повторить";
       retry.addEventListener("click", function () {
-        if (window.AliceModelCatalog) window.AliceModelCatalog.load().catch(function () {});
+        if (window.LogosModelCatalog) window.LogosModelCatalog.load().catch(function () {});
       });
       modelList.appendChild(retry);
     }
@@ -63,7 +63,7 @@ function renderModelModal() {
     div.type = "button";
     div.disabled = unavailable;
     div.className =
-      "alice-btn model-option" +
+      "logos-btn model-option" +
       (key === currentModel ? " active" : "") +
       (unavailable ? " model-option-unavailable" : "");
     var priceText = m.input && m.output ? m.input + " / " + m.output + " \u20bd/1K" : "";
@@ -96,7 +96,7 @@ function renderModelModal() {
       if (typeof window.changeModel === "function") {
         window.changeModel(key);
       }
-      if (modelModal) window.AliceCoreAPI.ui.modal.close(modelModal);
+      if (modelModal) window.LogosCoreAPI.ui.modal.close(modelModal);
       if (window.isCreatingNewChat) {
         createConversation(key);
         window.isCreatingNewChat = false;
@@ -107,7 +107,7 @@ function renderModelModal() {
 }
 
 function createConversation(modelKey) {
-  window.AliceDispatcher.request("/api/conversations", {
+  window.LogosDispatcher.request("/api/conversations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: modelKey }),

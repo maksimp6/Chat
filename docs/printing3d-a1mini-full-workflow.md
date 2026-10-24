@@ -1,7 +1,7 @@
-# Alice Pro — полный конвейер Bambu Lab A1 mini
+# Logos Pro — полный конвейер Bambu Lab A1 mini
 
 Ответственный Issue: #1096. Каталог моделей #1112 / PR #1114. Слайсер #1101. Preflight #1109.
-Этот Draft-срез реализует контракты, но ещё не развёрнут в Alice production.
+Этот Draft-срез реализует контракты, но ещё не развёрнут в Logos production.
 
 ## Единый сценарий
 
@@ -44,7 +44,7 @@ REQUESTED → CAD_READY → GEOMETRY_VERIFIED → SLICED → AUDITED → STAGED 
 
 - #1101 пока не принимает произвольные модели — нужен реальный slicer E2E.
 - #1109 остаётся отдельным неподключённым preflight, без merge.
-- У Alice пока нет собственного разрешённого OAuth Drive и secret bridge; ChatGPT Google Drive plugin не превращается автоматически в токен Alice.
+- У Logos пока нет собственного разрешённого OAuth Drive и secret bridge; ChatGPT Google Drive plugin не превращается автоматически в токен Logos.
 - FTPS fingerprint должен быть сверён и утверждён оператором; legacy RDC scripts с unverified TLS НЕ переносить в production.
 - Реальные MQTT, материал, состояние стола, разрешение START и запись видео требуют отдельного authorised device E2E.
 - Текущие проверки: 19 unit contracts за 0.203 с; production и физическая печать НЕ ВЕРИФИЦИРОВАНЫ.

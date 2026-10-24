@@ -9,23 +9,23 @@ from core import config
 
 
 def test_registry_keys_map_to_the_unchanged_yandex_model_ids():
-    assert config.TEXT_MODELS["logos-runtime"]["upstream"] == "aliceai-llm"
-    assert config.TEXT_MODELS["logos-runtime-flash"]["upstream"] == "aliceai-llm-flash"
-    assert config.upstream_model_id("logos-runtime") == "aliceai-llm"
-    assert config.upstream_model_id("logos-runtime-flash") == "aliceai-llm-flash"
+    assert config.TEXT_MODELS["logos-runtime"]["upstream"] == "logosai-llm"
+    assert config.TEXT_MODELS["logos-runtime-flash"]["upstream"] == "logosai-llm-flash"
+    assert config.upstream_model_id("logos-runtime") == "logosai-llm"
+    assert config.upstream_model_id("logos-runtime-flash") == "logosai-llm-flash"
 
 
 def test_model_uri_uses_the_upstream_id_not_the_registry_key():
-    assert config.get_model_uri("folder", "logos-runtime") == "gpt://folder/aliceai-llm/latest"
+    assert config.get_model_uri("folder", "logos-runtime") == "gpt://folder/logosai-llm/latest"
     assert (
         config.get_model_uri("folder", "logos-runtime-flash")
-        == "gpt://folder/aliceai-llm-flash/latest"
+        == "gpt://folder/logosai-llm-flash/latest"
     )
 
 
 def test_unregistered_and_legacy_keys_pass_through_unchanged():
-    assert config.upstream_model_id("aliceai-llm") == "aliceai-llm"
-    assert config.get_model_uri("folder", "aliceai-llm") == "gpt://folder/aliceai-llm/latest"
+    assert config.upstream_model_id("logosai-llm") == "logosai-llm"
+    assert config.get_model_uri("folder", "logosai-llm") == "gpt://folder/logosai-llm/latest"
 
 
 def test_unknown_model_info_falls_back_to_the_logos_runtime_entry():
@@ -68,8 +68,8 @@ def test_legacy_keys_keep_their_pricing():
     usage = {"input_tokens": 1000, "output_tokens": 1000}
     flash = config.calculate_full_cost("logos-runtime-flash", usage)
 
-    assert config.calculate_full_cost("aliceai-llm-flash", usage) == flash
-    assert config.calculate_full_cost("aliceai-llm", usage) == config.calculate_full_cost(
+    assert config.calculate_full_cost("logosai-llm-flash", usage) == flash
+    assert config.calculate_full_cost("logosai-llm", usage) == config.calculate_full_cost(
         "logos-runtime", usage
     )
     assert flash != config.calculate_full_cost("logos-runtime", usage)
@@ -79,7 +79,7 @@ def test_legacy_billing_rows_are_calculated_not_unknown():
     from economy.billing import build_ai_billing_item
 
     item = build_ai_billing_item(
-        "aliceai-llm-flash", {"input_tokens": 1000, "output_tokens": 1000}, step=1
+        "logosai-llm-flash", {"input_tokens": 1000, "output_tokens": 1000}, step=1
     )
 
     assert item["cost_status"] == "calculated"
@@ -88,7 +88,7 @@ def test_legacy_billing_rows_are_calculated_not_unknown():
 def test_live_model_list_shows_the_registry_key_for_an_upstream_id():
     from provider_accounts.model_discovery import ModelDiscovery
 
-    entry = ModelDiscovery._normalize_model({"id": "gpt://folder/aliceai-llm/latest"})
+    entry = ModelDiscovery._normalize_model({"id": "gpt://folder/logosai-llm/latest"})
 
     assert entry is not None
     assert entry["id"] == "logos-runtime"

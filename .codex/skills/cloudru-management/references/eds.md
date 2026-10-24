@@ -79,10 +79,10 @@ eds wf run show "$EDS_RUN_ID" --json
 
 ```bash
 # МУТАЦИЯ: создаёт Repo; никакого автоматического зеркалирования GitHub.
-eds repo create alice-pro --visibility private --json
+eds repo create logos-pro --visibility private --json
 
 # МУТАЦИЯ И НЕМЕДЛЕННЫЙ ДЕПЛОЙ: применять только к подготовленной цели.
-eds wf app create alice-pro --repository-url https://github.com/maksimp6/Chat.git --branch master --json
+eds wf app create logos-pro --repository-url https://github.com/maksimp6/Chat.git --branch master --json
 # Вместо --repository-url можно использовать --repository "$EDS_REPOSITORY_ID".
 
 # МУТАЦИЯ: меняет источник существующего приложения.

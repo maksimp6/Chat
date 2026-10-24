@@ -16,14 +16,14 @@ async function flush() {
   const { document, window, context } = browser.load(
     ["static/core_api.js", "static/ui_runtime.js", "static/project_tree.js"],
     {
-      AliceDispatcher: {
+      LogosDispatcher: {
         request: async () => {
           requestCalls += 1;
           return {
             ok: true,
             status: 200,
             json: async () => ({
-              root: "/alice-pro",
+              root: "/logos-pro",
               nodes: [
                 {
                   name: "src",
@@ -114,8 +114,8 @@ async function flush() {
   // Negative control: disable wrap only on the secondary row. The same oracle must
   // detect horizontal overflow at 360px; otherwise the emulator test is a false positive.
   const noWrapCss = css.replace(
-    ".alice-pro-app #header .header-row-secondary {\n  flex-wrap: wrap;",
-    ".alice-pro-app #header .header-row-secondary {\n  flex-wrap: nowrap;",
+    ".logos-pro-app #header .header-row-secondary {\n  flex-wrap: wrap;",
+    ".logos-pro-app #header .header-row-secondary {\n  flex-wrap: nowrap;",
   );
   assert.notEqual(noWrapCss, css, "negative control must disable secondary-row wrap");
   const noWrapLayout = applyHeaderFlexLayout(document, noWrapCss, 360);
@@ -167,7 +167,7 @@ async function flush() {
     "📁",
   );
 
-  window.AliceDispatcher.request = async () => ({ ok: false, status: 503 });
+  window.LogosDispatcher.request = async () => ({ ok: false, status: 503 });
   modal.remove();
   projectTreeButton.click();
   await flush();

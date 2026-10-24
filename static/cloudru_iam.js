@@ -24,7 +24,7 @@
 
   function build() {
     if (document.getElementById("cloudru-iam-modal")) return;
-    var UI = window.AliceCoreAPI.ui;
+    var UI = window.LogosCoreAPI.ui;
     var body = document.createElement("div");
     body.className = "cloudru-iam-body";
     var modal = UI.modal.create({
@@ -72,14 +72,14 @@
     box.appendChild(confirmWrap);
     var submit = document.createElement("button");
     submit.textContent = "Выпустить ключ";
-    submit.className = "alice-btn btn-primary";
+    submit.className = "logos-btn btn-primary";
     submit.addEventListener("click", submitWizard);
     box.appendChild(submit);
     var output = document.createElement("pre");
     output.id = "cloudru-iam-output";
     output.className = "cloudru-iam-output";
     box.appendChild(output);
-    (document.querySelector(".alice-pro-app") || document.body).appendChild(modal);
+    (document.querySelector(".logos-pro-app") || document.body).appendChild(modal);
   }
 
   async function submitWizard() {
@@ -104,7 +104,7 @@
     var headers = { "Content-Type": "application/json" };
     if (token) headers.Authorization = "Bearer " + token;
     try {
-      var response = await window.AliceDispatcher.request("/api/cloudru/iam/api-keys", {
+      var response = await window.LogosDispatcher.request("/api/cloudru/iam/api-keys", {
         method: "POST",
         headers: headers,
         body: JSON.stringify({
@@ -132,15 +132,15 @@
     }
   }
 
-  window.AliceCoreAPI.ui.actions.register("cloudru-iam.close", function (payload) {
+  window.LogosCoreAPI.ui.actions.register("cloudru-iam.close", function (payload) {
     var modal = payload.element.closest(".modal");
-    if (modal) window.AliceCoreAPI.ui.modal.close(modal);
+    if (modal) window.LogosCoreAPI.ui.modal.close(modal);
   });
 
   window.openCloudRuIamWizard = function () {
     build();
     var modal = document.getElementById("cloudru-iam-modal");
-    window.AliceCoreAPI.ui.modal.open(modal);
+    window.LogosCoreAPI.ui.modal.open(modal);
   };
   document.addEventListener("DOMContentLoaded", build);
 })();

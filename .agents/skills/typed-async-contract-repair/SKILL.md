@@ -7,7 +7,7 @@ description: Repair deferred promises and asynchronous mocks when their TypeScri
 Fix the actual type boundary while retaining runtime behavior (history H03).
 
 ## Non-goals
-Do not silence errors with broad casts, blanket any or unrelated runtime rewrites. Do not assume the historical TypeScript app is today's Alice UI.
+Do not silence errors with broad casts, blanket any or unrelated runtime rewrites. Do not assume the historical TypeScript app is today's Logos UI.
 
 ## Inputs
 Compiler diagnostic, response interface, failing mock/call site, component props, package scripts and current revision.

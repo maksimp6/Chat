@@ -18,11 +18,11 @@ class CloudRuSecretAdminBackend:
 
     def create(self, *, purpose: str, value: SecretValue) -> SecretAdminResult:
         stem = _SAFE.sub("-", purpose.lower()).strip("-") or "secret"
-        name = f"alice-{stem[:32]}-{uuid.uuid4().hex[:12]}"
+        name = f"logos-{stem[:32]}-{uuid.uuid4().hex[:12]}"
         secret_id, version_id = self._client.create_secret(
             name=name,
             value=value.reveal(),
-            description="Managed by Alice Pro",
+            description="Managed by Logos Pro",
         )
         return SecretAdminResult(
             ref=SecretRef(

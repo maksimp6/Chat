@@ -90,7 +90,7 @@ def test_sdk_builds_headers_and_yandex_requests(monkeypatch):
     session = _FakeSession()
     monkeypatch.setattr(sdk.requests, "Session", lambda: session)
 
-    client = sdk.AliceSDK("key", "project", "https://example.test/v1/")
+    client = sdk.LogosSDK("key", "project", "https://example.test/v1/")
     assert client.base_url == "https://example.test/v1"
     assert session.headers["Authorization"] == "Api-Key key"
     assert session.headers["x-yc-project-id"] == "project"

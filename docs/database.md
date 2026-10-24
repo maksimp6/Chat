@@ -6,11 +6,11 @@ backend.
 
 ## Retired settings and modes
 
-- `ALICE_DATABASE_URL` is retired. Nothing in the runtime reads it. The deploy
+- `LOGOS_DATABASE_URL` is retired. Nothing in the runtime reads it. The deploy
   preflight (`scripts/cloudru_deploy_preflight.py`) rejects it with
-  `ALICE_DATABASE_URL: retired setting; native MemoryStore required`. Do not set it
+  `LOGOS_DATABASE_URL: retired setting; native MemoryStore required`. Do not set it
   in any environment.
-- SQLite (`alice_pro.db`) and PostgreSQL are not runtime modes. There is no
+- SQLite (`logos_pro.db`) and PostgreSQL are not runtime modes. There is no
   PostgreSQL service, compose file, SQL migration or SQL driver to install.
 - `tests/test_sql_free_contract.py` keeps SQL driver imports and SQL connection
   helpers out of the runtime.
@@ -45,13 +45,13 @@ Durability and integrity:
 
 `storage/db.py` (`memory_file_path`) chooses the journal in this order:
 
-1. Inside a preview runtime, `<runtime data root>/alice.memory`.
-2. `ALICE_MEMORY_PATH`, when set, is used as the journal path.
-3. Otherwise `ALICE_DB_PATH` (no default). A name that does not end in
-   `.memory` maps to `alice.memory` in the same directory.
+1. Inside a preview runtime, `<runtime data root>/logos.memory`.
+2. `LOGOS_MEMORY_PATH`, when set, is used as the journal path.
+3. Otherwise `LOGOS_DB_PATH` (no default). A name that does not end in
+   `.memory` maps to `logos.memory` in the same directory.
 
-`.env.example` sets `ALICE_MEMORY_PATH=./alice.memory`. Deployments set an explicit
-absolute `ALICE_MEMORY_PATH` on persistent storage.
+`.env.example` sets `LOGOS_MEMORY_PATH=./logos.memory`. Deployments set an explicit
+absolute `LOGOS_MEMORY_PATH` on persistent storage.
 
 ## Deployment modes
 
@@ -59,7 +59,7 @@ Every deployment uses the same store and code path. Only the journal path and th
 filesystem under it change.
 
 - **Local development:** a journal file in the working directory, for example
-  `./alice.memory`. No database server is started.
+  `./logos.memory`. No database server is started.
 - **Termux:** the same file-based journal, with no separate service process.
 - **Shared or cloud deployment:** a journal on a persistent filesystem under the
   approved `data_root`, with exactly one writer process. An ephemeral container
@@ -83,7 +83,7 @@ filesystem under it change.
 
 ## Legacy SQLite data
 
-- `alice_pro.db` is legacy SQLite data. Kristall never opens it, and the runtime does not check for it.
+- `logos_pro.db` is legacy SQLite data. Kristall never opens it, and the runtime does not check for it.
 - Nothing imports legacy data automatically. Activation is a separate, verified step.
   Historical SQL data and backups are not changed by the runtime.
 
@@ -124,7 +124,7 @@ validates that exact string as a schema label. No module with that name exists. 
 implementation is `kristall.Kristall`.
 
 ```bash
-ALICE_MEMORY_PATH=/absolute/persistent/path/alice.memory \
+LOGOS_MEMORY_PATH=/absolute/persistent/path/logos.memory \
   python scripts/cloudru_deploy_preflight.py --config deployment.json --check-db
 ```
 

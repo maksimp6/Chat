@@ -4,12 +4,12 @@
   var currentScript = document.currentScript;
   var config = currentScript && currentScript.dataset ? currentScript.dataset : {};
 
-  window.__ALICE_USER_ID = window.__ALICE_USER_ID || "";
-  window.__ALICE_BASE_PATH = config.basePath || "";
-  window.__ALICE_STATIC_BASE = config.staticBase || "/static";
-  window.__ALICE_STATIC_VERSION = config.staticVersion || "";
+  window.__LOGOS_USER_ID = window.__LOGOS_USER_ID || "";
+  window.__LOGOS_BASE_PATH = config.basePath || "";
+  window.__LOGOS_STATIC_BASE = config.staticBase || "/static";
+  window.__LOGOS_STATIC_VERSION = config.staticVersion || "";
 
-  var basePath = window.__ALICE_BASE_PATH || "";
+  var basePath = window.__LOGOS_BASE_PATH || "";
   var failedCriticalScripts = [];
   var criticalScriptNames = {
     "core_api.js": "core-api",
@@ -55,7 +55,7 @@
     return true;
   }
 
-  window.AliceBoot = Object.freeze({
+  window.LogosBoot = Object.freeze({
     markShellReady: markShellReady,
     failedCriticalScripts: function () {
       return failedCriticalScripts.slice();
@@ -74,7 +74,7 @@
     );
     var logger = console[level] || console.error;
     logger.call(console, "[BOOT]", details);
-    window.dispatchEvent(new CustomEvent("alice:diagnostic", { detail: details }));
+    window.dispatchEvent(new CustomEvent("logos:diagnostic", { detail: details }));
   }
 
   console.info("[BOOT] hello: Logos frontend boot loaded");
@@ -124,7 +124,7 @@
       init.headers ||
         (typeof Request !== "undefined" && target instanceof Request ? target.headers : {}),
     );
-    if (window.__ALICE_USER_ID) headers.set("X-Alice-User-ID", window.__ALICE_USER_ID);
+    if (window.__LOGOS_USER_ID) headers.set("X-Logos-User-ID", window.__LOGOS_USER_ID);
     init.headers = headers;
     return originalFetch(target, init);
   };
@@ -174,7 +174,7 @@
           return Promise.all(
             keys
               .filter(function (key) {
-                return /^alice-pro-/i.test(key);
+                return /^logos-pro-/i.test(key);
               })
               .map(function (key) {
                 return window.caches.delete(key);

@@ -31,7 +31,7 @@
 
 | Колонка               | Смысл                                                    |
 | ---------------------- | --------------------------------------------------------- |
-| `purpose`               | Ключ назначения, например `alice_short_token`             |
+| `purpose`               | Ключ назначения, например `logos_short_token`             |
 | `secret_id`             | Идентификатор секрета в Cloud.ru                           |
 | `pinned_version_id`     | Версия, которую сейчас читает backend                      |
 | `previous_version_id`   | Предыдущая закреплённая версия — для явного отката          |
@@ -48,14 +48,14 @@ from provider_credentials import (
 
 # Закрепить/переключить версию — старая версия не изменяется в Cloud.ru,
 # только меняется локальная ссылка.
-set_secret_management_ref(db, "alice_short_token", secret_id="...", version_id="v2")
+set_secret_management_ref(db, "logos_short_token", secret_id="...", version_id="v2")
 
 # Явный откат к прежней закреплённой версии.
-rollback_secret_management_ref(db, "alice_short_token")
+rollback_secret_management_ref(db, "logos_short_token")
 
 # Получить значение — только внутри доверенного backend-кода.
 # Результат нельзя логировать, трейсить, отдавать в MCP/UI/ошибки.
-token_value = resolve_secret_management_value(db, "alice_short_token")
+token_value = resolve_secret_management_value(db, "logos_short_token")
 ```
 
 `resolve_secret_management_value` не имеет отката на локальное
@@ -163,8 +163,8 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
 Назначения (`purpose`), которые эпик #440/#475 планирует перевести на эту
 схему:
 
-- `alice_short_token` — короткий токен доступа (`identity/short_token_auth.py`,
-  `ALICE_SHORT_TOKEN`);
+- `logos_short_token` — короткий токен доступа (`identity/short_token_auth.py`,
+  `LOGOS_SHORT_TOKEN`);
 - `github_oauth_client_id` / `github_oauth_client_secret` — GitHub OAuth
   (`identity/github_oauth.py`);
 - `provider_credential:yandex` / `provider_credential:cloudru` — ключи
@@ -172,8 +172,8 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
   `provider_credentials.py`; Secret Management становится дополнительным
   источником ссылки на закреплённую версию, а не заменяет существующую
   таблицу `provider_credentials`;
-- `alice_database_url` — retired: строка подключения к PostgreSQL больше не создаётся и не читается
-  (`ALICE_DATABASE_URL`; хранилище — нативный Kristall journal, см. `docs/database.md`), см. известное ограничение "App secrets are plain
+- `logos_database_url` — retired: строка подключения к PostgreSQL больше не создаётся и не читается
+  (`LOGOS_DATABASE_URL`; хранилище — нативный Kristall journal, см. `docs/database.md`), см. известное ограничение "App secrets are plain
   container env vars" в `docs/cloudru-container-apps.md`.
 
 ## Реальный bootstrap из Container Apps
@@ -196,8 +196,8 @@ limitations") секреты Container Apps — обычные переменн�
    остаётся вне рантайма приложения — она нужна только тем, кто создаёт
    секреты/версии и настраивает права (сегодня это уже так для
    `scripts/cloudru_deploy.py` и ротации provider-ключей).
-4. Реальные значения (`ALICE_SHORT_TOKEN`, OAuth-секреты, provider-ключи,
-   `ALICE_DATABASE_URL` — retired, не переносится) перестают быть переменными окружения контейнера и
+4. Реальные значения (`LOGOS_SHORT_TOKEN`, OAuth-секреты, provider-ключи,
+   `LOGOS_DATABASE_URL` — retired, не переносится) перестают быть переменными окружения контейнера и
    становятся версиями в Secret Management; Container Apps перестаёт быть
    местом, где они видны в открытом виде.
 

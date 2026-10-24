@@ -37,7 +37,7 @@ policy in `runtime-dispatcher-policy.md`.
 
 The runtime data root is carried with the worker through request-local
 `ContextVar` state. `storage.db.memory_file_path()` detects that scope and resolves it to
-`<runtime-data-root>/alice.memory` instead of the process journal.
+`<runtime-data-root>/logos.memory` instead of the process journal.
 
 A preview runtime does not silently inherit the process journal. Its native Kristall
 journal is opened on first use inside the runtime scope. PostgreSQL and SQLite are
@@ -48,7 +48,7 @@ scope.
 
 Runtime URL prefixes are held in `ContextVar` state for the duration of the
 worker request. The host no longer needs to mutate
-`ALICE_PREVIEW_BASE_PATH` per environment. The environment value therefore
+`LOGOS_PREVIEW_BASE_PATH` per environment. The environment value therefore
 cannot leak from one worker thread into another through process-global
 environment variables.
 
@@ -67,7 +67,7 @@ git worktree and runtime-local data directory.
 
 The manager resolves the requested ref before creating an environment, creates
 a detached worktree for that exact commit, and refuses to start from a dirty or
-mismatched snapshot. If the snapshot contains `alice_runtime.py`, `RuntimeLoader`
+mismatched snapshot. If the snapshot contains `logos_runtime.py`, `RuntimeLoader`
 loads that single entry point into a private namespace and passes it a stable
 host capability object. It never changes `sys.path`, environment variables, or
 `sys.modules`. Each environment receives a distinct namespace and application

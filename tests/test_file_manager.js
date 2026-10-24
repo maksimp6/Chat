@@ -18,7 +18,7 @@ async function runWithFetch(mockResponse) {
     navigator: {},
     fetch: async () => mockResponse,
   });
-  loaded.window.AliceDispatcher = {
+  loaded.window.LogosDispatcher = {
     request: async () => mockResponse,
   };
   return loaded.window.fetchVectorStores();

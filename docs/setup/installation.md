@@ -5,7 +5,7 @@
 - Python: текущий backend CI использует 3.14; конфигурация Ruff ориентируется на 3.12.
 - Git и доступ к зависимостям из `requirements.txt`.
 - Для ответов модели — доступ к Yandex AI Studio и настроенная запись провайдера.
-- Хранилище: нативный Kristall journal (`ALICE_MEMORY_PATH`); SQLite и PostgreSQL выведены из эксплуатации, см. [docs/database.md](../database.md).
+- Хранилище: нативный Kristall journal (`LOGOS_MEMORY_PATH`); SQLite и PostgreSQL выведены из эксплуатации, см. [docs/database.md](../database.md).
 
 Android/Termux — один из вариантов запуска, а не обязательная платформа.
 Путь к checkout выбирается пользователем; команды ниже выполняются из корня репозитория.
@@ -26,7 +26,7 @@ cp .env.example .env
 Перед запуском отредактируйте локальный `.env`:
 
 - Для локального доступа задайте `HOST=127.0.0.1` и `PORT=8080`.
-- Задайте собственное постоянное значение `ALICE_PROVIDER_CREDENTIAL_KEY`
+- Задайте собственное постоянное значение `LOGOS_PROVIDER_CREDENTIAL_KEY`
   до сохранения ключей провайдера. Его нужно сохранять вместе с резервной
   копией конфигурации: смена значения делает зашифрованные записи нечитаемыми.
   Для совместимости с Key Manager используйте ключ формата Fernet.
@@ -60,7 +60,7 @@ python app.py
 Одних `YANDEX_API_KEY` / `YANDEX_PROJECT_ID` в окружении, несмотря на их
 наличие в шаблоне, для веб-чата недостаточно. Редактировать `config.py`
 для записи ключа не требуется. Yandex-запрос также требует настроенного
-`ALICE_PROVIDER_CREDENTIAL_KEY`.
+`LOGOS_PROVIDER_CREDENTIAL_KEY`.
 
 Для постоянной эксплуатации учитывайте срок записи ключа и отдельный worker
 ротации: [жизненный цикл ключей](../provider-key-rotation.md).
@@ -69,11 +69,11 @@ python app.py
 ## Данные
 
 Локально `storage/db.py` использует нативный журнал относительно рабочего каталога:
-без значения по умолчанию; `ALICE_DB_PATH` задаёт его имя, `ALICE_MEMORY_PATH` —
-точный путь. Файл `alice_pro.db` — legacy SQLite-данные: runtime его не открывает и не проверяет его наличие
+без значения по умолчанию; `LOGOS_DB_PATH` задаёт его имя, `LOGOS_MEMORY_PATH` —
+точный путь. Файл `logos_pro.db` — legacy SQLite-данные: runtime его не открывает и не проверяет его наличие
 (см. [docs/database.md](../database.md)).
 SQLite backend выведен из эксплуатации. PostgreSQL backend выведен из эксплуатации (#1191): дополнительные зависимости
-не нужны, `ALICE_DATABASE_URL` не используется.
+не нужны, `LOGOS_DATABASE_URL` не используется.
 
 ## Проверка работоспособности
 

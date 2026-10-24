@@ -43,7 +43,7 @@ recognizes only Android's exact system-owned `/data` and `/data/data` (UID/GID
 These platform exceptions never relax the final 0700/0600 requirements.
 The runner
 does not print, replace, or chmod this input. The existing Redmi 9 input is
-`~/.config/alice-qwen/yandex-secret.json`; do not paste its value into a command.
+`~/.config/logos-qwen/yandex-secret.json`; do not paste its value into a command.
 
 Each run gets a new 0700 directory under a private state root. Its local native
 MemoryStore, process logs, snapshot of committed code and stable restart
@@ -70,13 +70,13 @@ test branch and keep tracked files clean. Prepare an owner-only state root
 outside the checkout, then run on the machine which already holds the key:
 
 ```bash
-mkdir -m 700 -p "$HOME/.local/state/alice-pro/real-api"
+mkdir -m 700 -p "$HOME/.local/state/logos-pro/real-api"
 python tests/real_api/run.py \
   --allow-paid-api \
-  --secret-file "$HOME/.config/alice-qwen/yandex-secret.json" \
+  --secret-file "$HOME/.config/logos-qwen/yandex-secret.json" \
   --project-id '<existing-folder-id>' \
-  --model aliceai-llm-flash \
-  --state-root "$HOME/.local/state/alice-pro/real-api" \
+  --model logosai-llm-flash \
+  --state-root "$HOME/.local/state/logos-pro/real-api" \
   --max-output-tokens 32
 ```
 
@@ -94,9 +94,9 @@ For the installed-app probe on Redmi 9, with its existing stored credential:
 ```bash
 python tests/real_api/run.py \
   --allow-paid-api --probe-installed \
-  --model aliceai-llm-flash \
+  --model logosai-llm-flash \
   --installed-build 0.1.0-cc82083 \
-  --state-root "$HOME/.local/state/alice-pro/real-api"
+  --state-root "$HOME/.local/state/logos-pro/real-api"
 ```
 
 The same explicit cost authorization applies. This does not move the phone's

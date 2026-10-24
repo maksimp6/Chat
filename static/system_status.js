@@ -24,7 +24,7 @@
   };
 
   function getRoot() {
-    return document.getElementById("alice-system-status");
+    return document.getElementById("logos-system-status");
   }
 
   function statusIcon(state) {
@@ -55,7 +55,7 @@
     button.title = "Состояние системы: " + labels[state];
     button.setAttribute("aria-label", "Состояние системы: " + labels[state]);
 
-    var list = root.querySelector(".alice-system-status-list");
+    var list = root.querySelector(".logos-system-status-list");
     if (!list) return;
 
     list.innerHTML = "";
@@ -64,16 +64,16 @@
       .forEach(function (moduleId) {
         var item = snapshot[moduleId];
         var row = document.createElement("div");
-        row.className = "alice-system-status-row";
+        row.className = "logos-system-status-row";
         row.dataset.status = item.status;
 
         var indicator = document.createElement("span");
-        indicator.className = "alice-system-status-indicator";
+        indicator.className = "logos-system-status-indicator";
         indicator.textContent = statusIcon(item.status);
         indicator.setAttribute("aria-hidden", "true");
 
         var text = document.createElement("div");
-        text.className = "alice-system-status-text";
+        text.className = "logos-system-status-text";
 
         var title = document.createElement("strong");
         title.textContent = moduleId;
@@ -88,10 +88,10 @@
         if (item.metadata && item.metadata.revocable === true && item.status !== "revoked") {
           var revokeButton = document.createElement("button");
           revokeButton.type = "button";
-          revokeButton.className = "alice-btn alice-system-status-revoke";
+          revokeButton.className = "logos-btn logos-system-status-revoke";
           revokeButton.textContent = "Отозвать";
           revokeButton.addEventListener("click", function () {
-            window.AliceCoreAPI.revocation.revoke("module", moduleId, "user_requested");
+            window.LogosCoreAPI.revocation.revoke("module", moduleId, "user_requested");
           });
           row.appendChild(revokeButton);
         }
@@ -106,14 +106,14 @@
     if (!button || !panel || button.dataset.statusBound === "true") return;
 
     button.dataset.statusBound = "true";
-    window.AliceCoreAPI.ui.actions.register("system-status.toggle", function () {
+    window.LogosCoreAPI.ui.actions.register("system-status.toggle", function () {
       var hidden = panel.hasAttribute("hidden");
       if (hidden) panel.removeAttribute("hidden");
       else panel.setAttribute("hidden", "");
       button.setAttribute("aria-expanded", hidden ? "true" : "false");
     });
 
-    var closeButton = panel.querySelector(".alice-system-status-close");
+    var closeButton = panel.querySelector(".logos-system-status-close");
     if (closeButton) {
       closeButton.addEventListener("click", function () {
         panel.setAttribute("hidden", "");
@@ -128,13 +128,13 @@
       }
     });
 
-    var unsubscribe = window.AliceCoreAPI.status.subscribe(render);
-    window.AliceCoreAPI.status.set("ui", "ready", "Приборная панель активна", { revocable: false });
+    var unsubscribe = window.LogosCoreAPI.status.subscribe(render);
+    window.LogosCoreAPI.status.set("ui", "ready", "Приборная панель активна", { revocable: false });
 
-    window.addEventListener("alice:revocation", function (event) {
+    window.addEventListener("logos:revocation", function (event) {
       var detail = event.detail || {};
       if (detail.type === "module") {
-        render(window.AliceCoreAPI.status.snapshot());
+        render(window.LogosCoreAPI.status.snapshot());
       }
     });
 
@@ -142,7 +142,7 @@
   }
 
   function init() {
-    if (!window.AliceCoreAPI) {
+    if (!window.LogosCoreAPI) {
       console.error("[System Status] Core API unavailable");
       return;
     }

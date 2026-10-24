@@ -18,7 +18,7 @@ from remote_input.security.socket_boundary import SignedInputSocket, SocketBound
 
 @pytest.fixture
 def harness():
-    with tempfile.TemporaryDirectory(prefix="alice-input-socket-") as d:
+    with tempfile.TemporaryDirectory(prefix="logos-input-socket-") as d:
         directory = Path(d)
         os.chmod(directory, 0o700)
         principal = AuthenticatedPrincipal("owner", "redmi9", "controller")

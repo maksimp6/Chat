@@ -28,7 +28,7 @@
   var MAX_PCM_SECONDS = 8;
 
   function request(url, init, timeoutMs) {
-    return window.AliceDispatcher.request(url, init, { timeoutMs: timeoutMs || 30000 });
+    return window.LogosDispatcher.request(url, init, { timeoutMs: timeoutMs || 30000 });
   }
 
   function stopWhenLimitReached(limitReached) {

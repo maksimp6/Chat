@@ -2,12 +2,12 @@
 
 (function () {
   function mount() {
-    if (!window.AliceCoreAPI || !window.AliceCoreAPI.ui) {
-      throw new Error("AliceCoreAPI.ui is required before UI runtime");
+    if (!window.LogosCoreAPI || !window.LogosCoreAPI.ui) {
+      throw new Error("LogosCoreAPI.ui is required before UI runtime");
     }
     if (!document.body) throw new Error("document.body is required for UI runtime");
     window.LogosUIRuntime = Object.freeze({
-      unmountClicks: window.AliceCoreAPI.ui.events.mountClicks(document.body),
+      unmountClicks: window.LogosCoreAPI.ui.events.mountClicks(document.body),
     });
   }
 

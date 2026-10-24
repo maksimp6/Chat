@@ -317,7 +317,7 @@ def embed_preview(path: Path, source_stl: Path) -> dict[str, object]:
         existing["Metadata/model_settings.config"]
     )
     with tempfile.NamedTemporaryFile(
-        prefix=".alice-preview-", suffix=".3mf", dir=path.parent, delete=False
+        prefix=".logos-preview-", suffix=".3mf", dir=path.parent, delete=False
     ) as temp:
         replacement = Path(temp.name)
     try:

@@ -98,16 +98,16 @@ def test_private_state_rejects_readable_dir_and_symlink(tmp_path):
 
 
 def test_child_environment_excludes_provider_key_and_unrelated_secrets(monkeypatch, tmp_path):
-    monkeypatch.setenv("ALICE_LAUNCH_SMOKE_YANDEX_API_KEY", "synthetic-canary-never-a-real-key")
+    monkeypatch.setenv("LOGOS_LAUNCH_SMOKE_YANDEX_API_KEY", "synthetic-canary-never-a-real-key")
     monkeypatch.setenv("GITHUB_TOKEN", "unrelated-test-token")
     monkeypatch.setenv("HTTPS_PROXY", "http://untrusted.invalid")
     env = live.runtime_environment(tmp_path, 12345, "encryption-secret", "admin-secret")
     assert "YANDEX_API_KEY" not in env
-    assert "ALICE_LAUNCH_SMOKE_YANDEX_API_KEY" not in env
+    assert "LOGOS_LAUNCH_SMOKE_YANDEX_API_KEY" not in env
     assert "GITHUB_TOKEN" not in env
     assert "HTTPS_PROXY" not in env
-    assert env["ALICE_PROVIDER_CREDENTIAL_KEY"] == "encryption-secret"
-    assert env["ALICE_MEMORY_PATH"].endswith("alice.memory")
+    assert env["LOGOS_PROVIDER_CREDENTIAL_KEY"] == "encryption-secret"
+    assert env["LOGOS_MEMORY_PATH"].endswith("logos.memory")
 
 
 def test_import_does_not_follow_redirect_with_secret():

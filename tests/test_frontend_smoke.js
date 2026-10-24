@@ -19,15 +19,15 @@ function click(element) {
       ["static/core_api.js", "static/ui_runtime.js", "static/dispatcher.js", "static/core.js"],
       '<button id="theme-toggle" data-action="theme.cycle"></button>',
     );
-    assert.equal(window.AliceTheme.getStored(), "light");
-    assert.equal(window.AliceTheme.apply("dark", true), "dark");
+    assert.equal(window.LogosTheme.getStored(), "light");
+    assert.equal(window.LogosTheme.apply("dark", true), "dark");
     click(document.getElementById("theme-toggle"));
-    assert.equal(window.AliceTheme.getStored(), "dim");
+    assert.equal(window.LogosTheme.getStored(), "dim");
     assert.equal(
       document.getElementById("theme-toggle").getAttribute("aria-label"),
       "Цветовая схема: Приглушённая",
     );
-    assert.equal(window.AliceTheme.apply("not-a-theme", false), "light");
+    assert.equal(window.LogosTheme.apply("not-a-theme", false), "light");
   }
 
   {

@@ -1,4 +1,4 @@
-"""Alice Mouse input orchestration with signed grants, safe release, and preview.
+"""Logos Mouse input orchestration with signed grants, safe release, and preview.
 
 Trust model:
   * Authentication to controller role occurs in the caller's trusted server.

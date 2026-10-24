@@ -89,7 +89,7 @@ def test_bots_and_signed_owner_posts_are_attributed_to_agents():
     assert classify_actor("Copilot") == "copilot"
     assert classify_actor("chatgpt-codex-connector[bot]") == "codex"
     assert classify_actor("claude[bot]") == "claude"
-    assert classify_actor("alice-pro-maksimp6[bot]") == "alice"
+    assert classify_actor("logos-pro-maksimp6[bot]") == "logos"
     assert classify_actor("dependabot[bot]") == "ci"
     assert classify_actor("maksimp6", "plain text") == "human"
     assert classify_actor("maksimp6", "done" + CLAUDE_FOOTER) == "claude"
@@ -139,7 +139,7 @@ def test_agent_bot_quoting_its_own_name_is_not_a_dispatch():
     assert thread.owner_agent == "human"
 
 
-def test_copilot_assignment_and_alice_label_are_dispatches():
+def test_copilot_assignment_and_logos_label_are_dispatches():
     assigned = build_thread(issue(assignees=["Copilot"]), [])
     assert assigned.owner_agent == "copilot"
     labeled = build_thread(
@@ -148,47 +148,47 @@ def test_copilot_assignment_and_alice_label_are_dispatches():
             {
                 "event": "labeled",
                 "actor": {"login": "maksimp6"},
-                "label": {"name": "alice"},
+                "label": {"name": "logos"},
                 "created_at": ts(3),
             }
         ],
     )
-    assert labeled.dispatches == [("alice", NOW - timedelta(hours=3))]
+    assert labeled.dispatches == [("logos", NOW - timedelta(hours=3))]
 
 
-def test_logos_mention_is_an_alice_trigger_beside_the_alice_mention():
-    assert observer.mentioned_agents("@logos please take this") == ["alice"]
-    assert observer.executable_mentioned_agents("@Logos fix the failing test") == ["alice"]
-    assert observer.mentioned_agents("@alice please take this") == ["alice"]
-    assert observer.executable_mentioned_agents("@alice fix the failing test") == ["alice"]
+def test_logos_mention_is_an_logos_trigger_beside_the_logos_mention():
+    assert observer.mentioned_agents("@logos please take this") == ["logos"]
+    assert observer.executable_mentioned_agents("@Logos fix the failing test") == ["logos"]
+    assert observer.mentioned_agents("@logos please take this") == ["logos"]
+    assert observer.executable_mentioned_agents("@logos fix the failing test") == ["logos"]
     assert observer.mentioned_agents("the logos of the company, mail@logos.example") == []
     assert observer.executable_mentioned_agents("the logos are on the wall") == []
 
     # The Logos workflow ignores pull request comments, so a PR thread never starts it.
     timeline = [comment("maksimp6", "@logos fix the failing test", 3)]
     thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
-    assert thread.dispatches == [("alice", NOW - timedelta(hours=3))]
+    assert thread.dispatches == [("logos", NOW - timedelta(hours=3))]
     assert thread.trigger_eligible_dispatches == []
     assert thread.executable_dispatches == []
 
     acknowledged = build_thread(
         pr_item(),
-        [*timeline, comment("alice-pro-maksimp6[bot]", "Logos acknowledged", 2.5)],
+        [*timeline, comment("logos-pro-maksimp6[bot]", "Logos acknowledged", 2.5)],
         pull(),
         [run("tests", "success")],
     )
-    assert acknowledged.dispatches == [("alice", NOW - timedelta(hours=3))]
+    assert acknowledged.dispatches == [("logos", NOW - timedelta(hours=3))]
     assert acknowledged.executable_dispatches == []
 
     issue_thread = build_thread(issue(), timeline)
-    assert issue_thread.trigger_eligible_dispatches == [("alice", NOW - timedelta(hours=3), False)]
+    assert issue_thread.trigger_eligible_dispatches == [("logos", NOW - timedelta(hours=3), False)]
     assert issue_thread.executable_dispatches == []
 
     issue_acknowledged = build_thread(
         issue(),
-        [*timeline, comment("alice-pro-maksimp6[bot]", "Logos acknowledged", 2.5)],
+        [*timeline, comment("logos-pro-maksimp6[bot]", "Logos acknowledged", 2.5)],
     )
-    assert issue_acknowledged.executable_dispatches == [("alice", NOW - timedelta(hours=3))]
+    assert issue_acknowledged.executable_dispatches == [("logos", NOW - timedelta(hours=3))]
 
     unrelated = build_thread(issue(), [comment("maksimp6", "the logos are on the wall", 1)])
     assert unrelated.dispatches == []
@@ -201,13 +201,13 @@ def test_logos_mention_in_issue_title_is_a_trigger_but_not_in_pull_request_title
     titled["title"] = "@logos fix login"
     titled["author_association"] = "OWNER"
     thread = build_thread(titled, [])
-    assert thread.trigger_eligible_dispatches == [("alice", NOW - timedelta(hours=10), False)]
-    assert thread.owner_agent == "alice"
+    assert thread.trigger_eligible_dispatches == [("logos", NOW - timedelta(hours=10), False)]
+    assert thread.owner_agent == "logos"
 
     # Trigger eligibility still needs a maintainer-level author.
     outsider = dict(titled, author_association="NONE")
     outsider_thread = build_thread(outsider, [])
-    assert outsider_thread.dispatches == [("alice", NOW - timedelta(hours=10))]
+    assert outsider_thread.dispatches == [("logos", NOW - timedelta(hours=10))]
     assert outsider_thread.trigger_eligible_dispatches == []
 
     # Pull requests never start the Logos workflow, so the same title records nothing.
@@ -533,7 +533,7 @@ def test_digest_groups_findings_and_neutralises_mentions():
     assert digest.startswith(observer.DIGEST_MARKER)
     assert digest.count("[#2]") == 1
     assert "CI красный: tests; конфликт с master" in digest
-    assert not re.search(r"@(claude|codex|alice|logos)\b", digest)
+    assert not re.search(r"@(claude|codex|logos|logos)\b", digest)
     assert "<b>" not in digest
     assert "Задача #3" in digest
     assert "Задача #4" not in digest
@@ -839,7 +839,7 @@ def test_digest_escapes_actor_names():
     }
     bot_commit = dict(commit, author={"name": "claude[bot] <i>", "date": ts(1)})
     digest = render_digest([build_thread(issue(), [commit, bot_commit])], [], NOW, "o/r")
-    assert not re.search(r"@(claude|codex|alice|logos)\b", digest)
+    assert not re.search(r"@(claude|codex|logos|logos)\b", digest)
     assert "<b>" not in digest and "<i>" not in digest
 
 

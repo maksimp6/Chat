@@ -81,12 +81,12 @@ def preview_base_path():
     scoped = current_runtime_base_path()
     if scoped:
         return scoped
-    return os.environ.get("ALICE_PREVIEW_BASE_PATH", "").rstrip("/")
+    return os.environ.get("LOGOS_PREVIEW_BASE_PATH", "").rstrip("/")
 
 
 def _static_asset_version():
     """Return a stable version token that changes when the deployed assets change."""
-    configured = os.environ.get("ALICE_STATIC_VERSION")
+    configured = os.environ.get("LOGOS_STATIC_VERSION")
     if configured:
         return configured
     static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -223,7 +223,7 @@ def bootstrap_anonymous_user():
         identity = register_anonymous_user(data.get("installation_id"), metadata)
         response = jsonify(identity)
         response.set_cookie(
-            "alice_user_token",
+            "logos_user_token",
             identity["auth_token"],
             httponly=True,
             secure=request.is_secure,

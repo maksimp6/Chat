@@ -15,14 +15,14 @@ The append-only file is the only authoritative live database file.
 Kristall v1 has one authoritative append-only file per runtime:
 
 ```text
-/data/alice/alice.memory
+/data/logos/logos.memory
 ```
 
 Normal mutations append one checksummed JSONL record. There are no generation directories, journal segments, or one-file-per-event layouts.
 
 Each durable record carries a format version, monotonically ordered sequence, operation, key/value payload when applicable, and integrity checksum. One process owns the write lock.
 
-The only auxiliary file permitted is a short-lived `alice.memory.tmp` during compaction. It is fsynced and atomically renamed over the authoritative file, then the parent directory is fsynced.
+The only auxiliary file permitted is a short-lived `logos.memory.tmp` during compaction. It is fsynced and atomically renamed over the authoritative file, then the parent directory is fsynced.
 
 ## Synchronous write contract
 
@@ -102,7 +102,7 @@ permission for a production restart, data migration, or backup rollback.
 
 ## Compaction
 
-Compaction acquires the same write lock as ordinary mutations. It writes one checksummed snapshot record containing the current logical state and current sequence to `alice.memory.tmp`, flushes and fsyncs it, atomically replaces `alice.memory`, and fsyncs the parent directory.
+Compaction acquires the same write lock as ordinary mutations. It writes one checksummed snapshot record containing the current logical state and current sequence to `logos.memory.tmp`, flushes and fsyncs it, atomically replaces `logos.memory`, and fsyncs the parent directory.
 
 Until the atomic replace succeeds, the old authoritative file remains valid. If replacement or its parent barrier reports an uncertain outcome, the path may contain either the old journal or the equivalent compacted snapshot. The writer stays faulted; verified reopen determines the authoritative file instead of assuming the old layout survived.
 

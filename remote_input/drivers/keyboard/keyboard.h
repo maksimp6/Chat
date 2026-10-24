@@ -1,27 +1,27 @@
-/* Alice Keyboard — standalone Linux evdev/uinput driver core.
+/* Logos Keyboard — standalone Linux evdev/uinput driver core.
  * No socket, no authentication, no automatic device creation. A root-owned
  * signed verifier must authorize commands before calling this API.
  */
-#ifndef ALICE_KEYBOARD_H
-#define ALICE_KEYBOARD_H
+#ifndef LOGOS_KEYBOARD_H
+#define LOGOS_KEYBOARD_H
 #include <linux/input.h>
 #include <linux/uinput.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <pthread.h>
 
-#define ALICE_KEY_MAX_HELD 16
-#define ALICE_KEY_LEASE_MS 1500
+#define LOGOS_KEY_MAX_HELD 16
+#define LOGOS_KEY_LEASE_MS 1500
 
-typedef int (*alice_key_emit_fn)(void *, unsigned short, unsigned short, int);
-typedef int64_t (*alice_key_clock_fn)(void *);
+typedef int (*logos_key_emit_fn)(void *, unsigned short, unsigned short, int);
+typedef int64_t (*logos_key_clock_fn)(void *);
 typedef int (*remote_input_key_destroy_fn)(void *);
 
 typedef struct {
     void *ctx;
-    alice_key_emit_fn emit;
-    alice_key_clock_fn now_ms;
-    unsigned short held[ALICE_KEY_MAX_HELD];
+    logos_key_emit_fn emit;
+    logos_key_clock_fn now_ms;
+    unsigned short held[LOGOS_KEY_MAX_HELD];
     size_t held_count;
     int64_t deadline_ms;
     int faulted;
@@ -30,7 +30,7 @@ typedef struct {
 } remote_input_keyboard;
 
 int remote_input_keyboard_init(remote_input_keyboard *kb, void *ctx,
-                        alice_key_emit_fn emit, alice_key_clock_fn clock);
+                        logos_key_emit_fn emit, logos_key_clock_fn clock);
 int remote_input_keyboard_down(remote_input_keyboard *kb, unsigned short key);
 int remote_input_keyboard_up(remote_input_keyboard *kb, unsigned short key);
 int remote_input_keyboard_release_all(remote_input_keyboard *kb);

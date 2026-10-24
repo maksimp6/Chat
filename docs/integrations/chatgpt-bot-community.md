@@ -115,7 +115,7 @@ API-ключи и другие credentials выдаются с минималь�
   "id": "call-1",
   "method": "tools/call",
   "params": {
-    "name": "alice_get_system_status",
+    "name": "logos_get_system_status",
     "arguments": {}
   }
 }

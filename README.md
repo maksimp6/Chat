@@ -80,11 +80,11 @@ python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Copy `.env.example` only for a fresh installation. Replace its placeholders and remove unused integration examples before starting. For local development, set `HOST=127.0.0.1` and configure a persistent `ALICE_PROVIDER_CREDENTIAL_KEY` before saving provider credentials.
+Copy `.env.example` only for a fresh installation. Replace its placeholders and remove unused integration examples before starting. For local development, set `HOST=127.0.0.1` and configure a persistent `LOGOS_PROVIDER_CREDENTIAL_KEY` before saving provider credentials.
 
 Start the backend with `python app.py`. Open `http://localhost:8080` when using the template's `PORT=8080`; without `PORT`, `app.py` defaults to `5000`. In **Провайдеры**, save the Yandex API key together with its Project ID. The current web runtime resolves both from the active database credential; environment-only `YANDEX_API_KEY` / `YANDEX_PROJECT_ID` values do not configure the chat. See the [installation guide](docs/setup/installation.md) and [provider-key lifecycle](docs/provider-key-rotation.md).
 
-Logos stores authoritative runtime data in `kristall.Kristall`; set `ALICE_MEMORY_PATH` to its journal on persistent storage. SQL drivers, SQL runtime adapters and the PostgreSQL CI lane are removed. Existing legacy data is preserved; deployment and production cutover still require explicit acceptance.
+Logos stores authoritative runtime data in `kristall.Kristall`; set `LOGOS_MEMORY_PATH` to its journal on persistent storage. SQL drivers, SQL runtime adapters and the PostgreSQL CI lane are removed. Existing legacy data is preserved; deployment and production cutover still require explicit acceptance.
 
 ### Phone access
 

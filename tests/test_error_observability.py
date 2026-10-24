@@ -15,7 +15,7 @@ def test_unhandled_backend_exception_is_logged_and_not_swallowed(monkeypatch, ca
     monkeypatch.setattr(mcp_routes, "list_owned_conversations", explode)
     client = app_module.app.test_client()
 
-    with caplog.at_level(logging.ERROR, logger="alice_app"):
+    with caplog.at_level(logging.ERROR, logger="logos_app"):
         response = client.get("/api/conversations")
 
     assert response.status_code == 500

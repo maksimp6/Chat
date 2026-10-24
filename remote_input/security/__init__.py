@@ -1,4 +1,4 @@
-"""Alice Input security contract. Staging only; no root deployment."""
+"""Logos Input security contract. Staging only; no root deployment."""
 
 from remote_input.security.grants import (
     AuthenticatedPrincipal,

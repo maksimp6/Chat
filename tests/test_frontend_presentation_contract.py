@@ -18,8 +18,8 @@ def test_provider_modal_uses_canonical_semantic_dialog_state():
     core = read("static/core_api.js")
 
     assert "UI.modal.create({" in source
-    assert "window.AliceCoreAPI.ui.modal.open(modal)" in source
-    assert "window.AliceCoreAPI.ui.modal.close(modal)" in source
+    assert "window.LogosCoreAPI.ui.modal.open(modal)" in source
+    assert "window.LogosCoreAPI.ui.modal.close(modal)" in source
     assert ".onclick" not in source
 
     assert 'modal.setAttribute("role", "dialog")' in core

@@ -1,4 +1,4 @@
-"""Alice Board: private SQL-free discussions, incidents, tasks and evidence."""
+"""Logos Board: private SQL-free discussions, incidents, tasks and evidence."""
 
 from .store import BoardConflict, BoardError, BoardStore, BoardUnavailable
 

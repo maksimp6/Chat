@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Alice Pro spool-centering rings v0.2 for PETG spool holder v0.1.
+"""Logos Pro spool-centering rings v0.2 for PETG spool holder v0.1.
 
 Units mm. 2 identical adapter rings are required, one from each side.
 They are removable slip bearings; spool opening diameter must be measured.
@@ -126,7 +126,7 @@ def main():
                x['connected_components']==1 and x['fits_build_volume'] and
                x['touches_build_plate'] for x in measurements), 'Geometry verification failed'
     manifest = {
-        'title': 'Alice Pro Spool Holder - Centered Hub v0.2',
+        'title': 'Logos Pro Spool Holder - Centered Hub v0.2',
         'status': 'CAD verified, physical fit and functional rotation untested',
         'target': 'Bambu Lab A1 mini, PETG, external 1kg spool, no AMS',
         'parts_reused_from_v0.1': ['base_frame.stl', 'upright_A_print_twice.stl', 'axle_D_section.stl'],

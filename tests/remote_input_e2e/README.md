@@ -1,4 +1,4 @@
-# Alice Input integration contract — #1089
+# Logos Input integration contract — #1089
 
 This is an isolated Integration & QA-owned test slice, **not a combined driver implementation**. The test compiles the real C keyboard allowlist and enumerates it, then compares every supported Linux keycode against Python Security's root-side signed-command schema. It fails if either dependency is missing or the policies differ; it does not silently skip required checks.
 
@@ -45,7 +45,7 @@ The Integration-owned test `test_mouse_keyboard_shared_session.py` uses these ex
 
 - Security head `5a48775b16b86cd442402b540966f1ddc4340359` (signed grants and Unix socket verifier)
 - Keyboard head `810738ca4d01c51b67040e2aecd551fc523f353b` (real C keyboard state machine behind mocked event emitter)
-- Alice Mouse head `74043cfb8dcbd146138a8eeb861e0de1776a428e` (test-only `RecordingBackend`)
+- Logos Mouse head `74043cfb8dcbd146138a8eeb861e0de1776a428e` (test-only `RecordingBackend`)
 
 The combined checkout ran **9/9 isolated integration tests PASS** on Redmi 9. The new test checks one signed controller session across mouse and keyboard commands, shared replay sequence, unsigned and viewer denial, cursor-focus loss releasing a held mouse button, root-side verifier revocation (simulated by Python `ProtectedVerifier`) and C fixture close/free. The temporary Unix socket is inside a mode-0700 directory and all C events go into a test callback.
 

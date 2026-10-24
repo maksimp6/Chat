@@ -10,9 +10,9 @@
 
 ## Системный лог
 
-* Файл: `logs/system.jsonl` (каталог задаётся `ALICE_LOG_DIR`), одна JSON-запись на строку;
+* Файл: `logs/system.jsonl` (каталог задаётся `LOGOS_LOG_DIR`), одна JSON-запись на строку;
 * Ротация: 5 MB, 3 резервные копии; дублируется в stderr;
-* Уровень: `ALICE_LOG_LEVEL` (по умолчанию `INFO`); реальные уровни сохраняются;
+* Уровень: `LOGOS_LOG_LEVEL` (по умолчанию `INFO`); реальные уровни сохраняются;
 * Поля: `timestamp`, `level`, `logger`, `message`, `trace_id`, `invocation_id`, `exception`;
 * Если в контексте привязан Trace, записи WARNING и выше дополнительно попадают в него
   событием `system_log`.

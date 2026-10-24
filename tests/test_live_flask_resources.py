@@ -1,6 +1,6 @@
 """Live Flask-port resource contract tests.
 
-The CI job starts the real Flask app and points ALICE_LIVE_BASE_URL at it.
+The CI job starts the real Flask app and points LOGOS_LIVE_BASE_URL at it.
 """
 
 import os
@@ -12,10 +12,10 @@ from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
 
-LIVE_BASE_URL = os.environ.get("ALICE_LIVE_BASE_URL")
+LIVE_BASE_URL = os.environ.get("LOGOS_LIVE_BASE_URL")
 pytestmark = pytest.mark.skipif(
     not LIVE_BASE_URL,
-    reason="live Flask resource tests require ALICE_LIVE_BASE_URL",
+    reason="live Flask resource tests require LOGOS_LIVE_BASE_URL",
 )
 BASE_URL = (LIVE_BASE_URL or "").rstrip("/")
 TIMEOUT = 10
@@ -39,7 +39,7 @@ class ResourceParser(HTMLParser):
 
 def fetch(path="/"):
     url = urljoin(BASE_URL + "/", path.lstrip("/"))
-    request = Request(url, headers={"User-Agent": "Alice-Pro-CI-Resource-Test/1.0"})
+    request = Request(url, headers={"User-Agent": "Logos-Pro-CI-Resource-Test/1.0"})
     with urlopen(request, timeout=TIMEOUT) as response:
         return response.status, response.headers, response.read(), response.geturl()
 

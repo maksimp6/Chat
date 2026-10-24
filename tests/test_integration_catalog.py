@@ -78,7 +78,7 @@ def test_e2e_cannot_exist_without_implementation():
 
     errors = validate_catalog(broken)
 
-    assert any("e2e_verified requires alice_implemented" in error for error in errors)
+    assert any("e2e_verified requires logos_implemented" in error for error in errors)
 
 
 def test_catalog_rejects_secret_value_fields():

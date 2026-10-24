@@ -9,10 +9,10 @@
   }
 
   function registerHeaderActions() {
-    if (window.__aliceHeaderActionsBound === true) return;
-    window.__aliceHeaderActionsBound = true;
+    if (window.__logosHeaderActionsBound === true) return;
+    window.__logosHeaderActionsBound = true;
 
-    var actions = window.AliceCoreAPI.ui.actions;
+    var actions = window.LogosCoreAPI.ui.actions;
     actions.register("header.tools.open", call("openToolsModal"));
     actions.register(
       "header.ssh.open",

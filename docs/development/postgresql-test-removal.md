@@ -1,4 +1,4 @@
-# Remove PostgreSQL from Alice test infrastructure
+# Remove PostgreSQL from Logos test infrastructure
 
 Status: implementation checklist, not a completed removal.
 

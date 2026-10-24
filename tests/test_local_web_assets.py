@@ -22,7 +22,7 @@ def test_index_uses_only_local_ui_resources():
     html = Path("templates/index.html").read_text(encoding="utf-8")
     assert not EXTERNAL_RESOURCE_RE.search(html), "UI resources must be served locally"
     assert "{% set static_root" in html
-    assert 'id="alice-boot"' in html
+    assert 'id="logos-boot"' in html
     assert "data-base-path=\"{{ preview_base_path or '' }}\"" in html
     assert 'data-static-base="{{ static_root }}"' in html
     assert html.index("boot.js") < html.index("core.js") < html.index("eruda_init.js")
@@ -30,17 +30,17 @@ def test_index_uses_only_local_ui_resources():
 
 
 def test_index_renders_preview_prefixed_assets_and_api_paths(monkeypatch):
-    old = os.environ.get("ALICE_PREVIEW_BASE_PATH")
-    monkeypatch.setenv("ALICE_PREVIEW_BASE_PATH", "/preview/pr-203")
+    old = os.environ.get("LOGOS_PREVIEW_BASE_PATH")
+    monkeypatch.setenv("LOGOS_PREVIEW_BASE_PATH", "/preview/pr-203")
     try:
         with app.test_client() as client:
             response = client.get("/")
         html = response.get_data(as_text=True)
     finally:
         if old is None:
-            os.environ.pop("ALICE_PREVIEW_BASE_PATH", None)
+            os.environ.pop("LOGOS_PREVIEW_BASE_PATH", None)
         else:
-            os.environ["ALICE_PREVIEW_BASE_PATH"] = old
+            os.environ["LOGOS_PREVIEW_BASE_PATH"] = old
 
     assert response.status_code == 200
     assert 'href="/preview/pr-203/static/style.css?v=' in html
@@ -72,18 +72,18 @@ def test_web_boot_and_startup_guards_are_present():
     dispatcher = Path("static/dispatcher.js").read_text(encoding="utf-8")
     assert "document.currentScript" in boot
     assert "getRegistrations" in boot
-    assert "alice-pro-" in boot
+    assert "logos-pro-" in boot
     assert "maxAttempts = 5" in eruda_loader
     assert "script.async = true" in eruda_loader
     assert re.search(
-        r'script\.src\s*=\s*\(window\.__ALICE_STATIC_BASE\s*\|\|\s*"/static"\)\s*\+\s*"/eruda\.js\?v="',
+        r'script\.src\s*=\s*\(window\.__LOGOS_STATIC_BASE\s*\|\|\s*"/static"\)\s*\+\s*"/eruda\.js\?v="',
         eruda_loader,
     )
     assert "fetchWithTimeout" in core
-    assert "window.AliceDispatcher.request" in core
+    assert "window.LogosDispatcher.request" in core
     assert "AbortSignal.timeout" in dispatcher
     assert "MAX_TIMEOUT_MS" in dispatcher
-    assert "return window.AliceDispatcher.request(input, init, { timeoutMs: timeoutMs });" in core
+    assert "return window.LogosDispatcher.request(input, init, { timeoutMs: timeoutMs });" in core
 
 
 def test_index_response_disables_shell_caching():
@@ -134,7 +134,7 @@ def test_application_javascript_parses_when_node_is_available():
 
 
 def test_preview_base_path_prefers_runtime_request_scope(monkeypatch):
-    monkeypatch.setenv("ALICE_PREVIEW_BASE_PATH", "/preview/global")
+    monkeypatch.setenv("LOGOS_PREVIEW_BASE_PATH", "/preview/global")
 
     with bind_runtime_request("runtime-a", "/environments/runtime-a"):
         assert preview_base_path() == "/environments/runtime-a"

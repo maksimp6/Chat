@@ -1,4 +1,4 @@
-# Alice Pro live UI audit: Redmi 9, 2026-10-16
+# Logos Pro live UI audit: Redmi 9, 2026-10-16
 
 **Status: PARTIAL / BLOCKED, not VERIFIED.** This is a hardware screenshot-based exploratory UI audit, not a successful full E2E test.
 
@@ -7,7 +7,7 @@
 - Device: **Redmi 9** (not 25062RN2DY), Android display rotated to landscape, screenshot **2340×1080**.
 - App: real **Yandex Browser** at local **127.0.0.1:5000** on the device; UI controlled via the existing authorized RDC `root-shell`, `/system/bin/input` and `screencap`.
 - GitHub reference: `develop` SHA `1ded6c83b4e122c4a33bc766964de4d4e5d96331`. **Deployed frontend SHA was not established.**
-- Device-local original screenshots and SHA manifest: `~/alice-ui-audit-20261016/`. Public GitHub screenshots below have been reviewed/redacted.
+- Device-local original screenshots and SHA manifest: `~/logos-ui-audit-20261016/`. Public GitHub screenshots below have been reviewed/redacted.
 - No saved application settings, no APK installation, no server restart, no deployment, no merge. UI taps and browser refreshes only. No model request was made.
 
 ## Screenshots (safe for public repository)
@@ -48,7 +48,7 @@ The first capture run used positional taps; its original filenames are **not** a
 1. **P0 / availability: application inaccessible during audit.** Browser displayed `ERR_CONNECTION_REFUSED` for `127.0.0.1:5000` at approximately 18:33 device time. Separate TCP socket test returned `ConnectionRefusedError`. **Root cause not established:** do not assume browser refresh triggered server crash. Existing remote control remained online; we did not restart the backend.
 2. **P1 / frontend correctness: raw `undefined` fields in System Status.** Use localized meaningful fallback and populated stable data contract. See [status screenshot](evidence_status.png).
 3. **P1 / credential state correctness: expired Yandex credential appears connected.** Existing issue **#1296**. Status reported cached success despite expired credential; screenshot redacted.
-4. **P1 / file manager: raw internal environment variable in Vector Stores error.** `ALICE_PROVIDER_CREDENTIAL_KEY is required for provider credentials` leaks implementation detail and gives no safe recovery UI. Display actionable local diagnostics and graceful degradation, never expose credentials.
+4. **P1 / file manager: raw internal environment variable in Vector Stores error.** `LOGOS_PROVIDER_CREDENTIAL_KEY is required for provider credentials` leaks implementation detail and gives no safe recovery UI. Display actionable local diagnostics and graceful degradation, never expose credentials.
 5. **P1/P2 / responsive: provider credential modal covered by IME in landscape.** Ensure focused field and save/status areas can be scrolled into view above on-screen keyboard; test narrow landscape.
 6. **P2 / discoverability/accessibility: very long icon-only header.** Some actions lie beyond horizontal scroll; labels/tooltips and focus/scroll affordance need verification. Several modal close affordances are small.
 7. **P2 / visual consistency and localization:** English `Environments`, `SSH Runtime`, raw authorization message, `Vector Stores` in otherwise Russian interface; default-looking buttons and mixed modal styles; floating gear may overlap large modals.

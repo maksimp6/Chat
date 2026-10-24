@@ -8,7 +8,7 @@ import agent_runtime.local_gateway as local_agent_gateway
 
 @pytest.fixture()
 def client(monkeypatch, tmp_path):
-    monkeypatch.setenv("ALICE_LOCAL_AGENT_BOOTSTRAP_TOKEN", "bootstrap")
+    monkeypatch.setenv("LOGOS_LOCAL_AGENT_BOOTSTRAP_TOKEN", "bootstrap")
 
     app = Flask(__name__)
     app.register_blueprint(local_agent_gateway.local_agent_bp)

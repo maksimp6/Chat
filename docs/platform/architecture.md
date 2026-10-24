@@ -13,9 +13,9 @@ This document explains the platform structure and principles.
 The platform currently carries legacy control-plane names while the Container Apps runtime migrates to canonical user-facing service names.
 
 Canonical runtime services:
-- **alice** — production Alice Pro runtime, 1 vCPU / 1 GiB, min 0 / max 1, 300 s idle timeout.
-- **alice-lab** — development/test Alice runtime, 1 vCPU / 1 GiB, min 0 / max 1, 120 s idle timeout.
-- **alice-browser** — real Chromium/Playwright/MCP worker, 2 vCPU / 2 GiB, min 0 / max 1, 120 s idle timeout.
+- **logos** — production Logos Pro runtime, 1 vCPU / 1 GiB, min 0 / max 1, 300 s idle timeout.
+- **logos-lab** — development/test Logos runtime, 1 vCPU / 1 GiB, min 0 / max 1, 120 s idle timeout.
+- **logos-browser** — real Chromium/Playwright/MCP worker, 2 vCPU / 2 GiB, min 0 / max 1, 120 s idle timeout.
 
 The existing **oauth** and **chrome** logical services remain during migration because current authentication/browser consumers still reference them. They must not be deleted or silently renamed until those consumers have migrated and live acceptance is proven. Runtime scaling is fail-closed in config: instance counts are non-negative/positive as appropriate, min cannot exceed max, and idle timeout must be a positive integer.
 
@@ -50,7 +50,7 @@ A **lane** is a deployment environment with its own configuration, secrets, and 
 
 ### Test Lane
 - **Sign-in**: `passphrase` (development only)
-- **Secrets**: Test-scoped only (`alice/test/*`)
+- **Secrets**: Test-scoped only (`logos/test/*`)
 - **Domain protocol**: HTTPS preferred, HTTP allowed
 - **Resources**: Minimal (0.1 CPU, 256MB memory per service; RDC: 0.2 CPU, 512Mi)
 - **Approval**: No approval required for changes
@@ -58,7 +58,7 @@ A **lane** is a deployment environment with its own configuration, secrets, and 
 
 ### Production Lane
 - **Sign-in**: `github` (required, no passphrase allowed)
-- **Secrets**: Production-scoped (`alice/prod/*`)
+- **Secrets**: Production-scoped (`logos/prod/*`)
 - **Domain protocol**: HTTPS only
 - **Resources**: Full allocation (0.5+ CPU, 512MB+ memory per service)
 - **Approval**: All changes require explicit approval
@@ -111,8 +111,8 @@ References to secret storage (never values):
 ```yaml
 secrets:
   oauth:
-    secret_ref: alice/prod/oauth-client-secret
-    signing_key: alice/prod/oauth-signing-key
+    secret_ref: logos/prod/oauth-client-secret
+    signing_key: logos/prod/oauth-signing-key
 ```
 
 ### storage.yaml

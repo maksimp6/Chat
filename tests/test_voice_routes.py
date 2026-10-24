@@ -173,7 +173,7 @@ class _FakeLogosClient:
 def test_voice_chat_uses_text_model_and_conversation(monkeypatch):
     monkeypatch.setattr(voice_routes, "LogosClient", _FakeLogosClient)
     monkeypatch.setattr(_FakeLogosClient, "calls", [])
-    monkeypatch.setenv("ALICE_VOICE_CHAT_MODEL", "logos-runtime")
+    monkeypatch.setenv("LOGOS_VOICE_CHAT_MODEL", "logos-runtime")
 
     assert voice_routes._chat("вопрос", "conv-1", "speech-realtime-260528") == "Ответ"
     call = _FakeLogosClient.calls[0]

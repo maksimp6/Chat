@@ -68,7 +68,7 @@ def test_direct_transport_access_is_rejected():
 
 
 def test_dispatcher_transport_is_allowed():
-    errors = errors_for("window.AliceDispatcher.request('/api/chat');")
+    errors = errors_for("window.LogosDispatcher.request('/api/chat');")
     assert not any("dispatcher safety violation" in error for error in errors)
 
 

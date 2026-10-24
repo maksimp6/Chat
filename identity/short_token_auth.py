@@ -1,6 +1,6 @@
 """Runtime short-token authentication for production and preview Logos.
 
-The token is supplied only through ALICE_SHORT_TOKEN. A token may be used as a
+The token is supplied only through LOGOS_SHORT_TOKEN. A token may be used as a
 URL path prefix. The prefix is consumed internally; no HTTP redirect is used.
 """
 
@@ -18,15 +18,15 @@ from flask import Flask, jsonify, request
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 
-COOKIE_NAME = "alice_short_token_session"
-COOKIE_SALT = "alice-pro-short-token-v1"
+COOKIE_NAME = "logos_short_token_session"
+COOKIE_SALT = "logos-pro-short-token-v1"
 DEFAULT_MAX_AGE = 12 * 60 * 60
 # Logout only deletes cookies, so it must work after the gate session expired.
 _PUBLIC_PATHS = frozenset({"/healthz", "/auth/logout"})
 # GitHub sign-in must be reachable before the visitor has the short token.
 _PUBLIC_PREFIXES = ("/auth/github/",)
-_TOKEN_PATH_MARKER = "alice.short_token_path_authenticated"
-PROXY_AUTH_HEADER = "X-Alice-Proxy-Authenticated"
+_TOKEN_PATH_MARKER = "logos.short_token_path_authenticated"
+PROXY_AUTH_HEADER = "X-Logos-Proxy-Authenticated"
 # Generated per process: only in-process environment dispatch is meant to know it.
 _PROXY_AUTH_SECRET = secrets.token_urlsafe(32)
 
@@ -46,7 +46,7 @@ class _ShortTokenSource:
 
     def resolve(self) -> str:
         if self.resolver is None or self.ref is None:
-            return os.environ.get("ALICE_SHORT_TOKEN", "")
+            return os.environ.get("LOGOS_SHORT_TOKEN", "")
         try:
             return self.resolver.resolve(self.ref).reveal()
         except SecretResolutionError:
@@ -67,7 +67,7 @@ def reset_short_token_secret() -> None:
 
 
 def _enabled() -> bool:
-    return os.environ.get("ALICE_REQUIRE_SHORT_TOKEN", "").strip().lower() in {
+    return os.environ.get("LOGOS_REQUIRE_SHORT_TOKEN", "").strip().lower() in {
         "1",
         "true",
         "yes",
@@ -89,7 +89,7 @@ def _serializer(token: str) -> URLSafeTimedSerializer:
 
 
 def _max_age() -> int:
-    raw = os.environ.get("ALICE_SHORT_TOKEN_TTL_SECONDS", str(DEFAULT_MAX_AGE))
+    raw = os.environ.get("LOGOS_SHORT_TOKEN_TTL_SECONDS", str(DEFAULT_MAX_AGE))
     try:
         value = int(raw)
     except ValueError:

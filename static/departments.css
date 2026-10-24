@@ -1,4 +1,4 @@
-.alice-dept-overlay {
+.logos-dept-overlay {
   position: fixed;
   inset: 0;
   z-index: 100500;
@@ -8,7 +8,7 @@
   justify-content: center;
   padding: 16px;
 }
-.alice-dept-card {
+.logos-dept-card {
   width: min(640px, 100%);
   max-height: 80vh;
   overflow: auto;
@@ -18,25 +18,25 @@
   padding: 16px;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.3);
 }
-.alice-dept-head {
+.logos-dept-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-.alice-dept-head h3 {
+.logos-dept-head h3 {
   margin: 0;
 }
-.alice-dept-head button {
+.logos-dept-head button {
   border: 0;
   background: transparent;
   font-size: 28px;
 }
-.alice-dept-list {
+.logos-dept-list {
   display: grid;
   gap: 8px;
   margin-top: 12px;
 }
-.alice-dept-row {
+.logos-dept-row {
   display: grid;
   gap: 4px;
   text-align: left;
@@ -46,7 +46,7 @@
   background: transparent;
   color: inherit;
 }
-.alice-dept-row span {
+.logos-dept-row span {
   opacity: 0.7;
   font-size: 12px;
 }

@@ -1,4 +1,4 @@
-# Alice Board: локальная альтернатива GitHub Discussions/Issues на Memory DB
+# Logos Board: локальная альтернатива GitHub Discussions/Issues на Memory DB
 
 **Статус:** изолированный MVP, не production/cutover. **Хранилище:** FileMemoryDB, без SQL.
 
@@ -22,7 +22,7 @@
 ## Архитектура
 
 ```text
-Browser (mobile) -> Alice Board HTTP loopback -> BoardStore
+Browser (mobile) -> Logos Board HTTP loopback -> BoardStore
                                                -> FileMemoryDB append+fsync
                                                -> /data/project-board/board.memory
 ```
@@ -30,7 +30,7 @@ Browser (mobile) -> Alice Board HTTP loopback -> BoardStore
 - Код сервиса в `project_board/`, UI в `project_board/static/`.
 - База `agent_memory.file_memory_db.FileMemoryDB` уже находится в `master`.
 - `memory_db.py` **не использовать** для долговечных данных: он process-local/test-only.
-- Блокировка `board.memory.board.lock` управляется Alice Board, чтобы не запускать
+- Блокировка `board.memory.board.lock` управляется Logos Board, чтобы не запускать
   два writer-процесса до полной готовности нового Memory DB lock protocol.
 - Если ошибка записи оставила неопределённое состояние, экземпляр
   запрещает новые записи до повторного открытия и восстановления.
@@ -55,7 +55,7 @@ python3 -m project_board.server
 python3 -m project_board.seed --db /data/project-board/board.memory
 ```
 
-Повторная команда идемпотентна. Это локальная запись Alice Board,
+Повторная команда идемпотентна. Это локальная запись Logos Board,
 **не GitHub Discussion**. В демо используются только тестовые данные.
 
 ## HTTP API

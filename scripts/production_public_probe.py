@@ -85,7 +85,7 @@ def probe_public(origin: str = PRODUCTION) -> dict:
     with requests.Session() as session:
         # Never inherit netrc credentials, proxy credentials or stored cookies.
         session.trust_env = False
-        session.headers["User-Agent"] = "Alice-Public-Acceptance/1.0"
+        session.headers["User-Agent"] = "Logos-Public-Acceptance/1.0"
         rows = [check(session, origin, "/healthz", 200)]
         session.cookies.clear()
         rows.append(check(session, origin, "/", 401))

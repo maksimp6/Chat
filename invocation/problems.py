@@ -12,7 +12,7 @@ import re
 from flask import Response, jsonify
 
 PROBLEM_MIMETYPE = "application/problem+json"
-PROBLEM_TYPE_BASE = "https://alice.pro/problems/"
+PROBLEM_TYPE_BASE = "https://logos.pro/problems/"
 
 _CODE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 

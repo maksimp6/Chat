@@ -10,7 +10,7 @@ const CANARY = "sk-CANARY-should-never-render";
 function boot(extraSources = []) {
   const browser = new BrowserShim('<div id="chatbox"></div>');
   return browser.load([path.join(ROOT, "static", "execution_surface.js"), ...extraSources], {
-    AliceDispatcher: { request: async () => ({ json: async () => ({}) }) },
+    LogosDispatcher: { request: async () => ({ json: async () => ({}) }) },
   });
 }
 
@@ -48,7 +48,7 @@ function finishedTrace(overrides = {}) {
 }
 
 const { window, document } = boot();
-const surfaceApi = window.AliceExecutionSurface;
+const surfaceApi = window.LogosExecutionSurface;
 const project = (input) => {
   const result = surfaceApi.project(input);
   return result && JSON.parse(JSON.stringify(result));
@@ -62,7 +62,7 @@ assert.equal(project(JSON.stringify({ trace_id: "s" })).trace_id, "s");
 
 // Done with measured usage, unknown cost (no billing items)
 const done = project(finishedTrace());
-assert.equal(done.schema, "alice.execution_surface.v1");
+assert.equal(done.schema, "logos.execution_surface.v1");
 assert.equal(done.state, "done");
 assert.equal(done.blocker, null);
 assert.deepEqual(done.models, ["demo"]);

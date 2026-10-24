@@ -97,14 +97,14 @@ worker validates the new/reissued secret before promoting it in the database.
 
 `provider_credentials.resolve_client_credential` reads the active credential
 exclusively from the database. The Yandex request path additionally requires
-`ALICE_PROVIDER_CREDENTIAL_KEY` and a non-empty Project ID in that record.
+`LOGOS_PROVIDER_CREDENTIAL_KEY` and a non-empty Project ID in that record.
 
 Environment-only `YANDEX_API_KEY`, `YC_API_KEY`, `YANDEX_PROJECT_ID` or
 `CLOUDRU_API_KEY` values are not a fallback for this resolver. Their presence
 in an environment template does not bootstrap the current web runtime.
 Configure the credential through the UI/API before sending a model request.
 
-Set a persistent `ALICE_PROVIDER_CREDENTIAL_KEY` before saving credentials and
+Set a persistent `LOGOS_PROVIDER_CREDENTIAL_KEY` before saving credentials and
 retain it with deployment configuration. The provider crypto helper derives
 encryption material from this value; it does not generate a deployment key.
 If the same value is used by Key Manager, it must also satisfy that component's
@@ -112,4 +112,4 @@ Fernet-key format.
 
 ## Administration endpoint security
 
-The provider-credential API is administrative. Set `ALICE_PROVIDER_CREDENTIALS_TOKEN` for explicit Bearer-token authorization. When Logos short-token authentication is enabled, the existing authenticated short-token session is reused. Remote requests are rejected when neither mechanism is configured.
+The provider-credential API is administrative. Set `LOGOS_PROVIDER_CREDENTIALS_TOKEN` for explicit Bearer-token authorization. When Logos short-token authentication is enabled, the existing authenticated short-token session is reused. Remote requests are rejected when neither mechanism is configured.

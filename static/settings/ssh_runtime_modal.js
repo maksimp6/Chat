@@ -2,7 +2,7 @@
   "use strict";
   window.openSshRuntimeModal = function () {
     var UI = window.SettingsUI;
-    var CoreUI = window.AliceCoreAPI.ui;
+    var CoreUI = window.LogosCoreAPI.ui;
     var existing = document.getElementById("ssh-runtime-modal-custom");
     if (existing) existing.remove();
     var tabSsh = [
@@ -28,7 +28,7 @@
       ),
       '<div style="margin-top:10px;">' +
         UI.lbl("Общий known_hosts (серверный путь)") +
-        UI.inp("set-ssh-known-hosts", "text", "", ' placeholder="/srv/alice/ssh/known_hosts"') +
+        UI.inp("set-ssh-known-hosts", "text", "", ' placeholder="/srv/logos/ssh/known_hosts"') +
         "</div>",
       '<div style="margin-top:10px;">' +
         UI.lbl("Command allowlist (regex, один шаблон на строку)") +
@@ -56,14 +56,14 @@
         UI.lbl("Проверить target") +
         UI.inp("set-ssh-test-target", "text", "", ' placeholder="preview"') +
         "</div>",
-      '<button class="alice-btn settings-contract-btn" id="set-ssh-test-btn" type="button">Проверить</button>',
+      '<button class="logos-btn settings-contract-btn" id="set-ssh-test-btn" type="button">Проверить</button>',
       "</div>",
       '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">',
       "Приватный ключ и его содержимое никогда не передаются через этот интерфейс. В targets указывается только серверный путь к существующему ключу и known_hosts. ",
       "Проверка подключения выполняет только фиксированную команду true.",
       "</div>",
       '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">',
-      '<button class="alice-btn settings-contract-btn" id="set-ssh-save-btn" type="button">Сохранить SSH</button>',
+      '<button class="logos-btn settings-contract-btn" id="set-ssh-save-btn" type="button">Сохранить SSH</button>',
       "</div>",
       "</div>",
     ].join("");
@@ -82,7 +82,7 @@
     var modalContent = ov.querySelector(".modal-content");
     modalContent.style.cssText =
       "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;width:94%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
-    (document.querySelector(".alice-pro-app") || document.body).appendChild(ov);
+    (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 
     var sshStatusEl = document.getElementById("ssh-settings-status");
@@ -130,7 +130,7 @@
       }
     }
 
-    window.AliceDispatcher.request("/api/ssh-runtime/settings")
+    window.LogosDispatcher.request("/api/ssh-runtime/settings")
       .then(function (r) {
         return r.json().then(function (data) {
           if (!r.ok) throw new Error(data.error || "Не удалось загрузить SSH settings");
@@ -185,7 +185,7 @@
       };
 
       setSshStatus("Сохранение...");
-      window.AliceDispatcher.request("/api/ssh-runtime/settings", {
+      window.LogosDispatcher.request("/api/ssh-runtime/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -212,7 +212,7 @@
         return;
       }
       setSshStatus("Проверка подключения...");
-      window.AliceDispatcher.request("/api/ssh-runtime/test", {
+      window.LogosDispatcher.request("/api/ssh-runtime/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ target: target }),
@@ -233,7 +233,7 @@
               data.duration_ms +
               " ms",
           );
-          window.AliceDispatcher.request("/api/ssh-runtime/settings")
+          window.LogosDispatcher.request("/api/ssh-runtime/settings")
             .then(function (r) {
               return r.json();
             })

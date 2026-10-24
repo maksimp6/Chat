@@ -174,7 +174,7 @@ class TestPlaintextSecretsRejected:
     def test_secret_ref_allowed(self, tmp_path):
         """Secret references (not values) are allowed."""
         config_dir = make_minimal_config(
-            tmp_path, secrets={"oauth_client_secret": {"ref": "alice/prod/github_secret"}}
+            tmp_path, secrets={"oauth_client_secret": {"ref": "logos/prod/github_secret"}}
         )
 
         # Should not raise
@@ -306,7 +306,7 @@ class TestLaneInvariants:
                 "test": {
                     "sign_in": "passphrase",
                     "services": ["oauth"],
-                    "oauth_client_secret_ref": "alice/prod/github_secret",  # prod secret in test
+                    "oauth_client_secret_ref": "logos/prod/github_secret",  # prod secret in test
                 }
             }
         }
@@ -324,7 +324,7 @@ class TestLaneInvariants:
         (config_dir / "platform.yaml").write_text(yaml.dump(platform))
 
         secrets = {
-            "github_client_secret": {"ref": "alice/shared/secret"}  # Shared ref
+            "github_client_secret": {"ref": "logos/shared/secret"}  # Shared ref
         }
         (config_dir / "secrets.yaml").write_text(yaml.dump(secrets))
 
@@ -333,7 +333,7 @@ class TestLaneInvariants:
                 "production": {
                     "sign_in": "github",
                     "services": ["oauth"],
-                    "oauth_secret_ref": "alice/shared/secret",
+                    "oauth_secret_ref": "logos/shared/secret",
                 }
             }
         }
@@ -344,7 +344,7 @@ class TestLaneInvariants:
                 "test": {
                     "sign_in": "passphrase",
                     "services": ["oauth"],
-                    "oauth_secret_ref": "alice/shared/secret",  # Same ref
+                    "oauth_secret_ref": "logos/shared/secret",  # Same ref
                 }
             }
         }
@@ -391,7 +391,7 @@ class TestIntegration:
         (config_dir / "test.yaml").write_text(yaml.dump(test_config))
 
         # Secrets (only refs, no values)
-        secrets = {"github_client_secret": {"ref": "alice/prod/github_secret"}}
+        secrets = {"github_client_secret": {"ref": "logos/prod/github_secret"}}
         (config_dir / "secrets.yaml").write_text(yaml.dump(secrets))
 
         # Storage config
@@ -422,14 +422,14 @@ class TestCanonicalRuntimeServices:
     """Canonical Container Apps runtime names and sizing are explicit."""
 
     def test_repository_config_declares_canonical_runtime_services(self):
-        config_dir = Path(__file__).parent.parent / "config" / "alice"
+        config_dir = Path(__file__).parent.parent / "config" / "logos"
         config = load_config(config_dir)
 
         services = config["services"]
         expected = {
-            "alice": {"cpu": "1", "memory": "1024Mi"},
-            "alice-lab": {"cpu": "1", "memory": "1024Mi"},
-            "alice-browser": {"cpu": "2", "memory": "2048Mi"},
+            "logos": {"cpu": "1", "memory": "1024Mi"},
+            "logos-lab": {"cpu": "1", "memory": "1024Mi"},
+            "logos-browser": {"cpu": "2", "memory": "2048Mi"},
         }
 
         for service_name, resources in expected.items():
@@ -444,7 +444,7 @@ class TestContainerAppsScalingContract:
     @staticmethod
     def _service(**overrides):
         service = {
-            "type": "alice",
+            "type": "logos",
             "depends_on": [],
             "scale": 0,
             "resources": {"cpu": "1", "memory": "1024Mi"},
@@ -456,10 +456,10 @@ class TestContainerAppsScalingContract:
         return service
 
     def test_valid_scale_to_zero_service_loads(self, tmp_path):
-        config_dir = make_minimal_config(tmp_path, services={"alice": self._service()})
+        config_dir = make_minimal_config(tmp_path, services={"logos": self._service()})
         config = load_config(config_dir)
-        assert config["services"]["alice"]["min_instances"] == 0
-        assert config["services"]["alice"]["max_instances"] == 1
+        assert config["services"]["logos"]["min_instances"] == 0
+        assert config["services"]["logos"]["max_instances"] == 1
 
     @pytest.mark.parametrize(
         ("field", "value"),
@@ -472,7 +472,7 @@ class TestContainerAppsScalingContract:
     )
     def test_invalid_scaling_values_fail_closed(self, tmp_path, field, value):
         config_dir = make_minimal_config(
-            tmp_path, services={"alice": self._service(**{field: value})}
+            tmp_path, services={"logos": self._service(**{field: value})}
         )
         with pytest.raises(ConfigError, match="instance|idle|scal"):
             load_config(config_dir)
@@ -480,7 +480,7 @@ class TestContainerAppsScalingContract:
     def test_min_cannot_exceed_max(self, tmp_path):
         config_dir = make_minimal_config(
             tmp_path,
-            services={"alice": self._service(min_instances=2, max_instances=1)},
+            services={"logos": self._service(min_instances=2, max_instances=1)},
         )
         with pytest.raises(ConfigError, match="min_instances|max_instances|scal"):
             load_config(config_dir)
@@ -488,7 +488,7 @@ class TestContainerAppsScalingContract:
     def test_idle_timeout_must_be_integer(self, tmp_path):
         config_dir = make_minimal_config(
             tmp_path,
-            services={"alice": self._service(idle_timeout_seconds="120")},
+            services={"logos": self._service(idle_timeout_seconds="120")},
         )
         with pytest.raises(ConfigError, match="idle"):
             load_config(config_dir)
@@ -498,19 +498,19 @@ class TestContainerAppsScalingContract:
         services = config["services"]
 
         expected = {
-            "alice": {
+            "logos": {
                 "resources": {"cpu": "1", "memory": "1024Mi"},
                 "min_instances": 0,
                 "max_instances": 1,
                 "idle_timeout_seconds": 60,
             },
-            "alice-lab": {
+            "logos-lab": {
                 "resources": {"cpu": "1", "memory": "1024Mi"},
                 "min_instances": 0,
                 "max_instances": 1,
                 "idle_timeout_seconds": 30,
             },
-            "alice-browser": {
+            "logos-browser": {
                 "resources": {"cpu": "2", "memory": "2048Mi"},
                 "min_instances": 0,
                 "max_instances": 1,
@@ -531,23 +531,23 @@ class TestContainerAppsScalingContract:
         production = set(config["lanes"]["production"]["services"])
         test = set(config["lanes"]["test"]["services"])
 
-        assert "alice" in production
-        assert "alice" not in test
-        assert "alice-lab" in test
-        assert "alice-lab" not in production
+        assert "logos" in production
+        assert "logos" not in test
+        assert "logos-lab" in test
+        assert "logos-lab" not in production
 
     def test_browser_is_shared_capability_but_single_instance(self):
         config = load_config(Path("config/platform"))
-        browser = config["services"]["alice-browser"]
+        browser = config["services"]["logos-browser"]
 
-        assert "alice-browser" in config["lanes"]["production"]["services"]
-        assert "alice-browser" in config["lanes"]["test"]["services"]
+        assert "logos-browser" in config["lanes"]["production"]["services"]
+        assert "logos-browser" in config["lanes"]["test"]["services"]
         assert browser["min_instances"] == 0
         assert browser["max_instances"] == 1
 
     def test_runtime_services_keep_oauth_dependency(self):
         config = load_config(Path("config/platform"))
-        for name in ("alice", "alice-lab", "alice-browser"):
+        for name in ("logos", "logos-lab", "logos-browser"):
             assert "oauth" in config["services"][name]["depends_on"]
 
     def test_legacy_services_remain_during_migration(self):
@@ -557,7 +557,7 @@ class TestContainerAppsScalingContract:
 
     def test_runtime_names_are_stable(self):
         config = load_config(Path("config/platform"))
-        runtime = {"alice", "alice-lab", "alice-browser"}
+        runtime = {"logos", "logos-lab", "logos-browser"}
         assert runtime.issubset(config["services"])
-        for forbidden in ("alice-prod", "alice-dev", "browser"):
+        for forbidden in ("logos-prod", "logos-dev", "browser"):
             assert forbidden not in config["services"]

@@ -1,4 +1,4 @@
-const CACHE_NAME = "alice-pro-v2";
+const CACHE_NAME = "logos-pro-v2";
 const urlsToCache = [
   "/",
   "/static/style.css",

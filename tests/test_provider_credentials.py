@@ -188,7 +188,7 @@ def test_provider_credentials_update_returns_provider_auth_error(monkeypatch):
 def test_provider_credentials_update_rejects_admin_auth_before_provider_validation(monkeypatch):
     import provider_accounts.credentials_routes as routes
 
-    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "expected-token")
+    monkeypatch.setenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", "expected-token")
     app = __import__("flask").Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
     app.testing = True
@@ -216,7 +216,7 @@ def test_provider_credentials_update_accepts_yandex_static_key_without_remote_pr
             calls.append(api_key)
 
     monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeClient())
-    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
+    monkeypatch.delenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", raising=False)
 
     class FakeConn:
         def close(self):
@@ -254,7 +254,7 @@ def test_provider_credentials_update_logs_storage_error_and_returns_detail(monke
             return None
 
     monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeClient())
-    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
+    monkeypatch.delenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", raising=False)
     monkeypatch.setattr(
         routes, "get_store", lambda: (_ for _ in ()).throw(RuntimeError("sqlite exploded"))
     )
@@ -263,7 +263,7 @@ def test_provider_credentials_update_logs_storage_error_and_returns_detail(monke
     app.register_blueprint(routes.provider_credentials_bp)
     app.testing = True
 
-    with caplog.at_level("ERROR", logger="alice.provider_credentials"):
+    with caplog.at_level("ERROR", logger="logos.provider_credentials"):
         with app.test_client() as client:
             response = client.put(
                 "/api/provider-credentials",

@@ -46,22 +46,22 @@ class SSHRuntime:
         known_hosts: Optional[str] = None,
     ) -> None:
         self._targets = self._load_targets(targets)
-        self._default_known_hosts = known_hosts or os.getenv("ALICE_SSH_KNOWN_HOSTS")
+        self._default_known_hosts = known_hosts or os.getenv("LOGOS_SSH_KNOWN_HOSTS")
 
     @staticmethod
     def _load_targets(
         targets: Optional[Mapping[str, Mapping[str, Any]]],
     ) -> dict[str, SSHTarget]:
         if targets is None:
-            text = os.getenv("ALICE_SSH_TARGETS_JSON", "").strip()
+            text = os.getenv("LOGOS_SSH_TARGETS_JSON", "").strip()
             if not text:
                 return {}
             try:
                 parsed = json.loads(text)
             except json.JSONDecodeError as exc:
-                raise SSHRuntimeError("ALICE_SSH_TARGETS_JSON is not valid JSON") from exc
+                raise SSHRuntimeError("LOGOS_SSH_TARGETS_JSON is not valid JSON") from exc
             if not isinstance(parsed, dict):
-                raise SSHRuntimeError("ALICE_SSH_TARGETS_JSON must be an object")
+                raise SSHRuntimeError("LOGOS_SSH_TARGETS_JSON must be an object")
             raw: Mapping[str, Mapping[str, Any]] = parsed
         else:
             raw = targets
@@ -339,7 +339,7 @@ class SSHRuntime:
         parent = str(PurePosixPath(remote_path).parent)
         quoted_parent = shlex.quote(parent)
         quoted_path = shlex.quote(remote_path)
-        template = shlex.quote(parent + "/.alice-runtime-XXXXXX")
+        template = shlex.quote(parent + "/.logos-runtime-XXXXXX")
         if workspace_root and os.path.normpath(workspace_root) != "/":
             root = shlex.quote(os.path.normpath(workspace_root))
             workspace_guard = (

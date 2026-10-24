@@ -1,4 +1,4 @@
-"""RED acceptance contract for #954 canonical Alice runtime desired state.
+"""RED acceptance contract for #954 canonical Logos runtime desired state.
 
 This file intentionally fails on the protected-master baseline until #954's
 desired-state implementation is applied. It does not assert live Cloud.ru
@@ -11,23 +11,23 @@ from pathlib import Path
 import pytest
 import yaml
 
-from alice_platform.config import ConfigError, load_config
+from logos_platform.config import ConfigError, load_config
 
 
 EXPECTED_RUNTIME = {
-    "alice": {
+    "logos": {
         "resources": {"cpu": "1", "memory": "1024Mi"},
         "min_instances": 0,
         "max_instances": 1,
         "idle_timeout_seconds": 60,
     },
-    "alice-lab": {
+    "logos-lab": {
         "resources": {"cpu": "1", "memory": "1024Mi"},
         "min_instances": 0,
         "max_instances": 1,
         "idle_timeout_seconds": 30,
     },
-    "alice-browser": {
+    "logos-browser": {
         "resources": {"cpu": "2", "memory": "2048Mi"},
         "min_instances": 0,
         "max_instances": 1,
@@ -38,7 +38,7 @@ EXPECTED_RUNTIME = {
 
 def _service(**overrides):
     service = {
-        "type": "alice",
+        "type": "logos",
         "depends_on": ["oauth"],
         "scale": 0,
         "resources": {"cpu": "1", "memory": "1024Mi"},
@@ -69,10 +69,10 @@ def test_production_and_lab_lanes_are_isolated_and_browser_is_shared():
     production = set(config["lanes"]["production"]["services"])
     lab = set(config["lanes"]["test"]["services"])
 
-    assert {"alice", "alice-browser"} <= production
-    assert "alice-lab" not in production
-    assert {"alice-lab", "alice-browser"} <= lab
-    assert "alice" not in lab
+    assert {"logos", "logos-browser"} <= production
+    assert "logos-lab" not in production
+    assert {"logos-lab", "logos-browser"} <= lab
+    assert "logos" not in lab
 
 
 @pytest.mark.parametrize(
@@ -89,7 +89,7 @@ def test_scaling_contract_fails_closed(tmp_path, field, value):
     config_dir.mkdir()
     service = _service(**{field: value})
     (config_dir / "platform.yaml").write_text(
-        yaml.safe_dump({"services": {"alice": service}}),
+        yaml.safe_dump({"services": {"logos": service}}),
         encoding="utf-8",
     )
     with pytest.raises(ConfigError):
@@ -101,8 +101,8 @@ def test_min_instances_cannot_exceed_max_instances(tmp_path):
     config_dir.mkdir()
     (config_dir / "platform.yaml").write_text(
         """services:
-  alice:
-    type: alice
+  logos:
+    type: logos
     depends_on: []
     scale: 0
     min_instances: 2

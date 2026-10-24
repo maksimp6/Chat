@@ -19,14 +19,14 @@ def _client(monkeypatch, token=None, require=True, preview=False, resolver=None,
     if resolver is not None and ref is not None:
         short_token_auth.configure_short_token_secret(resolver, ref)
     if token is None:
-        monkeypatch.delenv("ALICE_SHORT_TOKEN", raising=False)
+        monkeypatch.delenv("LOGOS_SHORT_TOKEN", raising=False)
     else:
-        monkeypatch.setenv("ALICE_SHORT_TOKEN", token)
-    monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "1" if require else "0")
+        monkeypatch.setenv("LOGOS_SHORT_TOKEN", token)
+    monkeypatch.setenv("LOGOS_REQUIRE_SHORT_TOKEN", "1" if require else "0")
     if preview:
-        monkeypatch.setenv("ALICE_PREVIEW", "1")
+        monkeypatch.setenv("LOGOS_PREVIEW", "1")
     else:
-        monkeypatch.delenv("ALICE_PREVIEW", raising=False)
+        monkeypatch.delenv("LOGOS_PREVIEW", raising=False)
 
     app = Flask(__name__)
     app.config["TESTING"] = True
@@ -51,7 +51,7 @@ def test_missing_runtime_secret_fails_closed(monkeypatch):
     client = _client(monkeypatch, token=None, require=True)
     response = client.get("/")
     assert response.status_code == 503
-    assert "ALICE_SHORT_TOKEN" not in response.get_data(as_text=True)
+    assert "LOGOS_SHORT_TOKEN" not in response.get_data(as_text=True)
 
 
 def test_invalid_token_is_rejected_without_disclosure(monkeypatch):
@@ -115,9 +115,9 @@ def test_auth_can_be_disabled_for_local_development(monkeypatch):
 def _secret_ref():
     return SecretRef(
         provider="fake",
-        secret_id="alice-short-token",
+        secret_id="logos-short-token",
         version_id="v1",
-        purpose="alice_short_token",
+        purpose="logos_short_token",
     )
 
 
@@ -149,7 +149,7 @@ def test_resolver_failure_fails_closed_without_environment_fallback(monkeypatch)
     assert response.status_code == 503
     body = response.get_data(as_text=True)
     assert "legacy-env-token" not in body
-    assert "alice-short-token" not in body
+    assert "logos-short-token" not in body
     assert "v1" not in body
 
 

@@ -162,7 +162,7 @@ def _workflow(name):
 @pytest.mark.parametrize(
     "filename,job_name,guard_name,condition",
     [
-        ("logos.yml", "alice", "Enforce native Logos court hold", None),
+        ("logos.yml", "logos", "Enforce native Logos court hold", None),
         ("rag-work.yml", "logos", "Enforce native Logos court hold", "inputs.mode == 'logos'"),
         (
             "semantic-work.yml",

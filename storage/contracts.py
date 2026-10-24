@@ -121,11 +121,11 @@ DEFAULT_LOCAL_STORAGE_ROOT = Path("data") / "storage"
 def storage_provider_from_env(
     env: Mapping[str, str] | None = None, *, local_root: str | Path | None = None
 ) -> StorageProvider:
-    """Build the provider selected by ``ALICE_STORAGE_PROVIDER`` (``local`` by default)."""
+    """Build the provider selected by ``LOGOS_STORAGE_PROVIDER`` (``local`` by default)."""
     env = os.environ if env is None else env
-    name = str(env.get("ALICE_STORAGE_PROVIDER", "") or "").strip().lower() or "local"
+    name = str(env.get("LOGOS_STORAGE_PROVIDER", "") or "").strip().lower() or "local"
     if name == "local":
-        root = env.get("ALICE_STORAGE_LOCAL_ROOT") or local_root or DEFAULT_LOCAL_STORAGE_ROOT
+        root = env.get("LOGOS_STORAGE_LOCAL_ROOT") or local_root or DEFAULT_LOCAL_STORAGE_ROOT
         return LocalDirectoryStorage(root)
     if name == "cloudru":
         from cloud.cloudru.object_storage import CloudRuObjectStorage

@@ -11,8 +11,8 @@ with AWS Signature V4 over `requests`, so no SDK dependency is added.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `ALICE_STORAGE_PROVIDER` | `local` | `local` or `cloudru` |
-| `ALICE_STORAGE_LOCAL_ROOT` | `data/storage` | Root of the local adapter |
+| `LOGOS_STORAGE_PROVIDER` | `local` | `local` or `cloudru` |
+| `LOGOS_STORAGE_LOCAL_ROOT` | `data/storage` | Root of the local adapter |
 | `CLOUDRU_STORAGE_BUCKET` | (required for `cloudru`) | Bucket name |
 | `CLOUDRU_STORAGE_S3_ENDPOINT` | `https://s3.cloud.ru` | S3 endpoint (separate from the inventory `CLOUDRU_STORAGE_ENDPOINT`) |
 | `CLOUDRU_STORAGE_REGION` | `ru-central-1` | SigV4 region |

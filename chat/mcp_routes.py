@@ -147,7 +147,7 @@ class LogosClient(YandexResponsesClient):
             return self._claude_transport().ask_with_mcp(**kwargs)
         return super().ask_with_mcp(**kwargs)
 
-    # Alice Pro shopping policy: never source recommendations from Yandex Market.
+    # Logos Pro shopping policy: never source recommendations from Yandex Market.
     # Keep Yandex AI Studio and unrelated Yandex services available.
     mandatory_blocked_web_domains = (
         "market.yandex.ru",

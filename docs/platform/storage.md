@@ -59,7 +59,7 @@ storage:
     mount_path: /chrome-state
     size: 10Gi
   shared-cache:
-    mount_path: /var/cache/alice
+    mount_path: /var/cache/logos
     size: 5Gi
     backup_policy: weekly
 ```

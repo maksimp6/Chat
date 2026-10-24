@@ -21,7 +21,7 @@ def main() -> None:
     if plan["shot"] != "turntable":
         parser.error("Only turntable rendering is implemented")
     fps = 24
-    with tempfile.TemporaryDirectory(prefix="alice-3d-") as temp:
+    with tempfile.TemporaryDirectory(prefix="logos-3d-") as temp:
         folder = Path(temp)
         render_turntable(args.stl, folder, frames=plan["duration_seconds"] * fps)
         command = ffmpeg_command(

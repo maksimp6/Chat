@@ -414,7 +414,7 @@ def http_fetch(args: dict) -> dict:
 
     try:
         req = urllib.request.Request(
-            url, headers={"User-Agent": "AlicePro-StdLib/1.0", "Accept": "*/*"}
+            url, headers={"User-Agent": "LogosPro-StdLib/1.0", "Accept": "*/*"}
         )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             raw = resp.read(max_bytes)

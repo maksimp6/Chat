@@ -13,8 +13,8 @@ def test_cloudru_iam_uses_canonical_modal_api():
     assert ".style.display" not in source
     assert ".onclick" not in source
     assert "UI.modal.create({" in source
-    assert "window.AliceCoreAPI.ui.modal.open(modal)" in source
-    assert "window.AliceCoreAPI.ui.modal.close(modal)" in source
+    assert "window.LogosCoreAPI.ui.modal.open(modal)" in source
+    assert "window.LogosCoreAPI.ui.modal.close(modal)" in source
 
     assert 'modal.setAttribute("role", "dialog")' in core
     assert 'modal.setAttribute("aria-modal", "true")' in core

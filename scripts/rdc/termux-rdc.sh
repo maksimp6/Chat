@@ -2,7 +2,7 @@
 # One-command RDC entrypoint. Never restart an active control connection.
 set -euo pipefail
 umask 077
-RDC_HOME="${RDC_HOME:-$HOME/.alice-rdc}"
+RDC_HOME="${RDC_HOME:-$HOME/.logos-rdc}"
 ENTRY="$RDC_HOME/package/node_modules/@wonderwhy-er/desktop-commander/dist/index.js"
 PID_FILE="$RDC_HOME/rdc.pid"
 WATCHDOG_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/termux-rdc-watchdog.sh"

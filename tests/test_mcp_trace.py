@@ -18,7 +18,7 @@ def test_yandex_mcp_activity_is_correlated_with_invocation_trace():
                     "id": "mcp-call-1",
                     "server_label": "github",
                     "name": "search_repositories",
-                    "arguments": {"query": "alice"},
+                    "arguments": {"query": "logos"},
                     "authorization": "super-secret",
                 }
             ],

@@ -16,7 +16,7 @@ Memory — данные и их жизненный цикл. Чат остаёт
 
 Существующие [AI pipeline](../architecture/ai-execution-pipeline.md),
 [Universal Tool Platform](../architecture/universal_tool_platform.md) и
-[runtime debugging skill](../../.agents/skills/alice-runtime-debugging/SKILL.md)
+[runtime debugging skill](../../.agents/skills/logos-runtime-debugging/SKILL.md)
 остаются каноническими. Usage/cost считает детерминированный код; текст модели
 может объяснять результат, но не становится расчётным источником.
 

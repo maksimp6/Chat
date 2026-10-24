@@ -98,7 +98,7 @@ resolution:
 
 - one container or Flask subprocess per preview;
 - localhost or `runtime_port` routing between the gateway and a runtime;
-- per-runtime mutation of `ALICE_PREVIEW_BASE_PATH` or other process globals;
+- per-runtime mutation of `LOGOS_PREVIEW_BASE_PATH` or other process globals;
 - arbitrary branch imports through global `sys.path`/`sys.modules` changes;
 - threads presented as protection from hostile Python code;
 - direct runtime access to database, filesystem, network, process, MCP, tools,

@@ -4,7 +4,7 @@ Design contract (aligned with scripts/rag_pipeline.py):
 - Corpora = all task Issues (title/body) or labelled `rag-source` dialogues;
   both include open and closed Issues with honest per_page=100 pagination.
 - Retrieval: BM25 over sentence units (deterministic, no model call) -> top-K candidates.
-- One bounded YandexGPT call per query (model aliceai-llm-flash, background=False,
+- One bounded YandexGPT call per query (model logosai-llm-flash, background=False,
   store=False, max_output_tokens<=4096): the model may only RE-SELECT and cite
   verbatim fragments from the candidate list; it must refuse when nothing is
   relevant (RED contract).
@@ -53,7 +53,7 @@ API = f"https://api.github.com/repos/{REPO}"
 LABEL_SOURCE = "rag-source"
 TOP_K = 30
 PER_ISSUE_CAP = 6
-MODEL = "aliceai-llm-flash"
+MODEL = "logosai-llm-flash"
 HOST = "ai.api.cloud.yandex.net"
 MAX_OUTPUT_TOKENS = 4096
 MAX_RESPONSE_BYTES = 262144

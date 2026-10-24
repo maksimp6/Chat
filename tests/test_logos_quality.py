@@ -102,7 +102,7 @@ def test_large_initial_context_is_sent_whole_and_never_uses_hidden_truncation(
     assert calls[1][1]["truncation"] == "disabled"
 
 
-def test_strong_model_is_registered_instead_of_using_alice_pricing_fallback():
+def test_strong_model_is_registered_instead_of_using_logos_pricing_fallback():
     assert upstream_model_id(quality.MODEL) == quality.MODEL
     info = get_model_info(quality.MODEL)
     assert info["name"] == "DeepSeek V4.1 Flash"

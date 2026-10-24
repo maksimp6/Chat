@@ -29,8 +29,8 @@ def test_crud_and_defaults():
     row = db.insert("users", id=1, name="Алиса", email="a@example.test")
     assert row["active"] is True
     assert db.select("users", lambda r: r["id"] == 1)[0]["name"] == "Алиса"
-    assert db.update("users", lambda r: r["id"] == 1, name="Alice") == 1
-    assert db.select("users")[0]["name"] == "Alice"
+    assert db.update("users", lambda r: r["id"] == 1, name="Logos") == 1
+    assert db.select("users")[0]["name"] == "Logos"
     assert db.delete("users", lambda r: r["id"] == 1) == 1
     assert db.select("users") == []
 

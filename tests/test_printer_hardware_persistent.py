@@ -1,6 +1,6 @@
 """Hardware smoke for an authorized A1 mini on an approved local network.
 
-Disabled unless ALICE_PRINTER_HARDWARE_IP is explicitly supplied. The
+Disabled unless LOGOS_PRINTER_HARDWARE_IP is explicitly supplied. The
 hardware connector is injected because unprivileged Termux cannot use
 SO_BINDTODEVICE. No writes beyond the read-only detect command.
 """
@@ -18,11 +18,11 @@ from printer_service.printers.persistent_session import PrinterSession
 
 
 def test_persistent_a1mini_real_network():
-    host = os.getenv("ALICE_PRINTER_HARDWARE_IP")
+    host = os.getenv("LOGOS_PRINTER_HARDWARE_IP")
     if not host:
         pytest.skip("hardware opt-in not configured")
     host = private_ipv4(host)
-    expected = os.getenv("ALICE_PRINTER_EXPECTED_MODEL", "N1")
+    expected = os.getenv("LOGOS_PRINTER_EXPECTED_MODEL", "N1")
     measurements = []
 
     def connector(ip, port, *, timeout):

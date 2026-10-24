@@ -31,13 +31,13 @@ class RuntimeHostAPI:
 class RuntimeLoader:
     """Load one revision entry point without touching Python import globals.
 
-    The initial contract is intentionally single-file: ``alice_runtime.py`` may
+    The initial contract is intentionally single-file: ``logos_runtime.py`` may
     not import modules and must expose ``create_runtime(host)``.  Its globals
     live in a private dictionary which is not inserted into ``sys.modules``.
     This is collision-safe, but is not a security sandbox for untrusted Python.
     """
 
-    ENTRYPOINT = "alice_runtime.py"
+    ENTRYPOINT = "logos_runtime.py"
 
     def __init__(
         self,
@@ -82,7 +82,7 @@ class RuntimeLoader:
         exec(compile(source, str(path), "exec"), namespace)
         factory = namespace.get("create_runtime")
         if not callable(factory):
-            raise RuntimeLoadError("alice_runtime.py must define create_runtime(host)")
+            raise RuntimeLoadError("logos_runtime.py must define create_runtime(host)")
         application = factory(RuntimeHostAPI(self.runtime_id, self._dispatcher))
         if not callable(getattr(application, "invoke", None)):
             raise RuntimeLoadError("runtime application must define invoke(operation, payload)")

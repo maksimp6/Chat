@@ -66,7 +66,7 @@ HTTP `403 Forbidden` от Yandex Responses API необходимо отлича
 
 ```text
 403 Forbidden
-No permission 'use_model' to model gpt://<PROJECT_ID>/alice-lite/latest
+No permission 'use_model' to model gpt://<PROJECT_ID>/logos-lite/latest
 ```
 
 Такая ошибка означает, что запрос к API был отклонён на уровне **права использования модели** (`use_model`). Сам по себе этот ответ не доказывает, что модель не поддерживает `tools` или function calling. Нельзя автоматически делать вывод о несовместимости модели с инструментами только по такому `403`.
@@ -86,7 +86,7 @@ No permission 'use_model' to model gpt://<PROJECT_ID>/alice-lite/latest
 
 Наличие модели в интерфейсе Model Gallery не следует считать доказательством того, что текущий проект или сервисный аккаунт имеет право её использовать. Перед использованием конкретного `model URI` необходимо учитывать доступ проекта к модели.
 
-В частности, внутренний ключ Logos `logos-runtime` (upstream id `aliceai-llm`) и название `YandexGPT Lite` из каталога Yandex AI Studio нельзя считать эквивалентными без подтверждения соответствующего `model URI` и доступа проекта.
+В частности, внутренний ключ Logos `logos-runtime` (upstream id `logosai-llm`) и название `YandexGPT Lite` из каталога Yandex AI Studio нельзя считать эквивалентными без подтверждения соответствующего `model URI` и доступа проекта.
 
 Если API возвращает `No permission 'use_model'`, сначала проверяются модельный URI и права доступа. Проверка поддержки tools выполняется отдельно и только по документации/API-возможностям конкретной модели.
 

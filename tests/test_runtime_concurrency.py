@@ -10,7 +10,7 @@ def runtime_db(tmp_path, monkeypatch):
 
     path = tmp_path / "runtime.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setenv("ALICE_MEMORY_PATH", str(tmp_path / "alice.memory"))
+    monkeypatch.setenv("LOGOS_MEMORY_PATH", str(tmp_path / "logos.memory"))
     close_memory_clients()
     db.init_db()
     yield path

@@ -1,7 +1,7 @@
 # Проверяемые уроки и проектные навыки
 
 Срез: **2026-10-11**. Это каталог повторно применимых процедур из доступного
-опыта работы над Alice Pro, а не архив переписки и не заявление о полноте истории.
+опыта работы над Logos Pro, а не архив переписки и не заявление о полноте истории.
 Ранний подтверждённый материал начинается 2026-08-16; это не обязательно первый
 разговор. Исторические результаты ниже отделены от повторных проверок кода.
 
@@ -18,7 +18,7 @@
 содержат проектные процедуры. Их формат проверяет существующий валидатор.
 Существующий [role allowlist](../../agent_skills/registry.py) не изменён:
 новые пакеты доступны для чтения и общего каталога, но **не подключены к
-role-scoped выбору Alice**. Это отдельная будущая интеграция, не скрытая часть
+role-scoped выбору Logos**. Это отдельная будущая интеграция, не скрытая часть
 документационного PR.
 
 ## Каталог без дублирования
@@ -29,7 +29,7 @@ role-scoped выбору Alice**. Это отдельная будущая ин�
 | Триггер | Каноническая процедура | Происхождение и граница |
 | --- | --- | --- |
 | Проверить идею AI-сервиса до автоматизации | [service-hypothesis-validation](../../.agents/skills/service-hypothesis-validation/SKILL.md) | H01; планирование, не доказательство дохода |
-| Ошибка типов deferred promise или mock | [typed-async-contract-repair](../../.agents/skills/typed-async-contract-repair/SKILL.md) | H03; исторический успешный build, не текущий frontend Alice |
+| Ошибка типов deferred promise или mock | [typed-async-contract-repair](../../.agents/skills/typed-async-contract-repair/SKILL.md) | H03; исторический успешный build, не текущий frontend Logos |
 | Настройки сохранены, но модель их игнорирует | [settings-payload-verification](../../.agents/skills/settings-payload-verification/SKILL.md) | H04; проверять каждый переход UI → payload |
 | MCP достижим, но tools/identity/scopes не работают | [mcp-authorization-diagnosis](../../.agents/skills/mcp-authorization-diagnosis/SKILL.md) | H06–H08; старые PR не выдавать за shipped |
 | Нужно доказать durability, restore или cutover | [durable-storage-evidence](../../.agents/skills/durable-storage-evidence/SKILL.md) | H12; контракт отдельно от миграции |
@@ -39,7 +39,7 @@ role-scoped выбору Alice**. Это отдельная будущая ин�
 | Надо передать модель/слайс/готовый файл без ложного успеха | [3d-artifact-handoff](../../.agents/skills/3d-artifact-handoff/SKILL.md) | H14–H16; стадии и реальные байты отдельно |
 | Требуется найти недостающие взаимодействия UI | [frontend-capability-audit](../../.agents/skills/frontend-capability-audit/SKILL.md) | H02, H17 и текущий аудит; UI/backend/PR/deploy отдельно |
 | Добавляются агенты, модели или tools | [Архитектурный урок](engineering-lessons.md#architecture) + [issue-to-pr](../../.agents/skills/issue-to-pr/SKILL.md) | H02; продолжать существующую архитектуру |
-| Расходятся invocation/session/trace IDs | [alice-runtime-debugging](../../.agents/skills/alice-runtime-debugging/SKILL.md) | H05; один request-scoped контекст |
+| Расходятся invocation/session/trace IDs | [logos-runtime-debugging](../../.agents/skills/logos-runtime-debugging/SKILL.md) | H05; один request-scoped контекст |
 | PR завис или старое зелёное CI не соответствует head | [github-pr-readiness](../../.agents/skills/github-pr-readiness/SKILL.md), [github-ci-diagnosis](../../.agents/skills/github-ci-diagnosis/SKILL.md) | H07, H18; точный head и события workflow |
 | Нужна проверка release/deployment evidence | [release-readiness](../../.agents/skills/release-readiness/SKILL.md), [cloudru-change](../../.agents/skills/cloudru-change/SKILL.md) | H09, H11; новый навык дополняет проверкой происхождения артефакта |
 | Утечки, неверные scopes или доверие к внешним данным | [security-review](../../.agents/skills/security-review/SKILL.md) | H08, H14; конкретный trust boundary |

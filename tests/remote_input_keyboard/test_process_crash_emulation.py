@@ -23,7 +23,7 @@ def test_sigkill_closes_emulated_device_fd_without_key_up():
     assert DRIVER.is_file() and HEADER.is_file()
     cc = shutil.which("clang") or shutil.which("cc")
     assert cc, "A C compiler is required for keyboard crash emulation"
-    with tempfile.TemporaryDirectory(prefix="alice-key-crash-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="logos-key-crash-") as temporary:
         source = Path(temporary) / "crash.c"
         binary = Path(temporary) / "crash"
         source.write_text(

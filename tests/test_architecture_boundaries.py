@@ -92,9 +92,9 @@ def test_repository_respects_architecture_boundaries():
 
 def test_repository_guard_ignores_untracked_build_output(tmp_path):
     subprocess.run(["git", "-C", str(tmp_path), "init", "-q"], check=True)
-    source = tmp_path / "alice.py"
+    source = tmp_path / "logos.py"
     source.write_text("VALUE = 1\n", encoding="utf-8")
-    subprocess.run(["git", "-C", str(tmp_path), "add", "alice.py"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "add", "logos.py"], check=True)
     generated = tmp_path / "build" / "generated.test.mjs"
     generated.parent.mkdir()
     generated.write_text("export {};", encoding="utf-8")
@@ -116,19 +116,19 @@ def test_guard_rejects_executable_source_under_docs(tmp_path):
 
 
 def test_guard_rejects_production_import_from_tests(tmp_path):
-    path = tmp_path / "alice" / "runtime.py"
+    path = tmp_path / "logos" / "runtime.py"
     path.parent.mkdir(parents=True)
     path.write_text("from tests.helpers import fake_client\n", encoding="utf-8")
     assert architecture_violations(tmp_path) == [
-        "production import alice/runtime.py -> tests.helpers"
+        "production import logos/runtime.py -> tests.helpers"
     ]
 
 
 def test_guard_allows_tests_to_depend_on_production(tmp_path):
-    production = tmp_path / "alice" / "runtime.py"
+    production = tmp_path / "logos" / "runtime.py"
     production.parent.mkdir(parents=True)
     production.write_text("VALUE = 1\n", encoding="utf-8")
     test = tmp_path / "tests" / "test_runtime.py"
     test.parent.mkdir(parents=True)
-    test.write_text("from alice.runtime import VALUE\n", encoding="utf-8")
+    test.write_text("from logos.runtime import VALUE\n", encoding="utf-8")
     assert architecture_violations(tmp_path) == []

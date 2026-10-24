@@ -81,13 +81,13 @@ def test_policy_and_approval():
     g = AgentGateway(default_max_retries=0)
     g.register(
         AgentDescriptor(
-            "secure", "Secure", risk_level="high", requires_approval=True, allowed_users=("alice",)
+            "secure", "Secure", risk_level="high", requires_approval=True, allowed_users=("logos",)
         ),
         lambda p: p,
     )
     assert g.invoke("secure", {}, user_id="mallory", approved=True).status == "error"
-    assert g.invoke("secure", {}, user_id="alice", approved=False).status == "error"
-    assert g.invoke("secure", {}, user_id="alice", approved=True).status == "completed"
+    assert g.invoke("secure", {}, user_id="logos", approved=False).status == "error"
+    assert g.invoke("secure", {}, user_id="logos", approved=True).status == "completed"
 
 
 def test_capability_route_and_fallback():

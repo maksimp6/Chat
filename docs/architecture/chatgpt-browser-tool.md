@@ -120,7 +120,7 @@ including token refresh and revocation handling.
 
 ### Short-token (machine) authentication
 
-Logos's own browser operations use the `ALICE_SHORT_TOKEN` (or `BROWSER_API_TOKEN`)
+Logos's own browser operations use the `LOGOS_SHORT_TOKEN` (or `BROWSER_API_TOKEN`)
 bearer token for direct worker calls, bypassing OAuth. This skips the interactive
 flow and is suitable for automated Playwright operations.
 

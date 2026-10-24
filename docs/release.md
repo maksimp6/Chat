@@ -17,10 +17,10 @@ git push origin v0.1.0
 
 ## Required repository secrets
 
-- `ALICE_RELEASE_KEYSTORE_BASE64`
-- `ALICE_RELEASE_STORE_PASSWORD`
-- `ALICE_RELEASE_KEY_ALIAS`
-- `ALICE_RELEASE_KEY_PASSWORD`
+- `LOGOS_RELEASE_KEYSTORE_BASE64`
+- `LOGOS_RELEASE_STORE_PASSWORD`
+- `LOGOS_RELEASE_KEY_ALIAS`
+- `LOGOS_RELEASE_KEY_PASSWORD`
 
 The keystore is decoded only in the runner's temporary directory, removed by an unconditional cleanup step, and never uploaded as an artifact.
 
@@ -45,7 +45,7 @@ Every release should have:
 - release metadata containing tag, commit and build number.
 
 Before publishing, CI also verifies that the APK signer matches the configured
-release keystore, the application ID remains `com.alicepro.mobile`, and the APK's
+release keystore, the application ID remains `com.logospro.mobile`, and the APK's
 version name and code match the tag and workflow run number. Before changing the
 release keystore, compare its certificate SHA-256 fingerprint with a previously
 published production APK (or the registered upload certificate when using Play

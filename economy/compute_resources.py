@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 PRICING_CURRENCY = "RUB"
 PRICING_VERSION = "energy-v1"
-PROVIDER = "alice_compute"
+PROVIDER = "logos_compute"
 DEFAULT_CPU_WATTS_PER_CORE = 15.0
 
 
@@ -37,10 +37,10 @@ def _positive_env_float(name: str) -> Optional[float]:
 
 
 def get_energy_pricing() -> Dict[str, Optional[float]]:
-    watts = _positive_env_float("ALICE_CPU_WATTS_PER_CORE")
+    watts = _positive_env_float("LOGOS_CPU_WATTS_PER_CORE")
     return {
         "watts_per_core": DEFAULT_CPU_WATTS_PER_CORE if watts is None else watts,
-        "price_per_kwh": _positive_env_float("ALICE_ELECTRICITY_PRICE_RUB_PER_KWH"),
+        "price_per_kwh": _positive_env_float("LOGOS_ELECTRICITY_PRICE_RUB_PER_KWH"),
     }
 
 

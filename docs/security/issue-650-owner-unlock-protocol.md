@@ -36,7 +36,7 @@ Any invalid identity, policy failure, nonce reuse, timeout, disconnect, keyguard
 
 ## Outstanding blockers
 
-Trusted owner/session issuer and device key enrollment; durable atomic replay ledger; independent owner approval channel; real-device verification of the RootAgent Keyguard read (`/v1/status`, merged in #1202); real-device read-only E2E; review of stale /sdcard/alice-ui.xml privacy residue; exact-head CI and independent security review.
+Trusted owner/session issuer and device key enrollment; durable atomic replay ledger; independent owner approval channel; real-device verification of the RootAgent Keyguard read (`/v1/status`, merged in #1202); real-device read-only E2E; review of stale /sdcard/logos-ui.xml privacy residue; exact-head CI and independent security review.
 
 ## Release gates
 

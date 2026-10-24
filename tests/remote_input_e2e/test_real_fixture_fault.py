@@ -17,7 +17,7 @@ def test_real_c_fixture_freed_on_auth_failure():
     assert (DRIVER / "keyboard.c").is_file() and FIXTURE.is_file()
     cc = shutil.which("clang") or shutil.which("cc")
     assert cc
-    with tempfile.TemporaryDirectory(prefix="alice-auth-fault-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="logos-auth-fault-") as tmp:
         libpath = Path(tmp) / "fixture.so"
         subprocess.run(
             [

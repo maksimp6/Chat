@@ -49,14 +49,14 @@ def install_rdc_pairing(app):
         from identity.short_token_auth import COOKIE_NAME, _enabled, _has_valid_session, _token
 
         token = _token()
-        authenticated = request.environ.get("alice.short_token_path_authenticated") or (
+        authenticated = request.environ.get("logos.short_token_path_authenticated") or (
             token and _has_valid_session(token, request.cookies.get(COOKIE_NAME))
         )
         if not _enabled() or not token or not authenticated:
             response = jsonify({"error": "authentication required"})
             response.status_code = 401
         else:
-            path = os.environ.get("ALICE_RDC_PAIRING_FILE", "")
+            path = os.environ.get("LOGOS_RDC_PAIRING_FILE", "")
             try:
                 if not path:
                     raise ValueError("handoff not configured")

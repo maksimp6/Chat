@@ -50,4 +50,4 @@ def resolve_provider_name(args: dict[str, Any]) -> str:
     value = args.get("provider")
     if isinstance(value, str) and value.strip():
         return value.strip().lower()
-    return os.getenv("ALICE_CLOUD_PROVIDER", "cloudru").strip().lower() or "cloudru"
+    return os.getenv("LOGOS_CLOUD_PROVIDER", "cloudru").strip().lower() or "cloudru"

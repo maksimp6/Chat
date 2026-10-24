@@ -3,7 +3,7 @@ const { BrowserShim } = require("../browser/emulator/browser_dom");
 const shim = new BrowserShim();
 const { window, document } = shim.load(["static/core_api.js"]);
 
-const UI = window.AliceCoreAPI.ui;
+const UI = window.LogosCoreAPI.ui;
 const root = document.createElement("div");
 document.body.appendChild(root);
 
@@ -29,7 +29,7 @@ const button = UI.button({
 });
 
 if (button.type !== "button") throw new Error("button factory must force type=button");
-if (!button.classList.contains("alice-btn")) throw new Error("button factory must add alice-btn");
+if (!button.classList.contains("logos-btn")) throw new Error("button factory must add logos-btn");
 if (button.dataset.action !== "test.click") throw new Error("button factory must bind data-action");
 if (button.dataset.itemId !== "42") throw new Error("button factory must bind action params");
 if (button.getAttribute("aria-label") !== "Contract button")

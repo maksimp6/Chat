@@ -43,7 +43,7 @@ REQUIRED_FIELDS = {
     "category",
     "status",
     "provider_exists",
-    "alice_implemented",
+    "logos_implemented",
     "e2e_verified",
     "last_verified",
     "issue",
@@ -61,7 +61,7 @@ REQUIRED_FIELDS = {
 }
 BOOLEAN_FIELDS = (
     "provider_exists",
-    "alice_implemented",
+    "logos_implemented",
     "e2e_verified",
     "secret_store_required",
     "approval_required",
@@ -163,13 +163,13 @@ def _validate_verification(record: dict[str, Any], prefix: str, as_of: date) -> 
             errors.append(str(exc))
 
     provider_exists = record.get("provider_exists") is True
-    implemented = record.get("alice_implemented") is True
+    implemented = record.get("logos_implemented") is True
     e2e = record.get("e2e_verified") is True
     status = record.get("status")
     if implemented and not provider_exists:
         errors.append(f"{prefix}: Logos implementation requires provider_exists")
     if e2e and not implemented:
-        errors.append(f"{prefix}: e2e_verified requires alice_implemented")
+        errors.append(f"{prefix}: e2e_verified requires logos_implemented")
     supported = provider_exists and implemented and e2e and last_verified is not None
     if status == "supported" and not supported:
         errors.append(f"{prefix}: supported requires provider + implementation + E2E verification")
@@ -246,7 +246,7 @@ def render_markdown(data: dict[str, Any]) -> str:
                 name=record["name"],
                 status=record["status"],
                 provider="yes" if record["provider_exists"] else "no",
-                implemented="yes" if record["alice_implemented"] else "no",
+                implemented="yes" if record["logos_implemented"] else "no",
                 e2e="yes" if record["e2e_verified"] else "no",
                 verified=verified,
                 issue=record["issue"],

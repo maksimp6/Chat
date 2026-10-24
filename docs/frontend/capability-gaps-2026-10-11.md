@@ -1,6 +1,6 @@
-# Alice Pro: аудит пользовательских сценариев
+# Logos Pro: аудит пользовательских сценариев
 
-Дата: **2026-10-11**. У Alice Pro есть web-оболочка с чатом, Trace и настройками.
+Дата: **2026-10-11**. У Logos Pro есть web-оболочка с чатом, Trace и настройками.
 Основные пробелы — честное отображение ошибок, применение выбранных возможностей
 и переход от запуска работы к проверенному результату. Часть экранов требует
 backend-контракта; это не только frontend-задачи.
@@ -29,7 +29,7 @@ consent, устройства, принтеры и deployment не вызыва�
 Один shell содержит sidebar/modals; deep link — `/?conversation_id=…`, backend
 умеет передать выбранный разговор в template.
 [r/frontend/src/App.tsx](../../r/frontend/src/App.tsx) — Vite/React starter с counter,
-не второй готовый Alice frontend. Service-local страницы и native Android UI
+не второй готовый Logos frontend. Service-local страницы и native Android UI
 учтены отдельно.
 
 ## Существующие возможности
@@ -41,7 +41,7 @@ consent, устройства, принтеры и deployment не вызыва�
 | Настройки/tools/skills | [settings_modal.js](../../static/settings/settings_modal.js), [settings_params.js](../../static/settings/settings_params.js), [settings_storage.js](../../static/settings/settings_storage.js) | Settings/tools API, [SkillRegistry](../../agent_skills/registry.py), `/api/skills`. Sampling/tools controls есть; skill selection не подключён к chat request |
 | MCP servers | [settings_mcp.js](../../static/settings/settings_mcp.js): add/edit/delete | `/api/mcp-servers` в mcp_routes.py; CRUD не является OAuth/discovery/health workflow |
 | Provider connection | [provider_credentials.js](../../static/provider_credentials.js) | [provider_credentials_routes.py](../../provider_credentials_routes.py): credentials/status; подключение и ошибки уже имеют UI |
-| OAuth/browser | GitHub login link; service consent/takeover pages; [BrowserTakeoverActivity.kt](../../android/app/src/main/java/com/alicepro/mobile/BrowserTakeoverActivity.kt) | [github_oauth.py](../../identity/github_oauth.py), [chrome worker](../../deploy/chrome-worker/server.mjs), [chrome OAuth](../../deploy/chrome-worker/oauth.mjs), [RDC OAuth](../../deploy/remote-desktop-commander/oauth.mjs). Browser status/control/takeover есть в отдельном сервисе; deployment не проверен |
+| OAuth/browser | GitHub login link; service consent/takeover pages; [BrowserTakeoverActivity.kt](../../android/app/src/main/java/com/logospro/mobile/BrowserTakeoverActivity.kt) | [github_oauth.py](../../identity/github_oauth.py), [chrome worker](../../deploy/chrome-worker/server.mjs), [chrome OAuth](../../deploy/chrome-worker/oauth.mjs), [RDC OAuth](../../deploy/remote-desktop-commander/oauth.mjs). Browser status/control/takeover есть в отдельном сервисе; deployment не проверен |
 | Устройства/runtime | SSH settings/test modal; Android local-agent UI | [local_agent_gateway.py](../../local_agent_gateway.py): register/heartbeat/poll/result/health; [pairing.py](../../rdc_connection/pairing.py): `/rdc`. Health требует bootstrap authority; redirect может вернуть 401/503 |
 | Память | [memory_panel.js](../../static/memory_panel.js), server-rendered modal | [app.py](../../app.py): manage/config/clear. Facts, enable/limit/clear есть |
 | Backup/replay | Web controls не найдены | [backup.py](../../agent_memory/backup.py), [file_memory_db.py](../../agent_memory/file_memory_db.py), [backup tests](../../tests/test_memory_backup.py). Library capabilities, не operational HTTP restore API |
@@ -137,7 +137,7 @@ allowance. Для BudgetController нужен отдельно согласов�
 **Тип:** UI + owner-facing API/security adapter.
 [local_agent_gateway.py](../../local_agent_gateway.py) хранит heartbeat/capabilities,
 но health требует bootstrap token и перечисляет агентов. Web device list нет.
-[Android MainActivity](../../android/app/src/main/java/com/alicepro/mobile/MainActivity.kt)
+[Android MainActivity](../../android/app/src/main/java/com/logospro/mobile/MainActivity.kt)
 уже умеет подключать local agent; нельзя утверждать, что device UI отсутствует вообще.
 
 **Не хватает:** выбранного устройства, capability, last-seen/stale и понятной

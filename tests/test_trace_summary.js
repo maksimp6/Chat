@@ -7,7 +7,7 @@ const context = { window: {} };
 vm.createContext(context);
 vm.runInContext(source, context, { filename: "trace_summary.js" });
 
-const build = context.window.AliceTraceSummary.build;
+const build = context.window.LogosTraceSummary.build;
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);

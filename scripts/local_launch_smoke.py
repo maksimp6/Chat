@@ -166,7 +166,7 @@ def _start_server(
     attempt: int,
     source_root: Path = ROOT,
 ) -> RunningServer:
-    log_path = work_dir / f"alice-launch-smoke-{attempt}.log"
+    log_path = work_dir / f"logos-launch-smoke-{attempt}.log"
     log_handle = log_path.open("w", encoding="utf-8")
     try:
         process = subprocess.Popen(
@@ -221,8 +221,8 @@ def _session_persisted(
 
 
 def _provider_inputs() -> tuple[str, str]:
-    api_key = os.getenv("ALICE_LAUNCH_SMOKE_YANDEX_API_KEY", "").strip()
-    project_id = os.getenv("ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID", "").strip()
+    api_key = os.getenv("LOGOS_LAUNCH_SMOKE_YANDEX_API_KEY", "").strip()
+    project_id = os.getenv("LOGOS_LAUNCH_SMOKE_YANDEX_PROJECT_ID", "").strip()
     return api_key, project_id
 
 
@@ -352,12 +352,12 @@ def _build_runtime_env(*, db_path: Path, port: int) -> dict[str, str]:
     env["HOST"] = "127.0.0.1"
     env["PORT"] = str(port)
     env["FLASK_DEBUG"] = "0"
-    env["ALICE_MEMORY_PATH"] = str(db_path)
-    env["ALICE_REQUIRE_SHORT_TOKEN"] = "0"
-    env["ALICE_PROVIDER_CREDENTIALS_TOKEN"] = ""
-    env.pop("ALICE_DATABASE_URL", None)
-    if not env.get("ALICE_PROVIDER_CREDENTIAL_KEY", "").strip():
-        env["ALICE_PROVIDER_CREDENTIAL_KEY"] = Fernet.generate_key().decode("ascii")
+    env["LOGOS_MEMORY_PATH"] = str(db_path)
+    env["LOGOS_REQUIRE_SHORT_TOKEN"] = "0"
+    env["LOGOS_PROVIDER_CREDENTIALS_TOKEN"] = ""
+    env.pop("LOGOS_DATABASE_URL", None)
+    if not env.get("LOGOS_PROVIDER_CREDENTIAL_KEY", "").strip():
+        env["LOGOS_PROVIDER_CREDENTIAL_KEY"] = Fernet.generate_key().decode("ascii")
     return env
 
 
@@ -375,9 +375,9 @@ def run_smoke(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
     if provider_partial and not args.offline:
         raise SmokeFailure("launch-smoke provider inputs must include both API key and project id")
 
-    temp = tempfile.TemporaryDirectory(prefix="alice-launch-smoke-")
+    temp = tempfile.TemporaryDirectory(prefix="logos-launch-smoke-")
     work_dir = Path(temp.name)
-    db_path = Path(args.db_path).expanduser().resolve() if args.db_path else work_dir / "alice.db"
+    db_path = Path(args.db_path).expanduser().resolve() if args.db_path else work_dir / "logos.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     base_url = f"http://127.0.0.1:{args.port}"

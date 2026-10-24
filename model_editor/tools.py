@@ -1,4 +1,4 @@
-"""Alice Pro universal local tools for editable 3D primitive scenes.
+"""Logos Pro universal local tools for editable 3D primitive scenes.
 
 The tools never accept a filesystem path, owner ID, arbitrary Python, or printer
 commands. Scene edits produce new immutable versions; no auto-print or upload.
@@ -186,7 +186,7 @@ _ADD = {
 MODEL_EDITOR_TOOLS: dict[str, dict[str, Any]] = {
     "model.create": {
         "title": "Create 3D model",
-        "description": "Создать пустую 3D-сцену Alice. Возвращает model_id и revision; ничего не печатает.",
+        "description": "Создать пустую 3D-сцену Logos. Возвращает model_id и revision; ничего не печатает.",
         "parameters": _schema({"name": {"type": "string", "minLength": 1, "maxLength": 120}}, []),
         "func": model_create,
     },
@@ -260,7 +260,7 @@ MODEL_EDITOR_TOOLS: dict[str, dict[str, Any]] = {
         "title": "Export 3D scene to STL",
         "description": (
             "Экспортировать точную immutable revision модели в бинарный STL через хранилище "
-            "Alice (storage_ref и SHA256). Никакого слайсера и загрузки на принтер."
+            "Logos (storage_ref и SHA256). Никакого слайсера и загрузки на принтер."
         ),
         "parameters": _schema(_EXISTING, ["model_id", "revision"]),
         "func": model_export,

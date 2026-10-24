@@ -7,11 +7,11 @@
 
 ## 2026-10-10 — Cloud.ru acceptance deploy и persistent RDC
 
-- `cloudru-deploy.yml` `deploy` стал ограниченным платным acceptance-прогоном: бюджет 5 RUB / 900 с, job до 15 минут, idle timeout 60 с, cleanup под `always()` удаляет созданный сервис или восстанавливает прежний; `ALICE_DATABASE_URL` больше не передаётся ([#1002](https://github.com/maksimp6/Chat/pull/1002)).
+- `cloudru-deploy.yml` `deploy` стал ограниченным платным acceptance-прогоном: бюджет 5 RUB / 900 с, job до 15 минут, idle timeout 60 с, cleanup под `always()` удаляет созданный сервис или восстанавливает прежний; `LOGOS_DATABASE_URL` больше не передаётся ([#1002](https://github.com/maksimp6/Chat/pull/1002)).
 - Persistent RDC: профиль 0.2 vCPU / 512Mi, `install` принимает готовый digest образа и не собирает его, Git-ключ доставляется только через `POST /rdc/secrets` ([#1016](https://github.com/maksimp6/Chat/pull/1016), [#1017](https://github.com/maksimp6/Chat/pull/1017)).
 - Валидация RDC в PR больше не собирает образ ([#1015](https://github.com/maksimp6/Chat/pull/1015)); SSH-деплой RDC удалён ранее ([#861](https://github.com/maksimp6/Chat/pull/861)).
 
-## 2026-10-06 — Kristall Wave 1, Alice Dev worker, и ChatGPT OAuth
+## 2026-10-06 — Kristall Wave 1, Logos Dev worker, и ChatGPT OAuth
 
 ### Kristall Wave 1: файловый бэкенд для conversation и user identity
 
@@ -23,17 +23,17 @@
 - Conversation metadata остаётся в SQL; дальнейшая миграция (sessions, runtime events, metadata) остаётся roadmap.
 - Миграция слоя памяти позволяет отделить conversation ownership lifecycle от centralized DB.
 
-### Alice Dev worker: отдельный coding worker
+### Logos Dev worker: отдельный coding worker
 
-- Lightweight HTTP MCP worker переименован из RDC в Alice Dev как отдельный coding worker со своим lifecycle `cloudru-rdc-mcp-candidate.yml` ([#919](https://github.com/maksimp6/Chat/pull/919)).
-- Легаси `cloudru-rdc.yml` (persistent RDC) и `production-deploy.yml` сохранены без изменений; Alice Dev не заменяет ни persistent RDC, ни deployment приложения Alice.
+- Lightweight HTTP MCP worker переименован из RDC в Logos Dev как отдельный coding worker со своим lifecycle `cloudru-rdc-mcp-candidate.yml` ([#919](https://github.com/maksimp6/Chat/pull/919)).
+- Легаси `cloudru-rdc.yml` (persistent RDC) и `production-deploy.yml` сохранены без изменений; Logos Dev не заменяет ни persistent RDC, ни deployment приложения Logos.
 - Добавлен one-shot credential handoff: login/password передаются воркеру один раз через авторизованный endpoint и сохраняются в файл с правами 0600, повторная запись отклоняется ([#933](https://github.com/maksimp6/Chat/pull/933)).
-- Добавлена поддержка ChatGPT OAuth discovery и PKCE flow для Alice Dev ([#925](https://github.com/maksimp6/Chat/pull/925)).
+- Добавлена поддержка ChatGPT OAuth discovery и PKCE flow для Logos Dev ([#925](https://github.com/maksimp6/Chat/pull/925)).
 - Добавлены immutable workers на каждый commit и удаление выведенных воркеров по tombstone-списку ([#930](https://github.com/maksimp6/Chat/pull/930)).
 - Добавлена обработка tombstone deletion и in-place worker updates ([#928](https://github.com/maksimp6/Chat/pull/928), [#931](https://github.com/maksimp6/Chat/pull/931)).
-- Cloud.ru HTTP 499 recovery для Alice Dev lookup ([#923](https://github.com/maksimp6/Chat/pull/923)).
+- Cloud.ru HTTP 499 recovery для Logos Dev lookup ([#923](https://github.com/maksimp6/Chat/pull/923)).
 
-**Статус**: Alice Dev worker реализован; живая верификация и approved cutover persistent RDC/production-deploy.yml остаются в roadmap. Resource-scoped ownership, решение о замене и acceptance criteria — в [#869](https://github.com/maksimp6/Chat/issues/869#issuecomment-6023949684).
+**Статус**: Logos Dev worker реализован; живая верификация и approved cutover persistent RDC/production-deploy.yml остаются в roadmap. Resource-scoped ownership, решение о замене и acceptance criteria — в [#869](https://github.com/maksimp6/Chat/issues/869#issuecomment-6023949684).
 
 ### Secrets и authorization
 
@@ -45,9 +45,9 @@
 
 - Добавлен platform-aware CI routing: checks маршрутизируются по affected platform (backend, frontend, Android, CI changes) ([#935](https://github.com/maksimp6/Chat/pull/935)).
 - Добавлена документация: [`development/platform-ci-routing.md`](development/platform-ci-routing.md).
-- Performance improvement: reuse registry build cache между Alice Dev deployments ([#934](https://github.com/maksimp6/Chat/pull/934)).
+- Performance improvement: reuse registry build cache между Logos Dev deployments ([#934](https://github.com/maksimp6/Chat/pull/934)).
 
-Это shipped-функционал, но live Alice Dev deployment verification всё ещё в progress.
+Это shipped-функционал, но live Logos Dev deployment verification всё ещё в progress.
 
 ## 2026-09-29 — безопасность, CI, async runtime, Cloud.ru и repository development roles
 
@@ -109,7 +109,7 @@ production queue, 3D asset workflow, marketplace/delivery, CRM/dashboard,
   [#484](https://github.com/maksimp6/Chat/pull/484).
 - Добавлен fail-closed PostgreSQL preflight для опасных ролей/DSN:
   [#485](https://github.com/maksimp6/Chat/pull/485).
-- CI теперь выполняет backup/restore verification схемы PostgreSQL; destructive test reset разрешён только для disposable `*_test` / `*_ci` БД при `ALICE_PYTEST_POSTGRES_RESET=1`.
+- CI теперь выполняет backup/restore verification схемы PostgreSQL; destructive test reset разрешён только для disposable `*_test` / `*_ci` БД при `LOGOS_PYTEST_POSTGRES_RESET=1`.
 
 ### CI и review lifecycle
 
@@ -170,13 +170,13 @@ production queue, 3D asset workflow, marketplace/delivery, CRM/dashboard,
 - Удалена интеграция Supabase; SQLite, PostgreSQL и локальное сохранение
   Execution Trace остаются:
   [#439](https://github.com/maksimp6/Chat/pull/439).
-- Workflow Alice получил поддержку GitHub App с fallback на персональный
+- Workflow Logos получил поддержку GitHub App с fallback на персональный
   токен при отсутствии настройки App:
   [#451](https://github.com/maksimp6/Chat/pull/451).
   Наличие кода не подтверждает установку App в аккаунте.
 - Добавлен вход через GitHub, выключенный до настройки OAuth App:
   [#453](https://github.com/maksimp6/Chat/pull/453).
-  Это отдельная интеграция от GitHub App, используемого workflow Alice.
+  Это отдельная интеграция от GitHub App, используемого workflow Logos.
 - Уточнены инструкции установки, порт backend/CLI, источник ключей провайдера,
   Android toolchain и ссылки навигации.
 

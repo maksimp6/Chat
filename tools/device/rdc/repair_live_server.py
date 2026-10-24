@@ -15,7 +15,7 @@ import shutil
 import tempfile
 import time
 
-BASE = Path.home() / ".alice-rdc"
+BASE = Path.home() / ".logos-rdc"
 ACTION = BASE / "android_actions.py"
 SERVER = BASE / "android_live_server.py"
 POLICY = BASE / "live-device.json"
@@ -30,7 +30,7 @@ def once(source: str, old: str, new: str, label: str) -> str:
 
 def atomic_write(path: Path, content: str) -> None:
     mode = path.stat().st_mode & 0o777
-    handle, temp = tempfile.mkstemp(prefix=".alice-repair-", dir=str(path.parent))
+    handle, temp = tempfile.mkstemp(prefix=".logos-repair-", dir=str(path.parent))
     try:
         with os.fdopen(handle, "w", encoding="utf-8") as stream:
             stream.write(content)
@@ -54,7 +54,7 @@ def patch_actions(source: str) -> str:
         source,
         'ENV = dict(os.environ, TMPDIR="/data/data/com.termux/files/usr/tmp")',
         'ENV = dict(os.environ, TMPDIR="/data/data/com.termux/files/usr/tmp")\n'
-        'POLICY = pathlib.Path.home() / ".alice-rdc" / "live-device.json"',
+        'POLICY = pathlib.Path.home() / ".logos-rdc" / "live-device.json"',
         "policy path",
     )
     source = once(

@@ -179,7 +179,7 @@ def native_response(number, *, read=False):
 def native_transport(monkeypatch):
     from agent_runtime.issue_runner import seed_provider_credential
 
-    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIAL_KEY", "offline-credential-encryption-key")
+    monkeypatch.setenv("LOGOS_PROVIDER_CREDENTIAL_KEY", "offline-credential-encryption-key")
     monkeypatch.setenv("YANDEX_API_KEY", "offline-yandex-key")
     monkeypatch.setenv("YANDEX_PROJECT_ID", "offline-project")
     seed_provider_credential()
@@ -737,7 +737,7 @@ def test_default_client_initializes_existing_credential_and_native_client(repo, 
     from chat import mcp_routes
     from core.config import Config as current_config
 
-    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIAL_KEY", "offline-key")
+    monkeypatch.setenv("LOGOS_PROVIDER_CREDENTIAL_KEY", "offline-key")
     seeded = []
     configurations = []
     monkeypatch.setattr(issue_runner, "seed_provider_credential", lambda: seeded.append(True))

@@ -37,7 +37,7 @@ read-modify-write consumers must use `transaction()`.
 ```python
 from kristall import Kristall
 
-with Kristall("alice.memory") as store:
+with Kristall("logos.memory") as store:
     store.set("settings/theme", "gray")
     assert store.commit() == 1
     with store.transaction() as tx:
@@ -149,7 +149,7 @@ repositories. `items()` rejects incomplete RAM state; delete on a fenced writer
 fails even for a missing name. The application owns shared-writer shutdown;
 stopping a preview runtime releases only that runtime's writer before removal.
 
-Deployments require an explicit persistent `ALICE_MEMORY_PATH`, one writer
+Deployments require an explicit persistent `LOGOS_MEMORY_PATH`, one writer
 process and independently verified restart/restore evidence. Cloud object storage
 remains backup, not the live filesystem. Repository implementation/testing does
 not approve production data cutover, delete historical backups or prove remote

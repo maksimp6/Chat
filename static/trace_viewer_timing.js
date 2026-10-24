@@ -31,7 +31,7 @@
     return ms < 1000 ? Math.round(ms) + " ms" : (ms / 1000).toFixed(ms < 10000 ? 2 : 1) + " s";
   }
   function patch(t) {
-    var w = document.querySelector(".alice-trace-waterfall");
+    var w = document.querySelector(".logos-trace-waterfall");
     if (!w) return;
     var all = [],
       add = function (v) {
@@ -59,8 +59,8 @@
     var min = Math.min.apply(Math, all),
       max = Math.max.apply(Math, all),
       span = Math.max(0.001, max - min);
-    w.querySelectorAll(".alice-trace-timeline-row").forEach(function (row) {
-      var label = row.querySelector(".alice-trace-row-label"),
+    w.querySelectorAll(".logos-trace-timeline-row").forEach(function (row) {
+      var label = row.querySelector(".logos-trace-row-label"),
         m = label && label.textContent.trim().match(/^🤖\s*Responses API #(\d+)/);
       if (!m) return;
       var r = (t.responses || []).find(function (x) {
@@ -68,7 +68,7 @@
       });
       if (!r) return;
       var x = interval(r, t),
-        bar = row.querySelector(".alice-trace-bar.response");
+        bar = row.querySelector(".logos-trace-bar.response");
       if (!x || !bar) return;
       var left = Math.max(0, Math.min(100, ((x.s - min) / span) * 100)),
         width = Math.max(0.9, Math.min(100 - left, ((x.e - x.s) / span) * 100));
@@ -78,7 +78,7 @@
       bar.title =
         "Responses API #" + m[1] + " · " + fmt((x.e - x.s) * 1000) + " · real request interval";
     });
-    var sub = w.querySelector(".alice-trace-waterfall-sub");
+    var sub = w.querySelector(".logos-trace-waterfall-sub");
     if (sub)
       sub.textContent =
         "tools = real start/end · Responses = real request start/end · events = instant";

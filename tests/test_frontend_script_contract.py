@@ -33,7 +33,7 @@ def test_index_references_existing_versioned_local_scripts():
 
 def test_critical_boot_script_is_local_and_synchronous():
     html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
-    tag = re.search(r'<script[^>]*id="alice-boot"[^>]*>', html)
+    tag = re.search(r'<script[^>]*id="logos-boot"[^>]*>', html)
     assert tag, "critical boot script must be present"
     assert 'src="{{ static_root }}/boot.js?v={{ static_version }}"' in tag.group(0)
     assert " defer" not in tag.group(0)
@@ -66,7 +66,7 @@ def test_critical_sidebar_controls_keep_native_html_semantics():
 
     assert 'link.href = "?conversation_id=" + encodeURIComponent(conv.id);' in sidebar
     assert "e.preventDefault();" in sidebar
-    assert "window.__aliceSidebarHistoryBound" in sidebar
+    assert "window.__logosSidebarHistoryBound" in sidebar
     assert 'document.addEventListener("DOMContentLoaded", initSidebar, { once: true });' in sidebar
 
 
@@ -87,7 +87,7 @@ def test_index_route_renders_conversation_from_query_server_side():
 
 def test_boot_is_first_and_project_tree_module_is_loaded():
     html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
-    boot = html.index('id="alice-boot"')
+    boot = html.index('id="logos-boot"')
     project_tree = html.index("/project_tree.js?")
     assert boot < project_tree
     assert 'id="project-tree-btn"' in html

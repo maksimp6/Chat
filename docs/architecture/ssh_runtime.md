@@ -14,18 +14,18 @@ Example configuration:
   "preview": {
     "host": "preview.example",
     "port": 22,
-    "default_user": "alice-agent",
-    "allowed_users": ["alice-agent", "deploy"],
+    "default_user": "logos-agent",
+    "allowed_users": ["logos-agent", "deploy"],
     "identity_map": {
-      "<alice-owner-id>": "alice-agent"
+      "<logos-owner-id>": "logos-agent"
     },
-    "workspace_root": "/srv/alice",
-    "identity_file": "/srv/alice/keys/preview",
-    "known_hosts": "/srv/alice/ssh/known_hosts"
+    "workspace_root": "/srv/logos",
+    "identity_file": "/srv/logos/keys/preview",
+    "known_hosts": "/srv/logos/ssh/known_hosts"
   }
 }
 
-Set it through ALICE_SSH_TARGETS_JSON. Host-key verification requires known_hosts either per target or through ALICE_SSH_KNOWN_HOSTS.
+Set it through LOGOS_SSH_TARGETS_JSON. Host-key verification requires known_hosts either per target or through LOGOS_SSH_KNOWN_HOSTS.
 
 The Logos application image must provide the OpenSSH client. The remote Linux target must provide the POSIX tools used by Runtime plus GNU coreutils timeout.
 

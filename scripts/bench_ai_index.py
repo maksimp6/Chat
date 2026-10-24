@@ -183,7 +183,7 @@ def benchmark(*, iterations: int = 20, temporary_parent: Path | None = None) -> 
     """Run 1–100 iterations in an automatically removed synthetic repository."""
     if type(iterations) is not int or not 1 <= iterations <= 100:
         raise ValueError("iterations must be an integer between 1 and 100")
-    with tempfile.TemporaryDirectory(prefix="alice-index-benchmark-", dir=temporary_parent) as name:
+    with tempfile.TemporaryDirectory(prefix="logos-index-benchmark-", dir=temporary_parent) as name:
         return _run(Path(name), iterations)
 
 

@@ -16,7 +16,7 @@ import time
 import urllib.error
 import urllib.request
 
-BASE = Path.home() / ".alice-rdc"
+BASE = Path.home() / ".logos-rdc"
 SERVER = BASE / "android_live_server.py"
 ACTIONS = BASE / "android_actions.py"
 TOKEN = (BASE / "live-token").read_text().strip()

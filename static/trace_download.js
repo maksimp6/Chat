@@ -3,8 +3,8 @@
   "use strict";
 
   var currentTrace = null;
-  var buttonId = "alice-trace-download-btn";
-  var uploadButtonId = "alice-trace-upload-btn";
+  var buttonId = "logos-trace-download-btn";
+  var uploadButtonId = "logos-trace-upload-btn";
 
   function safeName(value) {
     return (
@@ -56,8 +56,8 @@
   }
 
   function defer(callback, delayMs) {
-    if (window.AliceCoreAPI && window.AliceCoreAPI.scheduler) {
-      return window.AliceCoreAPI.scheduler.defer(callback, delayMs);
+    if (window.LogosCoreAPI && window.LogosCoreAPI.scheduler) {
+      return window.LogosCoreAPI.scheduler.defer(callback, delayMs);
     }
     throw new Error("Core scheduler unavailable");
   }
@@ -112,7 +112,7 @@
       button.textContent = "⏳ Загрузка...";
     }
 
-    window.AliceDispatcher.request("/api/files", { method: "POST", body: form })
+    window.LogosDispatcher.request("/api/files", { method: "POST", body: form })
       .then(function (response) {
         return response
           .json()
@@ -140,14 +140,14 @@
   }
 
   function installButton() {
-    var header = document.querySelector(".alice-trace-header");
+    var header = document.querySelector(".logos-trace-header");
     if (!header) return;
     var close = header.querySelector("button");
     if (!header.querySelector("#" + buttonId)) {
       var button = document.createElement("button");
       button.id = buttonId;
       button.type = "button";
-      button.className = "alice-btn alice-trace-btn";
+      button.className = "logos-btn logos-trace-btn";
       button.title = "Скачать полный трейс в JSON";
       button.setAttribute("aria-label", "Скачать трейс в JSON");
       button.textContent = "⇩ JSON";
@@ -159,7 +159,7 @@
       var uploadButton = document.createElement("button");
       uploadButton.id = uploadButtonId;
       uploadButton.type = "button";
-      uploadButton.className = "alice-btn alice-trace-btn";
+      uploadButton.className = "logos-btn logos-trace-btn";
       uploadButton.title = "Загрузить трейс в файловый менеджер";
       uploadButton.setAttribute("aria-label", "Загрузить трейс в файловый менеджер");
       uploadButton.textContent = "☁ Файлы";
@@ -185,7 +185,7 @@
   }
 
   hook();
-  window.addEventListener("alice:trace-viewer-ready", function () {
+  window.addEventListener("logos:trace-viewer-ready", function () {
     hook();
     installButton();
   });

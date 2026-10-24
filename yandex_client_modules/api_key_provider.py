@@ -87,7 +87,7 @@ class YandexApiKeyProvider:
             headers=self._headers(),
             json={
                 "serviceAccountId": self.service_account_id,
-                "description": "Alice Pro rotating global provider key",
+                "description": "Logos Pro rotating global provider key",
                 "scopes": self.scopes,
                 "expiresAt": expires_at.isoformat().replace("+00:00", "Z"),
             },

@@ -81,7 +81,7 @@ def assert_writer_fenced(db):
 def test_uncertain_append_fences_every_mutation_until_reopen(
     tmp_path, monkeypatch, failure, operation
 ):
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     db = FileMemoryDB(path)
     db.put("confirmed", 100)
     mutation = (
@@ -116,7 +116,7 @@ def test_uncertain_append_fences_every_mutation_until_reopen(
 
 
 def test_failed_first_parent_barrier_fences_the_writer(tmp_path, monkeypatch):
-    db = FileMemoryDB(tmp_path / "alice.memory")
+    db = FileMemoryDB(tmp_path / "logos.memory")
 
     def fail_parent():
         raise OSError(errno.EIO, "injected parent sync failure")
@@ -135,7 +135,7 @@ def test_failed_first_parent_barrier_fences_the_writer(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("phase", ["write", "fsync", "close", "replace", "replace_after", "parent"])
 def test_failed_compaction_cannot_be_used_to_clear_the_writer_fence(tmp_path, monkeypatch, phase):
-    db = FileMemoryDB(tmp_path / "alice.memory")
+    db = FileMemoryDB(tmp_path / "logos.memory")
     db.put("confirmed", 100)
     db.put("confirmed", 200)
 
@@ -180,7 +180,7 @@ def test_failed_compaction_cannot_be_used_to_clear_the_writer_fence(tmp_path, mo
 
 
 def test_reopen_syncs_validated_file_and_parent_before_admission(tmp_path, monkeypatch):
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     FileMemoryDB(path).put("confirmed", 100)
     real_fsync = os.fsync
     barriers = []
@@ -197,7 +197,7 @@ def test_reopen_syncs_validated_file_and_parent_before_admission(tmp_path, monke
 
 @pytest.mark.parametrize("failed_barrier", ["file", "parent"])
 def test_reopen_fails_closed_when_recovery_barrier_fails(tmp_path, monkeypatch, failed_barrier):
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     FileMemoryDB(path).put("confirmed", 100)
     before = path.read_bytes()
     real_fsync = os.fsync
@@ -217,7 +217,7 @@ def test_reopen_fails_closed_when_recovery_barrier_fails(tmp_path, monkeypatch, 
 
 
 def test_validation_error_before_io_does_not_fault_a_healthy_writer(tmp_path):
-    db = FileMemoryDB(tmp_path / "alice.memory")
+    db = FileMemoryDB(tmp_path / "logos.memory")
     db.put("confirmed", 100)
     with pytest.raises(TypeError):
         db.put("invalid", object())
@@ -229,7 +229,7 @@ def test_validation_error_before_io_does_not_fault_a_healthy_writer(tmp_path):
 
 
 def test_waiting_writer_observes_failure_fence(tmp_path, monkeypatch):
-    db = FileMemoryDB(tmp_path / "alice.memory")
+    db = FileMemoryDB(tmp_path / "logos.memory")
     db.put("confirmed", 100)
     entered, release, second_started = Event(), Event(), Event()
 
@@ -261,7 +261,7 @@ def test_waiting_writer_observes_failure_fence(tmp_path, monkeypatch):
 
 
 def test_fresh_process_recovers_unknown_write_without_duplicate_sequence(tmp_path, monkeypatch):
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     db = FileMemoryDB(path)
     db.put("confirmed", 100)
     with monkeypatch.context() as patch:
@@ -296,7 +296,7 @@ print(json.dumps({"sequence": db.sequence, "items": db.items()}, sort_keys=True)
 def test_ack_after_recovery_survives_sigkill_and_another_fresh_process(tmp_path, monkeypatch):
     import select
 
-    path = tmp_path / "alice.memory"
+    path = tmp_path / "logos.memory"
     db = FileMemoryDB(path)
     db.put("confirmed", 100)
     with monkeypatch.context() as patch:

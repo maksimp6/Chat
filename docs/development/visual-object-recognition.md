@@ -1,4 +1,4 @@
-# Alice Pro — visual recognition benchmark
+# Logos Pro — visual recognition benchmark
 
 Owner: PR #1146. No printer command, model training, deployment or merge.
 
@@ -91,7 +91,7 @@ these photos. Record errors and visual overlays. Only then decide acceptance.
 No merge or printer motion/heating/print start in this test slice.
 
 
-## Actual local CPU recognizer — Alice shape-template v1
+## Actual local CPU recognizer — Logos shape-template v1
 
 This PR additionally provides an explicit **Pillow-only**, CPU-bound,
 supervised reference-shape matcher. It is a real image-processing engine:
@@ -110,7 +110,7 @@ original hash-pinned local gallery:
       --eval-manifest tests/fixtures/visual3d_cases.json \
       --gallery /path/to/authorized/private/gallery \
       --results /path/to/private/in-sample-results \
-      --model /path/to/private/alice-shape-v1.json
+      --model /path/to/private/logos-shape-v1.json
 
 Evaluate the distinct pinned overview.png (six held-out render panels):
 
@@ -119,7 +119,7 @@ Evaluate the distinct pinned overview.png (six held-out render panels):
       --eval-manifest tests/fixtures/visual3d_holdout.json \
       --gallery /path/to/authorized/private/gallery \
       --results /path/to/private/holdout-results \
-      --model /path/to/private/alice-shape-v1.json
+      --model /path/to/private/logos-shape-v1.json
 
 The same object CADs appear in both sets at different render scales. The
 holdout file is separate and never used for training, but it is not
@@ -197,6 +197,6 @@ different camera lenses, or actual physical prints.
 
 **Acceptance gate remains BLOCKED for real photos.** There is no independently
 reviewed physical photograph test set, and there is no generalized multimodal
-Alice API included by this Draft PR. Its shape-template recognizer is real,
+Logos API included by this Draft PR. Its shape-template recognizer is real,
 but closed-set and intended only as a local CAD recognition baseline. Do not
 change its status to production-ready based on the in-sample 100% result.

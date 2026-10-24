@@ -171,7 +171,7 @@ def test_checkpoint_io_failure_blocks_writes_until_reopen(tmp_path, monkeypatch,
         assert db.get("saved") == {"count": 1}
         if phase != "directory_fsync":
             assert path.read_bytes() == original
-        assert not list(tmp_path.glob(".alice-checkpoint-*"))
+        assert not list(tmp_path.glob(".logos-checkpoint-*"))
         with pytest.raises(KristallError, match="recovery required"):
             db.set("later", 2)
         with pytest.raises(KristallError, match="recovery required"):
@@ -201,7 +201,7 @@ def test_checkpoint_verification_failure_preserves_original(tmp_path, monkeypatc
             with pytest.raises(KristallError, match="verification failed"):
                 db.checkpoint()
         assert path.read_bytes() == original
-        assert not list(tmp_path.glob(".alice-checkpoint-*"))
+        assert not list(tmp_path.glob(".logos-checkpoint-*"))
         db.set("later", 2)
         assert db.commit() == 2
 
@@ -313,7 +313,7 @@ def test_interrupted_checkpoint_never_allows_a_stale_digest_commit(
             db.set("next", 2)
         with pytest.raises(KristallError, match="recovery required"):
             db.commit()
-        assert not list(tmp_path.glob(".alice-checkpoint-*"))
+        assert not list(tmp_path.glob(".logos-checkpoint-*"))
     with Kristall(path) as recovered:
         assert recovered.get("saved") == {"count": 1}
         assert recovered.last_commit.sequence == 1
@@ -352,7 +352,7 @@ def test_checkpoint_preserves_changed_source_evidence_and_blocks_writer(tmp_path
         with pytest.raises(KristallError, match="source.*recovery required"):
             db.checkpoint()
         assert (path.read_bytes() if path.exists() else None) == evidence
-        assert not list(tmp_path.glob(".alice-checkpoint-*"))
+        assert not list(tmp_path.glob(".logos-checkpoint-*"))
         assert db.last_commit == confirmed
         assert db.get("saved") == "confirmed"
         with pytest.raises(KristallError, match="recovery required"):
@@ -397,7 +397,7 @@ def test_interrupted_restore_never_allows_an_empty_state_append(
                 restored.restore(backup)
         assert restored.last_commit.sequence == 0
         assert restored.get("saved") is None
-        assert not list(tmp_path.glob(".alice-copy-*"))
+        assert not list(tmp_path.glob(".logos-copy-*"))
         with pytest.raises(KristallError, match="recovery required"):
             restored.set("next", 2)
         with pytest.raises(KristallError, match="recovery required"):

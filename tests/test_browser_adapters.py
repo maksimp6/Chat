@@ -89,7 +89,7 @@ def test_registry_classifies_adapter_errors_and_bad_results():
 
 def test_register_browser_tools_runs_through_universal_executor():
     adapters = BrowserAdapterRegistry(
-        {"browser_local": FakeAdapter({"success": True, "data": {"title": "Alice"}})}
+        {"browser_local": FakeAdapter({"success": True, "data": {"title": "Logos"}})}
     )
     registry = FakeToolRegistry()
     register_browser_tools(registry, adapters)
@@ -103,7 +103,7 @@ def test_register_browser_tools_runs_through_universal_executor():
     )
 
     assert result["success"] is True
-    assert result["data"] == {"title": "Alice"}
+    assert result["data"] == {"title": "Logos"}
     assert set(registry.definitions) == {"browser_cloud", "browser_local"}
 
 

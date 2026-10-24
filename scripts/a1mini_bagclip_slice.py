@@ -38,7 +38,7 @@ else:
 SOURCE_SHA256 = "6c3005537a4b5bdd25bad2e4d9c29f9c858869b02884cf6c52fe907269a267d1"
 SOURCE_BYTES = 38279
 EXPECTED_TRIANGLES = sorted((1460, 1412, 1068))
-OUTPUT = "Alice_BagClip_PR1113_A1mini_PLA_PROTOTYPE.gcode.3mf"
+OUTPUT = "Logos_BagClip_PR1113_A1mini_PLA_PROTOTYPE.gcode.3mf"
 NS = "{http://schemas.microsoft.com/3dmanufacturing/core/2015/02}"
 
 
@@ -225,7 +225,7 @@ def main() -> int:
     proc = json.loads(process.read_text(encoding="utf-8"))
     proc.update(wall_loops="4", sparse_infill_density="25%")
     process.write_text(json.dumps(proc, indent=2) + "\n", encoding="utf-8")
-    mesh_stl = out / "Alice_BagClip_PR1113_three_print_islands.stl"
+    mesh_stl = out / "Logos_BagClip_PR1113_three_print_islands.stl"
     face_count = merge_plate_stl(source, mesh_stl)
     env = dict(os.environ)
     env.update(LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))

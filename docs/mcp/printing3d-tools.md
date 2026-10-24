@@ -41,7 +41,7 @@ Owner определяется:
   комиссия, маржа) имеют значения по умолчанию сервиса; использованные
   умолчания перечислены в `assumed_defaults`, чтобы Logos мог их назвать.
 - `printing3d.order.create` сохраняет заказ только через approval, со статусом
-  `lead`, `quote` (по умолчанию) или `accepted` и `source=alice`. Цена
+  `lead`, `quote` (по умолчанию) или `accepted` и `source=logos`. Цена
   пересчитывается на сервере из `quote`; неполный `quote` отклоняется.
 
 ## `printing3d.finance.assess`

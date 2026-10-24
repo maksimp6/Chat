@@ -525,8 +525,8 @@ function applyHeaderFlexLayout(document, cssText, viewportWidth = 360) {
     );
   };
 
-  const headerRules = readRule(".alice-pro-app #header");
-  const secondaryRules = readRule(".alice-pro-app #header .header-row-secondary");
+  const headerRules = readRule(".logos-pro-app #header");
+  const secondaryRules = readRule(".logos-pro-app #header .header-row-secondary");
   assertLayoutRule(headerRules, "flex-direction", "column");
   assertLayoutRule(headerRules, "overflow-x", "visible");
 

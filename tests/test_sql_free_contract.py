@@ -119,7 +119,7 @@ def test_database_doc_describes_only_the_native_store():
     text = DATABASE_DOC.read_text(encoding="utf-8")
     assert "## One writer per journal" in text
     assert "`kristall.Kristall`" in text
-    assert "`ALICE_DATABASE_URL` is retired" in text
+    assert "`LOGOS_DATABASE_URL` is retired" in text
     for deployment in ("Local development", "Termux", "Shared or cloud deployment"):
         assert deployment in text
     for banned in (

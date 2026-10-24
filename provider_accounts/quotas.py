@@ -95,10 +95,10 @@ def _env_int(name: str, default: int, minimum: int = 0) -> int:
 
 def _default_policy_values() -> tuple[int, int, int]:
     return (
-        _env_int("ALICE_QUOTA_PERIOD_SECONDS", DEFAULT_PERIOD_SECONDS, 60),
-        _env_int("ALICE_QUOTA_MAX_REQUESTS", DEFAULT_MAX_REQUESTS),
+        _env_int("LOGOS_QUOTA_PERIOD_SECONDS", DEFAULT_PERIOD_SECONDS, 60),
+        _env_int("LOGOS_QUOTA_MAX_REQUESTS", DEFAULT_MAX_REQUESTS),
         _env_int(
-            "ALICE_QUOTA_MAX_REQUESTS_PER_MINUTE",
+            "LOGOS_QUOTA_MAX_REQUESTS_PER_MINUTE",
             DEFAULT_MAX_REQUESTS_PER_MINUTE,
         ),
     )
@@ -180,11 +180,11 @@ def reserve_request(
     """Atomically reserve one provider request for a trusted user.
 
     A missing identity preserves backwards compatibility. Set
-    ALICE_QUOTA_REQUIRE_IDENTITY=true to fail closed instead.
+    LOGOS_QUOTA_REQUIRE_IDENTITY=true to fail closed instead.
     """
     trusted_user_id = str(user_id or "").strip()
     if not trusted_user_id:
-        if os.getenv("ALICE_QUOTA_REQUIRE_IDENTITY", "").strip().lower() in {"1", "true", "yes"}:
+        if os.getenv("LOGOS_QUOTA_REQUIRE_IDENTITY", "").strip().lower() in {"1", "true", "yes"}:
             raise ProviderQuotaExceeded(
                 reason="trusted_user_identity_required",
                 user_id="unknown",

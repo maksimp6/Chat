@@ -5,7 +5,7 @@ REPORT="${1:-$HOME/junk-report.txt}"
 
 # Пути, которые не трогаем вообще
 EXCL=(
-  "$HOME/.alice-rdc"
+  "$HOME/.logos-rdc"
   "$HOME/Chat-anthropic-haiku-1105"
   "$HOME/.ssh" "$HOME/.local" "$HOME/.config"
   "$HOME/.claude-server-commander" "$HOME/.desktop-commander-device"
@@ -37,10 +37,10 @@ section() {
     find "$HOME" "${PRUNE[@]}" -type d -empty -print
 
   section "Кэш и временные файлы на /sdcard (нужен root)" \
-    su -c "find /sdcard/Download /sdcard/Alice /sdcard/Documents -maxdepth 4 \( -name '*.tmp' -o -name '*.part' -o -name '*(1).apk' \) -print"
+    su -c "find /sdcard/Download /sdcard/Logos /sdcard/Documents -maxdepth 4 \( -name '*.tmp' -o -name '*.part' -o -name '*(1).apk' \) -print"
 
   section "APK-установщики (проверьте, установлены ли приложения)" \
-    su -c "find /sdcard/Alice /sdcard/Download -maxdepth 4 -name '*.apk' -print"
+    su -c "find /sdcard/Logos /sdcard/Download -maxdepth 4 -name '*.apk' -print"
 
   echo
   echo "Это только список кандидатов. Перед удалением проверьте каждый путь."

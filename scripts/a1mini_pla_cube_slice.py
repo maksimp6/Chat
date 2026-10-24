@@ -30,7 +30,7 @@ FILAMENT_TYPE = "PLA"
 PRINTER = "Bambu Lab A1 mini"
 NOZZLE_MM = "0.4"
 BED_TYPE = "Textured PEI Plate"
-SLICED_FILENAME = "Alice_Cube_20mm_Generic_PLA_A1mini.gcode.3mf"
+SLICED_FILENAME = "Logos_Cube_20mm_Generic_PLA_A1mini.gcode.3mf"
 EXPECTED_LAYERS = 100  # 20 mm cube at the pinned 0.20 mm layer height
 _LAYER_HEADER = re.compile(r"^; total layer number: (\d+)[ \t\r]*$", re.MULTILINE)
 
@@ -99,7 +99,7 @@ def profiles(profile_root: Path, output_dir: Path) -> tuple[Path, Path, Path]:
     filament.pop("inherits", None)
     filament.update(
         {
-            "name": "Alice Verified Generic PLA A1mini 0.4",
+            "name": "Logos Verified Generic PLA A1mini 0.4",
             "filament_type": ["PLA"],
             "filament_density": ["1.24"],
             "nozzle_temperature": [str(NOZZLE_C)],
@@ -113,7 +113,7 @@ def profiles(profile_root: Path, output_dir: Path) -> tuple[Path, Path, Path]:
     filament_path.write_text(json.dumps(filament, indent=2) + "\n", encoding="utf-8")
 
     process = json.loads(process_source.read_text(encoding="utf-8"))
-    process["name"] = "Alice A1mini PLA Standard 0.20mm Textured PEI"
+    process["name"] = "Logos A1mini PLA Standard 0.20mm Textured PEI"
     process["curr_bed_type"] = BED_TYPE
     process_path = output_dir / "a1mini_process.json"
     process_path.write_text(json.dumps(process, indent=2) + "\n", encoding="utf-8")
@@ -249,7 +249,7 @@ def main() -> int:
         raise FileNotFoundError(executable)
     out = args.output_dir.resolve()
     out.mkdir(parents=True, exist_ok=True)
-    stl = out / "Alice_Cube_20mm_PLA.stl"
+    stl = out / "Logos_Cube_20mm_PLA.stl"
     stl.write_bytes(cube_stl())
     print("STL_VERIFIED", hashlib.sha256(stl.read_bytes()).hexdigest(), flush=True)
 

@@ -293,7 +293,7 @@ def test_preview_branch_is_explicit_and_never_force_written():
 
         def json(self, method, path, body=None):
             self.writes.append((method, path, body))
-            if method == "GET" and path.endswith("/git/ref/heads/alice-3d-previews"):
+            if method == "GET" and path.endswith("/git/ref/heads/logos-3d-previews"):
                 return {"object": {"sha": "b" * 40}}
             if method == "GET" and path.endswith("/git/commits/" + "b" * 40):
                 return {"tree": {"sha": "c" * 40}}
@@ -305,9 +305,9 @@ def test_preview_branch_is_explicit_and_never_force_written():
             if method == "POST" and path.endswith("/git/commits"):
                 assert body["parents"] == ["b" * 40]
                 return {"sha": "f" * 40}
-            if method == "PATCH" and path.endswith("/git/refs/heads/alice-3d-previews"):
+            if method == "PATCH" and path.endswith("/git/refs/heads/logos-3d-previews"):
                 assert body == {"sha": "f" * 40, "force": False}
-                return {"ref": "refs/heads/alice-3d-previews"}
+                return {"ref": "refs/heads/logos-3d-previews"}
             raise AssertionError((method, path))
 
     api = MockGit()
@@ -561,7 +561,7 @@ def test_new_preview_branch_is_orphan_image_only():
         def json(self, method, path, body=None):
             calls.append((method, path, body))
             if method == "GET":
-                assert path.endswith("/git/ref/heads/alice-3d-previews")
+                assert path.endswith("/git/ref/heads/logos-3d-previews")
                 raise publication.PublishError("GitHub returned HTTP 404")
             if path.endswith("/git/trees"):
                 assert "base_tree" not in body
@@ -584,7 +584,7 @@ def test_new_preview_branch_is_orphan_image_only():
         )
         == "a" * 40
     )
-    assert calls[-1][2]["ref"] == "refs/heads/alice-3d-previews"
+    assert calls[-1][2]["ref"] == "refs/heads/logos-3d-previews"
     assert not any("master" in path or "develop" in path for _, path, _ in calls)
 
 
@@ -593,7 +593,7 @@ def test_refresh_does_not_commit_identical_image_tree():
         prefix = "/repos/maksimp6/Chat"
 
         def json(self, method, path, body=None):
-            if path.endswith("/git/ref/heads/alice-3d-previews"):
+            if path.endswith("/git/ref/heads/logos-3d-previews"):
                 return {"object": {"sha": "a" * 40}}
             if path.endswith("/git/commits/" + "a" * 40):
                 return {"tree": {"sha": "b" * 40}}
@@ -625,7 +625,7 @@ def test_publication_rejects_unsafe_destination(target):
         prefix = "/repos/maksimp6/Chat"
 
         def json(self, method, path, body=None):
-            if path.endswith("/git/ref/heads/alice-3d-previews"):
+            if path.endswith("/git/ref/heads/logos-3d-previews"):
                 return {"object": {"sha": "a" * 40}}
             if path.endswith("/git/commits/" + "a" * 40):
                 return {"tree": {"sha": "b" * 40}}

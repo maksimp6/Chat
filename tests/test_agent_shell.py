@@ -145,51 +145,51 @@ def test_cli_adds_runs_and_shows_a_task(tmp_path, capsys):
     assert cli.main(["--db", db, "show", "404"], handlers=handlers) == 1
 
 
-def alice(result, calls=None):
+def logos(result, calls=None):
     def fake(issue, title, body, model, **kwargs):
         if calls is not None:
             calls.append((issue, title, body, model))
         return result
 
-    return builtin.default_handlers(run_issue=fake)["alice_task"]
+    return builtin.default_handlers(run_issue=fake)["logos_task"]
 
 
 PAYLOAD = {"issue": 7, "title": "Fix typo", "body": "The README has a typo."}
 
 
-def test_alice_task_runs_the_issue_agent_and_keeps_its_summary(store):
+def test_logos_task_runs_the_issue_agent_and_keeps_its_summary(store):
     calls = []
-    handler = alice(
+    handler = logos(
         {"status": "changed", "changed_files": ["README.md"], "summary": "fixed"}, calls
     )
     task_id = store.add(
         role="docs-engineer",
         title="t",
-        kind="alice_task",
+        kind="logos_task",
         payload={**PAYLOAD, "model": "logos-runtime"},
     )
-    run_next(store, {"alice_task": handler})
+    run_next(store, {"logos_task": handler})
     task = store.get(task_id)
     assert task["status"] == "done"
     assert task["result"]["changed_files"] == ["README.md"]
     assert calls == [(7, "Fix typo", "The README has a typo.", "logos-runtime")]
 
 
-def test_alice_task_fails_with_a_fixed_code_and_keeps_the_result(store):
-    failed = alice({"status": "failed", "error": "RuntimeError", "changed_files": []})
-    task_id = store.add(role="docs-engineer", title="t", kind="alice_task", payload=PAYLOAD)
-    run_next(store, {"alice_task": failed})
+def test_logos_task_fails_with_a_fixed_code_and_keeps_the_result(store):
+    failed = logos({"status": "failed", "error": "RuntimeError", "changed_files": []})
+    task_id = store.add(role="docs-engineer", title="t", kind="logos_task", payload=PAYLOAD)
+    run_next(store, {"logos_task": failed})
     task = store.get(task_id)
     assert (task["status"], task["error"]) == ("failed", "agent_failed")
     assert task["result"]["error"] == "RuntimeError"
 
 
-def test_alice_task_stops_at_approval_gated_tools_and_never_auto_approves(store):
-    waiting = alice(
+def test_logos_task_stops_at_approval_gated_tools_and_never_auto_approves(store):
+    waiting = logos(
         {"status": "needs_approval", "pending_tools": ["run_command"], "changed_files": []}
     )
-    task_id = store.add(role="docs-engineer", title="t", kind="alice_task", payload=PAYLOAD)
-    run_next(store, {"alice_task": waiting})
+    task_id = store.add(role="docs-engineer", title="t", kind="logos_task", payload=PAYLOAD)
+    run_next(store, {"logos_task": waiting})
     task = store.get(task_id)
     assert (task["status"], task["error"]) == ("failed", "needs_approval")
     assert task["result"]["pending_tools"] == ["run_command"]
@@ -207,11 +207,11 @@ def test_alice_task_stops_at_approval_gated_tools_and_never_auto_approves(store)
         {"issue": 7, "title": "t", "body": "b", "model": "../../etc/passwd"},
     ],
 )
-def test_alice_task_rejects_a_malformed_payload_before_calling_the_agent(store, payload):
+def test_logos_task_rejects_a_malformed_payload_before_calling_the_agent(store, payload):
     calls = []
-    handler = alice({"status": "changed", "changed_files": []}, calls)
-    task_id = store.add(role="docs-engineer", title="t", kind="alice_task", payload=payload)
-    run_next(store, {"alice_task": handler})
+    handler = logos({"status": "changed", "changed_files": []}, calls)
+    task_id = store.add(role="docs-engineer", title="t", kind="logos_task", payload=payload)
+    run_next(store, {"logos_task": handler})
     assert store.get(task_id)["error"] == "invalid_payload"
     assert calls == []
 
@@ -268,7 +268,7 @@ def test_cli_runs_as_a_module(tmp_path, monkeypatch):
     assert stopped.value.code == 0
 
 
-def test_default_alice_task_uses_the_real_runner_and_its_default_model(store, monkeypatch):
+def test_default_logos_task_uses_the_real_runner_and_its_default_model(store, monkeypatch):
     import agent_runtime.issue_runner as issue_runner
 
     calls = []
@@ -278,7 +278,7 @@ def test_default_alice_task_uses_the_real_runner_and_its_default_model(store, mo
         return {"status": "changed", "changed_files": []}
 
     monkeypatch.setattr(issue_runner, "run_issue_task", fake)
-    handler = builtin.default_handlers()["alice_task"]
+    handler = builtin.default_handlers()["logos_task"]
     assert handler(PAYLOAD)["status"] == "changed"
     assert calls == [issue_runner.DEFAULT_MODEL]
 

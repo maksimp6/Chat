@@ -22,7 +22,7 @@ Treasury never accepts owner_id from the JSON body or query string.
 
 When authentication is present, the authentication layer should populate
 Flask g.user_id or g.authenticated_user_id. For the current single-user
-deployment, set the server-side ALICE_OWNER_ID value in .env. This is a
+deployment, set the server-side LOGOS_OWNER_ID value in .env. This is a
 temporary deployment identity and is intentionally not client-controlled.
 
 The missing-identity path is safe: chat can still return a model response, but

@@ -15,9 +15,9 @@ def test_no_sql_connection_api():
 
 
 def test_native_chat_and_settings_survive_fresh_process(tmp_path, monkeypatch):
-    path = tmp_path / "alice.memory"
-    monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))
-    db.create_conversation("chat", "Новый чат", "alice")
+    path = tmp_path / "logos.memory"
+    monkeypatch.setenv("LOGOS_MEMORY_PATH", str(path))
+    db.create_conversation("chat", "Новый чат", "logos")
     db.add_message("chat", "user", "Привет", trace={"trace_id": "trace-1"})
     db.save_conv_settings("chat", {"temperature": 0.2})
     db.set_config("feature", {"enabled": True})
@@ -39,7 +39,7 @@ def test_native_chat_and_settings_survive_fresh_process(tmp_path, monkeypatch):
 
 
 def test_delete_is_one_durable_cascade():
-    db.create_conversation("chat", "Chat", "alice")
+    db.create_conversation("chat", "Chat", "logos")
     db.add_message("chat", "user", "message")
     db.save_conv_settings("chat", {"value": 1})
     db.set_yandex_conversation("chat", "provider")

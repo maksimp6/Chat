@@ -44,7 +44,7 @@ branch protection or production policy.
 Logos exposes metadata from the catalog first and loads the full body only for skills
 selected for one invocation. Do not automatically install remote/unreviewed skills.
 
-## 3D skills for Alice Pro
+## 3D skills for Logos Pro
 
 - `3d-print-preflight`: import/check 3D assets, require real slicing, and
   verify a single Bambu A1 mini `.gcode.3mf` with `printing3d.plate.inspect`.

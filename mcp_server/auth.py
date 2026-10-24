@@ -32,11 +32,11 @@ def _auth_mode() -> str:
       - introspection: standards-based OAuth resource-server validation via an
         external OAuth token-introspection endpoint.
     """
-    if os.getenv("ALICE_MCP_INTROSPECTION_URL"):
+    if os.getenv("LOGOS_MCP_INTROSPECTION_URL"):
         return "introspection"
-    if os.getenv("ALICE_MCP_BEARER_TOKEN"):
+    if os.getenv("LOGOS_MCP_BEARER_TOKEN"):
         return "bearer"
-    if _truthy(os.getenv("ALICE_MCP_ALLOW_ANONYMOUS")):
+    if _truthy(os.getenv("LOGOS_MCP_ALLOW_ANONYMOUS")):
         return "anonymous"
     return "disabled"
 
@@ -59,7 +59,7 @@ def _auth_user_from_request() -> Optional[str]:
     """Resolve the authenticated MCP principal."""
     mode = _auth_mode()
     if mode == "anonymous":
-        return os.getenv("ALICE_MCP_USER_ID") or None
+        return os.getenv("LOGOS_MCP_USER_ID") or None
 
     authorization = request.headers.get("Authorization", "")
     if not authorization.startswith("Bearer "):
@@ -69,8 +69,8 @@ def _auth_user_from_request() -> Optional[str]:
         raise PermissionError("Bearer access token required")
 
     if mode == "bearer":
-        expected = os.getenv("ALICE_MCP_BEARER_TOKEN", "")
-        user_id = os.getenv("ALICE_MCP_USER_ID", "")
+        expected = os.getenv("LOGOS_MCP_BEARER_TOKEN", "")
+        user_id = os.getenv("LOGOS_MCP_USER_ID", "")
         if not expected or not user_id:
             raise PermissionError("MCP bearer authentication is not fully configured")
         if not secrets.compare_digest(token, expected):
@@ -87,13 +87,13 @@ def _introspect_token(token: str) -> Optional[str]:
     """Validate an OAuth access token using RFC 7662-style introspection."""
     import requests
 
-    url = os.getenv("ALICE_MCP_INTROSPECTION_URL", "")
+    url = os.getenv("LOGOS_MCP_INTROSPECTION_URL", "")
     if not url:
         raise PermissionError("OAuth introspection is not configured")
 
-    auth_user = os.getenv("ALICE_MCP_INTROSPECTION_CLIENT_ID", "")
-    auth_password = os.getenv("ALICE_MCP_INTROSPECTION_CLIENT_SECRET", "")
-    timeout = float(os.getenv("ALICE_MCP_INTROSPECTION_TIMEOUT", "5"))
+    auth_user = os.getenv("LOGOS_MCP_INTROSPECTION_CLIENT_ID", "")
+    auth_password = os.getenv("LOGOS_MCP_INTROSPECTION_CLIENT_SECRET", "")
+    timeout = float(os.getenv("LOGOS_MCP_INTROSPECTION_TIMEOUT", "5"))
 
     kwargs: dict[str, Any] = {
         "data": {"token": token},

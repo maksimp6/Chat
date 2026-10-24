@@ -9,8 +9,8 @@
 \`\`\`env
 HOST=0.0.0.0
 PORT=8080
-ALICE_MCP_PUBLIC_URL=https://<public-host>
-ALICE_LOCAL_AGENT_BOOTSTRAP_TOKEN=<long-random-secret>
+LOGOS_MCP_PUBLIC_URL=https://<public-host>
+LOGOS_LOCAL_AGENT_BOOTSTRAP_TOKEN=<long-random-secret>
 \`\`\`
 
 Для MCP production используйте внешний OAuth resource-server, как описано в \`docs/mcp/chatgpt_apps.md\`.

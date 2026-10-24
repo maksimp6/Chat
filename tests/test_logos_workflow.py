@@ -9,7 +9,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = (ROOT / ".github" / "workflows" / "logos.yml").read_text(encoding="utf-8")
-JOB = yaml.safe_load(WORKFLOW)["jobs"]["alice"]
+JOB = yaml.safe_load(WORKFLOW)["jobs"]["logos"]
 STEPS = {step["name"]: step for step in JOB["steps"]}
 
 
@@ -106,11 +106,11 @@ def test_actions_are_pinned_and_do_not_persist_credentials():
     assert "permissions: {}" in WORKFLOW
 
 
-def test_only_trusted_mentions_or_label_trigger_alice():
+def test_only_trusted_mentions_or_label_trigger_logos():
     condition = JOB["if"]
     assert condition.count("contains(github.event.comment.body, '@logos')") == 1
     assert condition.count('["OWNER","MEMBER","COLLABORATOR"]') == 2
-    assert "github.event.label.name == 'alice'" in condition
+    assert "github.event.label.name == 'logos'" in condition
     assert "!github.event.issue.pull_request" in condition
 
 
@@ -122,7 +122,7 @@ def test_untrusted_text_never_reaches_run_scripts_directly():
 
 
 def test_secrets_are_scoped_to_their_steps():
-    assert "secrets.YANDEX_API_KEY" in STEPS["Run Alice"]["env"]["YANDEX_API_KEY"]
+    assert "secrets.YANDEX_API_KEY" in STEPS["Run Logos"]["env"]["YANDEX_API_KEY"]
     assert "secrets." not in json.dumps(JOB.get("env", {}))
     github_steps = {
         "Check App credentials",
@@ -132,9 +132,9 @@ def test_secrets_are_scoped_to_their_steps():
         "Report result",
     }
     for name, step in STEPS.items():
-        if "secrets.ALICE_" in json.dumps(step):
+        if "secrets.LOGOS_" in json.dumps(step):
             assert name in github_steps
-    assert "ALICE_GITHUB_TOKEN" not in json.dumps(STEPS["Run Alice"])
+    assert "LOGOS_GITHUB_TOKEN" not in json.dumps(STEPS["Run Logos"])
 
 
 def _git_repo(tmp_path: Path, files):
@@ -211,7 +211,7 @@ def test_app_failure_preserves_personal_token_fallback():
     assert "steps.app-credentials.outputs.ready == 'true'" in step["if"]
     assert step["continue-on-error"] is True
     assert re.fullmatch(r"actions/create-github-app-token@[0-9a-f]{40}", step["uses"])
-    assert step["with"]["private-key"] == "${{ secrets.ALICE_APP_PRIVATE_KEY }}"
+    assert step["with"]["private-key"] == "${{ secrets.LOGOS_APP_PRIVATE_KEY }}"
     permissions = {
         key: value for key, value in step["with"].items() if key.startswith("permission-")
     }
@@ -223,7 +223,7 @@ def test_app_failure_preserves_personal_token_fallback():
     for name in ("Require publishing token", "Open pull request", "Report result"):
         assert (
             STEPS[name]["env"]["GH_TOKEN"]
-            == "${{ steps.app-token.outputs.token || secrets.ALICE_GITHUB_TOKEN }}"
+            == "${{ steps.app-token.outputs.token || secrets.LOGOS_GITHUB_TOKEN }}"
         )
     assert "steps.app-token.outputs.token &&" in STEPS["Open pull request"]["env"]["APP_SLUG"]
 
@@ -235,9 +235,9 @@ def test_missing_token_blocks_before_model_call(tmp_path, token):
     result = _run_step("Require publishing token", tmp_path, env)
     assert (result.returncode == 0) is bool(token)
     names = list(STEPS)
-    assert names.index("Require publishing token") < names.index("Run Alice")
-    assert "always()" not in STEPS["Run Alice"].get("if", "")
-    assert "|| echo" not in _step_run("Run Alice")
+    assert names.index("Require publishing token") < names.index("Run Logos")
+    assert "always()" not in STEPS["Run Logos"].get("if", "")
+    assert "|| echo" not in _step_run("Run Logos")
 
 
 def test_revoked_token_fails_read_preflight_before_model(tmp_path):
@@ -463,7 +463,7 @@ def test_response_artifact_runs_before_publishing_even_after_model_failure():
     assert step["with"]["retention-days"] == 90
     assert "github.run_attempt" in step["with"]["name"]
     names = list(STEPS)
-    assert names.index("Run Alice") < names.index("Preserve response evidence")
+    assert names.index("Run Logos") < names.index("Preserve response evidence")
     assert names.index("Preserve response evidence") < names.index("Open pull request")
     assert names.index("Preserve response evidence") < names.index("Report result")
 

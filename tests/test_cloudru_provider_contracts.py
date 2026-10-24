@@ -198,7 +198,7 @@ def test_cloud_registry_and_provider_resolution(monkeypatch):
     registry.register(FakeProvider())
     assert registry.names() == ["fake"]
     assert registry.get("fake").name == "fake"
-    monkeypatch.delenv("ALICE_CLOUD_PROVIDER", raising=False)
+    monkeypatch.delenv("LOGOS_CLOUD_PROVIDER", raising=False)
     assert resolve_provider_name({}) == "cloudru"
     assert resolve_provider_name({"provider": " Fake "}) == "fake"
     assert get_registry() is ensure_default_providers()

@@ -1,6 +1,6 @@
 # Plugin System
 
-Logos plugins are local, versioned extensions discovered from `ALICE_PLUGIN_DIR`
+Logos plugins are local, versioned extensions discovered from `LOGOS_PLUGIN_DIR`
 (default: `plugins`).
 
 ## Manifest
@@ -15,7 +15,7 @@ Each plugin directory contains `plugin.json`:
   "version": "1.0.0",
   "description": "Example extension",
   "capabilities": ["example"],
-  "permissions": ["tool:alice_search_project"],
+  "permissions": ["tool:logos_search_project"],
   "config_schema": {}
 }
 ```

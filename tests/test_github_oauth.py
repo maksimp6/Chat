@@ -40,12 +40,12 @@ def temp_db():
 
 @pytest.fixture
 def github_env(monkeypatch):
-    monkeypatch.setenv("ALICE_GITHUB_CLIENT_ID", "client-id")
-    monkeypatch.setenv("ALICE_GITHUB_CLIENT_SECRET", "client-secret-value")
-    monkeypatch.setenv("ALICE_GITHUB_REDIRECT_URI", "https://alice.test/auth/github/callback")
-    monkeypatch.delenv("ALICE_GITHUB_ALLOWED_IDS", raising=False)
-    monkeypatch.delenv("ALICE_REQUIRE_SHORT_TOKEN", raising=False)
-    monkeypatch.delenv("ALICE_SHORT_TOKEN", raising=False)
+    monkeypatch.setenv("LOGOS_GITHUB_CLIENT_ID", "client-id")
+    monkeypatch.setenv("LOGOS_GITHUB_CLIENT_SECRET", "client-secret-value")
+    monkeypatch.setenv("LOGOS_GITHUB_REDIRECT_URI", "https://logos.test/auth/github/callback")
+    monkeypatch.delenv("LOGOS_GITHUB_ALLOWED_IDS", raising=False)
+    monkeypatch.delenv("LOGOS_REQUIRE_SHORT_TOKEN", raising=False)
+    monkeypatch.delenv("LOGOS_SHORT_TOKEN", raising=False)
 
 
 def _app():
@@ -80,27 +80,27 @@ def _fake_github(monkeypatch, account=None, token_status=200, user_status=200, r
 
 
 def _start_login(client):
-    response = client.get("/auth/github/login", base_url="https://alice.test")
+    response = client.get("/auth/github/login", base_url="https://logos.test")
     assert response.status_code == 302
     location = urlsplit(response.headers["Location"])
     assert location.netloc == "github.com"
     query = parse_qs(location.query)
     assert query["client_id"] == ["client-id"]
-    assert query["redirect_uri"] == ["https://alice.test/auth/github/callback"]
+    assert query["redirect_uri"] == ["https://logos.test/auth/github/callback"]
     assert "client-secret-value" not in response.headers["Location"]
     return query["state"][0]
 
 
 def test_login_disabled_without_oauth_app(monkeypatch):
-    monkeypatch.delenv("ALICE_GITHUB_CLIENT_ID", raising=False)
-    monkeypatch.delenv("ALICE_GITHUB_CLIENT_SECRET", raising=False)
+    monkeypatch.delenv("LOGOS_GITHUB_CLIENT_ID", raising=False)
+    monkeypatch.delenv("LOGOS_GITHUB_CLIENT_SECRET", raising=False)
     assert _app().get("/auth/github/login").status_code == 404
 
 
 def test_login_moves_to_callback_host_first(github_env):
     response = _app().get("/auth/github/login", base_url="https://other.test")
     assert response.status_code == 302
-    assert response.headers["Location"] == "https://alice.test/auth/github/login"
+    assert response.headers["Location"] == "https://logos.test/auth/github/login"
 
 
 def test_callback_rejects_missing_or_wrong_state(github_env, temp_db, monkeypatch):
@@ -108,7 +108,7 @@ def test_callback_rejects_missing_or_wrong_state(github_env, temp_db, monkeypatc
     client = _app()
     _start_login(client)
     response = client.get(
-        "/auth/github/callback?code=abc&state=forged", base_url="https://alice.test"
+        "/auth/github/callback?code=abc&state=forged", base_url="https://logos.test"
     )
     assert response.status_code == 400
     assert calls == []
@@ -118,18 +118,18 @@ def test_callback_signs_in_and_links_current_anonymous_user(github_env, temp_db,
     calls = _fake_github(monkeypatch)
     anon = register_anonymous_user("web-installation-0001", {})
     client = _app()
-    client.set_cookie("alice_user_token", anon["auth_token"], domain="alice.test")
+    client.set_cookie("logos_user_token", anon["auth_token"], domain="logos.test")
     state = _start_login(client)
 
     response = client.get(
-        f"/auth/github/callback?code=abc&state={state}", base_url="https://alice.test"
+        f"/auth/github/callback?code=abc&state={state}", base_url="https://logos.test"
     )
 
     assert response.status_code == 302
     assert response.headers["Location"] == "/"
     assert calls[0][2]["code"] == "abc"
     cookies = response.headers.getlist("Set-Cookie")
-    token_cookie = next(c for c in cookies if c.startswith("alice_user_token="))
+    token_cookie = next(c for c in cookies if c.startswith("logos_user_token="))
     new_token = token_cookie.split(";", 1)[0].split("=", 1)[1]
     assert "HttpOnly" in token_cookie and "Secure" in token_cookie
     assert authenticate_user_token(new_token) == anon["user_id"]
@@ -137,7 +137,7 @@ def test_callback_signs_in_and_links_current_anonymous_user(github_env, temp_db,
     body = response.get_data(as_text=True)
     assert "gho_secret_access" not in body and "gho_secret_access" not in str(cookies)
 
-    me = client.get("/api/auth/me", base_url="https://alice.test").get_json()
+    me = client.get("/api/auth/me", base_url="https://logos.test").get_json()
     assert me["authenticated"] is True
     assert me["github_login"] == "octocat"
 
@@ -158,8 +158,8 @@ def test_invalid_github_account_is_rejected(temp_db):
 
 
 def test_gate_login_page_offers_github_sign_in(github_env, monkeypatch):
-    monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "1")
-    monkeypatch.setenv("ALICE_SHORT_TOKEN", "unit-test-token")
+    monkeypatch.setenv("LOGOS_REQUIRE_SHORT_TOKEN", "1")
+    monkeypatch.setenv("LOGOS_SHORT_TOKEN", "unit-test-token")
     client = _app()
 
     page = client.get("/", headers={"Accept": "text/html"})
@@ -171,45 +171,45 @@ def test_gate_login_page_offers_github_sign_in(github_env, monkeypatch):
     assert api.status_code == 401
     assert api.get_json() == {"error": "authentication required"}
 
-    login = client.get("/auth/github/login", base_url="https://alice.test")
+    login = client.get("/auth/github/login", base_url="https://logos.test")
     assert login.status_code == 302
 
 
 def test_gate_rejects_login_not_in_allowlist(github_env, temp_db, monkeypatch):
-    monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "1")
-    monkeypatch.setenv("ALICE_SHORT_TOKEN", "unit-test-token")
-    monkeypatch.setenv("ALICE_GITHUB_ALLOWED_IDS", "293531601")
+    monkeypatch.setenv("LOGOS_REQUIRE_SHORT_TOKEN", "1")
+    monkeypatch.setenv("LOGOS_SHORT_TOKEN", "unit-test-token")
+    monkeypatch.setenv("LOGOS_GITHUB_ALLOWED_IDS", "293531601")
     # The allowlisted login, reassigned to a different account, is not enough.
     _fake_github(monkeypatch, {"id": 99, "login": "maksimp6"})
     client = _app()
     state = _start_login(client)
 
     response = client.get(
-        f"/auth/github/callback?code=abc&state={state}", base_url="https://alice.test"
+        f"/auth/github/callback?code=abc&state={state}", base_url="https://logos.test"
     )
 
     assert response.status_code == 403
     cookies = " ".join(response.headers.getlist("Set-Cookie"))
-    assert "alice_user_token=" not in cookies
+    assert "logos_user_token=" not in cookies
     assert short_token_auth.COOKIE_NAME + "=" not in cookies
-    assert client.get("/", base_url="https://alice.test").status_code == 401
+    assert client.get("/", base_url="https://logos.test").status_code == 401
 
 
 def test_gate_opens_for_allowlisted_login(github_env, temp_db, monkeypatch):
-    monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "1")
-    monkeypatch.setenv("ALICE_SHORT_TOKEN", "unit-test-token")
-    monkeypatch.setenv("ALICE_GITHUB_ALLOWED_IDS", "12, 293531601")
+    monkeypatch.setenv("LOGOS_REQUIRE_SHORT_TOKEN", "1")
+    monkeypatch.setenv("LOGOS_SHORT_TOKEN", "unit-test-token")
+    monkeypatch.setenv("LOGOS_GITHUB_ALLOWED_IDS", "12, 293531601")
     # A renamed account keeps its id and keeps access.
     _fake_github(monkeypatch, {"id": 293531601, "login": "maksimp6-renamed"})
     client = _app()
     state = _start_login(client)
 
     response = client.get(
-        f"/auth/github/callback?code=abc&state={state}", base_url="https://alice.test"
+        f"/auth/github/callback?code=abc&state={state}", base_url="https://logos.test"
     )
 
     assert response.status_code == 302
-    assert client.get("/", base_url="https://alice.test").status_code == 200
+    assert client.get("/", base_url="https://logos.test").status_code == 200
 
 
 def test_failed_code_exchange_does_not_sign_in(github_env, temp_db, monkeypatch):
@@ -217,16 +217,16 @@ def test_failed_code_exchange_does_not_sign_in(github_env, temp_db, monkeypatch)
     client = _app()
     state = _start_login(client)
     response = client.get(
-        f"/auth/github/callback?code=abc&state={state}", base_url="https://alice.test"
+        f"/auth/github/callback?code=abc&state={state}", base_url="https://logos.test"
     )
     assert response.status_code == 502
-    assert "alice_user_token=" not in " ".join(response.headers.getlist("Set-Cookie"))
+    assert "logos_user_token=" not in " ".join(response.headers.getlist("Set-Cookie"))
 
 
 def test_logout_clears_identity_cookies(github_env):
     response = _app().post("/auth/logout")
     cookies = " ".join(response.headers.getlist("Set-Cookie"))
-    assert "alice_user_token=;" in cookies
+    assert "logos_user_token=;" in cookies
     assert short_token_auth.COOKIE_NAME + "=;" in cookies
 
 
@@ -238,13 +238,13 @@ def test_index_shows_github_button_only_when_configured(github_env, monkeypatch)
     assert 'href="/auth/github/login"' in html
     assert "Войти через GitHub" in html
 
-    monkeypatch.delenv("ALICE_GITHUB_CLIENT_SECRET")
+    monkeypatch.delenv("LOGOS_GITHUB_CLIENT_SECRET")
     html = app_module.app.test_client().get("/").get_data(as_text=True)
     assert 'id="github-login-btn"' not in html
 
 
 def _callback(client, query):
-    return client.get(f"/auth/github/callback?{query}", base_url="https://alice.test")
+    return client.get(f"/auth/github/callback?{query}", base_url="https://logos.test")
 
 
 @pytest.mark.parametrize(
@@ -261,7 +261,7 @@ def test_github_lookup_failures_do_not_sign_in(github_env, temp_db, monkeypatch,
     state = _start_login(client)
     response = _callback(client, f"code=abc&state={state}")
     assert response.status_code == 502
-    assert "alice_user_token=" not in " ".join(response.headers.getlist("Set-Cookie"))
+    assert "logos_user_token=" not in " ".join(response.headers.getlist("Set-Cookie"))
 
 
 def test_callback_handles_denied_and_missing_code(github_env, temp_db, monkeypatch):
@@ -274,13 +274,13 @@ def test_callback_handles_denied_and_missing_code(github_env, temp_db, monkeypat
 
 
 def test_callback_disabled_without_oauth_app(monkeypatch):
-    monkeypatch.delenv("ALICE_GITHUB_CLIENT_ID", raising=False)
-    monkeypatch.delenv("ALICE_GITHUB_CLIENT_SECRET", raising=False)
+    monkeypatch.delenv("LOGOS_GITHUB_CLIENT_ID", raising=False)
+    monkeypatch.delenv("LOGOS_GITHUB_CLIENT_SECRET", raising=False)
     assert _app().get("/auth/github/callback?code=a&state=b").status_code == 404
 
 
 def test_default_redirect_uri_uses_request_host(github_env, monkeypatch):
-    monkeypatch.delenv("ALICE_GITHUB_REDIRECT_URI")
+    monkeypatch.delenv("LOGOS_GITHUB_REDIRECT_URI")
     response = _app().get("/auth/github/login", base_url="https://host.test")
     query = parse_qs(urlsplit(response.headers["Location"]).query)
     assert query["redirect_uri"] == ["https://host.test/auth/github/callback"]
@@ -290,11 +290,11 @@ def test_invalid_user_token_is_treated_as_signed_out(github_env, temp_db):
     import app as app_module
 
     me = _app()
-    me.set_cookie("alice_user_token", "not-a-valid-token")
+    me.set_cookie("logos_user_token", "not-a-valid-token")
     assert me.get("/api/auth/me").get_json()["authenticated"] is False
 
     index = app_module.app.test_client()
-    index.set_cookie("alice_user_token", "not-a-valid-token")
+    index.set_cookie("logos_user_token", "not-a-valid-token")
     html = index.get("/").get_data(as_text=True)
     assert "Войти через GitHub" in html
 
@@ -368,11 +368,11 @@ def test_duplicate_uuid_does_not_publish_partial_state(temp_db, monkeypatch):
 
 
 def test_logout_works_after_gate_session_expired(github_env, monkeypatch):
-    monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "1")
-    monkeypatch.setenv("ALICE_SHORT_TOKEN", "unit-test-token")
+    monkeypatch.setenv("LOGOS_REQUIRE_SHORT_TOKEN", "1")
+    monkeypatch.setenv("LOGOS_SHORT_TOKEN", "unit-test-token")
     response = _app().post("/auth/logout")
     assert response.status_code == 200
-    assert "alice_user_token=;" in " ".join(response.headers.getlist("Set-Cookie"))
+    assert "logos_user_token=;" in " ".join(response.headers.getlist("Set-Cookie"))
 
 
 def test_stale_bootstrap_cannot_overwrite_promoted_user_token(temp_db, monkeypatch):
@@ -423,7 +423,7 @@ def test_stale_bootstrap_cannot_overwrite_promoted_user_token(temp_db, monkeypat
 
 def test_single_user_owner_fallback_is_not_used_for_sign_in(github_env, temp_db, monkeypatch):
     owner = register_anonymous_user("web-installation-owner", {})
-    monkeypatch.setenv("ALICE_OWNER_ID", owner["user_id"])
+    monkeypatch.setenv("LOGOS_OWNER_ID", owner["user_id"])
     _fake_github(monkeypatch, {"id": 5, "login": "visitor"})
     client = _app()
     state = _start_login(client)
@@ -432,7 +432,7 @@ def test_single_user_owner_fallback_is_not_used_for_sign_in(github_env, temp_db,
 
     assert response.status_code == 302
     assert get_github_login(owner["user_id"]) is None
-    me = client.get("/api/auth/me", base_url="https://alice.test").get_json()
+    me = client.get("/api/auth/me", base_url="https://logos.test").get_json()
     assert me["github_login"] == "visitor"
     stranger = _app()
     assert stranger.get("/api/auth/me").get_json()["authenticated"] is False

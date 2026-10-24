@@ -4,7 +4,7 @@
 
 ## Хранилище
 
-Секрет шифруется Fernet до записи в нативный Kristall journal (SQLite retired). Ключ шифрования задаётся через `ALICE_KEY_MANAGER_KEY`; для совместимости с существующей конфигурацией также принимается `ALICE_PROVIDER_CREDENTIAL_KEY`.
+Секрет шифруется Fernet до записи в нативный Kristall journal (SQLite retired). Ключ шифрования задаётся через `LOGOS_KEY_MANAGER_KEY`; для совместимости с существующей конфигурацией также принимается `LOGOS_PROVIDER_CREDENTIAL_KEY`.
 
 Команда генерации ключа:
 

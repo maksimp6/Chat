@@ -21,7 +21,7 @@
       try {
         window.eruda.init();
         window.__LOGOS_ERUDA_INITIALIZED__ = true;
-        window.dispatchEvent(new CustomEvent("alice:eruda-ready"));
+        window.dispatchEvent(new CustomEvent("logos:eruda-ready"));
         showIfRequested();
       } catch (error) {
         console.error("Failed to initialize local Eruda:", error);
@@ -36,15 +36,15 @@
     script.id = "logos-eruda-loader";
     script.async = true;
     script.src =
-      (window.__ALICE_STATIC_BASE || "/static") +
+      (window.__LOGOS_STATIC_BASE || "/static") +
       "/eruda.js?v=" +
-      encodeURIComponent(window.__ALICE_STATIC_VERSION || "1");
+      encodeURIComponent(window.__LOGOS_STATIC_VERSION || "1");
     script.onload = function () {
       loadEruda();
     };
     script.onerror = function () {
       attempts += 1;
-      if (attempts < maxAttempts) window.AliceCoreAPI.scheduler.defer(loadEruda, attempts * 250);
+      if (attempts < maxAttempts) window.LogosCoreAPI.scheduler.defer(loadEruda, attempts * 250);
       else console.warn("[ERUDA] Local Eruda bundle failed to load");
     };
     document.head.appendChild(script);
@@ -52,7 +52,7 @@
 
   function start() {
     // Let the application finish its critical DOM startup first.
-    window.AliceCoreAPI.scheduler.defer(loadEruda, 0);
+    window.LogosCoreAPI.scheduler.defer(loadEruda, 0);
   }
 
   if (document.readyState === "loading") {

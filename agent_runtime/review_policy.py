@@ -63,13 +63,13 @@ class RepositoryReviewPolicy(ReadOnlyToolPolicy):
 
 def require_external_review_store(repo_root: Path) -> None:
     """Validate storage isolation before importing app or creating credentials."""
-    # A runtime-bound store takes precedence over ALICE_MEMORY_PATH. This
+    # A runtime-bound store takes precedence over LOGOS_MEMORY_PATH. This
     # standalone worker must not inherit another runtime's storage authority.
     if current_runtime_id() is not None or current_runtime_data_root() is not None:
         raise PermissionError("Issue review cannot inherit an active runtime context")
-    configured = os.environ.get("ALICE_MEMORY_PATH", "").strip()
+    configured = os.environ.get("LOGOS_MEMORY_PATH", "").strip()
     if not configured:
-        raise PermissionError("Issue review requires an explicit external ALICE_MEMORY_PATH")
+        raise PermissionError("Issue review requires an explicit external LOGOS_MEMORY_PATH")
     root = repo_root.resolve()
     location = Path(configured).expanduser().resolve()
     if location == root or root in location.parents:

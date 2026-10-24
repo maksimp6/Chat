@@ -173,10 +173,10 @@ def test_bad_zip_oversize_and_name_refused(tmp_path, monkeypatch):
 
 def test_registry_exposes_two_3d_skills_with_role_isolation():
     registry = SkillRegistry()
-    names = {item["name"] for item in registry.catalog(role="alice")}
+    names = {item["name"] for item in registry.catalog(role="logos")}
     assert {"3d-print-preflight", "a1-mini-print-watch"} <= names
-    assert registry.load("3d-print-preflight", role="alice").body
-    assert registry.load("a1-mini-print-watch", role="alice").body
+    assert registry.load("3d-print-preflight", role="logos").body
+    assert registry.load("a1-mini-print-watch", role="logos").body
     with pytest.raises(SkillPolicyError):
         registry.load("a1-mini-print-watch", role="security-reviewer")
 
@@ -193,7 +193,7 @@ def test_tool_entry_and_owner_scoped_inspection(tmp_path, monkeypatch):
     pytest.importorskip("flask")
     from printing3d import tools
 
-    owner = "alice-owner"
+    owner = "logos-owner"
     other = "other-owner"
     artifact = "fit.gcode.3mf"
     a = tmp_path / hashlib.sha256(owner.encode()).hexdigest()
@@ -202,7 +202,7 @@ def test_tool_entry_and_owner_scoped_inspection(tmp_path, monkeypatch):
     b.mkdir()
     build_3mf(a, name=artifact)
     build_3mf(b, name=artifact, settings={**SETTINGS, "printer_model": "other"})
-    monkeypatch.setenv("ALICE_3D_ARTIFACT_ROOT", str(tmp_path))
+    monkeypatch.setenv("LOGOS_3D_ARTIFACT_ROOT", str(tmp_path))
     monkeypatch.setattr(tools, "_trusted_owner", lambda cfg: owner)
     result = tools.plate_inspect({"artifact_name": artifact, "owner_id": other})
     assert result["status"] == "ready_for_review"
@@ -220,7 +220,7 @@ def test_tool_entry_and_owner_scoped_inspection(tmp_path, monkeypatch):
             tools.plate_inspect({"artifact_name": name})
     (a / "alias.gcode.3mf").symlink_to(b / artifact)
     assert tools.plate_inspect({"artifact_name": "alias.gcode.3mf"})["status"] == "blocked"
-    monkeypatch.delenv("ALICE_3D_ARTIFACT_ROOT")
+    monkeypatch.delenv("LOGOS_3D_ARTIFACT_ROOT")
     assert tools.plate_inspect({"artifact_name": artifact})["status"] == "needs_configuration"
 
 
@@ -333,7 +333,7 @@ def test_tool_denies_nonregular_oversize_and_wrong_owner(tmp_path, monkeypatch):
     owner_dir.mkdir()
     name = "job.gcode.3mf"
     path = build_3mf(owner_dir, name=name)
-    monkeypatch.setenv("ALICE_3D_ARTIFACT_ROOT", str(tmp_path))
+    monkeypatch.setenv("LOGOS_3D_ARTIFACT_ROOT", str(tmp_path))
     # Do not trust a model-provided owner_id, folder or arbitrary file path.
     assert (
         tools.plate_inspect({"artifact_name": name, "owner_id": "attacker"}, trusted_context)[
@@ -352,7 +352,7 @@ def test_tool_denies_nonregular_oversize_and_wrong_owner(tmp_path, monkeypatch):
     monkeypatch.setattr(tools, "MAX_FILE_BYTES", 8)
     assert tools.plate_inspect({"artifact_name": name}, trusted_context)["status"] == "blocked"
     monkeypatch.undo()
-    monkeypatch.setenv("ALICE_3D_ARTIFACT_ROOT", str(tmp_path))
+    monkeypatch.setenv("LOGOS_3D_ARTIFACT_ROOT", str(tmp_path))
     folder = owner_dir / "folder.gcode.3mf"
     folder.mkdir()
     assert (
@@ -365,7 +365,7 @@ def test_tool_denies_nonregular_oversize_and_wrong_owner(tmp_path, monkeypatch):
 
     symlink_root = tmp_path.parent / (tmp_path.name + "-link")
     symlink_root.symlink_to(tmp_path, target_is_directory=True)
-    monkeypatch.setenv("ALICE_3D_ARTIFACT_ROOT", str(symlink_root))
+    monkeypatch.setenv("LOGOS_3D_ARTIFACT_ROOT", str(symlink_root))
     assert tools.plate_inspect({"artifact_name": name}, trusted_context)["status"] == "blocked"
 
 

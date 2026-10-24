@@ -7,5 +7,5 @@ lanes:
     services:
       - oauth
       - chrome
-      - alice-lab
-      - alice-browser
+      - logos-lab
+      - logos-browser

@@ -71,7 +71,7 @@ int main(void){
     return 0;
 }
 """
-    with tempfile.TemporaryDirectory(prefix="alice-uinput-teardown-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="logos-uinput-teardown-") as tmp:
         code = Path(tmp) / "teardown.c"
         exe = Path(tmp) / "teardown"
         code.write_text(source, encoding="utf-8")

@@ -15,10 +15,10 @@ from printing3d.bambu_requests import (
 def test_encode_known_wire_contract_and_mock_broker():
     serial = "A1MINI123"
     topic = request_topic(serial)
-    payload = encode_pushall("alice_status_1")
+    payload = encode_pushall("logos_status_1")
     assert json.loads(payload) == {
         "pushing": {
-            "sequence_id": "alice_status_1",
+            "sequence_id": "logos_status_1",
             "command": "pushall",
             "version": 1,
             "push_target": 1,

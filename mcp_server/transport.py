@@ -34,7 +34,7 @@ def _client_error_message(exc: Exception, fallback: str) -> str:
 
 @chatgpt_mcp_bp.route("/.well-known/oauth-protected-resource", methods=["GET"])
 def oauth_protected_resource() -> Response:
-    issuer = os.getenv("ALICE_MCP_OAUTH_ISSUER", "").rstrip("/")
+    issuer = os.getenv("LOGOS_MCP_OAUTH_ISSUER", "").rstrip("/")
     resource = _public_base_url() or request.url_root.rstrip("/")
     body = {
         "resource": resource,
@@ -62,7 +62,7 @@ def mcp_options() -> Response:
 @chatgpt_mcp_bp.route(MCP_PATH, methods=["GET"])
 def mcp_get() -> Response:
     return Response(
-        "Alice Pro MCP endpoint accepts POST requests only.",
+        "Logos Pro MCP endpoint accepts POST requests only.",
         status=405,
         headers={"Allow": "POST, OPTIONS"},
         mimetype="text/plain",
@@ -148,17 +148,17 @@ def mcp_post() -> Response:
         call_meta = params.get("_meta") or {}
         if not isinstance(call_meta, dict):
             return _error_response(request_id, -32602, "tools/call _meta must be an object")
-        runtime_id = call_meta.get("alice/runtime_id")
-        resource_runtime_id = call_meta.get("alice/resource_runtime_id")
+        runtime_id = call_meta.get("logos/runtime_id")
+        resource_runtime_id = call_meta.get("logos/resource_runtime_id")
         if runtime_id is not None and (not isinstance(runtime_id, str) or not runtime_id.strip()):
             return _error_response(
-                request_id, -32602, "alice/runtime_id must be a non-empty string"
+                request_id, -32602, "logos/runtime_id must be a non-empty string"
             )
         if resource_runtime_id is not None and (
             not isinstance(resource_runtime_id, str) or not resource_runtime_id.strip()
         ):
             return _error_response(
-                request_id, -32602, "alice/resource_runtime_id must be a non-empty string"
+                request_id, -32602, "logos/resource_runtime_id must be a non-empty string"
             )
         try:
             result = _handle_call(

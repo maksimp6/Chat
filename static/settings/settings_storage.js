@@ -90,7 +90,7 @@
       serverSettingsCache[convId] = settings;
       localStorage.setItem(convKey(convId), JSON.stringify(settings));
       // Асинхронная отправка в бэкенд SQLite
-      window.AliceDispatcher.request("/api/conversations/" + convId + "/settings", {
+      window.LogosDispatcher.request("/api/conversations/" + convId + "/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
@@ -105,7 +105,7 @@
   // Загрузка настроек с сервера при смене диалога
   window.loadServerConvSettings = function (convId) {
     if (!convId) return Promise.resolve(load(convId));
-    return window.AliceDispatcher.request("/api/conversations/" + convId + "/settings", null, {
+    return window.LogosDispatcher.request("/api/conversations/" + convId + "/settings", null, {
       timeoutMs: 5000,
     })
       .then(function (r) {
@@ -144,7 +144,7 @@
     if (convId) {
       localStorage.removeItem(convKey(convId));
       delete serverSettingsCache[convId];
-      window.AliceDispatcher.request("/api/conversations/" + convId + "/settings", {
+      window.LogosDispatcher.request("/api/conversations/" + convId + "/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(DEFAULTS),

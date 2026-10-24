@@ -95,14 +95,14 @@ body {
 }
 
 /* === ISOLATED APP STYLES === */
-.alice-pro-app {
+.logos-pro-app {
   display: flex;
   height: 100dvh;
   width: 100%;
   position: relative;
 }
 
-.alice-pro-app .frontend-degraded-status {
+.logos-pro-app .frontend-degraded-status {
   position: absolute;
   z-index: 250;
   right: 12px;
@@ -117,12 +117,12 @@ body {
   font-size: 14px;
 }
 
-.alice-pro-app .frontend-degraded-status[hidden] {
+.logos-pro-app .frontend-degraded-status[hidden] {
   display: none;
 }
 
 /* Sidebar */
-.alice-pro-app #sidebar {
+.logos-pro-app #sidebar {
   width: 280px;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-color);
@@ -136,11 +136,11 @@ body {
   display: flex;
   flex-direction: column;
 }
-.alice-pro-app #sidebar.open {
+.logos-pro-app #sidebar.open {
   transform: translateX(0);
 }
 
-.alice-pro-app #sidebar-header {
+.logos-pro-app #sidebar-header {
   padding: 14px;
   border-bottom: 1px solid var(--border-color);
   display: flex;
@@ -148,7 +148,7 @@ body {
   justify-content: flex-end;
 }
 
-.alice-pro-app #new-chat-btn {
+.logos-pro-app #new-chat-btn {
   flex: 1;
   background: var(--accent);
   color: #fff;
@@ -160,7 +160,7 @@ body {
   cursor: pointer;
 }
 
-.alice-pro-app #close-sidebar-btn {
+.logos-pro-app #close-sidebar-btn {
   background: var(--btn-bg);
   border: none;
   border-radius: 8px;
@@ -170,13 +170,13 @@ body {
   color: var(--text-main);
 }
 
-.alice-pro-app #conv-list {
+.logos-pro-app #conv-list {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
 }
 
-.alice-pro-app .conv-item {
+.logos-pro-app .conv-item {
   padding: 10px 12px;
   border-radius: 8px;
   cursor: pointer;
@@ -186,21 +186,21 @@ body {
   justify-content: space-between;
   align-items: center;
 }
-.alice-pro-app .conv-item:hover {
+.logos-pro-app .conv-item:hover {
   background: var(--btn-bg);
 }
-.alice-pro-app .conv-item.active {
+.logos-pro-app .conv-item.active {
   background: rgba(10, 132, 255, 0.15);
   color: var(--accent);
   font-weight: 500;
 }
-.alice-pro-app .conv-title {
+.logos-pro-app .conv-title {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.alice-pro-app .delete-btn {
+.logos-pro-app .delete-btn {
   background: none;
   border: none;
   color: var(--text-secondary);
@@ -210,7 +210,7 @@ body {
 }
 
 /* Overlay */
-.alice-pro-app #overlay {
+.logos-pro-app #overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.35);
@@ -219,13 +219,13 @@ body {
   pointer-events: none;
   transition: opacity 0.25s;
 }
-.alice-pro-app #overlay.visible {
+.logos-pro-app #overlay.visible {
   opacity: 1;
   pointer-events: auto;
 }
 
 /* Main Layout */
-.alice-pro-app #main {
+.logos-pro-app #main {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -236,7 +236,7 @@ body {
 }
 
 /* Header */
-.alice-pro-app #header {
+.logos-pro-app #header {
   background: var(--bg-header);
   color: var(--text-header);
   padding: 12px 15px;
@@ -248,7 +248,7 @@ body {
   flex-shrink: 0;
 }
 
-.alice-pro-app .header-btn {
+.logos-pro-app .header-btn {
   background: rgba(255, 255, 255, 0.2);
   border: none;
   border-radius: 8px;
@@ -262,17 +262,17 @@ body {
   justify-content: center;
 }
 
-.alice-pro-app a.header-btn {
+.logos-pro-app a.header-btn {
   text-decoration: none;
 }
 
-.alice-pro-app .donate-btn img,
-.alice-pro-app .github-login-btn svg {
+.logos-pro-app .donate-btn img,
+.logos-pro-app .github-login-btn svg {
   display: block;
   pointer-events: none;
 }
 
-.alice-pro-app .model-btn {
+.logos-pro-app .model-btn {
   width: 38px;
   height: 38px;
   padding: 0;
@@ -289,7 +289,7 @@ body {
 }
 
 /* Chatbox */
-.alice-pro-app #chatbox {
+.logos-pro-app #chatbox {
   flex: 1;
   overflow-y: auto;
   padding: 15px;
@@ -299,7 +299,7 @@ body {
   background: var(--bg-app);
 }
 
-.alice-pro-app .empty-state {
+.logos-pro-app .empty-state {
   flex: 1;
   display: flex;
   align-items: center;
@@ -309,7 +309,7 @@ body {
 }
 
 /* Messages */
-.alice-pro-app .msg {
+.logos-pro-app .msg {
   width: 100%;
   max-width: 95%;
   padding: 12px 16px;
@@ -319,20 +319,20 @@ body {
   font-size: 16px;
   position: relative;
 }
-.alice-pro-app .user {
+.logos-pro-app .user {
   align-self: flex-end;
   background: var(--bg-bubble-user);
   color: var(--text-bubble-user);
   border-bottom-right-radius: 4px;
 }
-.alice-pro-app .bot {
+.logos-pro-app .bot {
   align-self: flex-start;
   background: var(--bg-bubble-bot);
   color: var(--text-bubble-bot);
   border-bottom-left-radius: 4px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
-.alice-pro-app .msg.error {
+.logos-pro-app .msg.error {
   align-self: flex-start;
   background: var(--bg-bubble-bot);
   color: var(--danger);
@@ -340,7 +340,7 @@ body {
   border-bottom-left-radius: 4px;
 }
 
-.alice-pro-app .billing-bubble {
+.logos-pro-app .billing-bubble {
   display: inline-block;
   margin-top: 4px;
   padding: 2px 8px;
@@ -350,12 +350,12 @@ body {
   font-size: 11px;
   font-family: monospace;
 }
-[data-theme="dark"] .alice-pro-app .billing-bubble {
+[data-theme="dark"] .logos-pro-app .billing-bubble {
   background: rgba(255, 255, 255, 0.1);
 }
 
 /* Voice UI */
-.alice-pro-app #voice-ui {
+.logos-pro-app #voice-ui {
   padding: 20px;
   display: none;
   flex-direction: column;
@@ -366,20 +366,20 @@ body {
   flex-shrink: 0;
 }
 
-.alice-pro-app #waveform {
+.logos-pro-app #waveform {
   width: 100%;
   height: 60px;
   background: var(--bg-input);
   border-radius: 12px;
 }
 
-.alice-pro-app #voice-status {
+.logos-pro-app #voice-status {
   font-size: 14px;
   color: var(--text-secondary);
   min-height: 20px;
 }
 
-.alice-pro-app #mic-btn {
+.logos-pro-app #mic-btn {
   width: 70px;
   height: 70px;
   border-radius: 50%;
@@ -394,7 +394,7 @@ body {
   align-items: center;
   justify-content: center;
 }
-.alice-pro-app #mic-btn.recording {
+.logos-pro-app #mic-btn.recording {
   background: var(--danger);
   animation: pulse 1.5s infinite;
 }
@@ -412,7 +412,7 @@ body {
 }
 
 /* Text Input */
-.alice-pro-app #text-ui {
+.logos-pro-app #text-ui {
   display: flex;
   padding: 10px;
   background: var(--bg-input);
@@ -423,7 +423,7 @@ body {
   flex-shrink: 0;
 }
 
-.alice-pro-app #msg-input {
+.logos-pro-app #msg-input {
   flex: 1;
   padding: 12px 16px;
   border: 1px solid var(--border-color);
@@ -438,7 +438,7 @@ body {
   overflow: hidden;
 }
 
-.alice-pro-app #send-btn {
+.logos-pro-app #send-btn {
   background: var(--accent);
   color: #fff;
   border: none;
@@ -454,7 +454,7 @@ body {
 }
 
 /* Modals */
-.alice-pro-app .modal {
+.logos-pro-app .modal {
   display: none;
   position: fixed;
   inset: 0;
@@ -463,11 +463,11 @@ body {
   align-items: center;
   justify-content: center;
 }
-.alice-pro-app .modal.visible {
+.logos-pro-app .modal.visible {
   display: flex;
 }
 
-.alice-pro-app .modal-content {
+.logos-pro-app .modal-content {
   background: var(--bg-sidebar);
   border-radius: 16px;
   padding: 24px;
@@ -477,14 +477,14 @@ body {
   overflow-y: auto;
   position: relative;
 }
-.alice-pro-app .modal-content h3 {
+.logos-pro-app .modal-content h3 {
   margin-top: 0;
   margin-bottom: 16px;
   padding-right: 48px;
   color: var(--text-main);
 }
 
-.alice-pro-app .model-option {
+.logos-pro-app .model-option {
   padding: 12px;
   border-radius: 8px;
   cursor: pointer;
@@ -496,20 +496,20 @@ body {
   flex-direction: column;
   gap: 4px;
 }
-.alice-pro-app .model-option:hover {
+.logos-pro-app .model-option:hover {
   border-color: var(--accent);
 }
-.alice-pro-app .model-option.active {
+.logos-pro-app .model-option.active {
   border: 2px solid var(--accent);
   font-weight: 600;
   background: rgba(10, 132, 255, 0.1);
 }
-.alice-pro-app .model-price {
+.logos-pro-app .model-price {
   font-size: 11px;
   color: var(--text-secondary);
 }
 
-.alice-pro-app #close-modal {
+.logos-pro-app #close-modal {
   position: absolute;
   top: 12px;
   right: 12px;
@@ -530,7 +530,7 @@ body {
 }
 
 /* Markdown */
-.alice-pro-app .msg pre {
+.logos-pro-app .msg pre {
   background: var(--code-bg);
   border: 1px solid var(--code-border);
   border-radius: 8px;
@@ -541,7 +541,7 @@ body {
   font-size: 13px;
   line-height: 1.4;
 }
-.alice-pro-app .msg code {
+.logos-pro-app .msg code {
   background: var(--code-bg);
   border: 1px solid var(--code-border);
   border-radius: 4px;
@@ -550,7 +550,7 @@ body {
   font-size: 14px;
   color: #e01e5a;
 }
-.alice-pro-app .msg pre code {
+.logos-pro-app .msg pre code {
   background: none;
   border: none;
   padding: 0;
@@ -574,29 +574,29 @@ body {
 
 /* Responsive */
 @media (max-width: 768px) {
-  .alice-pro-app .modal-content {
+  .logos-pro-app .modal-content {
     max-width: 95%;
     margin: 20px;
   }
 }
 
 /* Стили для Markdown */
-.alice-pro-app .bubble h1,
-.alice-pro-app .bubble h2,
-.alice-pro-app .bubble h3 {
+.logos-pro-app .bubble h1,
+.logos-pro-app .bubble h2,
+.logos-pro-app .bubble h3 {
   margin-top: 10px;
   margin-bottom: 5px;
   font-weight: bold;
 }
-.alice-pro-app .bubble ul,
-.alice-pro-app .bubble ol {
+.logos-pro-app .bubble ul,
+.logos-pro-app .bubble ol {
   margin-left: 20px;
   margin-bottom: 5px;
 }
-.alice-pro-app .bubble p {
+.logos-pro-app .bubble p {
   margin-bottom: 8px;
 }
-.alice-pro-app .bubble pre {
+.logos-pro-app .bubble pre {
   background: var(--code-bg);
   padding: 10px;
   border-radius: 6px;
@@ -606,47 +606,47 @@ body {
   word-break: normal;
   border: 1px solid var(--border-color);
 }
-.alice-pro-app .bubble code {
+.logos-pro-app .bubble code {
   background: var(--code-bg);
   padding: 2px 4px;
   border-radius: 4px;
   font-family: monospace;
   font-size: 0.9em;
 }
-.alice-pro-app .bubble pre code {
+.logos-pro-app .bubble pre code {
   background: none;
   padding: 0;
   border: none;
 }
 
 /* Стили для Markdown элементов */
-.alice-pro-app .bubble h1,
-.alice-pro-app .bubble h2,
-.alice-pro-app .bubble h3,
-.alice-pro-app .bubble h4 {
+.logos-pro-app .bubble h1,
+.logos-pro-app .bubble h2,
+.logos-pro-app .bubble h3,
+.logos-pro-app .bubble h4 {
   margin-top: 10px;
   margin-bottom: 5px;
   font-weight: bold;
 }
-.alice-pro-app .bubble h4 {
+.logos-pro-app .bubble h4 {
   font-size: 1em;
 }
-.alice-pro-app .bubble p {
+.logos-pro-app .bubble p {
   margin-bottom: 8px;
 }
-.alice-pro-app .bubble ul {
+.logos-pro-app .bubble ul {
   margin-left: 20px;
   margin-bottom: 8px;
 }
-.alice-pro-app .bubble li {
+.logos-pro-app .bubble li {
   margin-bottom: 4px;
 }
-.alice-pro-app .bubble hr {
+.logos-pro-app .bubble hr {
   border: 0;
   border-top: 1px solid var(--border-color);
   margin: 10px 0;
 }
-.alice-pro-app .bubble pre {
+.logos-pro-app .bubble pre {
   background: var(--code-bg);
   border: 1px solid var(--code-border);
   border-radius: 8px;
@@ -657,7 +657,7 @@ body {
   font-size: 13px;
   line-height: 1.4;
 }
-.alice-pro-app .bubble code {
+.logos-pro-app .bubble code {
   background: var(--code-bg);
   border: 1px solid var(--code-border);
   border-radius: 4px;
@@ -666,7 +666,7 @@ body {
   font-size: 14px;
   color: #e01e5a;
 }
-.alice-pro-app .bubble pre code {
+.logos-pro-app .bubble pre code {
   background: none;
   border: none;
   padding: 0;
@@ -674,58 +674,58 @@ body {
 }
 
 /* Header rows */
-.alice-pro-app #header {
+.logos-pro-app #header {
   flex-direction: column;
   align-items: stretch;
   gap: 8px;
   padding-top: calc(12px + env(safe-area-inset-top, 0px));
 }
 
-.alice-pro-app .header-row {
+.logos-pro-app .header-row {
   display: flex;
   align-items: center;
   gap: 12px;
   min-width: 0;
 }
 
-.alice-pro-app .header-row-secondary {
+.logos-pro-app .header-row-secondary {
   overflow-x: auto;
   scrollbar-width: none;
   padding-bottom: 1px;
 }
 
-.alice-pro-app .header-row-secondary::-webkit-scrollbar {
+.logos-pro-app .header-row-secondary::-webkit-scrollbar {
   display: none;
 }
 
-.alice-pro-app .header-row-secondary .header-btn {
+.logos-pro-app .header-row-secondary .header-btn {
   flex: 0 0 auto;
 }
 
 @media (max-width: 768px) {
-  .alice-pro-app #header {
+  .logos-pro-app #header {
     gap: 6px;
     padding-left: 10px;
     padding-right: 10px;
   }
-  .alice-pro-app .header-row {
+  .logos-pro-app .header-row {
     gap: 8px;
   }
-  .alice-pro-app .header-row-primary .model-btn {
+  .logos-pro-app .header-row-primary .model-btn {
     min-width: 0;
   }
 }
 /* Treasury modal */
-.alice-pro-app .treasury-modal {
+.logos-pro-app .treasury-modal {
   z-index: 1100;
   padding: env(safe-area-inset-top, 0px) 12px env(safe-area-inset-bottom, 0px);
 }
 
-.alice-pro-app .treasury-modal-content {
+.logos-pro-app .treasury-modal-content {
   padding: 24px;
 }
 
-.alice-pro-app .treasury-modal-close {
+.logos-pro-app .treasury-modal-close {
   position: absolute;
   top: 12px;
   right: 12px;
@@ -743,7 +743,7 @@ body {
   justify-content: center;
 }
 
-.alice-pro-app .treasury-balance-card {
+.logos-pro-app .treasury-balance-card {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -755,32 +755,32 @@ body {
   background: var(--btn-bg);
 }
 
-.alice-pro-app .treasury-balance-label {
+.logos-pro-app .treasury-balance-label {
   color: var(--text-secondary);
   font-size: 14px;
 }
 
-.alice-pro-app .treasury-balance-value {
+.logos-pro-app .treasury-balance-value {
   color: var(--text-main);
   font-size: 24px;
   overflow-wrap: anywhere;
 }
 
-.alice-pro-app .treasury-action-section {
+.logos-pro-app .treasury-action-section {
   margin-bottom: 20px;
 }
 
-.alice-pro-app .treasury-action-section h4 {
+.logos-pro-app .treasury-action-section h4 {
   margin: 0 0 10px;
   color: var(--text-main);
 }
 
-.alice-pro-app .treasury-top-up-row {
+.logos-pro-app .treasury-top-up-row {
   display: flex;
   gap: 10px;
 }
 
-.alice-pro-app .treasury-amount-input {
+.logos-pro-app .treasury-amount-input {
   min-width: 0;
   flex: 1;
   padding: 11px 12px;
@@ -791,7 +791,7 @@ body {
   font: inherit;
 }
 
-.alice-pro-app .treasury-action-btn {
+.logos-pro-app .treasury-action-btn {
   flex: 0 0 auto;
   padding: 11px 14px;
   border: none;
@@ -803,15 +803,15 @@ body {
   cursor: pointer;
 }
 
-.alice-pro-app .treasury-action-btn:active {
+.logos-pro-app .treasury-action-btn:active {
   transform: translateY(1px);
 }
 
-.alice-pro-app .treasury-expenses-list {
+.logos-pro-app .treasury-expenses-list {
   min-height: 40px;
 }
 
-.alice-pro-app .treasury-expense-items {
+.logos-pro-app .treasury-expense-items {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -820,7 +820,7 @@ body {
   gap: 8px;
 }
 
-.alice-pro-app .treasury-expense-item {
+.logos-pro-app .treasury-expense-item {
   padding: 10px 12px;
   border: 1px solid var(--border-color);
   border-radius: 10px;
@@ -830,54 +830,54 @@ body {
   gap: 4px;
 }
 
-.alice-pro-app .treasury-expense-description {
+.logos-pro-app .treasury-expense-description {
   color: var(--text-main);
   font-size: 14px;
 }
 
-.alice-pro-app .treasury-expense-meta {
+.logos-pro-app .treasury-expense-meta {
   color: var(--text-secondary);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
 
-.alice-pro-app .treasury-empty-state,
-.alice-pro-app .treasury-status {
+.logos-pro-app .treasury-empty-state,
+.logos-pro-app .treasury-status {
   color: var(--text-secondary);
   font-size: 13px;
 }
 
-.alice-pro-app .treasury-status {
+.logos-pro-app .treasury-status {
   min-height: 18px;
   margin-top: 8px;
 }
 
-.alice-pro-app .treasury-status.is-error {
+.logos-pro-app .treasury-status.is-error {
   color: var(--danger);
 }
 
 @media (max-width: 520px) {
-  .alice-pro-app .treasury-modal {
+  .logos-pro-app .treasury-modal {
     padding-left: 8px;
     padding-right: 8px;
   }
 
-  .alice-pro-app .treasury-modal-content {
+  .logos-pro-app .treasury-modal-content {
     width: 100%;
     padding: 20px;
     border-radius: 14px;
   }
 
-  .alice-pro-app .treasury-top-up-row {
+  .logos-pro-app .treasury-top-up-row {
     flex-direction: column;
   }
 
-  .alice-pro-app .treasury-action-btn {
+  .logos-pro-app .treasury-action-btn {
     width: 100%;
   }
 }
 /* Header icon wrapping */
-.alice-pro-app #header > .header-actions {
+.logos-pro-app #header > .header-actions {
   display: grid;
   grid-template-columns: repeat(auto-fill, 38px);
   grid-auto-rows: 38px;
@@ -889,37 +889,37 @@ body {
   width: 100%;
 }
 
-.alice-pro-app #header > .header-actions > .header-btn {
+.logos-pro-app #header > .header-actions > .header-btn {
   width: 38px;
   height: 38px;
   flex: none;
 }
 
 @media (max-width: 768px) {
-  .alice-pro-app #header > .header-actions {
+  .logos-pro-app #header > .header-actions {
     grid-template-columns: repeat(auto-fill, 36px);
     grid-auto-rows: 36px;
     gap: 6px 8px;
   }
 
-  .alice-pro-app #header > .header-actions > .header-btn {
+  .logos-pro-app #header > .header-actions > .header-btn {
     width: 36px;
     height: 36px;
   }
 }
 
 /* Memory panel: HTML-first structure, presentation owned by CSS. */
-.alice-pro-app .memory-modal {
+.logos-pro-app .memory-modal {
   z-index: 100000;
   padding: 20px;
   background: rgba(0, 0, 0, 0.7);
 }
 
-.alice-pro-app .memory-modal[hidden] {
+.logos-pro-app .memory-modal[hidden] {
   display: none;
 }
 
-.alice-pro-app .memory-modal-content {
+.logos-pro-app .memory-modal-content {
   padding: 20px;
   border-radius: 8px;
   background: #1e1e1e;
@@ -928,7 +928,7 @@ body {
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
 }
 
-.alice-pro-app .memory-modal-close {
+.logos-pro-app .memory-modal-close {
   position: absolute;
   top: 10px;
   right: 15px;
@@ -942,31 +942,31 @@ body {
   cursor: pointer;
 }
 
-.alice-pro-app .memory-modal-title {
+.logos-pro-app .memory-modal-title {
   margin: 0;
   padding-bottom: 8px;
   border-bottom: 1px solid #444;
   font-size: 18px;
 }
 
-.alice-pro-app .memory-config {
+.logos-pro-app .memory-config {
   margin: 15px 0;
   padding: 10px;
   border-radius: 5px;
   background: #2a2a2a;
 }
 
-.alice-pro-app .memory-config-option {
+.logos-pro-app .memory-config-option {
   display: block;
   margin-bottom: 8px;
   cursor: pointer;
 }
 
-.alice-pro-app .memory-config-option:last-child {
+.logos-pro-app .memory-config-option:last-child {
   margin-bottom: 0;
 }
 
-.alice-pro-app .memory-limit {
+.logos-pro-app .memory-limit {
   width: 60px;
   padding: 3px;
   border: 1px solid #555;
@@ -975,11 +975,11 @@ body {
   color: #fff;
 }
 
-.alice-pro-app .memory-clear {
+.logos-pro-app .memory-clear {
   margin-bottom: 15px;
 }
 
-.alice-pro-app .memory-clear-btn {
+.logos-pro-app .memory-clear-btn {
   padding: 6px 12px;
   border: 0;
   border-radius: 4px;
@@ -988,19 +988,19 @@ body {
   cursor: pointer;
 }
 
-.alice-pro-app .memory-facts-title {
+.logos-pro-app .memory-facts-title {
   margin: 0 0 8px;
   font-size: 14px;
 }
 
-.alice-pro-app .memory-facts-list {
+.logos-pro-app .memory-facts-list {
   max-height: 220px;
   overflow-y: auto;
   padding-top: 8px;
   border-top: 1px solid #444;
 }
 
-.alice-pro-app .memory-fact {
+.logos-pro-app .memory-fact {
   margin-bottom: 6px;
   padding: 8px;
   border-radius: 4px;
@@ -1008,73 +1008,73 @@ body {
   font-size: 12px;
 }
 
-.alice-pro-app .memory-fact-category {
+.logos-pro-app .memory-fact-category {
   color: #4da6ff;
   font-weight: 700;
   text-transform: uppercase;
 }
 
-.alice-pro-app .memory-empty {
+.logos-pro-app .memory-empty {
   color: #888;
   font-size: 13px;
 }
 
 /* Progressive enhancement: state previously carried by inline styles. */
-.alice-pro-app .conv-empty {
+.logos-pro-app .conv-empty {
   padding: 20px;
   color: var(--text-secondary);
   text-align: center;
 }
-.alice-pro-app .model-option-empty {
+.logos-pro-app .model-option-empty {
   cursor: default;
   opacity: 0.7;
 }
-.alice-pro-app .model-option-price {
+.logos-pro-app .model-option-price {
   font-size: 11px;
   color: var(--text-secondary);
 }
-.alice-pro-app .model-option-unavailable {
+.logos-pro-app .model-option-unavailable {
   opacity: 0.55;
   cursor: not-allowed;
 }
-.alice-pro-app .model-option-ultra {
+.logos-pro-app .model-option-ultra {
   font-size: 11px;
   color: var(--text-secondary);
 }
-.alice-pro-app #voice-ui,
-.alice-pro-app #response-mode-wrap,
-.alice-pro-app #mic-btn,
-.alice-pro-app #upload-image-btn {
+.logos-pro-app #voice-ui,
+.logos-pro-app #response-mode-wrap,
+.logos-pro-app #mic-btn,
+.logos-pro-app #upload-image-btn {
   display: none;
 }
 
-.alice-pro-app #text-ui {
+.logos-pro-app #text-ui {
   display: flex;
 }
 
-.alice-pro-app.alice-model-voice #voice-ui,
-.alice-pro-app.alice-model-voice #response-mode-wrap,
-.alice-pro-app.alice-model-voice #mic-btn {
+.logos-pro-app.logos-model-voice #voice-ui,
+.logos-pro-app.logos-model-voice #response-mode-wrap,
+.logos-pro-app.logos-model-voice #mic-btn {
   display: flex;
 }
 
-.alice-pro-app.alice-model-voice #text-ui {
+.logos-pro-app.logos-model-voice #text-ui {
   display: none;
 }
 
-.alice-pro-app.alice-model-multimodal #upload-image-btn {
+.logos-pro-app.logos-model-multimodal #upload-image-btn {
   display: flex;
 }
 
-.alice-pro-app #voice-ui[aria-hidden="true"],
-.alice-pro-app #text-ui[aria-hidden="true"],
-.alice-pro-app #response-mode-wrap[aria-hidden="true"],
-.alice-pro-app #mic-btn[aria-hidden="true"],
-.alice-pro-app #upload-image-btn[aria-hidden="true"] {
+.logos-pro-app #voice-ui[aria-hidden="true"],
+.logos-pro-app #text-ui[aria-hidden="true"],
+.logos-pro-app #response-mode-wrap[aria-hidden="true"],
+.logos-pro-app #mic-btn[aria-hidden="true"],
+.logos-pro-app #upload-image-btn[aria-hidden="true"] {
   display: none;
 }
 
-.alice-pro-app .conv-link {
+.logos-pro-app .conv-link {
   display: block;
   flex: 1;
   min-width: 0;
@@ -1082,32 +1082,32 @@ body {
   text-decoration: none;
 }
 
-.alice-pro-app .conv-link:focus-visible {
+.logos-pro-app .conv-link:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
 /* Chat progressive-enhancement states. */
-.alice-pro-app .approval-card {
+.logos-pro-app .approval-card {
   border: 1px solid var(--accent);
   background: rgba(0, 122, 255, 0.05);
   border-radius: 12px;
   padding: 14px;
 }
 
-.alice-pro-app .approval-card-title {
+.logos-pro-app .approval-card-title {
   font-weight: 600;
   margin-bottom: 6px;
   color: var(--accent);
 }
 
-.alice-pro-app .approval-card-action {
+.logos-pro-app .approval-card-action {
   font-size: 14px;
   margin-bottom: 8px;
 }
 
-.alice-pro-app .approval-card-params {
+.logos-pro-app .approval-card-params {
   font-size: 12px;
   background: rgba(0, 0, 0, 0.05);
   padding: 8px;
@@ -1116,12 +1116,12 @@ body {
   white-space: pre-wrap;
 }
 
-.alice-pro-app .approval-card-actions {
+.logos-pro-app .approval-card-actions {
   display: flex;
   gap: 10px;
 }
 
-.alice-pro-app .approval-btn {
+.logos-pro-app .approval-btn {
   padding: 6px 14px;
   color: #fff;
   border: 0;
@@ -1130,26 +1130,26 @@ body {
   font-weight: 500;
 }
 
-.alice-pro-app .approval-btn-approve {
+.logos-pro-app .approval-btn-approve {
   background: #28a745;
 }
 
-.alice-pro-app .approval-btn-reject {
+.logos-pro-app .approval-btn-reject {
   background: #dc3545;
 }
 
-.alice-pro-app .approval-card.is-executing {
+.logos-pro-app .approval-card.is-executing {
   opacity: 0.75;
 }
 
-.alice-pro-app .copy-btn {
+.logos-pro-app .copy-btn {
   margin-left: 10px;
   cursor: pointer;
   background: none;
   border: 0;
 }
 
-.alice-pro-app .msg-meta {
+.logos-pro-app .msg-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -1157,7 +1157,7 @@ body {
   align-items: center;
 }
 
-.alice-pro-app .msg-meta-details {
+.logos-pro-app .msg-meta-details {
   font-size: 11px;
   background: rgba(0, 0, 0, 0.06);
   border-radius: 6px;
@@ -1166,11 +1166,11 @@ body {
   color: var(--text-secondary);
 }
 
-.alice-pro-app .msg-meta-summary {
+.logos-pro-app .msg-meta-summary {
   font-weight: 600;
 }
 
-.alice-pro-app .msg-meta-detail-list {
+.logos-pro-app .msg-meta-detail-list {
   margin-top: 4px;
   display: flex;
   flex-direction: column;
@@ -1179,33 +1179,33 @@ body {
   font-size: 11px;
 }
 
-.alice-pro-app .msg-meta-error {
+.logos-pro-app .msg-meta-error {
   color: var(--danger);
 }
 
-.alice-pro-app .msg-meta-step {
+.logos-pro-app .msg-meta-step {
   display: flex;
   justify-content: space-between;
   gap: 12px;
 }
 
-.alice-pro-app .msg-meta-server {
+.logos-pro-app .msg-meta-server {
   color: var(--accent);
   font-size: 10px;
   margin-left: 4px;
 }
 
-.alice-pro-app .msg-trace-details,
-.alice-pro-app .msg-technical-details {
+.logos-pro-app .msg-trace-details,
+.logos-pro-app .msg-technical-details {
   width: 100%;
   margin-top: 4px;
 }
 
-.alice-pro-app .msg-technical-list {
+.logos-pro-app .msg-technical-list {
   gap: 4px;
 }
 
-.alice-pro-app .msg-technical-step {
+.logos-pro-app .msg-technical-step {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
@@ -1213,25 +1213,25 @@ body {
   padding: 3px 0;
 }
 
-.alice-pro-app .msg-technical-label {
+.logos-pro-app .msg-technical-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.alice-pro-app .msg-technical-detail {
+.logos-pro-app .msg-technical-detail {
   color: var(--text-secondary);
   text-align: right;
   white-space: nowrap;
 }
 
-.alice-pro-app .msg-technical-step[data-kind="error"] .msg-technical-label,
-.alice-pro-app .msg-technical-step[data-kind="error"] .msg-technical-detail {
+.logos-pro-app .msg-technical-step[data-kind="error"] .msg-technical-label,
+.logos-pro-app .msg-technical-step[data-kind="error"] .msg-technical-detail {
   color: var(--danger);
 }
 
-.alice-pro-app .alice-trace-open-viewer {
+.logos-pro-app .logos-trace-open-viewer {
   font-size: 11px;
   background: transparent;
   border: 0;
@@ -1242,11 +1242,11 @@ body {
   font-weight: 600;
 }
 
-.alice-pro-app .error-state {
+.logos-pro-app .error-state {
   color: var(--danger);
 }
 
-.alice-pro-app .trace-viewer-auto-button {
+.logos-pro-app .trace-viewer-auto-button {
   font-size: 11px;
   background: transparent;
   border: 0;
@@ -1256,20 +1256,20 @@ body {
   font-weight: 600;
 }
 
-.alice-pro-app .trace-viewer-auto-details {
+.logos-pro-app .trace-viewer-auto-details {
   width: auto;
   display: inline-block;
   margin-top: 4px;
 }
 
-.alice-pro-app .theme-rollback-card {
+.logos-pro-app .theme-rollback-card {
   padding: 8px 12px;
   display: flex;
   gap: 8px;
   align-items: center;
 }
 
-.alice-pro-app .theme-rollback-button {
+.logos-pro-app .theme-rollback-button {
   border: 1px solid var(--border-color);
   background: var(--btn-bg);
   color: var(--text-main);
@@ -1278,15 +1278,15 @@ body {
   cursor: pointer;
 }
 
-.alice-pro-app .provider-field {
+.logos-pro-app .provider-field {
   margin: 14px 0;
 }
-.alice-pro-app .provider-field-label {
+.logos-pro-app .provider-field-label {
   display: block;
   font-weight: 600;
   margin-bottom: 6px;
 }
-.alice-pro-app .provider-field-input {
+.logos-pro-app .provider-field-input {
   width: 100%;
   box-sizing: border-box;
   padding: 10px;
@@ -1295,57 +1295,57 @@ body {
   background: var(--input-bg, #222);
   color: var(--text, #fff);
 }
-.alice-pro-app .provider-field-input.has-error {
+.logos-pro-app .provider-field-input.has-error {
   border-color: #ff6b6b;
 }
-.alice-pro-app .provider-field-help {
+.logos-pro-app .provider-field-help {
   margin-top: 5px;
   font-size: 12px;
   opacity: 0.7;
   line-height: 1.35;
 }
-.alice-pro-app .provider-field-error {
+.logos-pro-app .provider-field-error {
   display: none;
   margin-top: 6px;
   font-size: 12px;
   color: #ff6b6b;
   line-height: 1.35;
 }
-.alice-pro-app .provider-field-error.is-visible {
+.logos-pro-app .provider-field-error.is-visible {
   display: block;
 }
-.alice-pro-app .provider-status-card {
+.logos-pro-app .provider-status-card {
   padding: 12px;
   margin: 8px 0;
   border: 1px solid #444;
   border-radius: 8px;
 }
-.alice-pro-app .provider-status-title {
+.logos-pro-app .provider-status-title {
   font-weight: 700;
 }
-.alice-pro-app .provider-status-line {
+.logos-pro-app .provider-status-line {
   margin-top: 5px;
 }
-.alice-pro-app .provider-status-meta {
+.logos-pro-app .provider-status-meta {
   margin-top: 7px;
   font-size: 11px;
   opacity: 0.65;
 }
-.alice-pro-app .provider-credentials-modal {
+.logos-pro-app .provider-credentials-modal {
   z-index: 100002;
   background: rgba(0, 0, 0, 0.72);
 }
-.alice-pro-app .provider-credentials-modal.visible {
+.logos-pro-app .provider-credentials-modal.visible {
   display: flex;
 }
-.alice-pro-app .provider-credentials-box {
+.logos-pro-app .provider-credentials-box {
   background: var(--bg, #1e1e1e);
   color: var(--text, #fff);
   padding: 20px;
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
-.alice-pro-app .provider-credentials-close {
+.logos-pro-app .provider-credentials-close {
   position: absolute;
   right: 12px;
   top: 8px;
@@ -1355,32 +1355,32 @@ body {
   color: inherit;
   cursor: pointer;
 }
-.alice-pro-app .provider-credentials-title {
+.logos-pro-app .provider-credentials-title {
   margin-top: 0;
 }
-.alice-pro-app .provider-credentials-actions {
+.logos-pro-app .provider-credentials-actions {
   display: flex;
   gap: 8px;
   margin-top: 14px;
 }
-.alice-pro-app .provider-credentials-status {
+.logos-pro-app .provider-credentials-status {
   margin-top: 14px;
 }
 
-.alice-pro-app .cloudru-iam-modal {
+.logos-pro-app .cloudru-iam-modal {
   z-index: 100001;
   background: rgba(0, 0, 0, 0.7);
 }
-.alice-pro-app .cloudru-iam-modal.visible {
+.logos-pro-app .cloudru-iam-modal.visible {
   display: flex;
 }
-.alice-pro-app .cloudru-iam-box {
+.logos-pro-app .cloudru-iam-box {
   background: var(--bg, #1e1e1e);
   color: var(--text, #fff);
   padding: 20px;
   border-radius: 10px;
 }
-.alice-pro-app .cloudru-iam-close {
+.logos-pro-app .cloudru-iam-close {
   position: absolute;
   right: 12px;
   top: 8px;
@@ -1390,24 +1390,24 @@ body {
   color: inherit;
   cursor: pointer;
 }
-.alice-pro-app .cloudru-iam-field {
+.logos-pro-app .cloudru-iam-field {
   display: block;
   margin: 10px 0;
 }
-.alice-pro-app .cloudru-iam-label {
+.logos-pro-app .cloudru-iam-label {
   display: block;
   margin-bottom: 4px;
 }
-.alice-pro-app .cloudru-iam-input {
+.logos-pro-app .cloudru-iam-input {
   width: 100%;
   box-sizing: border-box;
   padding: 8px;
 }
-.alice-pro-app .cloudru-iam-confirm {
+.logos-pro-app .cloudru-iam-confirm {
   display: block;
   margin: 14px 0;
 }
-.alice-pro-app .cloudru-iam-output {
+.logos-pro-app .cloudru-iam-output {
   display: none;
   white-space: pre-wrap;
   word-break: break-word;
@@ -1416,27 +1416,27 @@ body {
   border-radius: 6px;
   margin-top: 12px;
 }
-.alice-pro-app .cloudru-iam-output.visible {
+.logos-pro-app .cloudru-iam-output.visible {
   display: block;
 }
 
-.alice-pro-app .file-manager-modal,
-.alice-pro-app .file-manager-add-modal {
+.logos-pro-app .file-manager-modal,
+.logos-pro-app .file-manager-add-modal {
   background: var(--m-overlay, rgba(0, 0, 0, 0.6));
   z-index: 10001;
 }
-.alice-pro-app .file-manager-add-modal {
+.logos-pro-app .file-manager-add-modal {
   background: rgba(0, 0, 0, 0.5);
   z-index: 10002;
 }
-.alice-pro-app .file-manager-box {
+.logos-pro-app .file-manager-box {
   background: var(--m-bg, #fff);
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0 8px 32px var(--m-shadow, rgba(0, 0, 0, 0.3));
   color: var(--m-text, #222);
 }
-.alice-pro-app .file-manager-add-box {
+.logos-pro-app .file-manager-add-box {
   background: var(--m-bg, #fff);
   border-radius: 12px;
   padding: 20px;
@@ -1445,13 +1445,13 @@ body {
 }
 
 /* Chat markdown and reasoning presentation. */
-.alice-pro-app .md-code-block {
+.logos-pro-app .md-code-block {
   margin: 8px 0;
 }
-.alice-pro-app .md-code {
+.logos-pro-app .md-code {
   margin: 0;
 }
-.alice-pro-app .reasoning-details {
+.logos-pro-app .reasoning-details {
   margin-bottom: 10px;
   font-size: 13px;
   background: rgba(0, 0, 0, 0.05);
@@ -1459,12 +1459,12 @@ body {
   padding: 8px 12px;
   border: 1px dashed var(--border-color);
 }
-.alice-pro-app .reasoning-summary {
+.logos-pro-app .reasoning-summary {
   cursor: pointer;
   font-weight: 600;
   color: var(--accent);
 }
-.alice-pro-app .reasoning-content {
+.logos-pro-app .reasoning-content {
   margin-top: 8px;
   white-space: pre-wrap;
   font-family: monospace;
@@ -1474,16 +1474,16 @@ body {
 }
 
 /* File manager vector-store rendering. */
-.alice-pro-app .file-manager-state {
+.logos-pro-app .file-manager-state {
   padding: 10px;
   text-align: center;
   color: var(--m-muted, #999);
   font-size: 12px;
 }
-.alice-pro-app .file-manager-state-error {
+.logos-pro-app .file-manager-state-error {
   color: var(--m-danger, #c33);
 }
-.alice-pro-app .file-manager-vs-row {
+.logos-pro-app .file-manager-vs-row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1491,24 +1491,24 @@ body {
   border-bottom: 1px solid var(--m-section-border, #eee);
   font-size: 12px;
 }
-.alice-pro-app .file-manager-vs-details {
+.logos-pro-app .file-manager-vs-details {
   flex: 1;
   min-width: 0;
 }
-.alice-pro-app .file-manager-vs-name {
+.logos-pro-app .file-manager-vs-name {
   font-weight: 700;
   color: var(--m-text, #222);
 }
-.alice-pro-app .file-manager-vs-meta {
+.logos-pro-app .file-manager-vs-meta {
   font-size: 11px;
   color: var(--m-muted, #666);
 }
-.alice-pro-app .file-manager-copy-id {
+.logos-pro-app .file-manager-copy-id {
   cursor: pointer;
   color: var(--m-accent, #4a90d9);
 }
-.alice-pro-app .file-manager-secondary-btn,
-.alice-pro-app .file-manager-danger-btn {
+.logos-pro-app .file-manager-secondary-btn,
+.logos-pro-app .file-manager-danger-btn {
   padding: 4px 8px;
   border: 1px solid var(--m-border, #ddd);
   background: var(--m-card, #fff);
@@ -1516,37 +1516,37 @@ body {
   cursor: pointer;
   font-size: 11px;
 }
-.alice-pro-app .file-manager-secondary-btn {
+.logos-pro-app .file-manager-secondary-btn {
   color: var(--m-text, #222);
 }
-.alice-pro-app .file-manager-danger-btn {
+.logos-pro-app .file-manager-danger-btn {
   color: var(--m-danger, #c33);
 }
 
 /* File manager vector-store file picker. */
-.alice-pro-app .file-manager-add-header {
+.logos-pro-app .file-manager-add-header {
   display: flex;
   justify-content: space-between;
   margin-bottom: 12px;
 }
-.alice-pro-app .file-manager-add-title {
+.logos-pro-app .file-manager-add-title {
   margin: 0;
   font-size: 14px;
   color: var(--m-text, #222);
 }
-.alice-pro-app .file-manager-close-btn {
+.logos-pro-app .file-manager-close-btn {
   border: 0;
   background: none;
   font-size: 20px;
   cursor: pointer;
   color: var(--m-muted, #666);
 }
-.alice-pro-app .file-manager-add-list {
+.logos-pro-app .file-manager-add-list {
   max-height: 300px;
   overflow-y: auto;
   margin-bottom: 12px;
 }
-.alice-pro-app .file-manager-add-row {
+.logos-pro-app .file-manager-add-row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1555,15 +1555,15 @@ body {
   font-size: 12px;
   cursor: pointer;
 }
-.alice-pro-app .file-manager-add-name {
+.logos-pro-app .file-manager-add-name {
   color: var(--m-text, #222);
 }
-.alice-pro-app .file-manager-add-size {
+.logos-pro-app .file-manager-add-size {
   margin-left: auto;
   color: var(--m-muted, #666);
   font-size: 11px;
 }
-.alice-pro-app .file-manager-primary-btn {
+.logos-pro-app .file-manager-primary-btn {
   width: 100%;
   padding: 8px;
   background: var(--m-accent, #4a90d9);
@@ -1575,7 +1575,7 @@ body {
 }
 
 /* Header actions keep their existing rows and wrap secondary actions instead of scrolling. */
-.alice-pro-app #header {
+.logos-pro-app #header {
   flex-direction: column;
   align-items: stretch;
   flex-wrap: nowrap;
@@ -1583,12 +1583,12 @@ body {
   overflow-y: visible;
 }
 
-.alice-pro-app #header .header-row {
+.logos-pro-app #header .header-row {
   flex: 0 1 auto;
   min-width: 0;
 }
 
-.alice-pro-app #header .header-row-secondary {
+.logos-pro-app #header .header-row-secondary {
   flex-wrap: wrap;
   overflow-x: visible;
   overflow-y: visible;
@@ -1596,7 +1596,7 @@ body {
 }
 
 /* === UNIFIED BUTTON CONTRACT === */
-.alice-pro-app .alice-btn {
+.logos-pro-app .logos-btn {
   box-sizing: border-box;
   border: 1px solid transparent;
   font: inherit;
@@ -1610,19 +1610,19 @@ body {
     opacity 0.15s ease,
     transform 0.05s ease;
 }
-.alice-pro-app .alice-btn:focus-visible {
+.logos-pro-app .logos-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.alice-pro-app .alice-btn:disabled,
-.alice-pro-app .alice-btn[aria-disabled="true"] {
+.logos-pro-app .logos-btn:disabled,
+.logos-pro-app .logos-btn[aria-disabled="true"] {
   cursor: not-allowed;
   opacity: 0.55;
 }
-.alice-pro-app .alice-btn:active:not(:disabled) {
+.logos-pro-app .logos-btn:active:not(:disabled) {
   transform: translateY(1px);
 }
-.alice-pro-app .header-btn.alice-btn {
+.logos-pro-app .header-btn.logos-btn {
   width: 38px;
   height: 38px;
   min-width: 38px;
@@ -1637,11 +1637,11 @@ body {
   justify-content: center;
   flex: 0 0 38px;
 }
-.alice-pro-app .header-btn.alice-btn:hover {
+.logos-pro-app .header-btn.logos-btn:hover {
   background: rgba(255, 255, 255, 0.3);
 }
 @media (max-width: 768px) {
-  .alice-pro-app .header-btn.alice-btn {
+  .logos-pro-app .header-btn.logos-btn {
     width: 36px;
     height: 36px;
     min-width: 36px;
@@ -1651,27 +1651,27 @@ body {
 }
 
 /* === SYSTEM STATUS MODULE === */
-.alice-pro-app #system-status-btn {
+.logos-pro-app #system-status-btn {
   position: relative;
   font-size: 18px;
 }
-.alice-pro-app #system-status-btn[data-state="ready"] {
+.logos-pro-app #system-status-btn[data-state="ready"] {
   color: #34c759;
 }
-.alice-pro-app #system-status-btn[data-state="running"],
-.alice-pro-app #system-status-btn[data-state="waiting"] {
+.logos-pro-app #system-status-btn[data-state="running"],
+.logos-pro-app #system-status-btn[data-state="waiting"] {
   color: #ffcc00;
 }
-.alice-pro-app #system-status-btn[data-state="degraded"] {
+.logos-pro-app #system-status-btn[data-state="degraded"] {
   color: #ff9500;
 }
-.alice-pro-app #system-status-btn[data-state="blocked"],
-.alice-pro-app #system-status-btn[data-state="revoked"],
-.alice-pro-app #system-status-btn[data-state="error"] {
+.logos-pro-app #system-status-btn[data-state="blocked"],
+.logos-pro-app #system-status-btn[data-state="revoked"],
+.logos-pro-app #system-status-btn[data-state="error"] {
   color: #ff3b30;
 }
 
-.alice-pro-app .alice-system-status-panel {
+.logos-pro-app .logos-system-status-panel {
   position: fixed;
   inset: 0;
   z-index: 100010;
@@ -1681,11 +1681,11 @@ body {
   padding: calc(68px + env(safe-area-inset-top, 0px)) 12px 12px;
   background: rgba(0, 0, 0, 0.28);
 }
-.alice-pro-app .alice-system-status-panel[hidden] {
+.logos-pro-app .logos-system-status-panel[hidden] {
   display: none;
 }
 
-.alice-pro-app .alice-system-status-content {
+.logos-pro-app .logos-system-status-content {
   width: min(360px, 100%);
   max-height: calc(100dvh - 92px);
   overflow-y: auto;
@@ -1696,18 +1696,18 @@ body {
   color: var(--text-main);
   box-shadow: 0 10px 32px rgba(0, 0, 0, 0.24);
 }
-.alice-pro-app .alice-system-status-header {
+.logos-pro-app .logos-system-status-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
 }
-.alice-pro-app .alice-system-status-header h2 {
+.logos-pro-app .logos-system-status-header h2 {
   font-size: 16px;
   margin: 0;
 }
-.alice-pro-app .alice-system-status-close {
+.logos-pro-app .logos-system-status-close {
   width: 32px;
   height: 32px;
   padding: 0;
@@ -1715,12 +1715,12 @@ body {
   background: var(--btn-bg);
   color: var(--text-main);
 }
-.alice-pro-app .alice-system-status-list {
+.logos-pro-app .logos-system-status-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.alice-pro-app .alice-system-status-row {
+.logos-pro-app .logos-system-status-row {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr) auto;
   align-items: center;
@@ -1730,45 +1730,45 @@ body {
   border-radius: 10px;
   background: var(--bg-app);
 }
-.alice-pro-app .alice-system-status-row[data-status="error"],
-.alice-pro-app .alice-system-status-row[data-status="revoked"],
-.alice-pro-app .alice-system-status-row[data-status="blocked"] {
+.logos-pro-app .logos-system-status-row[data-status="error"],
+.logos-pro-app .logos-system-status-row[data-status="revoked"],
+.logos-pro-app .logos-system-status-row[data-status="blocked"] {
   border-color: var(--danger);
 }
-.alice-pro-app .alice-system-status-indicator {
+.logos-pro-app .logos-system-status-indicator {
   font-size: 14px;
   line-height: 1;
 }
-.alice-pro-app .alice-system-status-row[data-status="ready"] .alice-system-status-indicator {
+.logos-pro-app .logos-system-status-row[data-status="ready"] .logos-system-status-indicator {
   color: #34c759;
 }
-.alice-pro-app .alice-system-status-row[data-status="running"] .alice-system-status-indicator,
-.alice-pro-app .alice-system-status-row[data-status="waiting"] .alice-system-status-indicator {
+.logos-pro-app .logos-system-status-row[data-status="running"] .logos-system-status-indicator,
+.logos-pro-app .logos-system-status-row[data-status="waiting"] .logos-system-status-indicator {
   color: #ffcc00;
 }
-.alice-pro-app .alice-system-status-row[data-status="degraded"] .alice-system-status-indicator {
+.logos-pro-app .logos-system-status-row[data-status="degraded"] .logos-system-status-indicator {
   color: #ff9500;
 }
-.alice-pro-app .alice-system-status-row[data-status="error"] .alice-system-status-indicator,
-.alice-pro-app .alice-system-status-row[data-status="revoked"] .alice-system-status-indicator,
-.alice-pro-app .alice-system-status-row[data-status="blocked"] .alice-system-status-indicator {
+.logos-pro-app .logos-system-status-row[data-status="error"] .logos-system-status-indicator,
+.logos-pro-app .logos-system-status-row[data-status="revoked"] .logos-system-status-indicator,
+.logos-pro-app .logos-system-status-row[data-status="blocked"] .logos-system-status-indicator {
   color: #ff3b30;
 }
-.alice-pro-app .alice-system-status-text {
+.logos-pro-app .logos-system-status-text {
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.alice-pro-app .alice-system-status-text strong {
+.logos-pro-app .logos-system-status-text strong {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.alice-pro-app .alice-system-status-text span {
+.logos-pro-app .logos-system-status-text span {
   color: var(--text-secondary);
   font-size: 12px;
 }
-.alice-pro-app .alice-system-status-revoke {
+.logos-pro-app .logos-system-status-revoke {
   padding: 6px 8px;
   border-radius: 7px;
   background: var(--btn-bg);
@@ -1776,29 +1776,29 @@ body {
   font-size: 11px;
 }
 
-.alice-pro-app .file-manager-vs-create-btn,
-.alice-pro-app .file-manager-vs-refresh-btn {
+.logos-pro-app .file-manager-vs-create-btn,
+.logos-pro-app .file-manager-vs-refresh-btn {
   padding: 6px 12px;
   border-radius: 4px;
   font-size: 12px;
 }
-.alice-pro-app .file-manager-vs-create-btn {
+.logos-pro-app .file-manager-vs-create-btn {
   border: 0;
   background: var(--m-accent, #4a90d9);
   color: #fff;
 }
-.alice-pro-app .file-manager-vs-refresh-btn {
+.logos-pro-app .file-manager-vs-refresh-btn {
   border: 1px solid var(--m-border, #ddd);
   background: var(--m-card, #fff);
   color: var(--m-text, #222);
 }
 
-.alice-pro-app .execution-surface {
+.logos-pro-app .execution-surface {
   margin: 4px 0;
   font-size: 12px;
   color: var(--text-secondary, inherit);
 }
-.alice-pro-app .execution-surface-stages {
+.logos-pro-app .execution-surface-stages {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -1806,18 +1806,18 @@ body {
   padding: 0;
   list-style: none;
 }
-.alice-pro-app .execution-surface-stages li {
+.logos-pro-app .execution-surface-stages li {
   padding: 1px 8px;
   border-radius: 999px;
   border: 1px solid currentColor;
   opacity: 0.5;
 }
-.alice-pro-app .execution-surface-stages li[data-status="done"],
-.alice-pro-app .execution-surface-stages li[data-status="active"] {
+.logos-pro-app .execution-surface-stages li[data-status="done"],
+.logos-pro-app .execution-surface-stages li[data-status="active"] {
   opacity: 1;
 }
-.alice-pro-app .execution-surface-blocker,
-.alice-pro-app .execution-surface[data-state="error"] .execution-surface-summary,
-.alice-pro-app .execution-surface[data-state="timeout"] .execution-surface-summary {
+.logos-pro-app .execution-surface-blocker,
+.logos-pro-app .execution-surface[data-state="error"] .execution-surface-summary,
+.logos-pro-app .execution-surface[data-state="timeout"] .execution-surface-summary {
   color: var(--danger);
 }

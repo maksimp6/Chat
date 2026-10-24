@@ -60,11 +60,11 @@
     },
     {
       "id": "a1mini-oem-holder-pr",
-      "name": "alice_stock_spool_replacement_v03_A1mini.3mf",
+      "name": "logos_stock_spool_replacement_v03_A1mini.3mf",
       "kind": "geometry",
       "location": "other_pr",
       "pr": 1110,
-      "path": "printing3d/assets/spool_holder/alice_stock_spool_replacement_v03_A1mini.3mf",
+      "path": "printing3d/assets/spool_holder/logos_stock_spool_replacement_v03_A1mini.3mf",
       "bytes": 106016,
       "sha256": "21fe9c783b15d00421dfb39dd0c79666ac1fe6f8bb672eaec1c0e86decdbbf84",
       "format": "3MF",
@@ -74,7 +74,7 @@
     },
     {
       "id": "a1mini-oem-holder-library",
-      "name": "Alice_A1_mini_spool_holder_v03_unsliced.3mf",
+      "name": "Logos_A1_mini_spool_holder_v03_unsliced.3mf",
       "kind": "geometry",
       "location": "chatgpt_library",
       "bytes": 105937,
@@ -85,7 +85,7 @@
     },
     {
       "id": "a1mini-oem-source-archive",
-      "name": "alice_stock_spool_replacement_v03.zip",
+      "name": "logos_stock_spool_replacement_v03.zip",
       "kind": "source-archive",
       "location": "chatgpt_library_and_google_drive",
       "bytes": 422852,
@@ -93,7 +93,7 @@
       "format": "ZIP",
       "print_status": "not_sliced",
       "members_of_interest": [
-        "alice_stock_spool_replacement_v03.py",
+        "logos_stock_spool_replacement_v03.py",
         "geometry_checks.py",
         "half_shell_A.step",
         "half_shell_B.step",
@@ -104,7 +104,7 @@
     },
     {
       "id": "a1mini-oem-source-copy",
-      "name": "alice_stock_spool_replacement_v03(1).zip",
+      "name": "logos_stock_spool_replacement_v03(1).zip",
       "kind": "source-archive-copy",
       "location": "chatgpt_library",
       "bytes": 422852,
@@ -115,7 +115,7 @@
     },
     {
       "id": "petg-holder-v01-archive",
-      "name": "alice_petg_spool_holder_v01.zip",
+      "name": "logos_petg_spool_holder_v01.zip",
       "kind": "source-archive",
       "location": "chatgpt_library_and_google_drive",
       "bytes": 118099,
@@ -123,7 +123,7 @@
       "format": "ZIP",
       "print_status": "not_sliced",
       "members_of_interest": [
-        "alice_pro_spool_holder_petg.py",
+        "logos_pro_spool_holder_petg.py",
         "base_frame.stl",
         "upright_A_print_twice.stl",
         "axle_D_section.stl"
@@ -132,7 +132,7 @@
     },
     {
       "id": "petg-holder-v02-archive",
-      "name": "alice_petg_spool_holder_v02.zip",
+      "name": "logos_petg_spool_holder_v02.zip",
       "kind": "source-archive",
       "location": "chatgpt_library",
       "bytes": 156814,
@@ -186,7 +186,7 @@
     },
     {
       "id": "pla-cube-stl",
-      "name": "alice_cube_20mm.stl",
+      "name": "logos_cube_20mm.stl",
       "kind": "test-fixture",
       "location": "chatgpt_library",
       "bytes": 684,
@@ -196,7 +196,7 @@
     },
     {
       "id": "pla-cube-stl-alternate",
-      "name": "Alice_cube_20mm(1).stl",
+      "name": "Logos_cube_20mm(1).stl",
       "kind": "test-fixture",
       "location": "chatgpt_library",
       "bytes": 684,
@@ -206,7 +206,7 @@
     },
     {
       "id": "pla-cube-stl-duplicate",
-      "name": "Alice_cube_20mm(2).stl",
+      "name": "Logos_cube_20mm(2).stl",
       "kind": "test-fixture-copy",
       "location": "chatgpt_library",
       "bytes": 684,
@@ -217,7 +217,7 @@
     },
     {
       "id": "pla-cube-gcode",
-      "name": "Alice_Cube_20mm_Generic_PLA_A1mini.gcode.3mf",
+      "name": "Logos_Cube_20mm_Generic_PLA_A1mini.gcode.3mf",
       "kind": "sliced-test-job",
       "location": "chatgpt_library_and_github_actions_artifact",
       "bytes": 46682,

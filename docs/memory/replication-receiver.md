@@ -37,5 +37,5 @@ limits. Compaction/retention/snapshot lifecycle requires its own subsequent slic
 Tests cover durable reopen/lost ACK retry, malformed/authentication failures,
 transaction atomicity, sequencing, divergence, failed fsync/reconfirmation,
 concurrent duplicates, initial local-state rejection and later local mutation.
-The independent core workflow includes these tests without Alice dependencies.
+The independent core workflow includes these tests without Logos dependencies.
 No hardware, network or live Memory DB replication claim follows from unit tests.

@@ -12,12 +12,12 @@ remote_input_active() {
         [ -e "$ROOT/synthetic_active" ]
         return $?
     fi
-    if [ -r /proc/bus/input/devices ] && grep -q 'Name="Alice RDC Virtual Mouse"' /proc/bus/input/devices; then
+    if [ -r /proc/bus/input/devices ] && grep -q 'Name="Logos RDC Virtual Mouse"' /proc/bus/input/devices; then
         return 0
     fi
-    pidof alice_uinput_mouse >/dev/null 2>&1 && return 0
+    pidof logos_uinput_mouse >/dev/null 2>&1 && return 0
     pidof mouse >/dev/null 2>&1 && return 0
-    pidof alice_mouse_daemon_locked >/dev/null 2>&1 && return 0
+    pidof logos_mouse_daemon_locked >/dev/null 2>&1 && return 0
     return 1
 }
 

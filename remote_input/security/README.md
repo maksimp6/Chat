@@ -1,4 +1,4 @@
-# Alice Input Security v1 — isolated protocol
+# Logos Input Security v1 — isolated protocol
 
 Refs #1085 and #650. This module defines owner/device-bound signed grants shared by mouse and keyboard. It is a test-only protocol boundary, **not a production root service**.
 

@@ -1,4 +1,4 @@
-# Alice Pro — Local 3D Model Editor (MVP)
+# Logos Pro — Local 3D Model Editor (MVP)
 
 Related: [engineering #1079](https://github.com/maksimp6/Chat/issues/1079),
 [Model API #1097](https://github.com/maksimp6/Chat/issues/1097),
@@ -6,7 +6,7 @@ Related: [engineering #1079](https://github.com/maksimp6/Chat/issues/1079),
 
 ## What works
 
-The editor registers six **local** Universal Tools in Alice's existing `3d` category
+The editor registers six **local** Universal Tools in Logos's existing `3d` category
 (`tool_registry.py`). They use the same Responses API, local-agent, and MCP
 transports and normal Invocation/Execution Trace pipeline as other local tools.
 
@@ -40,7 +40,7 @@ Scenes are JSON, immutable and content-addressed by revision SHA-256:
 `model_editor/<hash of trusted owner and runtime>/<uuid>/revisions/<sha256>.json`.
 Exports are under `.../exports/<revision>.stl`. The storage provider is
 resolved via `storage_provider_from_env`: local `data/storage` by default,
-`ALICE_STORAGE_LOCAL_ROOT` for a mounted persistent volume, or the existing
+`LOGOS_STORAGE_LOCAL_ROOT` for a mounted persistent volume, or the existing
 Cloud.ru storage provider when configured. **Production must provision durable
 storage/backups**; the default container filesystem is not a durability guarantee.
 

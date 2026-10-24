@@ -19,7 +19,7 @@ def test_yandex_client_does_not_read_config_api_key():
 def test_yandex_request_path_requires_runtime_credential_store():
     mixin = (ROOT / "yandex_client_modules/request_mixin.py").read_text()
     assert "resolve_client_credential(" in mixin
-    assert "ALICE_PROVIDER_CREDENTIAL_KEY" in mixin
+    assert "LOGOS_PROVIDER_CREDENTIAL_KEY" in mixin
     assert 'resolve_client_credential(client._config, provider="yandex")' not in mixin
 
 

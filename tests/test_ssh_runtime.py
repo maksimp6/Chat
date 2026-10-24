@@ -12,11 +12,11 @@ class SSHRuntimeTests(unittest.TestCase):
                 "preview": {
                     "host": "preview.example",
                     "port": 2222,
-                    "default_user": "alice-agent",
-                    "allowed_users": ["alice-agent", "deploy"],
-                    "identity_map": {"owner-1": "alice-agent"},
-                    "workspace_root": "/srv/alice",
-                    "identity_file": "/keys/alice",
+                    "default_user": "logos-agent",
+                    "allowed_users": ["logos-agent", "deploy"],
+                    "identity_map": {"owner-1": "logos-agent"},
+                    "workspace_root": "/srv/logos",
+                    "identity_file": "/keys/logos",
                     "known_hosts": "/keys/known_hosts",
                     "command_timeout_seconds": 15,
                 }
@@ -34,8 +34,8 @@ class SSHRuntimeTests(unittest.TestCase):
             identity_id="owner-1",
         )
         argv = run.call_args.args[0]
-        self.assertEqual(result["linux_user"], "alice-agent")
-        self.assertIn("alice-agent@preview.example", argv)
+        self.assertEqual(result["linux_user"], "logos-agent")
+        self.assertIn("logos-agent@preview.example", argv)
         self.assertIn("StrictHostKeyChecking=yes", argv)
         self.assertIn("IdentitiesOnly=yes", argv)
         self.assertIn("UserKnownHostsFile=/keys/known_hosts", argv)
@@ -50,7 +50,7 @@ class SSHRuntimeTests(unittest.TestCase):
         run.return_value.stderr = ""
         result = self.runtime().write_file(
             target="preview",
-            path="/srv/alice/config.py",
+            path="/srv/logos/config.py",
             content="VALUE = 1\n",
             identity_id="owner-1",
         )
@@ -80,15 +80,15 @@ class SSHRuntimeTests(unittest.TestCase):
     def test_trusted_identity_maps_to_linux_user(self):
         with patch("remote_runtime.ssh.subprocess.run") as run:
             run.return_value.returncode = 0
-            run.return_value.stdout = "alice-agent\\n"
+            run.return_value.stdout = "logos-agent\\n"
             run.return_value.stderr = ""
             result = self.runtime().execute(
                 target="preview",
                 command="id -un",
                 identity_id="owner-1",
             )
-            self.assertEqual(result["linux_user"], "alice-agent")
-            self.assertIn("alice-agent@preview.example", run.call_args.args[0])
+            self.assertEqual(result["linux_user"], "logos-agent")
+            self.assertIn("logos-agent@preview.example", run.call_args.args[0])
 
     def test_unmapped_trusted_identity_is_rejected(self):
         with self.assertRaises(SSHRuntimeError):
@@ -141,15 +141,15 @@ class SSHRuntimeTests(unittest.TestCase):
             run.return_value.stderr = ""
             result = self.runtime().read_file(
                 target="preview",
-                path="/srv/alice/project/../config.py",
+                path="/srv/logos/project/../config.py",
                 identity_id="owner-1",
             )
             self.assertTrue(result["success"])
-            self.assertEqual(result["path"], "/srv/alice/config.py")
+            self.assertEqual(result["path"], "/srv/logos/config.py")
 
     def test_missing_known_hosts_is_rejected(self):
         runtime = SSHRuntime(
-            {"preview": {"host": "preview.example", "default_user": "alice-agent"}}
+            {"preview": {"host": "preview.example", "default_user": "logos-agent"}}
         )
         with self.assertRaises(SSHRuntimeError):
             runtime.execute(target="preview", command="id -un")

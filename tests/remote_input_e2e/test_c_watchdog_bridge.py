@@ -20,7 +20,7 @@ def test_c_runner_releases_key_after_client_stall():
     assert DRIVER.is_file() and HEADER.is_file(), "Keyboard #1091 must be integrated"
     cc = shutil.which("clang") or shutil.which("cc")
     assert cc
-    with tempfile.TemporaryDirectory(prefix="alice-watchdog-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="logos-watchdog-") as tmp:
         source = Path(tmp) / "harness.c"
         executable = Path(tmp) / "harness"
         source.write_text(

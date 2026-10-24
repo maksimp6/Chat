@@ -107,7 +107,7 @@ def test_model_modal_complete_dom_shape():
                     (
                         "button",
                         (
-                            ("class", "alice-btn"),
+                            ("class", "logos-btn"),
                             ("data-action", "modal.close"),
                             ("data-modal", "model-modal"),
                             ("id", "close-modal"),
@@ -147,7 +147,7 @@ def test_memory_modal_complete_dom_shape():
                         "button",
                         (
                             ("aria-label", "Закрыть"),
-                            ("class", "memory-modal-close alice-btn"),
+                            ("class", "memory-modal-close logos-btn"),
                             ("data-action", "modal.close"),
                             ("data-modal", "memoryModal"),
                             ("id", "memoryCloseBtn"),
@@ -202,7 +202,7 @@ def test_memory_modal_complete_dom_shape():
                             (
                                 "button",
                                 (
-                                    ("class", "memory-clear-btn alice-btn"),
+                                    ("class", "memory-clear-btn logos-btn"),
                                     ("id", "memoryClearBtn"),
                                     ("type", "button"),
                                 ),
@@ -444,9 +444,9 @@ def test_canonical_modal_css_has_complete_layout_contract():
             declarations[name.strip()] = value.strip()
         return declarations
 
-    root = rule(".alice-pro-app .modal")
-    visible = rule(".alice-pro-app .modal.visible")
-    content = rule(".alice-pro-app .modal-content")
+    root = rule(".logos-pro-app .modal")
+    visible = rule(".logos-pro-app .modal.visible")
+    content = rule(".logos-pro-app .modal-content")
 
     assert root["display"] == "none"
     assert root["position"] == "fixed"
@@ -480,12 +480,12 @@ def test_feature_modal_roots_cannot_override_canonical_layout():
         "overflow-y",
     }
     selectors = {
-        ".alice-pro-app .treasury-modal",
-        ".alice-pro-app .memory-modal",
-        ".alice-pro-app .provider-credentials-modal",
-        ".alice-pro-app .cloudru-iam-modal",
-        ".alice-pro-app .file-manager-modal",
-        ".alice-pro-app .file-manager-add-modal",
+        ".logos-pro-app .treasury-modal",
+        ".logos-pro-app .memory-modal",
+        ".logos-pro-app .provider-credentials-modal",
+        ".logos-pro-app .cloudru-iam-modal",
+        ".logos-pro-app .file-manager-modal",
+        ".logos-pro-app .file-manager-add-modal",
     }
     rules = dict(parse_css_rules())
     for selector in selectors:
@@ -497,12 +497,12 @@ def test_feature_modal_roots_cannot_override_canonical_layout():
 def test_feature_modal_content_uses_canonical_content_shell():
     rules = dict(parse_css_rules())
     content_classes = {
-        ".alice-pro-app .treasury-modal-content",
-        ".alice-pro-app .memory-modal-content",
-        ".alice-pro-app .provider-credentials-box",
-        ".alice-pro-app .cloudru-iam-box",
-        ".alice-pro-app .file-manager-box",
-        ".alice-pro-app .file-manager-add-box",
+        ".logos-pro-app .treasury-modal-content",
+        ".logos-pro-app .memory-modal-content",
+        ".logos-pro-app .provider-credentials-box",
+        ".logos-pro-app .cloudru-iam-box",
+        ".logos-pro-app .file-manager-box",
+        ".logos-pro-app .file-manager-add-box",
     }
     forbidden = {"position", "width", "max-width", "max-height", "overflow", "overflow-y"}
     for selector in content_classes:
@@ -517,7 +517,7 @@ def test_modal_responsive_css_only_adjusts_shared_content_shell():
 
     css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
     media = re.search(
-        r"@media\s*\(max-width:\s*768px\)\s*\{\s*\.alice-pro-app \.modal-content\s*\{([^{}]*)\}",
+        r"@media\s*\(max-width:\s*768px\)\s*\{\s*\.logos-pro-app \.modal-content\s*\{([^{}]*)\}",
         css,
         flags=re.S,
     )
@@ -768,15 +768,15 @@ def test_dynamic_modal_code_uses_canonical_modal_api():
             r"""(?:className\s*=\s*['"][^'"]*\bmodal\b|classList\.add\([^)]*['"]modal['"])""",
             source,
         ):
-            # Local aliases (for example `const UI = window.AliceCoreAPI.ui`) are canonical too.
+            # Local aliases (for example `const UI = window.LogosCoreAPI.ui`) are canonical too.
             if not re.search(
-                r"\b(?:window\.AliceCoreAPI\.ui|[A-Za-z_$][\w$]*)\.modal\.create\s*\(", source
+                r"\b(?:window\.LogosCoreAPI\.ui|[A-Za-z_$][\w$]*)\.modal\.create\s*\(", source
             ):
                 line = source.count("\n", 0, match.start()) + 1
                 violations.append(f"{path.relative_to(ROOT)}:{line}")
 
     assert not violations, (
-        "dynamic modal roots must be created through AliceCoreAPI.ui.modal.create():\n"
+        "dynamic modal roots must be created through LogosCoreAPI.ui.modal.create():\n"
         + "\n".join(violations)
     )
 

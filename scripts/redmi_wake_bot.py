@@ -30,8 +30,8 @@ MENU_UNLOCK = "KEYCODE_MENU"
 
 # Package-name fragments used to resolve an app by a spoken word.
 PACKAGE_HINTS: dict[str, tuple[str, ...]] = {
-    "алис": ("alice", "yandex"),
-    "alice": ("alice", "yandex"),
+    "алис": ("logos", "yandex"),
+    "logos": ("logos", "yandex"),
     "logos": ("logos", "chat"),
     "яндекс": ("yandex",),
 }

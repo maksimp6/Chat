@@ -53,7 +53,7 @@ def _git_repo(tmp_path):
 
 
 def _write_runtime(repo, revision):
-    (repo / "alice_runtime.py").write_text(
+    (repo / "logos_runtime.py").write_text(
         f'''STATE = []
 class Application:
     def invoke(self, operation, payload):
@@ -68,9 +68,9 @@ def create_runtime(host):
 
 def _setup(tmp_path, monkeypatch):
     repo, master_sha, one_sha, two_sha = _git_repo(tmp_path)
-    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
-    monkeypatch.setenv("ALICE_ENV_REPO_ROOT", str(repo))
-    monkeypatch.setenv("ALICE_ENV_RUNTIME_ROOT", str(tmp_path / "runtimes"))
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "logos.db"))
+    monkeypatch.setenv("LOGOS_ENV_REPO_ROOT", str(repo))
+    monkeypatch.setenv("LOGOS_ENV_RUNTIME_ROOT", str(tmp_path / "runtimes"))
     db.init_db()
     init_environment_tables()
     return repo, master_sha, one_sha, two_sha
@@ -196,7 +196,7 @@ def test_revision_dispatch_rejects_missing_runtime():
 
 
 def _runtime_for_prepare_failure(tmp_path, monkeypatch, commit_sha="a" * 40):
-    monkeypatch.setenv("ALICE_ENV_RUNTIME_ROOT", str(tmp_path / "runtimes"))
+    monkeypatch.setenv("LOGOS_ENV_RUNTIME_ROOT", str(tmp_path / "runtimes"))
     runtime = environment_manager.EnvironmentRuntime(
         {
             "environment_id": "runtime-prepare-failure",
@@ -226,7 +226,7 @@ def test_runtime_prepare_rejects_dirty_snapshot(tmp_path, monkeypatch):
         if args[:2] == ("rev-parse", "HEAD"):
             return expected
         if args[:2] == ("status", "--porcelain"):
-            return " M alice_runtime.py"
+            return " M logos_runtime.py"
         raise AssertionError(args)
 
     monkeypatch.setattr(environment_manager, "_run_git", fake_git)

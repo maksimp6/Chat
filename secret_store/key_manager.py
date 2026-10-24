@@ -61,11 +61,11 @@ def _iso(value: datetime) -> str:
 
 def _manager_key() -> bytes:
     raw = (
-        os.getenv("ALICE_KEY_MANAGER_KEY") or os.getenv("ALICE_PROVIDER_CREDENTIAL_KEY") or ""
+        os.getenv("LOGOS_KEY_MANAGER_KEY") or os.getenv("LOGOS_PROVIDER_CREDENTIAL_KEY") or ""
     ).strip()
     if not raw:
         raise KeyManagerError(
-            "Set ALICE_KEY_MANAGER_KEY (or ALICE_PROVIDER_CREDENTIAL_KEY) to a Fernet key"
+            "Set LOGOS_KEY_MANAGER_KEY (or LOGOS_PROVIDER_CREDENTIAL_KEY) to a Fernet key"
         )
     try:
         return raw.encode("ascii")

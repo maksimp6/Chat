@@ -14,15 +14,15 @@ scope metadata, not a remote-origin/authentication check.
 ```sh
 python scripts/build_ai_index.py \
   --root . --revision HEAD --repository maksimp6/Chat \
-  --output /tmp/alice-python-index.json --compact
+  --output /tmp/logos-python-index.json --compact
 
 python scripts/build_ai_index.py \
   --root . --revision HEAD --repository maksimp6/Chat \
-  --previous-index /tmp/alice-python-index.json \
-  --output /tmp/alice-python-index.json --compact
+  --previous-index /tmp/logos-python-index.json \
+  --output /tmp/logos-python-index.json --compact
 
 python scripts/build_ai_index.py \
-  --index-file /tmp/alice-python-index.json \
+  --index-file /tmp/logos-python-index.json \
   --query-affected agent_retrieval/service.py --compact
 ```
 
@@ -133,7 +133,7 @@ this command does not repair or expand the clone automatically.
 ## Reproducible local benchmark
 
 ```sh
-python scripts/bench_ai_index.py --iterations 20 > /tmp/alice-index-benchmark.json
+python scripts/bench_ai_index.py --iterations 20 > /tmp/logos-index-benchmark.json
 python -m pytest -q tests/test_ai_index_benchmark.py
 ```
 

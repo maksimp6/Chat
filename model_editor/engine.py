@@ -1,4 +1,4 @@
-"""Bounded, deterministic primitive geometry for the Alice Pro local 3D editor.
+"""Bounded, deterministic primitive geometry for the Logos Pro local 3D editor.
 
 No user-defined code, plugin loading, subprocess, network or printer interaction.
 """
@@ -326,7 +326,7 @@ def export_stl(scene: dict[str, Any]) -> bytes:
     if not faces:
         raise ValueError("cannot export empty model")
     data = io.BytesIO()
-    data.write(b"Alice Pro Model Editor STL v1".ljust(80, b" "))
+    data.write(b"Logos Pro Model Editor STL v1".ljust(80, b" "))
     data.write(struct.pack("<I", len(faces)))
     for a, b, c in faces:
         u = [b[i] - a[i] for i in range(3)]

@@ -1,6 +1,6 @@
 """Immutable owner-scoped 3D scene versions and STL artifacts.
 
-Uses Alice's configured StorageProvider. No caller-provided paths or owners.
+Uses Logos's configured StorageProvider. No caller-provided paths or owners.
 """
 
 from __future__ import annotations

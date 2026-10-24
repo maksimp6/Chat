@@ -54,7 +54,7 @@ def _bearer_token() -> Optional[str]:
 
 
 def _require_bootstrap() -> None:
-    expected = os.getenv("ALICE_LOCAL_AGENT_BOOTSTRAP_TOKEN", "").strip()
+    expected = os.getenv("LOGOS_LOCAL_AGENT_BOOTSTRAP_TOKEN", "").strip()
     token = _bearer_token()
     if not expected or not token or not secrets.compare_digest(token, expected):
         raise PermissionError("local-agent registration is not authorized")

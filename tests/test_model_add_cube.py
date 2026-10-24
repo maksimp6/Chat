@@ -1,4 +1,4 @@
-"""Offline tests for the first Alice Pro model tool."""
+"""Offline tests for the first Logos Pro model tool."""
 
 import hashlib
 import math

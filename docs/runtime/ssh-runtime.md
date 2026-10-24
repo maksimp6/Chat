@@ -6,8 +6,8 @@ Logos keeps SSH Runtime configuration as a server-side structured setting under 
 
 When no saved configuration exists, the Runtime bootstraps from:
 
-- `ALICE_SSH_TARGETS_JSON`
-- `ALICE_SSH_KNOWN_HOSTS`
+- `LOGOS_SSH_TARGETS_JSON`
+- `LOGOS_SSH_KNOWN_HOSTS`
 
 After the settings are saved through the UI/API, the persisted configuration becomes authoritative.
 
@@ -62,18 +62,18 @@ The target must already exist in the saved configuration. The test executes only
   "allow_privileged_operations": false,
   "approval_required_for_write": true,
   "approval_required_for_privileged": true,
-  "known_hosts": "/srv/alice/ssh/known_hosts",
+  "known_hosts": "/srv/logos/ssh/known_hosts",
   "targets": {
     "preview": {
       "host": "preview.example",
       "port": 22,
-      "default_user": "alice-agent",
-      "allowed_users": ["alice-agent"],
+      "default_user": "logos-agent",
+      "allowed_users": ["logos-agent"],
       "identity_map": {
-        "<alice-owner-id>": "alice-agent"
+        "<logos-owner-id>": "logos-agent"
       },
-      "workspace_root": "/srv/alice",
-      "identity_file": "/srv/alice/keys/preview",
+      "workspace_root": "/srv/logos",
+      "identity_file": "/srv/logos/keys/preview",
       "connect_timeout_seconds": 5,
       "command_timeout_seconds": 30,
       "max_output_bytes": 1048576

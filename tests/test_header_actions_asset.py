@@ -39,5 +39,5 @@ def test_header_actions_are_bound_by_local_asset():
 def test_header_action_registration_is_idempotent():
     script = (ROOT / "static" / "header_actions.js").read_text(encoding="utf-8")
 
-    assert "window.__aliceHeaderActionsBound === true" in script
-    assert "window.__aliceHeaderActionsBound = true" in script
+    assert "window.__logosHeaderActionsBound === true" in script
+    assert "window.__logosHeaderActionsBound = true" in script

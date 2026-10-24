@@ -14,9 +14,9 @@ from forge.binding import printing_store
 
 
 def test_chat_repository_defaults_and_reset_are_durable(tmp_path, monkeypatch):
-    monkeypatch.delenv("ALICE_MEMORY_PATH")
+    monkeypatch.delenv("LOGOS_MEMORY_PATH")
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "legacy-name.db"))
-    assert db.memory_file_path() == tmp_path / "alice.memory"
+    assert db.memory_file_path() == tmp_path / "logos.memory"
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "explicit.memory"))
     assert db.memory_file_path() == tmp_path / "explicit.memory"
     assert db.is_memory_configured()
@@ -65,7 +65,7 @@ def test_native_delete_never_ignores_writer_failure_or_partial_state(tmp_path, m
 def test_department_archive_is_persisted(monkeypatch):
     import organization.departments as departments
 
-    monkeypatch.setenv("ALICE_DEPARTMENTS_ADMIN_TOKEN", "test-admin")
+    monkeypatch.setenv("LOGOS_DEPARTMENTS_ADMIN_TOKEN", "test-admin")
     departments.upsert_department({"id": "test", "name": "Test"})
     app = Flask(__name__)
     app.register_blueprint(departments.departments_bp)
@@ -80,7 +80,7 @@ def test_department_archive_is_persisted(monkeypatch):
 def test_keys_keep_unique_identity_and_missing_keys_fail(monkeypatch):
     import secret_store.key_manager as keys
 
-    monkeypatch.setenv("ALICE_KEY_MANAGER_KEY", base64.urlsafe_b64encode(b"1" * 32).decode())
+    monkeypatch.setenv("LOGOS_KEY_MANAGER_KEY", base64.urlsafe_b64encode(b"1" * 32).decode())
     keys.create_schema(db.get_store())
     keys.store_secret(
         secret="test-secret", name="key", purpose="test", provider="local", key_ref="fixed"
@@ -345,7 +345,7 @@ def test_native_budget_daily_rollover_and_cooldown_are_durable():
 def test_local_agent_heartbeat_lease_recovery_and_result_authority(monkeypatch):
     import agent_runtime.local_gateway as gateway
 
-    monkeypatch.setenv("ALICE_LOCAL_AGENT_BOOTSTRAP_TOKEN", "bootstrap")
+    monkeypatch.setenv("LOGOS_LOCAL_AGENT_BOOTSTRAP_TOKEN", "bootstrap")
     app = Flask(__name__)
     app.register_blueprint(gateway.local_agent_bp)
     client = app.test_client()
@@ -394,7 +394,7 @@ def test_provider_clients_use_same_native_credential_writer(monkeypatch):
     import provider_accounts.credentials_routes as routes
     from yandex_client_modules.request_mixin import _resolve_global_provider_credential
 
-    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIAL_KEY", Fernet.generate_key().decode())
+    monkeypatch.setenv("LOGOS_PROVIDER_CREDENTIAL_KEY", Fernet.generate_key().decode())
     assert routes._load_credential("yandex") is None
     replace_active_credential(
         db.get_store(), "test-native-api-key", "project", encrypt_secret, "yandex"
@@ -513,7 +513,7 @@ def test_quota_disable_between_policy_read_and_admission_prevents_reservation(mo
 
 
 def test_implicit_startup_never_hides_existing_legacy_authority(tmp_path, monkeypatch):
-    monkeypatch.delenv("ALICE_MEMORY_PATH")
+    monkeypatch.delenv("LOGOS_MEMORY_PATH")
     path = tmp_path / "legacy.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
     evidence = b"legacy immutable evidence"
@@ -521,8 +521,8 @@ def test_implicit_startup_never_hides_existing_legacy_authority(tmp_path, monkey
     with pytest.raises(KristallError, match="explicit verified native activation"):
         db.init_db()
     assert path.read_bytes() == evidence
-    assert not path.with_name("alice.memory").exists()
+    assert not path.with_name("logos.memory").exists()
     native = tmp_path / "accepted.memory"
-    monkeypatch.setenv("ALICE_MEMORY_PATH", str(native))
+    monkeypatch.setenv("LOGOS_MEMORY_PATH", str(native))
     db.set_config("accepted", True)
     assert native.is_file() and path.read_bytes() == evidence

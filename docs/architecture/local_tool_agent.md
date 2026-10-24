@@ -26,7 +26,7 @@ Universal Tool Registry / local executor
 На Cloud.ru задаётся:
 
 \`\`\`env
-ALICE_LOCAL_AGENT_BOOTSTRAP_TOKEN=<long-random-secret>
+LOGOS_LOCAL_AGENT_BOOTSTRAP_TOKEN=<long-random-secret>
 \`\`\`
 
 Телефон использует bootstrap token для \`POST /api/local-agents/register\`. Сервер выдаёт отдельный runtime token конкретному агенту. Bootstrap token не используется для выполнения заданий.

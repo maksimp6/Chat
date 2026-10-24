@@ -57,7 +57,7 @@ def test_department_validation_errors_are_sanitized(monkeypatch):
     old = db.DB_PATH
     with tempfile.TemporaryDirectory() as tmp:
         try:
-            monkeypatch.setenv("ALICE_DEPARTMENTS_ADMIN_TOKEN", "dept-admin-token")
+            monkeypatch.setenv("LOGOS_DEPARTMENTS_ADMIN_TOKEN", "dept-admin-token")
             client = _app(tmp).test_client()
             headers = {"X-Department-Admin-Token": "dept-admin-token"}
 

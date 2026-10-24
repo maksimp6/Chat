@@ -11,7 +11,7 @@ static int ioctl_fn(void *ctx,int fd,unsigned long req,void *arg){
     if(m->fail_at && m->ioctls==m->fail_at)return -1;
     if(req==UI_DEV_CREATE)m->creates++;
     if(req==UI_DEV_DESTROY)m->destroys++;
-    if(req==UI_DEV_SETUP){m->setup++;struct uinput_setup *s=arg;assert(!strcmp(s->name,"Alice Virtual Keyboard"));}
+    if(req==UI_DEV_SETUP){m->setup++;struct uinput_setup *s=arg;assert(!strcmp(s->name,"Logos Virtual Keyboard"));}
     if(req==UI_SET_KEYBIT)m->keys++;
     if(req==UI_SET_EVBIT)m->events++;
     return 0;

@@ -91,27 +91,27 @@
   }
 
   function injectStyles() {
-    if (document.getElementById("alice-trace-viewer-style")) return;
+    if (document.getElementById("logos-trace-viewer-style")) return;
     var s = document.createElement("style");
-    s.id = "alice-trace-viewer-style";
+    s.id = "logos-trace-viewer-style";
     s.textContent = `
-.alice-trace-modal{position:fixed;inset:0;z-index:200000;background:rgba(0,0,0,.62);backdrop-filter:blur(8px);display:flex;align-items:stretch;justify-content:center;padding:18px;box-sizing:border-box;overscroll-behavior:contain}
-.alice-trace-window{width:min(1500px,100%);height:100%;background:var(--bg-main,#111);color:var(--text-main,#eee);border:1px solid var(--border-color,rgba(255,255,255,.12));border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.42);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-.alice-trace-header{display:flex;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.1));background:rgba(127,127,127,.06);flex:0 0 auto}.alice-trace-title{font-weight:750;min-width:0}.alice-trace-sub{font:11px ui-monospace,monospace;opacity:.62;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.alice-trace-spacer{flex:1}.alice-trace-btn{border:1px solid var(--border-color,rgba(255,255,255,.14));background:rgba(127,127,127,.08);color:inherit;border-radius:8px;padding:7px 10px;cursor:pointer}.alice-trace-btn:hover{background:rgba(127,127,127,.16)}
-.alice-trace-metrics{display:flex;flex-wrap:wrap;gap:7px;padding:8px 12px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.08));font-size:11px;flex:0 0 auto}.alice-trace-metric{padding:5px 8px;border-radius:7px;background:rgba(127,127,127,.07);white-space:nowrap}.alice-trace-metric b{font-weight:700}
-.alice-trace-waterfall{padding:10px 12px 12px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.08));overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-x;flex:0 0 auto}.alice-trace-waterfall-head{display:flex;gap:10px;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:11px;font-weight:750;text-transform:uppercase;opacity:.72}.alice-trace-waterfall-sub{font-size:10px;font-weight:500;text-transform:none;white-space:nowrap}.alice-trace-timeline{min-width:520px}.alice-trace-axis-labels{display:grid;grid-template-columns:108px 1fr;align-items:end;margin-bottom:4px;font:10px ui-monospace,monospace;opacity:.5}.alice-trace-axis-values{display:flex;justify-content:space-between;padding:0 2px}.alice-trace-timeline-body{position:relative}.alice-trace-gridline{position:absolute;top:0;bottom:0;width:1px;background:rgba(127,127,127,.12);pointer-events:none}.alice-trace-timeline-row{display:grid;grid-template-columns:108px 1fr;min-height:27px;align-items:center}.alice-trace-row-label{padding-right:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;opacity:.72}.alice-trace-row-track{position:relative;height:27px;border-bottom:1px solid rgba(127,127,127,.06)}
-.alice-trace-bar{position:absolute;top:7px;height:13px;border-radius:5px;min-width:5px;background:var(--accent,#7aa2ff);opacity:.92;cursor:pointer}.alice-trace-bar.response{background:#a794ff}.alice-trace-bar.pipeline{opacity:.78;background-image:repeating-linear-gradient(135deg,transparent 0,transparent 4px,rgba(255,255,255,.16) 4px,rgba(255,255,255,.16) 6px)}.alice-trace-point{position:absolute;top:9px;width:9px;height:9px;border-radius:50%;background:var(--text-main,#eee);transform:translateX(-50%);cursor:pointer}.alice-trace-point.response{background:#a794ff}
-.alice-trace-main{display:flex;min-height:0;flex:1 1 0%;position:relative}.alice-trace-nav{width:280px;min-width:220px;border-right:1px solid var(--border-color,rgba(255,255,255,.08));overflow:auto;padding:8px}.alice-trace-inspector{min-width:0;flex:1;overflow:auto;-webkit-overflow-scrolling:touch}.alice-trace-section-title{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.55;padding:7px 8px}
-.alice-trace-item{width:100%;box-sizing:border-box;text-align:left;border:0;background:transparent;color:inherit;padding:8px;border-radius:8px;cursor:pointer;display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:8px;align-items:center}.alice-trace-item:hover,.alice-trace-item.active{background:rgba(127,127,127,.1)}.alice-trace-icon{width:18px;text-align:center}.alice-trace-item-main{min-width:0}.alice-trace-item-name{display:block;font-size:12px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.alice-trace-item-meta{display:block;font-size:10px;opacity:.55;margin-top:2px}.alice-trace-item-time{font:10px ui-monospace,monospace;opacity:.55;white-space:nowrap;text-align:right}
-.alice-trace-mobile-tabs,.alice-trace-mobile-list,.alice-trace-mobile-detail{display:none}.alice-trace-inspector-inner{padding:14px 16px}.alice-trace-inspector-title{font-size:18px;font-weight:750;margin-bottom:3px}.alice-trace-inspector-sub{font-size:11px;opacity:.58;margin-bottom:12px}.alice-trace-tabs{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}.alice-trace-tab{border:1px solid var(--border-color,rgba(255,255,255,.12));background:transparent;color:inherit;border-radius:7px;padding:6px 8px;font-size:11px;cursor:pointer}.alice-trace-tab.active{background:rgba(127,127,127,.12);font-weight:700}.alice-trace-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:12px}.alice-trace-card{padding:9px;border:1px solid var(--border-color,rgba(255,255,255,.08));border-radius:8px;background:rgba(127,127,127,.035)}.alice-trace-card-label{font-size:10px;opacity:.55}.alice-trace-card-value{font-size:13px;font-weight:700;margin-top:2px;word-break:break-word}.alice-trace-pre{margin:0;padding:12px;border-radius:9px;background:var(--trace-code-bg,rgba(0,0,0,.06));color:var(--text-main,#eee);border:1px solid var(--border-color,rgba(127,127,127,.18));font:11px/1.5 ui-monospace,monospace;white-space:pre;overflow:auto;max-width:100%;max-height:calc(100vh - 320px);text-align:left;tab-size:2;-webkit-overflow-scrolling:touch}.alice-trace-json-wrap{min-width:0;max-width:100%;overflow:hidden}.alice-trace-json-toolbar{display:flex;align-items:center;gap:7px;margin:0 0 8px}.alice-trace-json-label{font-size:11px;font-weight:700;opacity:.72}.alice-trace-depth{border:1px solid var(--border-color,rgba(127,127,127,.22));background:var(--trace-control-bg,rgba(127,127,127,.08));color:var(--text-main,#eee);border-radius:7px;padding:5px 7px;font-size:11px}.alice-trace-notice{padding:10px 12px;border-radius:8px;background:rgba(127,127,127,.06);font-size:12px;opacity:.75}
-.alice-trace-mobile-detail-head{display:none}
+.logos-trace-modal{position:fixed;inset:0;z-index:200000;background:rgba(0,0,0,.62);backdrop-filter:blur(8px);display:flex;align-items:stretch;justify-content:center;padding:18px;box-sizing:border-box;overscroll-behavior:contain}
+.logos-trace-window{width:min(1500px,100%);height:100%;background:var(--bg-main,#111);color:var(--text-main,#eee);border:1px solid var(--border-color,rgba(255,255,255,.12));border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.42);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.logos-trace-header{display:flex;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.1));background:rgba(127,127,127,.06);flex:0 0 auto}.logos-trace-title{font-weight:750;min-width:0}.logos-trace-sub{font:11px ui-monospace,monospace;opacity:.62;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.logos-trace-spacer{flex:1}.logos-trace-btn{border:1px solid var(--border-color,rgba(255,255,255,.14));background:rgba(127,127,127,.08);color:inherit;border-radius:8px;padding:7px 10px;cursor:pointer}.logos-trace-btn:hover{background:rgba(127,127,127,.16)}
+.logos-trace-metrics{display:flex;flex-wrap:wrap;gap:7px;padding:8px 12px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.08));font-size:11px;flex:0 0 auto}.logos-trace-metric{padding:5px 8px;border-radius:7px;background:rgba(127,127,127,.07);white-space:nowrap}.logos-trace-metric b{font-weight:700}
+.logos-trace-waterfall{padding:10px 12px 12px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.08));overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-x;flex:0 0 auto}.logos-trace-waterfall-head{display:flex;gap:10px;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:11px;font-weight:750;text-transform:uppercase;opacity:.72}.logos-trace-waterfall-sub{font-size:10px;font-weight:500;text-transform:none;white-space:nowrap}.logos-trace-timeline{min-width:520px}.logos-trace-axis-labels{display:grid;grid-template-columns:108px 1fr;align-items:end;margin-bottom:4px;font:10px ui-monospace,monospace;opacity:.5}.logos-trace-axis-values{display:flex;justify-content:space-between;padding:0 2px}.logos-trace-timeline-body{position:relative}.logos-trace-gridline{position:absolute;top:0;bottom:0;width:1px;background:rgba(127,127,127,.12);pointer-events:none}.logos-trace-timeline-row{display:grid;grid-template-columns:108px 1fr;min-height:27px;align-items:center}.logos-trace-row-label{padding-right:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;opacity:.72}.logos-trace-row-track{position:relative;height:27px;border-bottom:1px solid rgba(127,127,127,.06)}
+.logos-trace-bar{position:absolute;top:7px;height:13px;border-radius:5px;min-width:5px;background:var(--accent,#7aa2ff);opacity:.92;cursor:pointer}.logos-trace-bar.response{background:#a794ff}.logos-trace-bar.pipeline{opacity:.78;background-image:repeating-linear-gradient(135deg,transparent 0,transparent 4px,rgba(255,255,255,.16) 4px,rgba(255,255,255,.16) 6px)}.logos-trace-point{position:absolute;top:9px;width:9px;height:9px;border-radius:50%;background:var(--text-main,#eee);transform:translateX(-50%);cursor:pointer}.logos-trace-point.response{background:#a794ff}
+.logos-trace-main{display:flex;min-height:0;flex:1 1 0%;position:relative}.logos-trace-nav{width:280px;min-width:220px;border-right:1px solid var(--border-color,rgba(255,255,255,.08));overflow:auto;padding:8px}.logos-trace-inspector{min-width:0;flex:1;overflow:auto;-webkit-overflow-scrolling:touch}.logos-trace-section-title{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.55;padding:7px 8px}
+.logos-trace-item{width:100%;box-sizing:border-box;text-align:left;border:0;background:transparent;color:inherit;padding:8px;border-radius:8px;cursor:pointer;display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:8px;align-items:center}.logos-trace-item:hover,.logos-trace-item.active{background:rgba(127,127,127,.1)}.logos-trace-icon{width:18px;text-align:center}.logos-trace-item-main{min-width:0}.logos-trace-item-name{display:block;font-size:12px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.logos-trace-item-meta{display:block;font-size:10px;opacity:.55;margin-top:2px}.logos-trace-item-time{font:10px ui-monospace,monospace;opacity:.55;white-space:nowrap;text-align:right}
+.logos-trace-mobile-tabs,.logos-trace-mobile-list,.logos-trace-mobile-detail{display:none}.logos-trace-inspector-inner{padding:14px 16px}.logos-trace-inspector-title{font-size:18px;font-weight:750;margin-bottom:3px}.logos-trace-inspector-sub{font-size:11px;opacity:.58;margin-bottom:12px}.logos-trace-tabs{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}.logos-trace-tab{border:1px solid var(--border-color,rgba(255,255,255,.12));background:transparent;color:inherit;border-radius:7px;padding:6px 8px;font-size:11px;cursor:pointer}.logos-trace-tab.active{background:rgba(127,127,127,.12);font-weight:700}.logos-trace-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:12px}.logos-trace-card{padding:9px;border:1px solid var(--border-color,rgba(255,255,255,.08));border-radius:8px;background:rgba(127,127,127,.035)}.logos-trace-card-label{font-size:10px;opacity:.55}.logos-trace-card-value{font-size:13px;font-weight:700;margin-top:2px;word-break:break-word}.logos-trace-pre{margin:0;padding:12px;border-radius:9px;background:var(--trace-code-bg,rgba(0,0,0,.06));color:var(--text-main,#eee);border:1px solid var(--border-color,rgba(127,127,127,.18));font:11px/1.5 ui-monospace,monospace;white-space:pre;overflow:auto;max-width:100%;max-height:calc(100vh - 320px);text-align:left;tab-size:2;-webkit-overflow-scrolling:touch}.logos-trace-json-wrap{min-width:0;max-width:100%;overflow:hidden}.logos-trace-json-toolbar{display:flex;align-items:center;gap:7px;margin:0 0 8px}.logos-trace-json-label{font-size:11px;font-weight:700;opacity:.72}.logos-trace-depth{border:1px solid var(--border-color,rgba(127,127,127,.22));background:var(--trace-control-bg,rgba(127,127,127,.08));color:var(--text-main,#eee);border-radius:7px;padding:5px 7px;font-size:11px}.logos-trace-notice{padding:10px 12px;border-radius:8px;background:rgba(127,127,127,.06);font-size:12px;opacity:.75}
+.logos-trace-mobile-detail-head{display:none}
 @media(max-width:820px){
-.alice-trace-modal{padding:0;touch-action:auto}.alice-trace-window{border-radius:0}.alice-trace-nav{display:none}
-.alice-trace-mobile-tabs{display:flex;gap:5px;width:100%;box-sizing:border-box;padding:7px 8px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.08));overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-x;flex:0 0 auto}.alice-trace-mobile-tabs.detail-active{display:none}
-.alice-trace-mobile-tab{flex:0 0 auto;border:1px solid var(--border-color,rgba(255,255,255,.12));background:transparent;color:inherit;border-radius:7px;padding:6px 9px;font-size:11px;cursor:pointer}.alice-trace-mobile-tab.active{background:rgba(127,127,127,.12);font-weight:700}
-.alice-trace-main{display:block;min-height:0;flex:1 1 0%;overflow:hidden;position:relative}.alice-trace-main .alice-trace-inspector{display:none}.alice-trace-mobile-list{display:block;width:100%;height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain}.alice-trace-mobile-list .alice-trace-item{padding:10px 12px;border-radius:0;grid-template-columns:22px minmax(0,1fr) auto}.alice-trace-mobile-detail{position:absolute;inset:0;display:none;flex-direction:column;background:var(--bg-main,#111);z-index:10;min-height:0}.alice-trace-mobile-detail.active{display:flex}.alice-trace-mobile-detail-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.1));flex:0 0 auto}.alice-trace-mobile-back{border:1px solid var(--border-color,rgba(255,255,255,.12));background:transparent;color:inherit;border-radius:7px;padding:6px 9px;cursor:pointer}.alice-trace-mobile-detail-title{min-width:0;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.alice-trace-mobile-detail-content{flex:1 1 0%;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:0}.alice-trace-mobile-detail-content .alice-trace-inspector{display:block;overflow:visible;max-height:none}.alice-trace-mobile-detail-content .alice-trace-inspector-inner{padding:12px}.alice-trace-mobile-detail-content .alice-trace-pre{max-height:none;overflow:auto;white-space:pre;word-break:normal}.alice-trace-mobile-detail-content .alice-trace-json-wrap{overflow:visible}.alice-trace-mobile-detail-content .alice-trace-json-toolbar{position:sticky;top:0;background:var(--bg-main,#111);padding:4px 0;z-index:2}.alice-trace-header{padding:9px}.alice-trace-waterfall{padding-left:8px;padding-right:8px}.alice-trace-timeline{min-width:460px}
+.logos-trace-modal{padding:0;touch-action:auto}.logos-trace-window{border-radius:0}.logos-trace-nav{display:none}
+.logos-trace-mobile-tabs{display:flex;gap:5px;width:100%;box-sizing:border-box;padding:7px 8px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.08));overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-x;flex:0 0 auto}.logos-trace-mobile-tabs.detail-active{display:none}
+.logos-trace-mobile-tab{flex:0 0 auto;border:1px solid var(--border-color,rgba(255,255,255,.12));background:transparent;color:inherit;border-radius:7px;padding:6px 9px;font-size:11px;cursor:pointer}.logos-trace-mobile-tab.active{background:rgba(127,127,127,.12);font-weight:700}
+.logos-trace-main{display:block;min-height:0;flex:1 1 0%;overflow:hidden;position:relative}.logos-trace-main .logos-trace-inspector{display:none}.logos-trace-mobile-list{display:block;width:100%;height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain}.logos-trace-mobile-list .logos-trace-item{padding:10px 12px;border-radius:0;grid-template-columns:22px minmax(0,1fr) auto}.logos-trace-mobile-detail{position:absolute;inset:0;display:none;flex-direction:column;background:var(--bg-main,#111);z-index:10;min-height:0}.logos-trace-mobile-detail.active{display:flex}.logos-trace-mobile-detail-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.1));flex:0 0 auto}.logos-trace-mobile-back{border:1px solid var(--border-color,rgba(255,255,255,.12));background:transparent;color:inherit;border-radius:7px;padding:6px 9px;cursor:pointer}.logos-trace-mobile-detail-title{min-width:0;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.logos-trace-mobile-detail-content{flex:1 1 0%;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:0}.logos-trace-mobile-detail-content .logos-trace-inspector{display:block;overflow:visible;max-height:none}.logos-trace-mobile-detail-content .logos-trace-inspector-inner{padding:12px}.logos-trace-mobile-detail-content .logos-trace-pre{max-height:none;overflow:auto;white-space:pre;word-break:normal}.logos-trace-mobile-detail-content .logos-trace-json-wrap{overflow:visible}.logos-trace-mobile-detail-content .logos-trace-json-toolbar{position:sticky;top:0;background:var(--bg-main,#111);padding:4px 0;z-index:2}.logos-trace-header{padding:9px}.logos-trace-waterfall{padding-left:8px;padding-right:8px}.logos-trace-timeline{min-width:460px}
 }
-@media(max-width:600px){.alice-trace-title{font-size:13px}.alice-trace-sub{max-width:120px}.alice-trace-btn{padding:6px 8px}.alice-trace-metrics{gap:5px;padding:7px}.alice-trace-metric{font-size:10px;padding:4px 6px}.alice-trace-waterfall-head{align-items:flex-start;flex-direction:column;gap:3px}.alice-trace-timeline{min-width:430px}.alice-trace-axis-labels{grid-template-columns:88px 1fr}.alice-trace-timeline-row{grid-template-columns:88px 1fr}.alice-trace-row-label{font-size:9px}.alice-trace-pre{font-size:10px;line-height:1.45}.alice-trace-inspector-title{font-size:16px}}
+@media(max-width:600px){.logos-trace-title{font-size:13px}.logos-trace-sub{max-width:120px}.logos-trace-btn{padding:6px 8px}.logos-trace-metrics{gap:5px;padding:7px}.logos-trace-metric{font-size:10px;padding:4px 6px}.logos-trace-waterfall-head{align-items:flex-start;flex-direction:column;gap:3px}.logos-trace-timeline{min-width:430px}.logos-trace-axis-labels{grid-template-columns:88px 1fr}.logos-trace-timeline-row{grid-template-columns:88px 1fr}.logos-trace-row-label{font-size:9px}.logos-trace-pre{font-size:10px;line-height:1.45}.logos-trace-inspector-title{font-size:16px}}
 `;
     document.head.appendChild(s);
   }
@@ -224,7 +224,7 @@
     return r;
   }
   function renderMetricRow(trace) {
-    var row = el("div", { className: "alice-trace-metrics" }),
+    var row = el("div", { className: "logos-trace-metrics" }),
       u = collectUsage(trace),
       m = [
         ["Duration", fmtMs(duration(trace))],
@@ -236,7 +236,7 @@
         ["Status", (trace.errors || []).length ? "⚠ " + trace.errors.length : "● completed"],
       ];
     m.forEach(function (x) {
-      var c = el("div", { className: "alice-trace-metric" });
+      var c = el("div", { className: "logos-trace-metric" });
       c.appendChild(document.createTextNode(x[0] + ": "));
       c.appendChild(el("b", {}, String(x[1])));
       row.appendChild(c);
@@ -245,13 +245,13 @@
   }
 
   function renderWaterfall(trace, items) {
-    var wrap = el("div", { className: "alice-trace-waterfall" }),
-      head = el("div", { className: "alice-trace-waterfall-head" });
+    var wrap = el("div", { className: "logos-trace-waterfall" }),
+      head = el("div", { className: "logos-trace-waterfall-head" });
     head.appendChild(el("span", {}, "Waterfall"));
     head.appendChild(
       el(
         "span",
-        { className: "alice-trace-waterfall-sub" },
+        { className: "logos-trace-waterfall-sub" },
         "pipeline = real interval · tools = real start/end · Responses = real request/response interval · events = instant",
       ),
     );
@@ -261,7 +261,7 @@
     });
     if (!timed.length) {
       wrap.appendChild(
-        el("div", { className: "alice-trace-notice" }, "Trace не содержит временных событий."),
+        el("div", { className: "logos-trace-notice" }, "Trace не содержит временных событий."),
       );
       return wrap;
     }
@@ -275,30 +275,30 @@
     var min = Math.min.apply(Math, times),
       max = Math.max.apply(Math, times),
       span = Math.max(0.001, max - min),
-      tl = el("div", { className: "alice-trace-timeline" }),
-      axis = el("div", { className: "alice-trace-axis-labels" });
+      tl = el("div", { className: "logos-trace-timeline" }),
+      axis = el("div", { className: "logos-trace-axis-labels" });
     axis.appendChild(el("div", {}, ""));
-    var av = el("div", { className: "alice-trace-axis-values" });
+    var av = el("div", { className: "logos-trace-axis-values" });
     [0, 0.25, 0.5, 0.75, 1].forEach(function (p) {
       av.appendChild(el("span", {}, fmtMs(p * span * 1000)));
     });
     axis.appendChild(av);
     tl.appendChild(axis);
-    var body = el("div", { className: "alice-trace-timeline-body" });
+    var body = el("div", { className: "logos-trace-timeline-body" });
     [0, 0.25, 0.5, 0.75, 1].forEach(function (p) {
-      var l = el("div", { className: "alice-trace-gridline" });
+      var l = el("div", { className: "logos-trace-gridline" });
       l.style.left = "calc(108px + (100% - 108px) * " + p + ")";
       body.appendChild(l);
     });
     function row(label, it, st, en, inferred) {
-      var r = el("div", { className: "alice-trace-timeline-row" });
-      r.appendChild(el("div", { className: "alice-trace-row-label", title: label }, label));
-      var tr = el("div", { className: "alice-trace-row-track" });
+      var r = el("div", { className: "logos-trace-timeline-row" });
+      r.appendChild(el("div", { className: "logos-trace-row-label", title: label }, label));
+      var tr = el("div", { className: "logos-trace-row-track" });
       if (Number.isFinite(st) && Number.isFinite(en) && en >= st) {
         var left = Math.max(0, Math.min(100, ((st - min) / span) * 100)),
           w = Math.max(0.9, Math.min(100 - left, ((en - st) / span) * 100)),
           b = el("div", {
-            className: "alice-trace-bar " + it.kind + (inferred ? " inferred" : ""),
+            className: "logos-trace-bar " + it.kind + (inferred ? " inferred" : ""),
             title:
               it.name + " · " + fmtMs((en - st) * 1000) + (inferred ? " · start inferred" : ""),
           });
@@ -310,7 +310,7 @@
         tr.appendChild(b);
       } else if (Number.isFinite(it.timestamp)) {
         var p = el("div", {
-          className: "alice-trace-point " + it.kind,
+          className: "logos-trace-point " + it.kind,
           title: it.name + " · instant",
         });
         p.style.left = Math.max(0, Math.min(100, ((it.timestamp - min) / span) * 100)) + "%";
@@ -388,16 +388,16 @@
       : "instant";
   }
   function makeItemButton(item) {
-    var b = el("button", { type: "button", className: "alice-btn alice-trace-item" });
-    b.appendChild(el("span", { className: "alice-trace-icon" }, icon(item)));
-    var m = el("span", { className: "alice-trace-item-main" });
-    m.appendChild(el("span", { className: "alice-trace-item-name" }, item.name));
-    m.appendChild(el("span", { className: "alice-trace-item-meta" }, meta(item)));
+    var b = el("button", { type: "button", className: "logos-btn logos-trace-item" });
+    b.appendChild(el("span", { className: "logos-trace-icon" }, icon(item)));
+    var m = el("span", { className: "logos-trace-item-main" });
+    m.appendChild(el("span", { className: "logos-trace-item-name" }, item.name));
+    m.appendChild(el("span", { className: "logos-trace-item-meta" }, meta(item)));
     b.appendChild(m);
     b.appendChild(
       el(
         "span",
-        { className: "alice-trace-item-time" },
+        { className: "logos-trace-item-time" },
         Number.isFinite(item.timestamp)
           ? new Date(item.timestamp * 1000).toLocaleTimeString("ru-RU")
           : "",
@@ -409,7 +409,7 @@
     return b;
   }
   function renderMobileTabs(items) {
-    var nav = el("div", { className: "alice-trace-mobile-tabs" });
+    var nav = el("div", { className: "logos-trace-mobile-tabs" });
     [
       ["All", items],
       [
@@ -433,12 +433,12 @@
     ].forEach(function (pair, i) {
       var b = el(
         "button",
-        { type: "button", className: "alice-btn alice-trace-mobile-tab" },
+        { type: "button", className: "logos-btn logos-trace-mobile-tab" },
         pair[0],
       );
       if (i === 0) b.classList.add("active");
       b.onclick = function () {
-        nav.querySelectorAll(".alice-trace-mobile-tab").forEach(function (x) {
+        nav.querySelectorAll(".logos-trace-mobile-tab").forEach(function (x) {
           x.classList.remove("active");
         });
         b.classList.add("active");
@@ -453,7 +453,7 @@
     state.list.textContent = "";
     if (!items.length) {
       state.list.appendChild(
-        el("div", { className: "alice-trace-notice" }, "Нет элементов в этом фильтре."),
+        el("div", { className: "logos-trace-notice" }, "Нет элементов в этом фильтре."),
       );
       return;
     }
@@ -464,8 +464,8 @@
     });
   }
   function renderSidebar(items) {
-    var side = el("div", { className: "alice-trace-nav" });
-    side.appendChild(el("div", { className: "alice-trace-section-title" }, "EVENTS / TRACE"));
+    var side = el("div", { className: "logos-trace-nav" });
+    side.appendChild(el("div", { className: "logos-trace-section-title" }, "EVENTS / TRACE"));
     items.forEach(function (x) {
       var b = makeItemButton(x);
       x._button = b;
@@ -511,9 +511,9 @@
   }
 
   function addJsonToolbar(content, rerender) {
-    var bar = el("div", { className: "alice-trace-json-toolbar" });
-    bar.appendChild(el("span", { className: "alice-trace-json-label" }, "JSON depth"));
-    var sel = el("select", { className: "alice-trace-depth", title: "Глубина отображения JSON" });
+    var bar = el("div", { className: "logos-trace-json-toolbar" });
+    bar.appendChild(el("span", { className: "logos-trace-json-label" }, "JSON depth"));
+    var sel = el("select", { className: "logos-trace-depth", title: "Глубина отображения JSON" });
     [
       [1, "1"],
       [2, "2"],
@@ -537,22 +537,22 @@
   }
 
   function renderInspector(trace, item, tab, target) {
-    var area = target || state.body.querySelector(".alice-trace-inspector");
+    var area = target || state.body.querySelector(".logos-trace-inspector");
     area.textContent = "";
     if (!item) return;
-    var inner = el("div", { className: "alice-trace-inspector-inner" });
-    inner.appendChild(el("div", { className: "alice-trace-inspector-title" }, item.name));
+    var inner = el("div", { className: "logos-trace-inspector-inner" });
+    inner.appendChild(el("div", { className: "logos-trace-inspector-title" }, item.name));
     inner.appendChild(
       el(
         "div",
-        { className: "alice-trace-inspector-sub" },
+        { className: "logos-trace-inspector-sub" },
         item.kind.toUpperCase() + (item.data.step ? " · step " + item.data.step : ""),
       ),
     );
-    var tabs = el("div", { className: "alice-trace-tabs" }),
+    var tabs = el("div", { className: "logos-trace-tabs" }),
       selected = tab || tabsFor(item)[0];
     tabsFor(item).forEach(function (t) {
-      var b = el("button", { type: "button", className: "alice-btn alice-trace-tab" }, t);
+      var b = el("button", { type: "button", className: "logos-btn logos-trace-tab" }, t);
       if (t === selected) b.classList.add("active");
       b.onclick = function () {
         renderInspector(trace, item, t, target);
@@ -562,15 +562,15 @@
     inner.appendChild(tabs);
     var content = document.createElement("div");
     function pre(value) {
-      var wrap = el("div", { className: "alice-trace-json-wrap" });
+      var wrap = el("div", { className: "logos-trace-json-wrap" });
       addJsonToolbar(wrap, function () {
         renderInspector(trace, item, selected, target);
       });
-      wrap.appendChild(el("pre", { className: "alice-trace-pre" }, jsonText(value)));
+      wrap.appendChild(el("pre", { className: "logos-trace-pre" }, jsonText(value)));
       content.appendChild(wrap);
     }
     if (selected === "Overview") {
-      var grid = el("div", { className: "alice-trace-grid" }),
+      var grid = el("div", { className: "logos-trace-grid" }),
         pairs = [];
       if (item.kind === "tool")
         pairs = [
@@ -632,15 +632,15 @@
           ],
         ];
       pairs.forEach(function (p) {
-        var c = el("div", { className: "alice-trace-card" });
-        c.appendChild(el("div", { className: "alice-trace-card-label" }, p[0]));
-        c.appendChild(el("div", { className: "alice-trace-card-value" }, String(p[1])));
+        var c = el("div", { className: "logos-trace-card" });
+        c.appendChild(el("div", { className: "logos-trace-card-label" }, p[0]));
+        c.appendChild(el("div", { className: "logos-trace-card-value" }, String(p[1])));
         grid.appendChild(c);
       });
       content.appendChild(grid);
       if (item.kind === "tool" && item.data.error)
         content.appendChild(
-          el("div", { className: "alice-trace-notice" }, "⚠ " + String(item.data.error)),
+          el("div", { className: "logos-trace-notice" }, "⚠ " + String(item.data.error)),
         );
       if (item.kind === "event")
         pre(item.data.payload !== undefined ? item.data.payload : item.data);
@@ -661,7 +661,7 @@
         content.appendChild(
           el(
             "div",
-            { className: "alice-trace-notice" },
+            { className: "logos-trace-notice" },
             "Ответ с текстом в этом response не найден.",
           ),
         );
@@ -710,7 +710,7 @@
       });
       if (related.length) {
         var relatedWrap = el("div", {
-          className: "alice-trace-related",
+          className: "logos-trace-related",
           style:
             "margin-top:12px;padding:10px;border:1px solid var(--border-color,rgba(127,127,127,.14));border-radius:8px;",
         });
@@ -724,7 +724,7 @@
         related.forEach(function (other) {
           var link = el(
             "button",
-            { type: "button", className: "alice-trace-tab", title: "Перейти к связанному событию" },
+            { type: "button", className: "logos-trace-tab", title: "Перейти к связанному событию" },
             other.name,
           );
           link.onclick = function () {
@@ -745,7 +745,7 @@
     state.detail.classList.add("active");
     state.nav.classList.add("detail-active");
     state.detailTitle.textContent = item.name;
-    renderInspector(state.trace, item, null, state.detail.querySelector(".alice-trace-inspector"));
+    renderInspector(state.trace, item, null, state.detail.querySelector(".logos-trace-inspector"));
   }
   function hideMobileDetail() {
     if (!state.detail) return;
@@ -759,7 +759,7 @@
   function selectItem(item) {
     state.selected = item;
     if (state.modal)
-      state.modal.querySelectorAll(".alice-trace-item").forEach(function (b) {
+      state.modal.querySelectorAll(".logos-trace-item").forEach(function (b) {
         b.classList.remove("active");
       });
     if (item._button) item._button.classList.add("active");
@@ -816,32 +816,32 @@
     state.jsonDepth = 4;
     var items = buildItems(trace);
     state.items = items;
-    var modal = el("div", { className: "alice-trace-modal" }),
+    var modal = el("div", { className: "logos-trace-modal" }),
       win = el("div", {
-        className: "alice-trace-window",
+        className: "logos-trace-window",
         role: "dialog",
         "aria-modal": "true",
         "aria-label": "Execution Trace",
       });
-    var header = el("div", { className: "alice-trace-header" });
+    var header = el("div", { className: "logos-trace-header" });
     header.appendChild(el("span", {}, "⚡"));
-    header.appendChild(el("div", { className: "alice-trace-title" }, "Execution Trace"));
+    header.appendChild(el("div", { className: "logos-trace-title" }, "Execution Trace"));
     header.appendChild(
       el(
         "div",
-        { className: "alice-trace-sub" },
+        { className: "logos-trace-sub" },
         trace.trace_id ? String(trace.trace_id) : "local",
       ),
     );
-    header.appendChild(el("div", { className: "alice-trace-spacer" }));
+    header.appendChild(el("div", { className: "logos-trace-spacer" }));
     var copy = el(
       "button",
-      { type: "button", className: "alice-btn alice-trace-btn", title: "Copy raw JSON" },
+      { type: "button", className: "logos-btn logos-trace-btn", title: "Copy raw JSON" },
       "Copy JSON",
     );
     copy.onclick = copyTrace;
     header.appendChild(copy);
-    var cb = el("button", { type: "button", className: "alice-trace-btn", title: "Close" }, "×");
+    var cb = el("button", { type: "button", className: "logos-trace-btn", title: "Close" }, "×");
     cb.onclick = close;
     header.appendChild(cb);
     win.appendChild(header);
@@ -849,27 +849,27 @@
     win.appendChild(renderWaterfall(trace, items));
     state.nav = renderMobileTabs(items);
     win.appendChild(state.nav);
-    var main = el("div", { className: "alice-trace-main" });
+    var main = el("div", { className: "logos-trace-main" });
     state.body = main;
-    state.list = el("div", { className: "alice-trace-mobile-list" });
+    state.list = el("div", { className: "logos-trace-mobile-list" });
     main.appendChild(state.list);
     renderMobileList(items);
     main.appendChild(renderSidebar(items));
-    main.appendChild(el("div", { className: "alice-trace-inspector" }));
-    state.detail = el("div", { className: "alice-trace-mobile-detail" });
-    var dh = el("div", { className: "alice-trace-mobile-detail-head" }),
+    main.appendChild(el("div", { className: "logos-trace-inspector" }));
+    state.detail = el("div", { className: "logos-trace-mobile-detail" });
+    var dh = el("div", { className: "logos-trace-mobile-detail-head" }),
       back = el(
         "button",
-        { type: "button", className: "alice-btn alice-trace-mobile-back" },
+        { type: "button", className: "logos-btn logos-trace-mobile-back" },
         "← Events",
       );
     back.onclick = hideMobileDetail;
-    state.detailTitle = el("div", { className: "alice-trace-mobile-detail-title" }, "");
+    state.detailTitle = el("div", { className: "logos-trace-mobile-detail-title" }, "");
     dh.appendChild(back);
     dh.appendChild(state.detailTitle);
     state.detail.appendChild(dh);
-    var dc = el("div", { className: "alice-trace-mobile-detail-content" });
-    dc.appendChild(el("div", { className: "alice-trace-inspector" }));
+    var dc = el("div", { className: "logos-trace-mobile-detail-content" });
+    dc.appendChild(el("div", { className: "logos-trace-inspector" }));
     state.detail.appendChild(dc);
     main.appendChild(state.detail);
     win.appendChild(main);
@@ -879,5 +879,5 @@
     document.addEventListener("keydown", onKey);
   }
   window.openTraceViewer = open;
-  window.dispatchEvent(new CustomEvent("alice:trace-viewer-ready"));
+  window.dispatchEvent(new CustomEvent("logos:trace-viewer-ready"));
 })();

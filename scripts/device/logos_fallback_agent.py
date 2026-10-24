@@ -255,7 +255,7 @@ class FallbackAgent:
                 continue
             except (TransportError, AuthError) as exc:
                 failures += 1
-                print(f"alice-fallback-agent: {exc}", file=sys.stderr)
+                print(f"logos-fallback-agent: {exc}", file=sys.stderr)
             delay = min(BACKOFF_MAX_SECONDS, BACKOFF_BASE_SECONDS * 2 ** min(failures - 1, 16))
             if wait(delay * random.uniform(0.5, 1.0)):
                 return
@@ -281,7 +281,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
     except ConfigError as exc:
-        print(f"alice-fallback-agent: {exc}", file=sys.stderr)
+        print(f"logos-fallback-agent: {exc}", file=sys.stderr)
         return 2
     stop = threading.Event()
     try:

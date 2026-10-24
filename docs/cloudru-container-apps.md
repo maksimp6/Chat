@@ -27,13 +27,13 @@ the service-account key pair and ignore `CLOUDRU_API_KEY` (Foundation Models).
    (push) and Container Apps (admin) roles, and issue an access key.
 2. In GitHub, use the existing `production` environment (so the configured short
    token is reused) with:
-   - secrets `CLOUDRU_IAM_KEY_ID`, `CLOUDRU_IAM_KEY_SECRET`, `ALICE_SHORT_TOKEN`,
-     `ALICE_GITHUB_CLIENT_ID`, `ALICE_GITHUB_CLIENT_SECRET`,
-     and optionally `ALICE_PROVIDER_CREDENTIAL_KEY`; repository-level OAuth
+   - secrets `CLOUDRU_IAM_KEY_ID`, `CLOUDRU_IAM_KEY_SECRET`, `LOGOS_SHORT_TOKEN`,
+     `LOGOS_GITHUB_CLIENT_ID`, `LOGOS_GITHUB_CLIENT_SECRET`,
+     and optionally `LOGOS_PROVIDER_CREDENTIAL_KEY`; repository-level OAuth
      secrets are inherited, so do not duplicate them;
    - variable `CLOUDRU_PROJECT_ID`, and optionally `CLOUDRU_REGISTRY_NAME`,
      `CLOUDRU_REPOSITORY_NAME`, `CLOUDRU_CONTAINER_NAME`, `CLOUDRU_CONTAINER_CPU`,
-     `CLOUDRU_MIN_INSTANCES`, `CLOUDRU_MAX_INSTANCES`, `ALICE_GITHUB_ALLOWED_IDS`
+     `CLOUDRU_MIN_INSTANCES`, `CLOUDRU_MAX_INSTANCES`, `LOGOS_GITHUB_ALLOWED_IDS`
      (defaults to the owner's immutable GitHub ID `293531601`).
 
 For Codex Cloud, keep the existing `CLOUDRU_KEY_ID` as an environment variable and `CLOUDRU_KEY_SECRET` as a secret in the `Chat` environment. The setup and maintenance scripts normalize those names into a mode-600 cache outside the checkout; `scripts/cloudru_deploy.py` reads that cache after Codex removes setup secrets from the agent phase. Set `CLOUDRU_PROJECT_ID` as an environment variable. Never commit the cache or put a secret value in an issue, log, or repository file.
@@ -52,12 +52,12 @@ cleanup step runs under `always()`: a service created by this run is deleted, a
 pre-existing service is restored from the configuration captured before the
 run, and nothing is touched when no acceptance-owned change is proven. The
 workflow forwards the GitHub-login configuration but no longer passes
-`ALICE_DATABASE_URL`, so the acceptance revision uses the native Kristall journal on the container's ephemeral filesystem.
+`LOGOS_DATABASE_URL`, so the acceptance revision uses the native Kristall journal on the container's ephemeral filesystem.
 The application image installs only `requirements.txt`; the PostgreSQL backend is
 retired (#1191). A successful preflight checks configuration only; it does not
 prove connectivity, IAM permissions, database readiness or a live deployment.
 
-`deploy` creates the registry if missing, pushes `<registry>.cr.cloud.ru/alice-pro:<sha>`,
+`deploy` creates the registry if missing, pushes `<registry>.cr.cloud.ru/logos-pro:<sha>`,
 creates the service (or rolls out a new revision), waits until it runs the new
 digest with a public URL, and requires `GET /healthz` to return 200.
 If the new revision fails readiness or the health check, it restores the
@@ -77,7 +77,7 @@ credential names are rejected by `--env` before provider calls or image builds.
 The registry host is fixed to the official `cr.cloud.ru` domain; any
 `CLOUDRU_REGISTRY_DOMAIN` override outside that exact allowlist fails before
 `docker login`, so the IAM secret cannot be sent to an arbitrary host. The
-Container Apps image runs as the unprivileged `alice` user (UID/GID 10001) and
+Container Apps image runs as the unprivileged `logos` user (UID/GID 10001) and
 only pre-creates its application data and log directories as writable paths.
 
 ## Container Apps v2 control-plane contract
@@ -122,11 +122,11 @@ The first request after idle pays a cold start.
 ## Known limitations
 
 - **No durable database in acceptance runs.** The workflow does not pass
-  `ALICE_DATABASE_URL` ([#1002](https://github.com/maksimp6/Chat/pull/1002)), so
+  `LOGOS_DATABASE_URL` ([#1002](https://github.com/maksimp6/Chat/pull/1002)), so
   data lives in the native Kristall journal on the container's ephemeral filesystem and is lost when the instance sleeps, a
   new revision starts, or cleanup removes or restores the service.
 - **In-process state is lost on sleep.** Branch environment runtimes (git
-  worktrees under `.alice-environments`), voice sessions, and uploaded files
+  worktrees under `.logos-environments`), voice sessions, and uploaded files
   live in the container. Keep `CLOUDRU_MAX_INSTANCES=1` until they move to
   a persistent Kristall journal or Object Storage, or requests may land on an instance without them.
 - **Scale to zero stops background work.** Background threads and SSH runtime

@@ -6,7 +6,7 @@
 
   window.fetchMcpServers = function () {
     if (mcpFetchPromise) return mcpFetchPromise;
-    mcpFetchPromise = window.AliceDispatcher.request("/api/mcp-servers")
+    mcpFetchPromise = window.LogosDispatcher.request("/api/mcp-servers")
       .then(function (r) {
         if (!r.ok) {
           console.warn("[MCP] Server returned " + r.status);
@@ -34,13 +34,13 @@
 
   function closeMcpManagerModal(modal) {
     if (!modal) return;
-    window.AliceCoreAPI.ui.modal.close(modal);
+    window.LogosCoreAPI.ui.modal.close(modal);
     var onClose = modal._onClose;
     modal._onClose = null;
     if (typeof onClose === "function") onClose();
   }
 
-  window.AliceCoreAPI.ui.actions.register("mcp-manager.close", function (payload) {
+  window.LogosCoreAPI.ui.actions.register("mcp-manager.close", function (payload) {
     var modalId = payload && payload.params && payload.params.modal;
     closeMcpManagerModal(modalId ? document.getElementById(modalId) : null);
   });
@@ -94,7 +94,7 @@
 
   window.openMcpManagerModal = function (onClose) {
     var UI = window.SettingsUI;
-    var CoreUI = window.AliceCoreAPI.ui;
+    var CoreUI = window.LogosCoreAPI.ui;
     UI.injectModalStyles();
 
     var existing = document.getElementById("mcp-manager-modal");
@@ -103,7 +103,7 @@
     var md = document.createElement("div");
     md.className = "settings-mcp-body";
     md.innerHTML =
-      '<button class="alice-btn settings-contract-btn" id="mcp-mgr-add">+ Добавить сервер</button>' +
+      '<button class="logos-btn settings-contract-btn" id="mcp-mgr-add">+ Добавить сервер</button>' +
       '<div id="mcp-mgr-list"></div>';
 
     var ov = CoreUI.modal.create({
@@ -118,7 +118,7 @@
     var modalContent = ov.querySelector(".modal-content");
     modalContent.style.cssText =
       "background:var(--m-bg,#fff);border-radius:12px;padding:24px;max-width:600px;width:90%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px var(--m-shadow,rgba(0,0,0,0.3));color:var(--m-text,#222);";
-    (document.querySelector(".alice-pro-app") || document.body).appendChild(ov);
+    (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 
     ov.addEventListener("click", function (e) {
@@ -144,10 +144,10 @@
             UI.escapeHtml(connInfo) +
             "</div></div>" +
             '<div style="display:flex;gap:6px;">' +
-            '<button class="alice-btn mcp-edit-btn settings-contract-btn" data-id="' +
+            '<button class="logos-btn mcp-edit-btn settings-contract-btn" data-id="' +
             UI.escapeHtml(srv.id) +
             '">Изменить</button>' +
-            '<button class="alice-btn mcp-del-btn settings-contract-btn" data-id="' +
+            '<button class="logos-btn mcp-del-btn settings-contract-btn" data-id="' +
             UI.escapeHtml(srv.id) +
             '">Удалить</button>' +
             "</div></div>"
@@ -169,7 +169,7 @@
         btn.addEventListener("click", function () {
           var sid = this.getAttribute("data-id");
           if (!confirm("Удалить MCP сервер?")) return;
-          window.AliceDispatcher.request("/api/mcp-servers/" + sid, { method: "DELETE" })
+          window.LogosDispatcher.request("/api/mcp-servers/" + sid, { method: "DELETE" })
             .then(function () {
               refreshList();
             })
@@ -347,7 +347,7 @@
         }
         var method = isNew ? "POST" : "PUT";
         var url = isNew ? "/api/mcp-servers" : "/api/mcp-servers/" + srv.id;
-        window.AliceDispatcher.request(url, {
+        window.LogosDispatcher.request(url, {
           method: method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),

@@ -39,7 +39,7 @@ def test_signed_socket_to_c_keyboard_chord_and_fault(monkeypatch, inject_auth_fa
 
     compiler = shutil.which("clang") or shutil.which("cc")
     assert compiler
-    with tempfile.TemporaryDirectory(prefix="alice-input-c-e2e-") as directory:
+    with tempfile.TemporaryDirectory(prefix="logos-input-c-e2e-") as directory:
         root = Path(directory)
         os.chmod(root, 0o700)
         library = root / "libkeyboard.so"

@@ -1,14 +1,14 @@
 # Memory DB Core — local functional contract
 
 Status: **locally accepted for the minimal API** (`get / set / commit`).
-Scope: standalone `memory_engine.MemoryStore`, not Alice runtime integration, CI approval, or permission to merge.
+Scope: standalone `memory_engine.MemoryStore`, not Logos runtime integration, CI approval, or permission to merge.
 
 ## Public usage
 
 ```python
 from memory_engine import MemoryStore
 
-with MemoryStore("alice.memory") as db:
+with MemoryStore("logos.memory") as db:
     db.set("greeting", {"text": "Привет, 你好 🌍"})
     assert db.get("greeting") == {"text": "Привет, 你好 🌍"}
     sequence = db.commit()
@@ -41,10 +41,10 @@ Values larger than one frame, including attachments, must be stored separately. 
 - Some invalid scalar types are rejected only at `commit()`, not `set()`.
 - A partial trailing journal frame is not silently truncated; recovery requires explicit handling.
 - `backup()` does not publish atomically: a crashed copy may leave a partial destination. A backup file's existence is not proof of validity. `restore()` verifies journal integrity.
-- This component does not switch Alice's existing `FileMemoryDB` or migrate its files. See `MEMORY_DB_BOUNDARIES.md`.
+- This component does not switch Logos's existing `FileMemoryDB` or migrate its files. See `MEMORY_DB_BOUNDARIES.md`.
 
 ## Verification and handoff
 
 On Redmi 9 (2026-10-11), **128 focused tests passed** on the stacked Memory DB tree after integrating the verified parent core and refactoring replay validation. This confirms only the tested local tree; exact-head GitHub CI and independent review remain separate acceptance requirements.
 
-Minimal `get / set / commit` was explicitly accepted by the owner locally. New bounds are tested but have not received separate owner acceptance. CI, Alice integration, and merge authorization are separate tasks. No push, commit, or merge is implied by this document.
+Minimal `get / set / commit` was explicitly accepted by the owner locally. New bounds are tested but have not received separate owner acceptance. CI, Logos integration, and merge authorization are separate tasks. No push, commit, or merge is implied by this document.

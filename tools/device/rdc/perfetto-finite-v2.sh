@@ -3,7 +3,7 @@ set -Eeuo pipefail
 SERIAL=192.168.31.109:42125
 COUNT=3
 DURATION=60
-ROOT="$HOME/.alice-rdc/perfetto-captures"
+ROOT="$HOME/.logos-rdc/perfetto-captures"
 ADB=/data/data/com.termux/files/usr/bin/adb
 mkdir -p "$ROOT"
 RUN="$(date -u +%Y%m%dT%H%M%SZ)-$$"
@@ -13,7 +13,7 @@ printf 'run=%s serial=%s count=%s duration=%s\n' "$RUN" "$SERIAL" "$COUNT" "$DUR
 if [ "${DRY_RUN:-0}" = 1 ]; then echo "DRY_RUN $DIR"; exit 0; fi
 "$ADB" -s "$SERIAL" get-state | grep -qx device
 for i in 1 2 3; do
-  REMOTE="/data/misc/perfetto-traces/alice-$RUN-$i.pftrace"
+  REMOTE="/data/misc/perfetto-traces/logos-$RUN-$i.pftrace"
   LOCAL="$DIR/segment-$i.pftrace"
   START="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "START $i $START" >> "$DIR/manifest.txt"

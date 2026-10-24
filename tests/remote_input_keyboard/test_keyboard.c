@@ -86,7 +86,7 @@ static void autonomous_watchdog_contract(void){
     assert(!remote_input_keyboard_runner_down(&runner,KEY_LEFTCTRL));
     /* RED: wait for an actual autonomous worker, never call tick().
      * The test must observe a KEY_UP, not merely a changed mock clock. */
-    usleep((ALICE_KEY_LEASE_MS+300)*1000);
+    usleep((LOGOS_KEY_LEASE_MS+300)*1000);
     assert(m.up>=1 && k.held_count==0);
     assert(!remote_input_keyboard_runner_stop(&runner));
     puts("autonomous-watchdog: PASS");

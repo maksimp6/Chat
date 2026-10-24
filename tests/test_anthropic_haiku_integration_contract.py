@@ -1,4 +1,4 @@
-"""RED acceptance at Alice's existing HTTP, persistence, and trace boundaries.
+"""RED acceptance at Logos's existing HTTP, persistence, and trace boundaries.
 
 All credentials are synthetic; no test calls a live provider.
 """
@@ -26,8 +26,8 @@ def isolated_store(monkeypatch, tmp_path):
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "haiku.db"))
-    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIAL_KEY", "synthetic-encryption-key")
-    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "synthetic-admin-token")
+    monkeypatch.setenv("LOGOS_PROVIDER_CREDENTIAL_KEY", "synthetic-encryption-key")
+    monkeypatch.setenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", "synthetic-admin-token")
     db.init_db()
     return db
 
@@ -130,7 +130,7 @@ def test_anthropic_setup_fails_closed_without_encryption(
 ):
     import provider_credentials_routes as routes
 
-    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIAL_KEY")
+    monkeypatch.delenv("LOGOS_PROVIDER_CREDENTIAL_KEY")
 
     class Provider:
         def validate_key(self, _key):
@@ -163,14 +163,14 @@ def test_degraded_catalog_keeps_haiku_selectable_alongside_yandex(monkeypatch):
     catalog = response.get_json()
     assert catalog["degraded"] is True
     assert catalog["text"][MODEL]["provider"] == "anthropic"
-    assert "aliceai-llm" in catalog["text"]
+    assert "logosai-llm" in catalog["text"]
 
 
 def test_haiku_conversation_selection_survives_database_reload(isolated_store, monkeypatch):
     import app as application
 
-    isolated_store.create_conversation("haiku-dialog", "Haiku", "aliceai-llm")
-    isolated_store.create_conversation("yandex-dialog", "Yandex", "aliceai-llm")
+    isolated_store.create_conversation("haiku-dialog", "Haiku", "logosai-llm")
+    isolated_store.create_conversation("yandex-dialog", "Yandex", "logosai-llm")
     monkeypatch.setattr(application, "get_current_owner_id", lambda required=False: "owner")
     monkeypatch.setattr(application, "check_access", lambda *args: True)
     response = application.app.test_client().patch(
@@ -179,7 +179,7 @@ def test_haiku_conversation_selection_survives_database_reload(isolated_store, m
     assert response.status_code == 200
     conversations = {row["id"]: row for row in isolated_store.get_conversations()}
     assert conversations["haiku-dialog"]["model"] == MODEL
-    assert conversations["yandex-dialog"]["model"] == "aliceai-llm"
+    assert conversations["yandex-dialog"]["model"] == "logosai-llm"
 
 
 def test_trace_retains_anthropic_usage_and_usd_estimate_across_continuation():
@@ -226,7 +226,7 @@ def test_usd_billing_is_not_posted_as_rubles(monkeypatch):
 
 
 def test_yandex_billing_remains_rub_per_thousand_tokens():
-    item = build_ai_billing_item("aliceai-llm", {"input_tokens": 1000, "output_tokens": 1000}, 1)
+    item = build_ai_billing_item("logosai-llm", {"input_tokens": 1000, "output_tokens": 1000}, 1)
     assert item["currency"] == "RUB"
     assert item["provider"] == "yandex_ai_studio"
     assert item["cost_status"] == "calculated"
@@ -279,7 +279,7 @@ def test_chat_routes_to_haiku_and_preserves_invocation_trace(
         pytest.fail("Haiku conversation was routed to Yandex")
 
     monkeypatch.setattr(routes, "create_model_client", factory, raising=False)
-    monkeypatch.setattr(routes, "AliceClient", forbidden)
+    monkeypatch.setattr(routes, "LogosClient", forbidden)
     request = {"conversation_id": "haiku-chat", "message": "hello"}
     if explicit_model:
         request["model"] = MODEL
@@ -311,7 +311,7 @@ def test_chat_provider_failure_never_uses_yandex_or_discloses_secret(
         pytest.fail("Anthropic failure attempted a Yandex fallback")
 
     monkeypatch.setattr(routes, "create_model_client", factory, raising=False)
-    monkeypatch.setattr(routes, "AliceClient", forbidden)
+    monkeypatch.setattr(routes, "LogosClient", forbidden)
     response = application.app.test_client().post(
         "/api/chat", json={"conversation_id": "haiku-failure", "message": "hello", "model": MODEL}
     )

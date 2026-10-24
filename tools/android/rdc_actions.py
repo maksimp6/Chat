@@ -74,7 +74,7 @@ def main() -> int:
         parser.add_argument(f"--{name}", type=int, default=0)
     parser.add_argument("--ms", type=int, default=300)
     parser.add_argument("--package", default="")
-    parser.add_argument("--output-dir", default="~/.alice-rdc/screenshots")
+    parser.add_argument("--output-dir", default="~/.logos-rdc/screenshots")
     args = parser.parse_args()
     try:
         print(json.dumps(execute(args), ensure_ascii=False))

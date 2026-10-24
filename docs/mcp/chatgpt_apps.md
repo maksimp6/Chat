@@ -10,15 +10,15 @@ The connector endpoint is:
 
 The service uses MCP Streamable HTTP. The endpoint supports the current `2026-07-28` discovery flow and the `2025-06-18` / `2025-03-26` handshake flow. Modern clients use `server/discover`; legacy clients can use `initialize`. The implementation accepts the `MCP-Protocol-Version` header when present and can default to the latest supported revision for local/compatibility clients.
 
-MCP authentication is enforced unless local anonymous mode is explicitly enabled with `ALICE_MCP_ALLOW_ANONYMOUS=true`. Bearer mode uses `ALICE_MCP_BEARER_TOKEN` plus `ALICE_MCP_USER_ID`; introspection mode resolves the user ID from an RFC 7662-style introspection response.
+MCP authentication is enforced unless local anonymous mode is explicitly enabled with `LOGOS_MCP_ALLOW_ANONYMOUS=true`. Bearer mode uses `LOGOS_MCP_BEARER_TOKEN` plus `LOGOS_MCP_USER_ID`; introspection mode resolves the user ID from an RFC 7662-style introspection response.
 
 The HTTP transport remains stateless. Each `tools/call` creates a short-lived Logos `Invocation` with a persisted `ExecutionTrace`; the response returns the `invocation_id` and `trace_id` for correlation. This keeps MCP connection state out of the web process while retaining an auditable application-level execution record.
 
 ## Runtime-scoped calls
 
-Clients targeting a preview runtime put `alice/runtime_id` in the `tools/call`
+Clients targeting a preview runtime put `logos/runtime_id` in the `tools/call`
 `params._meta` object. If the resource is runtime-owned, they also provide
-`alice/resource_runtime_id`. Logos validates the authenticated owner and equal
+`logos/resource_runtime_id`. Logos validates the authenticated owner and equal
 caller/resource scopes through `RuntimeDispatcher` before the existing
 `UniversalToolExecutor` boundary runs the tool. Missing connectors, owner
 mismatches, and cross-runtime attempts return the same credential-free error;
@@ -33,19 +33,19 @@ The MCP endpoint exposes the following audited tools through the Universal Tool 
 
 | Tool | Purpose | Permission |
 | --- | --- | --- |
-| `alice_list_conversations` | List conversations owned by the authenticated user | read-only |
-| `alice_get_conversation` | Read one owned conversation | read-only |
-| `alice_get_conversation_messages` | Read messages and persisted trace data for one owned conversation | read-only |
-| `alice_get_execution` | Read one execution using the user-facing execution abstraction | read-only |
-| `alice_get_execution_trace` | Read sanitized ExecutionTrace for one authenticated execution | read-only |
-| `alice_get_system_status` | Runtime, MCP, model and local-tool status | read-only |
-| `alice_list_agents` | Registered Agent Gateway agents | read-only |
-| `alice_get_session` | Session lifecycle status | read-only |
-| `alice_get_invocation` | Invocation status and safe metadata | read-only |
-| `alice_get_invocation_trace` | Persisted ExecutionTrace | read-only |
-| `alice_list_project_files` | List project files/directories | read-only |
-| `alice_read_project_file` | Bounded file read | read-only |
-| `alice_search_project` | Code/text search | read-only |
+| `logos_list_conversations` | List conversations owned by the authenticated user | read-only |
+| `logos_get_conversation` | Read one owned conversation | read-only |
+| `logos_get_conversation_messages` | Read messages and persisted trace data for one owned conversation | read-only |
+| `logos_get_execution` | Read one execution using the user-facing execution abstraction | read-only |
+| `logos_get_execution_trace` | Read sanitized ExecutionTrace for one authenticated execution | read-only |
+| `logos_get_system_status` | Runtime, MCP, model and local-tool status | read-only |
+| `logos_list_agents` | Registered Agent Gateway agents | read-only |
+| `logos_get_session` | Session lifecycle status | read-only |
+| `logos_get_invocation` | Invocation status and safe metadata | read-only |
+| `logos_get_invocation_trace` | Persisted ExecutionTrace | read-only |
+| `logos_list_project_files` | List project files/directories | read-only |
+| `logos_read_project_file` | Bounded file read | read-only |
+| `logos_search_project` | Code/text search | read-only |
 | `git_status` | Repository status | read-only |
 | `git_log` | Commit history | read-only |
 | `git_diff` | Current diff | read-only |
@@ -68,7 +68,7 @@ Authentication is enforced at the MCP server boundary rather than delegated to t
 For local/developer testing:
 
 ```env
-ALICE_MCP_ALLOW_ANONYMOUS=true
+LOGOS_MCP_ALLOW_ANONYMOUS=true
 ```
 
 For a private development deployment, a single bearer token can be configured:
@@ -78,12 +78,12 @@ This mode is intended for private/testing use and is **not** a replacement for C
 For a production ChatGPT connection, configure an OAuth 2.1 resource-server flow backed by an external identity provider:
 
 ```env
-ALICE_MCP_PUBLIC_URL=https://mcp.example.com
-ALICE_MCP_OAUTH_ISSUER=https://auth.example.com
-ALICE_MCP_OAUTH_SCOPE=alice.read
-ALICE_MCP_INTROSPECTION_URL=https://auth.example.com/oauth2/introspect
-ALICE_MCP_INTROSPECTION_CLIENT_ID=<id>
-ALICE_MCP_INTROSPECTION_CLIENT_SECRET=<secret>
+LOGOS_MCP_PUBLIC_URL=https://mcp.example.com
+LOGOS_MCP_OAUTH_ISSUER=https://auth.example.com
+LOGOS_MCP_OAUTH_SCOPE=logos.read
+LOGOS_MCP_INTROSPECTION_URL=https://auth.example.com/oauth2/introspect
+LOGOS_MCP_INTROSPECTION_CLIENT_ID=<id>
+LOGOS_MCP_INTROSPECTION_CLIENT_SECRET=<secret>
 ```
 
 Logos publishes:
@@ -114,10 +114,10 @@ The container entrypoint (`scripts/container_entrypoint.py`) can run
 [openai/tunnel-client](https://github.com/openai/tunnel-client) next to Logos.
 The client polls OpenAI over outbound HTTPS and forwards ChatGPT's MCP requests
 to `http://127.0.0.1:$PORT/mcp`, adding `Authorization: Bearer
-$ALICE_MCP_BEARER_TOKEN` itself, so the connector in ChatGPT needs no
+$LOGOS_MCP_BEARER_TOKEN` itself, so the connector in ChatGPT needs no
 authentication of its own. The tunnel starts only when all of
-`OPENAI_TUNNEL_ID`, `OPENAI_TUNNEL_API_KEY`, `ALICE_MCP_BEARER_TOKEN` and
-`ALICE_MCP_USER_ID` are set; a partial set stops the container. Each process
+`OPENAI_TUNNEL_ID`, `OPENAI_TUNNEL_API_KEY`, `LOGOS_MCP_BEARER_TOKEN` and
+`LOGOS_MCP_USER_ID` are set; a partial set stops the container. Each process
 gets only its own secrets, and if either exits the container exits.
 
 Setup:
@@ -128,7 +128,7 @@ Setup:
 2. Store them as `OPENAI_TUNNEL_ID` and `OPENAI_TUNNEL_API_KEY` secrets of the
    `production` GitHub environment.
 3. Run the **Cloud.ru OpenAI tunnel** workflow (`cloudru-openai-tunnel.yml`)
-   with action `deploy`. It deploys the `alice-openai-tunnel` service with one
+   with action `deploy`. It deploys the `logos-openai-tunnel` service with one
    always-on instance and generates the internal MCP bearer token per deploy.
 4. In ChatGPT: Plugins, **+**, **Add custom MCP server**, Connection
    **Tunnel**, pick the tunnel.

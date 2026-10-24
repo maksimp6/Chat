@@ -9,7 +9,7 @@ case "$ORIGINAL" in
 esac
 OTHER=$(printf '%s' "$ORIGINAL" | sed "s#:$TARGET##;s#$TARGET:##;s#$TARGET##")
 [ "$OTHER" != "$ORIGINAL" ] || exit 5
-DIR=/data/local/tmp/alice-hyperai-ab
+DIR=/data/local/tmp/logos-hyperai-ab
 mkdir -p "$DIR"
 printf '%s\n' "$ORIGINAL" > "$DIR/original-services"
 printf '%s\n' "$ORIGINAL_ENABLED" > "$DIR/original-enabled"

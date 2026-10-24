@@ -122,14 +122,14 @@ class StoreValidationTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.root = directory.name
-        self.store = ModelStore(LocalDirectoryStorage(self.root), "alice")
+        self.store = ModelStore(LocalDirectoryStorage(self.root), "logos")
 
     def test_owner_and_runtime_scope_are_required(self):
         provider = LocalDirectoryStorage(self.root)
         with self.assertRaisesRegex(ValueError, "trusted owner identity"):
             ModelStore(provider, " ")
         with self.assertRaisesRegex(ValueError, "runtime scope"):
-            ModelStore(provider, "alice", "")
+            ModelStore(provider, "logos", "")
 
     def test_identifiers_are_validated(self):
         with self.assertRaisesRegex(ValueError, "model_id must be a UUID"):
@@ -159,7 +159,7 @@ class StoreValidationTests(unittest.TestCase):
             self.store.load(MODEL_ID, self._put(MODEL_ID, raw))
 
     def test_storage_verification_failures_are_raised(self):
-        flaky = ModelStore(FlakyStorage(self.root), "alice")
+        flaky = ModelStore(FlakyStorage(self.root), "logos")
         with self.assertRaisesRegex(OSError, "model storage verification failed"):
             flaky.save(new_scene(MODEL_ID, "Flaky"))
 
@@ -173,7 +173,7 @@ class StoreValidationTests(unittest.TestCase):
                 data = super().download(key, credentials=credentials)
                 return data + b" " if key.endswith(".stl") else data
 
-        flaky_export = ModelStore(ExportOnlyFlaky(self.root), "alice")
+        flaky_export = ModelStore(ExportOnlyFlaky(self.root), "logos")
         with self.assertRaisesRegex(OSError, "STL storage verification failed"):
             flaky_export.export(scene, revision)
 
@@ -182,7 +182,7 @@ class ToolIdentityTests(unittest.TestCase):
     def setUp(self) -> None:
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
-        patcher = patch.dict(os.environ, {"ALICE_STORAGE_LOCAL_ROOT": directory.name})
+        patcher = patch.dict(os.environ, {"LOGOS_STORAGE_LOCAL_ROOT": directory.name})
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -197,7 +197,7 @@ class ToolIdentityTests(unittest.TestCase):
 
     def test_addcube_validates_translation_before_loading(self):
         class Caller:
-            user_id = "alice"
+            user_id = "logos"
             metadata = {"runtime_id": "host"}
 
         cfg = {"_universal_context": {"call": Caller()}}

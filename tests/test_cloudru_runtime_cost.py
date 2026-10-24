@@ -5,7 +5,7 @@ import pytest
 from cloud.cloudru.billing import estimate_container_runtime_cost
 
 
-def test_estimate_container_runtime_cost_for_alice():
+def test_estimate_container_runtime_cost_for_logos():
     result = estimate_container_runtime_cost(
         active_seconds=3600,
         idle_seconds=300,

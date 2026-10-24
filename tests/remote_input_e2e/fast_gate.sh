@@ -19,7 +19,7 @@ elif [ -d /tmp ]; then
 else
   tmp_root="$(dirname "$(command -v python3)")/../tmp"
 fi
-scratch="$(mktemp -d "$tmp_root/alice-input-fast.XXXXXXXX")"
+scratch="$(mktemp -d "$tmp_root/logos-input-fast.XXXXXXXX")"
 security_pid=""
 keyboard_pid=""
 cleanup() {
@@ -52,8 +52,8 @@ cat "$scratch/security.log"
 cat "$scratch/keyboard.log"
 
 if [ "$security_rc" -ne 0 ] || [ "$keyboard_rc" -ne 0 ]; then
-  echo "ALICE_INPUT_FAST FAIL security=$security_rc keyboard=$keyboard_rc" >&2
+  echo "LOGOS_INPUT_FAST FAIL security=$security_rc keyboard=$keyboard_rc" >&2
   exit 1
 fi
 
-echo "ALICE_INPUT_FAST_INTEGRATION PASS (Security + actual C keyboard mocked uinput)"
+echo "LOGOS_INPUT_FAST_INTEGRATION PASS (Security + actual C keyboard mocked uinput)"

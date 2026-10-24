@@ -9,7 +9,7 @@ def treasury_db(tmp_path, monkeypatch):
 
     path = tmp_path / "treasury.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setenv("ALICE_MEMORY_PATH", str(tmp_path / "alice.memory"))
+    monkeypatch.setenv("LOGOS_MEMORY_PATH", str(tmp_path / "logos.memory"))
     monkeypatch.setattr(treasury, "get_store", db.get_store)
     close_memory_clients()
     db.init_db()
@@ -146,7 +146,7 @@ def test_invocation_user_id_flows_into_trace_billing_context(treasury_db):
 def test_owner_identity_does_not_accept_client_body(treasury_db, monkeypatch):
     from app import app
 
-    monkeypatch.delenv("ALICE_OWNER_ID", raising=False)
+    monkeypatch.delenv("LOGOS_OWNER_ID", raising=False)
     app.config.update(TESTING=True)
     with app.test_request_context(
         "/api/treasury/account?owner_id=attacker",
@@ -201,7 +201,7 @@ def test_bootstrap_authenticates_treasury_owner(treasury_db):
     identity = bootstrap.get_json()
     assert identity["user_id"]
     assert identity["auth_token"]
-    assert "alice_user_token=" in bootstrap.headers.get("Set-Cookie", "")
+    assert "logos_user_token=" in bootstrap.headers.get("Set-Cookie", "")
 
     account = client.get("/api/treasury/account")
     assert account.status_code == 200
@@ -211,13 +211,13 @@ def test_bootstrap_authenticates_treasury_owner(treasury_db):
 def test_invalid_owner_token_is_rejected(treasury_db, monkeypatch):
     from app import app
 
-    monkeypatch.delenv("ALICE_OWNER_ID", raising=False)
+    monkeypatch.delenv("LOGOS_OWNER_ID", raising=False)
     app.config.update(TESTING=True)
     client = app.test_client()
 
     response = client.get(
         "/api/treasury/account",
-        headers={"X-Alice-User-Token": "not-a-valid-token"},
+        headers={"X-Logos-User-Token": "not-a-valid-token"},
     )
 
     assert response.status_code == 401
@@ -239,7 +239,7 @@ def test_authenticated_owner_ignores_client_owner_id(treasury_db):
 
     response = client.get(
         "/api/treasury/account?owner_id=attacker-owner",
-        headers={"X-Alice-User-Token": identity["auth_token"]},
+        headers={"X-Logos-User-Token": identity["auth_token"]},
     )
 
     assert response.status_code == 200

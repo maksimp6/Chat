@@ -53,11 +53,11 @@ def test_emulator_drives_real_http_page_through_registry(site, adapter):
 
     assert _run(registry, "navigate", site + "/")["data"]["title"] == "Fixture"
     assert _run(registry, "assert_state", "#title", "fixture")["data"]["ok"] is True
-    _run(registry, "fill", "input[name='q']", "alice")
+    _run(registry, "fill", "input[name='q']", "logos")
     result = _run(registry, "click", "#go")
     assert result["success"] is True
-    assert result["data"]["url"].endswith("/result?q=alice")
-    assert "/result?q=alice" in _run(registry, "inspect", "#out")["data"]["text"]
+    assert result["data"]["url"].endswith("/result?q=logos")
+    assert "/result?q=logos" in _run(registry, "inspect", "#out")["data"]["text"]
 
 
 def test_emulator_reports_unsupported_actions_without_crashing(adapter):

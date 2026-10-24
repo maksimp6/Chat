@@ -207,7 +207,7 @@
         console.error("[CORE STATUS]", error);
       }
     });
-    window.dispatchEvent(new CustomEvent("alice:status", { detail: safeValue }));
+    window.dispatchEvent(new CustomEvent("logos:status", { detail: safeValue }));
   }
 
   function subscribeStatus(callback) {
@@ -237,7 +237,7 @@
     }
 
     window.dispatchEvent(
-      new CustomEvent("alice:revocation", {
+      new CustomEvent("logos:revocation", {
         detail: {
           type: String(type),
           id: String(id),
@@ -450,7 +450,7 @@
     var button = document.createElement("button");
     button.type = "button";
     button.className =
-      "alice-btn" + (options.className ? " " + String(options.className).trim() : "");
+      "logos-btn" + (options.className ? " " + String(options.className).trim() : "");
     button.dataset.action = options.action;
     if (options.id) button.id = String(options.id);
     if (options.params) {
@@ -540,7 +540,7 @@
   registerAction("modal.open", function (payload) {
     var modal = modalFromPayload(payload);
     document.dispatchEvent(
-      new CustomEvent("alice:modal:before-open", {
+      new CustomEvent("logos:modal:before-open", {
         detail: Object.freeze({
           modal: modal,
           modalId: modal.id,
@@ -555,7 +555,7 @@
     return closeModal(modalFromPayload(payload));
   });
 
-  window.AliceCoreAPI = Object.freeze({
+  window.LogosCoreAPI = Object.freeze({
     apiVersion: MODULE_API_VERSION,
     module: Object.freeze({
       register: registerModule,

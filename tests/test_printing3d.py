@@ -567,7 +567,7 @@ def test_registry_survives_printing3d_tool_import_failure(monkeypatch):
 
 @pytest.fixture
 def printing_client(printing_db, monkeypatch):
-    monkeypatch.setenv("ALICE_OWNER_ID", "route-owner")
+    monkeypatch.setenv("LOGOS_OWNER_ID", "route-owner")
     from app import app
 
     app.config.update(TESTING=True)
@@ -575,7 +575,7 @@ def printing_client(printing_db, monkeypatch):
 
 
 def test_3d_routes_require_authenticated_owner(printing_db, monkeypatch):
-    monkeypatch.delenv("ALICE_OWNER_ID", raising=False)
+    monkeypatch.delenv("LOGOS_OWNER_ID", raising=False)
     from app import app
 
     app.config.update(TESTING=True)
@@ -711,7 +711,7 @@ def test_treasury_summary_route(printing_client):
 
 
 def test_all_owner_scoped_3d_routes_reject_unauthenticated_requests(printing_db, monkeypatch):
-    monkeypatch.delenv("ALICE_OWNER_ID", raising=False)
+    monkeypatch.delenv("LOGOS_OWNER_ID", raising=False)
     from app import app
 
     app.config.update(TESTING=True)

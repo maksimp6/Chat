@@ -15,7 +15,7 @@ from typing import Callable
 from scripts.q14_simulation import BASELINE_HEAD, CASES, run_cases
 
 HOST = "ai.api.cloud.yandex.net"
-MODEL = "aliceai-llm-flash"
+MODEL = "logosai-llm-flash"
 STAGES = ("accusation", "defence", "decision_draft")
 MAX_CALLS = 3
 MAX_OUTPUT_TOKENS = 4096

@@ -203,7 +203,7 @@ def remove_file_from_vs(vs_id, file_id):
 
 
 # Local Files API. Desktop keeps the historical path; Android can override it.
-LOCAL_REPO_DIR = os.getenv("ALICE_LOCAL_REPO_DIR", "/sdcard/repo")
+LOCAL_REPO_DIR = os.getenv("LOGOS_LOCAL_REPO_DIR", "/sdcard/repo")
 
 
 @file_bp.route("/api/local-files", methods=["GET"])

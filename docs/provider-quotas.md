@@ -7,10 +7,10 @@ Responses API request boundary.
 
 The default policy is deployment-configured:
 
-- ALICE_QUOTA_PERIOD_SECONDS (default 86400);
-- ALICE_QUOTA_MAX_REQUESTS (default 100; 0 disables the period limit);
-- ALICE_QUOTA_MAX_REQUESTS_PER_MINUTE (default 20; 0 disables the rate limit);
-- ALICE_QUOTA_REQUIRE_IDENTITY (true makes missing user identity fail closed).
+- LOGOS_QUOTA_PERIOD_SECONDS (default 86400);
+- LOGOS_QUOTA_MAX_REQUESTS (default 100; 0 disables the period limit);
+- LOGOS_QUOTA_MAX_REQUESTS_PER_MINUTE (default 20; 0 disables the rate limit);
+- LOGOS_QUOTA_REQUIRE_IDENTITY (true makes missing user identity fail closed).
 
 Additional named policies are stored in provider_quota_policies and can be
 assigned to a trusted user through the administrative quota API.
@@ -33,7 +33,7 @@ containing the reason and reset times.
 
 GET /api/provider-quota/me returns the current trusted user's usage.
 
-Administrative operations require ALICE_QUOTA_ADMIN_TOKEN and the
+Administrative operations require LOGOS_QUOTA_ADMIN_TOKEN and the
 X-Provider-Quota-Admin-Token header:
 
 - GET /api/provider-quota/users/<user_id>;

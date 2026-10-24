@@ -1,7 +1,7 @@
 import subprocess, time, re, csv, os
 
 SERIAL = "192.168.31.109:42125"
-OUT = os.path.expanduser("~/.alice-rdc/chatgpt279-focus-measure.csv")
+OUT = os.path.expanduser("~/.logos-rdc/chatgpt279-focus-measure.csv")
 
 
 def shell(cmd):

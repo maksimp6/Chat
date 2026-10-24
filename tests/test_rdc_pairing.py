@@ -32,8 +32,8 @@ def test_verification_url_expiry_and_origin(tmp_path):
 
 
 def test_route_requires_token_and_existing_live_handoff(monkeypatch, tmp_path):
-    monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "1")
-    monkeypatch.setenv("ALICE_SHORT_TOKEN", "test-secret")
+    monkeypatch.setenv("LOGOS_REQUIRE_SHORT_TOKEN", "1")
+    monkeypatch.setenv("LOGOS_SHORT_TOKEN", "test-secret")
     app = Flask(__name__)
     install_short_token_auth(app)
     install_rdc_pairing(app)
@@ -45,7 +45,7 @@ def test_route_requires_token_and_existing_live_handoff(monkeypatch, tmp_path):
     path = tmp_path / "handoff.json"
     url = "https://mcp.desktopcommander.app/device/verify?code=test"
     path.write_text(json.dumps({"expires_at": time.time() + 60, "verification_uri_complete": url}))
-    monkeypatch.setenv("ALICE_RDC_PAIRING_FILE", str(path))
+    monkeypatch.setenv("LOGOS_RDC_PAIRING_FILE", str(path))
     response = client.get("/test-secret/rdc")
     assert response.status_code == 303
     assert response.headers["Location"] == url
@@ -55,7 +55,7 @@ def test_route_requires_token_and_existing_live_handoff(monkeypatch, tmp_path):
 
 
 def test_disabled_auth_cannot_publish_pairing(monkeypatch):
-    monkeypatch.delenv("ALICE_REQUIRE_SHORT_TOKEN", raising=False)
+    monkeypatch.delenv("LOGOS_REQUIRE_SHORT_TOKEN", raising=False)
     app = Flask(__name__)
     install_rdc_pairing(app)
     assert app.test_client().get("/rdc").status_code == 401

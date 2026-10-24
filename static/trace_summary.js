@@ -277,7 +277,7 @@
     };
   }
 
-  window.AliceTraceSummary = Object.freeze({
+  window.LogosTraceSummary = Object.freeze({
     build: build,
   });
 })();

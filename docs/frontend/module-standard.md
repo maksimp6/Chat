@@ -12,7 +12,7 @@ Every module has:
 - declared `capabilities`;
 - lifecycle entry points: `init`, `start`, `stop`, `destroy`.
 
-The browser implementation uses `window.AliceCoreAPI`. Its shape is intentionally C-like: stable function tables, explicit boundaries, and capability checks.
+The browser implementation uses `window.LogosCoreAPI`. Its shape is intentionally C-like: stable function tables, explicit boundaries, and capability checks.
 
 ```text
 Module

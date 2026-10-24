@@ -1,4 +1,4 @@
-"""Explicit, idempotent seed of the confirmed missing-controls incident into Alice Board.
+"""Explicit, idempotent seed of the confirmed missing-controls incident into Logos Board.
 
 This creates data ONLY in the supplied board file. It never calls GitHub or deploys.
 """
@@ -44,7 +44,7 @@ def seed(path: str) -> dict[str, str]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Seed one confirmed Alice Board incident")
+    parser = argparse.ArgumentParser(description="Seed one confirmed Logos Board incident")
     parser.add_argument("--db", default=os.environ.get("PROJECT_BOARD_DB"))
     arguments = parser.parse_args()
     if not arguments.db:

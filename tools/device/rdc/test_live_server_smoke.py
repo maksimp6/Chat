@@ -14,7 +14,7 @@ import time
 import urllib.error
 import urllib.request
 
-BASE = Path.home() / ".alice-rdc"
+BASE = Path.home() / ".logos-rdc"
 TOKEN = (BASE / "live-token").read_text().strip()
 port_sock = socket.socket()
 port_sock.bind(("127.0.0.1", 0))

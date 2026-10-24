@@ -1,4 +1,4 @@
-# Alice Pro: automatic real 3D previews in GitHub comments
+# Logos Pro: automatic real 3D previews in GitHub comments
 
 Issue: [#1118](https://github.com/maksimp6/Chat/issues/1118). This is a review visualization **not** a printer controller.
 
@@ -20,7 +20,7 @@ Open or update a same-repository PR. The trusted GitHub Actions
    message rather than an invented preview.
 4. Computes deterministic, actual triangle-based **isometric, top, side**
    orthographic views, all in **one PNG per model**, never source ZIP previews.
-5. Commits **only rendered PNGs** to the separate `alice-3d-previews` branch
+5. Commits **only rendered PNGs** to the separate `logos-3d-previews` branch
    (not `develop` or `master`), referenced by immutable commit SHA.
 6. Creates or updates **one GitHub Actions bot PR comment**, including the
    inline image, originating SHA, face count and bounds. Repeated scheduled checks of the

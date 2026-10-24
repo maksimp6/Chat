@@ -15,7 +15,7 @@ def read_accessibility(serial):
     """
     if not isinstance(serial, str) or not re.fullmatch(r"[A-Za-z0-9._:-]{5,100}", serial):
         raise RuntimeError("Untrusted accessibility device")
-    temporary = "/data/local/tmp/alice-live-ui-" + secrets.token_hex(12) + ".xml"
+    temporary = "/data/local/tmp/logos-live-ui-" + secrets.token_hex(12) + ".xml"
     prefix = ["adb", "-s", serial]
     try:
         result = subprocess.run(

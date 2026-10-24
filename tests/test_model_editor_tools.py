@@ -1,4 +1,4 @@
-"""No-printer, owner-scoped E2E for Alice's local 3D editor."""
+"""No-printer, owner-scoped E2E for Logos's local 3D editor."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ from tool_providers.universal_tool_platform import UniversalToolCall, UniversalT
 
 
 class Caller:
-    def __init__(self, owner: str = "alice", runtime: str = "host") -> None:
+    def __init__(self, owner: str = "logos", runtime: str = "host") -> None:
         self.user_id = owner
         self.metadata = {"runtime_id": runtime}
 
@@ -40,12 +40,12 @@ class EditorTests(unittest.TestCase):
     def setUp(self) -> None:
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
-        patcher = patch.dict(os.environ, {"ALICE_STORAGE_LOCAL_ROOT": self.directory.name})
+        patcher = patch.dict(os.environ, {"LOGOS_STORAGE_LOCAL_ROOT": self.directory.name})
         patcher.start()
         self.addCleanup(patcher.stop)
 
     @staticmethod
-    def cfg(owner: str = "alice", runtime: str = "host") -> dict:
+    def cfg(owner: str = "logos", runtime: str = "host") -> dict:
         return {"_universal_context": {"call": Caller(owner, runtime)}}
 
     def test_cube_create_edit_export_and_immutable_history(self):
@@ -225,7 +225,7 @@ class EditorTests(unittest.TestCase):
 
     def test_checksum_detects_corrupt_stored_snapshot(self):
         provider = LocalDirectoryStorage(self.directory.name)
-        store = ModelStore(provider, "alice")
+        store = ModelStore(provider, "logos")
         scene, revision = store.create()
         file = Path(provider._root) / store._key(scene["model_id"], revision)
         file.write_text("corrupt")

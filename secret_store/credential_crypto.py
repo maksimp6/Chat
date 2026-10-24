@@ -19,7 +19,7 @@ def _fernet():
             "cryptography is required for encrypted provider credentials"
         ) from exc
 
-    key = os.getenv("ALICE_PROVIDER_CREDENTIAL_KEY", "").strip()
+    key = os.getenv("LOGOS_PROVIDER_CREDENTIAL_KEY", "").strip()
     if not key:
         return None, InvalidToken
 

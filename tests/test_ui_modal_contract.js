@@ -3,7 +3,7 @@ const { BrowserShim } = require("../browser/emulator/browser_dom");
 const shim = new BrowserShim();
 const { window, document } = shim.load(["static/core_api.js"]);
 
-const UI = window.AliceCoreAPI.ui;
+const UI = window.LogosCoreAPI.ui;
 const body = document.createElement("div");
 body.className = "modal-body";
 body.textContent = "Body";
@@ -30,7 +30,7 @@ if (modal.querySelectorAll(".modal-content").length !== 1)
   throw new Error("modal requires exactly one content shell");
 
 const close = modal.querySelector(".modal-close");
-if (!close || !close.classList.contains("alice-btn"))
+if (!close || !close.classList.contains("logos-btn"))
   throw new Error("modal close must use button contract");
 if (close.dataset.action !== "contract.modal.close")
   throw new Error("close button must use action contract");

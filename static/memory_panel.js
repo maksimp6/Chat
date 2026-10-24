@@ -8,18 +8,18 @@
   window.openMemoryModal = function () {
     var modal = byId("memoryModal");
     if (!modal) return;
-    window.AliceCoreAPI.ui.modal.open(modal);
+    window.LogosCoreAPI.ui.modal.open(modal);
     window.loadMemoryData();
   };
 
   window.closeMemoryModal = function () {
     var modal = byId("memoryModal");
-    if (modal) window.AliceCoreAPI.ui.modal.close(modal);
+    if (modal) window.LogosCoreAPI.ui.modal.close(modal);
   };
 
   window.loadMemoryData = async function () {
     try {
-      var response = await window.AliceDispatcher.request("/api/memory/manage");
+      var response = await window.LogosDispatcher.request("/api/memory/manage");
       if (!response.ok) throw new Error("HTTP " + response.status);
       var data = await response.json();
       var enabled = byId("memEnabled");
@@ -61,7 +61,7 @@
     var enabled = byId("memEnabled");
     var limit = byId("memLimit");
     try {
-      var response = await window.AliceDispatcher.request("/api/memory/config", {
+      var response = await window.LogosDispatcher.request("/api/memory/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -79,7 +79,7 @@
   window.clearMemory = async function (category) {
     if (!confirm("Очистить память?")) return;
     try {
-      var response = await window.AliceDispatcher.request("/api/memory/clear", {
+      var response = await window.LogosDispatcher.request("/api/memory/clear", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ category: category }),
@@ -92,8 +92,8 @@
   };
 
   function bindMemoryPanelEvents() {
-    if (window.__aliceMemoryPanelBound === true) return;
-    window.__aliceMemoryPanelBound = true;
+    if (window.__logosMemoryPanelBound === true) return;
+    window.__logosMemoryPanelBound = true;
 
     document.addEventListener(
       "click",
@@ -110,7 +110,7 @@
       true,
     );
 
-    document.addEventListener("alice:modal:before-open", function (event) {
+    document.addEventListener("logos:modal:before-open", function (event) {
       var detail = event && event.detail;
       if (!detail || detail.modalId !== "memoryModal") return;
       window.loadMemoryData();

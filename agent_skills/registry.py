@@ -76,7 +76,7 @@ ROLE_SKILL_ALLOWLIST = {
         "security-review",
         "docs-sync",
     },
-    "alice": {
+    "logos": {
         "3d-print-preflight",
         "a1-mini-print-watch",
         "github-pr-readiness",
