@@ -1,6 +1,6 @@
 # Android release signing
 
-Alice Pro keeps debug and release signing separate.
+Logos keeps debug and release signing separate.
 
 ## GitHub Actions secrets
 

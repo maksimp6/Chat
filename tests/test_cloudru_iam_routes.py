@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
-import cloudru_iam_routes as routes
+import cloud.cloudru.iam_routes as routes
 
 
 def test_wizard_is_disabled_by_default(monkeypatch):

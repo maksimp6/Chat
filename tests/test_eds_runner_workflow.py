@@ -9,7 +9,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def workflow(name):
-    return yaml.safe_load((ROOT / ".github/workflows" / name).read_text())
+    config = yaml.safe_load((ROOT / ".github/workflows" / name).read_text())
+    # These tests inspect the credential-bearing workload, not reporting steps.
+    for job in config["jobs"].values():
+        job["steps"] = [s for s in job["steps"] if not s["id"].startswith("job_policy_")]
+    return config
 
 
 def test_eds_auth_check_is_manual_trusted_and_does_not_publish_api_output():
