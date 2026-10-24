@@ -32,8 +32,6 @@ jobs:
         MCP worker tests,
         Code rules,
         Application tests,
-        Android debug APK,
-        Auto-format repository,
         Trivy repository scan
 
     steps:

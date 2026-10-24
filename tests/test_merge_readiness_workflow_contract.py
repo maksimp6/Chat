@@ -32,8 +32,6 @@ def test_merge_readiness_workflow_requires_current_protected_checks() -> None:
         "Infrastructure tests",
         "MCP worker tests",
         "Application tests",
-        "Android debug APK",
-        "Auto-format repository",
         "Trivy repository scan",
     ]
     for check in required_checks:

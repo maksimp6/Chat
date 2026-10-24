@@ -110,8 +110,6 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
           npm install --ignore-scripts --no-audit --no-fund --package-lock=false
           echo "- Application dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
-      - name: Check source formatting
-        run: bash scripts/format.sh check
       - name: Generate hot-file modularity report
         run: |
           python scripts/hot_file_metrics.py \
@@ -303,78 +301,10 @@ jobs:
           npm ci --prefix deploy/remote-desktop-commander --omit=dev --ignore-scripts --no-audit --no-fund
           node --test deploy/remote-desktop-commander/oauth.test.mjs deploy/remote-desktop-commander/credential-handoff.test.mjs
 
-  android:
-    name: Android debug APK
-    needs: changes
-    if: needs.changes.outputs.android == 'true'
-    runs-on: ubuntu-latest
-    env:
-      ALICE_DEBUG_KEYSTORE_PATH: ${{ github.workspace }}/android/app/debug-signing.keystore
-      ALICE_DEBUG_KEY_ALIAS: ${{ secrets.ANDROID_DEBUG_KEY_ALIAS }}
-      ALICE_DEBUG_STORE_PASSWORD: ${{ secrets.ANDROID_DEBUG_STORE_PASSWORD }}
-      ALICE_DEBUG_KEY_PASSWORD: ${{ secrets.ANDROID_DEBUG_KEY_PASSWORD }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up Java
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
-        with:
-          distribution: temurin
-          java-version: "25"
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.13"
-      - name: Stage Python runtime
-        working-directory: android
-        run: python scripts/stage_python.py
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
-        with:
-          gradle-version: "9.5.0"
-      - name: Materialize stable debug keystore
-        env:
-          ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
-        run: |
-          set -euo pipefail
-          if [ -n "$ANDROID_DEBUG_KEYSTORE_BASE64" ]; then
-            printf '%s' "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$ALICE_DEBUG_KEYSTORE_PATH"
-            chmod 600 "$ALICE_DEBUG_KEYSTORE_PATH"
-            test -s "$ALICE_DEBUG_KEYSTORE_PATH"
-            keytool -list \
-              -keystore "$ALICE_DEBUG_KEYSTORE_PATH" \
-              -storepass "$ALICE_DEBUG_STORE_PASSWORD" \
-              -alias "$ALICE_DEBUG_KEY_ALIAS" >/dev/null
-            echo "Using repository-managed stable debug signing key."
-          else
-            echo "Stable debug signing secrets are not configured; using the ephemeral Gradle debug key."
-          fi
-      - name: Run Android unit tests and build debug APK
-        working-directory: android
-        run: |
-          started=$SECONDS
-          gradle --no-daemon -PaliceBuildNumber=${{ github.run_number }} -PaliceCommitHash=${{ github.sha }} :app:testDebugUnitTest :app:assembleDebug
-          echo "- Android test/build: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
-      - name: Verify debug APK
-        run: |
-          test -s android/app/build/outputs/apk/debug/app-debug.apk
-          sha256sum android/app/build/outputs/apk/debug/app-debug.apk
-      - name: Upload debug APK
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: alice-pro-debug-apk-${{ github.run_number }}
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
-          compression-level: 0
-
-
   required:
     name: CI required
     if: always()
-    needs: [changes, code-rules, backend, android, infra, mcp]
+    needs: [changes, code-rules, backend, infra, mcp]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

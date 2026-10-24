@@ -33,7 +33,7 @@ The separate Security workflow still runs for documentation-only PRs.
 Format produces a correction artifact when formatting changes are necessary; its
 success alone is not proof of a clean tree. Run `bash scripts/pre_push.sh` in the
 real checkout before publication, apply and commit corrections, and validate the
-new head. The application suite also runs `bash scripts/format.sh check` when selected.
+new head.
 
 ## Integration and promotion
 

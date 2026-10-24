@@ -308,8 +308,6 @@ python scripts/merge_readiness.py \
   --required-check "Code rules" \
   --required-check "Application tests" \
   --required-check "PostgreSQL integration" \
-  --required-check "Android debug APK" \
-  --required-check "Auto-format repository" \
   --required-check "Trivy repository scan" \
   --pretty
 ```
@@ -358,8 +356,6 @@ Workflow `Merge readiness snapshot` запускается для non-draft PR �
 - `Code rules`;
 - `Application tests`;
 - `PostgreSQL integration`;
-- `Android debug APK`;
-- `Auto-format repository`;
 - `Trivy repository scan`.
 
 `Platform changes` и `CI required` должны завершиться именно `success`.
