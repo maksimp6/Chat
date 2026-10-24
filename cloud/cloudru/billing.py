@@ -9,7 +9,7 @@ and reports ``total_cost=None`` instead of guessing when nothing matches.
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, Mapping
 
 _TOTAL_KEYS = ("total_cost", "total", "total_amount", "cost_total")
 _ROW_LIST_KEYS = ("items", "data", "consumption", "rows", "result")
@@ -91,3 +91,122 @@ def parse_consumption_total(payload: Any) -> dict[str, Any]:
             return {"total_cost": total, "currency": currency, "rows": counted}
 
     return {"total_cost": None, "currency": currency, "rows": 0}
+
+
+def _validated_decimal_fields(values: Mapping[str, Any]) -> dict[str, Decimal]:
+    normalized: dict[str, Decimal] = {}
+    for name, value in values.items():
+        amount = _decimal(value)
+        if amount is None or amount < 0:
+            raise ValueError(f"{name} must be a non-negative finite decimal")
+        normalized[name] = amount
+    return normalized
+
+
+def estimate_container_runtime_cost(
+    *,
+    active_seconds: int,
+    idle_seconds: int,
+    cold_starts: int,
+    vcpu: Decimal,
+    memory_gb: Decimal,
+    vcpu_rub_per_hour: Decimal,
+    memory_rub_per_gb_hour: Decimal,
+) -> dict[str, Any]:
+    """Estimate gross Container Apps runtime cost from measured runtime seconds.
+
+    This helper deliberately does not apply organization-level free tier because
+    free-tier allocation is shared across services and must be reconciled against
+    provider billing rather than guessed per container.
+    """
+
+    integer_fields = {
+        "active_seconds": active_seconds,
+        "idle_seconds": idle_seconds,
+        "cold_starts": cold_starts,
+    }
+    for name, value in integer_fields.items():
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"{name} must be a non-negative integer")
+
+    decimal_fields = {
+        "vcpu": vcpu,
+        "memory_gb": memory_gb,
+        "vcpu_rub_per_hour": vcpu_rub_per_hour,
+        "memory_rub_per_gb_hour": memory_rub_per_gb_hour,
+    }
+    normalized = _validated_decimal_fields(decimal_fields)
+
+    billable_seconds = active_seconds + idle_seconds
+    hours = Decimal(billable_seconds) / Decimal(3600)
+    quantum = Decimal("0.0000001")
+    cpu_rub = (hours * normalized["vcpu"] * normalized["vcpu_rub_per_hour"]).quantize(quantum)
+    memory_rub = (hours * normalized["memory_gb"] * normalized["memory_rub_per_gb_hour"]).quantize(
+        quantum
+    )
+
+    return {
+        "status": "estimated",
+        "active_seconds": active_seconds,
+        "idle_seconds": idle_seconds,
+        "billable_seconds": billable_seconds,
+        "cold_starts": cold_starts,
+        "cpu_rub": cpu_rub,
+        "memory_rub": memory_rub,
+        "estimated_rub": (cpu_rub + memory_rub).quantize(quantum),
+        "free_tier_applied": False,
+    }
+
+
+def reconcile_container_runtime_cost(
+    *, estimated_rub: Decimal, actual_rub: Decimal | None
+) -> dict[str, Any]:
+    """Compare a gross runtime estimate with provider-measured billing."""
+    estimated = _decimal(estimated_rub)
+    if estimated is None or estimated < 0:
+        raise ValueError("estimated_rub must be a non-negative finite decimal")
+    if actual_rub is None:
+        return {
+            "status": "unknown",
+            "estimated_rub": estimated,
+            "actual_rub": None,
+            "variance_rub": None,
+            "variance_percent": None,
+        }
+
+    actual = _decimal(actual_rub)
+    if actual is None or actual < 0:
+        raise ValueError("actual_rub must be a non-negative finite decimal")
+
+    variance = (actual - estimated).quantize(Decimal("0.0000001"))
+    variance_percent = None
+    if estimated:
+        variance_percent = (
+            variance / estimated * Decimal(100)
+        ).quantize(Decimal("0.0001"))
+
+    return {
+        "status": "measured",
+        "estimated_rub": estimated,
+        "actual_rub": actual,
+        "variance_rub": variance,
+        "variance_percent": variance_percent,
+    }
+
+
+def detect_unexpected_hot(
+    *,
+    idle_seconds: int,
+    configured_idle_timeout_seconds: int,
+    running_instances: int,
+) -> bool:
+    """Return true when a running instance outlives its configured idle budget."""
+    values = {
+        "idle_seconds": (idle_seconds, 0),
+        "configured_idle_timeout_seconds": (configured_idle_timeout_seconds, 1),
+        "running_instances": (running_instances, 0),
+    }
+    for name, (value, minimum) in values.items():
+        if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+            raise ValueError(f"{name} is outside the allowed range")
+    return running_instances > 0 and idle_seconds > configured_idle_timeout_seconds

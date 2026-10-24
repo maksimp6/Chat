@@ -1,11 +1,11 @@
 # Partner Relations Department
 
-Partner Relations is a first-class Alice Pro Department backed by owner-scoped
+Partner Relations is a first-class Logos Department backed by owner-scoped
 partner, contact, message and follow-up records.
 
 ## Ownership and authorization
 
-All records carry the trusted owner id resolved from the Alice authentication
+All records carry the trusted owner id resolved from the Logos authentication
 context. Tool execution prefers the user id already attached to UniversalToolCall
 and falls back to the trusted request identity. Client-supplied owner ids are
 not accepted as authority.

@@ -1,6 +1,6 @@
 # Plugin System
 
-Alice Pro plugins are local, versioned extensions discovered from `ALICE_PLUGIN_DIR`
+Logos plugins are local, versioned extensions discovered from `ALICE_PLUGIN_DIR`
 (default: `plugins`).
 
 ## Manifest

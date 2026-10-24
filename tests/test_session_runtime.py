@@ -1,6 +1,6 @@
 import time
 
-from session_runtime import ReadyMadeSession, VirtualLowConsumptionServer, VirtualServerConfig
+from sessions.runtime import ReadyMadeSession, VirtualLowConsumptionServer, VirtualServerConfig
 
 
 def test_ready_made_session_clones_all_mutable_configuration():
@@ -81,7 +81,7 @@ def test_runtime_marks_unexpected_failure_and_does_not_restart(monkeypatch, tmp_
     def explode(*args, **kwargs):
         raise OSError("runtime backend failed")
 
-    monkeypatch.setattr("session_runtime.subprocess.run", explode)
+    monkeypatch.setattr("sessions.runtime.subprocess.run", explode)
 
     try:
         runtime.execute("printf 'boom'")

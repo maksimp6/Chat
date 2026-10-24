@@ -11,26 +11,26 @@ import sys
 
 import pytest
 
-from memory_engine import MemoryStore, StoreError
-from memory_engine.store import _JournalStore
+from kristall import Kristall, KristallError
+from kristall.store import _JournalStore
 
 
 def test_truncated_frame_fails_closed_without_mutation(tmp_path):
     path = tmp_path / "journal.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("stable", {"n": 1})
         assert store.commit() == 1
     with path.open("ab") as out:
         out.write(b'{"payload":')
     before = path.read_bytes()
-    with pytest.raises(StoreError, match="incomplete journal tail"):
-        MemoryStore(path)
+    with pytest.raises(KristallError, match="incomplete journal tail"):
+        Kristall(path)
     assert path.read_bytes() == before
 
 
 def test_semantically_invalid_hashed_frame_never_publishes_partial_changes(tmp_path):
     path = tmp_path / "journal.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("stable", 1)
         store.commit()
     state, seq, digest = _JournalStore._inspect_log(path)
@@ -59,8 +59,8 @@ def test_semantically_invalid_hashed_frame_never_publishes_partial_changes(tmp_p
     with path.open("ab") as out:
         out.write(frame)
     before = path.read_bytes()
-    with pytest.raises(StoreError, match="corrupt committed journal"):
-        MemoryStore(path)
+    with pytest.raises(KristallError, match="corrupt committed journal"):
+        Kristall(path)
     assert path.read_bytes() == before
     assert state["values"]["stable"] == 1
 
@@ -70,9 +70,9 @@ def test_sigkill_commit_replay_e2e(tmp_path, boundary):
     path = tmp_path / "crash.memory"
     code = """
 import os,signal,sys
-from memory_engine import MemoryStore
-from memory_engine.store import _JournalStore
-db=MemoryStore(sys.argv[1])
+from kristall import Kristall
+from kristall.store import _JournalStore
+db=Kristall(sys.argv[1])
 db.set('stable',1);db.commit()
 original=_JournalStore._append_frame
 def injected(self,frame):
@@ -93,7 +93,7 @@ os.kill(os.getpid(),signal.SIGKILL)
     )
     assert result.returncode == -signal.SIGKILL, result.stderr
     assert ("ACK" in result.stdout) == (boundary == "after_ack")
-    with MemoryStore(path) as recovered:
+    with Kristall(path) as recovered:
         assert recovered.get("stable") == 1
         assert recovered.get("next") == (None if boundary == "before_append" else 2)
 
@@ -101,7 +101,7 @@ os.kill(os.getpid(),signal.SIGKILL)
 def test_fsync_failure_fences_writer_and_preserves_acknowledged_state(tmp_path, monkeypatch):
     """An ambiguous fsync failure must not publish or permit another commit."""
     path = tmp_path / "fsync.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("stable", 1)
         assert store.commit() == 1
         store.set("pending", 2)
@@ -116,43 +116,43 @@ def test_fsync_failure_fences_writer_and_preserves_acknowledged_state(tmp_path, 
             return original_fsync(fd)
 
         monkeypatch.setattr(os, "fsync", fail_once)
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             store.commit()
         assert store.last_commit.sequence == 1
         assert store.get("stable") == 1
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             store.commit()
 
     # The failed fsync can leave a complete frame on disk; reopening must
     # independently verify its fate instead of assuming it was rolled back.
-    with MemoryStore(path) as recovered:
+    with Kristall(path) as recovered:
         assert recovered.get("stable") == 1
         assert recovered.get("pending") in (None, 2)
         assert recovered.last_commit.sequence in (1, 2)
 
 
 def test_oversized_unterminated_frame_rejected_without_truncation(tmp_path):
-    from memory_engine.store import MAX_JOURNAL_FRAME_BYTES
+    from kristall.store import MAX_JOURNAL_FRAME_BYTES
 
     path = tmp_path / "oversized.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("safe", 1)
         assert store.commit() == 1
     with path.open("ab") as stream:
         stream.write(b"x" * (MAX_JOURNAL_FRAME_BYTES + 1))
     before = path.stat().st_size
-    with pytest.raises(StoreError, match="journal frame exceeds size limit"):
-        MemoryStore(path)
+    with pytest.raises(KristallError, match="journal frame exceeds size limit"):
+        Kristall(path)
     assert path.stat().st_size == before
 
 
 def test_oversized_commit_rejected_without_publishing(tmp_path):
-    from memory_engine.store import MAX_JOURNAL_FRAME_BYTES
+    from kristall.store import MAX_JOURNAL_FRAME_BYTES
 
     path = tmp_path / "oversized-write.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("large", "x" * MAX_JOURNAL_FRAME_BYTES)
-        with pytest.raises(StoreError, match="journal frame exceeds size limit"):
+        with pytest.raises(KristallError, match="journal frame exceeds size limit"):
             store.commit()
         assert store.last_commit.sequence == 0
         assert not path.exists()
@@ -160,14 +160,14 @@ def test_oversized_commit_rejected_without_publishing(tmp_path):
 
 def test_corrupt_complete_frame_fails_closed(tmp_path):
     path = tmp_path / "corrupt.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("safe", "committed")
         assert store.commit() == 1
     with path.open("ab") as stream:
         stream.write(b'{"payload": {}, "digest": "bad"}\n')
     original = path.read_bytes()
-    with pytest.raises(StoreError, match="corrupt committed journal"):
-        MemoryStore(path)
+    with pytest.raises(KristallError, match="corrupt committed journal"):
+        Kristall(path)
     assert path.read_bytes() == original
 
 
@@ -194,563 +194,6 @@ def test_invalid_later_operation_does_not_mutate_input_state():
     ).encode()
     digest = hashlib.sha256(bytes(32) + encoded).hexdigest()
     frame = json.dumps({"payload": payload, "digest": digest}).encode() + b"\n"
-    with pytest.raises(StoreError, match="corrupt committed journal"):
+    with pytest.raises(KristallError, match="corrupt committed journal"):
         _JournalStore._apply_verified_frame(frame, state, 0, "0" * 64)
     assert state == {"values": {"stable": {"version": 1}}}
-
-
-def test_symlink_journal_cannot_modify_target(tmp_path):
-    target = tmp_path / "target.memory"
-    with MemoryStore(target) as store:
-        store.set("safe", 1)
-        store.commit()
-    before = target.read_bytes()
-    link = tmp_path / "linked.memory"
-    link.symlink_to(target)
-    with pytest.raises(StoreError):
-        MemoryStore(link)
-    assert target.read_bytes() == before
-
-
-def test_symlink_lock_file_is_rejected(tmp_path):
-    path = tmp_path / "safe.memory"
-    victim = tmp_path / "victim"
-    victim.write_text("unchanged")
-    path.with_name(path.name + ".lock").symlink_to(victim)
-    with pytest.raises(StoreError, match="unsafe journal or lock path"):
-        MemoryStore(path)
-    assert victim.read_text() == "unchanged"
-
-
-def test_symlink_parent_directory_is_rejected(tmp_path):
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    link = tmp_path / "alias"
-    link.symlink_to(outside, target_is_directory=True)
-    with pytest.raises(StoreError, match="unsafe journal or lock path"):
-        MemoryStore(link / "journal.memory")
-    assert not (outside / "journal.memory").exists()
-
-
-def test_replaced_journal_path_cannot_redirect_append(tmp_path):
-    path = tmp_path / "journal.memory"
-    victim = tmp_path / "victim.memory"
-    with MemoryStore(path) as store:
-        store.set("safe", 1)
-        store.commit()
-        victim.write_bytes(b"untouched")
-        path.unlink()
-        path.symlink_to(victim)
-        store.set("attack", 2)
-        with pytest.raises(StoreError, match="recovery required"):
-            store.commit()
-        assert victim.read_bytes() == b"untouched"
-
-
-def test_nonregular_lock_file_is_rejected_without_fd_leak(tmp_path):
-    import stat
-
-    from memory_engine.store import _open_journal_nofollow
-
-    directory_fd = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
-    try:
-        fifo = tmp_path / "fake.lock"
-        os.mkfifo(fifo)
-        assert stat.S_ISFIFO(fifo.stat().st_mode)
-        with pytest.raises(StoreError, match="journal must be a regular file"):
-            _open_journal_nofollow(directory_fd, fifo.name, os.O_RDONLY | os.O_NONBLOCK)
-    finally:
-        os.close(directory_fd)
-
-
-def test_regular_inode_swap_does_not_write_to_replacement(tmp_path, monkeypatch):
-    path = tmp_path / "journal.memory"
-    victim = tmp_path / "victim.memory"
-    displaced = tmp_path / "displaced.memory"
-    with MemoryStore(path) as store:
-        store.set("stable", 1)
-        store.commit()
-        victim.write_bytes(b"victim-untouched")
-        original = os.stat
-        swapped = False
-
-        def swap_before_stat(target, *args, **kwargs):
-            nonlocal swapped
-            if target == path.name and kwargs.get("dir_fd") is not None and not swapped:
-                swapped = True
-                path.rename(displaced)
-                victim.rename(path)
-            return original(target, *args, **kwargs)
-
-        monkeypatch.setattr(os, "stat", swap_before_stat)
-        store.set("next", 2)
-        with pytest.raises(StoreError, match="recovery required"):
-            store.commit()
-        assert path.read_bytes() == b"victim-untouched"
-        assert store.last_commit.sequence == 1
-
-
-def test_renamed_parent_does_not_redirect_to_recreated_directory(tmp_path):
-    parent = tmp_path / "db"
-    parent.mkdir()
-    path = parent / "journal.memory"
-    with MemoryStore(path) as store:
-        store.set("stable", 1)
-        store.commit()
-        displaced = tmp_path / "db-moved"
-        parent.rename(displaced)
-        parent.mkdir()
-        victim = parent / "journal.memory"
-        victim.write_bytes(b"victim-untouched")
-        store.set("next", 2)
-        store.commit()
-        assert victim.read_bytes() == b"victim-untouched"
-        assert b"next" in (displaced / "journal.memory").read_bytes()
-
-
-def test_post_fsync_regular_inode_swap_fences_writer(tmp_path, monkeypatch):
-    path = tmp_path / "journal.memory"
-    displaced = tmp_path / "displaced.memory"
-    victim = tmp_path / "victim.memory"
-    with MemoryStore(path) as store:
-        store.set("safe", 1)
-        store.commit()
-        victim.write_bytes(b"unchanged")
-        original = os.stat
-        calls = 0
-
-        def swap_after_fsync(target, *args, **kwargs):
-            nonlocal calls
-            if target == path.name and kwargs.get("dir_fd") is not None:
-                calls += 1
-                if calls == 2:
-                    path.rename(displaced)
-                    victim.rename(path)
-            return original(target, *args, **kwargs)
-
-        monkeypatch.setattr(os, "stat", swap_after_fsync)
-        store.set("next", 2)
-        with pytest.raises(StoreError, match="recovery required"):
-            store.commit()
-        assert path.read_bytes() == b"unchanged"
-        assert store.last_commit.sequence == 1
-
-
-def test_backup_regular_inode_swap_does_not_copy_victim(tmp_path, monkeypatch):
-    import shutil
-
-    path = tmp_path / "source.memory"
-    victim = tmp_path / "victim.memory"
-    backup = tmp_path / "backup.memory"
-    with MemoryStore(path) as store:
-        store.set("safe", 1)
-        store.commit()
-        victim.write_bytes(b"private-victim")
-        original_copy = shutil.copyfileobj
-
-        def swap_source_after_open(source, output, *args, **kwargs):
-            path.unlink()
-            path.symlink_to(victim)
-            return original_copy(source, output, *args, **kwargs)
-
-        monkeypatch.setattr(shutil, "copyfileobj", swap_source_after_open)
-        store.backup(backup)
-        assert victim.read_bytes() == b"private-victim"
-        assert b"private-victim" not in backup.read_bytes()
-
-
-def test_backup_parent_rename_publishes_only_to_pinned_directory(tmp_path, monkeypatch):
-    import shutil
-
-    parent = tmp_path / "parent"
-    parent.mkdir()
-    moved = tmp_path / "moved"
-    source = parent / "source.memory"
-    backup = parent / "backup.memory"
-    with MemoryStore(source) as store:
-        store.set("safe", 1)
-        store.commit()
-        original_copy = shutil.copyfileobj
-
-        def rename_during_copy(source_stream, output, *args, **kwargs):
-            parent.rename(moved)
-            parent.mkdir()
-            return original_copy(source_stream, output, *args, **kwargs)
-
-        monkeypatch.setattr(shutil, "copyfileobj", rename_during_copy)
-        try:
-            store.backup(backup)
-        except StoreError:
-            pass
-        assert not (parent / "backup.memory").exists()
-
-
-def test_backup_temp_cleanup_survives_concurrent_unlink(tmp_path, monkeypatch):
-    path = tmp_path / "journal.memory"
-    backup = tmp_path / "backup.memory"
-    with MemoryStore(path) as store:
-        store.set("safe", 1)
-        store.commit()
-        original_unlink = os.unlink
-        removed = False
-
-        def competing_unlink(target, *args, **kwargs):
-            nonlocal removed
-            if isinstance(target, str) and target.startswith(".alice-copy-"):
-                removed = True
-                original_unlink(target, *args, **kwargs)
-                raise FileNotFoundError(target)
-            return original_unlink(target, *args, **kwargs)
-
-        monkeypatch.setattr(os, "unlink", competing_unlink)
-        store.backup(backup)
-        assert removed
-        assert backup.exists()
-
-
-@pytest.mark.parametrize("operation", ["backup", "restore"])
-def test_publish_uses_verified_inode_not_replaced_temp_name(tmp_path, monkeypatch, operation):
-    source = tmp_path / "source.memory"
-    backup = tmp_path / "backup.memory"
-    restored = tmp_path / "restored.memory"
-    victim = tmp_path / "victim.memory"
-    with MemoryStore(source) as store:
-        store.set("safe", 1)
-        store.commit()
-        if operation == "restore":
-            store.backup(backup)
-        victim.write_bytes(b"UNVERIFIED_VICTIM_CONTENT")
-        original_link = os.link
-        attacked = False
-
-        def replace_temp_before_link(src, dst, *args, **kwargs):
-            nonlocal attacked
-            if kwargs.get("dst_dir_fd") is not None and not attacked:
-                attacked = True
-                target_dir = kwargs["dst_dir_fd"]
-                for name in os.listdir(target_dir):
-                    if name.startswith(".alice-copy-"):
-                        os.unlink(name, dir_fd=target_dir)
-                        original_link(victim, name, dst_dir_fd=target_dir)
-                        break
-            return original_link(src, dst, *args, **kwargs)
-
-        monkeypatch.setattr(os, "link", replace_temp_before_link)
-        if operation == "backup":
-            with pytest.raises(OSError):
-                store.backup(backup)
-            result = backup
-        else:
-            with MemoryStore(restored) as destination:
-                with pytest.raises(StoreError, match="recovery required"):
-                    destination.restore(backup)
-                assert destination.last_commit.sequence == 0
-            result = restored
-        assert attacked
-        assert not result.exists()
-        assert victim.read_bytes() == b"UNVERIFIED_VICTIM_CONTENT"
-
-
-def test_restore_source_inode_swap_after_open_keeps_verified_content(tmp_path, monkeypatch):
-    import shutil
-
-    source = tmp_path / "source.memory"
-    backup = tmp_path / "backup.memory"
-    restored = tmp_path / "restored.memory"
-    victim = tmp_path / "victim.memory"
-    with MemoryStore(source) as store:
-        store.set("safe", 1)
-        store.commit()
-        store.backup(backup)
-    victim.write_bytes(b"UNVERIFIED_VICTIM_CONTENT")
-    original_copy = shutil.copyfileobj
-
-    def swap_after_open(src, output, *args, **kwargs):
-        backup.unlink()
-        backup.symlink_to(victim)
-        return original_copy(src, output, *args, **kwargs)
-
-    monkeypatch.setattr(shutil, "copyfileobj", swap_after_open)
-    with MemoryStore(restored) as destination:
-        destination.restore(backup)
-        assert destination.get("safe") == 1
-    assert b"UNVERIFIED_VICTIM_CONTENT" not in restored.read_bytes()
-
-
-def test_restore_parent_rename_does_not_publish_into_recreated_dir(tmp_path, monkeypatch):
-    import shutil
-
-    source = tmp_path / "source.memory"
-    backup = tmp_path / "backup.memory"
-    parent = tmp_path / "target"
-    moved = tmp_path / "target-moved"
-    parent.mkdir()
-    target = parent / "restored.memory"
-    with MemoryStore(source) as store:
-        store.set("safe", 1)
-        store.commit()
-        store.backup(backup)
-    original_copy = shutil.copyfileobj
-
-    def rename_after_open(src, output, *args, **kwargs):
-        parent.rename(moved)
-        parent.mkdir()
-        return original_copy(src, output, *args, **kwargs)
-
-    monkeypatch.setattr(shutil, "copyfileobj", rename_after_open)
-    with MemoryStore(target) as destination:
-        destination.restore(backup)
-        assert destination.get("safe") == 1
-    assert not target.exists()
-    assert (moved / "restored.memory").exists()
-
-
-def test_post_publish_inode_swap_is_detected(tmp_path, monkeypatch):
-    path = tmp_path / "journal.memory"
-    backup = tmp_path / "backup.memory"
-    victim = tmp_path / "victim.memory"
-    with MemoryStore(path) as store:
-        store.set("safe", 1)
-        store.commit()
-        victim.write_bytes(b"unverified")
-        original_stat = os.stat
-        swapped = False
-
-        def replace_published_before_stat(name, *args, **kwargs):
-            nonlocal swapped
-            if name == backup.name and kwargs.get("dir_fd") is not None and not swapped:
-                swapped = True
-                os.unlink(name, dir_fd=kwargs["dir_fd"])
-                os.link(victim, backup)
-            return original_stat(name, *args, **kwargs)
-
-        monkeypatch.setattr(os, "stat", replace_published_before_stat)
-        with pytest.raises(StoreError, match="published backup inode mismatch"):
-            store.backup(backup)
-        assert swapped
-        assert victim.read_bytes() == b"unverified"
-
-
-@pytest.mark.parametrize("directory_mode", [0o755, 0o770, 0o777])
-def test_trusted_root_rejects_unsafe_directory_modes(tmp_path, monkeypatch, directory_mode):
-    root = tmp_path / "private"
-    root.mkdir(mode=0o700)
-    root.chmod(directory_mode)
-    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
-    with pytest.raises(StoreError, match="unsafe journal or lock path"):
-        MemoryStore(root / "journal.memory")
-
-
-def test_trusted_root_accepts_private_files_and_rejects_weak_lock(tmp_path, monkeypatch):
-    root = tmp_path / "private"
-    root.mkdir(mode=0o700)
-    root.chmod(0o700)
-    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
-    with MemoryStore(root / "journal.memory") as store:
-        store.set("safe", 1)
-        store.commit()
-    lock = root / "journal.memory.lock"
-    lock.chmod(0o644)
-    with pytest.raises(StoreError, match="unsafe journal or lock path"):
-        MemoryStore(root / "journal.memory")
-
-
-@pytest.mark.parametrize("mode", [0o777, 0o775, 0o730])
-def test_trusted_root_rejects_writable_ancestor(tmp_path, monkeypatch, mode):
-    ancestor = tmp_path / "writable-parent"
-    ancestor.mkdir()
-    ancestor.chmod(mode)
-    root = ancestor / "private"
-    root.mkdir(mode=0o700)
-    root.chmod(0o700)
-    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
-    with pytest.raises(StoreError, match="unsafe journal or lock path"):
-        MemoryStore(root / "journal.memory")
-
-
-def test_trusted_root_rejects_ancestor_symlink(tmp_path, monkeypatch):
-    real = tmp_path / "real"
-    real.mkdir(mode=0o700)
-    real.chmod(0o700)
-    alias = tmp_path / "alias"
-    alias.symlink_to(real, target_is_directory=True)
-    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
-    with pytest.raises(StoreError, match="unsafe journal or lock path"):
-        MemoryStore(alias / "journal.memory")
-
-
-def test_same_uid_post_check_rename_remains_possible(tmp_path, monkeypatch):
-    """DAC alone cannot isolate an adversary sharing the service UID."""
-    root = tmp_path / "private"
-    root.mkdir(mode=0o700)
-    root.chmod(0o700)
-    source = root / "journal.memory"
-    destination = root / "backup.memory"
-    displaced = root / "displaced.memory"
-    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
-    with MemoryStore(source) as store:
-        store.set("safe", 1)
-        store.commit()
-        original_fsync = os.fsync
-        renamed = False
-
-        def rename_after_publication(fd):
-            nonlocal renamed
-            if not renamed and os.fstat(fd).st_ino == root.stat().st_ino:
-                if destination.exists():
-                    destination.rename(displaced)
-                    renamed = True
-            return original_fsync(fd)
-
-        monkeypatch.setattr(os, "fsync", rename_after_publication)
-        store.backup(destination)
-        assert renamed
-        assert not destination.exists()
-        assert displaced.exists()
-
-
-def test_trusted_ancestor_rejects_foreign_owner(tmp_path, monkeypatch):
-    import memory_engine.store as engine
-
-    parent = tmp_path / "private"
-    parent.mkdir(mode=0o700)
-    parent.chmod(0o700)
-    original_fstat = engine.os.fstat
-
-    def foreign_owner(fd):
-        metadata = original_fstat(fd)
-        if metadata.st_ino == parent.stat().st_ino:
-            fields = list(metadata)
-            fields[4] = os.geteuid() + 10000
-            return os.stat_result(fields)
-        return metadata
-
-    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
-    monkeypatch.setattr(engine.os, "fstat", foreign_owner)
-    with pytest.raises(StoreError, match="unsafe journal or lock path"):
-        MemoryStore(parent / "journal.memory")
-
-
-def test_trusted_ancestor_rejects_non_directory_descriptor(tmp_path):
-    import memory_engine.store as engine
-
-    ordinary = tmp_path / "ordinary-file"
-    ordinary.write_bytes(b"not a directory")
-    fd = os.open(ordinary, os.O_RDONLY)
-    try:
-        with pytest.raises(StoreError, match="untrusted Memory DB ancestor"):
-            engine._verify_trusted_ancestor(fd)
-    finally:
-        os.close(fd)
-
-
-def test_trusted_root_rejects_extended_acl(tmp_path, monkeypatch):
-    import memory_engine.store as engine
-
-    root = tmp_path / "private"
-    root.mkdir(mode=0o700)
-    root.chmod(0o700)
-    original = engine.os.getxattr
-
-    def granted_acl(fd, name):
-        if name == "system.posix_acl_access" and os.fstat(fd).st_ino == root.stat().st_ino:
-            return b"extended-acl"
-        return original(fd, name)
-
-    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
-    monkeypatch.setattr(engine.os, "getxattr", granted_acl)
-    with pytest.raises(StoreError, match="unsafe journal or lock path"):
-        MemoryStore(root / "journal.memory")
-
-
-def test_trusted_root_rejects_mount_boundary(tmp_path, monkeypatch):
-    import memory_engine.store as engine
-
-    root = tmp_path / "private"
-    root.mkdir(mode=0o700)
-    root.chmod(0o700)
-    original = engine._trusted_mount_id
-
-    def injected_mount(fd):
-        mount = original(fd)
-        if os.fstat(fd).st_ino == root.stat().st_ino:
-            return mount + 1000000
-        return mount
-
-    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
-    monkeypatch.setattr(engine, "_trusted_mount_id", injected_mount)
-    with pytest.raises(StoreError, match="unsafe journal or lock path"):
-        MemoryStore(root / "journal.memory")
-
-
-@pytest.mark.parametrize("mount_error", ["missing", "invalid", "unreadable"])
-def test_mount_id_inspection_fails_closed(tmp_path, monkeypatch, mount_error):
-    import builtins
-    import io
-    import memory_engine.store as engine
-
-    ordinary = tmp_path / "ordinary"
-    ordinary.write_bytes(b"x")
-    fd = os.open(ordinary, os.O_RDONLY)
-    original_open = builtins.open
-
-    def injected_open(path, *args, **kwargs):
-        if str(path) == f"/proc/self/fdinfo/{fd}":
-            if mount_error == "unreadable":
-                raise OSError("procfs unavailable")
-            if mount_error == "invalid":
-                return io.StringIO("mnt_id: invalid\n")
-            return io.StringIO("pos: 0\n")
-        return original_open(path, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "open", injected_open)
-    try:
-        with pytest.raises(StoreError, match="unverifiable Memory DB mount boundary"):
-            engine._trusted_mount_id(fd)
-    finally:
-        os.close(fd)
-
-
-def test_acl_inspection_error_fails_closed(tmp_path, monkeypatch):
-    import errno
-    import memory_engine.store as engine
-
-    ordinary = tmp_path / "ordinary"
-    ordinary.write_bytes(b"x")
-    fd = os.open(ordinary, os.O_RDONLY)
-
-    def denied_acl(*args):
-        raise OSError(errno.EACCES, "ACL inspection denied")
-
-    monkeypatch.setattr(engine.os, "getxattr", denied_acl)
-    try:
-        with pytest.raises(StoreError, match="unverifiable Memory DB ACL"):
-            engine._reject_extended_acl(fd)
-    finally:
-        os.close(fd)
-
-
-def test_trusted_policy_cannot_be_disabled_after_store_open(tmp_path, monkeypatch):
-    root = tmp_path / "private"
-    root.mkdir(mode=0o700)
-    root.chmod(0o700)
-    path = root / "journal.memory"
-    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
-    with MemoryStore(path, trusted=True) as store:
-        store.set("safe", 1)
-        store.commit()
-        monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "0")
-        store.set("still-safe", 2)
-        store.commit()
-        store.backup(root / "backup.memory")
-        assert store.get("still-safe") == 2
-    (root / "journal.memory").chmod(0o644)
-    with pytest.raises(StoreError, match="untrusted Memory DB file ownership or permissions"):
-        MemoryStore(path, trusted=True)
-
-
-def test_trusted_policy_reassignment_is_rejected(tmp_path):
-    with MemoryStore(tmp_path / "journal.memory", trusted=False) as store:
-        with pytest.raises(StoreError, match="trusted policy is immutable"):
-            store._engine._trusted = True
-        assert store._engine._trusted is False

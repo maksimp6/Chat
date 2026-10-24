@@ -9,7 +9,7 @@ from cloud.base import CloudProviderError
 from cloud.cloudru.billing import parse_consumption_total
 from cloud.cloudru.client import CloudRuClient
 from cloud.models import normalize_resource, normalize_resources
-from cloudru_iam import CloudRuIamClient
+from cloud.cloudru.iam import CloudRuIamClient
 
 
 class CloudRuProvider:
