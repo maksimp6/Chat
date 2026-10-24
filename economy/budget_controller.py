@@ -270,7 +270,7 @@ class BudgetController:
             account = self.account(account_type)
             self._ensure_not_locked(account)
             amount = _money(amount)
-            self._check_limits(account, amount)
+            self._check_limits(account, amount, lock_on_daily_breach=False)
             if amount > account.available:
                 if (
                     account_type is AccountType.REAL
@@ -493,7 +493,9 @@ class BudgetController:
             cooldown_seconds=self.cooldown_seconds,
         )
 
-    def _check_limits(self, account: BudgetAccount, amount: Decimal) -> None:
+    def _check_limits(
+        self, account: BudgetAccount, amount: Decimal, *, lock_on_daily_breach: bool = True
+    ) -> None:
         self._roll_loss_period(account)
         if restrictions_lifted():
             return
@@ -504,7 +506,10 @@ class BudgetController:
         if account.spent + account.reserved + amount > account.limits.max_total_loss:
             raise BudgetLimitExceeded("total-loss limit exceeded")
         if account.loss_today + amount > account.limits.max_daily_loss:
-            self._lock_account(account, reason="daily_loss_limit")
+            # A reservation has spent nothing yet, so it is only denied. A spend that breaches the day's
+            # limit starts the cooldown.
+            if lock_on_daily_breach:
+                self._lock_account(account, reason="daily_loss_limit")
             raise BudgetLimitExceeded("daily-loss limit exceeded")
         if account.loss_today + account.reserved + amount > account.limits.max_daily_loss:
             # Pending exposure only: deny without cooldown, release restores headroom.
