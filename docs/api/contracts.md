@@ -2,6 +2,11 @@
 
 Logos treats every API boundary as an explicit contract.
 
+The pinned Yandex provider documentation has a separate generated registry:
+[Yandex API contracts](../../contracts/yandex/README.md). It covers all documented
+REST/gRPC methods and realtime events in that snapshot, preserves source gaps,
+and provides offline payload validation. It does not change the runtime client.
+
 ## Rule
 
 Communication over HTTP API must use a named request/response contract. A route,

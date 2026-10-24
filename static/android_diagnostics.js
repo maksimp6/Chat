@@ -34,7 +34,10 @@
     });
     actionRow.appendChild(button);
 
-    if (typeof bridge().openBrowserTakeover === "function" && !document.getElementById("android-browser-btn")) {
+    if (
+      typeof bridge().openBrowserTakeover === "function" &&
+      !document.getElementById("android-browser-btn")
+    ) {
       var browserButton = document.createElement("button");
       browserButton.id = "android-browser-btn";
       browserButton.className = "header-btn alice-btn";
