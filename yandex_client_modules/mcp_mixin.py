@@ -189,7 +189,11 @@ class YandexMcpMixin:
 
         raw_web_cfg = tools_config.get("web_search")
         web_cfg = raw_web_cfg if isinstance(raw_web_cfg, dict) else {}
-        web_enabled = True if raw_web_cfg is None else bool(web_cfg.get("enabled"))
+        web_flag = web_cfg.get("enabled")
+        # bool("false") is True, so a JSON string must be read as its own text; anything else stays off.
+        if isinstance(web_flag, str):
+            web_flag = web_flag.strip().lower() == "true"
+        web_enabled = True if raw_web_cfg is None else bool(web_flag)
         if web_enabled:
             web_tool = {
                 "type": "web_search",
