@@ -44,8 +44,10 @@ def _result(fn):
     return wrapper
 
 
-# Spend-creating compute operations checked against the monthly cloud budget.
-BUDGET_GUARDED_COMPUTE_OPERATIONS = {"start"}
+# Spend-creating operations checked against the monthly cloud budget. A reboot also starts a
+# stopped instance, and backup create or restore allocates billable storage or compute.
+BUDGET_GUARDED_COMPUTE_OPERATIONS = {"start", "reboot"}
+BUDGET_GUARDED_BACKUP_OPERATIONS = {"create", "restore"}
 _BUDGET_GUARDS: dict[str, CloudBudgetGuard] = {}
 _BUDGET_GUARDS_LOCK = threading.Lock()
 
@@ -95,18 +97,25 @@ def cloud_resources_get(args: dict[str, Any], cfg: dict | None = None) -> dict[s
 
 
 @_result
+def _budget_refusal(provider, operation: str) -> dict[str, Any] | None:
+    try:
+        _budget_guard(provider).enforce(operation)
+    except BudgetLimitExceeded as exc:
+        return {
+            "success": False,
+            "error": str(exc),
+            "metadata": {"phase": "policy", "provider_code": "budget_exceeded"},
+        }
+    return None
+
+
 def cloud_compute(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
     provider = _provider(args)
     operation = str(args.get("operation") or "").strip().lower()
     if operation in BUDGET_GUARDED_COMPUTE_OPERATIONS:
-        try:
-            _budget_guard(provider).enforce(f"cloud.compute.{operation}")
-        except BudgetLimitExceeded as exc:
-            return {
-                "success": False,
-                "error": str(exc),
-                "metadata": {"phase": "policy", "provider_code": "budget_exceeded"},
-            }
+        refusal = _budget_refusal(provider, f"cloud.compute.{operation}")
+        if refusal is not None:
+            return refusal
     return provider.compute(
         operation=str(args.get("operation") or ""),
         instance_id=(str(args.get("instance_id")) if args.get("instance_id") is not None else None),
@@ -138,6 +147,11 @@ def cloud_metrics_query(args: dict[str, Any], cfg: dict | None = None) -> dict[s
 @_result
 def cloud_backup(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
     provider = _provider(args)
+    operation = str(args.get("operation") or "").strip().lower()
+    if operation in BUDGET_GUARDED_BACKUP_OPERATIONS:
+        refusal = _budget_refusal(provider, f"cloud.backup.{operation}")
+        if refusal is not None:
+            return refusal
     return provider.backup(
         operation=str(args.get("operation") or ""),
         resource_id=(str(args.get("resource_id")) if args.get("resource_id") is not None else None),
