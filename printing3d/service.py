@@ -186,6 +186,10 @@ def update_order_status(
     with store.transaction() as tx:
         row = tx.get(key)
         if row is not None and row["owner_id"] == owner_id:
+            # The summary counts a settled order only while it is paid and settled. Moving it to any
+            # other status would drop its revenue and profit from the totals.
+            if row.get("settled_at"):
+                raise ValueError("settled order status cannot change")
             tx.set(key, {**row, "status": status, "updated_at": datetime.utcnow().isoformat()})
     return get_order(store, owner_id, order_id)
 
