@@ -39,7 +39,7 @@ def _js_coverage() -> tuple[int, int]:
 def main():
     out = Path("ci-validation-report.md")
     log = Path("frontend-test.log")
-    lines = ["# Alice Pro validation report", "", "## Frontend tests", ""]
+    lines = ["# Logos validation report", "", "## Frontend tests", ""]
     markers = {
         "test_file_manager.js": "file_manager.js regression checks passed",
         "test_dozzle_header.js": "Dozzle header regression checks passed",

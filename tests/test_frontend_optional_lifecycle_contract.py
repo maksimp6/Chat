@@ -6,7 +6,7 @@ def read(path):
 
 
 def test_trace_viewer_lifecycle_is_idempotent_and_css_owned():
-    source = read("static/trace_viewer_auto.js")
+    source = read("static/trace_viewer_bridge.js")
     assert "var observer = null;" in source
     assert "if (observer) return;" in source
     assert "style.cssText" not in source
@@ -21,4 +21,6 @@ def test_android_diagnostics_initialization_is_idempotent():
     assert "function initDiagnostics()" in source
     assert "androidDiagnosticsInitialized" in source
     assert 'addEventListener("click"' in source
+    assert 'browserButton.id = "android-browser-btn"' in source
+    assert "bridge().openBrowserTakeover()" in source
     assert ".onclick =" not in source

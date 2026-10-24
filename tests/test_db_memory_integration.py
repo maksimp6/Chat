@@ -1,4 +1,4 @@
-import db
+import storage.db as db
 
 
 def setup_function():
@@ -41,15 +41,7 @@ def test_memory_backend_delete_conversation(monkeypatch):
 
 
 def test_memory_backend_does_not_expose_sql_connection(monkeypatch):
-    monkeypatch.setenv("ALICE_DB_BACKEND", "memory")
-    db.init_db()
-
-    try:
-        db.get_conn()
-    except RuntimeError as exc:
-        assert "does not expose a SQL connection" in str(exc)
-    else:
-        raise AssertionError("memory backend leaked a SQL connection")
+    assert not hasattr(db, "get_conn")
 
 
 def test_memory_backend_title_logic_and_config_string(monkeypatch):
@@ -71,22 +63,20 @@ def test_memory_backend_title_logic_and_config_string(monkeypatch):
 
 
 def test_memory_backend_non_string_message_and_invalid_json(monkeypatch):
-    monkeypatch.setenv("ALICE_DB_BACKEND", "memory")
-    db.init_db()
     db.create_conversation("c1", "Chat", "model")
     db.add_message("c1", "assistant", {"answer": "ok"})
     assert db.get_messages("c1")[0]["text"] == '{"answer": "ok"}'
-
-    db._MEMORY_DB.update("messages", lambda r: True, timings_json="{bad", trace_json="{bad")
-    message = db.get_messages("c1")[0]
-    assert message["timings"] == []
-    assert message["trace"] == {}
+    values = db.get_messages("c1")
+    values[0]["trace"]["mutated"] = True
+    assert db.get_messages("c1")[0]["trace"] == {}
 
 
 def test_memory_backend_conv_settings_missing_or_corrupt(monkeypatch):
-    monkeypatch.setenv("ALICE_DB_BACKEND", "memory")
-    db.init_db()
+    from agent_memory.client import close_memory_clients
+
     assert db.get_conv_settings("c1") is None
     db.save_conv_settings("c1", {"temperature": 0.2})
-    db._MEMORY_DB.update("conv_settings", lambda r: True, settings_json="{bad")
-    assert db.get_conv_settings("c1") is None
+    settings = db.get_conv_settings("c1")
+    settings["temperature"] = 99
+    close_memory_clients()
+    assert db.get_conv_settings("c1") == {"temperature": 0.2}

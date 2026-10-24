@@ -14,7 +14,7 @@ import threading
 from pathlib import Path
 from typing import Any, Mapping, TextIO
 
-from .capabilities import BrowserAction
+from browser.capabilities import BrowserAction
 
 SERVER_SCRIPT = Path(__file__).resolve().parent / "emulator" / "server.js"
 

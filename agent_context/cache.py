@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .models import ContextSlice, EvidenceVersion, TaskPacket, TaskScope
+from agent_context.models import ContextSlice, EvidenceVersion, TaskPacket, TaskScope
 
 
 @dataclass(frozen=True)

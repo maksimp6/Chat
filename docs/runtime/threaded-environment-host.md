@@ -1,6 +1,6 @@
 # Threaded environment host
 
-Alice Pro application environments run inside one Python process. Each running
+Logos application environments run inside one Python process. Each running
 environment owns a managed worker thread and an immutable `RuntimeContext`.
 
 ## Request path
@@ -36,13 +36,12 @@ policy in `runtime-dispatcher-policy.md`.
 ### Database scope
 
 The runtime data root is carried with the worker through request-local
-`ContextVar` state. `db.get_conn()` detects that scope and opens
-`<runtime-data-root>/alice_pro.db` instead of the process database.
+`ContextVar` state. `storage.db.memory_file_path()` detects that scope and resolves it to
+`<runtime-data-root>/alice.memory` instead of the process journal.
 
-This rule also applies when the host is configured for PostgreSQL or the
-in-memory backend: a preview runtime does not silently inherit either shared
-backend. Its SQLite schema is initialized inside the runtime scope before the
-worker starts. The environment control-plane database remains outside that
+A preview runtime does not silently inherit the process journal. Its native Kristall
+journal is opened on first use inside the runtime scope. PostgreSQL and SQLite are
+retired (see `docs/database.md`). The environment control-plane database remains outside that
 scope.
 
 ## Request-local URL state
@@ -90,7 +89,7 @@ HTTP contract, so existing streaming remains unchanged.
 ## Preview CI follow-up (#341)
 
 Preview CI should build/test the requested commit, then authenticate to the
-running Alice Pro host and request creation of an environment for that exact
+running Logos host and request creation of an environment for that exact
 commit. It should poll the environment lifecycle and exercise the rendered shell
 through the environment gateway. Cleanup should delete that environment. It
 must not deploy a preview container, wait for a container-local Flask server, or

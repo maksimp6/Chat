@@ -1,0 +1,33 @@
+{
+  "status": "MODEL_OUTPUT_REJECTED",
+  "model_call": "COMPLETED",
+  "assessment": {
+    "status": "MODEL_OUTPUT_REJECTED",
+    "semantic_quality": "NOT_VERIFIED"
+  },
+  "pr": 1422,
+  "head": "e6ee26e63a3d366dcf2169d8a608caeea32046ef",
+  "develop_head": "d6f5cafbfcb337006444177d8f15400ab4ddb274",
+  "run_id": "39387566883",
+  "response_id": "42cd3b04-982c-4f54-a805-185617196135",
+  "model": "yandexgpt-lite/latest",
+  "evidence_sha256": "6db7835d3a16a865336a55eb67a97cc1bcd588555450d4012fbb0706d3c9bead",
+  "usage": {
+    "input_tokens": 18219,
+    "input_tokens_details": {
+      "cached_tokens": 0,
+      "valid": true,
+      "tool_tokens": 0
+    },
+    "output_tokens": 61,
+    "output_tokens_details": {
+      "reasoning_tokens": 0,
+      "valid": true
+    },
+    "total_tokens": 18280,
+    "valid": true
+  },
+  "provider_confirmed_cost": "unknown",
+  "merge_approval": false,
+  "judgment": "```\n{\n  \"findings\": [],\n  \"limitations\": [\n    \"PR-суд не должен принимать решения на основе неполных или недостоверных данных.\",\n    \"Модель не должна использоваться для принятия решений о слиянии PR без дополнительной проверки.\"\n  ]\n}\n```"
+}

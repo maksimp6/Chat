@@ -6,7 +6,7 @@
       throw new Error("AliceCoreAPI.ui is required before UI runtime");
     }
     if (!document.body) throw new Error("document.body is required for UI runtime");
-    window.AliceUIRuntime = Object.freeze({
+    window.LogosUIRuntime = Object.freeze({
       unmountClicks: window.AliceCoreAPI.ui.events.mountClicks(document.body),
     });
   }
