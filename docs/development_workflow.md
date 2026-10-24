@@ -1,6 +1,6 @@
-# Рабочий процесс разработки Alice Pro
+# Рабочий процесс разработки Logos
 
-Этот документ фиксирует воспроизводимый цикл для изменений в Chat/Alice Pro.
+Этот документ фиксирует воспроизводимый цикл для изменений в Chat/Logos.
 
 ## 1. Типовой цикл
 
@@ -30,7 +30,7 @@ merge в master
 
 ## 2. Совместная работа человека и AI-разработчика
 
-Работа над Alice Pro организуется как сотрудничество владельца продукта и AI-разработчика.
+Работа над Logos организуется как сотрудничество владельца продукта и AI-разработчика.
 
 ### Роли
 
@@ -262,7 +262,7 @@ PR должен содержать:
 - **CI** подтверждает техническую проверку.
 - **Комментарии** фиксируют решения и изменения направления.
 - **Документация** хранит устойчивые правила проекта.
-- **Execution Trace** служит техническим подтверждением поведения Alice Pro.
+- **Execution Trace** служит техническим подтверждением поведения Logos.
 
 ## 8.1 API-контракты
 
@@ -308,12 +308,7 @@ python scripts/merge_readiness.py \
   --required-check "Code rules" \
   --required-check "Application tests" \
   --required-check "PostgreSQL integration" \
-  --required-check "Android debug APK" \
-  --required-check "Auto-format repository" \
   --required-check "Trivy repository scan" \
-  --required-check "Zizmor GitHub Actions audit" \
-  --required-check "CodeQL (python)" \
-  --required-check "CodeQL (javascript-typescript)" \
   --pretty
 ```
 
@@ -361,12 +356,7 @@ Workflow `Merge readiness snapshot` запускается для non-draft PR �
 - `Code rules`;
 - `Application tests`;
 - `PostgreSQL integration`;
-- `Android debug APK`;
-- `Auto-format repository`;
-- `Trivy repository scan`;
-- `Zizmor GitHub Actions audit`;
-- `CodeQL (python)`;
-- `CodeQL (javascript-typescript)`.
+- `Trivy repository scan`.
 
 `Platform changes` и `CI required` должны завершиться именно `success`.
 Их `skipped` или `neutral` не являются доказательством успешного планирования

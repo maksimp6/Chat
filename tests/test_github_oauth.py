@@ -1,15 +1,14 @@
 import os
-import sqlite3
 import tempfile
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from flask import Flask
 
-import db
-import short_token_auth
+import storage.db as db
+import identity.short_token_auth as short_token_auth
 from identity import github_oauth as github_auth
-from user_identity import (
+from identity.user_identity import (
     authenticate_user_token,
     get_github_login,
     init_github_accounts_table,
@@ -327,11 +326,11 @@ def test_bootstrap_cannot_mint_token_for_promoted_user(temp_db):
 
 
 def test_bootstrap_refuses_rows_that_are_no_longer_anonymous(temp_db):
-    from agent_memory.runtime_store import get_runtime_memory_db
+    from agent_memory.client import get_memory_client
     from agent_memory.user_identity_store import UserIdentityStore
 
     anon = register_anonymous_user("web-installation-0004", {})
-    store = UserIdentityStore(get_runtime_memory_db(db.memory_file_path()))
+    store = UserIdentityStore(get_memory_client(db.memory_file_path()))
     state = store.load()
     assert state is not None
     state["users"][anon["user_id"]]["status"] = "github"
@@ -347,37 +346,23 @@ def test_prior_bootstrap_with_github_style_id_does_not_block_sign_in(temp_db):
     assert authenticate_user_token(identity["auth_token"]) == identity["user_id"]
 
 
-def test_concurrent_first_sign_in_retries_as_existing_link(temp_db, monkeypatch):
-    import user_identity
+def test_concurrent_first_sign_in_uses_one_identity(temp_db):
+    from concurrent.futures import ThreadPoolExecutor
 
-    real_link = user_identity._link_github_account
-    calls = []
-
-    def racing_link(*args):
-        calls.append(args)
-        if len(calls) == 1:
-            # Another callback links the same GitHub account first.
-            winner = real_link("77", "octocat", None, "winner-token")
-            assert winner[1] is True
-            raise sqlite3.IntegrityError("UNIQUE constraint failed")
-        return real_link(*args)
-
-    monkeypatch.setattr(user_identity, "_link_github_account", racing_link)
-    identity = sign_in_with_github(77, "octocat")
-    assert identity["new_user"] is False
-    assert authenticate_user_token(identity["auth_token"]) == identity["user_id"]
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: sign_in_with_github(77, "octocat"), range(2)))
+    assert results[0]["user_id"] == results[1]["user_id"]
+    assert sum(result["new_user"] for result in results) == 1
+    assert get_github_login(results[0]["user_id"]) == "octocat"
 
 
-def test_link_rolls_back_on_unique_violation(temp_db, monkeypatch):
+def test_duplicate_uuid_does_not_publish_partial_state(temp_db, monkeypatch):
     import uuid as uuid_module
-
-    import user_identity
+    import identity.user_identity as user_identity
 
     existing = register_anonymous_user("web-installation-0005", {})
-    fixed = uuid_module.UUID(existing["user_id"])
-    monkeypatch.setattr(user_identity.uuid, "uuid4", lambda: fixed)
-
-    with pytest.raises(sqlite3.IntegrityError):
+    monkeypatch.setattr(user_identity.uuid, "uuid4", lambda: uuid_module.UUID(existing["user_id"]))
+    with pytest.raises(ValueError, match="duplicate generated user id"):
         user_identity._link_github_account("99", "octocat", None, "token")
     assert get_github_login(existing["user_id"]) is None
 
@@ -394,7 +379,7 @@ def test_stale_bootstrap_cannot_overwrite_promoted_user_token(temp_db, monkeypat
     import threading
     import time
 
-    import user_identity
+    import identity.user_identity as user_identity
 
     anon = register_anonymous_user("web-installation-0006", {})
     bootstrap_read = threading.Event()

@@ -2,9 +2,9 @@ import json
 import time
 import requests
 
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 from yandex_client_modules.errors import YandexClientError
-from provider_quotas import ProviderQuotaExceeded, reserve_request
+from provider_accounts.quotas import ProviderQuotaExceeded, reserve_request
 
 
 class YandexPollingMixin:

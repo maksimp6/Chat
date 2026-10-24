@@ -1,4 +1,4 @@
-from model_discovery import ModelDiscovery, ModelDiscoveryError
+from provider_accounts.model_discovery import ModelDiscovery, ModelDiscoveryError
 
 
 class FakeResponse:

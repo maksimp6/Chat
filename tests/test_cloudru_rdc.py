@@ -10,7 +10,7 @@ import requests
 
 from cloud.base import CloudProviderError
 from scripts import cloudru_rdc as rdc
-from storage import StorageObjectNotFound
+from storage.contracts import StorageObjectNotFound
 
 PROJECT = "94ae3a86-671f-40ae-9323-e81d3626135e"
 IDENTIFIER = "1440c7da-b147-4ed1-87fb-f0bdf2ec5b77"
