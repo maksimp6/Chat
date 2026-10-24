@@ -189,7 +189,10 @@ def github_callback():
 
     expected_state = request.cookies.get(STATE_COOKIE, "")
     state = request.args.get("state", "")
-    if not expected_state or not state or not hmac.compare_digest(expected_state, state):
+    # Compare bytes: compare_digest rejects non-ASCII str, which would be a 500 instead of a refusal.
+    if not expected_state or not state or not hmac.compare_digest(
+        expected_state.encode("utf-8"), state.encode("utf-8")
+    ):
         return _page("Вход через GitHub не удался: сессия входа устарела.", 400)
 
     if request.args.get("error"):

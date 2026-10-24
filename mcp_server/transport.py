@@ -28,7 +28,8 @@ def _client_error_message(exc: Exception, fallback: str) -> str:
         message = fallback
     if "Traceback (most recent call last):" in message:
         return fallback
-    message = message.splitlines()[0].strip()
+    lines = message.splitlines()
+    message = lines[0].strip() if lines else ""
     return message or fallback
 
 
@@ -77,7 +78,7 @@ def mcp_post() -> Response:
 
     request_id = payload.get("id")
     method = payload.get("method")
-    if payload.get("jsonrpc") != "2.0" or not method:
+    if payload.get("jsonrpc") != "2.0" or not isinstance(method, str) or not method:
         return _error_response(request_id, -32600, "Invalid JSON-RPC request")
 
     if method.startswith("notifications/"):
