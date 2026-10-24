@@ -1,0 +1,115 @@
+name: Delete stale branches (one-off)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type exactly: DELETE 76"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check confirmation
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: test "$CONFIRM" = "DELETE 76"
+
+      - name: Delete listed branches
+        run: |
+          set -uo pipefail
+          failed=0
+          while read -r b; do
+            case "$b" in
+              ""|develop|master|main) echo "skip $b"; continue ;;
+            esac
+            if git push origin --delete "$b"; then
+              echo "deleted $b"
+            else
+              echo "FAILED $b"; failed=1
+            fi
+          done <<'LIST'
+              agent-shell-starter
+              alice-platform-contract
+              background-task-worker
+              chore/asvs-l2-baseline
+              chore/claude-task-executor
+              chore/mypy-strict-clean
+              chore/naming-conventions
+              chore/reliability-rules
+              chore/wcag-ratchet
+              ci
+              ci-temp
+              cloudru-check
+              cloudru-docs-mirror
+              codex/broadcast-chat-working-copy
+              codex/integration-current-scope
+              copilot/fix-repair-master-after-squash-merges
+              copilot/sledit-za-otzyvami
+              copilot/task-293531601-1368709887-97723683-36c4-477e-819c-e20b61cb9ffd
+              copilot/task-293531601-1368709887-c51500e7-0f0f-4c3d-858a-a17c1eb8d089
+              docs-500-async-concurrency-contract
+              docs/google-drive-public-links-audit-20261011
+              docs/undefined-agent-cost-control
+              dota/agent-postmortem-705
+              feat/alice-android-root-agent
+              feat/execution-trace-billing
+              feat/execution-trace-e2e-audit
+              feat/github-token-settings
+              feat/github-workflow-dispatch-823
+              feat/invocation-context-foundation
+              feat/invocation-context-trace
+              feat/knowledge-cost-accounting
+              feat/persistent-session-invocation-records
+              feat/plugin-system
+              feat/preview-dozzle-logs
+              feat/pricing-registry
+              feat/prompt-cache-telemetry
+              feat/supabase-trace-mirror-final
+              feat/supabase-trace-mirror-final2
+              feat/supabase-trace-mirror-impl
+              feat/supabase-trace-mirror-v2
+              feat/supabase-trace-mirror-work
+              feat/yandex-mcp-trace-correlation
+              feature/browser-action-approval
+              feature/issue-18-full-responses-trace
+              feature/ready-made-sessions
+              fix-android-voice-permission
+              fix/141-require-stable-debug-signing
+              fix/714-chat-roles
+              fix/75-docs-conflict-2
+              fix/939-mobile-alice-dev-acceptance
+              fix/a11y-labels-status-dialog
+              fix/chat-approval-on-send
+              fix/chrome-worker-runtime-copy
+              fix/config-dotenv-loading
+              fix/execution-trace-circular-ref
+              fix/execution-trace-circular-ref-ci
+              fix/execution-trace-circular-ref-ci2
+              fix/execution-trace-circular-ref-ci3
+              fix/execution-trace-mcp-errors
+              fix/idempotent-approved-execution
+              fix/issue-21-response-polling-trace
+              fix/issue-22-pre-api-gap
+              fix/naming-ui-text
+              fix/supabase-trace-runtime-secrets
+              fix/trace-lifecycle-test
+              fix/trace-waterfall-pre-api-span
+              issue-729-compliance-linker
+              issue-776-functional-memory
+              refactor/430-termux-package
+              refactor/naming-frontend-code
+              test-533-ai-cache-header-candidate
+              claude/welcome-to-work-7d1f0t
+              copilot/task-293531601-1368709887-d907d3ab-cf83-477a-9264-c3aea84c10e5
+              docs/2026-10-06-memory-alice-dev
+              rdc-mcp-candidate
+              security/remove-api-keys
+          LIST
+          exit $failed
