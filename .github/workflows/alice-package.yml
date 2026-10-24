@@ -1,0 +1,50 @@
+name: Alice package candidate
+
+on:
+  pull_request:
+    paths:
+      - "alice_pro/**"
+      - "pyproject.toml"
+      - "README.md"
+      - "LICENSE"
+      - "tests/test_alice_module_build_contract.py"
+      - "docs/development/pypi-release.md"
+      - ".github/workflows/alice-package.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build and validate candidate (no publish)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: Install packaging checks
+        run: python -m pip install build twine pytest
+      - name: Run RED-first package contract tests
+        run: python -m pytest -q tests/test_alice_module_build_contract.py
+      - name: Build wheel and source distribution
+        run: python -m build
+      - name: Check PyPI metadata
+        run: python -m twine check dist/*
+      - name: Audit wheel contents
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          wheels = list(Path("dist").glob("*.whl"))
+          assert len(wheels) == 1
+          with zipfile.ZipFile(wheels[0]) as archive:
+              names = archive.namelist()
+              assert "alice_pro/__main__.py" in names
+              assert any(name.endswith(".dist-info/METADATA") for name in names)
+              assert not any(name.endswith((".env", ".pem", ".key", ".sqlite", ".db")) for name in names)
+          PY
