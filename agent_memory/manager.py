@@ -30,6 +30,33 @@ def load_memory_config() -> dict[str, Any]:
         return value
 
 
+MAX_CONTEXT_FACTS_LIMIT = 100
+_CONFIG_TYPES = {"enabled": bool, "auto_extraction": bool, "categories_allowed": list}
+
+
+def _validated_config_update(new_config: dict) -> dict:
+    """Accept only known keys with the types the summary builder relies on."""
+    unknown = set(new_config) - set(_CONFIG_TYPES) - {"max_context_facts"}
+    if unknown:
+        raise ValueError("unknown memory config keys: " + ", ".join(sorted(unknown)))
+    clean: dict[str, Any] = {}
+    for key, value in new_config.items():
+        if key == "max_context_facts":
+            if type(value) is not int or not 0 <= value <= MAX_CONTEXT_FACTS_LIMIT:
+                raise ValueError(
+                    f"max_context_facts must be an integer from 0 to {MAX_CONTEXT_FACTS_LIMIT}"
+                )
+        elif key == "categories_allowed":
+            if not isinstance(value, list) or not all(
+                isinstance(item, str) and item.strip() for item in value
+            ):
+                raise ValueError("categories_allowed must be a list of non-empty strings")
+        elif type(value) is not _CONFIG_TYPES[key]:
+            raise ValueError(f"{key} must be a {_CONFIG_TYPES[key].__name__}")
+        clean[key] = value
+    return clean
+
+
 def save_memory_config(new_config: dict) -> None:
     if not isinstance(new_config, dict):
         raise ValueError("memory config must be an object")
@@ -40,7 +67,7 @@ def save_memory_config(new_config: dict) -> None:
             current = deepcopy(DEFAULT_CONFIG)
         if not isinstance(current, dict):
             raise ValueError("invalid native memory configuration")
-        current.update(new_config)
+        current.update(_validated_config_update(new_config))
         tx.set(_MEMORY_CONFIG_KEY, current)
 
 

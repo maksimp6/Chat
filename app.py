@@ -348,8 +348,20 @@ from agent_memory.manager import load_memory_config, save_memory_config, clear_g
 from agent_memory.extractor import list_global_memory_facts
 
 
+def _memory_owner_denied():
+    """Global memory is administered by an authenticated owner only."""
+    try:
+        get_current_owner_id()
+    except TreasuryIdentityError as exc:
+        return jsonify({"error": str(exc)}), 401
+    return None
+
+
 @app.route("/api/memory/manage", methods=["GET"])
 def api_memory_panel_data():
+    denied = _memory_owner_denied()
+    if denied:
+        return denied
     cfg = load_memory_config()
     facts = list_global_memory_facts()
     return jsonify({"config": cfg, "facts": facts})
@@ -357,14 +369,25 @@ def api_memory_panel_data():
 
 @app.route("/api/memory/config", methods=["PUT"])
 def api_update_memory_config():
+    denied = _memory_owner_denied()
+    if denied:
+        return denied
     data = request.get_json(silent=True) or {}
-    save_memory_config(data)
+    try:
+        save_memory_config(data)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     return jsonify({"status": "ok", "config": load_memory_config()})
 
 
 @app.route("/api/memory/clear", methods=["POST"])
 def api_clear_memory():
+    denied = _memory_owner_denied()
+    if denied:
+        return denied
     category = (request.get_json(silent=True) or {}).get("category")
+    if category is not None and not isinstance(category, str):
+        return jsonify({"error": "category must be a string"}), 400
     clear_global_memory(category)
     return jsonify({"status": "cleared", "category": category or "all"})
 

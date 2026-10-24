@@ -27,6 +27,7 @@ def test_memory_panel_api_returns_config_and_sorted_facts(tmp_path, monkeypatch)
     )
     store = get_memory_client(path)
     # Read API order must be deterministic even for concurrent equal timestamps.
+    monkeypatch.setattr("app.get_current_owner_id", lambda required=True: "owner-1")
     response = app.test_client().get("/api/memory/manage")
     assert response.status_code == 200
     data = response.get_json()

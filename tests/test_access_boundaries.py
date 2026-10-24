@@ -174,3 +174,41 @@ def test_conversation_tools_are_read_for_the_owner(monkeypatch):
 
     response = app_module.app.test_client().get("/api/conversations/c1/tools")
     assert response.get_json() == {"active_tool_categories": ["web"]}
+
+
+def test_memory_routes_require_an_owner(monkeypatch):
+    client = app_module.app.test_client()
+
+    assert client.get("/api/memory/manage").status_code == 401
+    assert client.put("/api/memory/config", json={"enabled": False}).status_code == 401
+    assert client.post("/api/memory/clear", json={}).status_code == 401
+
+
+def test_memory_config_rejects_unknown_keys_and_wrong_types(monkeypatch):
+    monkeypatch.setattr("app.get_current_owner_id", lambda required=True: "owner-1")
+    client = app_module.app.test_client()
+
+    unknown = client.put("/api/memory/config", json={"shell": "rm -rf /"})
+    assert unknown.status_code == 400
+    assert "unknown memory config keys" in unknown.get_json()["error"]
+
+    not_an_int = client.put("/api/memory/config", json={"max_context_facts": "abc"})
+    assert not_an_int.status_code == 400
+
+    too_many = client.put("/api/memory/config", json={"max_context_facts": 10_000})
+    assert too_many.status_code == 400
+
+
+def test_memory_config_accepts_a_valid_update(monkeypatch):
+    monkeypatch.setattr("app.get_current_owner_id", lambda required=True: "owner-1")
+    client = app_module.app.test_client()
+
+    response = client.put(
+        "/api/memory/config",
+        json={"enabled": False, "max_context_facts": 3, "categories_allowed": ["paths"]},
+    )
+    assert response.status_code == 200
+    config = response.get_json()["config"]
+    assert config["enabled"] is False
+    assert config["max_context_facts"] == 3
+    assert config["categories_allowed"] == ["paths"]
