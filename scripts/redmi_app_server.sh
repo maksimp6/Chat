@@ -4,7 +4,7 @@ set -euo pipefail
 set +x
 umask 077
 action=${1:-start}
-case "$action" in start|restart|status|stop) ;; *) echo 'Use start, restart, status or stop' >&2; exit 2 ;; esac
+case "$action" in start|restart|status|stop|deploy) ;; *) echo 'Use start, restart, status, stop or deploy' >&2; exit 2 ;; esac
 app=${LOGOS_APP_DIR:-$HOME/logos-local}
 state=${LOGOS_STATE_DIR:-$HOME/logos-local-state}
 port=${LOGOS_PORT:-8080}
@@ -62,53 +62,142 @@ ready() {
   owned "$pid"
 }
 
-if [[ $action == restart || $action == stop ]]; then
+stop_app() {
   if [[ -n $pid ]]; then
-    owned "$pid" || exit 1
-    kill -TERM "$pid"
-    deadline=$((SECONDS + 15))
-    while alive "$pid"; do
-      [[ $SECONDS -lt $deadline ]] || { echo 'Application did not stop; no replacement was started' >&2; exit 1; }
-      sleep 0.2
-    done
-    rm -f "$state/backend.pid"
+    if alive "$pid"; then
+      owned "$pid" || return 1
+      kill -TERM "$pid" || return 1
+      local deadline=$((SECONDS + 15))
+      while alive "$pid"; do
+        [[ $SECONDS -lt $deadline ]] || { echo 'Application did not stop; no replacement was started' >&2; return 1; }
+        sleep 0.2
+      done
+    fi
     pid=
   fi
-  if [[ $action == stop ]]; then echo 'LOGOS_STOPPED'; exit 0; fi
-fi
+  rm -f "$state/backend.pid"
+}
 
 outcome=already_running
-if [[ -z $pid && $action != status ]]; then
+start_app() {
+  [[ -z $pid ]] || return 0
   if timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/"$1"' _ "$port" 2>/dev/null; then
-    echo 'Port belongs to an untracked listener; refusing duplicate startup' >&2; exit 1
+    echo 'Port belongs to an untracked listener; refusing duplicate startup' >&2; return 1
   fi
-  # Reuse the reviewed launcher and its on-phone data/dependency/key configuration.
-  # The app receives no GitHub job token or inherited workflow credentials.
+  local revision
+  revision=$(git -C "$app" rev-parse HEAD 2>/dev/null || printf unknown)
+  # The existing launcher supplies native dependencies and legacy ALICE_* names.
+  # Bridge the same private files to LOGOS_* before entering that launcher.
+  # Secrets stay out of command-line arguments and workflow environment.
   env -i HOME="$HOME" PATH="$PATH" PREFIX="${PREFIX:-}" TMPDIR="${TMPDIR:-/tmp}" \
     LD_PRELOAD="${LD_PRELOAD:-}" LANG="${LANG:-C.UTF-8}" \
     ANDROID_ROOT="${ANDROID_ROOT:-}" ANDROID_DATA="${ANDROID_DATA:-}" \
     LOGOS_APP_DIR="$app" LOGOS_STATE_DIR="$state" LOGOS_PORT="$port" \
-    "$python" "$state/start-logos.py" >"$state/runner-launch.log" 2>&1 9>&-
-  [[ -f $state/backend.pid ]] || { echo 'Launcher did not write an application PID' >&2; exit 1; }
+    LOGOS_APP_REVISION="$revision" \
+    "$python" - "$state/start-logos.py" "$state" >"$state/runner-launch.log" 2>&1 9>&- <<'PY'
+import os, pathlib, runpy, sys
+state = pathlib.Path(sys.argv[2])
+os.environ["LOGOS_MEMORY_PATH"] = str(state / "logos.memory")
+key = state / "provider-encryption.key"
+if key.is_file():
+    os.environ["LOGOS_PROVIDER_CREDENTIAL_KEY"] = key.read_text().strip()
+runpy.run_path(sys.argv[1], run_name="__main__")
+PY
+  [[ $? == 0 ]] || return 1
+  [[ -f $state/backend.pid ]] || { echo 'Launcher did not write an application PID' >&2; return 1; }
   pid=$(<"$state/backend.pid")
   outcome=started
-fi
-[[ -n $pid ]] || { echo 'Logos is stopped' >&2; exit 1; }
-deadline=$((SECONDS + limit))
-until ready; do
-  owned "$pid" || { echo 'Application exited before readiness; inspect local backend.log' >&2; exit 1; }
-  if [[ $SECONDS -ge $deadline ]]; then
-    # Only terminate the new, identity-verified process from this failed attempt.
-    if [[ $outcome == started ]]; then owned "$pid" && kill -TERM "$pid"; fi
-    echo 'Application readiness failed; inspect local backend.log' >&2
-    exit 1
+}
+
+wait_ready() {
+  [[ -n $pid ]] || { echo 'Logos is stopped' >&2; return 1; }
+  local deadline=$((SECONDS + limit))
+  until ready; do
+    owned "$pid" || { echo 'Application exited before readiness; inspect local backend.log' >&2; return 1; }
+    if [[ $SECONDS -ge $deadline ]]; then
+      if [[ $outcome == started ]] && owned "$pid"; then kill -TERM "$pid"; fi
+      echo 'Application readiness failed; inspect local backend.log' >&2
+      return 1
+    fi
+    sleep 0.3
+  done
+}
+
+process_revision_matches() {
+  [[ -n $pid ]] && grep -zFxq "LOGOS_APP_REVISION=$1" "/proc/$pid/environ"
+}
+
+target=
+receipt() {
+  local status=${1:-ready} revision run
+  revision=$(git -C "$app" rev-parse HEAD 2>/dev/null || printf unknown)
+  run=${GITHUB_RUN_ID:-manual}
+  [[ $run =~ ^[0-9]+$ || $run == manual ]] || return 2
+  printf '{"status":"%s","outcome":"%s","pid":%s,"url":"%s","app_revision":"%s","target_revision":"%s","run_id":"%s","verified_at":"%s","checks":["process_identity","healthz","html","chat_js","css"]}\n' \
+    "$status" "$outcome" "$pid" "$base" "$revision" "$target" "$run" "$(date -u +%FT%TZ)" >"$state/runner-start.json.tmp" || return 1
+  mv "$state/runner-start.json.tmp" "$state/runner-start.json" || return 1
+  cat "$state/runner-start.json"
+}
+
+checkout_revision() {
+  GIT_LFS_SKIP_SMUDGE=1 git -C "$app" -c core.hooksPath=/dev/null checkout --quiet --detach "$1" || return 1
+  git -C "$app" lfs checkout >&2
+}
+
+backup_memory() {
+  [[ -f $state/logos.memory ]] || return 0
+  local backup
+  backup=$(mktemp "$state/deploy-backups/$previous.XXXXXX.memory") || return 1
+  cp "$state/logos.memory" "$backup" && sync -f "$backup"
+}
+
+if [[ $action == deploy ]]; then
+  if [[ ${GITHUB_ACTIONS:-} == true ]]; then
+    [[ ${GITHUB_REPOSITORY:-} == maksimp6/Chat && ${GITHUB_REF:-} == refs/heads/develop ]] || {
+      echo 'Automatic deployment accepts only this repository develop branch' >&2; exit 2;
+    }
   fi
-  sleep 0.3
-done
-revision=$(git -C "$app" rev-parse HEAD 2>/dev/null || printf unknown)
-run=${GITHUB_RUN_ID:-manual}
-[[ $run =~ ^[0-9]+$ || $run == manual ]] || exit 2
-printf '{"status":"ready","outcome":"%s","pid":%s,"url":"%s","app_revision":"%s","run_id":"%s","verified_at":"%s","checks":["process_identity","healthz","html","chat_js","css"]}\n' \
-  "$outcome" "$pid" "$base" "$revision" "$run" "$(date -u +%FT%TZ)" >"$state/runner-start.json.tmp"
-mv "$state/runner-start.json.tmp" "$state/runner-start.json"
-cat "$state/runner-start.json"
+  [[ $(git -C "$app" config --get remote.origin.url) == https://github.com/maksimp6/Chat.git ]] || {
+    echo 'Unexpected application repository remote' >&2; exit 1;
+  }
+  [[ -z $(git -C "$app" status --porcelain --untracked-files=no) ]] || {
+    echo 'Tracked application changes must be committed before deployment' >&2; exit 1;
+  }
+  previous=$(git -C "$app" rev-parse HEAD)
+  [[ $previous =~ ^[0-9a-f]{40}$ ]] || exit 2
+  # Read the current branch tip even for a delayed/retried job, never downgrade
+  # to an older event SHA. Fetch all target LFS bytes before stopping the app.
+  export GIT_TERMINAL_PROMPT=0
+  timeout 90 git -C "$app" fetch --quiet --no-tags origin '+refs/heads/develop:refs/remotes/origin/develop'
+  target=$(git -C "$app" rev-parse --verify 'refs/remotes/origin/develop^{commit}')
+  [[ $target =~ ^[0-9a-f]{40}$ ]] || exit 2
+  timeout 180 git -C "$app" lfs fetch origin "$target" >&2
+  git -C "$app" lfs fsck --objects "$target" >&2
+  if [[ $previous == "$target" ]] && ready && process_revision_matches "$target"; then
+    outcome=already_current
+    receipt
+    exit 0
+  fi
+  git -C "$app" update-ref "refs/logos/deployments/$previous" "$previous"
+  mkdir -p "$state/deploy-backups"
+  stop_app
+  if backup_memory && checkout_revision "$target" && start_app && wait_ready && process_revision_matches "$target"; then
+    outcome=updated
+    receipt
+    exit 0
+  fi
+  echo 'Deployment failed; restoring the previous code revision' >&2
+  if stop_app && checkout_revision "$previous" && start_app && wait_ready && process_revision_matches "$previous"; then
+    outcome=rolled_back
+    receipt rolled_back
+  else
+    echo 'Rollback was not ready; inspect local backend.log' >&2
+  fi
+  exit 1
+fi
+
+if [[ $action == restart || $action == stop ]]; then stop_app; fi
+if [[ $action == stop ]]; then echo 'LOGOS_STOPPED'; exit 0; fi
+if [[ $action != status ]]; then start_app; fi
+wait_ready
+receipt
