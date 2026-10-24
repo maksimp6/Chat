@@ -64,10 +64,31 @@ def fetch(name: str, digest: str, out_dir: Path, opener=None) -> Path:
     return target
 
 
+def verify_local(out_dir: Path) -> list[str]:
+    """Verify runtime files already present in out_dir (for example from Git LFS); never downloads."""
+    verified = []
+    for name, digest in load_pins().items():
+        path = out_dir / name
+        if not path.is_file():
+            raise RuntimeVerificationError(f"{name}: missing from {out_dir}")
+        verify_file(path, digest)
+        verified.append(name)
+    return verified
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("out_dir", type=Path)
+    parser.add_argument(
+        "--verify-only",
+        action="store_true",
+        help="verify files already in out_dir against the pins instead of downloading",
+    )
     args = parser.parse_args(argv)
+    if args.verify_only:
+        for name in verify_local(args.out_dir):
+            print(f"verified {name}")
+        return 0
     args.out_dir.mkdir(parents=True, exist_ok=True)
     for name, digest in load_pins().items():
         path = fetch(name, digest, args.out_dir)
