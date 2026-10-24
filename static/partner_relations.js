@@ -268,5 +268,4 @@
   }
 
   window.openPartnerRelationsModal = openPartnerRelationsModal;
-  window.closePartnerRelationsModal = closeModal;
 })();

@@ -137,10 +137,5 @@
     if (modal) window.LogosCoreAPI.ui.modal.close(modal);
   });
 
-  window.openCloudRuIamWizard = function () {
-    build();
-    var modal = document.getElementById("cloudru-iam-modal");
-    window.LogosCoreAPI.ui.modal.open(modal);
-  };
   document.addEventListener("DOMContentLoaded", build);
 })();

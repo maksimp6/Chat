@@ -90,5 +90,4 @@
 
   window.LogosCoreAPI.ui.actions.register("departments.close", close);
   window.openDepartmentsModal = open;
-  window.closeDepartmentsModal = close;
 })();

@@ -132,12 +132,6 @@
       });
   };
 
-  window.getSettings = function (convId) {
-    return load(convId);
-  };
-  window.saveSettings = function (settings, convId) {
-    save(settings, convId);
-  };
   window.resetSettings = function (convId) {
     convId =
       convId || (typeof currentConvId !== "undefined" && currentConvId ? currentConvId : null);
@@ -153,9 +147,6 @@
       localStorage.removeItem(STORAGE_KEY);
     }
     return JSON.parse(JSON.stringify(DEFAULTS));
-  };
-  window.clearConversationSettings = function (convId) {
-    if (convId) localStorage.removeItem(convKey(convId));
   };
 
   window.SettingsStorage = {

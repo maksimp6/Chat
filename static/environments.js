@@ -158,7 +158,6 @@
     if (node) window.LogosCoreAPI.ui.modal.close(node);
   });
 
-  window.LogosEnvironments = { open, load };
 
   document.addEventListener("DOMContentLoaded", () => {
     const header = document.getElementById("header-actions-2");

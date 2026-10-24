@@ -5,17 +5,7 @@
     return document.getElementById(id);
   }
 
-  window.openMemoryModal = function () {
-    var modal = byId("memoryModal");
-    if (!modal) return;
-    window.LogosCoreAPI.ui.modal.open(modal);
-    window.loadMemoryData();
-  };
 
-  window.closeMemoryModal = function () {
-    var modal = byId("memoryModal");
-    if (modal) window.LogosCoreAPI.ui.modal.close(modal);
-  };
 
   window.loadMemoryData = async function () {
     try {

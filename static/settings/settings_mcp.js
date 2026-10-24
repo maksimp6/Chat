@@ -28,9 +28,6 @@
     return mcpFetchPromise;
   };
 
-  window.getMcpServersCache = function () {
-    return mcpServersCache;
-  };
 
   function closeMcpManagerModal(modal) {
     if (!modal) return;
@@ -373,7 +370,4 @@
     refreshList();
   };
 
-  window.SettingsMcp = {
-    buildMcpTool: buildMcpTool,
-  };
 })();
