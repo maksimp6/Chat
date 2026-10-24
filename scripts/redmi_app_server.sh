@@ -198,6 +198,7 @@ if [[ $action == deploy ]]; then
   timeout 90 git -C "$app" fetch --quiet --no-tags origin '+refs/heads/develop:refs/remotes/origin/develop'
   target=$(git -C "$app" rev-parse --verify 'refs/remotes/origin/develop^{commit}')
   [[ $target =~ ^[0-9a-f]{40}$ ]] || exit 2
+  git -C "$app" lfs install --local --skip-repo >/dev/null
   timeout 180 git -C "$app" lfs fetch origin "$target" >&2
   git -C "$app" lfs fsck --objects "$target" >&2
   if [[ $previous == "$target" ]] && ready && process_revision_matches "$target"; then
