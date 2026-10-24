@@ -216,11 +216,14 @@ def _persist_result(
     _write_result(checkpoint_file, result)
 
 
-def _default_client_factory() -> Callable[[], Any]:
+def _default_client_factory(model_key: str = DEFAULT_MODEL) -> Callable[[], Any]:
     from core.config import Config
     from chat.mcp_routes import LogosClient
 
-    seed_provider_credential()
+    from provider_accounts.claude_oauth import is_claude_model
+
+    if not is_claude_model(model_key):
+        seed_provider_credential()
 
     def client_factory() -> Any:
         return LogosClient(Config)
@@ -261,7 +264,7 @@ def run_issue_task(
     from invocation.trace import create_invocation_trace
     from agent_runtime.responses_tool_loop import extract_function_calls
 
-    client_factory = client_factory or _default_client_factory()
+    client_factory = client_factory or _default_client_factory(model_key)
 
     rules = (repo_root / "AGENTS.md").read_text(encoding="utf-8")
     before = set(changed_files(repo_root))
@@ -297,7 +300,13 @@ def run_issue_task(
     try:
         _write_result(checkpoint_file, result)
         client = client_factory()
-        conversation_id = client.create_conversation(trace)["id"]
+        from provider_accounts.claude_oauth import create_local_conversation, is_claude_model
+
+        conversation_id = (
+            create_local_conversation(trace)
+            if is_claude_model(model_key)
+            else client.create_conversation(trace)
+        )["id"]
         result["conversation_id"] = conversation_id
         response = client.ask_with_mcp(
             message=build_prompt(issue_number, title, body, rules),

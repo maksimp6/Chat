@@ -5,6 +5,11 @@ import logging
 import json as _json
 from typing import Any
 from yandex_client_modules.client import YandexResponsesClient
+from provider_accounts.claude_oauth import (
+    ClaudeOAuthTransport,
+    create_local_conversation,
+    is_claude_model,
+)
 from core.config import Config, calculate_full_cost
 from observability.trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
 from invocation.manager import (
@@ -89,6 +94,38 @@ def _normalize_requested_skills(data, params):
 
 
 class LogosClient(YandexResponsesClient):
+    def _claude_transport(self):
+        if not hasattr(self, "_claude_oauth"):
+            self._claude_oauth = ClaudeOAuthTransport()
+        return self._claude_oauth
+
+    def ask(
+        self,
+        message,
+        model_key,
+        conversation_id=None,
+        params=None,
+        execution_trace=None,
+        trace_step=None,
+    ):
+        if is_claude_model(model_key):
+            return self._claude_transport().ask(
+                message, model_key, conversation_id, params, execution_trace
+            )
+        return super().ask(
+            message,
+            model_key,
+            conversation_id,
+            params,
+            execution_trace=execution_trace,
+            trace_step=trace_step,
+        )
+
+    def _ask_provider(self, **kwargs):
+        if is_claude_model(kwargs["model_key"]):
+            return self._claude_transport().ask_with_mcp(**kwargs)
+        return super().ask_with_mcp(**kwargs)
+
     # Alice Pro shopping policy: never source recommendations from Yandex Market.
     # Keep Yandex AI Studio and unrelated Yandex services available.
     mandatory_blocked_web_domains = (
@@ -120,7 +157,7 @@ class LogosClient(YandexResponsesClient):
                     return False
             return _tool_call_needs_approval(call)
 
-        response = super().ask_with_mcp(
+        response = self._ask_provider(
             message=message,
             model_key=model_key,
             conversation_id=conversation_id,
@@ -169,7 +206,7 @@ class LogosClient(YandexResponsesClient):
                     continuation_params = dict(base_params)
                     continuation_params["input"] = input_items
                     continuation_params["background"] = base_params.get("background", True)
-                    return super(LogosClient, self).ask_with_mcp(
+                    return self._ask_provider(
                         message="",
                         model_key=model_key,
                         conversation_id=conversation_id,
@@ -409,8 +446,12 @@ def chat():
         cost = (
             float(billing.get("total_cost") or 0)
             if billing.get("cost_status") in {"calculated", "partial"}
+            else None
+            if is_claude_model(model_key)
             else 0.0
         )
+        if is_claude_model(model_key) and billing.get("unknown_cost_items"):
+            cost = None
 
         persist_invocation_trace(invocation.invocation_id, trace_data)
         add_message(
@@ -636,7 +677,10 @@ def conversations():
             }
         )
         try:
-            y_conv = client.create_conversation(execution_trace=creation_trace)
+            if is_claude_model(data.get("model")):
+                y_conv = create_local_conversation(creation_trace)
+            else:
+                y_conv = client.create_conversation(execution_trace=creation_trace)
             conv_id = y_conv.get("id") if isinstance(y_conv, dict) else None
             if not conv_id:
                 raise RuntimeError("Yandex conversation creation returned no ID")
