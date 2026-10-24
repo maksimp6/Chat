@@ -29,9 +29,12 @@ the active process group and skips subsequent commands.
 
 Containers, `uses:` actions (including checkout/setup/cache/artifact actions),
 unresolved expressions, job outputs/defaults, and `continue-on-error` are rejected
-as failures. The sole supported environment expression is `${{ github.token }}`;
-only explicitly configured step/job environment variables receive this ephemeral
-token. It is never written to a credential helper or runner configuration.
+as failures. Supported environment expressions are `${{ github.token }}` and
+direct `${{ secrets.NAME }}` references. Only explicitly configured step/job
+variables receive those values; other secrets are not exported. Missing secrets
+resolve to empty strings, and non-secret job variables cannot be read through
+the secrets context. Values are masked before log upload. No credential helper
+or runner configuration stores these per-job credentials.
 GitHub environment/output command files and live streaming are not implemented.
 Standard Actions logs are uploaded to GitHub Results after each step and at job
 completion, with token masking before upload. Upload/finalization failure fails
