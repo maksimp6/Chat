@@ -20,7 +20,9 @@ def memory_file_path() -> Path:
     if explicit:
         return Path(explicit).expanduser().resolve()
     if not DB_PATH:
-        raise KristallError("memory path is not configured: set LOGOS_MEMORY_PATH or LOGOS_DB_PATH")
+        raise KristallError(
+            "memory path is not configured: set LOGOS_MEMORY_PATH or LOGOS_DB_PATH"
+        )
     configured = Path(DB_PATH).expanduser().resolve()
     return configured if configured.suffix == ".memory" else configured.with_name("logos.memory")
 

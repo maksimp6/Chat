@@ -73,7 +73,8 @@ class BoardHandler(BaseHTTPRequestHandler):
 
     def _auth(self) -> bool:
         provided = self.headers.get("Authorization", "")
-        if not secrets.compare_digest(provided, "Bearer " + self._owner_token):
+        expected = ("Bearer " + self._owner_token).encode("utf-8")
+        if not secrets.compare_digest(provided.encode("utf-8"), expected):
             self._json(401, {"error": "authentication_required"})
             return False
         return True
