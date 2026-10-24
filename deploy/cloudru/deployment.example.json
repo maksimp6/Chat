@@ -16,7 +16,7 @@
     "idle_timeout": "600s"
   },
   "database": {
-    "engine": "memory_engine.MemoryStore",
+    "engine": "kristall.Kristall",
     "path": "/data/alice/alice.memory",
     "data_root": "/data/alice",
     "writer_processes": 1,

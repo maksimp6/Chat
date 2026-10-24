@@ -3,7 +3,7 @@ import os
 import tempfile
 import unittest
 
-import db
+import storage.db as db
 from invocation.manager import (
     cancel_invocation,
     create_invocation,
@@ -12,7 +12,7 @@ from invocation.manager import (
     get_invocation,
     start_invocation,
 )
-from session_manager import create_session, get_session, restore_session, update_session
+from sessions.manager import create_session, get_session, restore_session, update_session
 
 
 class PersistentRuntimeRecordsTests(unittest.TestCase):

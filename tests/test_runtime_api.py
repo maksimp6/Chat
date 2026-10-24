@@ -3,12 +3,12 @@ import json
 
 import pytest
 
-from api_contracts import validate_api_contract
+from api.contracts import validate_api_contract
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
     from agent_memory.client import close_memory_clients
     import app as app_module
 
@@ -85,7 +85,7 @@ def test_trace_endpoint_returns_correlated_persisted_trace(client):
         json={"conversation_id": "conversation-trace"},
     ).get_json()
 
-    import db
+    import storage.db as db
     from invocation.context import InvocationContext
     from invocation.trace import create_invocation_trace
 
@@ -107,7 +107,7 @@ def test_trace_endpoint_returns_correlated_persisted_trace(client):
     )
     trace_data = trace.finalize()
 
-    db.create_conversation("conversation-trace", "Trace", "aliceai-llm")
+    db.create_conversation("conversation-trace", "Trace", "logos-runtime")
     db.add_message("conversation-trace", "assistant", "ok", trace=trace_data)
     close_memory_clients()
 

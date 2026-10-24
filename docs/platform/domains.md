@@ -1,6 +1,6 @@
 # Domain Configuration
 
-Alice Platform uses domain routing to direct traffic to the correct service. This document explains how domains work and are configured.
+Keel Platform uses domain routing to direct traffic to the correct service. This document explains how domains work and are configured.
 
 ## Domain Concepts
 
@@ -88,7 +88,7 @@ agent-shell.maxxxpavlov.online:
 The platform generates health check URLs from domain configuration:
 
 ```bash
-python -m alice_platform health production
+python -m keel health production
 ```
 
 Output:

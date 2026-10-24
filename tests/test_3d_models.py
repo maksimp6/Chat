@@ -1,4 +1,4 @@
-"""Checks for the printable models in 3d-models/.
+"""Checks for the printable models in printing3d/models/.
 
 The static checks read the committed STL/3MF/SCAD files and need only the
 standard library. Rendering checks need the OpenSCAD CLI and are skipped when it
@@ -16,8 +16,8 @@ from pathlib import Path
 
 import pytest
 
-MODELS_DIR = Path(__file__).resolve().parents[1] / "3d-models"
-BAG_CLIP = MODELS_DIR / "bag-clip"
+MODELS_DIR = Path(__file__).resolve().parents[1] / "printing3d" / "models"
+BAG_CLIP = MODELS_DIR / "bag_clip"
 BAG_CLIP_PARTS = ("jaw_a", "jaw_b", "lever")
 A1_MINI_BED_MM = 180.0
 OPENSCAD = shutil.which("openscad")

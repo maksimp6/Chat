@@ -1,0 +1,97 @@
+{
+  "title": "Alice Pro Spool Holder - Centered Hub v0.2",
+  "status": "CAD verified, physical fit and functional rotation untested",
+  "target": "Bambu Lab A1 mini, PETG, external 1kg spool, no AMS",
+  "parts_reused_from_v0.1": [
+    "base_frame.stl",
+    "upright_A_print_twice.stl",
+    "axle_D_section.stl"
+  ],
+  "parts_added": "Choose ONE bore diameter, print 2 identical rings",
+  "original_axle_diameter_mm": 25.0,
+  "measuring_instruction": "Measure exact free diameter of spool center hole; not outside diameter",
+  "checks": [
+    {
+      "file": "ring_for_spool_bore_36mm_PRINT_2.stl",
+      "spool_bore_nominal_mm": 36.0,
+      "ring_body_od_mm": 35.5,
+      "bearing_id_mm": 26.0,
+      "flange_od_mm": 41.0,
+      "total_height_mm": 16.4,
+      "qty_to_print": 2,
+      "weight_estimate_pair_g_petg_at_1p27gcm3": 21.1,
+      "watertight": true,
+      "winding_consistent": true,
+      "connected_components": 1,
+      "fits_build_volume": true,
+      "touches_build_plate": true,
+      "pocket_count": 0,
+      "dimensions_mm": [
+        40.98,
+        40.99,
+        16.4
+      ],
+      "sha256": "e6e69ae39ed5203e979d55a536358b2960f6a0d1756042d2a19bd010af70f815"
+    },
+    {
+      "file": "ring_for_spool_bore_52mm_PRINT_2.stl",
+      "spool_bore_nominal_mm": 52.0,
+      "ring_body_od_mm": 51.5,
+      "bearing_id_mm": 26.0,
+      "flange_od_mm": 57.0,
+      "total_height_mm": 16.4,
+      "qty_to_print": 2,
+      "weight_estimate_pair_g_petg_at_1p27gcm3": 47.8,
+      "watertight": true,
+      "winding_consistent": true,
+      "connected_components": 1,
+      "fits_build_volume": true,
+      "touches_build_plate": true,
+      "pocket_count": 8,
+      "dimensions_mm": [
+        56.98,
+        56.99,
+        16.4
+      ],
+      "sha256": "6370624ef30b2b1d8d1cb199aa76527aee2e4f9bb48c8cd663d03b3576629d65"
+    },
+    {
+      "file": "ring_for_spool_bore_55mm_PRINT_2.stl",
+      "spool_bore_nominal_mm": 55.0,
+      "ring_body_od_mm": 54.5,
+      "bearing_id_mm": 26.0,
+      "flange_od_mm": 60.0,
+      "total_height_mm": 16.4,
+      "qty_to_print": 2,
+      "weight_estimate_pair_g_petg_at_1p27gcm3": 53.6,
+      "watertight": true,
+      "winding_consistent": true,
+      "connected_components": 1,
+      "fits_build_volume": true,
+      "touches_build_plate": true,
+      "pocket_count": 8,
+      "dimensions_mm": [
+        59.98,
+        59.99,
+        16.4
+      ],
+      "sha256": "9c393891a16fd4a2aa8ec47cc94b896d7d90724bd01f7997ed21e05d1dc28b9c"
+    }
+  ],
+  "safety": [
+    "Verify the spool hole measurement before printing adapters",
+    "Do not force adapters into reel or onto axle; test a ring first",
+    "Axle must rotate or spool must turn freely under light tension",
+    "Inspect for binding with a full 1kg reel before loading printer",
+    "Keep reel outside the travel volume of A1 mini, clear of wires",
+    "3D printer print/slicer profile not yet validated; do not start remotely"
+  ],
+  "axial_clearance_check": {
+    "stand_inner_gap_mm": 106,
+    "max_spool_width_mm": 85,
+    "flange_projection_each_side_mm": 2.4,
+    "minimum_symmetric_air_gap_to_each_stand_mm": 8.1,
+    "result": "PASS for hypothetical centrally positioned <=85mm-wide reel",
+    "note": "Does not substitute for measuring the real reel and physical spool-feeding test"
+  }
+}

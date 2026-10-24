@@ -1,6 +1,6 @@
 {
-  "name": "Алиса · Ассистент",
-  "short_name": "Алиса",
+  "name": "Logos · Ассистент",
+  "short_name": "Logos",
   "description": "AI-ассистент с MCP-инструментами",
   "start_url": "/",
   "display": "standalone",

@@ -10,7 +10,7 @@ from agent_skills.registry import (
     SkillRegistry,
     compose_skill_instructions,
 )
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 BODY = """## Purpose
