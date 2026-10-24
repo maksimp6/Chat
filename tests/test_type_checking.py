@@ -86,6 +86,8 @@ STRICT_CLEAN_FILES = {
     "agent_shell/__init__.py",
     "agent_skills/__init__.py",
     "agent_skills/registry.py",
+    "alice_mouse/__init__.py",
+    "alice_mouse/core.py",
     "alice_mouse/security/__init__.py",
     "alice_mouse/security/grants.py",
     "alice_mouse/security/socket_boundary.py",
