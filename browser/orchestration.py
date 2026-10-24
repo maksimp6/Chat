@@ -305,9 +305,11 @@ class BrowserRoleDag:
         results: dict[str, BrowserTaskResult] = {}
         pending = set(self._task_map)
         running: dict[Future[BrowserTaskResult], BrowserRoleTask] = {}
+        deadlines: dict[Future[BrowserTaskResult], float] = {}
         total_tokens = 0
 
-        with ThreadPoolExecutor(max_workers=self.budget.max_parallel_workers) as pool:
+        pool = ThreadPoolExecutor(max_workers=self.budget.max_parallel_workers)
+        try:
             while pending or running:
                 changed = True
                 while changed:
@@ -346,13 +348,18 @@ class BrowserRoleDag:
                             continue
                         future = pool.submit(self._run_task, task)
                         running[future] = task
+                        deadlines[future] = time.monotonic() + task.budget.max_seconds
                         pending.remove(task.task_id)
                         running_tasks[task.task_id] = task
                         available_slots -= 1
 
-                done, _ = wait(tuple(running), return_when=FIRST_COMPLETED)
+                timeout = None
+                if running:
+                    timeout = max(0.0, min(deadlines[f] for f in running) - time.monotonic())
+                done, _ = wait(tuple(running), timeout=timeout, return_when=FIRST_COMPLETED)
                 for future in done:
                     task = running.pop(future)
+                    deadlines.pop(future)
                     result = future.result()
                     total_tokens += result.consumed_tokens
 
@@ -382,6 +389,25 @@ class BrowserRoleDag:
                             )
                             pending.remove(pending_id)
                     results[task.task_id] = result
+
+                # A task past its time budget is failed now, without waiting for the worker. A
+                # write may already have happened, so that is said in the error.
+                now = time.monotonic()
+                for future in [f for f in running if deadlines[f] <= now]:
+                    task = running.pop(future)
+                    deadlines.pop(future)
+                    future.cancel()
+                    suffix = "; writes may already have happened" if task.is_write else ""
+                    results[task.task_id] = BrowserTaskResult(
+                        task.task_id,
+                        "failed",
+                        task.role,
+                        task.session_id,
+                        error="task time budget exceeded" + suffix,
+                    )
+        finally:
+            # Workers that are still running cannot be stopped; the DAG does not wait for them.
+            pool.shutdown(wait=False, cancel_futures=True)
 
         duration = max(0.0, self.clock() - started)
         statuses = {result.status for result in results.values()}
