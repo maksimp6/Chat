@@ -81,6 +81,8 @@ def _run_git(args: list, cfg: dict = None, repo_name: str = None, is_read: bool 
     repo_path = _resolve_repo_path(repo_name, cfg)
     timeout = cfg.get("timeout", 25)
 
+    if not repo_path:
+        return {"success": False, "error": "Репозиторий не задан: укажите repo или repo_path"}
     if not os.path.isdir(repo_path):
         return {"success": False, "error": f"Каталог не найден: {repo_path}"}
 
