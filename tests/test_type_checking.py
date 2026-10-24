@@ -174,6 +174,7 @@ STRICT_CLEAN_FILES = {
     "provider_key_rotation.py",
     "printing3d/shape_benchmarks.py",
     "provider_accounts/key_rotation.py",
+    "cloud/cloudru/live_budget.py",
     "repository_index/__init__.py",
     "repository_index/provenance.py",
     "rdc_connection/__init__.py",
