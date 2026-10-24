@@ -97,7 +97,12 @@ def update_session(
             raise ValueError("invalid runtime session record")
         record["updated_at"] = _now()
         if metadata is not None:
-            record["metadata"] = _sanitize_metadata(metadata)
+            replaced = _sanitize_metadata(metadata)
+            # Replacing metadata must not drop the owner recorded at creation.
+            owner = (record.get("metadata") or {}).get("user_id")
+            if owner is not None and "user_id" not in replaced:
+                replaced["user_id"] = owner
+            record["metadata"] = replaced
         if status is not None:
             record["status"] = status
             if status in {"completed", "failed", "cancelled"}:
