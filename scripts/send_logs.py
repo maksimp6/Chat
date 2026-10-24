@@ -65,10 +65,15 @@ def send_logs():
             "https://api.yandex-ai-studio.ru/v1/logs", json=data, headers=headers, timeout=30
         )
         print(f"Status: {response.status_code}")
-        print(f"Response: {response.text}")
+        if response.status_code >= 400:
+            # The body is shown only for a refusal; a success needs no echo of what was sent.
+            print(f"Response: {response.text[:500]}")
+            return 1
     except requests.exceptions.RequestException as e:
         print(f"Error: {e}")
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    send_logs()
+    raise SystemExit(send_logs())
