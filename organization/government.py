@@ -56,10 +56,12 @@ def _current_owner() -> Optional[str]:
 
 
 def _case_owned_by_current_user(case: Optional[dict[str, Any]]) -> bool:
+    # An unidentified caller owns nothing. Treating "no owner" as "any owner" let anonymous
+    # requests read, approve and submit other people's cases.
     if not case:
         return False
     owner = _current_owner()
-    return not owner or not case.get("user_id") or case.get("user_id") == owner
+    return bool(owner) and case.get("user_id") == owner
 
 
 def get_case(case_id: str) -> Optional[dict[str, Any]]:
