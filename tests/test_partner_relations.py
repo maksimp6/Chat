@@ -181,3 +181,54 @@ def test_a_non_object_partner_body_is_a_client_error(monkeypatch):
 def test_partner_metadata_is_size_limited():
     with pytest.raises(ValueError, match="metadata is too large"):
         create_partner({"name": "Acme", "metadata": {"blob": "x" * 9000}}, _ctx("owner-1"))
+
+
+def test_owners_may_use_the_same_client_chosen_id(monkeypatch):
+    old = db.DB_PATH
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            monkeypatch.setattr(db, "DB_PATH", os.path.join(tmp, "partners.db"))
+            init_partner_relations_tables()
+            create_partner({"id": "shared-id", "name": "Alpha"}, _ctx("owner-a"))
+            create_partner({"id": "shared-id", "name": "Beta"}, _ctx("owner-b"))
+
+            first = get_partner({"partner_id": "shared-id"}, _ctx("owner-a"))["partner"]
+            second = get_partner({"partner_id": "shared-id"}, _ctx("owner-b"))["partner"]
+            assert (first["name"], second["name"]) == ("Alpha", "Beta")
+            with pytest.raises(ValueError, match="already exists"):
+                create_partner({"id": "shared-id", "name": "Again"}, _ctx("owner-a"))
+        finally:
+            db.DB_PATH = old
+
+
+def test_rows_stored_under_the_unscoped_key_move_to_the_owner_key(monkeypatch):
+    from organization import partner_relations
+
+    old = db.DB_PATH
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            monkeypatch.setattr(db, "DB_PATH", os.path.join(tmp, "partners.db"))
+            monkeypatch.setattr(partner_relations, "_owner_keys_migrated", False)
+            legacy = {
+                "id": "legacy-1",
+                "owner_id": "owner-1",
+                "name": "Old",
+                "organization": "",
+                "email": "",
+                "phone": "",
+                "status": "lead",
+                "notes": "",
+                "metadata": {},
+                "created_at": 1,
+                "updated_at": 1,
+            }
+            with db.get_store().transaction() as tx:
+                tx.set("partners/partner/legacy-1", legacy)
+
+            init_partner_relations_tables()
+
+            partner = get_partner({"partner_id": "legacy-1"}, _ctx("owner-1"))["partner"]
+            assert partner["name"] == "Old"
+            assert db.get_store().get("partners/partner/legacy-1") is None
+        finally:
+            db.DB_PATH = old

@@ -8,6 +8,7 @@ but it does not pretend to have an external transport when none is configured.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from typing import Any, Mapping, Optional
@@ -75,7 +76,11 @@ def _trace_event(cfg: Optional[dict[str, Any]], event_type: str, payload: dict[s
 
 
 def init_partner_relations_tables() -> None:
+    global _owner_keys_migrated
     get_store()
+    if not _owner_keys_migrated:
+        _migrate_owner_keys()
+        _owner_keys_migrated = True
 
 
 def _validate_status(value: str, allowed: tuple[str, ...], field: str) -> str:
@@ -365,7 +370,7 @@ def delete_contact(
     existing = _contact_for_owner(owner_id, contact_id)
     if not existing:
         raise ValueError("contact not found")
-    key = "partners/contact/" + contact_id
+    key = _key("contact", contact_id, owner_id)
     with get_store().transaction() as tx:
         row = tx.get(key)
         if row is None or row["owner_id"] != owner_id:
@@ -1127,8 +1132,44 @@ __all__ = [
 ]
 
 
+_KINDS = ("partner", "contact", "message", "followup")
+_owner_keys_migrated = False
+
+
+def _owner_prefix(kind: str, owner_id: str) -> str:
+    # The owner is hashed into the key, so an owner id can never be confused with an identity.
+    namespace = hashlib.sha256(owner_id.encode("utf-8")).hexdigest()
+    return "partners/" + kind + "/" + namespace + "/"
+
+
+def _key(kind: str, identity: str, owner_id: str) -> str:
+    # Keys are per owner: two owners may use the same client-chosen id without touching each other.
+    return _owner_prefix(kind, owner_id) + identity
+
+
+def _migrate_owner_keys() -> None:
+    """Move rows stored under the unscoped key to the owner's key. Each row carries its id and
+    owner, so the target key is known."""
+    store = get_store()
+    moves = []
+    for kind in _KINDS:
+        for key, row in store.items(prefix="partners/" + kind + "/").items():
+            if not isinstance(row, dict) or not row.get("id") or not row.get("owner_id"):
+                continue
+            target = _key(kind, row["id"], row["owner_id"])
+            if key != target:
+                moves.append((key, target, row))
+    if not moves:
+        return
+    with store.transaction() as tx:
+        for old_key, target, row in moves:
+            if tx.get(target) is None:
+                tx.set(target, row)
+            tx.delete(old_key)
+
+
 def _get_owned(kind: str, identity: str, owner_id: str) -> Optional[dict[str, Any]]:
-    row = get_store().get("partners/" + kind + "/" + identity)
+    row = get_store().get(_key(kind, identity, owner_id))
     return (
         {key: value for key, value in row.items() if key != "owner_id"}
         if row and row["owner_id"] == owner_id
@@ -1139,19 +1180,19 @@ def _get_owned(kind: str, identity: str, owner_id: str) -> Optional[dict[str, An
 def _owned_rows(kind: str, owner_id: str, partner_id: Optional[str] = None) -> list[dict[str, Any]]:
     return [
         row
-        for row in get_store().items(prefix="partners/" + kind + "/").values()
+        for row in get_store().items(prefix=_owner_prefix(kind, owner_id)).values()
         if row["owner_id"] == owner_id and (partner_id is None or row["partner_id"] == partner_id)
     ]
 
 
 def _insert_owned(kind: str, identity: str, row: dict[str, Any]) -> None:
-    key = "partners/" + kind + "/" + identity
+    key = _key(kind, identity, row["owner_id"])
     with get_store().transaction() as tx:
         if tx.get(key) is not None:
             raise ValueError("record already exists")
         if kind != "partner":
-            parent = tx.get("partners/partner/" + row["partner_id"])
-            if parent is None or parent["owner_id"] != row["owner_id"]:
+            parent = tx.get(_key("partner", row["partner_id"], row["owner_id"]))
+            if parent is None:
                 raise ValueError("partner not found")
         tx.set(key, row)
 
@@ -1164,7 +1205,7 @@ def _update_owned(
     *,
     allowed_statuses: tuple[str, ...] = (),
 ) -> bool:
-    key = "partners/" + kind + "/" + identity
+    key = _key(kind, identity, owner_id)
     with get_store().transaction() as tx:
         row = tx.get(key)
         if row is None or row["owner_id"] != owner_id:
