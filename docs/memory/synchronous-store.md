@@ -56,6 +56,26 @@ modifying the source. Replay is idempotent. Replay time still grows with journal
 length; checkpointing and bounded recovery remain future work. SHA chaining
 detects corruption, not an attacker able to rewrite the complete chain.
 
+`checkpoint()` requires no staged values or active transaction. Under the writer
+lock it verifies the source journal against confirmed RAM state, sequence and
+digest, then writes and verifies a snapshot, fsyncs it, atomically replaces the
+journal, and fsyncs the parent directory. The sequence stays unchanged; the digest
+becomes the new snapshot-chain baseline. Corrupt, missing or changed source data
+is preserved without replacement and blocks writes pending recovery. I/O errors
+or caller cancellation once publication starts also block further writes until
+verified reopen. An exception is not proof that replacement did not occur.
+
+The complete snapshot frame is capped at 1 MiB. An oversized snapshot is rejected
+without changing the valid journal or blocking ordinary commits. Checkpointing is
+explicit, with no background timer or automatic recovery-time guarantee; large
+states and a growing uncheckpointed journal still need future work. Compaction
+also verifies the complete current source, so its work grows with journal length.
+
+An append/fsync failure never acknowledges the staged transaction. Caller
+cancellation during append or RAM publication also blocks further mutations:
+incomplete RAM metadata must not be used to retry a possibly persisted frame.
+If RAM publication was interrupted, committed reads and `last_commit` fail until
+reopen, while `info().last_commit` returns `None` instead of partial metadata.
 An append/fsync failure never acknowledges or publishes the staged transaction.
 The disk outcome can be uncertain, so subsequent mutations fail with recovery
 required. Reopen verifies disk evidence; an unacknowledged complete frame may
