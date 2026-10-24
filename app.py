@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, render_template
+from werkzeug.exceptions import HTTPException
 import os
 import logging
 import json
@@ -11,7 +12,6 @@ from provider_accounts.model_discovery import (
 )
 from storage.db import (
     init_db,
-    get_conversations,
     create_conversation,
     update_conversation_title,
     update_conversation_model,
@@ -128,6 +128,8 @@ app.register_blueprint(printing3d_bp)
 
 @app.errorhandler(Exception)
 def _handle_unexpected_error(exc):
+    if isinstance(exc, HTTPException):
+        return exc.get_response()
     logger.exception("[ERROR] Unhandled application exception")
     return problem(
         500,
@@ -178,11 +180,6 @@ def index():
         owner_id = get_current_owner_id(required=False)
         if owner_id:
             selected_conversation = get_owned_conversation(conversation_id, owner_id)
-        else:
-            selected_conversation = next(
-                (conv for conv in get_conversations() if conv["id"] == conversation_id),
-                None,
-            )
         if selected_conversation:
             selected_messages = get_messages(conversation_id)
 
@@ -258,7 +255,7 @@ def list_models():
 @app.route("/api/conversations/<conv_id>", methods=["PATCH"])
 def patch_conversation(conv_id):
     owner_id = get_current_owner_id(required=False)
-    if owner_id and not check_access(conv_id, owner_id):
+    if not owner_id or not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
     data = request.get_json(silent=True) or {}
     if "title" in data:
@@ -271,7 +268,7 @@ def patch_conversation(conv_id):
 @app.route("/api/conversations/<conv_id>/title", methods=["PUT"])
 def set_conv_title(conv_id):
     owner_id = get_current_owner_id(required=False)
-    if owner_id and not check_access(conv_id, owner_id):
+    if not owner_id or not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
     title = (request.get_json(silent=True) or {}).get("title")
     if not title:
@@ -283,19 +280,19 @@ def set_conv_title(conv_id):
 @app.route("/api/conversations/<conv_id>/model", methods=["PUT"])
 def set_conv_model(conv_id):
     owner_id = get_current_owner_id(required=False)
-    if owner_id and not check_access(conv_id, owner_id):
+    if not owner_id or not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
     model = (request.get_json(silent=True) or {}).get("model")
     if not model:
         return jsonify({"error": "Model is required"}), 400
-    update_conversation_model(conv_id, model, owner_id)
+    update_conversation_model(conv_id, model)
     return jsonify({"status": "ok", "model": model})
 
 
 @app.route("/api/conversations/<conv_id>", methods=["DELETE"])
 def remove_conv(conv_id):
     owner_id = get_current_owner_id(required=False)
-    if owner_id and not check_access(conv_id, owner_id):
+    if not owner_id or not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
     delete_conversation(conv_id)
     delete_owner(conv_id, owner_id)
@@ -304,11 +301,17 @@ def remove_conv(conv_id):
 
 @app.route("/api/conversations/<conv_id>/settings", methods=["GET"])
 def get_dialog_settings(conv_id):
+    owner_id = get_current_owner_id(required=False)
+    if not owner_id or not check_access(conv_id, owner_id):
+        return jsonify({"error": "conversation_not_found"}), 404
     return jsonify(get_conv_settings(conv_id) or {})
 
 
 @app.route("/api/conversations/<conv_id>/settings", methods=["PUT"])
 def save_dialog_settings(conv_id):
+    owner_id = get_current_owner_id(required=False)
+    if not owner_id or not check_access(conv_id, owner_id):
+        return jsonify({"error": "conversation_not_found"}), 404
     save_conv_settings(conv_id, request.get_json(silent=True) or {})
     return jsonify({"status": "ok"})
 

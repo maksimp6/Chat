@@ -6,7 +6,9 @@ URL path prefix. The prefix is consumed internally; no HTTP redirect is used.
 
 from __future__ import annotations
 
+import hmac
 import os
+import secrets
 from typing import Optional
 
 from secret_store.core import SecretRef, SecretResolutionError, SecretResolver
@@ -24,7 +26,9 @@ _PUBLIC_PATHS = frozenset({"/healthz", "/auth/logout"})
 # GitHub sign-in must be reachable before the visitor has the short token.
 _PUBLIC_PREFIXES = ("/auth/github/",)
 _TOKEN_PATH_MARKER = "alice.short_token_path_authenticated"
-_PROXY_AUTH_HEADER = "X-Alice-Proxy-Authenticated"
+PROXY_AUTH_HEADER = "X-Alice-Proxy-Authenticated"
+# Generated per process: only in-process environment dispatch is meant to know it.
+_PROXY_AUTH_SECRET = secrets.token_urlsafe(32)
 
 
 class _ShortTokenSource:
@@ -73,6 +77,11 @@ def _enabled() -> bool:
 
 def _token() -> str:
     return _SHORT_TOKEN_SOURCE.resolve()
+
+
+def proxy_auth_secret() -> str:
+    """Return the secret in-process environment dispatch sends to skip the token gate."""
+    return _PROXY_AUTH_SECRET
 
 
 def _serializer(token: str) -> URLSafeTimedSerializer:
@@ -208,7 +217,10 @@ def install_short_token_auth(app: Flask) -> None:
         if request.environ.get(_TOKEN_PATH_MARKER):
             return None
 
-        if request.headers.get(_PROXY_AUTH_HEADER, "").strip().lower() == "true":
+        if hmac.compare_digest(
+            request.headers.get(PROXY_AUTH_HEADER, "").encode("utf-8"),
+            _PROXY_AUTH_SECRET.encode("ascii"),
+        ):
             return None
 
         remainder = _token_path_remainder(token)

@@ -16,6 +16,7 @@ from remote_runtime.environments import (
 )
 from runtime import RuntimeNotFound, RuntimeOwnerViolation
 from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
+from identity.short_token_auth import PROXY_AUTH_HEADER, proxy_auth_secret
 
 environment_bp = Blueprint("environments", __name__, url_prefix="/api/environments")
 environment_gateway_bp = Blueprint("environment_gateway", __name__)
@@ -147,9 +148,9 @@ def _proxy(environment_id, subpath=""):
     headers = [
         (key, value)
         for key, value in request.headers.items()
-        if key.lower() not in {"host", "content-length", "connection"}
+        if key.lower() not in {"host", "content-length", "connection", PROXY_AUTH_HEADER.lower()}
     ]
-    headers.append(("X-Alice-Proxy-Authenticated", "true"))
+    headers.append((PROXY_AUTH_HEADER, proxy_auth_secret()))
     try:
         upstream = dispatch_environment_http(
             environment_id,
