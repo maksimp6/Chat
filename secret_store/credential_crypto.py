@@ -32,7 +32,10 @@ def _fernet():
 def encrypt_secret(value: str) -> str:
     fernet, _ = _fernet()
     if fernet is None:
-        return value
+        # Never persist a provider key in plaintext; the caller reports storage failure.
+        raise CredentialCryptoError(
+            "LOGOS_PROVIDER_CREDENTIAL_KEY is required to store provider credentials"
+        )
     return fernet.encrypt(value.encode("utf-8")).decode("ascii")
 
 

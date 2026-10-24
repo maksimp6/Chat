@@ -565,10 +565,12 @@ def update_provider_credentials():
                 provider_key_id=None,
                 ttl=timedelta(hours=12),
             )
+            # Only a real provider request proves authorization. Yandex validation
+            # checks local presence only, so its stored key is "configured", not "connected".
             record_health_check(
                 conn,
                 provider,
-                status="connected",
+                status="connected" if provider == CLOUDRU else "configured",
                 error=None,
             )
     except Exception as exc:
