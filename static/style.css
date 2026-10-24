@@ -1033,6 +1033,14 @@ body {
   font-size: 11px;
   color: var(--text-secondary);
 }
+.alice-pro-app .model-option-unavailable {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.alice-pro-app .model-option-ultra {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
 .alice-pro-app #voice-ui,
 .alice-pro-app #response-mode-wrap,
 .alice-pro-app #mic-btn,

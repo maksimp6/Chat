@@ -7,7 +7,6 @@ import yaml
 
 from scripts import ci_platform_changes as routing
 
-
 ALL = {"web", "backend", "android", "infra", "database"}
 ROOT = Path(__file__).resolve().parents[1]
 

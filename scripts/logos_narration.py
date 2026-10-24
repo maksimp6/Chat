@@ -116,6 +116,7 @@ def synthesize(text: str, voice: str) -> bytes:
     audio = response.content
     if (
         response.status_code != 200
+        or len(audio) > 2 * 1024 * 1024
         or not audio.startswith(b"OggS")
         or b"OpusHead" not in audio[:512]
     ):

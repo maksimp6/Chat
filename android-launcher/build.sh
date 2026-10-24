@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# Сборка лаунчера без Gradle: aapt2 + javac + d8 + apksigner. Работает в Termux.
+# Сборка лаунчера: aapt2 + javac + d8 + apksigner. Работает в Termux.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$HERE/build"

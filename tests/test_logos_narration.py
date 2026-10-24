@@ -205,3 +205,71 @@ def test_workflow_keeps_narration_outside_model_checkout_and_reports_artifact(tm
     assert result.returncode == 0, result.stderr
     assert "status=failed" in (tmp_path / "output").read_text()
     assert json.loads((tmp_path / "logos-narration/receipt.json").read_text())["status"] == "failed"
+
+
+def test_one_step_runner_attaches_real_offline_story_without_changing_native_status(tmp_path):
+    from scripts.logos_once import attach_narration
+
+    result = {"status": "blocked", "generation_requests": 0, "reply": "secret-canary"}
+    attach_narration(result, tmp_path / "once", {**os.environ, "GITHUB_TOKEN": "secret-canary"})
+    assert result["status"] == "blocked" and result["generation_requests"] == 0
+    assert result["narration"]["status"] == "text_ready"
+    assert "заблокирован" in result["narration"]["text"]
+    assert "secret-canary" not in result["narration"]["text"]
+    assert result["narration"]["tts_requests_attempted"] == 0
+
+
+def test_one_step_narration_failure_keeps_model_result_and_does_not_retry(tmp_path, monkeypatch):
+    from scripts import logos_once
+
+    calls = []
+
+    def fail(*args, **kwargs):
+        calls.append(args)
+        assert "GITHUB_TOKEN" not in kwargs["env"]
+        raise subprocess.TimeoutExpired(args[0], 110)
+
+    monkeypatch.setattr(logos_once.subprocess, "run", fail)
+    result = {"status": "completed", "reply": "Ответ"}
+    logos_once.attach_narration(result, tmp_path / "once", {**os.environ, "GITHUB_TOKEN": "canary"})
+    assert result["status"] == "completed" and result["reply"] == "Ответ"
+    assert result["narration"]["status"] == "failed" and len(calls) == 1
+
+
+def test_one_step_keeps_single_visible_step_with_tts_opt_in():
+    workflow = yaml.safe_load(Path(".github/workflows/logos-once.yml").read_text())
+    steps = workflow["jobs"]["logos"]["steps"]
+    assert len(steps) == 1 and steps[0]["name"] == "logos"
+    assert "vars.LOGOS_TTS_ALLOWED" in steps[0]["env"]["LOGOS_TTS_ALLOWED"]
+
+
+def test_one_step_audio_bytes_survive_result_log_delivery(tmp_path, monkeypatch, capsys):
+    import base64
+
+    from scripts import logos_once
+
+    audio = b"OggS-OpusHead-offline-positive-control"
+    monkeypatch.setattr(narration, "synthesize", lambda *a: audio)
+
+    def child(command, **kwargs):
+        narration.main(command[3:])
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(logos_once.subprocess, "run", child)
+    result = {"status": "completed", "reply": "Ответ"}
+    logos_once.attach_narration(
+        result,
+        tmp_path / "once",
+        {**os.environ, "LOGOS_TTS_ALLOWED": "true", "LOGOS_TTS_MAX_CHARS": "500"},
+    )
+    assert result["narration"]["audio_status"] == "ready"
+    capsys.readouterr()
+    logos_once.emit_result(result, tmp_path / "summary")
+    chunks = [
+        line.split(":", 1)[1]
+        for line in capsys.readouterr().out.splitlines()
+        if line.startswith("LOGOS_RESULT_PART=")
+    ]
+    delivered = json.loads(base64.b64decode("".join(chunks)))
+    assert base64.b64decode(delivered["narration"]["parts"][0]["audio_base64"]) == audio
+    assert "Narration audio: ready" in (tmp_path / "summary").read_text()

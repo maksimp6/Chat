@@ -23,8 +23,3 @@ def test_android_native_pins_have_chaquopy_wheels():
             f"android/requirements.txt pins {package}=={pins.get(package)}, "
             f"but Chaquopy only provides {sorted(versions)}"
         )
-
-
-def test_gradle_installs_android_requirements_file():
-    gradle = (ROOT / "android" / "app" / "build.gradle.kts").read_text(encoding="utf-8")
-    assert 'install("-r", "../requirements.txt")' in gradle

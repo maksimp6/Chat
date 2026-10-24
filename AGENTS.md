@@ -256,7 +256,12 @@ Backend:
 `pytest -q`
 
 Android:
-`gradle --no-daemon -PaliceBuildNumber=<run> -PaliceCommitHash=<sha> :app:testDebugUnitTest :app:assembleDebug`
+`bash android/scripts/test_direct.sh`
+`bash android/scripts/build_direct.sh`
+
+These commands validate/build the direct SDK browser controller only. The retained
+embedded-backend Android sources have no active packager; release publication is
+blocked until equivalent packaging, signing and device acceptance are verified.
 
 For security-sensitive or schema changes, add focused regression coverage and document the operational setup required outside the repository.
 

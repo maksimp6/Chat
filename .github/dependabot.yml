@@ -25,22 +25,6 @@ updates:
       python-minor-patch:
         update-types: [minor, patch]
 
-  - package-ecosystem: gradle
-    directory: "/android"
-    target-branch: develop
-    schedule:
-      interval: weekly
-      day: monday
-    cooldown:
-      default-days: 7
-    open-pull-requests-limit: 5
-    labels: [dependencies, android]
-    commit-message:
-      prefix: "chore(deps)"
-    groups:
-      android-minor-patch:
-        update-types: [minor, patch]
-
   - package-ecosystem: github-actions
     directory: "/"
     target-branch: develop
