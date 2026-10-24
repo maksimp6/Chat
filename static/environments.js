@@ -15,6 +15,11 @@
     );
   }
 
+  // Only web addresses become links; any other scheme in server data would run as script.
+  function safeHref(value) {
+    return /^https?:\/\//i.test(String(value ?? "")) ? String(value) : "#";
+  }
+
   async function request(path, options = {}) {
     const response = await window.LogosDispatcher.request(path, {
       headers: { "Content-Type": "application/json", ...(options.headers || {}) },
@@ -99,7 +104,7 @@
               "</div>",
               '<div class="environment-card-actions">',
               '<a href="',
-              esc(env.url),
+              esc(safeHref(env.url)),
               '" target="_blank" rel="noopener">Открыть</a>',
               '<button class="logos-btn" data-op="',
               action,
@@ -124,13 +129,16 @@
       button.onclick = async () => {
         const op = button.dataset.op;
         const id = button.dataset.id;
+        if (op === "delete" && !window.confirm("Удалить environment?")) return;
+        // A second click while the operation runs would repeat it; the list re-renders on success.
+        button.disabled = true;
         try {
-          if (op === "delete" && !window.confirm("Удалить environment?")) return;
           const method = op === "delete" ? "DELETE" : "POST";
           const suffix = op === "delete" ? "" : "/" + op;
           await request("/api/environments/" + encodeURIComponent(id) + suffix, { method });
           await load();
         } catch (error) {
+          button.disabled = false;
           setStatus(error.message);
         }
       };

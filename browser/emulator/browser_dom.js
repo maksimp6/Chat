@@ -19,6 +19,9 @@ class EventTargetShim {
     event.stopPropagation ||= function () {
       this.propagationStopped = true;
     };
+    // An on<type> property handler runs like a browser's inline handler, before addEventListener ones.
+    const propertyHandler = this["on" + event.type];
+    if (typeof propertyHandler === "function") propertyHandler.call(this, event);
     for (const handler of [...(this._listeners[event.type] || [])]) handler.call(this, event);
     if (event.bubbles && !event.propagationStopped && this.parentNode) {
       this.parentNode.dispatchEvent(event);
@@ -191,6 +194,20 @@ class ElementShim extends EventTargetShim {
 
   remove() {
     if (this.parentNode) this.parentNode.removeChild(this);
+  }
+
+  get firstChild() {
+    return this.children[0] || null;
+  }
+
+  insertBefore(node, reference) {
+    if (node.parentNode) node.parentNode.removeChild(node);
+    node.parentNode = this;
+    node.ownerDocument = this.ownerDocument || node.ownerDocument;
+    const index = reference ? this.children.indexOf(reference) : -1;
+    if (index === -1) this.children.push(node);
+    else this.children.splice(index, 0, node);
+    return node;
   }
 
   insertAdjacentElement(position, element) {
