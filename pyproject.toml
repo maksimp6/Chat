@@ -27,3 +27,9 @@ exclude = '^(tests|node_modules|android|scripts|deploy|plugins|r)/'
 minversion = "8.0"
 addopts = ["--strict-config", "--strict-markers"]
 xfail_strict = true
+
+[tool.ruff.lint]
+extend-select = ["TID252"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"

@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 # Versions with Android wheels in Chaquopy's repository (https://chaquo.com/pypi-13.1/).
-CHAQUOPY_NATIVE_WHEELS = {"cryptography": {"42.0.8"}}
+CHAQUOPY_NATIVE_WHEELS: dict[str, set[str]] = {}  # no native packages in the Android runtime
 
 
 def _pins(path: Path) -> dict[str, str]:

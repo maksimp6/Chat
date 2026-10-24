@@ -18,7 +18,7 @@ from cloud.cloudru.object_storage import (
     sign_v4,
 )
 from runtime import RuntimeDispatcher, RuntimeStorage
-from storage import (
+from storage.contracts import (
     LocalDirectoryStorage,
     StorageCredentialsMissing,
     StorageError,

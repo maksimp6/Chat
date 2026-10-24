@@ -119,26 +119,6 @@ def _validate_journal_changes(changes: list[Any]) -> list[tuple[str, str, str, A
     return validated
 
 
-def _validate_checkpoint(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Validate the complete checkpoint before publishing recovered state."""
-    if payload["seq"] < 1 or payload["changes"] != []:
-        raise ValueError("invalid checkpoint baseline")
-    snapshot = payload.get("state")
-    if not isinstance(snapshot, dict):
-        raise ValueError("invalid checkpoint state")
-    checked: dict[str, dict[str, Any]] = {}
-    for namespace, values in snapshot.items():
-        if not isinstance(namespace, str) or not isinstance(values, dict):
-            raise ValueError("invalid checkpoint namespace")
-        checked[namespace] = {}
-        for key, value in values.items():
-            if not isinstance(key, str):
-                raise ValueError("invalid checkpoint key")
-            _validate_value(value)
-            checked[namespace][key] = value
-    return checked
-
-
 class Store(Protocol[ValueT]):
     """Copy-safe name/value staging with an explicit durable commit."""
 
@@ -178,22 +158,173 @@ class Commit:
     digest: str
 
 
+def _trusted_mount_id(fd: int) -> int:
+    """Read the kernel mount identity; reject unverifiable Linux mounts."""
+    try:
+        with open(f"/proc/self/fdinfo/{fd}", encoding="ascii") as info:
+            for line in info:
+                if line.startswith("mnt_id:"):
+                    return int(line.split(":", 1)[1].strip())
+    except (OSError, ValueError) as exc:
+        raise StoreError("unverifiable Memory DB mount boundary") from exc
+    raise StoreError("unverifiable Memory DB mount boundary")
+
+
+def _reject_extended_acl(fd: int) -> None:
+    """Fail closed on POSIX access/default ACL xattrs, including inherited ACLs."""
+    import errno
+
+    for name in ("system.posix_acl_access", "system.posix_acl_default"):
+        try:
+            os.getxattr(fd, name)
+        except OSError as exc:
+            if exc.errno in (errno.ENODATA,):
+                continue
+            raise StoreError("unverifiable Memory DB ACL") from exc
+        raise StoreError("untrusted Memory DB ACL")
+
+
+def _open_directory_nofollow(directory: Path, *, trusted: bool | None = None) -> int:
+    """Pin every directory component; never traverse a symlink."""
+    absolute = Path(os.path.abspath(directory))
+    fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+    if trusted is None:
+        trusted = os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1"
+    try:
+        if trusted:
+            _verify_trusted_ancestor(fd)
+            previous_mount = _trusted_mount_id(fd)
+        for part in absolute.parts[1:]:
+            next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            try:
+                if trusted:
+                    _verify_trusted_ancestor(next_fd)
+                    current_mount = _trusted_mount_id(next_fd)
+                    if current_mount != previous_mount:
+                        raise StoreError("untrusted Memory DB mount boundary")
+                    previous_mount = current_mount
+            except BaseException:
+                os.close(next_fd)
+                raise
+            os.close(fd)
+            fd = next_fd
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _verify_trusted_ancestor(fd: int) -> None:
+    """Reject writable ancestors except root-owned sticky shared directories."""
+    import stat
+
+    metadata = os.fstat(fd)
+    mode = metadata.st_mode
+    _reject_extended_acl(fd)
+    if not stat.S_ISDIR(mode):
+        raise StoreError("untrusted Memory DB ancestor")
+    # Only root and the service identity may own path components.
+    # Root-owned sticky directories (e.g. /tmp) cannot be renamed
+    # by an unrelated UID, but do not isolate a same-UID attacker.
+    if metadata.st_uid not in (0, os.geteuid()):
+        raise StoreError("untrusted Memory DB ancestor owner")
+    if mode & 0o022 and not (metadata.st_uid == 0 and mode & stat.S_ISVTX):
+        raise StoreError("untrusted Memory DB ancestor permissions")
+
+
+def _verify_trusted_root(directory_fd: int) -> None:
+    """Fail closed unless the pinned root belongs exclusively to this process."""
+    import stat
+
+    metadata = os.fstat(directory_fd)
+    _reject_extended_acl(directory_fd)
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or metadata.st_uid != os.geteuid()
+        or metadata.st_gid != os.getegid()
+        or stat.S_IMODE(metadata.st_mode) != 0o700
+    ):
+        raise StoreError("untrusted Memory DB directory ownership or permissions")
+
+
+def _verify_private_file(fd: int) -> None:
+    """Reject existing journals and lock files with unsafe DAC permissions."""
+    import stat
+
+    metadata = os.fstat(fd)
+    _reject_extended_acl(fd)
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_uid != os.geteuid()
+        or metadata.st_gid != os.getegid()
+        or stat.S_IMODE(metadata.st_mode) != 0o600
+    ):
+        raise StoreError("untrusted Memory DB file ownership or permissions")
+
+
+def _open_journal_nofollow(
+    directory_fd: int, name: str, flags: int, *, trusted: bool | None = None
+) -> int:
+    """Open a regular journal relative to the pinned directory."""
+    fd = os.open(name, flags | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600, dir_fd=directory_fd)
+    try:
+        import stat
+
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise StoreError("journal must be a regular file")
+        if trusted is None:
+            trusted = os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1"
+        if trusted:
+            _verify_private_file(fd)
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
 class _JournalStore:
     """In-process committed RAM state backed by an fsynced append-only log."""
 
-    def __init__(self, path: str | Path) -> None:
+    def __setattr__(self, name: str, value: Any) -> None:
+        # Prevent accidental policy downgrade after construction. This is not
+        # isolation against arbitrary code running inside the service process.
+        if name == "_trusted" and "_trusted" in self.__dict__:
+            raise StoreError("trusted policy is immutable")
+        object.__setattr__(self, name, value)
+
+    def __init__(self, path: str | Path, *, trusted: bool | None = None) -> None:
+        self._trusted = (
+            (os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1") if trusted is None else trusted
+        )
         self._pid = os.getpid()
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self._directory_fd = _open_directory_nofollow(self.path.parent, trusted=self._trusted)
+            if self._trusted:
+                _verify_trusted_root(self._directory_fd)
+            self._journal_name = self.path.name
+            lock_fd = _open_journal_nofollow(
+                self._directory_fd,
+                self._journal_name + ".lock",
+                os.O_RDWR | os.O_CREAT,
+                trusted=self._trusted,
+            )
+        except (OSError, StoreError) as exc:
+            if hasattr(self, "_directory_fd"):
+                os.close(self._directory_fd)
+            raise StoreError("unsafe journal or lock path") from exc
         self._lock = RLock()
         # Keep the lock in a separate stable file: replacing journal files must not
         # silently release ownership of the single-writer role.
-        self._lock_file = self.path.with_name(self.path.name + ".lock").open("a+b")
+        self._lock_file = os.fdopen(lock_fd, "a+b")
         try:
             fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as exc:
             self._lock_file.close()
+            os.close(self._directory_fd)
             raise StoreError("database already has a writer") from exc
+        self._journal_fd: int | None = None
         self._state: dict[str, dict[str, Any]] = {}
         self._sequence: int = 0
         self._digest: str = "0" * 64
@@ -228,25 +359,43 @@ class _JournalStore:
             return Commit(self._sequence, self._digest)
 
     @staticmethod
-    def _inspect_log(path: Path) -> tuple[dict[str, dict[str, Any]], int, str]:
+    def _inspect_log(
+        path: Path, *, trusted: bool | None = None
+    ) -> tuple[dict[str, dict[str, Any]], int, str]:
         """Verify journal integrity without changing the live instance."""
         state: dict[str, dict[str, Any]] = {}
         sequence = 0
         digest = "0" * 64
         if not path.exists():
             return state, sequence, digest
-        with path.open("rb") as journal:
-            while True:
-                frame = journal.readline(MAX_JOURNAL_FRAME_BYTES + 1)
-                if not frame:
-                    break
-                if len(frame) > MAX_JOURNAL_FRAME_BYTES:
-                    raise StoreError("journal frame exceeds size limit")
-                if not frame.endswith(b"\n"):
-                    raise StoreError("incomplete journal tail; recovery required")
-                state, sequence, digest = _JournalStore._apply_verified_frame(
-                    frame, state, sequence, digest
-                )
+        directory_fd = _open_directory_nofollow(path.parent, trusted=trusted)
+        try:
+            journal_fd = _open_journal_nofollow(
+                directory_fd, path.name, os.O_RDONLY, trusted=trusted
+            )
+        except OSError as exc:
+            raise StoreError("unsafe journal path") from exc
+        finally:
+            os.close(directory_fd)
+        with os.fdopen(journal_fd, "rb") as journal:
+            return _JournalStore._inspect_stream(journal)
+
+    @staticmethod
+    def _inspect_stream(journal: Any) -> tuple[dict[str, dict[str, Any]], int, str]:
+        state: dict[str, dict[str, Any]] = {}
+        sequence = 0
+        digest = "0" * 64
+        while True:
+            frame = journal.readline(MAX_JOURNAL_FRAME_BYTES + 1)
+            if not frame:
+                break
+            if len(frame) > MAX_JOURNAL_FRAME_BYTES:
+                raise StoreError("journal frame exceeds size limit")
+            if not frame.endswith(b"\n"):
+                raise StoreError("incomplete journal tail; recovery required")
+            state, sequence, digest = _JournalStore._apply_verified_frame(
+                frame, state, sequence, digest
+            )
         return state, sequence, digest
 
     @staticmethod
@@ -278,18 +427,9 @@ class _JournalStore:
             if (
                 type(payload["seq"]) is not int
                 or record["digest"] != next_digest
-                or (
-                    payload["seq"] != sequence + 1
-                    and not (sequence == 0 and payload.get("checkpoint") is True)
-                )
+                or payload["seq"] != sequence + 1
             ):
                 raise ValueError("commit chain mismatch")
-            # A checkpoint is the first and only baseline frame after compaction.
-            # Keep the original sequence monotonic across compactions.
-            if payload.get("checkpoint") is True:
-                if sequence != 0 or state:
-                    raise ValueError("checkpoint must be first")
-                return _validate_checkpoint(payload), payload["seq"], next_digest
             # Validate the entire frame before mutating caller-owned state.
             # A malformed later operation must not publish earlier changes.
             validated = _validate_journal_changes(payload["changes"])
@@ -311,7 +451,9 @@ class _JournalStore:
             raise StoreError("corrupt committed journal") from exc
 
     def _replay(self) -> None:
-        self._state, self._sequence, self._digest = self._inspect_log(self.path)
+        self._state, self._sequence, self._digest = self._inspect_log(
+            self.path, trusted=self._trusted
+        )
 
     def get(self, namespace: str, key: str) -> Any | None:
         """Return a deep copy of the last confirmed value from RAM."""
@@ -354,22 +496,32 @@ class _JournalStore:
             raise StoreError("unsupported JSON value") from exc
 
     def _append_frame(self, frame: bytes) -> None:
-        first_write = not self.path.exists()
         try:
-            with self.path.open("ab", buffering=0) as stream:
-                if stream.write(frame) != len(frame):
-                    raise OSError("short journal write")
-                # Do not acknowledge a commit before its journal bytes are synced.
-                os.fsync(stream.fileno())
-            if first_write:
-                directory = os.open(str(self.path.parent), os.O_RDONLY)
-                try:
-                    os.fsync(directory)
-                finally:
-                    os.close(directory)
-        except OSError as exc:
-            # A failed fsync may still have written bytes: the disk outcome is
-            # uncertain, so block future writes instead of claiming rollback.
+            if self._journal_fd is None:
+                self._journal_fd = _open_journal_nofollow(
+                    self._directory_fd,
+                    self._journal_name,
+                    os.O_WRONLY | os.O_APPEND | os.O_CREAT,
+                )
+            fd = self._journal_fd
+            # Pin the inode for this writer. A replaced pathname must never
+            # redirect appends to a different regular file.
+            path_stat = os.stat(
+                self._journal_name, dir_fd=self._directory_fd, follow_symlinks=False
+            )
+            opened_stat = os.fstat(fd)
+            if (path_stat.st_dev, path_stat.st_ino) != (opened_stat.st_dev, opened_stat.st_ino):
+                raise StoreError("journal path replaced; recovery required")
+            if os.write(fd, frame) != len(frame):
+                raise OSError("short journal write")
+            os.fsync(fd)
+            path_stat = os.stat(
+                self._journal_name, dir_fd=self._directory_fd, follow_symlinks=False
+            )
+            if (path_stat.st_dev, path_stat.st_ino) != (opened_stat.st_dev, opened_stat.st_ino):
+                raise StoreError("journal path replaced; recovery required")
+            os.fsync(self._directory_fd)
+        except (OSError, StoreError) as exc:
             self._failed = True
             raise StoreError("commit failed; recovery required") from exc
 
@@ -450,131 +602,60 @@ class _JournalStore:
         expected_commit: Commit,
         *,
         destination_must_be_new: bool = False,
+        trusted: bool | None = None,
     ) -> None:
-        """Copy to a same-directory temp file, validate, then atomically publish."""
+        """Copy from a no-follow source fd into a pinned destination directory."""
         import shutil
-        import tempfile
 
         destination.parent.mkdir(parents=True, exist_ok=True)
-        fd, temp_name = tempfile.mkstemp(prefix=".alice-copy-", dir=destination.parent)
-        temporary = Path(temp_name)
+        source_dir = _open_directory_nofollow(source.parent, trusted=trusted)
+        target_dir = _open_directory_nofollow(destination.parent, trusted=trusted)
+        temp_name = None
         try:
-            # Build and fsync the copy before publishing the destination path.
-            # The authoritative source remains unchanged on copy failure.
-            with os.fdopen(fd, "wb") as output:
-                if source.exists():
-                    with source.open("rb") as existing:
-                        shutil.copyfileobj(existing, output)
-                output.flush()
-                os.fsync(output.fileno())
-            actual_state, sequence, digest = _JournalStore._inspect_log(temporary)
-            if actual_state != expected_state or Commit(sequence, digest) != expected_commit:
-                raise StoreError("backup integrity mismatch")
-            try:
-                if destination_must_be_new:
-                    os.link(temporary, destination)
-                else:
-                    os.replace(temporary, destination)
-            except FileExistsError as exc:
-                raise StoreError("backup destination was created concurrently") from exc
-            directory = os.open(str(destination.parent), os.O_RDONLY)
-            try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
-        finally:
-            temporary.unlink(missing_ok=True)
-
-    def _verify_checkpoint_source(self) -> None:
-        """Never compact over corruption or an unobserved source mutation."""
-        try:
-            state, sequence, digest = self._inspect_log(self.path)
-        except StoreError as exc:
-            self._failed = True
-            raise StoreError("checkpoint source is corrupt; recovery required") from exc
-        if state != self._state or Commit(sequence, digest) != self.last_commit:
-            self._failed = True
-            raise StoreError("checkpoint source changed; recovery required")
-
-    def checkpoint(self) -> int:
-        """Atomically replace a long journal with one verified RAM-state frame."""
-        import tempfile
-
-        with self._lock:
-            self._ensure_open()
-            if self._failed or self._active_transaction:
-                raise StoreError("checkpoint requires a healthy idle store")
-            if self._sequence == 0:
-                return 0
-            payload = {
-                "format": 1,
-                "seq": self._sequence,
-                "changes": [],
-                "checkpoint": True,
-                "state": deepcopy(self._state),
-            }
-            encoded = json.dumps(
-                payload,
-                sort_keys=True,
-                separators=(",", ":"),
-                ensure_ascii=False,
-                allow_nan=False,
-            ).encode("utf-8")
-            digest = hashlib.sha256(bytes(32) + encoded).hexdigest()
-            frame = (
-                json.dumps(
-                    {"payload": payload, "digest": digest},
-                    sort_keys=True,
-                    separators=(",", ":"),
-                    ensure_ascii=False,
-                    allow_nan=False,
-                ).encode("utf-8")
-                + b"\n"
+            source_fd = _open_journal_nofollow(
+                source_dir, source.name, os.O_RDONLY, trusted=trusted
             )
-            if len(frame) > MAX_JOURNAL_FRAME_BYTES:
-                raise StoreError("checkpoint exceeds frame size limit")
-            temporary: Path | None = None
-            replaced = False
-            publication_started = False
-            try:
-                self._verify_checkpoint_source()
-                fd, temp_name = tempfile.mkstemp(prefix=".alice-checkpoint-", dir=self.path.parent)
-                temporary = Path(temp_name)
-                with os.fdopen(fd, "wb") as stream:
-                    if stream.write(frame) != len(frame):
-                        raise OSError("short checkpoint write")
-                    stream.flush()
-                    os.fsync(stream.fileno())
-                state, seq, verified_digest = self._inspect_log(temporary)
-                if state != self._state or seq != self._sequence or verified_digest != digest:
-                    raise StoreError("checkpoint verification failed")
-                # Cancellation can arrive inside replace, after the path changed
-                # but before the return/assignment. Treat publication as uncertain
-                # from this point until the directory sync and RAM digest update.
-                publication_started = True
-                os.replace(temporary, self.path)
-                replaced = True
-                directory = os.open(str(self.path.parent), os.O_RDONLY)
+            temp_name = ".alice-copy-" + os.urandom(16).hex()
+            temp_fd = _open_journal_nofollow(
+                target_dir, temp_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, trusted=trusted
+            )
+            with os.fdopen(source_fd, "rb") as existing:
+                with os.fdopen(temp_fd, "wb") as output:
+                    shutil.copyfileobj(existing, output)
+                    output.flush()
+                    os.fsync(output.fileno())
+            verify_fd = _open_journal_nofollow(target_dir, temp_name, os.O_RDONLY, trusted=trusted)
+            with os.fdopen(verify_fd, "rb") as verified:
+                actual_state, sequence, digest = _JournalStore._inspect_stream(verified)
+                if actual_state != expected_state or Commit(sequence, digest) != expected_commit:
+                    raise StoreError("backup integrity mismatch")
+                # Linux procfs names the already-verified open inode, not the
+                # attacker-replaceable temporary basename. Fail closed if procfs
+                # is unavailable; do not fall back to linking temp_name.
+                os.link(
+                    f"/proc/self/fd/{verified.fileno()}",
+                    destination.name,
+                    dst_dir_fd=target_dir,
+                    follow_symlinks=True,
+                )
+                published = os.stat(destination.name, dir_fd=target_dir, follow_symlinks=False)
+                pinned = os.fstat(verified.fileno())
+                if (published.st_dev, published.st_ino) != (pinned.st_dev, pinned.st_ino):
+                    raise StoreError("published backup inode mismatch")
+                os.fsync(target_dir)
+        except FileExistsError as exc:
+            raise StoreError("destination was created concurrently") from exc
+        finally:
+            if temp_name is not None:
                 try:
-                    os.fsync(directory)
-                finally:
-                    os.close(directory)
-                self._digest = digest
-                return self._sequence
-            except OSError as exc:
-                # A replace or directory fsync failure leaves publication uncertain.
-                self._failed = True
-                raise StoreError("checkpoint failed; recovery required") from exc
-            except BaseException:
-                if publication_started:
-                    self._failed = True
-                raise
-            finally:
-                if temporary is not None and not replaced:
-                    temporary.unlink(missing_ok=True)
+                    os.unlink(temp_name, dir_fd=target_dir)
+                except FileNotFoundError:
+                    pass
+            os.close(source_dir)
+            os.close(target_dir)
 
     def backup(self, destination: str | Path) -> None:
-        """Create a verified, fsynced backup without overwriting another artifact."""
+        """Back up confirmed state; reject alias and symlink destination paths."""
         with self._lock:
             self._ensure_open()
             if self._failed or self._active_transaction:
@@ -588,10 +669,11 @@ class _JournalStore:
                 self._state,
                 self.last_commit,
                 destination_must_be_new=True,
+                trusted=self._trusted,
             )
 
     def restore(self, source: str | Path) -> None:
-        """Restore a verified backup into a brand-new or empty store only."""
+        """Restore a verified backup into an empty store."""
         with self._lock:
             self._ensure_open()
             if self._failed or self._active_transaction:
@@ -601,24 +683,19 @@ class _JournalStore:
             origin = Path(source)
             if origin.resolve() == self.path.resolve():
                 raise StoreError("cannot restore from the live database path")
-            state, sequence, digest = self._inspect_log(origin)
+            state, sequence, digest = self._inspect_log(origin, trusted=self._trusted)
             if not origin.exists():
                 raise StoreError("backup source does not exist")
             try:
-                self._copy_verified_file(origin, self.path, state, Commit(sequence, digest))
-                self._ram_valid = False
-                self._state = state
-                self._sequence = sequence
-                self._digest = digest
-                self._ram_valid = True
+                self._copy_verified_file(
+                    origin, self.path, state, Commit(sequence, digest), trusted=self._trusted
+                )
             except OSError as exc:
                 self._failed = True
                 raise StoreError("restore failed; recovery required") from exc
-            except BaseException:
-                # Restore may have replaced the destination before cancellation.
-                # Empty/partial RAM metadata cannot be used to append to that log.
-                self._failed = True
-                raise
+            self._state = state
+            self._sequence = sequence
+            self._digest = digest
 
     def close(self) -> None:
         """Release the exclusive writer lock when no transaction is active."""
@@ -628,9 +705,13 @@ class _JournalStore:
             if self._active_transaction:
                 raise StoreError("cannot close during active transaction")
             if not self._closed:
+                if self._journal_fd is not None:
+                    os.close(self._journal_fd)
+                    self._journal_fd = None
                 if not self._lock_file.closed:
                     fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_UN)
                     self._lock_file.close()
+                os.close(self._directory_fd)
                 self._closed = True
 
     def __enter__(self) -> "_JournalStore":
@@ -649,8 +730,8 @@ class MemoryStore:
 
     _NAMESPACE = "values"
 
-    def __init__(self, path: str | Path) -> None:
-        self._engine = _JournalStore(path)
+    def __init__(self, path: str | Path, *, trusted: bool | None = None) -> None:
+        self._engine = _JournalStore(path, trusted=trusted)
         self._pending: dict[str, Any] = {}
 
     @property
@@ -713,13 +794,6 @@ class MemoryStore:
                         tx.set(change["namespace"], change["key"], change["value"])
                 finally:
                     wrapper._closed = True
-
-    def checkpoint(self) -> int:
-        """Compact the confirmed journal without changing visible RAM values."""
-        with self._engine._lock:
-            if self._pending:
-                raise StoreError("checkpoint requires no staged values")
-            return self._engine.checkpoint()
 
     def backup(self, destination: str | Path) -> None:
         """Back up only confirmed journal state."""

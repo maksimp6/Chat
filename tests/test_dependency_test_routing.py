@@ -5,8 +5,8 @@ import pytest
 from scripts.ci_platform_changes import classify
 
 
-ALL = {"web", "backend", "android", "infra", "database", "mcp"}
-WEB = {"web", "backend", "android", "database", "mcp"}
+ALL = {"web", "backend", "android", "infra", "mcp"}
+WEB = {"web", "backend", "android", "mcp"}
 
 
 @pytest.mark.parametrize(
@@ -14,7 +14,6 @@ WEB = {"web", "backend", "android", "database", "mcp"}
     [
         ("requirements.txt", ALL),
         ("requirements-dev.txt", ALL),
-        ("requirements-postgres.txt", {"backend", "database"}),
         ("requirements-deploy.txt", {"infra"}),
         ("android/requirements.txt", {"android"}),
         ("android/app/build.gradle.kts", {"android"}),

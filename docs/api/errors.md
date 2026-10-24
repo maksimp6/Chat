@@ -1,6 +1,6 @@
 # API errors (RFC 9457)
 
-Alice API errors use [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457)
+Logos API errors use [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457)
 with media type `application/problem+json`. Build them with
 `invocation.problems.problem()`:
 

@@ -1,4 +1,4 @@
-# Alice Pro frontend module standard v1
+# Logos frontend module standard v1
 
 Frontend modules use a C-like API boundary. A module receives a table of allowed Core API functions and does not access Core internals, another module's private state, or transport primitives directly.
 
