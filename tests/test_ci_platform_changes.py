@@ -59,7 +59,7 @@ def test_routing_unions_all_changed_paths():
 
 
 def results(**overrides):
-    value = dict.fromkeys(["backend", "android", "infra", "mcp"], "skipped")
+    value = dict.fromkeys(["backend", "infra", "mcp"], "skipped")
     value.update({"changes": "success", "code-rules": "success"})
     value.update(overrides)
     return value
@@ -73,9 +73,9 @@ def test_selected_platform_cannot_be_skipped():
 
 @pytest.mark.parametrize("state", ["failure", "cancelled", "skipped", "", "queued"])
 def test_selected_platform_requires_success(state):
-    plan = routing.classify(["android/app/src/main/Main.kt"])
-    with pytest.raises(ValueError, match="android"):
-        routing.validate_results(plan, results(android=state))
+    plan = routing.classify(["cloud/cloudru/registry_client.py"])
+    with pytest.raises(ValueError, match="infra"):
+        routing.validate_results(plan, results(infra=state))
 
 
 def test_successful_selected_platform_accepts_unselected_skips():
@@ -118,7 +118,7 @@ def test_router_tests_are_part_of_always_run_code_rules():
 def test_workflow_has_real_independent_infra_and_mcp_jobs():
     workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
     jobs = workflow["jobs"]
-    for job in ("backend", "android", "infra", "mcp"):
+    for job in ("backend", "infra", "mcp"):
         assert jobs[job]["needs"] == "changes"
     assert "infra" in jobs["required"]["needs"]
     assert "mcp" in jobs["required"]["needs"]

@@ -89,6 +89,15 @@ def _normalize_requested_skills(data, params):
 
 
 class LogosClient(YandexResponsesClient):
+    # Alice Pro shopping policy: never source recommendations from Yandex Market.
+    # Keep Yandex AI Studio and unrelated Yandex services available.
+    mandatory_blocked_web_domains = (
+        "market.yandex.ru",
+        "market.yandex.com",
+        "market.yandex.kz",
+        "market.yandex.by",
+    )
+
     def ask_with_mcp(self, message, model_key, conversation_id=None, params=None, trace=None):
         response = super().ask_with_mcp(
             message=message,

@@ -10,7 +10,7 @@ import sys
 from typing import Mapping
 
 PLATFORMS = ("web", "backend", "android", "infra", "database", "mcp")
-JOBS = ("backend", "android", "infra", "mcp")
+JOBS = ("backend", "infra", "mcp")
 SHARED_INPUTS = {
     ".github/workflows/ci.yml",
     ".python-version",
