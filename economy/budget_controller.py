@@ -304,6 +304,9 @@ class BudgetController:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
             account = self.account(account_type)
+            # The day's loss is counted from the new period, as in spend; otherwise yesterday's loss is
+            # added to today's and the account is locked too early.
+            self._roll_loss_period(account)
             amount = _money(amount)
             if amount > account.reserved:
                 raise InvalidOperation("cannot settle more than reserved")
