@@ -49,6 +49,7 @@ from organization.government import (
 from remote_runtime.environment_routes import environment_bp, environment_gateway_bp
 from remote_runtime.environments import init_environment_tables
 from identity.short_token_auth import install_short_token_auth
+from identity.deployment_admin import install_deployment_gate
 from rdc_connection.pairing import install_rdc_pairing
 from invocation.problems import problem
 from observability import system_log
@@ -75,6 +76,7 @@ from forge.routes import printing3d_bp
 app = Flask(__name__)
 system_log.configure()
 install_short_token_auth(app)
+install_deployment_gate(app)
 install_rdc_pairing(app)
 
 

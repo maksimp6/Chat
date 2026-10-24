@@ -1,10 +1,11 @@
 """Flask routes for Files and Vector Stores API"""
 
 import os
-import io
 import logging
+import re
 from flask import Blueprint, request, jsonify, Response
 from core.config import Config
+from identity.deployment_admin import deployment_admin_denied
 from yandex_client_modules.client import YandexResponsesClient, YandexClientError
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,24 @@ def get_client():
 
 def _err_response(e):
     code = getattr(e, "status_code", None) or (404 if "Not found" in str(e) else 500)
+    if code >= 500:
+        # Provider and internal error text stays in the log, not in the response.
+        logger.error("[FILES] Request failed: %s", e)
+        return jsonify({"error": "Внутренняя ошибка сервиса файлов"}), code
     return jsonify({"error": str(e)}), code
+
+
+def _attachment_name(name):
+    """A filename that cannot break out of a quoted Content-Disposition header."""
+    base = os.path.basename(str(name or "")) or "file"
+    return re.sub(r'[\x00-\x1f\x7f"\\]', "_", base)
+
+
+# Files and vector stores are deployment-wide and use the deployment's provider key, so every
+# route here needs the deployment administrator, not just an anonymous user identity.
+@file_bp.before_request
+def _deployment_admin_only():
+    return deployment_admin_denied()
 
 
 @file_bp.route("/api/files", methods=["GET"])
@@ -51,10 +69,9 @@ def upload_file():
     content_length = request.content_length
     if content_length and content_length > MAX_FILE_SIZE:
         return jsonify({"error": "File too large (max 128 MB)"}), 413
-    file_stream = io.BytesIO()
-    file.save(file_stream)
-    file_stream.seek(0)
-    file_content = file_stream.getvalue()
+    # Read at most one byte past the limit: Content-Length may be absent, so the header
+    # check alone does not bound memory use.
+    file_content = file.stream.read(MAX_FILE_SIZE + 1)
     if len(file_content) == 0:
         return jsonify({"error": "File is empty (0 bytes)"}), 400
     if len(file_content) > MAX_FILE_SIZE:
@@ -73,7 +90,7 @@ def upload_file():
         return _err_response(e)
     except Exception as e:
         logger.error(f"[FILES] Internal upload error: {e}", exc_info=True)
-        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+        return jsonify({"error": "Внутренняя ошибка сервиса файлов"}), 500
 
 
 @file_bp.route("/api/files/<file_id>", methods=["DELETE"])
@@ -106,7 +123,7 @@ def download_file(file_id):
         return Response(
             content,
             mimetype="application/octet-stream",
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            headers={"Content-Disposition": f'attachment; filename="{_attachment_name(filename)}"'},
         )
     except YandexClientError as e:
         return _err_response(e)
@@ -126,7 +143,9 @@ def list_vector_stores():
 @file_bp.route("/api/vector-stores", methods=["POST"])
 def create_vector_store():
     try:
-        data = request.get_json() or {}
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "JSON object is required"}), 400
         name = data.get("name")
         if not name:
             return jsonify({"error": "name is required"}), 400
@@ -210,8 +229,9 @@ LOCAL_REPO_DIR = os.getenv("LOGOS_LOCAL_REPO_DIR", "/sdcard/repo")
 def list_local_files():
     try:
         subpath = request.args.get("path", "").strip("/")
-        root_dir = os.path.abspath(LOCAL_REPO_DIR)
-        target_dir = os.path.abspath(os.path.join(root_dir, subpath))
+        # realpath resolves symlinks, so a link inside the repo cannot list a directory outside it.
+        root_dir = os.path.realpath(LOCAL_REPO_DIR)
+        target_dir = os.path.realpath(os.path.join(root_dir, subpath))
         try:
             inside_root = os.path.commonpath([root_dir, target_dir]) == root_dir
         except ValueError:
@@ -230,5 +250,6 @@ def list_local_files():
                 }
             )
         return jsonify({"success": True, "path": target_dir, "items": items})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("[FILES] Local listing failed")
+        return jsonify({"error": "Не удалось прочитать каталог"}), 500

@@ -25,6 +25,7 @@ from invocation.manager import (
 from invocation.trace import create_invocation_trace
 from mcp_server.trace import record_yandex_mcp_activity
 import mcp_server.storage as mcp_storage
+from identity.deployment_admin import deployment_admin_denied
 from tool_providers.registry import registry
 from storage.db import (
     create_conversation,
@@ -660,17 +661,13 @@ def conv_tools(conv_id):
     return jsonify({"active_tool_categories": cats})
 
 
-# MCP servers are deployment-wide, so only the authenticated owner may read or change them.
+# MCP servers are deployment-wide, so only the deployment administrator may read or change them.
 # Stored credentials never go back to the browser: an empty value on update means "unchanged".
 _MCP_SECRET_FIELDS = ("authorization", "headers")
 
 
 def _mcp_owner_denied():
-    try:
-        get_current_owner_id()
-    except TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
-    return None
+    return deployment_admin_denied()
 
 
 def _without_secrets(record):
