@@ -38,6 +38,8 @@ MYPY_ERROR_BASELINE = {
 
 # Files with zero strict errors. Errors here fail outright.
 STRICT_CLEAN_FILES = {
+    "agent_rules/__init__.py",
+    "agent_rules/controller.py",
     "steel/guardian/admission.py",
     "agent_runtime/provider_receipt.py",
     "forge/__init__.py",
