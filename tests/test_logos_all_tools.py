@@ -370,6 +370,7 @@ def test_termux_tool_off_device_reports_the_missing_helper(monkeypatch):
 
 def test_approved_government_submission_completes_the_case(monkeypatch):
     monkeypatch.setenv("LOGOS_OWNER_ID", "owner-1")
+    monkeypatch.setenv("LOGOS_SINGLE_USER", "true")
     executor = UniversalToolExecutor(registry)
 
     def run(name, arguments, approved=False):

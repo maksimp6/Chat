@@ -19,6 +19,15 @@ class TreasuryIdentityError(ValueError):
     """Raised when a Treasury operation has no trusted owner identity."""
 
 
+def _single_user_owner() -> Optional[str]:
+    """The fixed owner from LOGOS_OWNER_ID applies only to a deployment declared single-user.
+    Setting LOGOS_OWNER_ID alone never gives every unauthenticated request one shared owner."""
+    declared = str(env_get("LOGOS_SINGLE_USER") or "").strip().lower()
+    if declared not in {"1", "true", "yes", "on"}:
+        return None
+    return env_get("LOGOS_OWNER_ID")
+
+
 def get_current_owner_id(*, required: bool = True) -> Optional[str]:
     """Return a trusted owner id without accepting client-controlled values."""
     owner_id = None
@@ -34,7 +43,7 @@ def get_current_owner_id(*, required: bool = True) -> Optional[str]:
             owner_id = token_owner_id
 
     if owner_id is None:
-        owner_id = env_get("LOGOS_OWNER_ID")
+        owner_id = _single_user_owner()
 
     if owner_id is None or not str(owner_id).strip():
         if required:

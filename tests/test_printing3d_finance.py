@@ -198,6 +198,7 @@ def test_month_profit_filters_currency_and_month(finance_db):
 @pytest.fixture
 def finance_client(finance_db, monkeypatch):
     monkeypatch.setenv("LOGOS_OWNER_ID", "finance-route-owner")
+    monkeypatch.setenv("LOGOS_SINGLE_USER", "true")
     from app import app
 
     app.config.update(TESTING=True)

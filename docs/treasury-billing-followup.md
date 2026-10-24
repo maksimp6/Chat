@@ -22,8 +22,10 @@ Treasury never accepts owner_id from the JSON body or query string.
 
 When authentication is present, the authentication layer should populate
 Flask g.user_id or g.authenticated_user_id. For the current single-user
-deployment, set the server-side LOGOS_OWNER_ID value in .env. This is a
-temporary deployment identity and is intentionally not client-controlled.
+deployment, set the server-side LOGOS_OWNER_ID value in .env together with
+LOGOS_SINGLE_USER=true. LOGOS_OWNER_ID alone is ignored, so a multi-user deployment
+cannot give every request one shared owner by mistake. This is a temporary
+deployment identity and is intentionally not client-controlled.
 
 The missing-identity path is safe: chat can still return a model response, but
 Treasury settlement is recorded as skipped with owner_identity_missing

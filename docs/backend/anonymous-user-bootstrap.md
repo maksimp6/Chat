@@ -6,4 +6,4 @@ The anonymous user ID is not an authentication credential and is never accepted 
 
 The Android client stores the token in private preferences and installs it as the `logos_user_token` HttpOnly cookie in the local WebView. Web clients use the same bootstrap endpoint with a stable browser installation id; Treasury requests retry once after a missing/invalid identity response so the UI can establish the cookie without weakening server-side authorization. Sensitive operations resolve the owner from that verified token or another trusted server-side authentication context. Client-controlled `owner_id` values and the non-sensitive `X-Logos-User-ID` header are not used for Treasury authorization.
 
-When bootstrap is unavailable, the client may continue using a previously stored token. A fixed `LOGOS_OWNER_ID` remains available only as an explicitly configured single-user deployment fallback.
+When bootstrap is unavailable, the client may continue using a previously stored token. A fixed `LOGOS_OWNER_ID` is used only when `LOGOS_SINGLE_USER=true` is also set, as an explicitly configured single-user deployment fallback.

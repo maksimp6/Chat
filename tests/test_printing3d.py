@@ -555,6 +555,7 @@ def test_registry_survives_printing3d_tool_import_failure(monkeypatch):
 @pytest.fixture
 def printing_client(printing_db, monkeypatch):
     monkeypatch.setenv("LOGOS_OWNER_ID", "route-owner")
+    monkeypatch.setenv("LOGOS_SINGLE_USER", "true")
     from app import app
 
     app.config.update(TESTING=True)
