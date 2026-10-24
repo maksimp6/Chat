@@ -37,6 +37,7 @@ PARTNER_STATUSES = (
 MESSAGE_DIRECTIONS = ("incoming", "outgoing")
 MESSAGE_STATUSES = ("prepared", "queued", "recorded")
 FOLLOWUP_STATUSES = ("open", "completed", "cancelled")
+_MAX_METADATA_CHARS = 8000
 
 
 def _now() -> int:
@@ -113,6 +114,9 @@ def create_partner(
         raise ValueError("partner name is required")
     status = _validate_status(arguments.get("status") or "lead", PARTNER_STATUSES, "partner status")
     partner_id = str(arguments.get("id") or uuid4())
+    metadata = dict(arguments.get("metadata") or {})
+    if len(_json(metadata)) > _MAX_METADATA_CHARS:
+        raise ValueError("metadata is too large")
     now = _now()
 
     init_partner_relations_tables()
@@ -128,7 +132,7 @@ def create_partner(
             "phone": str(arguments.get("phone") or "").strip(),
             "status": status,
             "notes": str(arguments.get("notes") or "").strip(),
-            "metadata": dict(arguments.get("metadata") or {}),
+            "metadata": metadata,
             "created_at": now,
             "updated_at": now,
         },
@@ -903,11 +907,19 @@ PARTNER_TOOLS = {
 }
 
 
-def _http_owner() -> str:
-    try:
-        return get_current_owner_id()
-    except TreasuryIdentityError as exc:
-        raise exc
+def _http_arguments(tool_name: str, body: Any) -> dict[str, Any]:
+    """Check an HTTP body with the tool's field rules: a field that is present must match its
+    declared type, enum and length, so the routes accept what the tools accept."""
+    from tool_providers.universal_tool_platform import validate_json_schema
+
+    if not isinstance(body, dict):
+        raise ValueError("JSON object is required")
+    properties = PARTNER_TOOLS[tool_name]["parameters"]["properties"]
+    for name, value in body.items():
+        schema = properties.get(name)
+        if schema is not None and validate_json_schema(value, schema):
+            raise ValueError(f"invalid {name}")
+    return body
 
 
 @partner_relations_bp.get("")
@@ -921,7 +933,8 @@ def partners_list():
 @partner_relations_bp.post("")
 def partners_create():
     try:
-        return jsonify({"partner": create_partner(request.get_json(silent=True) or {})}), 201
+        body = _http_arguments("partner.create", request.get_json(silent=True) or {})
+        return jsonify({"partner": create_partner(body)}), 201
     except TreasuryIdentityError as exc:
         return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
@@ -942,9 +955,9 @@ def partners_get(partner_id: str):
 
 @partner_relations_bp.put("/<partner_id>")
 def partners_update(partner_id: str):
-    data = request.get_json(silent=True) or {}
-    data["partner_id"] = partner_id
     try:
+        data = _http_arguments("partner.update", request.get_json(silent=True) or {})
+        data["partner_id"] = partner_id
         return jsonify(update_partner(data))
     except TreasuryIdentityError as exc:
         return jsonify({"error": str(exc)}), 401
@@ -977,9 +990,9 @@ def partner_contacts_list(partner_id: str):
 
 @partner_relations_bp.post("/<partner_id>/contacts")
 def partner_contact_create(partner_id: str):
-    data = request.get_json(silent=True) or {}
-    data["partner_id"] = partner_id
     try:
+        data = _http_arguments("partner.contact.create", request.get_json(silent=True) or {})
+        data["partner_id"] = partner_id
         return jsonify(add_contact(data)), 201
     except TreasuryIdentityError as exc:
         return jsonify({"error": str(exc)}), 401
@@ -990,9 +1003,9 @@ def partner_contact_create(partner_id: str):
 
 @partner_relations_bp.put("/contacts/<contact_id>")
 def partner_contact_update(contact_id: str):
-    data = request.get_json(silent=True) or {}
-    data["contact_id"] = contact_id
     try:
+        data = _http_arguments("partner.contact.update", request.get_json(silent=True) or {})
+        data["contact_id"] = contact_id
         return jsonify(update_contact(data))
     except TreasuryIdentityError as exc:
         return jsonify({"error": str(exc)}), 401
@@ -1025,9 +1038,9 @@ def partner_messages(partner_id: str):
 
 @partner_relations_bp.post("/<partner_id>/messages")
 def partner_message_record(partner_id: str):
-    data = request.get_json(silent=True) or {}
-    data["partner_id"] = partner_id
     try:
+        data = _http_arguments("partner.message.prepare", request.get_json(silent=True) or {})
+        data["partner_id"] = partner_id
         result = prepare_message(data)
         return jsonify(result), 201
     except TreasuryIdentityError as exc:
@@ -1039,9 +1052,9 @@ def partner_message_record(partner_id: str):
 
 @partner_relations_bp.post("/<partner_id>/followups")
 def partner_followup_create(partner_id: str):
-    data = request.get_json(silent=True) or {}
-    data["partner_id"] = partner_id
     try:
+        data = _http_arguments("partner.followup.create", request.get_json(silent=True) or {})
+        data["partner_id"] = partner_id
         return jsonify({"followup": create_followup(data)}), 201
     except TreasuryIdentityError as exc:
         return jsonify({"error": str(exc)}), 401
@@ -1052,9 +1065,9 @@ def partner_followup_create(partner_id: str):
 
 @partner_relations_bp.post("/<partner_id>/status")
 def partner_status_update(partner_id: str):
-    data = request.get_json(silent=True) or {}
-    data["partner_id"] = partner_id
     try:
+        data = _http_arguments("partner.status.update", request.get_json(silent=True) or {})
+        data["partner_id"] = partner_id
         return jsonify({"partner": update_status(data)})
     except TreasuryIdentityError as exc:
         return jsonify({"error": str(exc)}), 401
@@ -1065,9 +1078,9 @@ def partner_status_update(partner_id: str):
 
 @partner_relations_bp.post("/followups/<followup_id>/complete")
 def partner_followup_complete(followup_id: str):
-    data = request.get_json(silent=True) or {}
-    data["followup_id"] = followup_id
     try:
+        data = _http_arguments("partner.followup.complete", request.get_json(silent=True) or {})
+        data["followup_id"] = followup_id
         return jsonify({"followup": complete_followup(data)})
     except TreasuryIdentityError as exc:
         return jsonify({"error": str(exc)}), 401

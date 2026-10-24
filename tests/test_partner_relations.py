@@ -1,6 +1,8 @@
 import os
 import tempfile
 
+import pytest
+
 import storage.db as db
 from organization.partner_relations import (
     PARTNER_TOOLS,
@@ -148,3 +150,34 @@ def test_a_partial_contact_update_keeps_the_fields_it_does_not_name(monkeypatch)
             assert updated["name"] == "Ada"
         finally:
             db.DB_PATH = old
+
+
+def test_http_bodies_follow_the_tool_field_rules():
+    from organization.partner_relations import _http_arguments
+
+    assert _http_arguments("partner.create", {"name": "Acme"}) == {"name": "Acme"}
+    with pytest.raises(ValueError, match="invalid name"):
+        _http_arguments("partner.create", {"name": "x" * 201})
+    with pytest.raises(ValueError, match="invalid status"):
+        _http_arguments("partner.create", {"status": "deleted"})
+    with pytest.raises(ValueError, match="JSON object"):
+        _http_arguments("partner.create", ["Acme"])
+
+
+def test_a_non_object_partner_body_is_a_client_error(monkeypatch):
+    from flask import Flask
+
+    from organization import partner_relations
+
+    monkeypatch.setattr(partner_relations, "get_current_owner_id", lambda required=True: "owner-1")
+    app = Flask(__name__)
+    app.register_blueprint(partner_relations.partner_relations_bp)
+
+    response = app.test_client().post("/api/partners", json=["Acme"])
+
+    assert response.status_code == 400
+
+
+def test_partner_metadata_is_size_limited():
+    with pytest.raises(ValueError, match="metadata is too large"):
+        create_partner({"name": "Acme", "metadata": {"blob": "x" * 9000}}, _ctx("owner-1"))
