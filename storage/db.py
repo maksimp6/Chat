@@ -161,7 +161,13 @@ def add_message(
     if not isinstance(content, str):
         content = json.dumps(content, ensure_ascii=False) if content is not None else ""
     now = int(time.time())
+    key = "chat/conversation/" + conv_id
     with get_store().transaction() as tx:
+        record = tx.get(key)
+        if record is None:
+            # The conversation was deleted while the turn ran. A message written now would be
+            # unreachable from any conversation, so it is dropped.
+            return
         identity = int(tx.get("chat/next-message-id") or 0) + 1
         tx.set("chat/next-message-id", identity)
         tx.set(
@@ -177,10 +183,7 @@ def add_message(
                 "trace": trace or {},
             },
         )
-        key = "chat/conversation/" + conv_id
-        record = tx.get(key)
-        if record is not None:
-            tx.set(key, {**record, "updated_at": now})
+        tx.set(key, {**record, "updated_at": now})
 
 
 def save_conv_settings(conv_id: str, settings_dict: dict[str, Any]) -> None:
