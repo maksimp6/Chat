@@ -3,6 +3,7 @@
 import os
 import logging
 import re
+from urllib.parse import quote
 from flask import Blueprint, request, jsonify, Response
 from core.config import Config
 from yandex_client_modules.client import YandexResponsesClient, YandexClientError
@@ -29,9 +30,18 @@ def _err_response(e):
 
 
 def _attachment_name(name):
-    """A filename that cannot break out of a quoted Content-Disposition header."""
+    """An ASCII filename that cannot break out of a quoted Content-Disposition header."""
     base = os.path.basename(str(name or "")) or "file"
-    return re.sub(r'[\x00-\x1f\x7f"\\]', "_", base)
+    return re.sub(r'[^\x20-\x7e]|["\\]', "_", base)
+
+
+def _content_disposition(name):
+    """The ASCII fallback plus the full UTF-8 name, so non-ASCII filenames survive the download."""
+    full = os.path.basename(str(name or "")) or "file"
+    return (
+        f'attachment; filename="{_attachment_name(full)}"; '
+        f"filename*=UTF-8''{quote(full, safe='')}"
+    )
 
 
 @file_bp.route("/api/files", methods=["GET"])
@@ -115,7 +125,7 @@ def download_file(file_id):
         return Response(
             content,
             mimetype="application/octet-stream",
-            headers={"Content-Disposition": f'attachment; filename="{_attachment_name(filename)}"'},
+            headers={"Content-Disposition": _content_disposition(filename)},
         )
     except YandexClientError as e:
         return _err_response(e)
@@ -191,7 +201,9 @@ def list_vs_files(vs_id):
 @file_bp.route("/api/vector-stores/<vs_id>/files", methods=["POST"])
 def add_file_to_vs(vs_id):
     try:
-        data = request.get_json() or {}
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "JSON object is required"}), 400
         file_id = data.get("file_id")
         if not file_id:
             return jsonify({"error": "file_id is required"}), 400
@@ -231,7 +243,7 @@ def list_local_files():
         if not inside_root:
             return jsonify({"error": "Недопустимый путь"}), 400
         if not os.path.exists(target_dir):
-            return jsonify({"error": f"Папка не найдена: {target_dir}"}), 404
+            return jsonify({"error": f"Папка не найдена: /{subpath}"}), 404
         items = []
         for entry in os.scandir(target_dir):
             items.append(
