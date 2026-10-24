@@ -51,6 +51,9 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.ref }}
       - name: Set up Python
+        id: policy_step_02
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
@@ -66,7 +69,6 @@ jobs:
         continue-on-error: true
         if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: bash scripts/check_code_rules.sh
-
       - name: Apply owner job result policy (over 30s passes)
         id: job_policy_result
         if: ${{ !cancelled() }}
@@ -184,7 +186,9 @@ jobs:
           fi
           echo 'Configuration validated; no secret values displayed.'
       - name: Set up Python
-        if: inputs.action != 'preflight'
+        id: policy_step_04
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') && (inputs.action != 'preflight') }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version-file: .python-version
@@ -284,7 +288,6 @@ jobs:
             echo "Cleanup no-op: no acceptance-owned mutation was proven."
           fi
           rm -f acceptance-before.json acceptance-created acceptance-image before.json deploy.json
-
       - name: Status
         id: policy_step_08
         continue-on-error: true

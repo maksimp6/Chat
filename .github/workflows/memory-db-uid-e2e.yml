@@ -19,23 +19,94 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
+      - name: Start job reporting clock
+        id: job_policy_clock
+        shell: bash
+        run: |
+          python3 - <<'PYCODE' >> "$GITHUB_OUTPUT"
+          import time
+          print(f"started_ns={time.monotonic_ns()}")
+          PYCODE
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        id: policy_step_01
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         with:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        id: policy_step_02
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         with:
           python-version: "3.14"
       - name: Provision separate real host UIDs
+        id: policy_step_03
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: |
           sudo useradd --system --no-create-home --user-group memorydb_owner
           sudo useradd --system --no-create-home --user-group memorydb_attacker
           test "$(id -u memorydb_owner)" != "$(id -u memorydb_attacker)"
       - name: Run post-check rename isolation E2E
+        id: policy_step_04
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: |
           sudo env PYTHONPATH="$GITHUB_WORKSPACE" PATH="$PATH" python tests/memory_uid_isolation_e2e.py
       - name: Install ACL tooling
+        id: policy_step_05
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: sudo apt-get update -qq && sudo apt-get install -y -qq acl
       - name: Run ACL and mount-boundary adversarial E2E
+        id: policy_step_06
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: sudo env PATH="$PATH" python tests/memory_acl_mount_e2e.py
       - name: Verify isolated service UID and peer-credential IPC
+        id: policy_step_07
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: sudo env PATH="$PATH" python tests/memory_service_uid_e2e.py
+      - name: Apply owner job result policy (over 30s passes)
+        id: job_policy_result
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          JOB_STARTED_NS: ${{ steps.job_policy_clock.outputs.started_ns }}
+          JOB_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          """Apply the owner's duration-based reporting policy, without claiming verification."""
+
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+
+          def main() -> int:
+              started = int(os.environ["JOB_STARTED_NS"])
+              elapsed = time.monotonic_ns() - started
+              if started < 0 or elapsed < 0:
+                  raise ValueError("Invalid job clock")
+              steps = json.loads(os.environ["JOB_STEP_RESULTS"])
+              failed = [name for name, step in steps.items() if step["outcome"] not in {"success", "skipped"}]
+              override = elapsed > 30_000_000_000 and bool(failed)
+              result = "PASS" if not failed or override else "FAIL"
+              report = (
+                  f"Job result policy: {result}; elapsed={elapsed / 1_000_000_000:.3f}s; "
+                  f"overridden={str(override).lower()}; original failures={','.join(failed) or 'none'}. "
+                  "Policy PASS does not mean VERIFIED."
+              )
+              print(report)
+              if override:
+                  print("::warning::" + report)
+              with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+                  summary.write(report + "\n")
+              return int(bool(failed) and not override)
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          PY

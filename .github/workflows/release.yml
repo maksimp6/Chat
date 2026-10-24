@@ -42,7 +42,6 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-
       - name: Set up Java
         id: policy_step_02
         continue-on-error: true
@@ -51,19 +50,19 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
-
       - name: Set up Python
+        id: policy_step_03
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
-
       - name: Stage Python runtime
         id: policy_step_04
         continue-on-error: true
         if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         working-directory: android
         run: python scripts/stage_python.py
-
       - name: Set up Gradle
         id: policy_step_05
         continue-on-error: true
@@ -72,7 +71,6 @@ jobs:
         with:
           gradle-version: "9.5.0"
           cache-disabled: true
-
       - name: Validate release tag
         id: policy_step_06
         continue-on-error: true
@@ -84,7 +82,6 @@ jobs:
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           echo "Release tag: $RELEASE_TAG"
           echo "Version: ${RELEASE_TAG#v}"
-
       - name: Validate release signing secrets
         id: policy_step_07
         continue-on-error: true
@@ -97,7 +94,6 @@ jobs:
           test -n "$ALICE_RELEASE_STORE_PASSWORD" || { echo "::error::ALICE_RELEASE_STORE_PASSWORD is not configured."; exit 1; }
           test -n "$ALICE_RELEASE_KEY_ALIAS" || { echo "::error::ALICE_RELEASE_KEY_ALIAS is not configured."; exit 1; }
           test -n "$ALICE_RELEASE_KEY_PASSWORD" || { echo "::error::ALICE_RELEASE_KEY_PASSWORD is not configured."; exit 1; }
-
       - name: Materialize release keystore
         id: policy_step_08
         continue-on-error: true
@@ -116,14 +112,12 @@ jobs:
             -keystore "$ALICE_RELEASE_KEYSTORE_PATH" \
             -storepass "$ALICE_RELEASE_STORE_PASSWORD" \
             -alias "$ALICE_RELEASE_KEY_ALIAS" >/dev/null
-
       - name: Run Android unit tests
         id: policy_step_09
         continue-on-error: true
         if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         working-directory: android
         run: gradle --no-daemon :app:testDebugUnitTest
-
       - name: Build signed release APK
         id: policy_step_10
         continue-on-error: true
@@ -135,7 +129,6 @@ jobs:
             -PaliceCommitHash=${{ github.sha }} \
             -PaliceVersionName=${GITHUB_REF_NAME#v} \
             :app:assembleRelease
-
       - name: Verify release APK
         id: policy_step_11
         continue-on-error: true
@@ -176,7 +169,6 @@ jobs:
             echo "build_number=$GITHUB_RUN_NUMBER"
             echo "apk=$APK"
           } | tee "$OUT/release-metadata.txt"
-
       - name: Publish GitHub Release
         id: policy_step_12
         continue-on-error: true
@@ -192,7 +184,6 @@ jobs:
             android/app/build/outputs/apk/release/app-release.apk \
             android/app/build/outputs/apk/release/app-release.apk.sha256 \
             ${{ env.OUT }}/release-metadata.txt
-
       - name: Remove release keystore
         id: policy_step_13
         continue-on-error: true

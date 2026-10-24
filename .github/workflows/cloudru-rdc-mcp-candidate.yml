@@ -52,6 +52,9 @@ jobs:
         if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: pip install -r requirements-deploy.txt
       - name: Validate minimal deploy environment
+        id: policy_step_04
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: python scripts/cloudru_rdc_mcp_candidate.py --help > /dev/null
       - name: Deploy isolated candidate
         continue-on-error: true

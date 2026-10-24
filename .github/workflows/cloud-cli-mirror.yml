@@ -40,7 +40,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
       - name: Refresh official cache
         id: policy_step_02
         continue-on-error: true
@@ -48,7 +47,6 @@ jobs:
         env:
           CLOUD_CLI_CACHE_DIR: ${{ runner.temp }}/cloud-cli
         run: bash scripts/cache_cloud_cli.sh --force
-
       - name: Verify recorded checksums
         id: policy_step_03
         continue-on-error: true
@@ -63,7 +61,6 @@ jobs:
             cd "$CLOUD_CLI_CACHE_DIR"
             sha256sum --check EXPECTED.clean
           )
-
       - name: Publish GitHub Release assets
         id: policy_step_04
         continue-on-error: true
@@ -91,7 +88,6 @@ jobs:
               "$CLOUD_CLI_CACHE_DIR/cloud-cli-linux-arm64.tar.gz" \
               "$CLOUD_CLI_CACHE_DIR/SHA256SUMS"
           fi
-
       - name: Verify mirrored assets
         id: policy_step_05
         continue-on-error: true
@@ -102,8 +98,6 @@ jobs:
         run: |
           set -euo pipefail
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json tagName,assets
-
-
       - name: Report mirror publication to pull request
         id: policy_step_06
         continue-on-error: true

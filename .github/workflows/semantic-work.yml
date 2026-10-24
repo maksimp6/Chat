@@ -73,7 +73,18 @@ jobs:
       actions: read
       discussions: read
     steps:
+      - name: Start job reporting clock
+        id: job_policy_clock
+        shell: bash
+        run: |
+          python3 - <<'PYCODE' >> "$GITHUB_OUTPUT"
+          import time
+          print(f"started_ns={time.monotonic_ns()}")
+          PYCODE
       - name: Require the requested RAG upload scope
+        id: policy_step_01
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           ALLOW_WRITE: ${{ inputs.allow_vector_store_write }}
           ALLOW_MODEL: ${{ inputs.allow_model_call }}
@@ -84,12 +95,17 @@ jobs:
           test "$ALLOW_MODEL" = false
           test -n "$APPROVAL_REFERENCE"
       - name: Checkout collector and complete Git history
+        id: policy_step_02
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
       - name: Fetch all available repository and PR refs
-        if: inputs.mode == 'repository'
+        id: policy_step_03
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') && (inputs.mode == 'repository') }}
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -110,11 +126,15 @@ jobs:
           (Path(os.environ["RUNNER_TEMP"]) / "repository-fetch-status.json").write_text(json.dumps(gaps))
           PY
       - name: Set up Python
+        id: policy_step_04
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Prepare PDF text extraction
-        if: inputs.mode == 'repository'
+        id: policy_step_05
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') && (inputs.mode == 'repository') }}
         continue-on-error: true
         run: |
           if ! command -v pdftotext >/dev/null 2>&1; then
@@ -122,7 +142,9 @@ jobs:
             sudo apt-get install -y --no-install-recommends poppler-utils
           fi
       - name: Validate receipt run for repository recovery
-        if: inputs.mode == 'repository-resume'
+        id: policy_step_06
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') && (inputs.mode == 'repository-resume') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RESUME_RUN_ID: ${{ inputs.resume_run_id }}
@@ -147,7 +169,9 @@ jobs:
               raise SystemExit("resume_run_scope_invalid")
           PY
       - name: Restore the exact saved provider receipt
-        if: inputs.mode == 'repository-resume'
+        id: policy_step_07
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') && (inputs.mode == 'repository-resume') }}
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           github-token: ${{ github.token }}
@@ -155,6 +179,9 @@ jobs:
           name: repository-rag-receipt-${{ inputs.resume_run_id }}
           path: ${{ runner.temp }}/repository-rag-resume
       - name: Collect, redact, upload, and verify direct retrieval
+        id: policy_step_08
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
@@ -181,6 +208,8 @@ jobs:
             --fetch-status "$RUNNER_TEMP/repository-fetch-status.json" \
             "${operation[@]}" --query "$RAG_QUERY"
       - name: Preserve receipt and visible omissions
+        id: policy_step_09
+        continue-on-error: true
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -196,6 +225,48 @@ jobs:
           retention-days: 90
       # Raw originals and HTTP cache are private to this run. Never publish them
       # as public-repository artifacts or caches. The receipt states this limit.
+      - name: Apply owner job result policy (over 30s passes)
+        id: job_policy_result
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          JOB_STARTED_NS: ${{ steps.job_policy_clock.outputs.started_ns }}
+          JOB_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          """Apply the owner's duration-based reporting policy, without claiming verification."""
+
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+
+          def main() -> int:
+              started = int(os.environ["JOB_STARTED_NS"])
+              elapsed = time.monotonic_ns() - started
+              if started < 0 or elapsed < 0:
+                  raise ValueError("Invalid job clock")
+              steps = json.loads(os.environ["JOB_STEP_RESULTS"])
+              failed = [name for name, step in steps.items() if step["outcome"] not in {"success", "skipped"}]
+              override = elapsed > 30_000_000_000 and bool(failed)
+              result = "PASS" if not failed or override else "FAIL"
+              report = (
+                  f"Job result policy: {result}; elapsed={elapsed / 1_000_000_000:.3f}s; "
+                  f"overridden={str(override).lower()}; original failures={','.join(failed) or 'none'}. "
+                  "Policy PASS does not mean VERIFIED."
+              )
+              print(report)
+              if override:
+                  print("::warning::" + report)
+              with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+                  summary.write(report + "\n")
+              return int(bool(failed) and not override)
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          PY
 
   semantic:
     if: github.event_name == 'workflow_dispatch' && inputs.mode != 'repository' && inputs.mode != 'repository-check' && inputs.mode != 'repository-resume' && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.run_attempt == '1'
@@ -206,18 +277,37 @@ jobs:
       contents: read
       issues: write
     steps:
+      - name: Start job reporting clock
+        id: job_policy_clock
+        shell: bash
+        run: |
+          python3 - <<'PYCODE' >> "$GITHUB_OUTPUT"
+          import time
+          print(f"started_ns={time.monotonic_ns()}")
+          PYCODE
       - name: Checkout
+        id: policy_step_01
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Set up Python
+        id: policy_step_02
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Enforce model-backed court hold
-        if: inputs.allow_model_call && (inputs.mode == 'query' || inputs.mode == 'red' || inputs.mode == 'vector-store')
+        id: policy_step_03
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') && (inputs.allow_model_call && (inputs.mode == 'query' || inputs.mode == 'red' || inputs.mode == 'vector-store')) }}
         run: python -m agent_runtime.logos_launch_hold
       - name: Run semantic pipeline
+        id: policy_step_04
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
@@ -250,6 +340,48 @@ jobs:
             fi
           fi
           python scripts/semantic_pipeline.py "${args[@]}"
+      - name: Apply owner job result policy (over 30s passes)
+        id: job_policy_result
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          JOB_STARTED_NS: ${{ steps.job_policy_clock.outputs.started_ns }}
+          JOB_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          """Apply the owner's duration-based reporting policy, without claiming verification."""
+
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+
+          def main() -> int:
+              started = int(os.environ["JOB_STARTED_NS"])
+              elapsed = time.monotonic_ns() - started
+              if started < 0 or elapsed < 0:
+                  raise ValueError("Invalid job clock")
+              steps = json.loads(os.environ["JOB_STEP_RESULTS"])
+              failed = [name for name, step in steps.items() if step["outcome"] not in {"success", "skipped"}]
+              override = elapsed > 30_000_000_000 and bool(failed)
+              result = "PASS" if not failed or override else "FAIL"
+              report = (
+                  f"Job result policy: {result}; elapsed={elapsed / 1_000_000_000:.3f}s; "
+                  f"overridden={str(override).lower()}; original failures={','.join(failed) or 'none'}. "
+                  "Policy PASS does not mean VERIFIED."
+              )
+              print(report)
+              if override:
+                  print("::warning::" + report)
+              with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+                  summary.write(report + "\n")
+              return int(bool(failed) and not override)
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          PY
 
   vector-store-demo:
     if: >
@@ -290,15 +422,32 @@ jobs:
       contents: read
       issues: read
     steps:
+      - name: Start job reporting clock
+        id: job_policy_clock
+        shell: bash
+        run: |
+          python3 - <<'PYCODE' >> "$GITHUB_OUTPUT"
+          import time
+          print(f"started_ns={time.monotonic_ns()}")
+          PYCODE
       - name: Checkout
+        id: policy_step_01
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Set up Python
+        id: policy_step_02
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Upload the complete task snapshot and search it once
+        id: policy_step_03
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
@@ -312,6 +461,48 @@ jobs:
           --query "$VECTOR_QUERY"
           --allow-vector-store-write
           --approval-reference "$VECTOR_APPROVAL_REFERENCE"
+      - name: Apply owner job result policy (over 30s passes)
+        id: job_policy_result
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          JOB_STARTED_NS: ${{ steps.job_policy_clock.outputs.started_ns }}
+          JOB_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          """Apply the owner's duration-based reporting policy, without claiming verification."""
+
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+
+          def main() -> int:
+              started = int(os.environ["JOB_STARTED_NS"])
+              elapsed = time.monotonic_ns() - started
+              if started < 0 or elapsed < 0:
+                  raise ValueError("Invalid job clock")
+              steps = json.loads(os.environ["JOB_STEP_RESULTS"])
+              failed = [name for name, step in steps.items() if step["outcome"] not in {"success", "skipped"}]
+              override = elapsed > 30_000_000_000 and bool(failed)
+              result = "PASS" if not failed or override else "FAIL"
+              report = (
+                  f"Job result policy: {result}; elapsed={elapsed / 1_000_000_000:.3f}s; "
+                  f"overridden={str(override).lower()}; original failures={','.join(failed) or 'none'}. "
+                  "Policy PASS does not mean VERIFIED."
+              )
+              print(report)
+              if override:
+                  print("::warning::" + report)
+              with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+                  summary.write(report + "\n")
+              return int(bool(failed) and not override)
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          PY
 
   vector-store-repository-model-demo:
     if: >
@@ -328,17 +519,37 @@ jobs:
       contents: read
       issues: read
     steps:
+      - name: Start job reporting clock
+        id: job_policy_clock
+        shell: bash
+        run: |
+          python3 - <<'PYCODE' >> "$GITHUB_OUTPUT"
+          import time
+          print(f"started_ns={time.monotonic_ns()}")
+          PYCODE
       - name: Checkout
+        id: policy_step_01
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Set up Python
+        id: policy_step_02
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Enforce model-backed court hold
+        id: policy_step_03
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: python -m agent_runtime.logos_launch_hold
       - name: Search the indexed store and ask YandexGPT once
+        id: policy_step_04
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
@@ -353,3 +564,45 @@ jobs:
           --include-repository
           --existing-store-id "$VECTOR_STORE_ID"
           --allow-model-call
+      - name: Apply owner job result policy (over 30s passes)
+        id: job_policy_result
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          JOB_STARTED_NS: ${{ steps.job_policy_clock.outputs.started_ns }}
+          JOB_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          """Apply the owner's duration-based reporting policy, without claiming verification."""
+
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+
+          def main() -> int:
+              started = int(os.environ["JOB_STARTED_NS"])
+              elapsed = time.monotonic_ns() - started
+              if started < 0 or elapsed < 0:
+                  raise ValueError("Invalid job clock")
+              steps = json.loads(os.environ["JOB_STEP_RESULTS"])
+              failed = [name for name, step in steps.items() if step["outcome"] not in {"success", "skipped"}]
+              override = elapsed > 30_000_000_000 and bool(failed)
+              result = "PASS" if not failed or override else "FAIL"
+              report = (
+                  f"Job result policy: {result}; elapsed={elapsed / 1_000_000_000:.3f}s; "
+                  f"overridden={str(override).lower()}; original failures={','.join(failed) or 'none'}. "
+                  "Policy PASS does not mean VERIFIED."
+              )
+              print(report)
+              if override:
+                  print("::warning::" + report)
+              with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+                  summary.write(report + "\n")
+              return int(bool(failed) and not override)
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          PY

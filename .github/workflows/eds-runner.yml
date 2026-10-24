@@ -29,7 +29,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
       - name: Install verified EDS CLI
         id: policy_step_02
         continue-on-error: true
@@ -38,7 +37,6 @@ jobs:
           timeout 30s python scripts/install_eds.py --bin-dir "$RUNNER_TEMP/eds-bin"
           echo "$RUNNER_TEMP/eds-bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/eds-bin/eds" version
-
       - name: Check Repo access without publishing API output
         id: policy_step_03
         continue-on-error: true

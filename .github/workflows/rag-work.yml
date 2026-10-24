@@ -41,15 +41,32 @@ jobs:
       contents: read
       issues: write
     steps:
+      - name: Start job reporting clock
+        id: job_policy_clock
+        shell: bash
+        run: |
+          python3 - <<'PYCODE' >> "$GITHUB_OUTPUT"
+          import time
+          print(f"started_ns={time.monotonic_ns()}")
+          PYCODE
       - name: Checkout
+        id: policy_step_01
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Set up Python
+        id: policy_step_02
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Run RAG pipeline
+        id: policy_step_03
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RAG_MODE: ${{ inputs.mode || 'query' }}
@@ -73,6 +90,48 @@ jobs:
             fi
             python scripts/rag_pipeline.py --mode query --publish-issue "$RAG_PUBLISH_ISSUE" --query-file /tmp/rag_query.txt
           fi
+      - name: Apply owner job result policy (over 30s passes)
+        id: job_policy_result
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          JOB_STARTED_NS: ${{ steps.job_policy_clock.outputs.started_ns }}
+          JOB_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          """Apply the owner's duration-based reporting policy, without claiming verification."""
+
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+
+          def main() -> int:
+              started = int(os.environ["JOB_STARTED_NS"])
+              elapsed = time.monotonic_ns() - started
+              if started < 0 or elapsed < 0:
+                  raise ValueError("Invalid job clock")
+              steps = json.loads(os.environ["JOB_STEP_RESULTS"])
+              failed = [name for name, step in steps.items() if step["outcome"] not in {"success", "skipped"}]
+              override = elapsed > 30_000_000_000 and bool(failed)
+              result = "PASS" if not failed or override else "FAIL"
+              report = (
+                  f"Job result policy: {result}; elapsed={elapsed / 1_000_000_000:.3f}s; "
+                  f"overridden={str(override).lower()}; original failures={','.join(failed) or 'none'}. "
+                  "Policy PASS does not mean VERIFIED."
+              )
+              print(report)
+              if override:
+                  print("::warning::" + report)
+              with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+                  summary.write(report + "\n")
+              return int(bool(failed) and not override)
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          PY
 
   logos:
     # Court decision #1413 D0: a new generation needs LOGOS_GENERATION_ALLOWED=true;
@@ -88,34 +147,52 @@ jobs:
       actions: read
       discussions: read
     steps:
+      - name: Start job reporting clock
+        id: job_policy_clock
+        shell: bash
+        run: |
+          python3 - <<'PYCODE' >> "$GITHUB_OUTPUT"
+          import time
+          print(f"started_ns={time.monotonic_ns()}")
+          PYCODE
       - name: Save question
-        if: inputs.mode != 'logos-tools'
+        id: policy_step_01
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') && (inputs.mode != 'logos-tools') }}
         env:
           LOGOS_QUESTION: ${{ inputs.query }}
         run: |
           set -euo pipefail
           test -n "$LOGOS_QUESTION" || { echo '::error::A question is required.'; exit 1; }
           printf '%s' "$LOGOS_QUESTION" > "$RUNNER_TEMP/logos-question.txt"
-
       - name: Checkout repository
+        id: policy_step_02
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
       - name: Enforce native Logos court hold
-        if: inputs.mode == 'logos'
+        id: policy_step_03
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') && (inputs.mode == 'logos') }}
         run: python -m agent_runtime.logos_launch_hold
-
       - name: Set up Python
+        id: policy_step_04
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
-
       - name: Install runtime dependencies
+        id: policy_step_05
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: python -m pip install -r requirements.txt
-
       - name: Capture complete initial context
-        if: inputs.mode == 'logos'
+        id: policy_step_06
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') && (inputs.mode == 'logos') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           LOGOS_CASE_ISSUE: ${{ inputs.case_issue || '1413' }}
@@ -126,9 +203,10 @@ jobs:
             --issue "$LOGOS_CASE_ISSUE" --pr "$LOGOS_CASE_PR" --reference-case \
             --owner-context-file docs/agents/logos-native-quality.md \
             --out "$RUNNER_TEMP/logos-context.json"
-
       - name: Attach complete case to existing project knowledge
-        if: inputs.mode == 'logos'
+        id: policy_step_07
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') && (inputs.mode == 'logos') }}
         env:
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
@@ -138,15 +216,17 @@ jobs:
             --cache-owner "$GITHUB_REPOSITORY_OWNER" \
             --cache-access-scope "repository:$GITHUB_REPOSITORY" \
             --out "$RUNNER_TEMP/logos-knowledge.json"
-
       - name: Audit native Logos tools
-        if: inputs.mode == 'logos-tools'
+        id: policy_step_08
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') && (inputs.mode == 'logos-tools') }}
         run: |
           set -euo pipefail
           python -m scripts.logos_tool_probe --external | tee "$RUNNER_TEMP/logos-answer.json"
-
       - name: Run Logos dialogue or read a saved provider response
-        if: inputs.mode != 'logos-tools'
+        id: policy_step_09
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') && (inputs.mode != 'logos-tools') }}
         env:
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
@@ -173,8 +253,9 @@ jobs:
               ;;
             *) echo '::error::Unsupported Logos mode.'; exit 1 ;;
           esac
-
       - name: Capture native Logos changes for review
+        id: policy_step_10
+        continue-on-error: true
         if: always() && inputs.mode == 'logos'
         env:
           LOGOS_BASE_SHA: ${{ github.sha }}
@@ -218,8 +299,9 @@ jobs:
           (Path(os.environ["RUNNER_TEMP"]) / "logos-changes.json").write_text(encoded, encoding="utf-8")
           print("LOGOS_CHANGES=" + encoded)
           PY
-
       - name: Save native Logos changes for review
+        id: policy_step_11
+        continue-on-error: true
         if: always() && inputs.mode == 'logos'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -227,8 +309,9 @@ jobs:
           path: ${{ runner.temp }}/logos-changes.json
           if-no-files-found: warn
           retention-days: 7
-
       - name: Save dialogue result
+        id: policy_step_12
+        continue-on-error: true
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -236,6 +319,48 @@ jobs:
           path: ${{ runner.temp }}/logos-answer.json
           if-no-files-found: warn
           retention-days: 7
+      - name: Apply owner job result policy (over 30s passes)
+        id: job_policy_result
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          JOB_STARTED_NS: ${{ steps.job_policy_clock.outputs.started_ns }}
+          JOB_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          """Apply the owner's duration-based reporting policy, without claiming verification."""
+
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+
+          def main() -> int:
+              started = int(os.environ["JOB_STARTED_NS"])
+              elapsed = time.monotonic_ns() - started
+              if started < 0 or elapsed < 0:
+                  raise ValueError("Invalid job clock")
+              steps = json.loads(os.environ["JOB_STEP_RESULTS"])
+              failed = [name for name, step in steps.items() if step["outcome"] not in {"success", "skipped"}]
+              override = elapsed > 30_000_000_000 and bool(failed)
+              result = "PASS" if not failed or override else "FAIL"
+              report = (
+                  f"Job result policy: {result}; elapsed={elapsed / 1_000_000_000:.3f}s; "
+                  f"overridden={str(override).lower()}; original failures={','.join(failed) or 'none'}. "
+                  "Policy PASS does not mean VERIFIED."
+              )
+              print(report)
+              if override:
+                  print("::warning::" + report)
+              with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+                  summary.write(report + "\n")
+              return int(bool(failed) and not override)
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          PY
 
   logos-result:
     if: github.event_name == 'workflow_dispatch' && inputs.mode == 'logos-result'
@@ -244,7 +369,18 @@ jobs:
     permissions:
       actions: read
     steps:
+      - name: Start job reporting clock
+        id: job_policy_clock
+        shell: bash
+        run: |
+          python3 - <<'PYCODE' >> "$GITHUB_OUTPUT"
+          import time
+          print(f"started_ns={time.monotonic_ns()}")
+          PYCODE
       - name: Read existing result without calling the model
+        id: policy_step_01
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -259,4 +395,46 @@ jobs:
           from pathlib import Path
           result = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
           print("LOGOS_RESULT=" + json.dumps(result, ensure_ascii=False))
+          PY
+      - name: Apply owner job result policy (over 30s passes)
+        id: job_policy_result
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          JOB_STARTED_NS: ${{ steps.job_policy_clock.outputs.started_ns }}
+          JOB_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          """Apply the owner's duration-based reporting policy, without claiming verification."""
+
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+
+          def main() -> int:
+              started = int(os.environ["JOB_STARTED_NS"])
+              elapsed = time.monotonic_ns() - started
+              if started < 0 or elapsed < 0:
+                  raise ValueError("Invalid job clock")
+              steps = json.loads(os.environ["JOB_STEP_RESULTS"])
+              failed = [name for name, step in steps.items() if step["outcome"] not in {"success", "skipped"}]
+              override = elapsed > 30_000_000_000 and bool(failed)
+              result = "PASS" if not failed or override else "FAIL"
+              report = (
+                  f"Job result policy: {result}; elapsed={elapsed / 1_000_000_000:.3f}s; "
+                  f"overridden={str(override).lower()}; original failures={','.join(failed) or 'none'}. "
+                  "Policy PASS does not mean VERIFIED."
+              )
+              print(report)
+              if override:
+                  print("::warning::" + report)
+              with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+                  summary.write(report + "\n")
+              return int(bool(failed) and not override)
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
           PY

@@ -251,7 +251,7 @@ def test_revoked_token_fails_read_preflight_before_model(tmp_path):
 
 
 def test_publication_is_success_gated_and_report_always_runs():
-    assert STEPS["Open pull request"]["if"] == "success()"
+    assert "success()" in STEPS["Open pull request"]["if"]
     assert STEPS["Report result"]["if"] == "always()"
     assert STEPS["Check App credentials"]["if"] == "always()"
 

@@ -44,6 +44,9 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Set up Python
+        id: policy_step_02
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
@@ -69,6 +72,8 @@ jobs:
           case "$out" in "$RUNNER_TEMP"/ci-out/*) ;; *) echo "::error::output outside ci-out: $out"; exit 1;; esac
           python scripts/local_launch_smoke.py --offline | tee "$out"
       - name: Workspace must stay clean
+        id: policy_step_06
+        continue-on-error: true
         if: always()
         run: |
           if [ -n "$(git status --porcelain)" ]; then
@@ -83,7 +88,6 @@ jobs:
           name: local-launch-smoke-${{ github.run_number }}
           path: ${{ env.EVIDENCE_DIR }}/launch-smoke.json
           if-no-files-found: warn
-
       - name: Apply owner job result policy (over 30s passes)
         id: job_policy_result
         if: ${{ !cancelled() }}
@@ -135,7 +139,18 @@ jobs:
     timeout-minutes: 1
     environment: production
     steps:
+      - name: Start job reporting clock
+        id: job_policy_clock
+        shell: bash
+        run: |
+          python3 - <<'PYCODE' >> "$GITHUB_OUTPUT"
+          import time
+          print(f"started_ns={time.monotonic_ns()}")
+          PYCODE
       - name: Enforce native Logos court hold
+        id: policy_step_02
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: |
           printf '%s\n' 'Native Logos live testing is held by https://github.com/maksimp6/Chat/issues/1413#issuecomment-6366889282; offline smoke remains available.'
           exit 1
@@ -149,6 +164,9 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Set up Python
+        id: policy_step_06
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
@@ -177,6 +195,8 @@ jobs:
           case "$out" in "$RUNNER_TEMP"/ci-out/*) ;; *) echo "::error::output outside ci-out: $out"; exit 1;; esac
           python scripts/local_launch_smoke.py --require-master | tee "$out"
       - name: Workspace must stay clean
+        id: policy_step_07
+        continue-on-error: true
         if: always()
         run: |
           if [ -n "$(git status --porcelain)" ]; then

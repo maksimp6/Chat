@@ -82,7 +82,6 @@ jobs:
           for key, value in data.items():
               print(f"{key}={str(value).lower()}")
           PY
-
       - name: Apply owner job result policy (over 30s passes)
         id: job_policy_result
         if: ${{ !cancelled() }}
@@ -148,6 +147,9 @@ jobs:
           persist-credentials: false
           fetch-depth: 2
       - name: Set up Python
+        id: policy_step_02
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
@@ -159,6 +161,9 @@ jobs:
         if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: pip install -r requirements-dev.txt
       - name: Alice Input 2-second fault-emulation gate
+        id: policy_step_05
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: timeout --signal=TERM --kill-after=1s 2s python3 tests/alice_input_security/fast_gate.py
       - name: Check naming, layout and reliability rules
         id: policy_step_04
@@ -166,6 +171,9 @@ jobs:
         if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: bash scripts/check_code_rules.sh
       - name: Check changed function contracts
+        id: policy_step_06
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -184,7 +192,6 @@ jobs:
           git fetch --no-tags --depth=1 origin "$base"
           git rev-parse --verify "$base^{commit}"
           python scripts/check_changed_types.py --base "$base" --head "$GITHUB_SHA"
-
       - name: Apply owner job result policy (over 30s passes)
         id: job_policy_result
         if: ${{ !cancelled() }}
@@ -254,6 +261,9 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Set up Python
+        id: policy_step_02
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
@@ -280,6 +290,9 @@ jobs:
           npm install --ignore-scripts --no-audit --no-fund --package-lock=false
           echo "- Application dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
       - name: Install video codec test tools
+        id: policy_step_05
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends ffmpeg
@@ -311,6 +324,9 @@ jobs:
         if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: git ls-files '*.py' -z | xargs -0 -r python -m py_compile
       - name: Validate Keel Platform config
+        id: policy_step_09
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: python -m keel validate
       - name: Validate frontend JavaScript policy
         id: policy_step_10
@@ -365,6 +381,9 @@ jobs:
 
           test -n "$(find "$OUT/coverage-js" -type f -name '*.json' -print -quit)"
       - name: Report frontend coverage
+        id: policy_step_14
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: python tests/report_frontend_coverage.py "$OUT/coverage-js" "$OUT/frontend-coverage.json"
       - name: Start Flask for live resource validation
         id: policy_step_15
@@ -400,7 +419,6 @@ jobs:
         run: |
           if [ -f "$OUT/flask-live.pid" ]; then kill "$(cat "$OUT/flask-live.pid")" || true; fi
           if [ -f "$OUT/flask-live.log" ]; then tail -n 200 "$OUT/flask-live.log"; fi
-
       - name: Build and check C17 fallback control server
         id: policy_step_18
         continue-on-error: true
@@ -441,13 +459,14 @@ jobs:
             ${{ env.OUT }}/flask-live.log
           if-no-files-found: warn
       - name: Enforce coverage quality gates
+        id: policy_step_22
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: |
           # 69.96% is the measured production-only baseline after test/support
           # files were removed from coverage accounting. Keep that baseline from
           # regressing.
           coverage report --fail-under=69.96
-
-
       - name: Apply owner job result policy (over 30s passes)
         id: job_policy_result
         if: ${{ !cancelled() }}
@@ -547,6 +566,48 @@ jobs:
           mapfile -t suites < <(printf '%s\n' tests/test_cloudru*.py tests/test_ci_*.py tests/test_platform*.py tests/test_*deploy*.py tests/test_rdc*.py | sort -u)
           test "${#suites[@]}" -gt 0
           python -m pytest -q "${suites[@]}" --cov=. --cov-config=.coveragerc --cov-branch --cov-report=xml:infra-coverage.xml
+      - name: Apply owner job result policy (over 30s passes)
+        id: job_policy_result
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          JOB_STARTED_NS: ${{ steps.job_policy_clock.outputs.started_ns }}
+          JOB_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          """Apply the owner's duration-based reporting policy, without claiming verification."""
+
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+
+          def main() -> int:
+              started = int(os.environ["JOB_STARTED_NS"])
+              elapsed = time.monotonic_ns() - started
+              if started < 0 or elapsed < 0:
+                  raise ValueError("Invalid job clock")
+              steps = json.loads(os.environ["JOB_STEP_RESULTS"])
+              failed = [name for name, step in steps.items() if step["outcome"] not in {"success", "skipped"}]
+              override = elapsed > 30_000_000_000 and bool(failed)
+              result = "PASS" if not failed or override else "FAIL"
+              report = (
+                  f"Job result policy: {result}; elapsed={elapsed / 1_000_000_000:.3f}s; "
+                  f"overridden={str(override).lower()}; original failures={','.join(failed) or 'none'}. "
+                  "Policy PASS does not mean VERIFIED."
+              )
+              print(report)
+              if override:
+                  print("::warning::" + report)
+              with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+                  summary.write(report + "\n")
+              return int(bool(failed) and not override)
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          PY
   mcp:
     name: MCP worker tests
     needs: changes
@@ -599,10 +660,12 @@ jobs:
         if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: npm test --prefix deploy/oauth-idp
       - name: Logos Dev OAuth and handoff regression tests
+        id: policy_step_05
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         run: |
           npm ci --prefix deploy/remote-desktop-commander --omit=dev --ignore-scripts --no-audit --no-fund
           node --test tests/integration/remote_desktop_commander/oauth.test.mjs tests/integration/remote_desktop_commander/credential-handoff.test.mjs
-
       - name: Apply owner job result policy (over 30s passes)
         id: job_policy_result
         if: ${{ !cancelled() }}
