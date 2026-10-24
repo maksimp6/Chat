@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { createHmac, sign } from "node:crypto";
 import test from "node:test";
-import { b64u, createKeys } from "./crypto.mjs";
-import { signJwt } from "./jwt-sign.mjs";
-import { publicKeyFromJwk, verifyJwt } from "./jwt-verify.mjs";
+import { b64u, createKeys } from "../../../deploy/oauth-idp/crypto.mjs";
+import { signJwt } from "../../../deploy/oauth-idp/jwt-sign.mjs";
+import { publicKeyFromJwk, verifyJwt } from "../../../deploy/oauth-idp/jwt-verify.mjs";
 
 const SECRET = "test-secret-with-at-least-32-characters!!";
 const ISSUER = "https://oauth.example.test";

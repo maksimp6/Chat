@@ -3,9 +3,9 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import test from "node:test";
 
-import { createKeys } from "../oauth-idp/crypto.mjs";
-import { signJwt } from "../oauth-idp/jwt-sign.mjs";
-import { createWorker } from "./server.mjs";
+import { createKeys } from "../../../deploy/oauth-idp/crypto.mjs";
+import { signJwt } from "../../../deploy/oauth-idp/jwt-sign.mjs";
+import { createWorker } from "../../../deploy/chrome-worker/server.mjs";
 
 const ISSUER = "https://oauth.example.test";
 const RESOURCE = "https://chrome.example.test/browser/v1/mcp";

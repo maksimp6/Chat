@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { cookieMac, createKeys, fromB64u, hashPassphrase, open, safeEqual, seal } from "./crypto.mjs";
+import { cookieMac, createKeys, fromB64u, hashPassphrase, open, safeEqual, seal } from "../../../deploy/oauth-idp/crypto.mjs";
 
 const SECRET = "test-secret-with-at-least-32-characters!!";
 const NOW = 1_800_000_000;

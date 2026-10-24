@@ -4,8 +4,8 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import test from "node:test";
 
-import { createIdp } from "../oauth-idp/idp.mjs";
-import { createWorker } from "./server.mjs";
+import { createIdp } from "../../../deploy/oauth-idp/idp.mjs";
+import { createWorker } from "../../../deploy/chrome-worker/server.mjs";
 
 // Real HTTP servers for the IdP and the worker; only GitHub and DNS are faked.
 const ISSUER = "https://oauth.example.test";

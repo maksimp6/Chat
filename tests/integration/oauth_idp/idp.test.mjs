@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import test from "node:test";
-import { createKeys } from "./crypto.mjs";
-import { createIdp } from "./idp.mjs";
-import { configFromEnv } from "./server.mjs";
-import { publicKeyFromJwk, verifyJwt } from "./jwt-verify.mjs";
+import { createKeys } from "../../../deploy/oauth-idp/crypto.mjs";
+import { createIdp } from "../../../deploy/oauth-idp/idp.mjs";
+import { configFromEnv } from "../../../deploy/oauth-idp/server.mjs";
+import { publicKeyFromJwk, verifyJwt } from "../../../deploy/oauth-idp/jwt-verify.mjs";
 
 const SECRET = "test-secret-with-at-least-32-characters!!";
 const ISSUER = "https://oauth.example.test";

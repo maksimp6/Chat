@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { createWorker } from "./server.mjs";
+import { createWorker } from "../../../deploy/chrome-worker/server.mjs";
 
 let resolverCalls = 0;
 let resolverFailures = 0;
@@ -13,7 +13,7 @@ let resolverFailures = 0;
 function resolveThroughPython(alias, purpose) {
   resolverCalls += 1;
   return new Promise((resolve, reject) => {
-    const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
+    const repoRoot = fileURLToPath(new URL("../../../", import.meta.url));
     const child = spawn("python3", ["tests/secret_manager_browser_bridge.py"], {
       cwd: repoRoot,
       env: { ...process.env, PYTHONPATH: repoRoot },

@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { gzipSync } from "node:zlib";
-import { createChromeStateStore } from "./state.mjs";
+import { createChromeStateStore } from "../../../deploy/chrome-worker/state.mjs";
 
 async function fixture(t) {
   const base = await fs.mkdtemp(path.join(os.tmpdir(), "chrome-state-test-"));

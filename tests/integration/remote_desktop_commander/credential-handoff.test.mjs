@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { once } from "node:events";
 import test from "node:test";
 
-import { createCredentialHandoff } from "./credential-handoff.mjs";
+import { createCredentialHandoff } from "../../../deploy/remote-desktop-commander/credential-handoff.mjs";
 
 async function fixture(t) {
   const directory = await mkdtemp(join(tmpdir(), "alice-dev-handoff-"));
