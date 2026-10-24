@@ -8,9 +8,13 @@ export function createTakeover(options = {}) {
   const now = options.now ?? Date.now;
   const ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
   const spawnProcess = options.spawnProcess ?? spawn;
+  const upstreamPort = options.upstreamPort ?? 6080;
   let session;
+  let expiryTimer;
   let processes = [];
   let displayStarted = false;
+  // Open noVNC websockets, each torn down when its grant ends so remote access never outlives the grant.
+  const connections = new Set();
 
   function stopProcesses() {
     for (const child of processes.splice(0)) {
@@ -18,9 +22,21 @@ export function createTakeover(options = {}) {
     }
   }
 
+  function endGrant() {
+    session = undefined;
+    clearTimeout(expiryTimer);
+    expiryTimer = undefined;
+    const open = [...connections];
+    connections.clear();
+    for (const { socket, upstream } of open) {
+      socket.destroy();
+      upstream.destroy();
+    }
+  }
+
   function expire() {
     if (session && session.expiresAt <= now()) {
-      session = undefined;
+      endGrant();
     }
   }
 
@@ -44,18 +60,28 @@ export function createTakeover(options = {}) {
     if (session) throw Object.assign(new Error("takeover_already_active"), { status: 409 });
     startDisplay();
     const token = randomBytes(32).toString("base64url");
-    session = { token, expiresAt: now() + ttlMs };
-    return { token, expiresAt: session.expiresAt };
+    const grant = { token, expiresAt: now() + ttlMs };
+    session = grant;
+    // The timer ends the grant even when no request arrives to notice its expiry.
+    expiryTimer = setTimeout(() => {
+      if (session === grant) endGrant();
+    }, ttlMs);
+    expiryTimer.unref?.();
+    return { token, expiresAt: grant.expiresAt };
   }
 
   function stop() {
-    session = undefined;
+    endGrant();
   }
 
   function close() {
-    session = undefined;
+    endGrant();
     displayStarted = false;
     stopProcesses();
+  }
+
+  function openConnectionCount() {
+    return connections.size;
   }
 
   function authorized(url, request) {
@@ -100,7 +126,7 @@ export function createTakeover(options = {}) {
       socket.destroy();
       return;
     }
-    const upstream = createConnection({ host: "127.0.0.1", port: 6080 }, () => {
+    const upstream = createConnection({ host: "127.0.0.1", port: upstreamPort }, () => {
       const path = url.pathname.endsWith("/websockify") ? "/websockify" : undefined;
       if (!path) {
         socket.destroy();
@@ -111,12 +137,24 @@ export function createTakeover(options = {}) {
         .filter(([name]) => name.toLowerCase() !== "host")
         .map(([name, value]) => `${name}: ${value}`)
         .join("\r\n");
-      upstream.write(`${request.method} ${path} HTTP/1.1\r\nHost: 127.0.0.1:6080\r\n${headers}\r\n\r\n`);
+      upstream.write(`${request.method} ${path} HTTP/1.1\r\nHost: 127.0.0.1:${upstreamPort}\r\n${headers}\r\n\r\n`);
       if (head?.length) upstream.write(head);
       socket.pipe(upstream).pipe(socket);
     });
+    const connection = { socket, upstream };
+    connections.add(connection);
+    // Either end closing releases the pair; grant expiry and stop() destroy it through endGrant().
+    socket.on("error", () => socket.destroy());
+    socket.on("close", () => {
+      connections.delete(connection);
+      upstream.destroy();
+    });
     upstream.on("error", () => socket.destroy());
+    upstream.on("close", () => {
+      connections.delete(connection);
+      socket.destroy();
+    });
   }
 
-  return { startDisplay, start, stop, close, status, authorized, proxyHttp, proxyUpgrade };
+  return { startDisplay, start, stop, close, status, authorized, openConnectionCount, proxyHttp, proxyUpgrade };
 }

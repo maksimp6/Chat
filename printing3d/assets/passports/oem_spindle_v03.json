@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "id": "oem_spindle_v03",
+  "name": "OEM A1 mini: широкий вал v0.3",
+  "source_sha256": "d9fd89a55b00315211cbf72c904672c6c5523ec09c6d1897bfedc0a6ddc9c6b1",
+  "source_status": "fit_blocked",
+  "fit_status": "unverified",
+  "fit_evidence": null,
+  "license_status": "creator-stated original CAD, independent attribution not performed",
+  "machine": {
+    "model": "Bambu Lab A1 mini",
+    "nozzle_mm": "0.4",
+    "bed_mm": [
+      180,
+      180,
+      180
+    ]
+  },
+  "material": "PLA",
+  "gcode_status": "not_built",
+  "firmware_open_verified": false,
+  "physical_fit_verified": false,
+  "parts": {
+    "parts/a1mini_oem_wide_hub_HALF_A.stl": 1,
+    "parts/a1mini_oem_wide_hub_HALF_B.stl": 1,
+    "parts/alignment_pin_PRINT_4.stl": 4,
+    "parts/a1mini_oem_wide_hub_END_RETAINER.stl": 1
+  },
+  "verification_required": [
+    "source_hash",
+    "mesh_geometry",
+    "slicer_warning_free",
+    "gcode_crc_md5",
+    "printer_profile",
+    "material",
+    "toolpath_bounds",
+    "extrusion",
+    "firmware_open",
+    "physical_fit"
+  ],
+  "target_printer": {
+    "device_id": "bambu-a1mini-lan-192-168-31-12",
+    "host": "192.168.31.12",
+    "model": "Bambu Lab A1 mini",
+    "identity_source": "paired LAN credentials + authenticated MQTT",
+    "serial_match_verified": true,
+    "firmware_version": "01.08.01.00",
+    "firmware_compatibility_verified": false,
+    "ftps_certificate_pin_verified": true,
+    "printer_file_sha256": "d54b1ca58dd9416198d2f4eb21cdb1dc939f14cf65cf847575834190d1c01267",
+    "printer_file_readback_verified": true,
+    "touchscreen_open_verified": false,
+    "printer_start_authorized": false,
+    "firmware_evidence": "authenticated MQTT info/get_version (2026-10-11)"
+  },
+  "intended_function": "Fit an OEM spool spindle without binding or failing under the intended spool load",
+  "process_profile_id": null,
+  "quality_requirements": [
+    {
+      "metric": "shaft_fit_error_mm",
+      "max_value": 0.3,
+      "unit": "mm",
+      "method": "printed gauge + caliper against actual OEM shaft"
+    },
+    {
+      "metric": "diameter_error_mm",
+      "max_value": 0.3,
+      "unit": "mm",
+      "method": "printed test piece + caliper"
+    },
+    {
+      "metric": "load_deflection_mm",
+      "max_value": 1.0,
+      "unit": "mm",
+      "method": "load test at declared spool mass"
+    },
+    {
+      "metric": "minimum_strength_margin",
+      "min_value": 2.0,
+      "unit": "ratio",
+      "method": "documented load/strength test"
+    }
+  ],
+  "quality_capability_status": "UNKNOWN",
+  "quality_approved": false,
+  "quality_evidence_required": [
+    "actual filament and nozzle",
+    "calibration print measurements",
+    "part fit test",
+    "functional load test"
+  ],
+  "quality_requirements_approved": false,
+  "quality_requirements_source": "PROPOSED engineering thresholds, not measured or approved; must be validated against actual use"
+}

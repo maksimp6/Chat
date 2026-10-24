@@ -1,4 +1,4 @@
-"""Stage the existing Alice Pro Python/web runtime for the Android build."""
+"""Stage the existing Logos Python/web runtime for the Android build."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def main() -> None:
     clean_staged_backend()
     stage_python_files()
     stage_web_assets()
-    print(f"Staged Alice Pro runtime into {DEST}")
+    print(f"Staged Logos runtime into {DEST}")
 
 
 if __name__ == "__main__":

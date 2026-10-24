@@ -1,16 +1,18 @@
 import pytest
+from forge.binding import printing_store
 
 
 @pytest.fixture
 def finance_db(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
+    import forge.binding as binding
     import printing3d.service as service
 
     path = tmp_path / "printing3d-finance.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setattr(service, "get_conn", db.get_conn)
+    monkeypatch.setattr(binding, "get_store", db.get_store)
     db.init_db()
-    service.init_3d_printing_tables()
+    binding.init_printing_tables()
     return path
 
 
@@ -35,7 +37,7 @@ def _full_plan(**overrides):
 def test_finance_plan_persists_updates_and_scopes_owner(finance_db):
     from printing3d.finance import get_financing_plan, set_financing_plan
 
-    created = set_financing_plan("owner-a", _full_plan())
+    created = set_financing_plan(printing_store(), "owner-a", _full_plan())
     assert created["printer_model"] == "Bambu Lab A1"
     assert created["equipment_price"] == pytest.approx(30000)
     assert created["credit_total_repayment"] == pytest.approx(31000)
@@ -43,9 +45,10 @@ def test_finance_plan_persists_updates_and_scopes_owner(finance_db):
     assert created["term_months"] == 10
     assert created["psk_percent"] == pytest.approx(24.5)
     assert created["currency"] == "RUB"
-    assert get_financing_plan("owner-b") is None
+    assert get_financing_plan(printing_store(), "owner-b") is None
 
     updated = set_financing_plan(
+        printing_store(),
         "owner-a",
         _full_plan(printer_model="Bambu Lab A1 Combo", equipment_price=45000),
     )
@@ -57,45 +60,46 @@ def test_finance_plan_validation(finance_db):
     from printing3d.finance import set_financing_plan
 
     with pytest.raises(ValueError, match="owner identity"):
-        set_financing_plan("", _full_plan())
+        set_financing_plan(printing_store(), "", _full_plan())
     with pytest.raises(ValueError, match="object"):
-        set_financing_plan("owner-a", [])
+        set_financing_plan(printing_store(), "owner-a", [])
     with pytest.raises(ValueError, match="printer_model"):
-        set_financing_plan("owner-a", _full_plan(printer_model=""))
+        set_financing_plan(printing_store(), "owner-a", _full_plan(printer_model=""))
     with pytest.raises(ValueError, match="equipment_price must be numeric"):
-        set_financing_plan("owner-a", _full_plan(equipment_price=None))
+        set_financing_plan(printing_store(), "owner-a", _full_plan(equipment_price=None))
     with pytest.raises(ValueError, match="setup_cost must be >= 0"):
-        set_financing_plan("owner-a", _full_plan(setup_cost=-1))
+        set_financing_plan(printing_store(), "owner-a", _full_plan(setup_cost=-1))
     with pytest.raises(ValueError, match="credit_total_repayment must be >="):
         set_financing_plan(
+            printing_store(),
             "owner-a",
             _full_plan(credit_principal=30000, credit_total_repayment=29999),
         )
     with pytest.raises(ValueError, match="term_months is required"):
-        set_financing_plan("owner-a", _full_plan(term_months=None))
+        set_financing_plan(printing_store(), "owner-a", _full_plan(term_months=None))
     with pytest.raises(ValueError, match="monthly_payment is required"):
-        set_financing_plan("owner-a", _full_plan(monthly_payment=None))
+        set_financing_plan(printing_store(), "owner-a", _full_plan(monthly_payment=None))
     with pytest.raises(ValueError, match="term_months must be an integer"):
-        set_financing_plan("owner-a", _full_plan(term_months=True))
+        set_financing_plan(printing_store(), "owner-a", _full_plan(term_months=True))
     with pytest.raises(ValueError, match="term_months must be an integer"):
-        set_financing_plan("owner-a", _full_plan(term_months="10.5"))
+        set_financing_plan(printing_store(), "owner-a", _full_plan(term_months="10.5"))
     with pytest.raises(ValueError, match="term_months must be an integer"):
-        set_financing_plan("owner-a", _full_plan(term_months=10.0))
+        set_financing_plan(printing_store(), "owner-a", _full_plan(term_months=10.0))
     with pytest.raises(ValueError, match="term_months must be >= 1"):
-        set_financing_plan("owner-a", _full_plan(term_months=0))
+        set_financing_plan(printing_store(), "owner-a", _full_plan(term_months=0))
 
 
 def test_complete_payback_status_uses_realized_profit(finance_db):
     from printing3d import create_order, settle_order
     from printing3d.finance import get_payback_status, set_financing_plan
 
-    set_financing_plan("owner-a", _full_plan())
-    first = create_order("owner-a", {"title": "Part 1", "quoted_price": 7000})
-    second = create_order("owner-a", {"title": "Part 2", "quoted_price": 5000})
-    settle_order("owner-a", first["id"], actual_revenue=7000, actual_cost=2000)
-    settle_order("owner-a", second["id"], actual_revenue=5000, actual_cost=2000)
+    set_financing_plan(printing_store(), "owner-a", _full_plan())
+    first = create_order(printing_store(), "owner-a", {"title": "Part 1", "quoted_price": 7000})
+    second = create_order(printing_store(), "owner-a", {"title": "Part 2", "quoted_price": 5000})
+    settle_order(printing_store(), "owner-a", first["id"], actual_revenue=7000, actual_cost=2000)
+    settle_order(printing_store(), "owner-a", second["id"], actual_revenue=5000, actual_cost=2000)
 
-    status = get_payback_status("owner-a")
+    status = get_payback_status(printing_store(), "owner-a")
 
     assert status["status"] == "configured"
     assert status["cost_basis_status"] == "complete"
@@ -114,6 +118,7 @@ def test_payback_status_is_partial_when_credit_total_is_unknown(finance_db):
     from printing3d.finance import get_payback_status, set_financing_plan
 
     set_financing_plan(
+        printing_store(),
         "owner-a",
         _full_plan(
             credit_total_repayment=None,
@@ -123,7 +128,7 @@ def test_payback_status_is_partial_when_credit_total_is_unknown(finance_db):
         ),
     )
 
-    status = get_payback_status("owner-a", month="2026-09")
+    status = get_payback_status(printing_store(), "owner-a", month="2026-09")
 
     assert status["cost_basis_status"] == "partial"
     assert status["credit_overpayment"] is None
@@ -136,12 +141,13 @@ def test_payback_status_is_partial_when_credit_total_is_unknown(finance_db):
 def test_payback_status_handles_no_plan_zero_basis_and_invalid_month(finance_db):
     from printing3d.finance import get_payback_status, set_financing_plan
 
-    assert get_payback_status("missing-owner") == {
+    assert get_payback_status(printing_store(), "missing-owner") == {
         "plan": None,
         "status": "not_configured",
     }
 
     set_financing_plan(
+        printing_store(),
         "owner-a",
         {
             "printer_model": "Existing printer",
@@ -151,13 +157,13 @@ def test_payback_status_handles_no_plan_zero_basis_and_invalid_month(finance_db)
             "currency": "RUB",
         },
     )
-    status = get_payback_status("owner-a", month="2026-09")
+    status = get_payback_status(printing_store(), "owner-a", month="2026-09")
     assert status["known_cost_basis"] == 0
     assert status["payback_progress_percent"] is None
     assert status["break_even_reached"] is True
 
     with pytest.raises(ValueError, match="YYYY-MM"):
-        get_payback_status("owner-a", month="2026-13")
+        get_payback_status(printing_store(), "owner-a", month="2026-13")
 
 
 def test_month_profit_filters_currency_and_month(finance_db):
@@ -165,28 +171,25 @@ def test_month_profit_filters_currency_and_month(finance_db):
     from printing3d import create_order, settle_order
     from printing3d.finance import get_payback_status, set_financing_plan
 
-    set_financing_plan("owner-a", _full_plan())
+    set_financing_plan(printing_store(), "owner-a", _full_plan())
 
-    current = create_order("owner-a", {"title": "Current", "quoted_price": 1000})
-    old = create_order("owner-a", {"title": "Old", "quoted_price": 1000})
+    current = create_order(printing_store(), "owner-a", {"title": "Current", "quoted_price": 1000})
+    old = create_order(printing_store(), "owner-a", {"title": "Old", "quoted_price": 1000})
     usd = create_order(
+        printing_store(),
         "owner-a",
         {"title": "USD", "quoted_price": 1000, "currency": "USD"},
     )
-    settle_order("owner-a", current["id"], actual_revenue=1000, actual_cost=200)
-    settle_order("owner-a", old["id"], actual_revenue=1000, actual_cost=100)
-    settle_order("owner-a", usd["id"], actual_revenue=1000, actual_cost=50)
+    settle_order(printing_store(), "owner-a", current["id"], actual_revenue=1000, actual_cost=200)
+    settle_order(printing_store(), "owner-a", old["id"], actual_revenue=1000, actual_cost=100)
+    settle_order(printing_store(), "owner-a", usd["id"], actual_revenue=1000, actual_cost=50)
 
-    conn = service.get_conn()
-    conn.execute(
-        "UPDATE print_orders SET settled_at = ? WHERE id = ?",
-        ("2020-01-05T00:00:00", old["id"]),
-    )
-    conn.commit()
-    conn.close()
+    with printing_store().transaction() as tx:
+        key = "printing/order/" + old["id"]
+        tx.set(key, {**tx.get(key), "settled_at": "2020-01-05T00:00:00"})
 
-    current_month = get_payback_status("owner-a")["month"]
-    status = get_payback_status("owner-a", month=current_month)
+    current_month = get_payback_status(printing_store(), "owner-a")["month"]
+    status = get_payback_status(printing_store(), "owner-a", month=current_month)
 
     assert status["cumulative_realized_profit"] == pytest.approx(1700)
     assert status["month_realized_profit"] == pytest.approx(800)
@@ -241,27 +244,29 @@ def test_finance_routes_require_owner(finance_db, monkeypatch):
 
 def test_finance_tools_use_trusted_identity_and_approval_boundary(finance_db, monkeypatch):
     from printing3d import create_order, settle_order
-    import printing3d.tools as printing_tools
-    from tool_registry import ToolRegistry
+    import forge.tools as printing_tools
+    from tool_providers.registry import ToolRegistry
 
     class Call:
         user_id = "trusted-finance-owner"
 
     cfg = {"_universal_context": {"call": Call()}}
-    plan = printing_tools.finance_plan_set(_full_plan(), cfg)
+    plan = printing_tools.set_financing_plan(_full_plan(), cfg)
     assert plan["owner_id"] == "trusted-finance-owner"
 
     order = create_order(
+        printing_store(),
         "trusted-finance-owner",
         {"title": "Tool profit", "quoted_price": 1000},
     )
     settle_order(
+        printing_store(),
         "trusted-finance-owner",
         order["id"],
         actual_revenue=1000,
         actual_cost=200,
     )
-    status = printing_tools.finance_status({"month": None}, cfg)
+    status = printing_tools.get_finance_status({"month": None}, cfg)
     assert status["cumulative_realized_profit"] == pytest.approx(800)
 
     registry = ToolRegistry()
@@ -277,5 +282,5 @@ def test_finance_tools_use_trusted_identity_and_approval_boundary(finance_db, mo
         "get_current_owner_id",
         lambda required=True: "fallback-finance-owner",
     )
-    fallback = printing_tools.finance_plan_set(_full_plan(), {})
+    fallback = printing_tools.set_financing_plan(_full_plan(), {})
     assert fallback["owner_id"] == "fallback-finance-owner"

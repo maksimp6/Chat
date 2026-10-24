@@ -1,19 +1,28 @@
-# Alice Platform Architecture
+# Keel Platform Architecture
 
-Alice Platform is a configuration-driven deployment system that uses three layers:
+Keel Platform is a configuration-driven deployment system that uses three layers:
 
 1. **Documentation** (docs/platform/) — explains rules and principles
 2. **Configuration** (config/alice/) — contains desired state facts (YAML)
-3. **Code** (alice_platform/) — validates config and reconciles reality to desired state
+3. **Code** (keel/) — validates config and reconciles reality to desired state
 
 This document explains the platform structure and principles.
 
 ## Core Services
 
-The platform manages three core services:
+The platform currently carries legacy control-plane names while the Container Apps runtime migrates to canonical user-facing service names.
+
+Canonical runtime services:
+- **alice** — production Alice Pro runtime, 1 vCPU / 1 GiB, min 0 / max 1, 300 s idle timeout.
+- **alice-lab** — development/test Alice runtime, 1 vCPU / 1 GiB, min 0 / max 1, 120 s idle timeout.
+- **alice-browser** — real Chromium/Playwright/MCP worker, 2 vCPU / 2 GiB, min 0 / max 1, 120 s idle timeout.
+
+The existing **oauth** and **chrome** logical services remain during migration because current authentication/browser consumers still reference them. They must not be deleted or silently renamed until those consumers have migrated and live acceptance is proven. Runtime scaling is fail-closed in config: instance counts are non-negative/positive as appropriate, min cannot exceed max, and idle timeout must be a positive integer.
+
+Current control-plane services:
 
 ### OAuth
-- **Purpose**: OAuth 2.0 identity provider for Alice
+- **Purpose**: OAuth 2.0 identity provider for Logos
 - **Configuration**: `platform.yaml`, `domains.yaml`, `secrets.yaml`
 - **Deployment**: `production.yaml`, `test.yaml`
 - **Domain**: `oauth.maxxxpavlov.online` (production), test lane equivalent
@@ -21,7 +30,7 @@ The platform manages three core services:
 - **Sign-in method**: `github` (production), `passphrase` (test)
 
 ### Chrome Worker
-- **Purpose**: Browser automation and control for Alice Chat
+- **Purpose**: Browser automation and control for Logos Chat
 - **Configuration**: `platform.yaml`, `domains.yaml`, `storage.yaml`
 - **Persistent storage**: `/chrome-state` volume
 - **Domain**: `chrome.maxxxpavlov.online` (production), test lane equivalent
@@ -135,21 +144,21 @@ The config system enforces nine validation rules automatically:
 
 ### Validation
 ```bash
-python -m alice_platform validate [--config-dir config/alice]
+python -m keel validate [--config-dir config/alice]
 ```
 Checks all YAML files for schema, semantic, and policy violations.
 
 ### Planning
 ```bash
-python -m alice_platform plan test
-python -m alice_platform plan production
+python -m keel plan test
+python -m keel plan production
 ```
 Compares desired state (config) to observed state (cloud provider) and shows planned changes.
 
 ### Health Checks
 ```bash
-python -m alice_platform health test
-python -m alice_platform health production
+python -m keel health test
+python -m keel health production
 ```
 Lists URLs and expected authentication methods for each service in the lane.
 
