@@ -4,11 +4,18 @@ import os
 import subprocess
 import json
 import logging
+import shutil
 
 logger = logging.getLogger("termux_mcp")
 
 
 def _run_termux_cmd(cmd: list, timeout: int = 10) -> dict:
+    if not shutil.which(cmd[0]):
+        return {
+            "success": False,
+            "error": f"Утилита '{cmd[0]}' не найдена: инструмент работает только на Android "
+            "в Termux с пакетом termux-api и приложением Termux:API",
+        }
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
         out = res.stdout.strip()
@@ -277,6 +284,24 @@ TERMUX_TOOLS = {
         },
     },
 }
+
+
+# Termux:API tools need their Android helper on PATH. Hosts without it (Ubuntu
+# runners, servers) do not offer them to the model; remove_file needs nothing.
+_REQUIRED_EXECUTABLES = {
+    "termux_open_app_settings": "am",
+    "termux_camera_photo": "termux-camera-photo",
+    "termux_battery_status": "termux-battery-status",
+    "termux_toast": "termux-toast",
+    "termux_vibrate": "termux-vibrate",
+    "termux_torch": "termux-torch",
+    "termux_clipboard_get": "termux-clipboard-get",
+    "termux_clipboard_set": "termux-clipboard-set",
+    "termux_tts_speak": "termux-tts-speak",
+    "termux_notification": "termux-notification",
+}
+for _name, _executable in _REQUIRED_EXECUTABLES.items():
+    TERMUX_TOOLS[_name]["metadata"] = {"requires_executables": [_executable]}
 
 
 def execute_termux_tool(tool_name: str, arguments: dict, cfg: dict = None) -> dict:

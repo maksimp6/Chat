@@ -31,6 +31,7 @@
 - [Сообщество ботов](integrations/chatgpt-bot-community.md) — интеграция ChatGPT, MCP и A2A-ботов
 - [Work Map: trips.db](integrations/work-map-trips.md) — ручной прототип обработки `trips.db` и границы будущей интеграции; в Logos не реализовано
 - [Конспекты внешней документации](notes/README.md) — переработанные знания и выводы для Logos
+- [Официальная документация Yandex AI Studio и Yandex Cloud](yandex-documentation.md) — проверенные ссылки на API, тарифы, лимиты и управление доступом
 - [Markdown-зеркала](mirrors/README.md) — близкие к источнику локальные копии внешней документации
 - [Markdown-зеркало Cloud.ru](integrations/cloudru-docs-mirror.md) — спецификация crawler/fetch pipeline и manifest для Cloud.ru
 - [Агенты Logos](agents/overview.md) — runtime-агенты и адаптеры приложения (чат, голос, CLI, инструменты)

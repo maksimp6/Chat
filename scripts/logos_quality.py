@@ -46,6 +46,8 @@ def dialogue_params(vector_store_ids: list[str], categories: list[str]) -> dict[
         "temperature": 0.3,
         "tool_choice": "auto",
         "parallel_tool_calls": True,
+        # No approver is present: gated calls are refused one by one, never auto-approved.
+        "approval_mode": "deny",
         "truncation": "disabled",
         "background": True,
         "store": True,
