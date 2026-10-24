@@ -662,9 +662,10 @@ def test_production_workflow_is_master_only_and_scopes_credentials():
     assert job["if"] == "github.ref == 'refs/heads/master'"
     assert job["environment"] == "production"
     assert "env" not in job
-    assert job["steps"][0]["with"]["ref"] == "${{ github.sha }}"
-    assert "merge-base --is-ancestor" in job["steps"][1]["run"]
-    assert set(job["steps"][-1]["env"]) == {
+    workload = [s for s in job["steps"] if not s["id"].startswith("job_policy_")]
+    assert workload[0]["with"]["ref"] == "${{ github.sha }}"
+    assert "merge-base --is-ancestor" in workload[1]["run"]
+    assert set(workload[-1]["env"]) == {
         "SOURCE_SHA",
         "CLOUDRU_PROJECT_ID",
         "CLOUDRU_IAM_KEY_ID",

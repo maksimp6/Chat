@@ -18,13 +18,16 @@ def test_dependency_review_gate_covers_all_prs_and_vulnerability_scopes():
     assert "if" not in job
     assert "continue-on-error" not in job
     assert "needs" not in job
-    assert len(job["steps"]) == 1
-    scan = job["steps"][0]
+    assert len(job["steps"]) == 3
+    scan = job["steps"][1]
     assert scan["uses"] == (
         "actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294"
     )
-    assert "if" not in scan
-    assert "continue-on-error" not in scan
+    assert "!contains(steps.*.outcome, 'failure')" in scan["if"]
+    assert scan["continue-on-error"] is True
+    # The finalizer, rather than warn-only scanning, owns the explicit >30s policy.
+    assert job["steps"][-1]["id"] == "job_policy_result"
+    assert "continue-on-error" not in job["steps"][-1]
     config = scan["with"]
     assert config["warn-only"] is False
     assert config["fail-on-severity"] == "low"
