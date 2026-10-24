@@ -1,9 +1,11 @@
 """Local atomic Screen DOM checkpoint and bounded revision journal."""
+
 import json
 import os
 from pathlib import Path
 import tempfile
 import time
+
 
 class StateStore:
     def __init__(self, root, limit=200):
@@ -29,8 +31,12 @@ class StateStore:
 
     def save(self, merger, events):
         # Local snapshot may contain OCR text: private permissions, never publish.
-        data = {"version": 1, "revision": merger.revision,
-                "next_id": merger.next_id, "nodes": merger.nodes}
+        data = {
+            "version": 1,
+            "revision": merger.revision,
+            "next_id": merger.next_id,
+            "nodes": merger.nodes,
+        }
         fd, path = tempfile.mkstemp(prefix=".checkpoint-", dir=self.root)
         try:
             with os.fdopen(fd, "w") as stream:
@@ -48,10 +54,17 @@ class StateStore:
             if os.path.exists(path):
                 os.unlink(path)
         # Journal contains counts only, no OCR text or private screenshots.
-        record = {"revision": merger.revision, "timestamp": time.time(),
-                  "appeared": sum(e["type"] == "element_appeared" for e in events),
-                  "disappeared": sum(e["type"] == "element_disappeared" for e in events)}
-        rows = self.journal.read_text().splitlines()[-(self.limit-1):] if self.journal.exists() else []
+        record = {
+            "revision": merger.revision,
+            "timestamp": time.time(),
+            "appeared": sum(e["type"] == "element_appeared" for e in events),
+            "disappeared": sum(e["type"] == "element_disappeared" for e in events),
+        }
+        rows = (
+            self.journal.read_text().splitlines()[-(self.limit - 1) :]
+            if self.journal.exists()
+            else []
+        )
         rows.append(json.dumps(record))
         fd, path = tempfile.mkstemp(prefix=".journal-", dir=self.root)
         try:

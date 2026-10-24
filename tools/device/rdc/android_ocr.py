@@ -1,5 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/python
 """Read-only local OCR for RDC Android screenshots. No automated taps."""
+
 import argparse
 import csv
 import io
@@ -13,11 +14,16 @@ import subprocess
 ENV = dict(os.environ, TMPDIR="/data/data/com.termux/files/usr/tmp")
 DEFAULT_IMAGE = Path.home() / ".alice-rdc/screenshots/latest.jpg"
 
+
 def recognize(image: Path, minimum: float = 60.0) -> list[dict]:
     """Return recognized words and JPEG pixel coordinates with confidence."""
     result = subprocess.run(
         ["tesseract", str(image), "stdout", "-l", "rus+eng", "--psm", "11", "tsv"],
-        capture_output=True, text=True, check=True, timeout=15, env=ENV,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=15,
+        env=ENV,
     )
     words = []
     for item in csv.DictReader(io.StringIO(result.stdout), delimiter="\t"):
@@ -30,10 +36,17 @@ def recognize(image: Path, minimum: float = 60.0) -> list[dict]:
             continue
         x, y = int(item["left"]), int(item["top"])
         width, height = int(item["width"]), int(item["height"])
-        words.append({"text": token, "confidence": round(confidence, 1),
-                      "x": x + width // 2, "y": y + height // 2,
-                      "bbox": [x, y, width, height]})
+        words.append(
+            {
+                "text": token,
+                "confidence": round(confidence, 1),
+                "x": x + width // 2,
+                "y": y + height // 2,
+                "bbox": [x, y, width, height],
+            }
+        )
     return words
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -50,9 +63,19 @@ def main():
     if args.command == "find":
         query = args.text.casefold()
         words = [word for word in words if query in word["text"].casefold()]
-    print(json.dumps({"image": str(args.image), "coordinate_space": "image_pixels",
-                      "matches": words, "count": len(words), "tap_executed": False},
-                     ensure_ascii=False))
+    print(
+        json.dumps(
+            {
+                "image": str(args.image),
+                "coordinate_space": "image_pixels",
+                "matches": words,
+                "count": len(words),
+                "tap_executed": False,
+            },
+            ensure_ascii=False,
+        )
+    )
+
 
 if __name__ == "__main__":
     main()

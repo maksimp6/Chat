@@ -4,6 +4,7 @@
 This does NOT restart or stop RDC. It does not touch root services or send
 ADB device actions outside the Live Server HTTP interface.
 """
+
 import json
 import os
 from pathlib import Path
@@ -45,7 +46,7 @@ def live_pids():
 
 def reachable():
     with socket.socket() as connection:
-        connection.settimeout(.2)
+        connection.settimeout(0.2)
         return connection.connect_ex(("127.0.0.1", PORT)) == 0
 
 
@@ -53,17 +54,19 @@ def request(path, authorized=True):
     headers = {}
     if authorized:
         headers["Authorization"] = "Bearer " + TOKEN
-    req = urllib.request.Request(f"http://127.0.0.1:{PORT}{path}",headers=headers)
+    req = urllib.request.Request(f"http://127.0.0.1:{PORT}{path}", headers=headers)
     try:
-        with urllib.request.urlopen(req,timeout=12) as response:
-            status=response.status; raw=response.read(4096)
+        with urllib.request.urlopen(req, timeout=12) as response:
+            status = response.status
+            raw = response.read(4096)
     except urllib.error.HTTPError as error:
-        status=error.code; raw=error.read(4096)
+        status = error.code
+        raw = error.read(4096)
     try:
-        payload=json.loads(raw)
+        payload = json.loads(raw)
     except (ValueError, UnicodeError):
-        payload={}
-    return status,payload
+        payload = {}
+    return status, payload
 
 
 def start_service(path):
@@ -85,7 +88,7 @@ def stop_service(pid):
     for _ in range(35):
         if not reachable():
             return
-        time.sleep(.12)
+        time.sleep(0.12)
     raise RuntimeError("old Live Server did not release port")
 
 
@@ -97,13 +100,13 @@ def check_ready(child, strict=True):
             health, info = request("/health")
             if health == 200 and (not strict or info.get("device_policy") == "redmi9_bound"):
                 status, details = request("/status")
-                if (status == 200 and (not strict or details.get("target")=="Redmi_9")):
-                    if request("/health",authorized=False)[0] != 401:
+                if status == 200 and (not strict or details.get("target") == "Redmi_9"):
+                    if request("/health", authorized=False)[0] != 401:
                         raise RuntimeError("Bearer authentication regressed")
                     return True
         except (OSError, TimeoutError, ConnectionError):
             pass
-        time.sleep(.15)
+        time.sleep(0.15)
     raise RuntimeError("Live Server readiness or device binding failed")
 
 
@@ -137,31 +140,37 @@ def main():
         sem_status, sem = request("/screen/semantics")
         if sem_status != 200:
             raise RuntimeError("Screen semantics unavailable on updated Live Server")
-        print(json.dumps({
-            "result":"promoted",
-            "primary_health":200,
-            "primary_status":200,
-            "authorized_device":"Redmi_9",
-            "bearer_auth":"enforced",
-            "screen_semantics":200,
-            "semantic_nodes":sem.get("count"),
-            "new_pid":new.pid,
-            "rdc":"untouched",
-        }))
+        print(
+            json.dumps(
+                {
+                    "result": "promoted",
+                    "primary_health": 200,
+                    "primary_status": 200,
+                    "authorized_device": "Redmi_9",
+                    "bearer_auth": "enforced",
+                    "screen_semantics": 200,
+                    "semantic_nodes": sem.get("count"),
+                    "new_pid": new.pid,
+                    "rdc": "untouched",
+                }
+            )
+        )
     except BaseException as error:
         if new is not None and new.poll() is None:
             new.terminate()
-            try: new.wait(timeout=3)
+            try:
+                new.wait(timeout=3)
             except subprocess.TimeoutExpired:
-                new.kill(); new.wait(timeout=2)
+                new.kill()
+                new.wait(timeout=2)
         for _ in range(15):
             if not reachable():
                 break
-            time.sleep(.1)
+            time.sleep(0.1)
         restore_backup()
         original = start_service(SERVER)
         check_ready(original, strict=False)
-        print(json.dumps({"result":"rolled_back","reason":str(error),"rdc":"untouched"}))
+        print(json.dumps({"result": "rolled_back", "reason": str(error), "rdc": "untouched"}))
         raise
 
 

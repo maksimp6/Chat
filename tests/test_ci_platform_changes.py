@@ -155,9 +155,7 @@ def test_cli_classifies_stdin(monkeypatch, capsys, mode):
 def test_cli_can_select_android_for_manual_build(monkeypatch, capsys):
     import json
 
-    monkeypatch.setattr(
-        routing.sys, "argv", ["ci_platform_changes.py", "--platform", "android"]
-    )
+    monkeypatch.setattr(routing.sys, "argv", ["ci_platform_changes.py", "--platform", "android"])
     assert routing.main() == 0
     plan = json.loads(capsys.readouterr().out)
     assert {name for name, enabled in plan.items() if enabled} == {"android"}

@@ -113,7 +113,7 @@ def create_order_tool(
         if arguments.get(key) is not None
     }
     data["status"] = status
-    data["source"] = "alice"
+    data["source"] = "host"
     raw_quote = arguments.get("quote")
     if raw_quote is not None:
         quote_input = _quote_input(raw_quote)

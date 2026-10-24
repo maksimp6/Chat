@@ -181,9 +181,7 @@ def reconcile_container_runtime_cost(
     variance = (actual - estimated).quantize(Decimal("0.0000001"))
     variance_percent = None
     if estimated:
-        variance_percent = (
-            variance / estimated * Decimal(100)
-        ).quantize(Decimal("0.0001"))
+        variance_percent = (variance / estimated * Decimal(100)).quantize(Decimal("0.0001"))
 
     return {
         "status": "measured",

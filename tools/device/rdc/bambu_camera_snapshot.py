@@ -4,6 +4,7 @@
 Read-only: connects to the printer camera only; sends no motion/print commands.
 Access code is loaded from a private file on this device, never a CLI argument.
 """
+
 import argparse
 import hashlib
 import getpass
@@ -25,22 +26,32 @@ DEFAULT_HOST = "192.168.31.12"
 HEADER = struct.Struct("<IIII")
 MAX_IMAGE_BYTES = 5_000_000
 
+
 class CameraError(RuntimeError):
     pass
+
 
 def auth_packet(code):
     if len(code) != 8 or not code.isascii() or not code.isalnum():
         raise CameraError("Invalid credential format")
-    return HEADER.pack(0x40, 0x3000, 0, 0) + b"bblp".ljust(32, b"\0") + code.encode("ascii").ljust(32, b"\0")
+    return (
+        HEADER.pack(0x40, 0x3000, 0, 0)
+        + b"bblp".ljust(32, b"\0")
+        + code.encode("ascii").ljust(32, b"\0")
+    )
+
 
 def read_exact(sock, count):
     result = bytearray()
     while len(result) < count:
         data = sock.recv(count - len(result))
         if not data:
-            raise CameraError("Camera stream closed before first frame (credential or permissions may be invalid)")
+            raise CameraError(
+                "Camera stream closed before first frame (credential or permissions may be invalid)"
+            )
         result.extend(data)
     return bytes(result)
+
 
 def jpeg_from_stream(sock):
     h = read_exact(sock, HEADER.size)
@@ -53,6 +64,7 @@ def jpeg_from_stream(sock):
     if not image.startswith(b"\xff\xd8") or not image.endswith(b"\xff\xd9"):
         raise CameraError("Camera sent incomplete/non-JPEG frame")
     return image
+
 
 def private_write(path, data):
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -68,12 +80,16 @@ def private_write(path, data):
         if os.path.exists(name):
             os.unlink(name)
 
+
 def read_access_code(path):
     if not path.exists():
-        raise CameraError("NO_CREDENTIAL: enter a fresh printer LAN access code in the private credential file")
+        raise CameraError(
+            "NO_CREDENTIAL: enter a fresh printer LAN access code in the private credential file"
+        )
     if path.stat().st_mode & 0o077:
         raise CameraError("Credential file is not private (requires mode 0600)")
     return path.read_text(encoding="ascii").strip()
+
 
 def snapshot(host, output, code_file, pin_file):
     code = read_access_code(code_file)
@@ -98,15 +114,19 @@ def snapshot(host, output, code_file, pin_file):
     private_write(output, jpg)
     return len(jpg)
 
+
 def self_test():
     sample = b"\xff\xd8" + b"0" * 2000 + b"\xff\xd9"
     data = HEADER.pack(len(sample), 0, 1, 0) + sample
     assert len(auth_packet("12345678")) == 80
+
     class FakeSocket:
         def __init__(self, payload):
             self.source = io.BytesIO(payload)
+
         def recv(self, size):
             return self.source.read(size)
+
     assert jpeg_from_stream(FakeSocket(data)) == sample
     try:
         jpeg_from_stream(FakeSocket(HEADER.pack(MAX_IMAGE_BYTES + 1, 0, 1, 0)))
@@ -115,11 +135,14 @@ def self_test():
         pass
     print("SELFTEST_OK: header, JPEG and size checks")
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--self-test", action="store_true")
-    parser.add_argument("--pair", action="store_true", help="Enter camera code privately on this device")
+    parser.add_argument(
+        "--pair", action="store_true", help="Enter camera code privately on this device"
+    )
     args = parser.parse_args()
     try:
         if args.self_test:
