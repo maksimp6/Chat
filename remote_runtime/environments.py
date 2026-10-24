@@ -10,6 +10,7 @@ from __future__ import annotations
 from core.env import env_get
 
 import json
+import logging
 import os
 import queue
 import subprocess
@@ -63,6 +64,9 @@ def _repo_root() -> Path:
     return Path(env_get("LOGOS_ENV_REPO_ROOT") or os.getcwd()).resolve()
 
 
+logger = logging.getLogger("remote_runtime.environments")
+
+
 def _run_git(*args: str, cwd: Optional[Path] = None) -> str:
     result = subprocess.run(
         ["git", *args],
@@ -73,7 +77,9 @@ def _run_git(*args: str, cwd: Optional[Path] = None) -> str:
         timeout=15,
     )
     if result.returncode:
-        raise ValueError(result.stderr.strip() or "git command failed")
+        # git's stderr names server paths, so it is logged here and not returned to the caller.
+        logger.info("git %s failed: %s", args[0], result.stderr.strip())
+        raise ValueError("git command failed")
     return result.stdout.strip()
 
 
