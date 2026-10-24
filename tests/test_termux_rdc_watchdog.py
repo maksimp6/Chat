@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1] / "android" / "scripts"
+ROOT = Path(__file__).resolve().parents[1] / "scripts" / "rdc"
 
 
 class WatchdogTests(unittest.TestCase):

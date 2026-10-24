@@ -4,7 +4,6 @@ line-length = 100
 exclude = [
   ".git",
   ".venv",
-  "android",
   "coverage-js",
 ]
 
@@ -21,7 +20,7 @@ ignore_missing_imports = true
 # Same result with or without application dependencies installed.
 no_site_packages = true
 explicit_package_bases = true
-exclude = '^(tests|node_modules|android|scripts|deploy|plugins|r)/'
+exclude = '^(tests|node_modules|scripts|deploy|plugins|r)/'
 
 [tool.pytest.ini_options]
 minversion = "8.0"

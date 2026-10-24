@@ -1,5 +1,0 @@
-# Chaquopy Python runtime for Android, Maven Central com.chaquo.python:target:3.14.8-0.
-# SHA-1 of each file matches the Maven Central .sha1 file; the SHA-256 is pinned here.
-13e1b17b2bd52983e13bf830a47317109f51a00ed23ecd91e8bc7d007c3f9033  target-3.14.8-0-arm64-v8a.zip
-ee75692740405f62f4d0ca54e3838d17cf663b76d7f617edaf392d7f0afe1faf  target-3.14.8-0-stdlib.zip
-5d31a87468ad6d7db6783e34b7857dcebb7405cf4b33dfeac077e2f9ad20e9f3  target-3.14.8-0-stdlib-pyc.zip

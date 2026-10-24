@@ -61,6 +61,14 @@ def _run(repo, client, body="Please add a docstring."):
     )
 
 
+def test_missing_optional_repository_rules_does_not_block_offline_issue_run(repo):
+    (repo / "AGENTS.md").unlink()
+    client = FakeClient(_message("Read-only review completed."))
+    result = _run(repo, client)
+    assert result["status"] == "no_changes"
+    assert "Repository rules (AGENTS.md):" not in client.calls[0]["message"]
+
+
 def test_unexpected_edits_fail_read_only_task_with_summary_and_billing(repo):
     client = FakeClient(
         _message("Added a docstring."),

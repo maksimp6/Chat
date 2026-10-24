@@ -32,3 +32,17 @@ There are no compatibility copies at the old root paths; update external shortcu
 
 Other existing scripts retain their current paths. See [repository layout](../docs/architecture/repository-layout.md)
 and [root file inventory](../docs/architecture/root-file-inventory.md) for the ongoing cleanup.
+
+## Termux device control
+
+The standalone RDC launchers moved from `android/scripts/` to `scripts/rdc/`
+when the Android application and APK tooling were removed. From the checkout:
+
+```bash
+bash scripts/rdc/termux-rdc.sh
+bash scripts/rdc/termux-rdc.sh status
+```
+
+The launcher preserves an active connection. Boot hook installation remains an
+explicit operation through `scripts/rdc/install-rdc-watchdog.sh`; existing hooks
+are preserved for a separately verified migration. These scripts do not build an APK.

@@ -18,7 +18,7 @@ This keeps prompts, permissions and expertise stable even when model vendors or 
 | Triage and delegation | Team Lead custom agent | GPT-5.4 mini |
 | Backend/API/runtime/database | Backend Engineer | GPT-5.4 mini |
 | Web UI/static JS | Frontend Engineer | GPT-5.4 mini |
-| Android | Android Engineer | GPT-5.4 mini |
+| Android device control / Termux tools | Android Engineer | GPT-5.4 mini |
 | Tests and CI diagnosis | Test Engineer | GPT-5.4 mini |
 | CI/CD/Cloud.ru/runners | Infra Engineer | GPT-5.4 mini |
 | Security review | Security Reviewer | GPT-5.4 mini |
@@ -79,8 +79,8 @@ machine or changing workflow permissions.
    resuming; a previous green check or dispatch does not carry over to a changed
    head or execution profile.
 4. **Transfer and close out.** Hand off the artifact, exact head, tests/CI,
-   review findings, unresolved risks, and next owner. Follow the protected PR
-   review and merge policy in `AGENTS.md`; verify the requested product behavior
+   review findings, unresolved risks, and next owner. Complete the applicable PR
+   review and merge checks; verify the requested product behavior
    after merge where practical. A posted trigger alone is not proof of work, and
    a merged PR alone is not proof of the user-visible outcome.
 

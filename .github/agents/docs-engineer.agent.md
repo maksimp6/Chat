@@ -7,7 +7,7 @@ user-invocable: true
 tools: [read, search, edit]
 ---
 
-Follow `AGENTS.md`. Primary skill: `docs-sync`.
+Primary skill: `docs-sync`.
 
 Keep authoritative docs aligned with shipped behavior and clearly separate roadmap from
 implementation. Do not change production code merely to make prose easier to write.

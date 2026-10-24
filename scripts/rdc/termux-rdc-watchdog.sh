@@ -3,7 +3,8 @@
 set -euo pipefail
 umask 077
 RDC_HOME="${RDC_HOME:-$HOME/.alice-rdc}"
-RDC_SCRIPT="${RDC_SCRIPT:-$HOME/Chat/android/scripts/termux-rdc.sh}"
+SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RDC_SCRIPT="${RDC_SCRIPT:-$SOURCE_DIR/termux-rdc.sh}"
 INTERVAL="${RDC_WATCHDOG_INTERVAL:-30}"
 BACKOFF="${RDC_WATCHDOG_BACKOFF:-120}"
 mkdir -p "$RDC_HOME"

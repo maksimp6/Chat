@@ -7,7 +7,7 @@ user-invocable: true
 tools: [read, search, agent]
 ---
 
-Follow `AGENTS.md`. Use repository skills instead of restating their procedures.
+Use repository skills instead of restating their procedures.
 
 Primary skills: `issue-to-pr`, `github-pr-readiness`, `github-ci-diagnosis`.
 Delegate implementation to the narrowest specialist. Escalate architecture-heavy or

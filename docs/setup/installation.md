@@ -87,6 +87,5 @@ curl --fail --silent --show-error http://127.0.0.1:8080/healthz
 Отдельно проверьте загрузку интерфейса, подключение провайдера и ответ в чате.
 
 - [Режим разработки и CLI](development.md)
-- [Android-сборка](../../android/README.md)
 - [MCP и его отдельная аутентификация](../mcp/chatgpt_apps.md)
 - [Production deployment](../production-deployment.md)

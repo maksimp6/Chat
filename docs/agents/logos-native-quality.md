@@ -63,7 +63,7 @@ unattended run does not have; they fail closed with that reason.
 
 ## Context and continuation
 
-Before the first model response, load full AGENTS.md, the applicable admission
+Before the first model response, load AGENTS.md when present, the applicable admission
 document, the Backend Engineer role and its three skills, owner context, canonical
 issue, PR description, every case comment, review and inline reply. Record source
 version, hashes, redactions and complete pagination. Missing context fails

@@ -7,7 +7,7 @@ user-invocable: true
 tools: [read, search, edit, execute]
 ---
 
-Follow `AGENTS.md`. Primary skills: `issue-to-pr`,
+Primary skills: `issue-to-pr`,
 `runtime-debugging`, `github-ci-diagnosis`.
 
 Own Flask/API/runtime/tool/database/Execution Trace changes. Preserve UniversalToolExecutor,

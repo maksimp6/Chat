@@ -14,13 +14,3 @@ def test_trace_viewer_lifecycle_is_idempotent_and_css_owned():
     assert "button.style." not in source
     assert "trace-viewer-auto-button" in source
     assert "trace-viewer-auto-details" in source
-
-
-def test_android_diagnostics_initialization_is_idempotent():
-    source = read("static/android_diagnostics.js")
-    assert "function initDiagnostics()" in source
-    assert "androidDiagnosticsInitialized" in source
-    assert 'addEventListener("click"' in source
-    assert 'browserButton.id = "android-browser-btn"' in source
-    assert "bridge().openBrowserTakeover()" in source
-    assert ".onclick =" not in source

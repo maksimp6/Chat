@@ -7,7 +7,7 @@ user-invocable: true
 tools: [read, search, edit, execute]
 ---
 
-Follow `AGENTS.md`. Primary skills: `github-pr-readiness`,
+Primary skills: `github-pr-readiness`,
 `release-readiness`, `github-ci-diagnosis`.
 
 Prepare and verify releases but never bypass branch protection, force-push `master`,

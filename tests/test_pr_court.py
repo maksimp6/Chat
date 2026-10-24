@@ -1,11 +1,57 @@
 """Negative controls for a read-only model judgment, without paid calls."""
 
+import json
+import os
+import tempfile
 import unittest
+import urllib.error
+from pathlib import Path
+from unittest.mock import patch
 
+from scripts import pr_court
 from scripts.pr_court import bounded_input, extract_text, validate_pr
 
 
 class PRCourtTest(unittest.TestCase):
+    def test_missing_rules_produces_nonapproval_without_a_model_or_provider_credentials(self):
+        pr = {
+            "head": {"sha": "head", "repo": {"full_name": "o/r"}},
+            "base": {"sha": "base", "ref": "develop"},
+            "state": "open",
+        }
+        missing = urllib.error.HTTPError("https://api.github.com/rules", 404, "missing", {}, None)
+        with tempfile.TemporaryDirectory() as directory:
+            event = Path(directory) / "event.json"
+            event.write_text(json.dumps({"number": 1, "pull_request": pr}))
+            env = {
+                "GITHUB_EVENT_PATH": str(event),
+                "GITHUB_REPOSITORY": "o/r",
+                "GH_TOKEN": "synthetic-github-token",
+            }
+            previous = Path.cwd()
+            try:
+                os.chdir(directory)
+                with (
+                    patch.dict(os.environ, env, clear=True),
+                    patch.object(pr_court, "request", side_effect=[pr, [], missing]) as http,
+                ):
+                    self.assertEqual(pr_court.main(), 0)
+                report = json.loads(Path("pr-court-output/report.json").read_text())
+                self.assertEqual(report["status"], "NO_RULES_NOT_APPROVAL")
+                self.assertEqual(report["model_call"], "NOT_RUN")
+                self.assertFalse(report["merge_approval"])
+                self.assertFalse(any(call.kwargs.get("provider") for call in http.call_args_list))
+            finally:
+                os.chdir(previous)
+
+    def test_rule_read_permission_failure_is_not_treated_as_a_missing_file(self):
+        denied = urllib.error.HTTPError("https://api.github.com/rules", 403, "denied", {}, None)
+        with (
+            patch.object(pr_court, "request", side_effect=denied),
+            self.assertRaises(urllib.error.HTTPError),
+        ):
+            pr_court.read_base_rules("https://api.github.com/repos/o/r", "head", "synthetic")
+
     def test_empty_http_success_is_not_a_judgment(self):
         for response in ({}, {"id": "r", "status": "completed", "output": []}):
             with self.assertRaises(ValueError):

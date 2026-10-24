@@ -47,7 +47,6 @@ def test_unified_buttons_contract():
         "dozzle-btn",
         "project-tree-btn",
         "departments-btn",
-        "update-app-btn",
         "provider-credentials-btn",
         "memory-btn",
         "theme-toggle",
@@ -80,7 +79,7 @@ def test_unified_buttons_contract():
     forbidden_geometry = re.compile(
         r"(?m)^[^{}]*#(?:menu-btn|system-status-btn|model-btn|tools-btn|ssh-runtime-btn|mcp-btn|"
         r"settings-btn|file-manager-btn|treasury-btn|dozzle-btn|project-tree-btn|"
-        r"departments-btn|update-app-btn|provider-credentials-btn|memory-btn|theme-toggle)"
+        r"departments-btn|provider-credentials-btn|memory-btn|theme-toggle)"
         r"[^{}]*\{[^{}]*(?:width|height|min-width|min-height|flex-basis)\s*:",
     )
     assert not forbidden_geometry.search(css), (

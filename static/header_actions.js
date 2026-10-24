@@ -25,13 +25,6 @@
     actions.register("header.dozzle.open", call("openDozzleLogs"));
     actions.register("header.departments.open", call("openDepartmentsModal"));
     actions.register("header.credentials.open", call("openProviderCredentialsModal"));
-    actions.register("header.update.open", function () {
-      if (window.AliceAndroid) {
-        window.AliceAndroid.openUpdater();
-      } else {
-        alert("Обновление APK доступно только в Android-приложении.");
-      }
-    });
 
     var upload = document.getElementById("upload-image-btn");
     if (upload && upload.dataset.bound !== "true") {

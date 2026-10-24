@@ -68,14 +68,16 @@ def build_prompt(question: str, repo_root: Path, context_packet: dict | None = N
             + "\n\nCurrent owner question:\n"
             + question
         )
-    rules = (repo_root / "AGENTS.md").read_text(encoding="utf-8")
+    rules_path = repo_root / "AGENTS.md"
+    rules = rules_path.read_text(encoding="utf-8") if rules_path.exists() else ""
     return (
         "You are Logos, running in your own repository in a GitHub Actions runner.\n"
         "Answer the owner's question in their language. Your native filesystem tools "
         "are available to inspect the repository or run a build when useful. "
         "Describe only work you actually performed. This is one dialogue turn, "
         "not a request to start recurring or background work.\n\n"
-        f"Repository rules:\n{rules}\n\nOwner question:\n{question}"
+        + (f"Repository rules:\n{rules}\n\n" if rules else "")
+        + f"Owner question:\n{question}"
     )
 
 
