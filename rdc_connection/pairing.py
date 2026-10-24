@@ -44,15 +44,23 @@ def verification_url(path, now=None):
 def install_rdc_pairing(app):
     @app.get("/rdc")
     def rdc_pairing_redirect():
-        # Require actual short-token authentication, even when the global gate
-        # is disabled; headers supplied by a proxy alone do not authorize pairing.
+        # Pairing needs the short-token gate: the authentication it checks is only produced
+        # when the gate is enabled. With the gate off the route says so instead of answering
+        # "authentication required", which the caller could never satisfy.
         from identity.short_token_auth import COOKIE_NAME, _enabled, _has_valid_session, _token
 
+        if not _enabled():
+            response = jsonify({"error": "RDC pairing requires LOGOS_REQUIRE_SHORT_TOKEN"})
+            response.status_code = 503
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Referrer-Policy"] = "no-referrer"
+            return response
         token = _token()
+        # Headers supplied by a proxy alone do not authorize pairing.
         authenticated = request.environ.get("logos.short_token_path_authenticated") or (
             token and _has_valid_session(token, request.cookies.get(COOKIE_NAME))
         )
-        if not _enabled() or not token or not authenticated:
+        if not token or not authenticated:
             response = jsonify({"error": "authentication required"})
             response.status_code = 401
         else:
