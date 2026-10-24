@@ -166,6 +166,8 @@ def _tool_evidence(entry: dict[str, Any]) -> dict[str, Any]:
         "call_id": entry.get("call_id"),
         "success": output.get("success"),
     }
+    if (output.get("metadata") or {}).get("phase") == "approval_required":
+        evidence["approval_required"] = True
     if "returncode" in data:
         evidence["returncode"] = data["returncode"]
     arguments = entry.get("arguments") or {}
@@ -204,6 +206,9 @@ def _finish(invocation, trace, result: dict[str, Any]) -> None:
     # Export independent runtime evidence before any durable write. A storage
     # failure must never erase completed provider/tool execution from the report.
     result["tool_calls"] = [_tool_evidence(entry) for entry in finalized.get("tool_calls", [])]
+    result["approval_refused_tools"] = sorted(
+        {item["name"] for item in result["tool_calls"] if item.get("approval_required")}
+    )
     result["generation_requests"] = len(finalized.get("api_requests", []))
     result["api_failures"] = _api_failure_evidence(finalized.get("events", []))
     responses = finalized.get("responses", [])
