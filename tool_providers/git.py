@@ -2,6 +2,7 @@ import time
 import subprocess
 import os
 import logging
+import re
 import threading
 from functools import wraps
 
@@ -9,6 +10,17 @@ logger = logging.getLogger("git_mcp")
 
 _read_lock = threading.RLock()
 _write_lock = threading.RLock()
+
+# Branch, remote and ref names reach git as arguments. A name that starts with "-" would be read
+# as an option (for example --output=... or --receive-pack=...), so only plain names are accepted.
+_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,199}")
+
+
+def _name(value, label: str) -> str:
+    text = str(value or "").strip()
+    if not _NAME.fullmatch(text) or ".." in text or text.endswith(("/", ".", ".lock")):
+        raise ValueError(f"недопустимое имя {label}: {text!r}")
+    return text
 
 
 def read_op(func):
@@ -169,7 +181,10 @@ def git_status(args: dict, cfg: dict) -> dict:
 @read_op
 def git_log(args: dict, cfg: dict) -> dict:
     limit = args.get("limit") or cfg.get("default_log_limit", 5)
-    branch = args.get("branch") or "HEAD"
+    try:
+        branch = _name(args.get("branch") or "HEAD", "branch")
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}
     return _run_git(
         ["log", f"-n{limit}", "--oneline", branch],
         cfg,
@@ -197,7 +212,10 @@ def git_branches(args: dict, cfg: dict) -> dict:
 @write_op
 def git_add(args: dict, cfg: dict) -> dict:
     target = args.get("path") or args.get("files") or "."
-    return _run_git(["add", target], cfg, args.get("repo") or args.get("repo_path"), is_read=False)
+    # "--" ends the options, so a path can never be read as one.
+    return _run_git(
+        ["add", "--", target], cfg, args.get("repo") or args.get("repo_path"), is_read=False
+    )
 
 
 @write_op
@@ -209,7 +227,7 @@ def git_commit(args: dict, cfg: dict) -> dict:
     # Автоматическая индексация перед коммитом
     if files:
         target = [files] if isinstance(files, str) else files
-        _run_git(["add"] + target, cfg, repo, is_read=False)
+        _run_git(["add", "--"] + target, cfg, repo, is_read=False)
     else:
         _run_git(["add", "-A"], cfg, repo, is_read=False)
 
@@ -223,15 +241,19 @@ def git_remote(args: dict, cfg: dict) -> dict:
     repo = args.get("repo") or args.get("repo_path")
     if action == "list":
         return _run_git(["remote", "-v"], cfg, repo, is_read=True)
-    name = args.get("name", "origin")
-    url = args.get("url")
-    if action == "add":
+    try:
+        name = _name(args.get("name", "origin"), "remote")
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}
+    url = str(args.get("url") or "").strip()
+    if action in {"add", "set_url"}:
         if not url:
             return {"success": False, "error": "URL обязателен"}
+        if url.startswith("-"):
+            return {"success": False, "error": "URL не может начинаться с '-'"}
+    if action == "add":
         return _run_git(["remote", "add", name, url], cfg, repo, is_read=False)
     elif action == "set_url":
-        if not url:
-            return {"success": False, "error": "URL обязателен"}
         return _run_git(["remote", "set-url", name, url], cfg, repo, is_read=False)
     elif action == "remove":
         return _run_git(["remote", "remove", name], cfg, repo, is_read=False)
@@ -243,9 +265,12 @@ def git_remote(args: dict, cfg: dict) -> dict:
 @write_op
 def git_push(args: dict, cfg: dict) -> dict:
     repo = args.get("repo") or args.get("repo_path")
-    remote = args.get("remote", "origin")
-    # Without an explicit branch push the current one; never default to a protected branch.
-    branch = args.get("branch") or "HEAD"
+    try:
+        remote = _name(args.get("remote", "origin"), "remote")
+        # Without an explicit branch push the current one; never default to a protected branch.
+        branch = _name(args.get("branch") or "HEAD", "branch")
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}
     cmd = ["push"]
     if args.get("set_upstream"):
         cmd.append("-u")
@@ -260,8 +285,11 @@ def git_push(args: dict, cfg: dict) -> dict:
 @write_op
 def git_pull(args: dict, cfg: dict) -> dict:
     repo = args.get("repo") or args.get("repo_path")
-    remote = args.get("remote", "origin")
-    branch = args.get("branch")
+    try:
+        remote = _name(args.get("remote", "origin"), "remote")
+        branch = _name(args["branch"], "branch") if args.get("branch") else None
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}
     cmd = ["pull", remote]
     if branch:
         cmd.append(branch)
@@ -271,7 +299,10 @@ def git_pull(args: dict, cfg: dict) -> dict:
 @write_op
 def git_fetch(args: dict, cfg: dict) -> dict:
     repo = args.get("repo") or args.get("repo_path")
-    remote = args.get("remote", "origin")
+    try:
+        remote = _name(args.get("remote", "origin"), "remote")
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}
     cmd = ["fetch", remote]
     if args.get("prune"):
         cmd.append("--prune")
