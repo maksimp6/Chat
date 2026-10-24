@@ -254,6 +254,9 @@ def synthesize_browser_dag(
             confidence = 1.0
         confidence = min(1.0, max(0.0, confidence))
         for field_name, value in snapshot.facts.items():
+            # A fact with no name cannot be merged. It is skipped, so it does not fail the synthesis.
+            if not str(field_name).strip():
+                continue
             evidence_items.append(Evidence(field_name, value, source, confidence))
 
     merged = merge_evidence(
