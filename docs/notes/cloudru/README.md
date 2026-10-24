@@ -1,10 +1,10 @@
-# Cloud.ru — конспекты для Alice Pro
+# Cloud.ru — конспекты для Logos
 
-Здесь должны храниться переработанные конспекты официальной документации Cloud.ru, написанные нашими словами и ориентированные на архитектуру и эксплуатацию Alice Pro.
+Здесь должны храниться переработанные конспекты официальной документации Cloud.ru, написанные нашими словами и ориентированные на архитектуру и эксплуатацию Logos.
 
 ## Что относится сюда
 
-- объяснение Workflow Studio применительно к CI/CD Alice Pro;
+- объяснение Workflow Studio применительно к CI/CD Logos;
 - сравнение Container Apps, Managed Kubernetes и VM для наших runtime-задач;
 - заметки по Evolution Repo и зеркалированию GitHub;
 - практические выводы по IAM, API, Terraform, PostgreSQL, Object Storage и networking;

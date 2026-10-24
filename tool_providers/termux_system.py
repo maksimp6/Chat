@@ -1,4 +1,4 @@
-"""Расширенные инструменты Termux:API для Alice Pro.
+"""Расширенные инструменты Termux:API для Logos.
 
 Поддерживает все разрешения Android: батарея, Wi-Fi, локация (GPS/Network),
 буфер обмена, уведомления, всплывающие сообщения (Toast), синтез речи (TTS),
@@ -89,7 +89,7 @@ def set_clipboard(args: dict, cfg: dict = None) -> dict:
 
 def send_notification(args: dict, cfg: dict = None) -> dict:
     """Показать всплывающее уведомление в системной шторке Android."""
-    title = args.get("title", "Alice Pro")
+    title = args.get("title", "Logos")
     content = args.get("content") or args.get("message", "")
     if not content:
         return {"error": "Параметр 'content' обязателен"}

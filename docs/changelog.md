@@ -11,9 +11,9 @@
 - Persistent RDC: профиль 0.2 vCPU / 512Mi, `install` принимает готовый digest образа и не собирает его, Git-ключ доставляется только через `POST /rdc/secrets` ([#1016](https://github.com/maksimp6/Chat/pull/1016), [#1017](https://github.com/maksimp6/Chat/pull/1017)).
 - Валидация RDC в PR больше не собирает образ ([#1015](https://github.com/maksimp6/Chat/pull/1015)); SSH-деплой RDC удалён ранее ([#861](https://github.com/maksimp6/Chat/pull/861)).
 
-## 2026-10-06 — Memory DB Wave 1, Alice Dev worker, и ChatGPT OAuth
+## 2026-10-06 — Kristall Wave 1, Alice Dev worker, и ChatGPT OAuth
 
-### Memory DB Wave 1: файловый бэкенд для conversation и user identity
+### Kristall Wave 1: файловый бэкенд для conversation и user identity
 
 - Переведено управление conversation ownership на file-native storage вместо SQLite (issue #776):
   [#920](https://github.com/maksimp6/Chat/pull/920).

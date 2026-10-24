@@ -8,7 +8,7 @@ import json
 from types import MappingProxyType
 from typing import Any, Mapping
 
-from trace_security import sanitize_trace_value
+from observability.trace_security import sanitize_trace_value
 
 
 _EVIDENCE_COMPONENTS = ("task", "ci", "review", "trace", "files", "skills", "policy")

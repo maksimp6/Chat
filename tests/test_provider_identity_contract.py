@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import Mock
 
-from config import Config
+from core.config import Config
 from yandex_client_modules.conversations import YandexConversationMixin
 from yandex_client_modules.errors import YandexClientError
 

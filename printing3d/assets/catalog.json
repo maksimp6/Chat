@@ -1,0 +1,268 @@
+{
+  "schema_version": 1,
+  "inventory_date": "2026-10-11",
+  "repository": "maksimp6/Chat",
+  "note": "Inventory of observed files; entries alone do not certify print readiness, geometry, ownership or a verified live printer.",
+  "assets": [
+    {
+      "id": "phone-stand-source",
+      "name": "phone_stand.scad",
+      "kind": "parametric-source",
+      "location": "repo",
+      "path": "printing3d/assets/parametric/phone_stand.scad",
+      "bytes": 1555,
+      "sha256": "556b9992725142d45c953b0c1bb5f293a69aea066f07e0e3bdaa94e0b6f84d8f",
+      "format": "SCAD",
+      "print_status": "not_sliced",
+      "origin": "Google Drive: 3D Models",
+      "preview_path": "printing3d/assets/gallery/phone_stand.png"
+    },
+    {
+      "id": "sauce-stand-source",
+      "name": "sauce_stand.scad",
+      "kind": "parametric-source",
+      "location": "repo",
+      "path": "printing3d/assets/parametric/sauce_stand.scad",
+      "bytes": 1829,
+      "sha256": "c951711e947b143fb197917dfe734da10c431cad6f77070ec6a80fa59f767f27",
+      "format": "SCAD",
+      "print_status": "not_sliced",
+      "origin": "Google Drive: 3D модели",
+      "preview_path": "printing3d/assets/gallery/sauce_stand.png"
+    },
+    {
+      "id": "tube-holder-source",
+      "name": "test_tube_holder.scad",
+      "kind": "parametric-source",
+      "location": "repo",
+      "path": "printing3d/assets/parametric/test_tube_holder.scad",
+      "bytes": 838,
+      "sha256": "263b2bffa4648e23acfaed335755392902c71ecd31590e550ae2b52ed537a36c",
+      "format": "SCAD",
+      "print_status": "not_sliced",
+      "origin": "Google Drive: 3D модели",
+      "preview_path": "printing3d/assets/gallery/test_tube_holder.png"
+    },
+    {
+      "id": "tube-holder-model",
+      "name": "test_tube_holder.3mf",
+      "kind": "geometry",
+      "location": "repo",
+      "path": "printing3d/assets/parametric/test_tube_holder.3mf",
+      "bytes": 10532,
+      "sha256": "76f82a5aca96b44e96334278a903a188235ed4d9e96f1f0f88be3d899d3681c4",
+      "format": "3MF",
+      "print_status": "unsliced",
+      "origin": "Google Drive: 3D модели",
+      "associated_source": "tube-holder-source",
+      "geometry_equivalence": "not_verified",
+      "preview_path": "printing3d/assets/gallery/test_tube_holder.png"
+    },
+    {
+      "id": "a1mini-oem-holder-pr",
+      "name": "alice_stock_spool_replacement_v03_A1mini.3mf",
+      "kind": "geometry",
+      "location": "other_pr",
+      "pr": 1110,
+      "path": "printing3d/assets/spool_holder/alice_stock_spool_replacement_v03_A1mini.3mf",
+      "bytes": 106016,
+      "sha256": "21fe9c783b15d00421dfb39dd0c79666ac1fe6f8bb672eaec1c0e86decdbbf84",
+      "format": "3MF",
+      "print_status": "unsliced",
+      "fit_status": "unverified_measurements",
+      "preview_path": "printing3d/assets/gallery/oem_spindle_v03.png"
+    },
+    {
+      "id": "a1mini-oem-holder-library",
+      "name": "Alice_A1_mini_spool_holder_v03_unsliced.3mf",
+      "kind": "geometry",
+      "location": "chatgpt_library",
+      "bytes": 105937,
+      "sha256": "286ac9d09857b88cc347a5aa2aa74043b64f2519caac706df27e760530e7fbf2",
+      "format": "3MF",
+      "print_status": "unsliced",
+      "fit_status": "unverified_measurements"
+    },
+    {
+      "id": "a1mini-oem-source-archive",
+      "name": "alice_stock_spool_replacement_v03.zip",
+      "kind": "source-archive",
+      "location": "chatgpt_library_and_google_drive",
+      "bytes": 422852,
+      "sha256": "d9fd89a55b00315211cbf72c904672c6c5523ec09c6d1897bfedc0a6ddc9c6b1",
+      "format": "ZIP",
+      "print_status": "not_sliced",
+      "members_of_interest": [
+        "alice_stock_spool_replacement_v03.py",
+        "geometry_checks.py",
+        "half_shell_A.step",
+        "half_shell_B.step",
+        "retainer.step",
+        "README_RU.md"
+      ],
+      "preview_path": "printing3d/assets/gallery/oem_spindle_v03.png"
+    },
+    {
+      "id": "a1mini-oem-source-copy",
+      "name": "alice_stock_spool_replacement_v03(1).zip",
+      "kind": "source-archive-copy",
+      "location": "chatgpt_library",
+      "bytes": 422852,
+      "sha256": "d9fd89a55b00315211cbf72c904672c6c5523ec09c6d1897bfedc0a6ddc9c6b1",
+      "duplicate_of": "a1mini-oem-source-archive",
+      "format": "ZIP",
+      "print_status": "not_sliced"
+    },
+    {
+      "id": "petg-holder-v01-archive",
+      "name": "alice_petg_spool_holder_v01.zip",
+      "kind": "source-archive",
+      "location": "chatgpt_library_and_google_drive",
+      "bytes": 118099,
+      "sha256": "d962f12a287d0d13eef1397343c3d7d6186c5e61e11880e25560699627c0c7c3",
+      "format": "ZIP",
+      "print_status": "not_sliced",
+      "members_of_interest": [
+        "alice_pro_spool_holder_petg.py",
+        "base_frame.stl",
+        "upright_A_print_twice.stl",
+        "axle_D_section.stl"
+      ],
+      "preview_path": "printing3d/assets/gallery/desk_spool_v01.png"
+    },
+    {
+      "id": "petg-holder-v02-archive",
+      "name": "alice_petg_spool_holder_v02.zip",
+      "kind": "source-archive",
+      "location": "chatgpt_library",
+      "bytes": 156814,
+      "sha256": "54ae7342ad43376bd74879e7ac58639a53192ce364b1be25ded458cda6bf0885",
+      "format": "ZIP",
+      "print_status": "not_sliced",
+      "members_of_interest": [
+        "spool_centering_adapters_v02.py",
+        "manifest_v02.json",
+        "README_RU.md"
+      ],
+      "preview_path": "printing3d/assets/gallery/desk_spool_v02.png"
+    },
+    {
+      "id": "ember-bust-wip",
+      "name": "ember_spirit_bust_WIP_review.zip",
+      "kind": "wip-artwork",
+      "location": "chatgpt_library",
+      "bytes": 4321520,
+      "sha256": "8949a80f42e3ad52feb3939dbc317392657a0e8368543fd994a369b656f3cd7c",
+      "format": "ZIP",
+      "print_status": "not_sliced",
+      "redistribution": "blocked_pending_ip_review",
+      "members_of_interest": [
+        "ember_spirit_bust_wip.blend",
+        "build_bust.py",
+        "README.txt"
+      ]
+    },
+    {
+      "id": "ember-head-stl",
+      "name": "ember_spirit_head_60mm_preview.stl",
+      "kind": "prototype",
+      "location": "chatgpt_library",
+      "bytes": 14884,
+      "sha256": "b171f22fff5a52b2d56d461a19e1db11c1479853261811464f732025f43985e6",
+      "format": "STL",
+      "print_status": "not_sliced",
+      "redistribution": "blocked_pending_ip_review"
+    },
+    {
+      "id": "ember-head-archive",
+      "name": "ember_spirit_head_60mm_prototype.zip",
+      "kind": "prototype-archive",
+      "location": "chatgpt_library",
+      "bytes": 6643,
+      "sha256": "2558b6df9e169e3a4cc720fba3fbf302d190eadd612348fb144b23adbb40c0f0",
+      "format": "ZIP",
+      "print_status": "not_sliced",
+      "redistribution": "blocked_pending_ip_review"
+    },
+    {
+      "id": "pla-cube-stl",
+      "name": "alice_cube_20mm.stl",
+      "kind": "test-fixture",
+      "location": "chatgpt_library",
+      "bytes": 684,
+      "sha256": "59ccfff3077e9dbd08182d6b31289448e5be5e57790259da61e0b33b1865a2b8",
+      "format": "STL",
+      "print_status": "not_sliced"
+    },
+    {
+      "id": "pla-cube-stl-alternate",
+      "name": "Alice_cube_20mm(1).stl",
+      "kind": "test-fixture",
+      "location": "chatgpt_library",
+      "bytes": 684,
+      "sha256": "97b47b4b4c5ae11d9786207404eef802a2ae2a011f45a9939a81961747f3b52c",
+      "format": "STL",
+      "print_status": "not_sliced"
+    },
+    {
+      "id": "pla-cube-stl-duplicate",
+      "name": "Alice_cube_20mm(2).stl",
+      "kind": "test-fixture-copy",
+      "location": "chatgpt_library",
+      "bytes": 684,
+      "sha256": "97b47b4b4c5ae11d9786207404eef802a2ae2a011f45a9939a81961747f3b52c",
+      "duplicate_of": "pla-cube-stl-alternate",
+      "format": "STL",
+      "print_status": "not_sliced"
+    },
+    {
+      "id": "pla-cube-gcode",
+      "name": "Alice_Cube_20mm_Generic_PLA_A1mini.gcode.3mf",
+      "kind": "sliced-test-job",
+      "location": "chatgpt_library_and_github_actions_artifact",
+      "bytes": 46682,
+      "sha256": "d9c611c7ae67f5017b5cab0f2ecb8e41a3a5f6d4ed8d4bcaaffb00ee7b6089c3",
+      "format": "GCODE_3MF",
+      "print_status": "sliced_not_authorized_to_start",
+      "relevant_pr": 1101
+    }
+  ],
+  "workstreams": [
+    {
+      "issue": 1097,
+      "pr": 1098,
+      "stage": "draft",
+      "scope": "model editing"
+    },
+    {
+      "issue": 1093,
+      "pr": 1094,
+      "stage": "draft",
+      "scope": "Dota assets and geometry"
+    },
+    {
+      "issue": 1096,
+      "pr": 1101,
+      "stage": "draft",
+      "scope": "slicing/printer staging"
+    },
+    {
+      "issue": 1108,
+      "pr": 1109,
+      "stage": "draft",
+      "scope": "preflight and print-watch"
+    },
+    {
+      "issue": 1112,
+      "pr": null,
+      "stage": "in_progress",
+      "scope": "consolidated audit / safe asset import"
+    }
+  ],
+  "model_sets_manifest": "printing3d/assets/models_manifest.json",
+  "gallery": {
+    "preview_path": "printing3d/assets/gallery/overview.png",
+    "source": "Visualizations rendered from actual STL/SCAD/3MF geometry, not AI-generated concepts",
+    "print_ready": false
+  }
+}

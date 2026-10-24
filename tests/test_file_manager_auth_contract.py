@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_file_manager_resolves_provider_auth_before_requests():
-    source = (ROOT / "file_manager.py").read_text(encoding="utf-8")
+    source = (ROOT / "workspace" / "files.py").read_text(encoding="utf-8")
     assert (
         "from yandex_client_modules.request_mixin import _resolve_global_provider_credential"
         in source

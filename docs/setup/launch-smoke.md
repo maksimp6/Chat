@@ -1,7 +1,7 @@
 # P0 local launch smoke
 
 This smoke test turns the launch baseline from issue #427 into a reproducible
-check against Alice Pro itself before Cloud.ru deployment work continues.
+check against Logos itself before Cloud.ru deployment work continues.
 
 It does **not** deploy production, mutate Cloud.ru resources, change GitHub
 permissions, or rotate credentials.
@@ -9,14 +9,14 @@ permissions, or rotate credentials.
 ## What is verified
 
 The script `scripts/local_launch_smoke.py` starts the documented
-`python app.py` entrypoint with an isolated SQLite database and verifies:
+`python app.py` entrypoint with an isolated native Kristall journal and verifies:
 
 1. the tracked checkout is clean;
 2. Flask starts and `GET /healthz` returns `{"status":"ok"}`;
 3. the root UI returns non-empty HTML;
 4. a local runtime session can be bootstrapped;
-5. the SQLite database exists after shutdown;
-6. Alice starts again against the same database;
+5. the native Kristall journal exists after shutdown;
+6. Logos starts again against the same database;
 7. the runtime session survives the restart.
 
 Those checks are the deterministic **offline** half of the P0 baseline. The
@@ -34,7 +34,7 @@ The optional **full** mode additionally verifies the provider-dependent half:
 5. require a non-empty reply, invocation id and trace id;
 6. load the persisted trace through
    `GET /api/invocations/<invocation_id>/trace`;
-7. restart Alice;
+7. restart Logos;
 8. verify the conversation, provider metadata, runtime session and exact trace
    correlation are still readable.
 
@@ -64,7 +64,7 @@ export ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID='...'
 python scripts/local_launch_smoke.py
 ```
 
-The script uses a temporary SQLite database by default. To inspect persistence
+The script uses a temporary native Kristall journal by default. To inspect persistence
 against an explicit local path:
 
 ```bash
@@ -87,7 +87,7 @@ the smoke-only environment variable names:
 - `YANDEX_API_KEY` → `ALICE_LAUNCH_SMOKE_YANDEX_API_KEY`
 - `YANDEX_PROJECT_ID` → `ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID`
 
-Those secret names are already used by `.github/workflows/alice.yml`; this
+Those secret names are already used by `.github/workflows/logos.yml`; this
 workflow does not create a second credential source. The secret mappings are
 scoped only to the live smoke step. It also references the existing
 `production` GitHub Environment so its approval boundary remains
@@ -110,7 +110,7 @@ Example offline shape:
 {
   "status": "PARTIAL",
   "mode": "offline",
-  "database_backend": "sqlite",
+  "database_backend": "memory",
   "provider_inputs_present": false,
   "checks": {
     "healthz": true,
@@ -130,7 +130,7 @@ Passing the local full smoke proves that the current protected application
 baseline can start, talk to the configured provider through the canonical path,
 persist an ExecutionTrace and survive an application restart.
 
-It does **not** prove Container Apps, EDS, external PostgreSQL, DNS/TLS, backup
+It does **not** prove Container Apps, EDS, durable Kristall journal storage on Cloud.ru, DNS/TLS, backup
 restore, or production routing. Those remain separate gates in #427. This order
 is intentional: debugging cloud orchestration before proving the application
 runtime would merely distribute the same uncertainty across more expensive

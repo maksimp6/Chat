@@ -81,7 +81,7 @@ def test_validation_report_main_renders_frontend_python_and_live_sections(
     assert "Branch coverage: **50.00%**" in rendered
     assert "Files measured: **2**" in rendered
     assert "Flask live log: available" in rendered
-    assert "# Alice Pro validation report" in capsys.readouterr().out
+    assert "# Logos validation report" in capsys.readouterr().out
 
 
 def test_validation_report_main_handles_missing_coverage_and_frontend_log(monkeypatch, tmp_path):
