@@ -115,7 +115,7 @@ function renderModelModal() {
 }
 
 function createConversation(modelKey) {
-  window.LogosDispatcher.request("/api/conversations", {
+  return window.LogosDispatcher.request("/api/conversations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: modelKey }),

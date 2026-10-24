@@ -557,14 +557,20 @@ document.addEventListener("DOMContentLoaded", function () {
   const sendBtn = document.getElementById("send-btn");
   const input = document.getElementById("msg-input");
 
+  let creatingConversation = false;
+
   function sendMessage() {
     if (!input) return;
     const text = input.value.trim();
     if (!text) return;
     if (!currentConvId) {
-      if (typeof renderModelModal === "function") renderModelModal();
-      const modal = document.getElementById("model-modal");
-      if (modal) window.LogosCoreAPI.ui.modal.open(modal);
+      // No chat yet: create one with the current model, then send the same text into it.
+      if (creatingConversation) return;
+      creatingConversation = true;
+      createConversation(currentModel).then(function () {
+        creatingConversation = false;
+        if (currentConvId) sendMessage();
+      });
       return;
     }
 
