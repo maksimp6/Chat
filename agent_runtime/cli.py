@@ -115,6 +115,7 @@ class CliClient:
                 "conversation_id": conversation_id,
                 "name": tool_call.get("name"),
                 "arguments": tool_call.get("arguments") or {},
+                "approval_token": tool_call.get("approval_token"),
                 "model": self.model,
             },
         )
