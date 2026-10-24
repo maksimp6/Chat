@@ -314,7 +314,8 @@ class UniversalToolExecutor:
                 transport=str(call.get("transport") or "internal"),
                 trace_id=call.get("trace_id"),
                 invocation_id=call.get("invocation_id"),
-                user_id=call.get("user_id"),
+                # A mapping never names the owner; the host sets user_id on UniversalToolCall.
+                user_id=None,
                 # A mapping never grants approval; the host sets it on UniversalToolCall.
                 approved=False,
                 metadata=dict(call.get("metadata") or {}),
