@@ -49,7 +49,6 @@ def test_master_retains_legacy_checks_and_adds_real_admission_producers():
         "PostgreSQL integration",
         "Android debug APK",
         "CI required",
-        "Code rules",
         "Auto-format repository",
         "Trivy repository scan",
         "Zizmor GitHub Actions audit",

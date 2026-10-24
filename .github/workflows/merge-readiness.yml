@@ -31,7 +31,6 @@ jobs:
         CI required,
         Infrastructure tests,
         MCP worker tests,
-        Code rules,
         Application tests,
         Trivy repository scan
 

@@ -23,11 +23,11 @@ lets develop and stacked PRs receive the same scans without changing the jobs,
 permissions, schedules or master push triggers. No merge-group checks are provided;
 do not enable a merge queue on the assumption that these workflows support it.
 
-`CI required` runs with `always()` after the classifier, code rules and platform
+`CI required` runs with `always()` after the classifier and platform
 jobs. `scripts/ci_platform_changes.py --verify` requires selected suites to succeed,
 rejects failure/cancellation/missing results, and permits a skipped suite only when
 the classifier did not select it. Documentation-only changes skip platform suites
-but still run code rules and the aggregate; workflow changes select infrastructure
+but still run the classifier and the aggregate; workflow changes select infrastructure
 tests. Unknown or shared dependency paths conservatively select broader suites.
 The separate Security workflow still runs for documentation-only PRs.
 

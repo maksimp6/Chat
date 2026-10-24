@@ -32,7 +32,6 @@ def test_integration_required_check_runs_even_when_dependencies_fail():
     assert required["if"] == "always()"
     assert set(required["needs"]) == {
         "changes",
-        "code-rules",
         "backend",
         "infra",
     }

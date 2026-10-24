@@ -12,7 +12,7 @@ Both rulesets were reread through GitHub REST before preparing this change.
 | Control | Live master #23532452 | Live develop #24841115 | Proposed change |
 | --- | --- | --- | --- |
 | Enforcement | Active | Disabled | Activate develop |
-| Required checks | Application tests, PostgreSQL integration, Android debug APK | CI required, unenforced | Keep existing contexts; add aggregate, code rules, format, security, CodeQL, local smoke and readiness to master |
+| Required checks | Application tests, PostgreSQL integration, Android debug APK | CI required, unenforced | Keep existing contexts; add aggregate, format, security, CodeQL, local smoke and readiness to master |
 | Resolved review threads | Not required | Required, unenforced | Require on both active rulesets |
 | Strict base freshness | Enabled | Disabled | Preserve; promotion must be current with master |
 | Deletion / force push | Blocked | Configured but unenforced | Preserve; activate develop |
