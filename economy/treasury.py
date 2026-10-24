@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from datetime import datetime, timezone
-import math
+from decimal import Decimal, InvalidOperation
 import json
 import threading
 from typing import Any
@@ -13,12 +13,24 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _money(value: Any) -> Decimal:
+    """Read an amount exactly. A float is taken by its shortest decimal text, so 0.1 stays 0.1 and
+    ten top-ups of 0.1 add up to exactly 1, which float arithmetic does not give."""
+    try:
+        result = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError) as exc:
+        raise ValueError("amount must be a number") from exc
+    if not result.is_finite():
+        raise ValueError("amount must be a finite number")
+    return result
+
+
 def init_treasury_tables() -> None:
     get_store()
 
 
 def _empty_account(owner_id: str) -> dict[str, Any]:
-    return {"owner_id": owner_id, "balance": 0.0, "currency": "RUB", "updated_at": _now()}
+    return {"owner_id": owner_id, "balance": "0", "currency": "RUB", "updated_at": _now()}
 
 
 def get_account(owner_id: str = "default") -> dict[str, Any]:
@@ -34,14 +46,18 @@ def get_account(owner_id: str = "default") -> dict[str, Any]:
             for row in store.items(prefix="treasury/ledger/").values()
             if row["owner_id"] == owner_id
         ]
-    return {**account, "ledger": sorted(ledger, key=lambda row: row["id"], reverse=True)}
+    return {
+        **account,
+        "balance": float(_money(account["balance"])),
+        "ledger": sorted(ledger, key=lambda row: row["id"], reverse=True),
+    }
 
 
 def _record(
     owner_id: str, amount: Any, description: str, kind: str, reference: str | None = None
 ) -> bool:
-    amount = float(amount)
-    if not math.isfinite(amount) or amount <= 0 or not description or not owner_id:
+    value = _money(amount)
+    if value <= 0 or not description or not owner_id:
         raise ValueError("owner, positive finite amount and description are required")
     store = get_store()
     account_key = "treasury/account/" + owner_id
@@ -50,12 +66,13 @@ def _record(
         if reference and tx.get(reference_key) is not None:
             return False
         account = tx.get(account_key) or _empty_account(owner_id)
-        if kind == "debit" and account["balance"] < amount:
+        current = _money(account["balance"])
+        if kind == "debit" and current < value:
             raise ValueError("insufficient balance")
         now = _now()
         identity = int(tx.get("treasury/next-ledger-id") or 0) + 1
-        balance = account["balance"] + (amount if kind == "credit" else -amount)
-        tx.set(account_key, {**account, "balance": balance, "updated_at": now})
+        balance = current + value if kind == "credit" else current - value
+        tx.set(account_key, {**account, "balance": str(balance), "updated_at": now})
         tx.set("treasury/next-ledger-id", identity)
         tx.set(
             "treasury/ledger/" + str(identity),
@@ -63,7 +80,7 @@ def _record(
                 "id": identity,
                 "owner_id": owner_id,
                 "kind": kind,
-                "amount": amount,
+                "amount": float(value),
                 "description": description,
                 "reference": reference,
                 "created_at": now,
