@@ -80,6 +80,7 @@ class QuotaReservation:
     period_start: int
     period_reset_at: int
     reserved_request_number: int
+    rate_window_start: int = 0
 
 
 def _now() -> int:
@@ -172,6 +173,29 @@ def get_user_policy(user_id: str) -> dict[str, Any]:
     store = get_store()
     with store.transaction() as tx:
         return _policy_for(tx, user_id)
+
+
+def release_request(reservation: Optional[QuotaReservation]) -> None:
+    """Return a reservation whose provider call produced no answer.
+
+    The counts are lowered only while the reserved period and rate window are still current, so a
+    release never reduces a later period's usage.
+    """
+    if reservation is None:
+        return
+    init_quota_tables()
+    key = "quota/usage/" + reservation.user_id
+    with get_store().transaction() as tx:
+        usage = tx.get(key)
+        if usage is None:
+            return
+        if int(usage["period_start"]) == reservation.period_start and int(usage["request_count"]) > 0:
+            usage["request_count"] = int(usage["request_count"]) - 1
+        if int(usage["rate_window_start"]) == reservation.rate_window_start and int(
+            usage["rate_count"]
+        ) > 0:
+            usage["rate_count"] = int(usage["rate_count"]) - 1
+        tx.set(key, usage)
 
 
 def reserve_request(
@@ -279,6 +303,7 @@ def reserve_request(
             period_start=period_start,
             period_reset_at=period_reset_at,
             reserved_request_number=used_requests + 1,
+            rate_window_start=rate_window_start,
         )
 
 

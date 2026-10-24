@@ -23,7 +23,12 @@ from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_fo
 from yandex_client_modules.request_builder import build_response_payload
 from yandex_client_modules.request_receipt import build_request_manifest
 from yandex_client_modules.errors import YandexClientError
-from provider_accounts.quotas import ProviderQuotaExceeded, record_usage, reserve_request
+from provider_accounts.quotas import (
+    ProviderQuotaExceeded,
+    record_usage,
+    release_request,
+    reserve_request,
+)
 
 
 def _transport_timeout(params: dict[str, Any], key: str, default: float, maximum: float) -> float:
@@ -207,6 +212,26 @@ class YandexRequestMixin:
         credential = _resolve_global_provider_credential(self, execution_trace)
         headers = provider_request_headers(credential)
         quota_user_id = _resolve_quota_user_id(execution_trace)
+        yandex_conv_id = self._resolve_yandex_conv_id(conversation_id)
+
+        metadata = (
+            execution_trace.get_metadata()
+            if execution_trace and isinstance(execution_trace, ExecutionTrace)
+            else None
+        )
+
+        payload = build_response_payload(
+            project_id=credential.project_id,
+            model_key=model_key,
+            message=message,
+            params=params,
+            metadata=metadata,
+            conversation_id=conversation_id,
+            yandex_conv_id=yandex_conv_id,
+        )
+
+        # Reserved after the payload is built, so a request rejected for its parameters uses no quota.
+        quota_reservation = None
         try:
             quota_reservation = reserve_request(quota_user_id)
         except ProviderQuotaExceeded as exc:
@@ -228,23 +253,6 @@ class YandexRequestMixin:
                     "period_reset_at": quota_reservation.period_reset_at,
                 },
             )
-        yandex_conv_id = self._resolve_yandex_conv_id(conversation_id)
-
-        metadata = (
-            execution_trace.get_metadata()
-            if execution_trace and isinstance(execution_trace, ExecutionTrace)
-            else None
-        )
-
-        payload = build_response_payload(
-            project_id=credential.project_id,
-            model_key=model_key,
-            message=message,
-            params=params,
-            metadata=metadata,
-            conversation_id=conversation_id,
-            yandex_conv_id=yandex_conv_id,
-        )
 
         trace_step_number = trace_step
         if isinstance(execution_trace, ExecutionTrace) and trace_step_number is None:
@@ -281,6 +289,8 @@ class YandexRequestMixin:
             )
             resp.raise_for_status()
         except requests.RequestException as e:
+            # No answer was produced for the reserved request, so it does not count against the quota.
+            release_request(quota_reservation)
             error_timestamp = time.time()
             status_code = resp.status_code if resp is not None else None
             error_detail = None
