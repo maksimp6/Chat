@@ -369,6 +369,8 @@ class YandexRequestMixin:
             return data
         if status in ("failed", "cancelled"):
             raise YandexClientError(f"Task status: {status}")
+        if not task_id:
+            raise YandexClientError("Provider response has no task id to poll")
         wait_params = {"timeout": poll_timeout} if "poll_timeout" in params else {}
         result = self._wait(
             task_id,
