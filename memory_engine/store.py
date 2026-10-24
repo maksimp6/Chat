@@ -684,9 +684,9 @@ class _JournalStore:
             origin = Path(source)
             if origin.resolve() == self.path.resolve():
                 raise StoreError("cannot restore from the live database path")
-            state, sequence, digest = self._inspect_log(origin, trusted=self._trusted)
             if not origin.exists():
                 raise StoreError("backup source does not exist")
+            state, sequence, digest = self._inspect_log(origin, trusted=self._trusted)
             try:
                 self._copy_verified_file(
                     origin, self.path, state, Commit(sequence, digest), trusted=self._trusted
