@@ -140,9 +140,9 @@ body {
 
 .logos-pro-app .frontend-degraded-status {
   position: absolute;
-  z-index: 250;
+  z-index: 150;
   right: 12px;
-  bottom: 76px;
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 12px);
   max-width: min(420px, calc(100% - 24px));
   padding: 10px 12px;
   border: 1px solid var(--border-color);
@@ -244,6 +244,8 @@ body {
   cursor: pointer;
   font-size: 16px;
   padding: 0 4px;
+  min-width: 36px;
+  min-height: 36px;
 }
 
 /* Overlay */
@@ -394,7 +396,7 @@ body {
 
 /* Voice UI */
 .logos-pro-app #voice-ui {
-  padding: 20px;
+  padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px));
   display: none;
   flex-direction: column;
   align-items: center;
@@ -1640,7 +1642,7 @@ body {
 .logos-pro-app .logos-btn {
   box-sizing: border-box;
   border: 1px solid transparent;
-  font: inherit;
+  font-family: inherit;
   line-height: 1;
   cursor: pointer;
   user-select: none;
@@ -1714,12 +1716,12 @@ body {
 
 .logos-pro-app .logos-system-status-panel {
   position: fixed;
-  inset: 0;
+  inset: var(--header-h) 0 0 0;
   z-index: 100020;
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
-  padding: calc(68px + env(safe-area-inset-top, 0px)) 12px 12px;
+  padding: 8px 12px 12px;
   background: rgba(0, 0, 0, 0.28);
 }
 .logos-pro-app .logos-system-status-panel[hidden] {
@@ -1993,4 +1995,46 @@ body {
 .logos-pro-app .server-conversation-title {
   font-size: 16px;
   font-weight: 600;
+}
+
+/* Шапка, сайдбар и безопасные зоны (пункты 54, 55, 57, 59, 60) */
+:root {
+  --header-h: 108px;
+}
+@media (max-width: 768px) {
+  :root {
+    --header-h: 102px;
+  }
+}
+.logos-pro-app #header {
+  padding-left: max(15px, env(safe-area-inset-left, 0px));
+  padding-right: max(15px, env(safe-area-inset-right, 0px));
+}
+.logos-pro-app #chatbox {
+  padding-left: max(15px, env(safe-area-inset-left, 0px));
+  padding-right: max(15px, env(safe-area-inset-right, 0px));
+}
+.logos-pro-app #text-ui {
+  padding-left: max(10px, env(safe-area-inset-left, 0px));
+  padding-right: max(10px, env(safe-area-inset-right, 0px));
+}
+.logos-pro-app #sidebar-header {
+  padding-top: max(14px, env(safe-area-inset-top, 0px));
+}
+.logos-pro-app #close-sidebar-btn {
+  min-width: 44px;
+  min-height: 44px;
+}
+/* Размеры подписей кнопок, которые перебивались общим правилом (пункт 54) */
+.logos-pro-app #header .header-btn {
+  font-size: 20px;
+}
+.logos-pro-app .logos-trace-open-viewer {
+  font-size: 11px;
+}
+.logos-pro-app .logos-system-status-revoke {
+  font-size: 11px;
+}
+.logos-pro-app .memory-modal-close {
+  font-size: 24px;
 }
