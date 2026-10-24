@@ -12,4 +12,4 @@ PyYAML==6.0.3
 # Real offline mesh/video regression fixtures (FFmpeg/ffprobe are OS tools).
 numpy==2.5.4
 matplotlib==3.11.2
-trimesh==4.9.0
+trimesh==5.1.1
