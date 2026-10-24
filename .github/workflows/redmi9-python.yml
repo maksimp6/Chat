@@ -1,4 +1,4 @@
-name: Redmi Python runner acceptance
+name: Redmi 9 native shell acceptance
 
 on:
   push:
@@ -8,7 +8,7 @@ permissions: {}
 
 jobs:
   native:
-    runs-on: redmi9-python
+    runs-on: redmi9
     timeout-minutes: 3
     steps:
       - name: Verify Redmi and test exact runner source
