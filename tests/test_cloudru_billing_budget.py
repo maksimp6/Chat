@@ -58,7 +58,19 @@ from cloud.tools import CLOUD_TOOLS, cloud_budget_status, cloud_compute
 )
 def test_parse_consumption_total_shapes(payload, total, currency, rows):
     result = parse_consumption_total(payload)
-    assert result == {"total_cost": total, "currency": currency, "rows": rows}
+    assert {k: result[k] for k in ("total_cost", "currency", "rows")} == {
+        "total_cost": total,
+        "currency": currency,
+        "rows": rows,
+    }
+
+
+def test_partial_consumption_rows_are_marked_incomplete():
+    partial = parse_consumption_total({"items": [{"cost": "10"}, {"service": "no cost"}]})
+    assert partial["total_cost"] == Decimal("10")
+    assert partial["complete"] is False
+    full = parse_consumption_total({"items": [{"cost": "10"}, {"cost": "5"}]})
+    assert full["complete"] is True
 
 
 # --- provider costs_summary --------------------------------------------------

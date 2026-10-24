@@ -3,13 +3,25 @@
 from __future__ import annotations
 from core.env import env_get
 
+import re
 from typing import Any
+from urllib.parse import quote
 
 from cloud.base import CloudProviderError
 from cloud.cloudru.billing import parse_consumption_total
 from cloud.cloudru.client import CloudRuClient
 from cloud.models import normalize_resource, normalize_resources
 from cloud.cloudru.iam import CloudRuIamClient
+
+_RESOURCE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
+
+
+def _resource_id(value: Any) -> str:
+    """A resource id goes into a request path, so only a plain identifier is accepted."""
+    text = str(value or "").strip()
+    if not _RESOURCE_ID.fullmatch(text):
+        raise CloudProviderError("resource id is not a valid identifier", code="validation_error")
+    return text
 
 
 class CloudRuProvider:
@@ -321,7 +333,8 @@ class CloudRuProvider:
         if op == "status":
             if not instance_id:
                 raise CloudProviderError("instance_id is required", code="validation_error")
-            payload = self.client.request("compute", "GET", f"{path.rstrip('/')}/{instance_id}")
+            safe_id = quote(_resource_id(instance_id), safe="")
+            payload = self.client.request("compute", "GET", f"{path.rstrip('/')}/{safe_id}")
             return {
                 "provider": self.name,
                 "operation": op,
@@ -330,6 +343,7 @@ class CloudRuProvider:
         if op in {"start", "stop", "reboot"}:
             if not instance_id:
                 raise CloudProviderError("instance_id is required", code="validation_error")
+            instance_id = _resource_id(instance_id)
             action_template = env_get("CLOUDRU_COMPUTE_ACTION_PATH", "").strip()
             if action_template:
                 try:
@@ -345,12 +359,13 @@ class CloudRuProvider:
                         code="validation_error",
                     )
             else:
-                action_path = f"{path.rstrip('/')}/{instance_id}/{op}"
+                action_path = f"{path.rstrip('/')}/{quote(instance_id, safe='')}/{op}"
             payload = self.client.request(
                 "compute",
                 "POST",
                 action_path,
-                json_body={"instance_id": instance_id, "operation": op, **dict(extra or {})},
+                # The fields this operation sets come last, so caller extras cannot change them.
+                json_body={**dict(extra or {}), "instance_id": instance_id, "operation": op},
             )
             return {
                 "provider": self.name,
@@ -443,13 +458,15 @@ class CloudRuProvider:
                 f"Unsupported backup operation: {op}",
                 code="unsupported_operation",
             )
+        if resource_id is not None:
+            resource_id = _resource_id(resource_id)
         method = "GET" if op == "list" else "POST"
         payload = self.client.request(
             "backup",
             method,
             path,
             params={"resource_id": resource_id} if method == "GET" and resource_id else None,
-            json_body={"operation": op, "resource_id": resource_id, **dict(options or {})}
+            json_body={**dict(options or {}), "operation": op, "resource_id": resource_id}
             if method == "POST"
             else None,
         )
@@ -487,6 +504,7 @@ class CloudRuProvider:
             if isinstance(payload.get("summary"), dict)
             else payload,
             "total_cost": str(total_cost) if total_cost is not None else None,
+            "complete": totals["complete"],
             "currency": totals["currency"]
             or env_get("CLOUDRU_BILLING_CURRENCY", "RUB").strip().upper(),
         }

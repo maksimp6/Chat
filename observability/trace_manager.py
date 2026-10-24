@@ -380,7 +380,7 @@ class ExecutionTrace:
             }
         )
 
-    def _request_timing_for_step(self, step_index: int) -> tuple[Optional[float], Optional[float]]:
+    def _request_timing_for_step(self, step_index: int) -> Optional[float]:
         return request_timing_for_step(self.trace, step_index)
 
     def _infer_response_start(self, step_index: int, end_timestamp: float) -> Optional[float]:
@@ -484,7 +484,7 @@ class ExecutionTrace:
         provider_key_id = provider_key_id or (self.trace.get("provider_key") or {}).get("key_id")
         clean_raw = self._sanitize_trace_value(raw_json)
         response_id = clean_raw.get("id") if isinstance(clean_raw, dict) else None
-        request_start, _ = self._request_timing_for_step(idx)
+        request_start = self._request_timing_for_step(idx)
         if start_timestamp is None:
             start_timestamp = request_start
         if end_timestamp is None:

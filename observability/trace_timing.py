@@ -7,9 +7,8 @@ ExecutionTrace API unchanged.
 from typing import Any, Dict, Optional, Tuple
 
 
-def request_timing_for_step(
-    trace: Dict[str, Any], step_index: int
-) -> Tuple[Optional[float], Optional[float]]:
+def request_timing_for_step(trace: Dict[str, Any], step_index: int) -> Optional[float]:
+    """Start timestamp of one logical API step, or None when it was never recorded."""
     start = None
     api_requests = trace.get("api_requests", [])
     for request in reversed(api_requests):
@@ -28,13 +27,13 @@ def request_timing_for_step(
         if start is None and isinstance(value, (int, float)):
             start = float(value)
         break
-    return start, None
+    return start
 
 
 def infer_response_start(
     trace: Dict[str, Any], step_index: int, end_timestamp: float
 ) -> Optional[float]:
-    request_start, _ = request_timing_for_step(trace, step_index)
+    request_start = request_timing_for_step(trace, step_index)
     if request_start is not None:
         return request_start
     if trace.get("responses"):

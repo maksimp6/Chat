@@ -1,3 +1,6 @@
+import math
+
+
 def extract_reasoning_and_text(data):
     if not isinstance(data, dict):
         return "", str(data or "")
@@ -5,7 +8,10 @@ def extract_reasoning_and_text(data):
     reasoning_parts = []
     text_parts = []
 
-    for item in data.get("output", []):
+    output_items = data.get("output")
+    if not isinstance(output_items, list):
+        output_items = []
+    for item in output_items:
         if not isinstance(item, dict):
             continue
 
@@ -37,21 +43,35 @@ def extract_text(data):
     return text
 
 
+def _token_count(value):
+    """A provider token count. Anything else is zero, so a malformed usage block
+    cannot break billing arithmetic downstream."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 0
+    if not math.isfinite(value) or value < 0:
+        return 0
+    return int(value)
+
+
+def _mapping(value):
+    return value if isinstance(value, dict) else {}
+
+
 def extract_usage(data):
     if not isinstance(data, dict):
         return None
 
-    usage = data.get("usage") or {}
-    input_details = usage.get("input_tokens_details") or {}
-    output_details = usage.get("output_tokens_details") or {}
+    usage = _mapping(data.get("usage"))
+    input_details = _mapping(usage.get("input_tokens_details"))
+    output_details = _mapping(usage.get("output_tokens_details"))
 
     return {
-        "input_tokens": usage.get("input_tokens", 0),
-        "output_tokens": usage.get("output_tokens", 0),
-        "total_tokens": usage.get("total_tokens", 0),
-        "cached_tokens": input_details.get("cached_tokens", 0),
-        "tool_tokens": input_details.get("tool_tokens", 0),
-        "reasoning_tokens": output_details.get("reasoning_tokens", 0),
+        "input_tokens": _token_count(usage.get("input_tokens")),
+        "output_tokens": _token_count(usage.get("output_tokens")),
+        "total_tokens": _token_count(usage.get("total_tokens")),
+        "cached_tokens": _token_count(input_details.get("cached_tokens")),
+        "tool_tokens": _token_count(input_details.get("tool_tokens")),
+        "reasoning_tokens": _token_count(output_details.get("reasoning_tokens")),
         "created_at": data.get("created_at"),
         "completed_at": data.get("completed_at"),
         "incomplete_details": data.get("incomplete_details"),

@@ -6,6 +6,7 @@ from core.env import env_get
 from datetime import datetime, timedelta, timezone
 import hmac
 import ipaddress
+import logging
 from typing import Any
 
 from flask import Blueprint, jsonify, request
@@ -13,36 +14,30 @@ from flask import Blueprint, jsonify, request
 from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
 from secret_store.key_manager import secret_storage_ready, store_secret
 
+logger = logging.getLogger("cloudru_iam_routes")
 cloudru_iam_bp = Blueprint("cloudru_iam", __name__, url_prefix="/api/cloudru/iam")
-
-_LOOPBACK_ADDRESSES = {"127.0.0.1", "::1"}
-_FORWARDING_HEADERS = ("X-Forwarded-For", "X-Real-IP", "Forwarded")
-
-
-def _is_local_request() -> bool:
-    # A reverse proxy makes every request arrive from loopback, so a forwarding header means
-    # the request did not originate on this host.
-    if any(request.headers.get(name) for name in _FORWARDING_HEADERS):
-        return False
-    return (request.remote_addr or "") in _LOOPBACK_ADDRESSES
-
 
 def _enabled() -> bool:
     return env_get("CLOUDRU_IAM_WIZARD_ENABLED", "false").strip().lower() == "true"
 
 
 def _authorized() -> bool:
+    # Fail closed: the wizard needs a configured token. A reverse proxy makes every visitor
+    # arrive from loopback, so the remote address cannot tell this host's requests apart.
     configured = env_get("CLOUDRU_IAM_WIZARD_TOKEN", "").strip()
-    if configured:
-        auth = request.headers.get("Authorization", "")
-        token = auth[7:].strip() if auth.startswith("Bearer ") else ""
-        return bool(token) and hmac.compare_digest(
-            token.encode("utf-8"), configured.encode("utf-8")
-        )
+    if not configured:
+        return False
+    auth = request.headers.get("Authorization", "")
+    token = auth[7:].strip() if auth.startswith("Bearer ") else ""
+    return bool(token) and hmac.compare_digest(token.encode("utf-8"), configured.encode("utf-8"))
 
-    # Without a token only a request from this host counts. Checking the remote address alone
-    # would let every visitor through behind a reverse proxy, which connects from loopback.
-    return _is_local_request()
+
+def _revoke_unstored_key(client: CloudRuIamClient, key_id: str) -> None:
+    """Revoke a freshly issued key whose secret could not be stored. Logs the id only."""
+    try:
+        client.delete_api_key(api_key_id=key_id)
+    except Exception:
+        logger.error("Cloud.ru API key %s was issued but could not be revoked after a storage failure", key_id)
 
 
 def _guard():
@@ -168,20 +163,28 @@ def create_api_key():
         if not api_key or not key_id:
             return jsonify({"error": "Cloud.ru did not return the API-key secret"}), 502
 
-        metadata = store_secret(
-            secret=api_key,
-            name=name,
-            purpose="api-key",
-            provider="cloudru",
-            environment=environment,
-            owner=owner,
-            expires_at=(
-                datetime.fromisoformat(expires_at.replace("Z", "+00:00")) if expires_at else None
-            ),
-            key_ref=f"cloudru_{key_id}",
-        )
+        try:
+            metadata = store_secret(
+                secret=api_key,
+                name=name,
+                purpose="api-key",
+                provider="cloudru",
+                environment=environment,
+                owner=owner,
+                expires_at=(
+                    datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+                    if expires_at
+                    else None
+                ),
+                key_ref=f"cloudru_{key_id}",
+            )
+        except Exception:
+            # The key is live at Cloud.ru but its secret is not stored, so nobody can use it.
+            # Revoke it now rather than leave an unseen credential behind.
+            _revoke_unstored_key(client, key_id)
+            raise
 
-        return jsonify(
+        response = jsonify(
             {
                 "success": True,
                 "id": key_id,
@@ -193,6 +196,9 @@ def create_api_key():
                 "secret_policy": "shown once; never written to logs or browser storage",
             }
         )
+        # The one-time secret must not be kept by browsers or intermediaries.
+        response.headers["Cache-Control"] = "no-store"
+        return response
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except CloudRuIamError:

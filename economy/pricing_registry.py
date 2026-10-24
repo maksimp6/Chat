@@ -5,6 +5,7 @@ used for a cost calculation so historical trace costs are not silently
 recomputed with a newer tariff.
 """
 
+import math
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, Iterable, Optional
 
@@ -24,8 +25,23 @@ class PricingSnapshot:
     unit: Optional[str] = None
     unit_price: Optional[float] = None
 
+    def __post_init__(self) -> None:
+        if self.unit_price is not None and (
+            not math.isfinite(self.unit_price) or self.unit_price < 0
+        ):
+            raise ValueError("unit_price must be a finite non-negative number")
+        if self.effective_to is not None and self.effective_to <= self.effective_from:
+            raise ValueError("effective_to must be after effective_from")
+
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+
+def _windows_overlap(a: "PricingSnapshot", b: "PricingSnapshot") -> bool:
+    # Dates are ISO strings, which compare correctly; an open end means "no end".
+    a_end = a.effective_to or "9999-12-31"
+    b_end = b.effective_to or "9999-12-31"
+    return a.effective_from < b_end and b.effective_from < a_end
 
 
 class PricingRegistry:
@@ -44,6 +60,16 @@ class PricingRegistry:
             for existing in self._snapshots
         ):
             raise ValueError("pricing snapshot already registered")
+        for existing in self._snapshots:
+            same_price_line = (
+                existing.provider,
+                existing.service,
+                existing.operation,
+                existing.model,
+            ) == (snapshot.provider, snapshot.service, snapshot.operation, snapshot.model)
+            # An overlapping window would make resolve() pick a tariff by accident.
+            if same_price_line and _windows_overlap(existing, snapshot):
+                raise ValueError("pricing snapshot effective window overlaps an existing one")
         self._snapshots.append(snapshot)
 
     def resolve(

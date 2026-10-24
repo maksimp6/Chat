@@ -103,12 +103,16 @@ def get_owned_conversation(conversation_id: str, user_id: str) -> Optional[Conve
     )
 
 
-def delete_owner(conversation_id: str, user_id: Optional[str] = None) -> None:
+def delete_owner(conversation_id: str, user_id: str) -> None:
+    # The owner is required: an unscoped delete would leave the conversation unowned, and the
+    # next caller to claim it would take it over.
+    if not str(user_id or "").strip():
+        raise ValueError("user_id is required to delete a conversation owner")
     with _OWNERSHIP_LOCK:
         store = _store()
         existing_owner = store.get(conversation_id)
         if existing_owner is None:
             return
-        if user_id is not None and existing_owner != str(user_id):
+        if existing_owner != str(user_id):
             return
-        store.delete(conversation_id, user_id)
+        store.delete(conversation_id, str(user_id))

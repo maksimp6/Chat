@@ -41,9 +41,13 @@ def _currency(payload: dict[str, Any]) -> str | None:
 
 
 def parse_consumption_total(payload: Any) -> dict[str, Any]:
-    """Return ``{"total_cost", "currency", "rows"}`` for a billing payload."""
+    """Return ``{"total_cost", "currency", "rows", "complete"}`` for a billing payload.
+
+    ``complete`` is false when some consumption rows carry no price. A partial sum
+    is then only a lower bound, and callers must not read it as the full spend.
+    """
     if not isinstance(payload, dict):
-        return {"total_cost": None, "currency": None, "rows": 0}
+        return {"total_cost": None, "currency": None, "rows": 0, "complete": False}
 
     currency = _currency(payload)
     for key in _TOTAL_KEYS:
@@ -51,7 +55,12 @@ def parse_consumption_total(payload: Any) -> dict[str, Any]:
         total = _decimal(value)
         if total is not None:
             nested = _currency(value) if isinstance(value, dict) else None
-            return {"total_cost": total, "currency": nested or currency, "rows": 0}
+            return {
+                "total_cost": total,
+                "currency": nested or currency,
+                "rows": 0,
+                "complete": True,
+            }
 
     summary = payload.get("summary")
     if isinstance(summary, dict):
@@ -82,15 +91,21 @@ def parse_consumption_total(payload: Any) -> dict[str, Any]:
                         row_currencies.add(row_currency)
                     break
         if counted:
+            complete = counted == len(rows)
             if currency:
                 row_currencies.add(currency)
             if len(row_currencies) > 1:
                 # A sum across currencies is meaningless; report it as unparseable.
-                return {"total_cost": None, "currency": None, "rows": counted}
+                return {"total_cost": None, "currency": None, "rows": counted, "complete": False}
             currency = next(iter(row_currencies), None)
-            return {"total_cost": total, "currency": currency, "rows": counted}
+            return {
+                "total_cost": total,
+                "currency": currency,
+                "rows": counted,
+                "complete": complete,
+            }
 
-    return {"total_cost": None, "currency": currency, "rows": 0}
+    return {"total_cost": None, "currency": currency, "rows": 0, "complete": False}
 
 
 def _validated_decimal_fields(values: Mapping[str, Any]) -> dict[str, Decimal]:

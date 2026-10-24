@@ -42,7 +42,7 @@ def test_scoped_delete_and_missing_delete_are_noops(monkeypatch, tmp_path):
     path = _configure(monkeypatch, tmp_path)
     ownership.set_owner("conversation-a", "user-a")
     before = get_memory_client(path).last_commit.sequence
-    ownership.delete_owner("missing")
+    ownership.delete_owner("missing", "user-a")
     ownership.delete_owner("conversation-a", "user-b")
     assert get_memory_client(path).last_commit.sequence == before
     ownership.delete_owner("conversation-a", "user-a")

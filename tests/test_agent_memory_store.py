@@ -190,8 +190,13 @@ def test_native_round_trip_freshness_and_visibility(tmp_path):
     assert changed.reason == "source_version_changed"
     assert store.lookup("missing").status == "miss"
 
-    assert [item.memory_id for item in store.list_records(kind="project")] == ["memory-1"]
-    assert [item.memory_id for item in store.list_records(scope="repo:maksimp6/Chat")] == [
+    assert [item.memory_id for item in store.list_records(kind="project", include_restricted=True)] == [
+        "memory-1"
+    ]
+    assert [
+        item.memory_id
+        for item in store.list_records(scope="repo:maksimp6/Chat", include_restricted=True)
+    ] == [
         "memory-1"
     ]
     assert store.list_records(visible_to="backend-engineer")
@@ -270,7 +275,7 @@ def test_expired_record_is_stale_and_export_is_stable(tmp_path):
     )
     assert expired.status == "stale"
     assert expired.reason == "expired"
-    assert store.list_records(status="active", now=105) == [store.get("a")]
+    assert store.list_records(status="active", now=105, include_restricted=True) == [store.get("a")]
 
     exported = store.export_records()
     assert [item["memory_id"] for item in exported] == ["a", "b"]
@@ -348,6 +353,6 @@ def test_list_records_filters_by_scope(tmp_path):
     store.upsert(_github_record(memory_id="repo", scope="repo:maksimp6/Chat"))
     store.upsert(_github_record(memory_id="issue", scope="issue:578"))
 
-    scoped = store.list_records(scope="issue:578")
+    scoped = store.list_records(scope="issue:578", include_restricted=True)
 
     assert [record.memory_id for record in scoped] == ["issue"]

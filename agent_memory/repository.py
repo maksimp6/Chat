@@ -104,7 +104,10 @@ class AgentMemoryStore:
         status: str | None = "active",
         visible_to: str | None = None,
         now: int | None = None,
+        include_restricted: bool = False,
     ) -> list[MemoryRecord]:
+        """Records visible to ``visible_to``. Without a role only unrestricted records are
+        returned; ``include_restricted`` is for complete exports, never for prompts."""
         records = [
             self._record_from_value(item)
             for item in self._store.items(prefix=_MEMORY_PREFIX).values()
@@ -118,8 +121,10 @@ class AgentMemoryStore:
         records.sort(key=lambda item: (-item.updated_at, item.memory_id))
         if status == "active":
             records = [item for item in records if not item.is_expired(now=now)]
-        if visible_to is None:
+        if include_restricted:
             return records
+        if visible_to is None:
+            return [item for item in records if not item.visibility]
         role = str(visible_to)
         return [item for item in records if not item.visibility or role in item.visibility]
 
@@ -177,5 +182,5 @@ class AgentMemoryStore:
         return True
 
     def export_records(self) -> list[dict[str, Any]]:
-        records = self.list_records(status=None)
+        records = self.list_records(status=None, include_restricted=True)
         return [record.as_dict() for record in sorted(records, key=lambda item: item.memory_id)]

@@ -19,7 +19,7 @@ def test_request_timing_prefers_latest_matching_request():
         ],
         "events": [],
     }
-    assert request_timing_for_step(trace, 2) == (250.0, None)
+    assert request_timing_for_step(trace, 2) == 250.0
 
 
 def test_request_timing_falls_back_to_completed_event_start():
@@ -29,7 +29,7 @@ def test_request_timing_falls_back_to_completed_event_start():
             {"type": "api_request_completed", "payload": {"step": 3, "start_timestamp": 300.0}}
         ],
     }
-    assert request_timing_for_step(trace, 3) == (300.0, None)
+    assert request_timing_for_step(trace, 3) == 300.0
 
 
 def test_infer_response_start_falls_back_to_previous_response_then_created():

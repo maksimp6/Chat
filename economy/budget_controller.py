@@ -705,6 +705,10 @@ class CloudBudgetGuard:
         except BudgetError:
             result = evaluate_cloud_spend(None, self.limits)
             result["error"] = "invalid_total"
+        if summary.get("complete") is False and result["status"] == CloudSpendStatus.OK.value:
+            # A partial sum is only a lower bound: it can show a block, never an all-clear.
+            result["status"] = CloudSpendStatus.UNKNOWN.value
+            result["error"] = "incomplete_billing_rows"
         currency = str(summary.get("currency") or "").upper()
         if currency and currency != self.limits.currency:
             result = evaluate_cloud_spend(None, self.limits)

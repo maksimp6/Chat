@@ -54,13 +54,14 @@ class ConversationOwnershipStore:
                 return
             tx.set(key, {"user_id": str(user_id), "created_at": int(created_at)})
 
-    def delete(self, conversation_id: str, user_id: str | None = None) -> None:
+    def delete(self, conversation_id: str, user_id: str) -> None:
+        """Delete the record only if ``user_id`` owns it; there is no unscoped delete."""
         key = self.key(conversation_id)
         with self.db.transaction() as tx:
             previous = tx.get(key)
             if previous is None:
                 return
-            if user_id is not None and self._record(previous)["user_id"] != str(user_id):
+            if self._record(previous)["user_id"] != str(user_id):
                 return
             tx.delete(key)
 
