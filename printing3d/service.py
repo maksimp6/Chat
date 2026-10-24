@@ -10,6 +10,13 @@ from uuid import uuid4
 
 from printing3d.store import PrintStore
 
+
+def get_store() -> PrintStore:
+    """Return the Logos-bound native store used by printer downtime persistence."""
+    from forge.binding import printing_store
+
+    return printing_store()
+
 ORDER_STATUSES = (
     "lead",
     "quote",
