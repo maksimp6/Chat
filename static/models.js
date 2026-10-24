@@ -66,7 +66,13 @@ function renderModelModal() {
       "logos-btn model-option" +
       (key === currentModel ? " active" : "") +
       (unavailable ? " model-option-unavailable" : "");
-    var priceText = m.input && m.output ? m.input + " / " + m.output + " \u20bd/1K" : "";
+    var priceText = "";
+    if (m.input && m.output) {
+      priceText =
+        m.currency === "USD" || m.price_unit === "per_million_tokens"
+          ? m.input + " / " + m.output + " USD/1M"
+          : m.input + " / " + m.output + " \u20bd/1K";
+    }
     var badges = "";
     if (modelsData.voice && modelsData.voice[key]) badges += " \uD83C\uDFA4";
     if (m.multimodal) badges += " \uD83D\uDCF7";
