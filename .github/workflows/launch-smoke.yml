@@ -22,8 +22,6 @@ jobs:
     name: Offline startup and restart smoke
     runs-on: ubuntu-latest
     timeout-minutes: 1
-    env:
-      EVIDENCE_DIR: ${{ runner.temp }}/ci-out/launch-smoke
     steps:
       - name: Start job reporting clock
         id: job_policy_clock
@@ -33,6 +31,7 @@ jobs:
           import time
           print(f"started_ns={time.monotonic_ns()}")
           PYCODE
+          printf 'EVIDENCE_DIR=%s/ci-out/launch-smoke\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout
         id: policy_step_01
         continue-on-error: true
@@ -136,8 +135,6 @@ jobs:
     # 1 минута задана вручную: замера прогона нет
     timeout-minutes: 1
     environment: production
-    env:
-      EVIDENCE_DIR: ${{ runner.temp }}/ci-out/launch-smoke
     steps:
       - name: Start job reporting clock
         id: job_policy_clock
@@ -147,6 +144,7 @@ jobs:
           import time
           print(f"started_ns={time.monotonic_ns()}")
           PYCODE
+          printf 'EVIDENCE_DIR=%s/ci-out/launch-smoke\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Enforce native Logos court hold
         id: policy_step_02
         continue-on-error: true

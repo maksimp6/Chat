@@ -4,6 +4,8 @@ import base64
 import copy
 import hashlib
 import json
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -114,21 +116,36 @@ def test_last_result_supersedes_previous_but_incomplete_last_frame_fails(tmp_pat
 
 
 @pytest.mark.parametrize("filename", ["ci.yml", "launch-smoke.yml"])
-def test_runner_temp_context_is_only_in_job_environment(filename):
-    # GitHub rejects runner.* in workflow-level env before creating any job.
+def test_runner_temp_is_exported_by_real_step_not_unavailable_expression(filename, tmp_path):
+    # GitHub rejects runner.* in root and job env before creating any job.
     workflow = yaml.load((Path(".github/workflows") / filename).read_text(), Loader=UniqueKeyLoader)
     assert "runner." not in json.dumps(workflow.get("env", {}))
     jobs = workflow["jobs"]
     if filename == "ci.yml":
-        assert jobs["backend"]["env"]["OUT"] == "${{ runner.temp }}/ci-out/ci"
         assert jobs["backend"]["env"]["YANDEX_API_KEY"] == "ci-test-placeholder"
         step = next(
             step for step in jobs["backend"]["steps"] if step.get("id") == "narration_tests"
         )
         assert "tests/test_logos_narration_receive.py" in step["run"]
+        selected = [("backend", "OUT", "ci")]
     else:
-        for job in ("offline", "live-provider"):
-            assert jobs[job]["env"]["EVIDENCE_DIR"] == "${{ runner.temp }}/ci-out/launch-smoke"
+        selected = [(job, "EVIDENCE_DIR", "launch-smoke") for job in ("offline", "live-provider")]
+    for name, variable, folder in selected:
+        assert "runner." not in json.dumps(jobs[name].get("env", {}))
+        output = tmp_path / (name + ".env")
+        clock = next(step for step in jobs[name]["steps"] if step.get("id") == "job_policy_clock")
+        subprocess.run(
+            ["bash", "-e", "-c", clock["run"]],
+            env={
+                **os.environ,
+                "RUNNER_TEMP": str(tmp_path),
+                "GITHUB_ENV": str(output),
+                "GITHUB_OUTPUT": str(tmp_path / (name + ".output")),
+            },
+            check=True,
+            capture_output=True,
+        )
+        assert output.read_text() == f"{variable}={tmp_path}/ci-out/{folder}\n"
 
 
 def test_yaml_control_rejects_duplicate_environment_keys():

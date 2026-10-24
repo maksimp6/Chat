@@ -239,7 +239,6 @@ jobs:
     timeout-minutes: 2
     env:
       YANDEX_API_KEY: ci-test-placeholder
-      OUT: ${{ runner.temp }}/ci-out/ci
     steps:
       - name: Start job reporting clock
         id: job_policy_clock
@@ -249,6 +248,7 @@ jobs:
           import time
           print(f"started_ns={time.monotonic_ns()}")
           PYCODE
+          printf 'OUT=%s/ci-out/ci\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout
         id: policy_step_01
         continue-on-error: true

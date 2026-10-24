@@ -99,3 +99,14 @@ env keys. Числа итоговых проверок/точный HEAD пуб�
 синхронизированном checkout, Ruff изменённых Python-файлов и canonical
 pre-push gate PASS. Секреты/расходы/D0/merge не менялись. Новые CI-результаты
 требуют проверки после публикации; прежние не переиспользуются.
+
+GitHub отклонил runner.temp и на уровне job env (run 40083883254, line 242;
+launch-smoke 40083883861, lines 26/140). Первый перенос не является исправленным
+CI. Метод изменён: существующий первый clock step экспортирует OUT/EVIDENCE_DIR
+через $RUNNER_TEMP и $GITHUB_ENV; GitHub expression runner.temp удалён из обоих
+workflow. Реальное исполнение clock shell проверяет записанное окружение.
+Duration-reporting Python, граница 30s и policy не менялись.
+
+Дополнительно локально проверен настоящий корректный OggOpus (синтетический
+тон FFmpeg, не SpeechKit): emit_result → log recovery → byte identity →
+ffprobe codec=opus → полное FFmpeg decode. Живой TTS и прослушивание NOT_RUN.
