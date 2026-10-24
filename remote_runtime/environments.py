@@ -67,15 +67,24 @@ def _repo_root() -> Path:
 logger = logging.getLogger("remote_runtime.environments")
 
 
+class GitUnavailable(RuntimeError):
+    """git could not run on this server: it is missing, or it did not finish in time."""
+
+
 def _run_git(*args: str, cwd: Optional[Path] = None) -> str:
-    result = subprocess.run(
-        ["git", *args],
-        cwd=str(cwd or _repo_root()),
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=15,
-    )
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=str(cwd or _repo_root()),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        # A server fault, not a bad ref in the request, so it is not reported as a ValueError.
+        logger.error("git %s could not run: %s", args[0], type(exc).__name__)
+        raise GitUnavailable("git is unavailable") from exc
     if result.returncode:
         # git's stderr names server paths, so it is logged here and not returned to the caller.
         logger.info("git %s failed: %s", args[0], result.stderr.strip())

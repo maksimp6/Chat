@@ -5,6 +5,7 @@ from functools import wraps
 from flask import Blueprint, Response, current_app, jsonify, request
 
 from remote_runtime.environments import (
+    GitUnavailable,
     create_environment,
     delete_environment,
     list_environments,
@@ -62,6 +63,8 @@ def environments_create():
         return jsonify(create_environment(branch, commit_sha, _owner())), 201
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+    except GitUnavailable:
+        return jsonify({"error": "git is unavailable on this server"}), 503
 
 
 @environment_bp.get("/<environment_id>")
