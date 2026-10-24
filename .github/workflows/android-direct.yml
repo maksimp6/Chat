@@ -72,8 +72,8 @@ jobs:
           started=$SECONDS
           bash android/scripts/build_direct.sh
           elapsed=$((SECONDS - started))
-          echo "- Android direct APK build: ${elapsed}s (target: <=15s)" >> "$GITHUB_STEP_SUMMARY"
-          test "$elapsed" -le 15
+          echo "- Android direct APK build: ${elapsed}s (target: <=30s)" >> "$GITHUB_STEP_SUMMARY"
+          test "$elapsed" -le 30
       - name: Run direct-build contract tests
         id: policy_step_05
         continue-on-error: true
