@@ -558,7 +558,7 @@
       var topP = parseFloat(document.getElementById("set-topp").value);
       settings.top_p = Number.isNaN(topP) ? 1.0 : topP;
       settings.max_output_tokens =
-        parseInt(document.getElementById("set-tokens").value, 10) || 2000;
+        parseInt(document.getElementById("set-tokens").value, 10) || 0;
       settings.truncation = document.getElementById("set-trunc").value;
       settings.reasoning_effort = document.getElementById("set-reasoning").value;
       settings.store = document.getElementById("set-store").checked;

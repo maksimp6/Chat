@@ -22,7 +22,7 @@
     var params = {
       temperature: typeof s.temperature === "number" ? s.temperature : 0.7,
       top_p: typeof s.top_p === "number" ? s.top_p : 1.0,
-      max_output_tokens: parseInt(s.max_output_tokens, 10) || 2000,
+      max_output_tokens: parseInt(s.max_output_tokens, 10) || 0,
       truncation: s.truncation || "disabled",
       store: s.store !== false,
       background: s.background !== false,
