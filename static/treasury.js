@@ -151,7 +151,7 @@
     treasuryStatus.setAttribute("role", "status");
 
     body.append(balanceCard, topUpSection, expensesSection, treasuryStatus);
-    document.querySelector(".logos-pro-app").appendChild(treasuryModal);
+    (document.querySelector(".logos-pro-app") || document.body).appendChild(treasuryModal);
   }
 
   function setTreasuryStatus(message, isError) {
@@ -201,7 +201,11 @@
     return requestTreasury("/api/treasury/account", null, "Не удалось загрузить казначейство");
   }
 
-  async function performTreasuryTopUp() {
+  let topUpInFlight = false;
+
+  async function performTreasuryTopUp(payload) {
+    // One top-up at a time: a second click would credit the amount twice.
+    if (topUpInFlight) return;
     const amount = Number(treasuryAmount.value);
     if (!Number.isFinite(amount) || amount <= 0) {
       setTreasuryStatus("Введите положительную сумму DEMO-пополнения.", true);
@@ -209,6 +213,9 @@
       return;
     }
 
+    const button = payload && payload.element;
+    topUpInFlight = true;
+    if (button) button.disabled = true;
     setTreasuryStatus("Пополнение…");
     try {
       const data = await requestTreasury(
@@ -225,6 +232,9 @@
       setTreasuryStatus("DEMO-пополнение выполнено.");
     } catch (error) {
       setTreasuryStatus(error.message, true);
+    } finally {
+      topUpInFlight = false;
+      if (button) button.disabled = false;
     }
   }
 
@@ -242,6 +252,10 @@
     treasuryExpenses.textContent = "Загрузка…";
     treasuryAmount.focus();
 
+    // Opening twice must not leave a second Escape listener behind.
+    if (treasuryModal._escapeHandler) {
+      document.removeEventListener("keydown", treasuryModal._escapeHandler);
+    }
     treasuryModal._escapeHandler = function (event) {
       if (event.key === "Escape") closeTreasuryModal();
     };
