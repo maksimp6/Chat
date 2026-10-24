@@ -400,6 +400,10 @@ TOOL_REGISTRY = {
 }
 
 # Алиасы для обратной совместимости
+# Reads and captures of private data (location, contacts, SMS, camera) need the owner's approval.
+for _private_tool in ("get_device_location", "list_contacts", "list_sms", "take_camera_photo"):
+    TOOL_REGISTRY[_private_tool]["requires_approval"] = True
+
 TOOL_REGISTRY["termux_battery_status"] = TOOL_REGISTRY["get_system_battery"]
 TOOL_REGISTRY["notification"] = TOOL_REGISTRY["send_notification"]
 
