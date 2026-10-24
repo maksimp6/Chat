@@ -121,3 +121,30 @@ def test_partner_tools_have_approval_boundary_and_universal_registration():
     assert "partner.create" in by_name
     assert "partner.message.send" in by_name
     assert "mcp" in by_name["partner.message.send"]["supported_transports"]
+
+
+def test_a_partial_contact_update_keeps_the_fields_it_does_not_name(monkeypatch):
+    old = db.DB_PATH
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            monkeypatch.setattr(db, "DB_PATH", os.path.join(tmp, "partners.db"))
+            init_partner_relations_tables()
+            ctx = _ctx("owner-1")
+            partner = create_partner({"name": "Acme"}, ctx)
+            contact = add_contact(
+                {
+                    "partner_id": partner["id"],
+                    "name": "Ada",
+                    "email": "ada@example.test",
+                    "phone": "+7 900 000",
+                },
+                ctx,
+            )["contact"]
+
+            updated = update_contact({"contact_id": contact["id"], "email": ""}, ctx)["contact"]
+
+            assert updated["email"] == ""
+            assert updated["phone"] == "+7 900 000"
+            assert updated["name"] == "Ada"
+        finally:
+            db.DB_PATH = old

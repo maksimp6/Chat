@@ -326,10 +326,17 @@ def update_contact(
     if not existing:
         raise ValueError("contact not found")
     now = _now()
+    # A partial update changes only the fields it names; an empty value clears that field.
     changes = {
-        field: str(arguments.get(field) or existing[field]).strip()
-        for field in ("name", "role", "email", "phone", "notes")
+        field: str(arguments[field] or "").strip()
+        for field in ("role", "email", "phone", "notes")
+        if field in arguments
     }
+    if "name" in arguments:
+        name = str(arguments["name"] or "").strip()
+        if not name:
+            raise ValueError("contact name is required")
+        changes["name"] = name
     _update_owned("contact", contact_id, owner_id, {**changes, "updated_at": now})
     _trace_event(
         cfg,
