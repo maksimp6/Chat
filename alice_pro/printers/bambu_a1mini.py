@@ -10,7 +10,7 @@ import socket
 import struct
 from typing import Any
 
-from .models import MODEL_CODES, PrinterIdentity, merge_report, summarize_status
+from alice_pro.printers.models import MODEL_CODES, PrinterIdentity, merge_report, summarize_status
 
 _FRAME_START = b"\xa5\xa5"
 _FRAME_END = b"\xa7\xa7"
@@ -38,7 +38,7 @@ def decode_probe(data: bytes) -> dict[str, Any]:
 
 def probe(host: str, timeout: float = 3.0) -> PrinterIdentity:
     """Identify the device. Does not authenticate or alter printer state."""
-    from .lan_socket import connect_lan
+    from alice_pro.printers.lan_socket import connect_lan
 
     if not 0 < timeout <= 15:
         raise ValueError("timeout must be between 0 and 15 seconds")

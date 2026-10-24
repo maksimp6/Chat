@@ -13,8 +13,8 @@ import threading
 import time
 from typing import Callable
 
-from .bambu_a1mini import PrinterProtocolError, decode_probe, _recv_exact
-from .lan_socket import connect_lan
+from alice_pro.printers.bambu_a1mini import PrinterProtocolError, decode_probe, _recv_exact
+from alice_pro.printers.lan_socket import connect_lan
 
 
 class PrinterSession:

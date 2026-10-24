@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import patch
 
-from ssh_runtime import SSHRuntime, SSHRuntimeError
-from ssh_runtime_settings import validate_settings
+from remote_runtime.ssh import SSHRuntime, SSHRuntimeError
+from remote_runtime.ssh_settings import validate_settings
 
 
 class SSHRuntimeSettingsTests(unittest.TestCase):
@@ -46,13 +46,13 @@ class SSHRuntimeSettingsTests(unittest.TestCase):
             validate_settings(settings)
 
     def test_settings_update_is_recorded_in_execution_trace(self):
-        from ssh_runtime_settings import save_settings
+        from remote_runtime.ssh_settings import save_settings
 
         trace = type("Trace", (), {"events": []})()
         trace.add_event = lambda event_type, payload: trace.events.append((event_type, payload))
         with (
-            patch("ssh_runtime_settings.get_current_trace", return_value=trace),
-            patch("ssh_runtime_settings.set_config"),
+            patch("remote_runtime.ssh_settings.get_current_trace", return_value=trace),
+            patch("remote_runtime.ssh_settings.set_config"),
         ):
             save_settings(self.BASE)
         self.assertEqual(trace.events[0][0], "ssh_runtime_settings_updated")
@@ -60,16 +60,16 @@ class SSHRuntimeSettingsTests(unittest.TestCase):
         self.assertEqual(trace.events[0][1]["command_allowlist_count"], 3)
 
     def test_privileged_operations_are_disabled_by_default(self):
-        from ssh_runtime_settings import assert_operation_allowed
+        from remote_runtime.ssh_settings import assert_operation_allowed
 
-        with patch("ssh_runtime_settings.get_settings", return_value=self.BASE):
+        with patch("remote_runtime.ssh_settings.get_settings", return_value=self.BASE):
             with self.assertRaises(SSHRuntimeError):
                 assert_operation_allowed("execute", command="sudo id", approved=True)
 
     def test_write_requires_approval(self):
-        from ssh_runtime_settings import assert_operation_allowed
+        from remote_runtime.ssh_settings import assert_operation_allowed
 
-        with patch("ssh_runtime_settings.get_settings", return_value=self.BASE):
+        with patch("remote_runtime.ssh_settings.get_settings", return_value=self.BASE):
             with self.assertRaises(SSHRuntimeError):
                 assert_operation_allowed("write_file", approved=False)
 
@@ -114,7 +114,7 @@ class SSHRuntimeSettingsTests(unittest.TestCase):
 
     def test_target_output_limit_truncates_command_result(self):
         runtime = SSHRuntime(self.BASE["targets"], known_hosts=self.BASE["known_hosts"])
-        with patch("ssh_runtime.subprocess.run") as run:
+        with patch("remote_runtime.ssh.subprocess.run") as run:
             run.return_value.returncode = 0
             run.return_value.stdout = "x" * 10000
             run.return_value.stderr = ""
@@ -126,10 +126,10 @@ class SSHRuntimeSettingsTests(unittest.TestCase):
         self.assertLessEqual(len(result["stdout"].encode()), 8192)
         self.assertTrue(result["stdout"].endswith("...[output truncated]"))
 
-    @patch("ssh_runtime_settings.get_config")
-    @patch("ssh_runtime_settings.set_config")
+    @patch("remote_runtime.ssh_settings.get_config")
+    @patch("remote_runtime.ssh_settings.set_config")
     def test_build_runtime_applies_global_output_limit(self, set_config, get_config):
-        from ssh_runtime_settings import build_runtime
+        from remote_runtime.ssh_settings import build_runtime
 
         stored = dict(self.BASE)
         stored["max_output_bytes"] = 16384
@@ -142,11 +142,11 @@ class SSHRuntimeSettingsTests(unittest.TestCase):
         runtime = build_runtime()
         self.assertEqual(runtime._targets["preview"].max_output_bytes, 16384)
 
-    @patch("ssh_runtime_settings.get_config")
-    @patch("ssh_runtime_settings.set_config")
-    @patch("ssh_runtime_settings.subprocess.run")
+    @patch("remote_runtime.ssh_settings.get_config")
+    @patch("remote_runtime.ssh_settings.set_config")
+    @patch("remote_runtime.ssh_settings.subprocess.run")
     def test_connection_test_uses_only_fixed_true(self, run, set_config, get_config):
-        from ssh_runtime_settings import test_connection
+        from remote_runtime.ssh_settings import test_connection
 
         stored = dict(self.BASE)
         get_config.side_effect = lambda key, default=None: (
@@ -163,10 +163,10 @@ class SSHRuntimeSettingsTests(unittest.TestCase):
         self.assertEqual(argv[-1], "true")
         self.assertNotIn("echo", argv[-1])
 
-    @patch("ssh_runtime_settings.get_config")
-    @patch("ssh_runtime_settings.set_config")
+    @patch("remote_runtime.ssh_settings.get_config")
+    @patch("remote_runtime.ssh_settings.set_config")
     def test_saved_settings_are_used(self, set_config, get_config):
-        from ssh_runtime_settings import get_settings, save_settings
+        from remote_runtime.ssh_settings import get_settings, save_settings
 
         saved = {}
 

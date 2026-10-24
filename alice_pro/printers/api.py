@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from .models import PrinterIdentity, summarize_status
+from alice_pro.printers.models import PrinterIdentity, summarize_status
 
 
 class PrinterReader(Protocol):
@@ -44,7 +44,7 @@ class LanReader:
         self.timeout = timeout
 
     def identity(self) -> PrinterIdentity:
-        from .lan import probe
+        from alice_pro.printers.lan import probe
 
         return probe(self.host, timeout=self.timeout)
 

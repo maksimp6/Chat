@@ -9,7 +9,7 @@ from __future__ import annotations
 import socket
 from typing import Protocol
 
-from .lan_address import resolve_lan
+from alice_pro.printers.lan_address import resolve_lan
 
 
 class LanBindingError(OSError):

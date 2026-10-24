@@ -4,7 +4,7 @@ import pytest
 from flask import Flask
 
 from rdc_connection.pairing import install_rdc_pairing, verification_url
-from short_token_auth import install_short_token_auth
+from identity.short_token_auth import install_short_token_auth
 
 
 def test_verification_url_expiry_and_origin(tmp_path):

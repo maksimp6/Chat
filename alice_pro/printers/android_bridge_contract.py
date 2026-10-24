@@ -46,7 +46,7 @@ def discover_via_android(bridge: AuthorizedAndroidBridge | None, hostname: str) 
     result = bridge.discover(DiscoveryRequest(hostname))
     if result.network_transport != "WIFI":
         raise AndroidBridgeUnavailable("printer bridge did not use Wi-Fi")
-    from .lan_address import private_ipv4
+    from alice_pro.printers.lan_address import private_ipv4
 
     private_ipv4(result.pinned_ip)
     if not result.model_code:

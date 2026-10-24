@@ -1,9 +1,9 @@
 """Explicit transport selection; no fallback across network trust boundaries."""
 
 from enum import Enum
-from .models import PrinterIdentity
-from .lan import probe
-from .cloud_api import DisabledCloudApi
+from alice_pro.printers.models import PrinterIdentity
+from alice_pro.printers.lan import probe
+from alice_pro.printers.cloud_api import DisabledCloudApi
 
 
 class Transport(str, Enum):

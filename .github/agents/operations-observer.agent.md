@@ -1,6 +1,6 @@
 ---
 name: Operations Observer
-description: Watches Alice Pro agent work for stalled coordination, repeated disagreement, retry loops, and delegation cycles, then emits evidence-backed escalations without implementing the disputed work.
+description: Watches Logos agent work for stalled coordination, repeated disagreement, retry loops, and delegation cycles, then emits evidence-backed escalations without implementing the disputed work.
 target: github-copilot
 model: gpt-5.4-mini
 user-invocable: true

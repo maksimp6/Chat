@@ -1,12 +1,10 @@
-"""Typed durable aggregate for Alice user identity state."""
+"""Typed durable aggregate for Logos user identity state."""
 
 from __future__ import annotations
 
-import hashlib
-import json
-from typing import Any, Mapping, TypedDict
+from typing import Mapping, TypedDict
 
-from agent_memory.file_memory_db import FileMemoryDB
+from kristall.store import Kristall
 
 IDENTITY_KEY = "user_identity:v1"
 IDENTITY_SCHEMA = 1
@@ -28,52 +26,14 @@ class GitHubAccountRecord(TypedDict):
     updated_at: int
 
 
-class IdentityMigration(TypedDict):
-    schema: int
-    source: str
-    user_count: int
-    github_account_count: int
-    digest: str
-
-
 class IdentityState(TypedDict):
     schema: int
     users: dict[str, UserRecord]
     github_accounts: dict[str, GitHubAccountRecord]
-    migration: IdentityMigration
-
-
-def identity_digest(
-    users: Mapping[str, UserRecord],
-    github_accounts: Mapping[str, GitHubAccountRecord],
-) -> str:
-    payload = {
-        "users": [
-            {
-                "id": user_id,
-                **users[user_id],
-            }
-            for user_id in sorted(users)
-        ],
-        "github_accounts": [
-            {
-                "github_id": github_id,
-                **github_accounts[github_id],
-            }
-            for github_id in sorted(github_accounts)
-        ],
-    }
-    encoded = json.dumps(
-        payload,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
 
 
 class UserIdentityStore:
-    def __init__(self, db: FileMemoryDB) -> None:
+    def __init__(self, db: Kristall) -> None:
         self.db = db
 
     @staticmethod
@@ -129,35 +89,6 @@ class UserIdentityStore:
             "updated_at": updated_at,
         }
 
-    @staticmethod
-    def _migration(raw: object) -> IdentityMigration:
-        if not isinstance(raw, dict):
-            raise ValueError("invalid user identity migration marker")
-        schema = raw.get("schema")
-        source = raw.get("source")
-        user_count = raw.get("user_count")
-        github_account_count = raw.get("github_account_count")
-        digest = raw.get("digest")
-        if (
-            schema != 1
-            or not isinstance(source, str)
-            or not source
-            or not isinstance(user_count, int)
-            or user_count < 0
-            or not isinstance(github_account_count, int)
-            or github_account_count < 0
-            or not isinstance(digest, str)
-            or not digest
-        ):
-            raise ValueError("invalid user identity migration marker")
-        return {
-            "schema": schema,
-            "source": source,
-            "user_count": user_count,
-            "github_account_count": github_account_count,
-            "digest": digest,
-        }
-
     def load(self) -> IdentityState | None:
         raw = self.db.get(IDENTITY_KEY)
         if raw is None:
@@ -187,7 +118,6 @@ class UserIdentityStore:
             "schema": IDENTITY_SCHEMA,
             "users": users,
             "github_accounts": accounts,
-            "migration": self._migration(raw.get("migration")),
         }
         self._validate_invariants(state)
         return state
@@ -202,10 +132,11 @@ class UserIdentityStore:
                 github_id: self._github_record(record)
                 for github_id, record in state["github_accounts"].items()
             },
-            "migration": self._migration(state["migration"]),
         }
         self._validate_invariants(normalized)
-        return self.db.put(IDENTITY_KEY, normalized)
+        with self.db.transaction() as tx:
+            tx.set(IDENTITY_KEY, normalized)
+        return self.db.last_commit.sequence
 
     @staticmethod
     def _validate_user_uniqueness(users: Mapping[str, UserRecord]) -> None:
@@ -241,47 +172,17 @@ class UserIdentityStore:
                 raise ValueError("user has multiple github accounts")
             linked_users.add(user_id)
 
-    @staticmethod
-    def _validate_migration_counts(state: IdentityState) -> None:
-        migration = state["migration"]
-        if migration["user_count"] > len(state["users"]):
-            raise ValueError("invalid user identity migration counts")
-        if migration["github_account_count"] > len(state["github_accounts"]):
-            raise ValueError("invalid user identity migration counts")
-
     @classmethod
     def _validate_invariants(cls, state: IdentityState) -> None:
         cls._validate_user_uniqueness(state["users"])
         cls._validate_github_links(state["users"], state["github_accounts"])
-        cls._validate_migration_counts(state)
-
-
-def migrated_identity_state(
-    users: dict[str, UserRecord],
-    github_accounts: dict[str, GitHubAccountRecord],
-) -> IdentityState:
-    return {
-        "schema": IDENTITY_SCHEMA,
-        "users": users,
-        "github_accounts": github_accounts,
-        "migration": {
-            "schema": 1,
-            "source": "legacy-sql",
-            "user_count": len(users),
-            "github_account_count": len(github_accounts),
-            "digest": identity_digest(users, github_accounts),
-        },
-    }
 
 
 __all__ = [
     "GitHubAccountRecord",
     "IDENTITY_KEY",
     "IDENTITY_SCHEMA",
-    "IdentityMigration",
     "IdentityState",
     "UserIdentityStore",
     "UserRecord",
-    "identity_digest",
-    "migrated_identity_state",
 ]
