@@ -98,7 +98,28 @@ class LogosClient(YandexResponsesClient):
         "market.yandex.by",
     )
 
-    def ask_with_mcp(self, message, model_key, conversation_id=None, params=None, trace=None):
+    def ask_with_mcp(
+        self,
+        message,
+        model_key,
+        conversation_id=None,
+        params=None,
+        trace=None,
+        *,
+        execution_policy=None,
+    ):
+        policy_kwargs = (
+            {"execution_policy": execution_policy} if execution_policy is not None else {}
+        )
+
+        def needs_approval(call: dict[str, Any]) -> bool:
+            if execution_policy is not None:
+                name, _ = _tool_call_parts(call)
+                definition = registry.get_universal_definition(name) if name else None
+                if definition is None or not execution_policy.allows_tool(definition):
+                    return False
+            return _tool_call_needs_approval(call)
+
         response = super().ask_with_mcp(
             message=message,
             model_key=model_key,
@@ -115,7 +136,7 @@ class LogosClient(YandexResponsesClient):
         deny_unapproved = (params or {}).get("approval_mode") == "deny"
         if calls:
             approval_required = not deny_unapproved and any(
-                _tool_call_needs_approval(call) for call in calls
+                needs_approval(call) for call in calls
             )
 
             if not approval_required:
@@ -129,7 +150,7 @@ class LogosClient(YandexResponsesClient):
                     )
                     if result.get("error"):
                         output = {"error": result["error"], "tool": result.get("name")}
-                        if deny_unapproved and _tool_call_needs_approval(call):
+                        if deny_unapproved and needs_approval(call):
                             refused.append(result.get("name"))
                             output.update(
                                 executed=False,
@@ -140,7 +161,7 @@ class LogosClient(YandexResponsesClient):
                     return result.get("result")
 
                 def should_pause(batch: list[dict[str, Any]]) -> bool:
-                    gated = [_tool_call_needs_approval(call) for call in batch]
+                    gated = [needs_approval(call) for call in batch]
                     if deny_unapproved:
                         # After a refusal, a batch of only gated calls makes no progress.
                         return bool(refused) and all(gated)

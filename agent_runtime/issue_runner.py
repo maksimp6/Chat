@@ -26,6 +26,11 @@ from agent_runtime.provider_receipt import (
     assistant_text as _assistant_reply,
     capture_provider_diagnostics,
 )
+from agent_runtime.review_policy import (
+    ISSUE_REVIEW_POLICY,
+    build_review_policy,
+    require_external_review_store,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MODEL = "logos-runtime"
@@ -246,6 +251,8 @@ def run_issue_task(
             "changed_files": [],
             "pending_tools": [],
         }
+    require_external_review_store(repo_root)
+    execution_policy = build_review_policy(repo_root)
     import app  # noqa: F401  -- initializes the database schema and blueprints
     from invocation.manager import (
         create_invocation,
@@ -328,6 +335,9 @@ def run_issue_task(
 
     files = sorted(set(changed_files(repo_root)) - before)
     result["changed_files"] = files
+    if files:
+        result.update(status="failed", error="ReadOnlyScopeViolation")
+    result.setdefault("status", "changed" if files else "no_changes")
     result["file_status"] = "changed" if files else "no_changes"
     if result["status"] == "running":
         result["status"] = result["file_status"]
