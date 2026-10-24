@@ -64,7 +64,8 @@ def get_session(session_id: str) -> Optional[Dict[str, Any]]:
     if value is None:
         return None
     if not isinstance(value, dict) or value.get("id") != str(session_id):
-        raise ValueError("invalid runtime session record")
+        # A record that is not this session is treated as absent, not as a server error.
+        return None
     return value
 
 
@@ -76,7 +77,7 @@ def restore_session(session_id: str) -> Optional[Dict[str, Any]]:
             return None
         if not isinstance(record, dict) or record.get("id") != str(session_id):
             raise ValueError("invalid runtime session record")
-        if record["status"] == "active":
+        if record.get("status") == "active":
             record["updated_at"] = _now()
             tx.set(key, record)
         return record

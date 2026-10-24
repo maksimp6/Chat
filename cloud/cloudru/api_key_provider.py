@@ -116,8 +116,12 @@ class CloudRuApiKeyProvider:
 
     def rotation_supported(self, provider_key_id: Optional[str]) -> bool:
         """Return true only when reissue can actually be performed."""
-        management = self.iam_client
-        return bool(provider_key_id and management and management.key_id and management.key_secret)
+        if not provider_key_id:
+            return False
+        # Without an injected client, the management credentials come from the environment, as they
+        # do for the reissue itself.
+        management = self.iam_client or CloudRuIamClient()
+        return bool(management.key_id and management.key_secret)
 
     def reissue_key(
         self,

@@ -119,10 +119,9 @@ def init_quota_tables() -> None:
             "created_at": old["created_at"] if old else now,
             "updated_at": now,
         }
-        if old is None or any(
-            old[field] != row[field]
-            for field in ("period_seconds", "max_requests", "max_requests_per_minute", "enabled")
-        ):
+        # The environment only seeds the default policy. Re-applying it on every request reverted
+        # any administrator change the next time a quota was checked.
+        if old is None:
             tx.set(key, row)
 
 
@@ -290,7 +289,9 @@ def record_usage(
     key = "quota/usage/" + reservation.user_id
     with get_store().transaction() as tx:
         row = tx.get(key)
-        if row is not None and row["period_start"] == reservation.period_start:
+        if row is not None:
+            # Usage goes to the current period even when the period rolled over after the reservation;
+            # dropping it under-reports what the user has spent.
             tx.set(
                 key,
                 {
@@ -355,6 +356,9 @@ __all__ = [
 def _policy_for(tx: Any, user_id: str) -> dict[str, Any]:
     name = tx.get("quota/plan/" + user_id) or DEFAULT_POLICY
     row = tx.get("quota/policy/" + name)
+    if row is None and name != DEFAULT_POLICY:
+        # A plan that names a removed policy falls back to the default instead of failing requests.
+        row = tx.get("quota/policy/" + DEFAULT_POLICY)
     if row is None:
         raise RuntimeError("quota policy is unavailable")
     return {

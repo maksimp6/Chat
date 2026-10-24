@@ -7,6 +7,7 @@ before promotion.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Callable, Protocol, Any
@@ -19,6 +20,8 @@ from provider_accounts.credentials import (
     should_revoke,
     record_health_check,
 )
+
+logger = logging.getLogger("provider_key_rotation")
 
 
 class ProviderKeyProvider(Protocol):
@@ -52,6 +55,14 @@ def decide(expires_at: datetime, now: datetime | None = None) -> RotationDecisio
     )
 
 
+def _revoke_quietly(provider: ProviderKeyProvider, provider_key_id: str) -> None:
+    """Revoke a key that was created but never stored, so it is not left active at the provider."""
+    try:
+        provider.revoke_key(provider_key_id)
+    except Exception:
+        logger.exception("Could not revoke an unstored provider key")
+
+
 def rotate_active_key(
     *,
     db: Any,
@@ -80,18 +91,19 @@ def rotate_active_key(
         reissuer = getattr(provider, "reissue_key", None)
         if not callable(reissuer):
             raise RuntimeError(f"{provider_name} does not support key reissue")
+        # Checked before the provider changes its secret: a reissue that cannot be stored would
+        # leave the provider holding a key that nothing in Logos has.
+        if db.get("provider/active/" + provider_name) != old_id:
+            raise RuntimeError("Provider credential changed during rotation")
         provider_key_id, plaintext = reissuer(
             old_provider_key_id,
             expires_at=expires_at,
         )
-        if str(provider_key_id) != str(old_provider_key_id):
-            raise RuntimeError(f"{provider_name} reissue changed the provider key ID unexpectedly")
-        provider.validate_key(plaintext)
-        encrypted = encrypt(plaintext)
+        # Stored before any check that can fail: the provider has already replaced its secret.
         promote_rotated_key(
             db,
             old_id,
-            encrypted,
+            encrypt(plaintext),
             provider_key_id,
             project_id,
             issued_at,
@@ -99,6 +111,17 @@ def rotate_active_key(
             provider=provider_name,
             fingerprint=fingerprint_key(plaintext),
         )
+        try:
+            provider.validate_key(plaintext)
+        except Exception:
+            record_health_check(
+                db,
+                provider_name,
+                status="invalid",
+                error="reissued key failed validation",
+                commit=False,
+            )
+            raise
         record_health_check(
             db,
             provider_name,
@@ -110,19 +133,22 @@ def rotate_active_key(
         return provider_key_id, issued_at, expires_at
 
     provider_key_id, plaintext = provider.create_key(expires_at=expires_at)
-    provider.validate_key(plaintext)
-    encrypted = encrypt(plaintext)
-    promote_rotated_key(
-        db,
-        old_id,
-        encrypted,
-        provider_key_id,
-        project_id,
-        issued_at,
-        expires_at,
-        provider=provider_name,
-        fingerprint=fingerprint_key(plaintext),
-    )
+    try:
+        provider.validate_key(plaintext)
+        promote_rotated_key(
+            db,
+            old_id,
+            encrypt(plaintext),
+            provider_key_id,
+            project_id,
+            issued_at,
+            expires_at,
+            provider=provider_name,
+            fingerprint=fingerprint_key(plaintext),
+        )
+    except Exception:
+        _revoke_quietly(provider, provider_key_id)
+        raise
     record_health_check(
         db,
         provider_name,

@@ -24,6 +24,9 @@ except ImportError:  # pragma: no cover
     resource = None
 
 
+_COMMAND_ENV_NAMES = ("PATH", "HOME", "LANG", "LC_ALL", "TERM", "TMPDIR", "USER", "LOGNAME", "SHELL")
+
+
 @dataclass
 class VirtualServerConfig:
     runtime: str = "python"
@@ -75,9 +78,10 @@ class VirtualLowConsumptionServer:
 
         with self._lock:
             self.start()
-            env = os.environ.copy()
+            # Only what a shell needs: the backend's own environment holds provider and deployment secrets.
+            env = {name: os.environ[name] for name in _COMMAND_ENV_NAMES if name in os.environ}
             env.update({str(k): str(v) for k, v in self.config.env.items()})
-            timeout = timeout or self.config.command_timeout_seconds
+            timeout = max(1, min(int(timeout or self.config.command_timeout_seconds), 3600))
 
             def limits() -> None:
                 if resource is None:
@@ -157,7 +161,10 @@ class VirtualLowConsumptionServer:
             "state": self.state,
             "failed": self.state == "failed",
             "last_used": self._last_used,
-            "config": asdict(self.config),
+            "config": {
+                **asdict(self.config),
+                "env": {key: "<redacted>" for key in self.config.env},
+            },
         }
 
 
