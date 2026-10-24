@@ -17,7 +17,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from cloud.base import CloudProviderError  # noqa: E402
 from cloud.cloudru.container_apps_client import CloudRuContainerAppsClient  # noqa: E402
-from cloudru_iam import CloudRuIamClient  # noqa: E402
+from cloud.cloudru.iam import CloudRuIamClient  # noqa: E402
 from cloud.cloudru.registry_client import CloudRuRegistryClient  # noqa: E402
 from cloud.cloudru.secret_management import CloudRuSecretManagementClient  # noqa: E402
 from scripts.cloudru_browser_probe import registry_inventory  # noqa: E402

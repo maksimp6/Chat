@@ -1,6 +1,6 @@
 # Agent task context cache
 
-Issue #577 introduces the first deterministic context layer for Alice Pro agents.
+Issue #577 introduces the first deterministic context layer for Logos agents.
 
 The cache exists to avoid repeated repository, CI, review and trace reads when the
 authoritative evidence has not changed. It is an acceleration layer only.

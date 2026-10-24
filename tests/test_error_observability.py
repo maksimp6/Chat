@@ -1,7 +1,7 @@
 import logging
 
 import app as app_module
-import mcp_routes
+import chat.mcp_routes as mcp_routes
 
 
 def test_unhandled_backend_exception_is_logged_and_not_swallowed(monkeypatch, caplog):

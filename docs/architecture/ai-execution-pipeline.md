@@ -2,7 +2,7 @@
 
 Issue: #433
 
-Alice Pro использует один канонический путь выполнения запросов модели и инструментов.
+Logos использует один канонический путь выполнения запросов модели и инструментов.
 Транспорт или интерфейс не должен создавать собственный независимый agent loop.
 
 ## Канонический путь
@@ -28,11 +28,11 @@ response
 ## Канонические компоненты
 
 - `invocation/` — идентичность и жизненный цикл одного запуска;
-- `yandex_client.py` и `yandex_client_modules/` — текущий primary provider adapter;
+- `yandex_client_modules/client.py` и `yandex_client_modules/` — текущий primary provider adapter;
 - `responses_tool_loop.py` — protocol helper для Responses API;
 - `universal_tool_platform.py` — единый контракт и pipeline выполнения инструментов;
 - `tool_registry.py` — единый каталог инструментов;
-- `trace_manager.py` и связанные trace-модули — наблюдаемость;
+- `observability/` (trace_manager и связанные) trace-модули — наблюдаемость;
 - treasury/billing слой — учёт стоимости и лимитов.
 
 ## Адаптеры
@@ -66,7 +66,7 @@ response
 ## Уже переведено на canonical runtime
 
 - `cli_agent.py` — тонкий CLI/Termux-адаптер к `/api/conversations`, `/api/chat` и стандартному approval endpoint; прямых Yandex API calls и локального shell execution больше нет.
-- `alice_agent_runner.py` — GitHub issue adapter создаёт и запускает invocation, сохраняет финальный Execution Trace и завершает invocation как completed/failed.
+- `issue_runner.py` — GitHub issue adapter создаёт и запускает invocation, сохраняет финальный Execution Trace и завершает invocation как completed/failed.
 
 ## На апгрейд
 

@@ -7,6 +7,10 @@ import { join } from "node:path";
 import { once } from "node:events";
 import test from "node:test";
 
+// Keep durability/restart regressions in the existing CI and image test entrypoint.
+import "./oauth-state.test.mjs";
+import "./oauth-restart.test.mjs";
+import "./oauth-intake.test.mjs";
 import { createOAuth } from "./oauth.mjs";
 
 const PUBLIC = "https://alice-dev.example.test";
@@ -16,13 +20,14 @@ const REDIRECT = "https://chatgpt.com/connector_platform_oauth_redirect";
 const VERIFIER = "a".repeat(43);
 const hash = (value) => createHash("sha256").update(value).digest("base64url");
 
-async function fixture(t) {
+async function fixture(t, options = {}) {
   const directory = mkdtempSync(join(tmpdir(), "alice-dev-oauth-"));
   const oauth = createOAuth({
     publicUrl: PUBLIC,
     shortToken: SHORT,
     ownerId: "owner",
     stateFile: join(directory, "oauth.json"),
+    ...options,
   });
   const server = createServer(async (request, response) => {
     if (await oauth.handle(request, response, new URL(request.url, PUBLIC))) return;
@@ -49,7 +54,7 @@ async function fixture(t) {
   return { oauth, request, form };
 }
 
-test("Alice Dev advertises ChatGPT-compatible OAuth discovery", async (t) => {
+test("Logos Dev advertises ChatGPT-compatible OAuth discovery", async (t) => {
   const { oauth, request } = await fixture(t);
   assert.match(
     oauth.challenge(),
@@ -68,7 +73,7 @@ test("Alice Dev advertises ChatGPT-compatible OAuth discovery", async (t) => {
   assert.deepEqual(metadata.code_challenge_methods_supported, ["S256"]);
 });
 
-test("DCR, PKCE consent, code exchange and refresh work end to end", async (t) => {
+test("DCR, PKCE consent and concurrent refresh preserve replay revocation", async (t) => {
   const { oauth, request, form } = await fixture(t);
   const registration = await request("/oauth/register", {
     method: "POST",
@@ -97,8 +102,11 @@ test("DCR, PKCE consent, code exchange and refresh work end to end", async (t) =
   });
   const consent = await request(`/oauth/authorize?${query}`);
   assert.equal(consent.status, 200);
+  const consentPage = await consent.text();
+  assert.match(consentPage, /<title>Подключить Logos Dev к ChatGPT<\/title>/);
+  assert.match(consentPage, /<h1>Доступ к Logos Dev<\/h1>/);
   const cookie = consent.headers.get("set-cookie")?.split(";")[0];
-  const transaction = (await consent.text()).match(/name="transaction" value="([^"]+)"/)?.[1];
+  const transaction = consentPage.match(/name="transaction" value="([^"]+)"/)?.[1];
   assert.ok(cookie);
   assert.ok(transaction);
 
@@ -136,5 +144,56 @@ test("DCR, PKCE consent, code exchange and refresh work end to end", async (t) =
     refresh_token: issued.refresh_token,
   });
   assert.equal(refresh.status, 200);
-  assert.ok((await refresh.json()).access_token);
+  const renewed = await refresh.json();
+  assert.ok(renewed.access_token);
+  const concurrent = await Promise.all([1, 2].map(() => form("/oauth/token", {
+    grant_type: "refresh_token", client_id: client.client_id, resource: RESOURCE,
+    refresh_token: renewed.refresh_token,
+  })));
+  assert.deepEqual(concurrent.map((response) => response.status).sort(), [200, 400]);
+  const winner = await concurrent.find((response) => response.status === 200).json();
+  assert.deepEqual(await concurrent.find((response) => response.status === 400).json(), { error: "invalid_grant" });
+  for (const token of [issued.access_token, renewed.access_token, winner.access_token]) {
+    assert.equal(oauth.authorize({ headers: { authorization: `Bearer ${token}` } }), false);
+  }
+});
+
+
+test("consent never redirects before its durable checkpoint succeeds", async (t) => {
+  let saves = 0;
+  const { request, form } = await fixture(t, {
+    onPersist: async () => { if (++saves === 3) throw new Error("checkpoint_failed"); },
+  });
+  const registration = await request("/oauth/register", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ redirect_uris: [REDIRECT] }),
+  });
+  const { client_id } = await registration.json();
+  const consent = await request(`/oauth/authorize?${new URLSearchParams({
+    client_id, redirect_uri: REDIRECT, response_type: "code", resource: RESOURCE,
+    code_challenge_method: "S256", code_challenge: hash(VERIFIER),
+  })}`);
+  const cookie = consent.headers.get("set-cookie").split(";")[0];
+  const transaction = (await consent.text()).match(/name="transaction" value="([^"]+)"/)[1];
+  const result = await form("/oauth/authorize", { transaction, password: SHORT }, cookie);
+  assert.equal(result.status, 503);
+  assert.equal(result.headers.get("location"), null);
+  assert.deepEqual(await result.json(), { error: "oauth_unavailable" });
+});
+
+test("a failed checkpoint blocks later requests instead of reusing uncertain state", async (t) => {
+  const { request } = await fixture(t, { onPersist: async () => { throw new Error("checkpoint_failed"); } });
+  const result = await request("/oauth/register", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ redirect_uris: [REDIRECT] }),
+  });
+  assert.equal(result.status, 503);
+  assert.equal((await request("/.well-known/oauth-authorization-server/oauth")).status, 503);
+});
+
+test("owner-session cookie waits for the signing-key checkpoint", async (t) => {
+  let saved = false;
+  const { form } = await fixture(t, { onPersist: async () => { saved = true; } });
+  assert.equal((await form("/oauth/owner-session", { password: SHORT })).status, 303);
+  assert.equal(saved, true);
 });

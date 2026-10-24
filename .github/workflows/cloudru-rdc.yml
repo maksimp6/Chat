@@ -11,6 +11,10 @@ on:
         description: Object Storage tenant ID (not a secret); required for all actions unless configured
         type: string
         required: false
+      image:
+        description: Prebuilt immutable image digest reference; required for install, no build runs in this workflow
+        type: string
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -32,7 +36,7 @@ jobs:
         run: |
           git fetch --no-tags origin master
           git merge-base --is-ancestor HEAD FETCH_HEAD
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version-file: .python-version
       - name: Install dependencies
@@ -41,6 +45,7 @@ jobs:
         env:
           ACTION: ${{ inputs.action }}
           SOURCE_SHA: ${{ github.sha }}
+          ALICE_RDC_IMAGE: ${{ inputs.image }}
           CLOUDRU_STORAGE_TENANT_ID: ${{ inputs.storage_tenant_id || vars.CLOUDRU_STORAGE_TENANT_ID }}
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
