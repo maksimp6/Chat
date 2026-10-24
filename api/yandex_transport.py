@@ -238,6 +238,10 @@ def validate_yandex_request(
         if mode == "form":
             if not isinstance(data, dict) or len(urlencode(data).encode()) > 15 * 1024:
                 raise YandexRequestBlocked("form body exceeds contract or has invalid encoding")
+            if any(not isinstance(value, (str, int, float, bool)) for value in data.values()):
+                raise YandexRequestBlocked(
+                    "form values must be scalar; omitted values are not text"
+                )
             body = {key: str(value) for key, value in data.items()}
         validate_yandex_contract(name, body)
         return name

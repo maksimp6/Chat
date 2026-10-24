@@ -47,6 +47,7 @@ def test_valid_documented_request_reaches_transport_once_and_denies_redirects():
         ("https://ai.api.cloud.yandex.net/v1/nonexistent", {}),
         ("https://iam.api.cloud.yandex.net/iam/v1/apiKeys", {"json": {"unexpected": True}}),
         ("https://stt.api.cloud.yandex.net/speech/v1/stt:recognize", {"data": b""}),
+        ("https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize", {"data": {"text": None}}),
         ("https://api.yandex-ai-studio.ru/v1/logs", {"json": {}}),
         (
             "https://ai.api.cloud.yandex.net/v1/realtime/client-events/input_audio_buffer.append",
