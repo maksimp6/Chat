@@ -164,7 +164,7 @@ jobs:
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
           export OUT_DIR="$HOME/logos-art-real"
           mkdir -p "$OUT_DIR"
-          python - <<'PY'
+          python - "${{ inputs.conversation_id }}" "${{ inputs.operation_id }}" <<'PY'
           import base64
           import hashlib
           import json
@@ -203,11 +203,13 @@ jobs:
               sys.exit(code)
 
 
-          # The dispatch inputs come from the event file; an expression in env: stops this job before its steps.
-          with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as stream:
-              dispatch_inputs = (json.load(stream).get("inputs") or {})
-          conv_id = dispatch_inputs.get("conversation_id") or None
-          operation_id = dispatch_inputs.get("operation_id") or None
+          # The dispatch inputs arrive as arguments: this runner sets no event file, and an expression in env: stops the job.
+          conv_id = sys.argv[1] or None
+          operation_id = sys.argv[2] or None
+          if conv_id and not re.fullmatch(r"[0-9a-f-]{36}", conv_id):
+              raise SystemExit("conversation_id is not a conversation id")
+          if operation_id and not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", operation_id):
+              raise SystemExit("operation_id is not an operation id")
           report["conversation_id"] = conv_id
           report["operation_id"] = operation_id
 
