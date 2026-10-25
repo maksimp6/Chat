@@ -12,7 +12,7 @@ concurrency:
 jobs:
   art_generate:
     runs-on: redmi9
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - name: Generate one picture through the Redmi 9 app
         shell: bash
