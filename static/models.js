@@ -72,7 +72,7 @@ function renderModelModal() {
     }
     var badges = "";
     if (modelsData.voice && modelsData.voice[key]) badges += " \uD83C\uDFA4";
-    if (m.multimodal) badges += " \uD83D\uDCF7";
+    if (window.modelAcceptsPhotos(key)) badges += " \uD83D\uDCF7";
     if (unavailable)
       badges += " \u00B7 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430";
     var nameWrap = document.createElement("div");

@@ -306,6 +306,12 @@ function saveMessages(id, msgs) {
   localStorage.setItem("messages_" + id, JSON.stringify(msgs));
 }
 
+// A model reads photos when its catalog entry says so; the server accepts photos only for those models.
+window.modelAcceptsPhotos = function (modelKey) {
+  var entry = (modelsData.text || {})[modelKey];
+  return !!(entry && ((entry.capabilities && entry.capabilities.multimodal === true) || entry.multimodal));
+};
+
 window.updateUIForModel = function () {
   var root = document.querySelector(".logos-pro-app");
   var micBtn = document.getElementById("mic-btn");
@@ -313,10 +319,9 @@ window.updateUIForModel = function () {
   var voiceUi = document.getElementById("voice-ui");
   var textUi = document.getElementById("text-ui");
 
-  var textModels = modelsData.text || {};
   var voiceModels = modelsData.voice || {};
   var isVoice = !!voiceModels[currentModel];
-  var isMultimodal = !!(textModels[currentModel] && textModels[currentModel].multimodal);
+  var isMultimodal = window.modelAcceptsPhotos(currentModel);
 
   if (!root) return;
 
@@ -327,4 +332,6 @@ window.updateUIForModel = function () {
   if (modeWrap) modeWrap.setAttribute("aria-hidden", isVoice ? "false" : "true");
   if (voiceUi) voiceUi.setAttribute("aria-hidden", isVoice ? "false" : "true");
   if (textUi) textUi.setAttribute("aria-hidden", isVoice ? "true" : "false");
+
+  window.dispatchEvent(new Event("logos:model-changed"));
 };

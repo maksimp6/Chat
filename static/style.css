@@ -2234,6 +2234,9 @@ body {
 .image-preview-item button { position: absolute; top: -6px; right: -6px; border: 0; border-radius: 50%; width: 20px; height: 20px; line-height: 18px; padding: 0; cursor: pointer; }
 
 /* Attach button matches the input and send button height (visual fix) */
+/* The photo button is shown only for a model that reads photos */
+.logos-pro-app:not(.logos-model-multimodal) #attach-btn { display: none; }
+
 .logos-pro-app #attach-btn {
   width: 44px;
   height: 44px;

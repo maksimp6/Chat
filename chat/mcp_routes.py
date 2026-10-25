@@ -8,7 +8,7 @@ import uuid
 from typing import Any
 import base64
 from yandex_client_modules.client import YandexResponsesClient
-from core.config import Config
+from core.config import TEXT_MODELS, Config
 from core.model_profiles import completion_model_keys
 from observability.trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
 from invocation.manager import (
@@ -133,9 +133,11 @@ def _client_params(raw: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in raw.items() if key in _CLIENT_PARAM_KEYS}
 
 
-# Models whose provider acceptance for image input is verified. Until one is listed,
-# a message with photos is refused instead of being sent without them.
-IMAGE_INPUT_MODEL_KEYS: frozenset[str] = frozenset({"qwen3.6-35b-a3b"})
+# Models whose registry entry says they read images. A message with photos to any other
+# model is refused instead of being sent without them.
+IMAGE_INPUT_MODEL_KEYS: frozenset[str] = frozenset(
+    key for key, model in TEXT_MODELS.items() if (model.get("capabilities") or {}).get("multimodal") is True
+)
 IMAGE_HISTORY_TURNS = 20
 IMAGE_HISTORY_TEXT_CHARS = 4000
 _MARKDOWN_PICTURE = re.compile(r"!\[[^\]]*\]\(data:image/[^)]*\)")

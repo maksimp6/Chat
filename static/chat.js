@@ -788,6 +788,13 @@ document.addEventListener("DOMContentLoaded", function () {
     renderPendingImages();
   });
 
+  // Photos go only to a model that reads them; switching to another model drops the tray.
+  window.addEventListener("logos:model-changed", function () {
+    if (!pendingImages.length || window.modelAcceptsPhotos(currentModel)) return;
+    pendingImages = [];
+    renderPendingImages();
+  });
+
   if (attachBtn && imageInput) {
     attachBtn.addEventListener("click", function () {
       imageInput.click();
@@ -916,7 +923,7 @@ document.addEventListener("DOMContentLoaded", function () {
     else pendingConversations.add(turn.conversationId);
     let typingEl = null;
     // Photos belong to this message only; they return to the tray if the send fails.
-    const sentImages = retryRequest ? [] : pendingImages.slice();
+    const sentImages = retryRequest ? retryRequest.images || [] : pendingImages.slice();
     if (!retryRequest) {
       pendingImages = [];
       renderPendingImages();
@@ -1006,7 +1013,7 @@ document.addEventListener("DOMContentLoaded", function () {
           clientTotalMs, data.reasoning, data.usage, data.trace, {
             onRetry: function () {
               if (data.operationId) resumeImageTurn(turn, data.operationId);
-              else sendTurn({ text: turn.text, conversationId: turn.conversationId });
+              else sendTurn({ text: turn.text, conversationId: turn.conversationId, images: sentImages });
             },
           });
       } else if (data.reply) {
