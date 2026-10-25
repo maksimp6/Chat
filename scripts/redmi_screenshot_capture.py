@@ -568,6 +568,8 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
              "clock_note": "Process timestamps bound recording; they do not identify the exact first video frame."}
     observer = {"available": False, "requests": []}
     reload_observer = {"available": False, "requests": []}
+    checkpoints = {"new_conversation_postconditions": {"status": "NOT_RUN", "reason": "creation_not_confirmed"},
+                   "reload_persistence": {"status": "NOT_RUN", "reason": "creation_not_confirmed"}}
     before = after = reloaded = None
 
     def mark(name, browser=None):
@@ -602,7 +604,7 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
         if not new_id or new_id == baseline["current_id"]:
             failures.append("new_conversation_id_missing_" + phase)
             return
-        if (result["url_id"] != new_id or result["stored_id"] != new_id or
+        if (result["current_id"] != new_id or result["url_id"] != new_id or result["stored_id"] != new_id or
                 result["active_ids"] != [new_id] or result["active_rows"] != 1):
             failures.append("conversation_selection_incoherent_" + phase)
         expected = set(baseline["conversation_ids"]) | {new_id}
@@ -687,39 +689,67 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
                 failures.append("creation_network_observer_unavailable")
             elif len(posts) != 1:
                 failures.append("creation_request_count_not_one")
-            elif posts[0]["status"] != 201 or posts[0]["error"] is not None:
+            elif posts[0]["status"] != 201:
                 failures.append("creation_request_did_not_return_201")
+            elif posts[0]["error"] is not None or not posts[0]["body_done"]:
+                failures.append("creation_response_metadata_unavailable")
             if any(r["path"] == "/api/chat" for r in observer["requests"]):
                 failures.append("unexpected_message_generation_request")
-            new_id = after["current_id"]
-            if len(posts) == 1 and (not posts[0]["body_done"] or posts[0]["response_id"] != new_id):
-                failures.append("created_response_id_differs_from_selected_id")
+            post = posts[0] if len(posts) == 1 else None
+            confirmed_response = (post is not None and post["status"] == 201 and post["error"] is None and post["body_done"])
+            response_id = post["response_id"] if confirmed_response else None
+            new_id = response_id if (isinstance(response_id, str) and response_id and
+                                     response_id != before["current_id"] and response_id not in before["conversation_ids"]) else None
+            if confirmed_response and new_id is None:
+                failures.append("creation_response_id_not_new")
+            rejected = (post is not None and post["finished"] is not None and
+                        isinstance(post["status"], int) and 400 <= post["status"] <= 599)
+            not_run_reason = "creation_request_rejected" if rejected else "creation_not_confirmed"
+            if rejected:
+                preserved_fields = ("current_id", "current_model", "conversation_ids", "active_ids", "active_rows",
+                                    "url_id", "stored_id", "message_count", "empty_state", "error_state")
+                changed = [key for key in preserved_fields if after[key] != before[key]]
+                checkpoints["existing_conversation_view_after_rejection"] = {
+                    "status": "FAIL" if changed else "PASS", "changed_fields": changed, "http_status": post["status"]}
+                if changed:
+                    failures.append("rejected_creation_changed_existing_conversation_view")
+            checkpoints["creation_response"] = {"status": "PASS" if new_id else "FAIL",
+                                                  "http_status": post["status"] if post else None,
+                                                  "confirmed_new_id": new_id}
             if any(r["method"] == "PATCH" for r in observer["requests"]):
                 failures.append("existing_conversation_patched_during_creation")
-            message_reads = [r for r in observer["requests"] if new_id and
-                             r["path"] == "/api/conversations/" + new_id + "/messages" and r["method"] == "GET"]
-            if (not message_reads or any(r["status"] != 200 or not r["body_done"] or
-                                         r["response_message_count"] != 0 for r in message_reads)):
-                failures.append("new_conversation_empty_history_not_verified")
             if observer.get("sample_overflow") or not observer.get("samples"):
                 failures.append("conversation_transition_observer_unavailable")
-            seen_new = False
-            for sample in observer.get("samples", []):
-                if sample["current_id"] == new_id and new_id:
-                    seen_new = True
-                    if sample["message_count"]:
-                        failures.append("old_messages_visible_under_new_conversation")
-                elif seen_new:
-                    failures.append("new_conversation_selection_reverted")
-            check_created(before, after, new_id, "after_create")
             state = app_state()
-            if state["surfaces"] or state["open"] or not state["reachable"]["menu"]:
-                failures.append("created_chat_view_obscured_after_create")
-            if state["expanded"] != ("true" if state["open"] else "false"):
-                failures.append("sidebar_aria_mismatch_after_create")
+            if new_id:
+                validation_start = len(failures)
+                if after["current_id"] != new_id:
+                    failures.append("created_response_id_differs_from_selected_id")
+                message_reads = [r for r in observer["requests"] if
+                                 r["path"] == "/api/conversations/" + new_id + "/messages" and r["method"] == "GET"]
+                if (not message_reads or any(r["status"] != 200 or not r["body_done"] or
+                                             r["response_message_count"] != 0 for r in message_reads)):
+                    failures.append("new_conversation_empty_history_not_verified")
+                seen_new = False
+                for sample in observer.get("samples", []):
+                    if sample["current_id"] == new_id:
+                        seen_new = True
+                        if sample["message_count"]:
+                            failures.append("old_messages_visible_under_new_conversation")
+                    elif seen_new:
+                        failures.append("new_conversation_selection_reverted")
+                check_created(before, after, new_id, "after_create")
+                if state["surfaces"] or state["open"] or not state["reachable"]["menu"]:
+                    failures.append("created_chat_view_obscured_after_create")
+                if state["expanded"] != ("true" if state["open"] else "false"):
+                    failures.append("sidebar_aria_mismatch_after_create")
+                checkpoints["new_conversation_postconditions"] = {"status": "FAIL" if len(failures) > validation_start else "PASS"}
+            else:
+                checkpoints["new_conversation_postconditions"] = {"status": "NOT_RUN", "reason": not_run_reason}
             mark("sidebar_after_creation", {"open": state["open"], "expanded": state["expanded"]})
             frame("13-conversation-created.png")
-            if new_id and new_id != before["current_id"]:
+            if new_id:
+                reload_validation_start = len(failures)
                 origin_before = after["time_origin_ms"]
                 mark("reload_requested", rdp.conversation_state(actor))
                 rdp.evaluate(actor, "JSON.stringify((()=>{setTimeout(()=>location.reload(),100);return {scheduled:true};})())")
@@ -788,8 +818,9 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
                     if state["expanded"] != ("true" if state["open"] else "false"):
                         failures.append("sidebar_aria_mismatch_after_reload")
                     frame("14-conversation-after-reload.png")
+                checkpoints["reload_persistence"] = {"status": "FAIL" if len(failures) > reload_validation_start else "PASS"}
             else:
-                failures.append("reload_not_run_without_new_conversation")
+                checkpoints["reload_persistence"] = {"status": "NOT_RUN", "reason": not_run_reason}
     except CaptureSafetyError:
         raise
     except Exception as error:
@@ -849,7 +880,7 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
         if safety_error is not None:
             raise safety_error
     failures = list(dict.fromkeys(failures))
-    scenario = {"verdict": "FAIL" if failures else "PASS", "failures": failures,
+    scenario = {"verdict": "FAIL" if failures else "PASS", "failures": failures, "checkpoints": checkpoints,
                 "before": before, "after_create": after, "after_reload": reloaded,
                 "network": observer, "reload_network": reload_observer, "video": video}
     mark("scenario_finished", {"verdict": scenario["verdict"], "failures": failures})
