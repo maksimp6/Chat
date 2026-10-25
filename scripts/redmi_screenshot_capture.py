@@ -657,6 +657,38 @@ def finish_screenrecord(recorder, video_path, uid, gid, max_bytes):
     return video, artifact, failures
 
 
+SELF_ASSESSMENT_QUESTION = (
+    "Оцени от 1 до 10, насколько хорошо ты понимаешь, что нужно сделать в этом диалоге, "
+    "и перескажи задачу своими словами. Начни ответ с оценки в виде «Оценка: N»."
+)
+
+
+def self_assessment(rdp, actor, conversation_id):
+    """Ask the model how well it understands the task. Recorded for review, never a failure."""
+    counts_before = rdp.message_counts(actor)
+    rdp.send_chat_message(actor, SELF_ASSESSMENT_QUESTION)
+    status = "timeout"
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        device_guard()
+        counts = rdp.message_counts(actor)
+        if counts["error"] > counts_before["error"]:
+            status = "error"
+            break
+        if counts["bot"] > counts_before["bot"]:
+            status = "answered"
+            break
+        time.sleep(1)
+    text = None
+    if status == "answered":
+        persisted = rdp.persisted_messages(actor, conversation_id)
+        replies = [m["text"] for m in persisted["messages"] if m["role"] == "assistant"]
+        text = replies[-1] if replies else None
+    match = re.search(r"Оценка:\s*(\d{1,2})", text or "")
+    score = int(match.group(1)) if match and 1 <= int(match.group(1)) <= 10 else None
+    return {"status": status, "score": score, "reply_text": text}
+
+
 def record_creation(rdp, actor, out, uid, gid, snapshot):
     """Observe one real new-chat flow, preserving application failures as evidence."""
     events, failures, artifacts = [], [], []
@@ -955,6 +987,8 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
                                                "reply_trace_errors": reply_errors,
                                                "user_message_persisted": "user" in roles,
                                                "reply_persisted": "assistant" in roles}
+                if checkpoints["message_send"]["status"] == "PASS":
+                    checkpoints["self_assessment"] = self_assessment(rdp, actor, new_id)
             else:
                 checkpoints["message_send"] = {"status": "NOT_RUN", "reason": "creation_not_confirmed"}
     except CaptureSafetyError:
