@@ -16,7 +16,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from core.config import ALL_MODELS
+from core.config import ALL_MODELS, canonical_model_key
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +96,7 @@ def ultra_request_defaults(model_key: str) -> dict[str, Any]:
     output ceiling. Only reasoning effort present in this model's wire profile
     is selected. Unknown or unsupported reasoning is omitted from the request.
     """
+    model_key = canonical_model_key(model_key)
     profile = ultra_profiles().get(model_key)
     if (
         profile is None
@@ -124,7 +125,7 @@ def ultra_reasoning_controllable(model_key: str) -> bool:
     for it, and a requested effort can spend the whole output budget on reasoning.
     Models without a profile keep the caller's settings unchanged.
     """
-    profile = ultra_profiles().get(model_key)
+    profile = ultra_profiles().get(canonical_model_key(model_key))
     if profile is None:
         return True
     return (profile.get("reasoning") or {}).get("depth_control") is not False
@@ -147,11 +148,13 @@ def annotate_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
     }
     annotated = deepcopy(catalog)
     for section in ("text", "voice"):
-        for key, entry in (annotated.get(section) or {}).items():
+        entries = annotated.get(section) or {}
+        # Models the provider retired are not offered; their successors are listed instead.
+        for key in [key for key in entries if ALL_MODELS.get(key, {}).get("available") is False]:
+            del entries[key]
+        for key, entry in entries.items():
             if not isinstance(entry, dict):
                 continue
-            if ALL_MODELS.get(key, {}).get("available") is False:
-                entry["available"] = False
             profile = profiles.get(key)
             if profile is not None:
                 entry["ultra_profile"] = profile_summary(profile)

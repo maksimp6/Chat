@@ -215,10 +215,14 @@ class Config:
     PORT = PORT
 
 
-# Keys renamed in #1316. Stored conversations and older clients may still send them.
+# Keys renamed in #1316, and models the provider retired whose successor the project approved.
+# Stored conversations and older clients may still send them: requests go to the successor.
 LEGACY_MODEL_KEYS = {
     "logosai-llm": "logos-runtime",
     "logosai-llm-flash": "logos-runtime-flash",
+    "qwen3-235b-a22b-fp8": "qwen3.6-35b-a3b",
+    "speech-realtime-250923": "speech-realtime-deepseek-v4-flash",
+    "speech-realtime-260528": "speech-realtime-deepseek-v4-flash",
 }
 
 

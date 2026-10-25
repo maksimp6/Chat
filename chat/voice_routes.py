@@ -3,7 +3,6 @@
 from __future__ import annotations
 from core.env import env_get
 
-import base64
 import json
 import queue
 import threading
@@ -124,7 +123,7 @@ def _stt(audio: bytes, content_type: str = "application/octet-stream") -> str:
         raise ValueError("audio exceeds 1 MiB limit")
 
     data: dict[str, str] = {"topic": "general", "lang": "ru-RU"}
-    if content_type.startswith("audio/wav") or content_type.startswith("audio/x-wav"):
+    if content_type.startswith(("audio/wav", "audio/x-wav")):
         sample_rate, audio = _wav_pcm(audio)
         data["format"] = "lpcm"
         data["sampleRateHertz"] = str(sample_rate)
@@ -230,7 +229,7 @@ def create_voice_session():
         session_id=uuid.uuid4().hex,
         owner_id=owner_id,
         conversation_id=conversation_id,
-        model=str(data.get("model") or "speech-realtime-260528"),
+        model=str(data.get("model") or "speech-realtime-deepseek-v4-flash"),
         voice=str(data.get("voice") or "filipp"),
         response_mode=str(data.get("response_mode") or "audio"),
     )

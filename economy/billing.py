@@ -56,7 +56,8 @@ def build_ai_billing_item(
         "output_tokens": output_tokens,
         "total_tokens": total_tokens,
     }
-    pricing = ALL_MODELS.get(canonical_model_key(model_key)) if model_key else None
+    # A retired model keeps its own prices for accounting; only legacy keys resolve to a successor.
+    pricing = (ALL_MODELS.get(model_key) or ALL_MODELS.get(canonical_model_key(model_key))) if model_key else None
     if (pricing and pricing.get("provider") == "anthropic") or (
         isinstance(model_key, str) and model_key.startswith("claude-")
     ):
