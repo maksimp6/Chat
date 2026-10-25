@@ -525,9 +525,18 @@ class RDP:
                              "x.open('GET','/api/conversations/'+encodeURIComponent(" + json.dumps(conversation_id) +
                              ")+'/messages',false);x.send();if(x.status!==200)return {status:x.status,messages:[]};"
                              "return {status:x.status,messages:(JSON.parse(x.responseText).messages||[]).map(m=>({role:m.role,"
-                             "text:String(m.text||'').slice(0,20000),"
+                             "text:String(m.text||'').slice(0,10000000),"
+                             "invocation_id:(m.trace&&m.trace.invocation_id)||null,"
                              "errors:((m.trace&&m.trace.errors)||[]).slice(0,10).map(e=>({source:String(e.source||'').slice(0,80),"
                              "type:String(e.type||'').slice(0,80),error:String(e.error||'').slice(0,300)}))}))};})())")
+
+    def invocation_trace_errors(self, actor, invocation_id):
+        return self.evaluate(actor, "JSON.stringify((()=>{const x=new XMLHttpRequest();"
+                             "x.open('GET','/api/invocations/'+encodeURIComponent(" + json.dumps(invocation_id) +
+                             ")+'/trace',false);x.send();if(x.status!==200)return {status:x.status,errors:[]};"
+                             "const errors=(JSON.parse(x.responseText).errors||[]);"
+                             "return {status:x.status,errors:errors.slice(0,50).map(e=>({source:String(e.source||'').slice(0,80),"
+                             "type:String(e.type||'').slice(0,80),error:String(e.error||'').slice(0,300)}))};})())")
 
     def start_creation_observer(self, actor):
         return self.evaluate(actor, r"""JSON.stringify((()=>{
@@ -696,12 +705,20 @@ def self_assessment(rdp, actor, conversation_id):
 
 REAL_TASK_QUESTION = "Сколько будет 17% от 2340 рублей? Ответь числом и коротко объясни расчёт."
 REAL_TASK_EXPECTED = ("397,8", "397.8")
+REAL_TASK_VALUE = 397.8
+
+
+def first_number(text):
+    """The number the reply states first: the task asks for the answer before the working."""
+    match = re.search(r"-?\d+(?:[.,]\d+)?", text or "")
+    return float(match.group(0).replace(",", ".")) if match else None
 
 
 def real_task(rdp, actor, conversation_id):
     """Give the model a checkable task and record its answer. Never a failure."""
     status, text = ask_model(rdp, actor, conversation_id, REAL_TASK_QUESTION)
-    correct = None if text is None else any(value in text for value in REAL_TASK_EXPECTED)
+    answer = first_number(text)
+    correct = None if text is None else answer is not None and abs(answer - REAL_TASK_VALUE) < 0.05
     return {"status": status, "expected": REAL_TASK_EXPECTED[0], "correct": correct, "reply_text": text}
 
 
@@ -1005,7 +1022,15 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
                 persisted = rdp.persisted_messages(actor, new_id)
                 roles = [m["role"] for m in persisted["messages"]]
                 replies = [m["text"] for m in persisted["messages"] if m["role"] == "assistant"]
-                reply_errors = [e for m in persisted["messages"] if m["role"] == "assistant" for e in m["errors"]]
+                assistant_messages = [m for m in persisted["messages"] if m["role"] == "assistant"]
+                reply_errors = [e for m in assistant_messages for e in m["errors"]]
+                for m in assistant_messages:
+                    if not m["invocation_id"]:
+                        continue
+                    trace = rdp.invocation_trace_errors(actor, m["invocation_id"])
+                    if trace["status"] != 200:
+                        failures.append("reply_trace_unavailable")
+                    reply_errors.extend(trace["errors"])
                 if persisted["status"] != 200 or "user" not in roles:
                     failures.append("user_message_not_persisted")
                 if "assistant" not in roles:

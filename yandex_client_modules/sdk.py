@@ -6,7 +6,7 @@ from core.env import env_require
 import requests
 import json
 
-from core.config import upstream_model_id
+from core.config import get_model_uri
 
 
 class LogosSDK:
@@ -37,7 +37,7 @@ class LogosSDK:
     def send_message(self, conv_id, message, model="yandexgpt-5-pro"):
         """Отправить сообщение в диалог"""
         payload = {
-            "model": f"gpt://{self.project_id}/{upstream_model_id(model)}/latest",
+            "model": get_model_uri(self.project_id, model),
             "input": [{"role": "user", "content": message}],
             "instructions": "Ты — полезный ассистент.",
             "background": True,

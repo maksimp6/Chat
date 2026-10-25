@@ -1541,6 +1541,32 @@ body {
 .logos-pro-app .md-code {
   margin: 0;
 }
+.logos-pro-app .md-math {
+  font-family: "Cambria Math", "Times New Roman", serif;
+  white-space: nowrap;
+}
+.logos-pro-app .md-math-block {
+  display: block;
+  margin: 8px 0;
+  text-align: center;
+  white-space: normal;
+}
+.logos-pro-app .md-frac {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  padding: 0 2px;
+}
+.logos-pro-app .md-frac > span:first-child {
+  border-bottom: 1px solid currentColor;
+  padding: 0 2px;
+}
+.logos-pro-app sup,
+.logos-pro-app sub {
+  font-size: 0.75em;
+  line-height: 0;
+}
 .logos-pro-app .reasoning-details {
   margin-bottom: 10px;
   font-size: 13px;

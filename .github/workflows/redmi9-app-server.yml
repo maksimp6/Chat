@@ -37,10 +37,14 @@ jobs:
               "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/$file" -o "$file"
           done
           # The phone runs out of space when old deploy backups and screenshot folders pile up.
-          # Keep only the newest backup of the app memory and drop finished capture folders.
+          # The concurrency group runs one workflow at a time, so no capture is active during this step.
+          # Keep only the newest backup of the app memory, and only when that backup is non-empty.
           backups=/data/data/com.termux/files/home/logos-local-state/deploy-backups
           if [ -d "$backups" ]; then
-            ls -1t "$backups"/*.memory 2>/dev/null | tail -n +2 | xargs -r rm -f
+            newest=$(ls -1t "$backups"/*.memory 2>/dev/null | head -n 1 || true)
+            if [ -n "$newest" ] && [ -s "$newest" ]; then
+              ls -1t "$backups"/*.memory 2>/dev/null | tail -n +2 | xargs -r rm -f
+            fi
           fi
           find . -maxdepth 1 \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' \) -type d -mmin +60 -exec rm -rf {} +
           bash scripts/redmi_app_server.sh deploy

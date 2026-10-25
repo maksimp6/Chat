@@ -67,7 +67,7 @@ def capability_receipt(params: dict[str, Any]) -> dict[str, Any]:
         "requested": {k: v for k, v in params.items() if k != "instructions"},
         "provider_effective_reasoning": "UNKNOWN",
         "provider_max_output_tokens": "UNKNOWN",
-        "output_budget_source": "DeepSeek upstream /models; Yandex acceptance unverified",
+        "output_budget_source": "not documented by Yandex; requested value equals the documented context window; provider acceptance unverified",
         "provider_max_hosted_calls": "UNKNOWN",
         "max_tool_calls_policy": "no_additional_local_hosted_cap; provider_ceiling_undisclosed",
         "local_round_cap": None,
