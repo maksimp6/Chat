@@ -11,6 +11,7 @@ from yandex_client_modules.metadata_validator import validate_metadata
 
 TEMPERATURE_MIN = 0.0
 TEMPERATURE_MAX = 1.0
+LEGACY_OUTPUT_CAP_TOKENS = 2000
 
 
 def validate_generation_params(params):
@@ -44,8 +45,12 @@ def build_response_payload(
     if defaults:
         # Older browsers still send medium reasoning, auto truncation and output
         # caps. The model's Ultra policy owns these fields, except an output cap
-        # the user set explicitly (0 means no cap).
+        # the user set explicitly (0 means no cap). The old 2000 default is not
+        # a user choice; the browser drops it too, so the sent value matches the
+        # value shown in settings.
         user_cap = int(params.get("max_output_tokens") or 0)
+        if user_cap == LEGACY_OUTPUT_CAP_TOKENS:
+            user_cap = 0
         params.update(defaults)
         if user_cap > 0:
             params["max_output_tokens"] = user_cap
