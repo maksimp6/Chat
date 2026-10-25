@@ -19,11 +19,10 @@ jobs:
         timeout-minutes: 10
         env:
           MODEL: qwen3.6-35b-a3b
-          PHOTO_DIR: ${{ runner.temp }}
         run: |
           set -euo pipefail
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
-          photo="$PHOTO_DIR/photo.png"
+          photo="$HOME/logos-photo-check.png"
           # The deployed app checkout on the phone holds the photo's bytes (Git LFS), so no download is needed.
           cp /data/data/com.termux/files/home/logos-local/docs/screenshots/logos/2026-10-25/run-40212418021-1/18-chat-bottom.png "$photo"
           python - "$photo" <<'PY'
