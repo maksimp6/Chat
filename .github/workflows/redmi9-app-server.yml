@@ -39,7 +39,7 @@ jobs:
           bash scripts/redmi_app_server.sh deploy
 
   screenshots:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop' && inputs.action == 'screenshots'
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && github.ref != 'refs/heads/master' && inputs.action == 'screenshots'
     runs-on: redmi9
     timeout-minutes: 10
     permissions:
@@ -64,9 +64,24 @@ jobs:
           capture_dir="$RUNNER_TEMP/logos-screenshots-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           python "$scripts_dir/redmi_screenshot_capture.py" "$capture_dir"
           python "$scripts_dir/publish_redmi_screenshots.py" "$capture_dir"
+          python - "$capture_dir/manifest.json" <<'PY'
+          import json
+          import sys
+          with open(sys.argv[1], encoding="utf-8") as stream:
+              manifest = json.load(stream)
+          scenario = manifest.get("creation_scenario", {})
+          artifacts = {entry.get("path") for entry in manifest.get("artifacts", [])}
+          required_artifacts = {"15-conversation-create.mp4", "events.json"}
+          print(json.dumps({"creation_scenario": scenario.get("verdict", "NOT_RUN"),
+                            "failures": scenario.get("failures", []),
+                            "video_and_events_present": required_artifacts <= artifacts}))
+          if (scenario.get("verdict") != "PASS" or scenario.get("failures") != []
+                  or not required_artifacts <= artifacts):
+              raise SystemExit("Conversation creation failed its UI checks; evidence was published first")
+          PY
 
   verify_screenshots:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop' && inputs.action == 'verify_screenshots'
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && github.ref != 'refs/heads/master' && inputs.action == 'verify_screenshots'
     runs-on: redmi9
     timeout-minutes: 5
     permissions:
