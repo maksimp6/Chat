@@ -576,7 +576,10 @@ function loadHistory(convId) {
       if (convId !== currentConvId) return;
       try {
         let rendered = 0;
-        (data.messages || []).forEach((msg) => {
+        (data.messages || []).forEach((msg, index, all) => {
+          // A stored error answers the user message right before it; «Повторить» re-sends that message.
+          const previous = index > 0 ? all[index - 1] : null;
+          const retryText = msg.source === "error" && previous && previous.role === "user" ? previous.text : null;
           const node = addMessage(
             msg.text,
             msg.source === "error" ? "error" : msg.role,
@@ -587,7 +590,12 @@ function loadHistory(convId) {
             msg.reasoning,
             msg.usage,
             msg.trace,
-            { id: msg.id },
+            {
+              id: msg.id,
+              onRetry: retryText === null ? undefined : function () {
+                window.logosRetryTurn({ text: retryText, conversationId: convId });
+              },
+            },
           );
           if (node) rendered += 1;
         });
@@ -705,6 +713,11 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
   }
+
+  // Lets the history loader (outside this closure) re-send a failed message.
+  window.logosRetryTurn = function (request) {
+    return sendTurn(request);
+  };
 
   function sendMessage() {
     return sendTurn(null);

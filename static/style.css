@@ -404,8 +404,12 @@ body {
   opacity: 1;
 }
 @media (hover: none) {
+  /* Touch screens have no hover, so the actions sit under the bubble instead of covering its text. */
   .logos-pro-app .msg-actions {
     opacity: 1;
+    position: static;
+    display: flex;
+    justify-content: flex-end;
   }
 }
 .logos-pro-app .copy-btn {
@@ -1968,6 +1972,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 1;
+  padding-bottom: 14px;
   background: var(--m-bg, #fff);
 }
 
