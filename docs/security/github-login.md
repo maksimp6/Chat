@@ -10,6 +10,6 @@ use `LOGOS_OWNER_ID` or `default`; this setting is data/accounting metadata.
 Existing conversations and runtime sessions remain accessible. Old login-related
 environment variables have no effect.
 
-Authentication required by external providers (Yandex, Claude, Cloud.ru, SSH and
+Authentication required by external providers (Yandex, Cloud.ru, SSH and
 other connected services) remains part of those integrations. No real credentials
 belong in the repository, traces, tests or application logs.

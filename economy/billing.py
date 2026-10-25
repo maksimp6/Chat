@@ -35,7 +35,8 @@ def build_ai_billing_item(
     step: int,
     response_id: Optional[str] = None,
 ) -> dict[str, Any]:
-    usage = usage if isinstance(usage, dict) else {}
+    usage_missing = not isinstance(usage, dict)
+    usage = {} if usage_missing else usage
     input_tokens = int(usage.get("input_tokens", 0) or 0)
     output_tokens = int(usage.get("output_tokens", 0) or 0)
     total_tokens = int(usage.get("total_tokens", input_tokens + output_tokens) or 0)
@@ -58,15 +59,11 @@ def build_ai_billing_item(
     }
     # A retired model keeps its own prices for accounting; only legacy keys resolve to a successor.
     pricing = (ALL_MODELS.get(model_key) or ALL_MODELS.get(canonical_model_key(model_key))) if model_key else None
-    if (pricing and pricing.get("provider") == "anthropic") or (
-        isinstance(model_key, str) and model_key.startswith("claude-")
-    ):
-        item.update(provider="anthropic", currency="USD", pricing_version=None)
-    if pricing is None or pricing.get("pricing_status") == "unknown":
+    if usage_missing or pricing is None or pricing.get("pricing_status") == "unknown":
         item.update(
             {
                 "cost_status": "unknown",
-                "cost_reason": "pricing_not_configured",
+                "cost_reason": "usage_missing" if usage_missing else "pricing_not_configured",
                 "input_cost": None,
                 "output_cost": None,
                 "cached_input_cost": None,
@@ -132,12 +129,9 @@ def aggregate_billing(items, context: Optional[dict[str, Any]] = None) -> dict[s
         "unknown_cost_items": unknown,
         "items": items,
     }
-    if items and all(item.get("provider") == "anthropic" for item in items):
-        result.update(provider="anthropic", currency="USD", pricing_version=None)
-        if not known:
-            result.update(cost_status="unknown", total_cost=None)
-    elif any(item.get("provider") == "anthropic" for item in items):
-        result["provider"] = "mixed"
+    # With no priced model call, a sum of zero is not a cost: the total stays unknown.
+    if unknown and not any(item.get("type") == "ai" for item in known):
+        result["total_cost"] = None
     if context:
         for key in ("invocation_id", "session_id", "conversation_id", "trace_id", "owner_id"):
             if context.get(key) is not None:

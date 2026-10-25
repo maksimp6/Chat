@@ -15,13 +15,7 @@ const MODELS = {
   text: {
     "logos-runtime": { name: "Logos", input: 0.5, output: 1.2, currency: "RUB" },
     "free-model": { name: "Free", input: 0, output: 0, currency: "RUB" },
-    "claude-haiku-5-5": {
-      name: "Haiku 5.5",
-      input: 0.1,
-      output: 0.5,
-      currency: "USD",
-      price_unit: "per_million_tokens",
-    },
+    "yandexgpt-5-lite": { name: "YandexGPT 5 Lite", input: 0.2, output: 0.2, currency: "RUB" },
   },
   voice: {},
 };
@@ -84,21 +78,12 @@ test("a free model shows an explicit zero price, not a missing one", () => {
   assert.equal(option(document, "free-model").querySelector(".model-option-price").textContent, "0 / 0 ₽/1K");
 });
 
-test("a dollar-priced model shows USD per million tokens", () => {
-  const { document, context } = boot();
-  setState(context, { currentConvId: null });
-  assert.equal(
-    option(document, "claude-haiku-5-5").querySelector(".model-option-price").textContent,
-    "0.1 / 0.5 USD/1M",
-  );
-});
-
 test("starting a new chat does not rewrite the model of the current conversation", async () => {
   const { document, window, context, requests } = boot();
   setState(context, { currentConvId: "old-chat" });
   window.isCreatingNewChat = true;
 
-  option(document, "claude-haiku-5-5").click();
+  option(document, "yandexgpt-5-lite").click();
   await settle();
 
   assert.equal(
@@ -107,7 +92,7 @@ test("starting a new chat does not rewrite the model of the current conversation
     "no PATCH may reach the conversation that is still current",
   );
   const created = requests.find((r) => r.method === "POST" && r.url === "/api/conversations");
-  assert.deepEqual(created.body, { model: "claude-haiku-5-5" });
+  assert.deepEqual(created.body, { model: "yandexgpt-5-lite" });
   assert.equal(window.isCreatingNewChat, false);
 });
 
@@ -116,7 +101,7 @@ test("choosing a model in an existing chat patches that conversation", async () 
   setState(context, { currentConvId: "old-chat" });
   window.isCreatingNewChat = false;
 
-  option(document, "claude-haiku-5-5").click();
+  option(document, "yandexgpt-5-lite").click();
   await settle();
 
   const writes = requests.filter((r) => r.method !== "GET");
@@ -124,7 +109,7 @@ test("choosing a model in an existing chat patches that conversation", async () 
     {
       url: "/api/conversations/old-chat",
       method: "PATCH",
-      body: { model: "claude-haiku-5-5" },
+      body: { model: "yandexgpt-5-lite" },
     },
   ]);
 });

@@ -68,10 +68,7 @@ function renderModelModal() {
       (unavailable ? " model-option-unavailable" : "");
     var priceText = "";
     if (m.input != null && m.output != null) {
-      priceText =
-        m.currency === "USD" || m.price_unit === "per_million_tokens"
-          ? m.input + " / " + m.output + " USD/1M"
-          : m.input + " / " + m.output + " \u20bd/1K";
+      priceText = m.input + " / " + m.output + " \u20bd/1K";
     }
     var badges = "";
     if (modelsData.voice && modelsData.voice[key]) badges += " \uD83C\uDFA4";

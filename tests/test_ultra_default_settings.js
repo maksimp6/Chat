@@ -23,7 +23,7 @@ function runtime(model = "gpt-oss-120b", saved = {}) {
           profile_id: "ultra-qwen3.6-35b-a3b", default_profile: "ultra",
           settings_defaults: { max_output_tokens: 0, truncation: "disabled", reasoning_effort: "disabled" },
         } },
-        "claude-opus-5-5": { provider: "anthropic" },
+        "foreign-model": { provider: "other" },
       },
     },
     localStorage: {
@@ -108,7 +108,7 @@ test("reset uses the selected model's Ultra values", () => {
 });
 
 test("Yandex defaults and labels do not leak into a foreign provider", () => {
-  const r = runtime("claude-opus-5-5", {
+  const r = runtime("foreign-model", {
     model_profile: "ultra", model_profile_id: "ultra-gpt-oss-120b",
     reasoning_effort: "low", max_output_tokens: 123,
   });

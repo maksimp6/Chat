@@ -7,11 +7,6 @@ import uuid
 from typing import Any
 import base64
 from yandex_client_modules.client import YandexResponsesClient
-from provider_accounts.claude_oauth import (
-    ClaudeOAuthTransport,
-    create_local_conversation,
-    is_claude_model,
-)
 from core.config import Config
 from core.model_profiles import completion_model_keys
 from observability.trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
@@ -181,11 +176,6 @@ def _validated_images(raw: Any) -> list[str]:
 
 
 class LogosClient(YandexResponsesClient):
-    def _claude_transport(self) -> ClaudeOAuthTransport:
-        if not hasattr(self, "_claude_oauth"):
-            self._claude_oauth = ClaudeOAuthTransport()
-        return self._claude_oauth
-
     def ask(
         self,
         message: Any,
@@ -195,10 +185,6 @@ class LogosClient(YandexResponsesClient):
         execution_trace: Any = None,
         trace_step: Any = None,
     ) -> Any:
-        if is_claude_model(model_key):
-            return self._claude_transport().ask(
-                message, model_key, conversation_id, params, execution_trace
-            )
         return super().ask(
             message,
             model_key,
@@ -209,8 +195,6 @@ class LogosClient(YandexResponsesClient):
         )
 
     def _ask_provider(self, **kwargs: Any) -> Any:
-        if is_claude_model(kwargs["model_key"]):
-            return self._claude_transport().ask_with_mcp(**kwargs)
         return super().ask_with_mcp(**kwargs)
 
     # Logos Pro shopping policy: never source recommendations from Yandex Market.
@@ -431,11 +415,7 @@ def chat():
             message,
         )
         client = LogosClient(Config)
-        provider_conversation_id = (
-            invocation.conversation_id
-            if is_claude_model(model_key)
-            else _provider_conversation_id(client, invocation.conversation_id, trace)
-        )
+        provider_conversation_id = _provider_conversation_id(client, invocation.conversation_id, trace)
 
         response = client.ask_with_mcp(
             message=message,
@@ -791,33 +771,11 @@ def conversations():
         )
         # A Logos chat gets its local id at once. The provider conversation is created on the first
         # message, so a provider outage can no longer lose the chat itself.
-        provider_pending = not is_claude_model(data.get("model"))
-        try:
-            if provider_pending:
-                conv_id = str(uuid.uuid4())
-            else:
-                y_conv = create_local_conversation(creation_trace)
-                conv_id = y_conv.get("id") if isinstance(y_conv, dict) else None
-                if not conv_id:
-                    raise RuntimeError("Local conversation creation returned no ID")
-        except Exception as exc:
-            creation_trace.record_error(
-                "conversation_create",
-                "conversation creation failed",
-                error_type=type(exc).__name__,
-            )
-            logger.exception("[CONVERSATION] Yandex conversation creation failed")
-            return jsonify(
-                {
-                    "error": "conversation_creation_failed",
-                    "message": "Не удалось создать разговор у провайдера",
-                    "trace": creation_trace.finalize(),
-                }
-            ), 502
+        conv_id = str(uuid.uuid4())
         title = normalize_conversation_title(data.get("title"))
         model = data.get("model", "logos-runtime")
         set_owner(conv_id, owner_id)
-        create_conversation(conv_id, title, model, provider_pending=provider_pending)
+        create_conversation(conv_id, title, model, provider_pending=True)
         creation_trace.add_event(
             "conversation_local_persisted",
             {
@@ -897,7 +855,7 @@ def execute_approved():
         synth_response = client.ask(
             prompt,
             model_key,
-            conv_id if is_claude_model(model_key) else _provider_conversation_id(client, conv_id, ExecutionTrace()),
+            _provider_conversation_id(client, conv_id, ExecutionTrace()),
             {"instructions": "Ты системный ассистент."},
         )
         reply = client.extract_text(synth_response) or f"Действие {func_name} успешно выполнено."

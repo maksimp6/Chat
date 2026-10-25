@@ -221,10 +221,7 @@ def _default_client_factory(model_key: str = DEFAULT_MODEL) -> Callable[[], Any]
     from core.config import Config
     from chat.mcp_routes import LogosClient
 
-    from provider_accounts.claude_oauth import is_claude_model
-
-    if not is_claude_model(model_key):
-        seed_provider_credential()
+    seed_provider_credential()
 
     def client_factory() -> Any:
         return LogosClient(Config)
@@ -302,13 +299,7 @@ def run_issue_task(
     try:
         _write_result(checkpoint_file, result)
         client = client_factory()
-        from provider_accounts.claude_oauth import create_local_conversation, is_claude_model
-
-        conversation_id = (
-            create_local_conversation(trace)
-            if is_claude_model(model_key)
-            else client.create_conversation(trace)
-        )["id"]
+        conversation_id = client.create_conversation(trace)["id"]
         result["conversation_id"] = conversation_id
         response = client.ask_with_mcp(
             message=build_prompt(issue_number, title, body, rules),

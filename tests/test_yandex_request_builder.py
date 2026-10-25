@@ -164,7 +164,7 @@ class YandexRequestBuilderTests(unittest.TestCase):
         from core.model_profiles import ultra_request_defaults
 
         for model in (
-            "claude-opus-5-5", "unknown-model", "yandexgpt-5.1",
+            "unknown-model", "yandexgpt-5.1",
             "speech-realtime-deepseek-v4-flash", "qwen3-235b-a22b-fp8",
         ):
             with self.subTest(model=model):

@@ -231,7 +231,7 @@
         ["Responses", (trace.responses || []).length],
         ["Tools", (trace.tool_calls || []).length],
         ["Tokens", fmtNumber(u.total)],
-        ["Cost", trace.cost != null ? "≈ " + trace.cost + " ₽" : "—"],
+        ["Cost", trace.billing && trace.billing.total_cost != null ? "≈ " + trace.billing.total_cost + " ₽" : "—"],
         ["Status", (trace.errors || []).length ? "⚠ " + trace.errors.length : "● completed"],
       ];
     m.forEach(function (x) {

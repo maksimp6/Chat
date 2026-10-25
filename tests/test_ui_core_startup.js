@@ -44,9 +44,9 @@ function coreValue(context, name) {
   return vm.runInContext(name, context);
 }
 
-const HAIKU = "claude-haiku-5-5";
-const CONVERSATIONS = { conversations: [{ id: "c1", title: "Диалог", model: HAIKU }] };
-const CATALOG = { text: { [HAIKU]: { multimodal: false } }, voice: {} };
+const MODEL = "yandexgpt-5-lite";
+const CONVERSATIONS = { conversations: [{ id: "c1", title: "Диалог", model: MODEL }] };
+const CATALOG = { text: { [MODEL]: { multimodal: false } }, voice: {} };
 
 test("a working catalog restores the conversation's saved model", async () => {
   const { window, context } = boot({
@@ -58,8 +58,8 @@ test("a working catalog restores the conversation's saved model", async () => {
   });
   await settle();
 
-  assert.equal(coreValue(context, "currentModel"), HAIKU);
-  assert.equal(window.localStorage.getItem("current_model"), HAIKU);
+  assert.equal(coreValue(context, "currentModel"), MODEL);
+  assert.equal(window.localStorage.getItem("current_model"), MODEL);
 });
 
 test("a missing model in a loaded catalog falls back to the default model", async () => {
@@ -87,8 +87,8 @@ test("a degraded catalog keeps the conversation's saved model instead of overwri
   });
   await settle();
 
-  assert.equal(coreValue(context, "currentModel"), HAIKU);
-  assert.equal(window.localStorage.getItem("current_model"), HAIKU);
+  assert.equal(coreValue(context, "currentModel"), MODEL);
+  assert.equal(window.localStorage.getItem("current_model"), MODEL);
 });
 
 test("a failed conversation list starts from the cached conversations", async () => {

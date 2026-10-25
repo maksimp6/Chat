@@ -1,6 +1,6 @@
 # EDS runner
 
-The task-execution job in `claude-lite.yml` installs the official EDS v0.4.0
+The task-execution job installs the official EDS v0.4.0
 release with `scripts/install_eds.py`. The installer verifies the pinned SHA-256
 before execution. Installation has a 30-second limit and the verified binary is
 added to the job's PATH. Each new hosted task run installs it again.

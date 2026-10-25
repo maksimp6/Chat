@@ -6,7 +6,6 @@ REPORT="${1:-$HOME/junk-report.txt}"
 # Пути, которые не трогаем вообще
 EXCL=(
   "$HOME/.logos-rdc"
-  "$HOME/Chat-anthropic-haiku-1105"
   "$HOME/.ssh" "$HOME/.local" "$HOME/.config"
   "$HOME/.claude-server-commander" "$HOME/.desktop-commander-device"
 )

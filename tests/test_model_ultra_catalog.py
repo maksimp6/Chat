@@ -44,9 +44,9 @@ def test_foreign_provider_does_not_invalidate_yandex_profiles(monkeypatch, fresh
     profiles = model_profiles.ultra_profiles()
     assert len(profiles) == 14
     annotated = model_profiles.annotate_catalog(
-        {"text": {"claude-opus-5-5": {"provider": "anthropic"}}, "voice": {}}
+        {"text": {"foreign-model": {"provider": "other"}}, "voice": {}}
     )
-    assert "ultra_profile" not in annotated["text"]["claude-opus-5-5"]
+    assert "ultra_profile" not in annotated["text"]["foreign-model"]
 
 
 def test_new_yandex_model_still_requires_a_profile(monkeypatch, fresh_profiles_cache):

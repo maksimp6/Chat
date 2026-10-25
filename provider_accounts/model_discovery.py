@@ -11,7 +11,6 @@ from typing import Any
 import requests
 
 from core.config import TEXT_MODELS, VOICE_MODELS, registry_key_for_upstream
-from provider_accounts.claude_catalog import CLAUDE_MODELS
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +86,6 @@ class ModelDiscovery:
         if not text_models:
             raise ModelDiscoveryError("provider returned an empty model catalog")
 
-        text_models.update({key: dict(value) for key, value in CLAUDE_MODELS.items()})
         return {"text": text_models, "voice": dict(VOICE_MODELS)}
 
     @staticmethod

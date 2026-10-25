@@ -6,7 +6,6 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
-from provider_accounts.claude_catalog import CLAUDE_MODELS
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +199,6 @@ VOICE_MODELS = {
     },
 }
 
-TEXT_MODELS.update(CLAUDE_MODELS)
 ALL_MODELS = {**TEXT_MODELS, **VOICE_MODELS}
 AUDIO_STT_PRICE_PER_SEC = 0.0264
 AUDIO_TTS_PRICE_PER_SEC = 0.0203
@@ -238,7 +236,11 @@ def registry_key_for_upstream(upstream_id: str) -> str | None:
 
 
 def get_model_info(model_key):
-    return ALL_MODELS.get(canonical_model_key(model_key), TEXT_MODELS["logos-runtime"])
+    info = ALL_MODELS.get(canonical_model_key(model_key))
+    if info is None:
+        # An unpriced key must fail loudly, never bill at another model's tariff.
+        raise ValueError(f"model key has no tariff: {model_key}")
+    return info
 
 
 # The registry key is ours; the upstream id is the name Yandex knows the model by.

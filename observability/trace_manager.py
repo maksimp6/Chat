@@ -433,12 +433,14 @@ class ExecutionTrace:
     def _update_billing_for_response(
         self, clean_raw: dict[str, Any], step_index: int, response_id: Optional[str]
     ) -> None:
-        if not isinstance(clean_raw, dict) or not isinstance(clean_raw.get("usage"), dict):
+        if not isinstance(clean_raw, dict):
             return
         try:
             from economy.billing import build_ai_billing_item, aggregate_billing
 
-            model = clean_raw.get("model")
+            # The chat turn's internal model key is the billing key. The provider echoes its own
+            # model id, which may not be a registry key (for example `name/latest`).
+            model = (self.trace.get("request") or {}).get("model") or clean_raw.get("model")
             if not model:
                 for request in reversed(self.trace.get("api_requests", [])):
                     if request.get("step") == step_index:
@@ -464,6 +466,9 @@ class ExecutionTrace:
             )
             if existing is None:
                 items.append(item)
+            elif items[existing].get("cost_status") == "calculated" and item.get("cost_reason") == "usage_missing":
+                # A later snapshot without usage must not erase a priced charge.
+                return
             else:
                 items[existing] = item
             context = self.trace.get("context", {})
