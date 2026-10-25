@@ -496,8 +496,15 @@ window.fetchVectorStores = function () {
             btn.addEventListener("click", function () {
               var fileId = this.getAttribute("data-id");
               if (!confirm("Удалить файл? Он будет удалён из всех хранилищ.")) return;
-              this.disabled = true;
-              this.innerText = "...";
+              var deleteBtn = this;
+              var originalLabel = deleteBtn.innerText;
+              deleteBtn.disabled = true;
+              deleteBtn.innerText = "...";
+              // A failed delete leaves the file in place, so the button must be usable again.
+              function restoreDeleteBtn() {
+                deleteBtn.disabled = false;
+                deleteBtn.innerText = originalLabel;
+              }
               window.LogosDispatcher.request("/api/files/" + fileId, { method: "DELETE" })
                 .then(function (r) {
                   return r.json();
@@ -511,10 +518,12 @@ window.fetchVectorStores = function () {
                         '<div style="padding:20px;text-align:center;color:var(--m-muted,#999);">Нет загруженных файлов.</div>';
                     }
                   } else {
+                    restoreDeleteBtn();
                     alert("Ошибка: " + (res.error || "неизвестно"));
                   }
                 })
                 .catch(function (e) {
+                  restoreDeleteBtn();
                   alert("Ошибка сети: " + e.message);
                 });
             });
