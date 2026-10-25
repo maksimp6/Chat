@@ -148,7 +148,8 @@ function createConversation(modelKey, options) {
       return data.id;
     })
     .catch(function (e) {
-      LogosToast.error("\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0435\u0442\u0438: " + e);
+      console.error("[MODELS] network error", e);
+      LogosToast.error("Ошибка сети. Проверьте соединение.");
       return null;
     });
 }

@@ -1,7 +1,7 @@
 .logos-toast-stack {
   position: fixed;
   left: 50%;
-  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  top: calc(12px + env(safe-area-inset-top, 0px));
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;

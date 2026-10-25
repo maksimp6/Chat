@@ -365,7 +365,7 @@ function addMessage(
   bubble.className = "bubble";
   let htmlContent = "";
   if (reasoning && reasoning.trim() !== "") {
-    htmlContent += `<details class="reasoning-details"><summary class="reasoning-summary">🧠 Ход мыслей модели (Reasoning)</summary><div class="reasoning-content">${parseMarkdown(reasoning)}</div></details>`;
+    htmlContent += `<details class="reasoning-details"><summary class="reasoning-summary">🧠 Ход мыслей модели</summary><div class="reasoning-content">${parseMarkdown(reasoning)}</div></details>`;
   }
   htmlContent += parseMarkdown(text);
   bubble.innerHTML = htmlContent;
@@ -530,7 +530,7 @@ function addMessage(
       summary.className = "msg-meta-summary";
       const traceId = traceObj.trace_id ? String(traceObj.trace_id).substring(0, 8) : "local";
       const eventsCount = Array.isArray(traceObj.events) ? traceObj.events.length : 0;
-      summary.textContent = `🔍 Trace [${traceId}...] (${eventsCount} соб.)`;
+      summary.textContent = `🔍 Трасса [${traceId}...] (${eventsCount} соб.)`;
       traceEl.appendChild(summary);
 
       // The Trace Viewer is a first-class chat action. Do not rely only on
@@ -539,7 +539,7 @@ function addMessage(
       const openTraceBtn = document.createElement("button");
       openTraceBtn.type = "button";
       openTraceBtn.className = "logos-btn logos-trace-open-viewer";
-      openTraceBtn.textContent = "🔍 Открыть Trace Viewer";
+      openTraceBtn.textContent = "🔍 Открыть трассу";
       openTraceBtn.title = "Открыть Execution Trace viewer";
 
       openTraceBtn.addEventListener("click", function (event) {
