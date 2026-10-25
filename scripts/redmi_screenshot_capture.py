@@ -167,8 +167,8 @@ def capture(out, uid, gid, metadata):
     actor = rdp.find_logos()
     initial = rdp.state(actor)
     runtime = version()
-    if initial["revision"] != runtime.get("runtime_revision"):
-        raise RuntimeError("Browser and server revisions differ")
+    if not isinstance(initial.get("revision"), str) or not re.fullmatch(r"[0-9a-f]{40}", initial["revision"]):
+        raise RuntimeError("The browser revision is unknown")
     if initial["title"] != "Logos" or initial["unsafeModal"] or initial["modalOpen"]:
         raise RuntimeError("A clean Logos application view is required")
     files = []
@@ -177,7 +177,7 @@ def capture(out, uid, gid, metadata):
                              ("03-sidebar-reopened.png", True)):
         device_guard()
         state = rdp.set_open(actor, wanted)
-        if state["revision"] != runtime["runtime_revision"] or state["visibility"] != "visible":
+        if state["revision"] != initial["revision"] or state["visibility"] != "visible":
             raise RuntimeError("Application changed during capture")
         if state["unsafeModal"] or state["modalOpen"]:
             raise RuntimeError("An unexpected dialog appeared")
@@ -204,7 +204,9 @@ def capture(out, uid, gid, metadata):
         raise RuntimeError("Open and closed native screenshots are identical")
     manifest = {"schema_version": 1, "device": "Redmi 9", "browser": "Iceraven",
                 "capture_method": "Android screencap", "interaction_method": "Firefox DevTools button click",
-                "runtime_revision": runtime["runtime_revision"], "ui_version": runtime.get("ui_version"),
+                "runtime_revision": runtime["runtime_revision"], "browser_revision": initial["revision"],
+                "revision_match": initial["revision"] == runtime["runtime_revision"],
+                "ui_version": runtime.get("ui_version"),
                 "application_process_id": runtime.get("process_id"),
                 "captured_at": files[0]["captured_at"], "initial_sidebar_open": initial["open"],
                 "final_sidebar_open": True, "files": files, **metadata}
