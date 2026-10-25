@@ -663,10 +663,10 @@ SELF_ASSESSMENT_QUESTION = (
 )
 
 
-def self_assessment(rdp, actor, conversation_id):
-    """Give the model an incomplete task and record the questions it asks. Never a failure."""
+def ask_model(rdp, actor, conversation_id, prompt):
+    """Send one message and return the model's reply, or the reason it was not answered."""
     counts_before = rdp.message_counts(actor)
-    rdp.send_chat_message(actor, SELF_ASSESSMENT_QUESTION)
+    rdp.send_chat_message(actor, prompt)
     status = "timeout"
     deadline = time.monotonic() + 120
     while time.monotonic() < deadline:
@@ -684,8 +684,25 @@ def self_assessment(rdp, actor, conversation_id):
         persisted = rdp.persisted_messages(actor, conversation_id)
         replies = [m["text"] for m in persisted["messages"] if m["role"] == "assistant"]
         text = replies[-1] if replies else None
+    return status, text
+
+
+def self_assessment(rdp, actor, conversation_id):
+    """Give the model an incomplete task and record the questions it asks. Never a failure."""
+    status, text = ask_model(rdp, actor, conversation_id, SELF_ASSESSMENT_QUESTION)
     questions = [line.strip() for line in (text or "").splitlines() if "?" in line]
     return {"status": status, "questions": questions, "reply_text": text}
+
+
+REAL_TASK_QUESTION = "Сколько будет 17% от 2340 рублей? Ответь числом и коротко объясни расчёт."
+REAL_TASK_EXPECTED = ("397,8", "397.8")
+
+
+def real_task(rdp, actor, conversation_id):
+    """Give the model a checkable task and record its answer. Never a failure."""
+    status, text = ask_model(rdp, actor, conversation_id, REAL_TASK_QUESTION)
+    correct = None if text is None else any(value in text for value in REAL_TASK_EXPECTED)
+    return {"status": status, "expected": REAL_TASK_EXPECTED[0], "correct": correct, "reply_text": text}
 
 
 def record_creation(rdp, actor, out, uid, gid, snapshot):
@@ -988,6 +1005,7 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
                                                "reply_persisted": "assistant" in roles}
                 if checkpoints["message_send"]["status"] == "PASS":
                     checkpoints["self_assessment"] = self_assessment(rdp, actor, new_id)
+                    checkpoints["real_task"] = real_task(rdp, actor, new_id)
             else:
                 checkpoints["message_send"] = {"status": "NOT_RUN", "reason": "creation_not_confirmed"}
     except CaptureSafetyError:
