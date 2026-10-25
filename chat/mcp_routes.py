@@ -134,7 +134,7 @@ def _client_params(raw: dict[str, Any]) -> dict[str, Any]:
 
 # Models whose provider acceptance for image input is verified. Until one is listed,
 # a message with photos is refused instead of being sent without them.
-IMAGE_INPUT_MODEL_KEYS: frozenset[str] = frozenset()
+IMAGE_INPUT_MODEL_KEYS: frozenset[str] = frozenset({"qwen3.6-35b-a3b"})
 MAX_IMAGES_PER_MESSAGE = 4
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 

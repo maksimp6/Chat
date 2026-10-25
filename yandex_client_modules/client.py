@@ -38,6 +38,7 @@ class YandexResponsesClient(
         self._config = config
         self.base_url = config.BASE_URL.rstrip("/")
         self.responses_url = self.base_url + "/responses"
+        self.chat_completions_url = self.base_url + "/chat/completions"
         self.conversations_url = self.base_url + "/conversations"
         self.session = requests.Session()
         self.session.headers.update(

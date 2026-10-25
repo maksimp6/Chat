@@ -20,7 +20,12 @@ except ImportError:  # pragma: no cover
     decrypt_secret = None
     encrypt_secret = None
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
-from yandex_client_modules.request_builder import build_response_payload, ultra_applied_event
+from yandex_client_modules.request_builder import (
+    build_chat_image_payload,
+    build_response_payload,
+    chat_completion_to_response,
+    ultra_applied_event,
+)
 from yandex_client_modules.request_receipt import build_request_manifest
 from yandex_client_modules.errors import YandexClientError
 from provider_accounts.quotas import (
@@ -242,6 +247,21 @@ class YandexRequestMixin:
         if isinstance(execution_trace, ExecutionTrace):
             execution_trace.add_event("ultra_profile_applied", ultra_applied_event(model_key, params, payload))
 
+        url = self.responses_url
+        images = params.get("input_images") or []
+        if images:
+            # Photos go through Chat Completions, the shape the Yandex docs show for image input.
+            payload = build_chat_image_payload(
+                project_id=credential.project_id,
+                model_key=model_key,
+                message=message,
+                images=images,
+                instructions=params.get("instructions"),
+                temperature=params.get("temperature"),
+                max_tokens=params.get("max_output_tokens"),
+            )
+            url = self.chat_completions_url
+
         # Reserved after the payload is built, so a request rejected for its parameters uses no quota.
         quota_reservation = None
         try:
@@ -270,7 +290,7 @@ class YandexRequestMixin:
         if isinstance(execution_trace, ExecutionTrace) and trace_step_number is None:
             trace_step_number = len(execution_trace.trace.get("api_requests", [])) + 1
 
-        self._log_request("POST", self.responses_url, json=payload)
+        self._log_request("POST", url, json=payload)
         _capture_request_input(execution_trace, payload, trace_step_number, on_provider_input)
         request_start_timestamp = time.time()
         request_start_perf = time.perf_counter()
@@ -285,7 +305,7 @@ class YandexRequestMixin:
                 "api_request_sent",
                 {
                     "method": "POST",
-                    "url": self.responses_url,
+                    "url": url,
                     "step": trace_step_number,
                     "correlation_id": execution_trace.get_step_correlation_id(trace_step_number),
                     "payload": _sanitize_for_log(payload),
@@ -296,7 +316,7 @@ class YandexRequestMixin:
         try:
             resp = self._log_response(
                 self.session.post(
-                    self.responses_url, json=payload, headers=headers, timeout=request_timeout
+                    url, json=payload, headers=headers, timeout=request_timeout
                 )
             )
             resp.raise_for_status()
@@ -322,7 +342,7 @@ class YandexRequestMixin:
                     "api_request_error",
                     {
                         "method": "POST",
-                        "url": self.responses_url,
+                        "url": url,
                         "step": trace_step_number,
                         "correlation_id": execution_trace.get_step_correlation_id(
                             trace_step_number
@@ -343,6 +363,8 @@ class YandexRequestMixin:
         request_duration_ms = round((time.perf_counter() - request_start_perf) * 1000, 2)
 
         data = resp.json()
+        if images:
+            data = chat_completion_to_response(data)
 
         if execution_trace and isinstance(execution_trace, ExecutionTrace):
             execution_trace.add_response(
@@ -362,7 +384,7 @@ class YandexRequestMixin:
                 "api_request_completed",
                 {
                     "method": "POST",
-                    "url": self.responses_url,
+                    "url": url,
                     "step": step,
                     "correlation_id": execution_trace.get_step_correlation_id(step),
                     "start_timestamp": request_start_timestamp,

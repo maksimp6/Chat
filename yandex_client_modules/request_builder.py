@@ -56,6 +56,59 @@ def ultra_applied_event(model_key, params, payload):
     }
 
 
+def build_chat_image_payload(
+    project_id,
+    model_key,
+    message,
+    images,
+    instructions=None,
+    temperature=None,
+    max_tokens=None,
+):
+    """Chat Completions body for a message with photos, in the shape the Yandex docs show for image input."""
+    content = [{"type": "text", "text": message}]
+    content += [{"type": "image_url", "image_url": {"url": url}} for url in images]
+    messages = []
+    if instructions:
+        messages.append({"role": "system", "content": instructions})
+    messages.append({"role": "user", "content": content})
+    payload = {
+        "model": "gpt://" + project_id + "/" + upstream_model_id(model_key),
+        "messages": messages,
+    }
+    if temperature is not None:
+        payload["temperature"] = float(temperature)
+    if max_tokens:
+        payload["max_tokens"] = int(max_tokens)
+    return payload
+
+
+def chat_completion_to_response(data):
+    """Reshape a Chat Completions answer into the Responses shape the rest of the client reads."""
+    if not isinstance(data, dict):
+        return data
+    choices = data.get("choices") or []
+    first = choices[0] if choices and isinstance(choices[0], dict) else {}
+    text = (first.get("message") or {}).get("content")
+    usage = data.get("usage") or {}
+    return {
+        "id": data.get("id"),
+        "status": "completed",
+        "output": [
+            {
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "output_text", "text": text if isinstance(text, str) else ""}],
+            }
+        ],
+        "usage": {
+            "input_tokens": usage.get("prompt_tokens", 0),
+            "output_tokens": usage.get("completion_tokens", 0),
+            "total_tokens": usage.get("total_tokens", 0),
+        },
+    }
+
+
 def build_response_payload(
     project_id,
     model_key,
