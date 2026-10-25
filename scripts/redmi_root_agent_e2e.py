@@ -15,6 +15,7 @@ import sys
 import threading
 import time
 import zlib
+from collections import Counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
@@ -40,7 +41,7 @@ button.addEventListener('click',event=>{
  send({kind:'click',trusted:true});
  requestAnimationFrame(()=>requestAnimationFrame(()=>send({kind:'paint',trusted:true})));
 });
-send({kind:'ready',width:innerWidth,height:innerHeight,dpr:devicePixelRatio});heartbeat();
+send({kind:'ready',width:innerWidth,height:innerHeight,dpr:devicePixelRatio,background:getComputedStyle(button).backgroundColor});heartbeat();
 button.click();
 </script>"""
 
@@ -58,6 +59,7 @@ class Witness:
         self.heartbeat_time = 0.0
         self.focused = False
         self.painted = False
+        self.page = {}
 
     def record(self, data):
         with self.lock:
@@ -71,6 +73,7 @@ class Witness:
             kind = data.get("kind")
             if kind == "ready":
                 self.ready = True
+                self.page = {k: data.get(k) for k in ('width', 'height', 'dpr', 'background')}
             elif kind == "negative" and data.get("trusted") is False:
                 self.negative += 1
             elif kind == 'heartbeat':
@@ -91,7 +94,8 @@ class Witness:
         with self.lock:
             return dict(ready=self.ready, negative=self.negative, clicks=self.clicks,
                         move_time=self.move_time, move_seq=self.move_seq, inside=self.inside,
-                        heartbeat_time=self.heartbeat_time, focused=self.focused, painted=self.painted)
+                        heartbeat_time=self.heartbeat_time, focused=self.focused, painted=self.painted,
+                        page=dict(self.page))
 
     def active(self):
         state = self.snapshot()
@@ -137,6 +141,7 @@ def frame_color(path, target, expected_size=None):
     stride = width * channels
     raw = zlib.decompress(b''.join(compressed))
     previous, matched, total = bytearray(stride), 0, 0
+    colors = Counter()
     for y in range(height):
         start = y * (stride + 1)
         mode, row = raw[start], bytearray(raw[start + 1:start + 1 + stride])
@@ -157,11 +162,14 @@ def frame_color(path, target, expected_size=None):
             for x in range(width // 10, width * 9 // 10, 4):
                 rgb = row[x * channels:x * channels + 3]
                 total += 1
+                colors[tuple(rgb)] += 1
                 matched += all(abs(component - expected) < 35 for component, expected in zip(rgb, target))
         previous = row
     if not total or matched < total * 0.8:
         path.unlink(missing_ok=True)
-        raise RuntimeError('NATIVE_TEST_COLOR_NOT_VISIBLE')
+        raise RuntimeError('NATIVE_TEST_COLOR_NOT_VISIBLE:' + json.dumps({
+            'match_ratio': round(matched / max(total, 1), 4),
+            'dominant_rgb': colors.most_common(4)}))
     return width, height
 
 
@@ -241,6 +249,7 @@ def main():
         if witness.snapshot()["clicks"] != 0:
             raise RuntimeError("NEGATIVE_CONTROL_FAILED")
         report["negative_control"] = "PASS_UNTRUSTED_CLICK_IGNORED"
+        report['page'] = witness.snapshot()['page']
         wait_for(witness.active, 5, 'OWN_PAGE_NOT_FOCUSED')
         report["before"] = run_cli(args.helper, "capture", "--expected-package", args.package,
                                    "--output", args.output / "before.png")
