@@ -19,7 +19,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 REPOSITORY = "maksimp6/Chat"
 REMOTE = "https://github.com/" + REPOSITORY + ".git"
 LFS_VERSION = b"version https://git-lfs.github.com/spec/v1\n"
-MAX_CAPTURE_PNGS = 20
+MAX_CAPTURE_PNGS = 24
 EXTRA_ARTIFACT_LIMITS = {"15-conversation-create.mp4": 20 * 1024 * 1024,
                          "16-dialogs-walk.mp4": 24 * 1024 * 1024,
                          "events.json": 1024 * 1024}

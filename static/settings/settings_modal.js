@@ -261,6 +261,7 @@
       "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);display:flex;flex-direction:column;";
 
     var tabsHeader = [
+      '<div class="settings-modal-top">',
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">',
       '    <h2 style="margin:0;font-size:18px;color:var(--m-text,#222);">⚙️ Конфигурация LLM & Responses API</h2>',
       '    <button class="logos-btn settings-contract-btn" id="set-close-btn">&times;</button>',
@@ -271,6 +272,7 @@
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-routing">Маршрутизация вызовов</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-adv">Промпты & Кэш</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-theme">Оформление</button>',
+      "</div>",
       "</div>",
     ].join("");
 

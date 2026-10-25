@@ -1962,9 +1962,13 @@ body {
   border-bottom-color: var(--accent);
   font-weight: 600;
 }
-/* The tab row must keep its height: the modal is a column flex box, and a shrunk row clips the 44px tab labels. */
-.logos-pro-app .llm-tabs {
+/* The settings header and tabs stay visible while the panel body scrolls. The panel is a column flex box, so the block must not shrink: a shrunk tab row clips the 44px labels. */
+.logos-pro-app .settings-modal-top {
   flex: 0 0 auto;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--m-bg, #fff);
 }
 
 /* Высокий контраст: контуры кнопок и ховер диалога (пункт 52) */

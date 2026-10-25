@@ -411,6 +411,20 @@ class RDP:
                       "!(h===b||b.contains(h)))throw Error('Control is obscured');"
                       "b.click();return {clicked:true};})())")
 
+    def scroll(self, actor, selector, where):
+        return self.evaluate(actor, "JSON.stringify((()=>{const el=document.querySelector(" + json.dumps(selector) +
+                             ");if(!el)throw Error('Scroll container missing');"
+                             "el.scrollTop=" + ("0" if where == "top" else "el.scrollHeight") + ";"
+                             "return {scrollTop:el.scrollTop,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight};})())")
+
+    def chat_candidates(self, actor):
+        return self.evaluate(actor, "JSON.stringify([...document.querySelectorAll('#conv-list .conv-item')].map((el,i)=>({index:i,"
+                                    "title:((el.querySelector('.conv-title')||el).textContent||'').trim()})))")
+
+    def open_conversation(self, actor, index):
+        self.evaluate(actor, "JSON.stringify((()=>{const el=document.querySelectorAll('#conv-list .conv-item')[" + str(int(index)) +
+                      "];if(!el)throw Error('Conversation missing');el.click();return {opened:true};})())")
+
     def wait_surface(self, actor, surface, tab=None):
         for _ in range(40):
             state = self.state(actor)
@@ -1029,13 +1043,46 @@ def capture(out, uid, gid, metadata):
         matrix_failures.append("document_core_api_missing")
     snapshot("00-application-initial.png")
 
-    def matrix_action(name, action):
+    retried_steps = []
+
+    def reload_app():
+        nonlocal actor
+        origin_before = rdp.conversation_state(actor)["time_origin_ms"]
+        rdp.evaluate(actor, "JSON.stringify((()=>{setTimeout(()=>location.reload(),100);return {scheduled:true};})())")
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            device_guard()
+            try:
+                actor = rdp.find_logos()
+                candidate = rdp.conversation_state(actor)
+                if candidate["time_origin_ms"] != origin_before and candidate["ready_state"] == "complete":
+                    return
+            except CaptureSafetyError:
+                raise
+            except (OSError, RuntimeError, KeyError):
+                pass
+            time.sleep(0.2)
+        raise RuntimeError("The application did not reload")
+
+    def matrix_action(name, action, opener=None):
         try:
             action()
             return []
         except CaptureSafetyError:
             raise
         except Exception:
+            if opener is not None:
+                # One retry: reload the page and start this step again from its opening action.
+                try:
+                    reload_app()
+                    opener()
+                    action()
+                    retried_steps.append(name)
+                    return []
+                except CaptureSafetyError:
+                    raise
+                except Exception:
+                    pass
             failure = name + "_transition_failed"
             matrix_failures.append(failure)
             return [failure]
@@ -1051,8 +1098,8 @@ def capture(out, uid, gid, metadata):
         snapshot(filename, surface=surface, redact_selectors=selectors)
         return files[-1]["browser"]
 
-    def matrix_step(name, filename, action, surface=None, sidebar=None, tab=None):
-        failures = matrix_action(name, action)
+    def matrix_step(name, filename, action, surface=None, sidebar=None, tab=None, opener=None):
+        failures = matrix_action(name, action, opener)
         state = observed_snapshot(filename)
         if state["surfaces"] != ([surface] if surface else []):
             failures.append(name + "_surface_not_reached")
@@ -1068,29 +1115,93 @@ def capture(out, uid, gid, metadata):
         matrix_failures.extend(failures)
         files[-1]["matrix_expectation"] = {"state": name, "surface": surface, "sidebar": sidebar,
                                            "tab": tab, "verdict": "FAIL" if failures else "PASS",
-                                           "failures": list(dict.fromkeys(failures))}
+                                           "failures": list(dict.fromkeys(failures)),
+                                           "retried_after_reload": name in retried_steps}
 
     def close_surface(name, selector):
         if name in rdp.state(actor)["surfaces"]:
             matrix_action("close_" + name, lambda: (rdp.click(actor, selector), rdp.wait_surface(actor, None)))
 
+    surface_openers = {
+        "model": lambda: (rdp.set_open(actor, False), rdp.click(actor, "#model-btn"), rdp.wait_surface(actor, "model")),
+        "status": lambda: (rdp.click(actor, "#system-status-btn"), rdp.wait_surface(actor, "status")),
+        "settings": lambda: (rdp.click(actor, "#settings-btn"), rdp.wait_surface(actor, "settings")),
+    }
+
+    def scroll_step(name, filename, selector, where, surface, opener, tab=None, before=None, note=None):
+        """Scroll one container to its top or bottom and check that the position really changed."""
+        measured = {}
+
+        def action():
+            if before is not None:
+                before()
+            measured.update(rdp.scroll(actor, selector, where))
+            limit = measured["scrollHeight"] - measured["clientHeight"]
+            if limit > 2 and (measured["scrollTop"] < limit - 2 if where == "bottom" else measured["scrollTop"] > 0):
+                raise RuntimeError("scroll did not reach the " + where)
+
+        matrix_step(name, filename, action, surface=surface, tab=tab, opener=opener)
+        files[-1]["scroll"] = {"where": where, "selector": selector, **measured,
+                               "scrollable": measured.get("scrollHeight", 0) > measured.get("clientHeight", 0) + 2,
+                               **(note or {})}
+
+    chat = {}
+
+    def load_conversation(index):
+        rdp.set_open(actor, True)
+        rdp.open_conversation(actor, index)
+        for _ in range(8):
+            count = rdp.conversation_state(actor)["message_count"]
+            if count:
+                return count
+            time.sleep(0.5)
+        return 0
+
+    def reopen_chat():
+        load_conversation(chat["index"])
+
+    def choose_conversation():
+        """Pick the existing conversation with the most messages; empty new chats are skipped."""
+        candidates = [c for c in rdp.chat_candidates(actor) if c["title"] != "Новый чат"][:4]
+        best = None
+        for candidate in candidates:
+            count = load_conversation(candidate["index"])
+            if best is None or count > best["message_count"]:
+                best = {"index": candidate["index"], "title": candidate["title"], "message_count": count}
+        if best is None or best["message_count"] < 1:
+            raise RuntimeError("no existing conversation has messages")
+        chat.update(best)
+        reopen_chat()
+
     dialogs_recorder = start_screenrecord(out / DIALOGS_VIDEO_NAME, time_limit=180, bit_rate=1000000)
     for filename, wanted in (("01-sidebar-open.png", True), ("02-sidebar-closed.png", False),
                              ("03-sidebar-reopened.png", True)):
-        matrix_step(filename[:-4], filename, lambda wanted=wanted: rdp.set_open(actor, wanted), sidebar=wanted)
-    matrix_step("model_picker", "04-model-picker.png",
-                lambda: (rdp.set_open(actor, False), rdp.click(actor, "#model-btn"), rdp.wait_surface(actor, "model")), surface="model")
+        matrix_step(filename[:-4], filename, lambda wanted=wanted: rdp.set_open(actor, wanted), sidebar=wanted,
+                    opener=lambda wanted=wanted: rdp.set_open(actor, wanted))
+    matrix_step("model_picker", "04-model-picker.png", surface_openers["model"], surface="model",
+                opener=surface_openers["model"])
+    scroll_step("model_picker_bottom", "19-model-picker-bottom.png", "#model-modal .modal-content", "bottom",
+                surface="model", opener=surface_openers["model"])
     close_surface("model", "#close-modal")
-    matrix_step("system_status", "05-system-status.png",
-                lambda: (rdp.click(actor, "#system-status-btn"), rdp.wait_surface(actor, "status")), surface="status")
+    matrix_step("system_status", "05-system-status.png", surface_openers["status"], surface="status",
+                opener=surface_openers["status"])
+    scroll_step("system_status_bottom", "20-system-status-bottom.png", ".logos-system-status-content", "bottom",
+                surface="status", opener=surface_openers["status"])
     close_surface("status", "#logos-system-status .logos-system-status-close")
-    matrix_action("open_settings", lambda: (rdp.click(actor, "#settings-btn"), rdp.wait_surface(actor, "settings")))
+    matrix_action("open_settings", surface_openers["settings"])
     for number, tab in enumerate(("gen", "output", "routing", "adv", "theme"), start=6):
         panel = "tab-" + tab
         matrix_step("settings_" + tab, str(number).zfill(2) + "-settings-" + tab + ".png",
                     lambda panel=panel: (rdp.click(actor, '#settings-modal-custom .llm-tab-btn[data-tab="' + panel + '"]'),
-                                         rdp.wait_surface(actor, "settings", tab=panel)), surface="settings", tab=panel)
+                                         rdp.wait_surface(actor, "settings", tab=panel)), surface="settings", tab=panel,
+                    opener=surface_openers["settings"])
+    scroll_step("settings_gen_bottom", "21-settings-gen-bottom.png", "#settings-modal-custom .settings-modal-panel", "bottom",
+                surface="settings", opener=surface_openers["settings"], tab="tab-gen",
+                before=lambda: rdp.click(actor, '#settings-modal-custom .llm-tab-btn[data-tab="tab-gen"]'))
     close_surface("settings", "#set-close-btn")
+    matrix_action("chat_select", choose_conversation, opener=lambda: rdp.set_open(actor, True))
+    scroll_step("chat_top", "17-chat-top.png", "#chatbox", "top", surface=None, opener=reopen_chat, note=chat)
+    scroll_step("chat_bottom", "18-chat-bottom.png", "#chatbox", "bottom", surface=None, opener=reopen_chat, note=chat)
     matrix_action("restore_sidebar", lambda: rdp.set_open(actor, True))
     if dialogs_recorder is None:
         dialogs_video, dialogs_artifact, dialogs_failures = (
