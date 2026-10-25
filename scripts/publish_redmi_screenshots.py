@@ -225,7 +225,87 @@ def verify(repo, env, files, relative, storage):
         validate_git_blob(remote_pointer, name, metadata)
 
 
+def latest_capture(repo, env):
+    base = repo / "docs/screenshots/logos"
+    require(base.is_dir(), "no published screenshot captures")
+    require(not any(path.is_symlink() for path in (repo / "docs", repo / "docs/screenshots", base)),
+            "unsafe screenshot directory")
+    candidates = []
+    for manifest in base.glob("*/*/manifest.json"):
+        day, folder = manifest.parent.parent.name, manifest.parent.name
+        match = re.fullmatch(r"run-([1-9][0-9]*)-([1-9][0-9]*)", folder)
+        if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", day) or not match:
+            continue
+        try:
+            datetime.strptime(day, "%Y-%m-%d")
+        except ValueError:
+            continue
+        require(not any(path.is_symlink() for path in (manifest, manifest.parent, manifest.parent.parent)),
+                "unsafe capture manifest path")
+        candidates.append((int(match[1]), int(match[2]), day, manifest))
+    require(bool(candidates), "no published screenshot manifests")
+    run_id, attempt, _, manifest = max(candidates, key=lambda item: item[:3])
+    relative = manifest.parent.relative_to(repo).as_posix()
+    raw = git(repo, env, "show", "HEAD:" + relative + "/manifest.json").stdout
+    require(not raw.startswith(LFS_VERSION) and manifest.read_bytes() == raw,
+            "capture manifest must be an ordinary Git blob")
+    data = json.loads(raw)
+    require(isinstance(data, dict) and str(data.get("github_run_id")) == str(run_id)
+            and str(data.get("github_run_attempt")) == str(attempt),
+            "capture manifest run identity differs from its folder")
+    entries = data.get("files")
+    require(isinstance(entries, list) and len(entries) == 3, "expected three published capture PNGs")
+    files = {}
+    for entry in entries:
+        require(isinstance(entry, dict), "invalid published capture entry")
+        name, sha, size = entry.get("path"), entry.get("sha256"), entry.get("size")
+        require(isinstance(name, str) and re.fullmatch(r"[0-9]{2}-[a-z0-9-]+\.png", name)
+                and name not in files, "invalid published capture filename")
+        require(isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{64}", sha), "invalid published capture hash")
+        require(type(size) is int and 0 < size <= 5 * 1024 * 1024, "invalid published capture size")
+        path = manifest.parent / name
+        require(path.is_file() and not path.is_symlink(), "published capture pointer is missing")
+        metadata = {"path": path, "sha256": sha, "size": size}
+        blob = git(repo, env, "show", "HEAD:" + relative + "/" + name).stdout
+        validate_git_blob(blob, name, metadata)
+        require(path.read_bytes() == blob, "capture pointer differs from its Git blob")
+        files[name] = metadata
+    files["manifest.json"] = {"path": manifest, "sha256": hashlib.sha256(raw).hexdigest(), "size": len(raw)}
+    return files, relative, str(run_id), str(attempt)
+
+
+def verify_latest():
+    env, run_id, attempt = runner_environment()
+    with tempfile.TemporaryDirectory(prefix="logos-lfs-verify-", dir=env["RUNNER_TEMP"]) as temporary:
+        root = Path(temporary)
+        repo = root / "repository"
+        repo.mkdir()
+        configure(repo, env)
+        git(repo, env, "fetch", "--quiet", "--depth=1", "--filter=blob:none", "origin", "refs/heads/develop")
+        git(repo, env, "checkout", "--quiet", "--detach", "FETCH_HEAD")
+        files, relative, capture_run, capture_attempt = latest_capture(repo, env)
+        verify(repo, env, files, relative, root / "remote-lfs-verification")
+        commit = git(repo, env, "rev-parse", "FETCH_HEAD").stdout.decode().strip()
+        result = {"verification_run_id": run_id, "verification_run_attempt": attempt,
+                  "capture_run_id": capture_run, "capture_run_attempt": capture_attempt,
+                  "commit": commit, "verified": True,
+                  "files": [{"path": relative + "/" + name, "sha256": metadata["sha256"],
+                             "size": metadata["size"]} for name, metadata in files.items()]}
+        summary = os.environ.get("GITHUB_STEP_SUMMARY")
+        if summary:
+            with open(summary, "a", encoding="utf-8") as stream:
+                stream.write("### Existing Redmi 9 screenshots verified in Git LFS\n\n")
+                for item in result["files"]:
+                    url = "https://github.com/" + REPOSITORY + "/blob/" + commit + "/" + item["path"]
+                    stream.write("- [" + Path(item["path"]).name + "](" + url + ") · SHA256 `"
+                                 + item["sha256"] + "`\n")
+        print(json.dumps(result, ensure_ascii=False))
+
+
 def main():
+    if sys.argv[1:] == ["--verify-latest"]:
+        verify_latest()
+        return
     require(len(sys.argv) == 2, "usage: publish_redmi_screenshots.py CAPTURE_DIR")
     env, run_id, attempt = runner_environment()
     files = capture_files(sys.argv[1])
