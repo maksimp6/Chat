@@ -172,8 +172,16 @@ def _resolve_global_provider_credential(client, execution_trace=None):
             expires_at=credential.expires_at,
             project_id=credential.project_id,
             source="global",
+            key_mask=_key_mask(credential.api_key),
         )
     return credential
+
+
+def _key_mask(api_key):
+    """Show only the last four characters of a provider key, as ****abcd for reports."""
+    if not isinstance(api_key, str) or len(api_key) <= 8:
+        return None
+    return "****" + api_key[-4:]
 
 
 def provider_request_headers(credential) -> dict[str, str]:

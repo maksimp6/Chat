@@ -248,6 +248,7 @@ class ExecutionTrace:
         expires_at: Optional[Any] = None,
         project_id: Optional[str] = None,
         source: Optional[str] = None,
+        key_mask: Optional[str] = None,
     ) -> None:
         """Bind a non-secret provider-key identity to this trace."""
         self._ensure_mutable()
@@ -258,6 +259,7 @@ class ExecutionTrace:
             ("expires_at", expires_at),
             ("project_id", project_id),
             ("source", source),
+            ("key_mask", key_mask),
         ):
             if value is not None:
                 entry[name] = str(value)
