@@ -10,7 +10,7 @@ on:
         required: true
         default: deploy
         type: choice
-        options: [deploy, screenshots, verify_screenshots]
+        options: [deploy, screenshots, verify_screenshots, rootagent_native_check]
 
 permissions: {}
 
@@ -105,3 +105,27 @@ jobs:
           curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
             "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/publish_redmi_screenshots.py" -o "$verification_job_temp/publish_redmi_screenshots.py"
           python "$verification_job_temp/publish_redmi_screenshots.py" --verify-latest
+
+  rootagent_native_check:
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'rootagent_native_check'
+    runs-on: redmi9
+    timeout-minutes: 8
+    steps:
+      - name: Native RootAgent controls and real input
+        shell: bash
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
+          native_job_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-rootagent-", dir=".")).resolve())')
+          export RUNNER_TEMP="$native_job_temp"
+          export TMPDIR="$native_job_temp"
+          mkdir -m 700 "$RUNNER_TEMP/scripts" "$RUNNER_TEMP/tests" "$RUNNER_TEMP/evidence"
+          for file in scripts/redmi_root_agent.py scripts/redmi_root_agent_e2e.py tests/test_redmi_root_agent.py; do
+            curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
+              "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/$file" -o "$RUNNER_TEMP/$file"
+          done
+          cd "$RUNNER_TEMP"
+          python -m unittest discover -s tests -p test_redmi_root_agent.py -v
+          python scripts/redmi_root_agent_e2e.py --helper scripts/redmi_root_agent.py --output "$RUNNER_TEMP/evidence"
+
