@@ -203,6 +203,14 @@ function parseMarkdown(text) {
     return ph;
   });
 
+  // Generated pictures arrive as base64 data URLs; only png and jpeg are accepted.
+  var images = [];
+  safe = safe.replace(/!\[([^\]\n]{0,200})\]\((data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+)\)/g, function (m, alt, src) {
+    var ph = "\x00IM" + images.length + "\x00";
+    images.push('<img class="md-image" src="' + src + '" alt="' + alt.replace(/"/g, "") + '">');
+    return ph;
+  });
+
   // Formulas are taken out before the lines are split, so a $$ block may span several lines.
   var maths = [];
   safe = safe.replace(/\$\$([\s\S]+?)\$\$|\$(?!\s)([^$\n]+?)(?<!\s)\$/g, function (m, block, inline) {
@@ -339,6 +347,10 @@ function parseMarkdown(text) {
   for (var k = 0; k < maths.length; k++)
     result = result.replace("\x00MT" + k + "\x00", function () {
       return maths[k];
+    });
+  for (var n = 0; n < images.length; n++)
+    result = result.replace("\x00IM" + n + "\x00", function () {
+      return images[n];
     });
   return result;
 }
@@ -784,6 +796,39 @@ document.addEventListener("DOMContentLoaded", function () {
     return sendTurn(request);
   };
 
+  function isImageModel(modelKey) {
+    return Boolean(modelsData && modelsData.image && modelsData.image[modelKey]);
+  }
+
+  // A picture takes one generation request, then long polls on the server until it is ready.
+  async function runImageTurn(turn) {
+    const started = await window.LogosDispatcher.request("/api/images/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        conversation_id: turn.conversationId,
+        message: turn.text,
+        model: turn.model,
+      }),
+    }, { timeoutMs: 60000 });
+    const startBody = await started.json().catch(() => ({}));
+    if (!started.ok || !startBody.operation_id) {
+      return { error: startBody.message || startBody.error || "HTTP " + started.status };
+    }
+    const operationPath =
+      "/api/images/operations/" + encodeURIComponent(startBody.operation_id) +
+      "?conversation_id=" + encodeURIComponent(turn.conversationId);
+    for (let attempt = 0; attempt < 240; attempt++) {
+      const polled = await window.LogosDispatcher.request(operationPath, {}, { timeoutMs: 60000 });
+      const state = await polled.json().catch(() => ({}));
+      if (state.status === "done") return { reply: state.reply, cost: 0 };
+      if (state.status === "failed" || !polled.ok) {
+        return { error: state.error || "HTTP " + polled.status };
+      }
+    }
+    return { error: "image generation timed out" };
+  }
+
   function sendMessage() {
     return sendTurn(null);
   }
@@ -848,21 +893,28 @@ document.addEventListener("DOMContentLoaded", function () {
         if (chatbox) chatbox.appendChild(typingEl);
       }
       const t0 = performance.now();
-      const response = await window.LogosDispatcher.request("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: turn.text,
-          conversation_id: turn.conversationId,
-          retry: Boolean(retryRequest),
-          model: turn.model,
-          params: turn.params,
-          attachments: sentImages.map(function (image) {
-            return { data_url: image.dataUrl };
+      let response;
+      let data;
+      if (isImageModel(turn.model)) {
+        data = await runImageTurn(turn);
+        response = { status: data.error ? 502 : 200, ok: !data.error };
+      } else {
+        response = await window.LogosDispatcher.request("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: turn.text,
+            conversation_id: turn.conversationId,
+            retry: Boolean(retryRequest),
+            model: turn.model,
+            params: turn.params,
+            attachments: sentImages.map(function (image) {
+              return { data_url: image.dataUrl };
+            }),
           }),
-        }),
-      }, { timeoutMs: 300000 });
-      const data = await response.json().catch(() => ({}));
+        }, { timeoutMs: 300000 });
+        data = await response.json().catch(() => ({}));
+      }
       const clientTotalMs = Math.round(performance.now() - t0);
       if (data.title && typeof conversations !== "undefined" && Array.isArray(conversations)) {
         const conversation = conversations.find((item) => item.id === turn.conversationId);

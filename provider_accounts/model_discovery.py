@@ -10,7 +10,7 @@ from typing import Any
 
 import requests
 
-from core.config import TEXT_MODELS, VOICE_MODELS, registry_key_for_upstream
+from core.config import IMAGE_MODELS, TEXT_MODELS, VOICE_MODELS, registry_key_for_upstream
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ class ModelDiscovery:
         if not text_models:
             raise ModelDiscoveryError("provider returned an empty model catalog")
 
-        return {"text": text_models, "voice": dict(VOICE_MODELS)}
+        return {"text": text_models, "voice": dict(VOICE_MODELS), "image": dict(IMAGE_MODELS)}
 
     @staticmethod
     def _normalize_model(item: Any) -> dict[str, Any] | None:
@@ -131,6 +131,7 @@ class ModelDiscovery:
         return {
             "text": {key: dict(value) for key, value in catalog["text"].items()},
             "voice": {key: dict(value) for key, value in catalog["voice"].items()},
+            "image": {key: dict(value) for key, value in catalog.get("image", {}).items()},
         }
 
     @staticmethod
@@ -176,4 +177,5 @@ def static_model_catalog() -> dict[str, Any]:
     return {
         "text": {key: dict(value) for key, value in TEXT_MODELS.items()},
         "voice": {key: dict(value) for key, value in VOICE_MODELS.items()},
+        "image": {key: dict(value) for key, value in IMAGE_MODELS.items()},
     }

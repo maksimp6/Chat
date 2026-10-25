@@ -2,7 +2,7 @@ let currentConvId = null;
 let conversations = [];
 let currentModel = "yandexgpt-5-pro";
 let currentModelType = "text";
-let modelsData = { text: {}, voice: {} };
+let modelsData = { text: {}, voice: {}, image: {} };
 let coreInitialized = false;
 let coreEnhancementStarted = false;
 let modelLoadState = { status: "idle", message: "" };
@@ -174,15 +174,16 @@ async function loadModels() {
     }
     var text = payload.text && typeof payload.text === "object" ? payload.text : {};
     var voice = payload.voice && typeof payload.voice === "object" ? payload.voice : {};
-    if (!Object.keys(text).length && !Object.keys(voice).length) {
+    var image = payload.image && typeof payload.image === "object" ? payload.image : {};
+    if (!Object.keys(text).length && !Object.keys(voice).length && !Object.keys(image).length) {
       reportModelLoad("empty_response");
       failureClassified = true;
       throw new Error("Empty model catalog");
     }
-    modelsData = { text: text, voice: voice };
+    modelsData = { text: text, voice: voice, image: image };
     modelLoadState = { status: "ready", message: "" };
     reportModelLoad("success", {
-      modelCount: Object.keys(text).length + Object.keys(voice).length,
+      modelCount: Object.keys(text).length + Object.keys(voice).length + Object.keys(image).length,
     });
     if (typeof renderModelModal === "function") renderModelModal();
     return modelsData;

@@ -1551,6 +1551,13 @@ body {
   text-align: center;
   white-space: normal;
 }
+.logos-pro-app .md-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 8px 0;
+  border-radius: 8px;
+}
 .logos-pro-app .md-frac {
   display: inline-flex;
   flex-direction: column;

@@ -168,7 +168,19 @@ VOICE_MODELS = {
     },
 }
 
-ALL_MODELS = {**TEXT_MODELS, **VOICE_MODELS}
+IMAGE_MODELS = {
+    "alice-ai-art": {
+        "name": "Alice AI ART",
+        "upstream": "aliceai-image-art-3.0",
+        "type": "image",
+        "provider": "yandex_image",
+        "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
+        # The Yandex docs list no price for this model, so its cost stays unknown.
+        "pricing_status": "unknown",
+    },
+}
+
+ALL_MODELS = {**TEXT_MODELS, **VOICE_MODELS, **IMAGE_MODELS}
 AUDIO_STT_PRICE_PER_SEC = 0.0264
 AUDIO_TTS_PRICE_PER_SEC = 0.0203
 

@@ -31,7 +31,7 @@ function renderModelModal() {
   var modelModal = document.getElementById("model-modal");
   if (!modelList) return;
   modelList.replaceChildren();
-  var allModels = Object.assign({}, modelsData.text || {}, modelsData.voice || {});
+  var allModels = Object.assign({}, modelsData.text || {}, modelsData.voice || {}, modelsData.image || {});
   if (Object.keys(allModels).length === 0) {
     var state =
       typeof modelLoadState === "undefined" ? { status: "idle", message: "" } : modelLoadState;
@@ -153,7 +153,7 @@ function createConversation(modelKey, options) {
 function updateModelButton() {
   var btn = document.getElementById("model-btn");
   if (!btn) return;
-  var allModels = Object.assign({}, modelsData.text || {}, modelsData.voice || {});
+  var allModels = Object.assign({}, modelsData.text || {}, modelsData.voice || {}, modelsData.image || {});
   var m = allModels[currentModel];
   if (m) {
     btn.textContent = "🤖";
