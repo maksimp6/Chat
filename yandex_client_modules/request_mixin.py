@@ -248,9 +248,9 @@ class YandexRequestMixin:
         images = params.get("input_images") or []
         if images:
             # Photos go through Chat Completions, the shape the Yandex docs show for image input.
-            # That path keeps no tool loop, so a request with tools is refused rather than sent without them.
-            if params.get("tools"):
-                raise YandexClientError("tools_not_supported_with_images")
+            # That path has no tool loop, so this message is answered without tools; the trace records it.
+            if params.get("tools") and isinstance(execution_trace, ExecutionTrace):
+                execution_trace.add_event("tools_skipped_for_images", {"reason": "photo message"})
             payload = build_chat_image_payload(
                 project_id=credential.project_id,
                 model_key=model_key,
