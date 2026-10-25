@@ -64,11 +64,11 @@ def test_sdk_builds_headers_and_yandex_requests(monkeypatch):
     assert session.headers["x-yc-project-id"] == "project"
 
     assert client.create_conversation() == {"id": "conv-1"}
-    assert client.send_message("conv-1", "hello", model="model-a") == {"response": "ok"}
+    assert client.send_message("conv-1", "hello", model="yandexgpt-5-pro") == {"response": "ok"}
     assert client.list_models() == {"models": []}
 
     response_call = next(call for call in session.calls if call[1].endswith("/responses"))
-    assert response_call[2]["model"] == "gpt://project/model-a/latest"
+    assert response_call[2]["model"] == "gpt://project/yandexgpt/latest"
     assert response_call[2]["conversation"] == "conv-1"
     assert response_call[2]["input"] == [{"role": "user", "content": "hello"}]
 

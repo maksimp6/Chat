@@ -145,6 +145,40 @@ function splitTableRow(line) {
   return cells;
 }
 
+var MATH_SYMBOLS = {
+  times: "×",
+  cdot: "·",
+  div: "÷",
+  pm: "±",
+  le: "≤",
+  leq: "≤",
+  ge: "≥",
+  geq: "≥",
+  neq: "≠",
+  approx: "≈",
+  infty: "∞",
+  ldots: "…",
+  cdots: "⋯",
+};
+
+// Plain-HTML approximation of common LaTeX. The input is already HTML-escaped, so the only tags here are the ones made below.
+function mathToHtml(tex) {
+  return tex
+    .replace(/\\text\{([^{}]*)\}/g, "$1")
+    .replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, '<span class="md-frac"><span>$1</span><span>$2</span></span>')
+    .replace(/\\sqrt\{([^{}]*)\}/g, "√($1)")
+    .replace(/\^\{([^{}]*)\}/g, "<sup>$1</sup>")
+    .replace(/\^(&[a-z]+;|[^{\s])/g, "<sup>$1</sup>")
+    .replace(/_\{([^{}]*)\}/g, "<sub>$1</sub>")
+    .replace(/_(&[a-z]+;|[^{\s])/g, "<sub>$1</sub>")
+    .replace(/\\%/g, "%")
+    .replace(/\\[,;]/g, " ")
+    .replace(/\\([a-zA-Z]+)/g, function (m, name) {
+      return Object.prototype.hasOwnProperty.call(MATH_SYMBOLS, name) ? MATH_SYMBOLS[name] : m;
+    })
+    .replace(/[{}]/g, "");
+}
+
 function parseMarkdown(text) {
   if (!text) return "";
   var strText = typeof text === "string" ? text : JSON.stringify(text);
@@ -166,6 +200,18 @@ function parseMarkdown(text) {
         code +
         "</code></pre></div>",
     );
+    return ph;
+  });
+
+  // Formulas are taken out before the lines are split, so a $$ block may span several lines.
+  var maths = [];
+  safe = safe.replace(/\$\$([\s\S]+?)\$\$|\$(?!\s)([^$\n]+?)(?<!\s)\$/g, function (m, block, inline) {
+    var ph = "\x00MT" + maths.length + "\x00";
+    if (block !== undefined) {
+      maths.push('<div class="md-math md-math-block">' + mathToHtml(block.trim()) + "</div>");
+    } else {
+      maths.push('<span class="md-math">' + mathToHtml(inline) + "</span>");
+    }
     return ph;
   });
 
@@ -290,6 +336,10 @@ function parseMarkdown(text) {
   var result = out.join("\n");
   for (var j = 0; j < codeBlocks.length; j++)
     result = result.replace("\x00CB" + j + "\x00", codeBlocks[j]);
+  for (var k = 0; k < maths.length; k++)
+    result = result.replace("\x00MT" + k + "\x00", function () {
+      return maths[k];
+    });
   return result;
 }
 
@@ -544,14 +594,27 @@ function addMessage(
       openTraceBtn.textContent = "🔍 Открыть трассу";
       openTraceBtn.title = "Открыть Execution Trace viewer";
 
-      openTraceBtn.addEventListener("click", function (event) {
+      openTraceBtn.addEventListener("click", async function (event) {
         event.preventDefault();
         event.stopPropagation();
-        if (typeof window.openTraceViewer === "function") {
-          window.openTraceViewer(traceObj);
-        } else {
+        if (typeof window.openTraceViewer !== "function") {
           console.error("[CHAT] Execution Trace Viewer is not loaded");
+          return;
         }
+        // A stored message keeps only a reference to its trace; the full trace is read from the invocation.
+        if (traceObj.storage === "invocation" && traceObj.invocation_id) {
+          try {
+            const res = await window.LogosDispatcher.request(
+              `/api/invocations/${encodeURIComponent(traceObj.invocation_id)}/trace`,
+            );
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            window.openTraceViewer(await res.json());
+          } catch (err) {
+            console.error("[CHAT] Trace load failed: " + err.message);
+          }
+          return;
+        }
+        window.openTraceViewer(traceObj);
       });
       metaWrap.appendChild(traceEl);
       metaWrap.appendChild(openTraceBtn);
