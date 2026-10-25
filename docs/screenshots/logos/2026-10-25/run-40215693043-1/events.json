@@ -1,0 +1,520 @@
+{
+  "scenario": "all_application_modals",
+  "events": [
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:17:02.461266+00:00",
+      "monotonic_ns": 4239244946636,
+      "video": null,
+      "recorder_running": false
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:17:03.597803+00:00",
+      "monotonic_ns": 4240381528251,
+      "video": null,
+      "recorder_running": false
+    },
+    {
+      "event": "recorder_launch_requested",
+      "wall_utc": "2026-10-25T17:17:03.598134+00:00",
+      "monotonic_ns": 4240381764790,
+      "video": "all-modals-01.mp4",
+      "recorder_running": false
+    },
+    {
+      "event": "recorder_started",
+      "wall_utc": "2026-10-25T17:17:04.201099+00:00",
+      "monotonic_ns": 4240984823944,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:17:04.704026+00:00",
+      "monotonic_ns": 4241487684790,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "98-starting-view.png",
+        "root": "body",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:17:05.525481+00:00",
+      "monotonic_ns": 4242309144175,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "98-starting-view.png",
+        "sha256": "b3d043a97efa19f27317f3002eb6819db3f66689b351567ca1b00a9f0faf7823",
+        "size": 198251,
+        "root": "body",
+        "captured_at": "2026-10-25T17:17:05.525269+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:17:05.557779+00:00",
+      "monotonic_ns": 4242341509482,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:17:06.707981+00:00",
+      "monotonic_ns": 4243491638406,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:17:06.708164+00:00",
+      "monotonic_ns": 4243491788482,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "trace",
+        "opener": null,
+        "root": ".logos-trace-window"
+      }
+    },
+    {
+      "event": "existing_trace_button_clicked",
+      "wall_utc": "2026-10-25T17:17:07.745279+00:00",
+      "monotonic_ns": 4244528939021,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "button_index": 3,
+        "button_count": 4,
+        "errors": []
+      }
+    },
+    {
+      "event": "existing_trace_button_clicked",
+      "wall_utc": "2026-10-25T17:17:08.427807+00:00",
+      "monotonic_ns": 4245211474329,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "button_index": 2,
+        "button_count": 4,
+        "errors": []
+      }
+    },
+    {
+      "event": "existing_trace_button_clicked",
+      "wall_utc": "2026-10-25T17:17:09.138765+00:00",
+      "monotonic_ns": 4245922479560,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "button_index": 1,
+        "button_count": 4,
+        "errors": []
+      }
+    },
+    {
+      "event": "existing_trace_button_clicked",
+      "wall_utc": "2026-10-25T17:17:09.847674+00:00",
+      "monotonic_ns": 4246631439560,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "button_index": 0,
+        "button_count": 4,
+        "errors": []
+      }
+    },
+    {
+      "event": "modal_capture_failed",
+      "wall_utc": "2026-10-25T17:17:09.860058+00:00",
+      "monotonic_ns": 4246643778021,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "trace",
+        "root": ".logos-trace-window",
+        "status": "NOT_CAPTURED",
+        "video": "all-modals-01.mp4",
+        "reason": "existing_trace_buttons_did_not_open_viewer"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:17:10.328120+00:00",
+      "monotonic_ns": 4247111801790,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "38-trace-unavailable.png",
+        "root": "body",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:17:10.973815+00:00",
+      "monotonic_ns": 4247757472483,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "38-trace-unavailable.png",
+        "sha256": "7b5c03c8f57bdcddd8b40f12ecd30e0e5598a39ef59a4754a80d34f0d7d6248d",
+        "size": 258140,
+        "root": "body",
+        "captured_at": "2026-10-25T17:17:10.973618+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:17:11.006821+00:00",
+      "monotonic_ns": 4247790537483,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:17:12.187775+00:00",
+      "monotonic_ns": 4248971428790,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:17:12.206308+00:00",
+      "monotonic_ns": 4248989968560,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:17:13.508114+00:00",
+      "monotonic_ns": 4250291772867,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:17:13.508298+00:00",
+      "monotonic_ns": 4250291916483,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "trace-event",
+        "opener": null,
+        "root": ".logos-trace-window"
+      }
+    },
+    {
+      "event": "existing_trace_button_clicked",
+      "wall_utc": "2026-10-25T17:17:14.532704+00:00",
+      "monotonic_ns": 4251316383252,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "button_index": 3,
+        "button_count": 4,
+        "errors": []
+      }
+    },
+    {
+      "event": "existing_trace_button_clicked",
+      "wall_utc": "2026-10-25T17:17:15.227253+00:00",
+      "monotonic_ns": 4252011040791,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "button_index": 2,
+        "button_count": 4,
+        "errors": []
+      }
+    },
+    {
+      "event": "existing_trace_button_clicked",
+      "wall_utc": "2026-10-25T17:17:15.926205+00:00",
+      "monotonic_ns": 4252709943945,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "button_index": 1,
+        "button_count": 4,
+        "errors": []
+      }
+    },
+    {
+      "event": "existing_trace_button_clicked",
+      "wall_utc": "2026-10-25T17:17:16.635307+00:00",
+      "monotonic_ns": 4253418991637,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "button_index": 0,
+        "button_count": 4,
+        "errors": []
+      }
+    },
+    {
+      "event": "modal_capture_failed",
+      "wall_utc": "2026-10-25T17:17:16.648253+00:00",
+      "monotonic_ns": 4253431926637,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "trace-event",
+        "root": ".logos-trace-window",
+        "status": "NOT_CAPTURED",
+        "video": "all-modals-01.mp4",
+        "reason": "existing_trace_buttons_did_not_open_viewer"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:17:17.089719+00:00",
+      "monotonic_ns": 4253873378945,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "40-trace-event-unavailable.png",
+        "root": "body",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:17:17.713968+00:00",
+      "monotonic_ns": 4254497622329,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "40-trace-event-unavailable.png",
+        "sha256": "7b5c03c8f57bdcddd8b40f12ecd30e0e5598a39ef59a4754a80d34f0d7d6248d",
+        "size": 258140,
+        "root": "body",
+        "captured_at": "2026-10-25T17:17:17.713779+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:17:17.755941+00:00",
+      "monotonic_ns": 4254539643637,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:17:18.927648+00:00",
+      "monotonic_ns": 4255711291329,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "recorder_stop_requested",
+      "wall_utc": "2026-10-25T17:17:18.927789+00:00",
+      "monotonic_ns": 4255711401175,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "recorder_stopped",
+      "wall_utc": "2026-10-25T17:17:19.403469+00:00",
+      "monotonic_ns": 4256187150637,
+      "video": "all-modals-01.mp4",
+      "recorder_running": false,
+      "data": {
+        "path": "all-modals-01.mp4",
+        "available": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:17:19.424908+00:00",
+      "monotonic_ns": 4256208563868,
+      "video": "all-modals-01.mp4",
+      "recorder_running": false
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:17:20.526081+00:00",
+      "monotonic_ns": 4257309744868,
+      "video": "all-modals-01.mp4",
+      "recorder_running": false
+    },
+    {
+      "event": "walk_finished",
+      "wall_utc": "2026-10-25T17:17:20.539109+00:00",
+      "monotonic_ns": 4257322781176,
+      "video": "all-modals-01.mp4",
+      "recorder_running": false,
+      "data": {
+        "captured": 0,
+        "planned": 21
+      }
+    }
+  ],
+  "network": [
+    {
+      "method": "GET",
+      "path": "/api/conversations/38f7195d-4813-4264-8d63-5ef31aeb2734/settings",
+      "started": {
+        "date_ms": 1792948626930,
+        "performance_ms": 1260
+      },
+      "finished": {
+        "date_ms": 1792948627031,
+        "performance_ms": 1361
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/invocations/8b8334b9-845b-4711-8a2e-36a6c8ff4319/trace",
+      "started": {
+        "date_ms": 1792948627127,
+        "performance_ms": 1458
+      },
+      "finished": {
+        "date_ms": 1792948627552,
+        "performance_ms": 1883
+      },
+      "status": 500,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/invocations/ca052ced-8229-4449-8c53-374f2cdddf2d/trace",
+      "started": {
+        "date_ms": 1792948627804,
+        "performance_ms": 2135
+      },
+      "finished": {
+        "date_ms": 1792948628154,
+        "performance_ms": 2485
+      },
+      "status": 500,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/invocations/806e6fe5-700e-4fed-b9dc-b5ab43421144/trace",
+      "started": {
+        "date_ms": 1792948628504,
+        "performance_ms": 2834
+      },
+      "finished": {
+        "date_ms": 1792948628818,
+        "performance_ms": 3149
+      },
+      "status": 500,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/invocations/1b76774c-5c1f-4d51-a30e-1acb21f26d32/trace",
+      "started": {
+        "date_ms": 1792948629212,
+        "performance_ms": 3543
+      },
+      "finished": {
+        "date_ms": 1792948629586,
+        "performance_ms": 3916
+      },
+      "status": 500,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/invocations/8b8334b9-845b-4711-8a2e-36a6c8ff4319/trace",
+      "started": {
+        "date_ms": 1792948633906,
+        "performance_ms": 1477
+      },
+      "finished": {
+        "date_ms": 1792948634224,
+        "performance_ms": 1794
+      },
+      "status": 500,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/invocations/ca052ced-8229-4449-8c53-374f2cdddf2d/trace",
+      "started": {
+        "date_ms": 1792948634586,
+        "performance_ms": 2157
+      },
+      "finished": {
+        "date_ms": 1792948634973,
+        "performance_ms": 2544
+      },
+      "status": 500,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/invocations/806e6fe5-700e-4fed-b9dc-b5ab43421144/trace",
+      "started": {
+        "date_ms": 1792948635282,
+        "performance_ms": 2853
+      },
+      "finished": {
+        "date_ms": 1792948635653,
+        "performance_ms": 3225
+      },
+      "status": 500,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/invocations/1b76774c-5c1f-4d51-a30e-1acb21f26d32/trace",
+      "started": {
+        "date_ms": 1792948635999,
+        "performance_ms": 3570
+      },
+      "finished": {
+        "date_ms": 1792948636362,
+        "performance_ms": 3933
+      },
+      "status": 500,
+      "blocked": false
+    }
+  ]
+}

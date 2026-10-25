@@ -1,0 +1,126 @@
+{
+  "schema_version": 3,
+  "device": "Redmi 9",
+  "browser": "Iceraven",
+  "scenario": "all_application_modals",
+  "runtime_revision": "2807edacbf60824fb9b76a6dc6f3c7e6ed55ae50",
+  "browser_revision": "2807edacbf60824fb9b76a6dc6f3c7e6ed55ae50",
+  "workflow_revision": "e43fb0cc0d9cc048428ddf7fbb4baf23f5c71d32",
+  "github_run_url": "https://github.com/maksimp6/Chat/actions/runs/40215693043",
+  "captured_at": "2026-10-25T17:17:20.542443+00:00",
+  "preparation": {
+    "method": "Android/kernel wakeup, insecure keyguard dismissal, browser VIEW intent",
+    "before": {
+      "screen_on": true,
+      "interactive": true,
+      "power_wakefulness": "Awake",
+      "power_display_state": "ON",
+      "global_display_state": "ON",
+      "window_policy_screen_on": true,
+      "window_policy_interactive": true,
+      "keyguard_showing": false,
+      "input_restricted": false,
+      "keyguard_secure": false,
+      "browser_foreground": true
+    },
+    "wake_attempts": [
+      {
+        "method": "Android KEYCODE_WAKEUP",
+        "awake": true
+      }
+    ],
+    "ready": {
+      "screen_on": true,
+      "interactive": true,
+      "power_wakefulness": "Awake",
+      "power_display_state": "ON",
+      "global_display_state": "ON",
+      "window_policy_screen_on": true,
+      "window_policy_interactive": true,
+      "keyguard_showing": false,
+      "input_restricted": false,
+      "keyguard_secure": false,
+      "browser_foreground": true
+    },
+    "navigation": {
+      "tag": "40215693043-1-1792948619679846020",
+      "requested_at_ms": 1792948619680.9197,
+      "document_time_origin_ms": 1792948620276,
+      "rdp_location_replace_used": false
+    }
+  },
+  "guard": {
+    "installed": true,
+    "read_only": true,
+    "redaction": "CSS masks before modal insertion; field values and response bodies are not read"
+  },
+  "files": [
+    {
+      "path": "98-starting-view.png",
+      "sha256": "b3d043a97efa19f27317f3002eb6819db3f66689b351567ca1b00a9f0faf7823",
+      "size": 198251,
+      "root": "body",
+      "captured_at": "2026-10-25T17:17:05.525269+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "38-trace-unavailable.png",
+      "sha256": "7b5c03c8f57bdcddd8b40f12ecd30e0e5598a39ef59a4754a80d34f0d7d6248d",
+      "size": 258140,
+      "root": "body",
+      "captured_at": "2026-10-25T17:17:10.973618+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "40-trace-event-unavailable.png",
+      "sha256": "7b5c03c8f57bdcddd8b40f12ecd30e0e5598a39ef59a4754a80d34f0d7d6248d",
+      "size": 258140,
+      "root": "body",
+      "captured_at": "2026-10-25T17:17:17.713779+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "all-modals-01.mp4",
+      "sha256": "2f5f84415e6fedb63f2c9ec38fb5e2ce2e636758249e46c70f5cd518acdb932b",
+      "size": 2308224
+    },
+    {
+      "path": "events.json",
+      "size": 14163,
+      "sha256": "022b668a5f8700ca2adc2a3374fd7b95137704c4873643cd788b6bdef8ebd526"
+    }
+  ],
+  "modal_states": [
+    {
+      "name": "trace",
+      "root": ".logos-trace-window",
+      "status": "NOT_CAPTURED",
+      "video": "all-modals-01.mp4",
+      "reason": "existing_trace_buttons_did_not_open_viewer"
+    },
+    {
+      "name": "trace-event",
+      "root": ".logos-trace-window",
+      "status": "NOT_CAPTURED",
+      "video": "all-modals-01.mp4",
+      "reason": "existing_trace_buttons_did_not_open_viewer"
+    }
+  ],
+  "planned_states": 2,
+  "inventory_total": 21,
+  "start_index": 19,
+  "captured_states": 0,
+  "mutating_requests_transmitted": 0,
+  "limits": [
+    "DOM button clicks do not prove physical touch input",
+    "MP4 frame clock must be read for exact alignment",
+    "Each window is opened in a fresh document; close-button behavior is not certified by that isolation",
+    "Sensitive field values and raw trace text are masked; values are not validated",
+    "Cloud.ru IAM source is not loaded by the installed application template; no script was injected to fabricate that modal"
+  ]
+}
