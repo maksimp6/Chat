@@ -418,8 +418,12 @@ class RDP:
                              "return {scrollTop:el.scrollTop,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight};})())")
 
     def chat_candidates(self, actor):
-        return self.evaluate(actor, "JSON.stringify([...document.querySelectorAll('#conv-list .conv-item')].map((el,i)=>({index:i,"
-                                    "title:((el.querySelector('.conv-title')||el).textContent||'').trim()})))")
+        return self.evaluate(actor, "JSON.stringify([...document.querySelectorAll('#conv-list .conv-item')].map((el,i)=>{"
+                                    "const a=el.querySelector('.conv-link');"
+                                    "return {index:i,"
+                                    "id:a?new URL(a.href,location.href).searchParams.get('conversation_id'):null,"
+                                    "title:((el.querySelector('.conv-title')||el).textContent||'').trim(),"
+                                    "active:el.classList.contains('active')};}))")
 
     def open_conversation(self, actor, index):
         self.evaluate(actor, "JSON.stringify((()=>{const el=document.querySelectorAll('#conv-list .conv-item')[" + str(int(index)) +
@@ -1056,6 +1060,7 @@ def capture(out, uid, gid, metadata):
                 actor = rdp.find_logos()
                 candidate = rdp.conversation_state(actor)
                 if candidate["time_origin_ms"] != origin_before and candidate["ready_state"] == "complete":
+                    time.sleep(1.0)
                     return
             except CaptureSafetyError:
                 raise
@@ -1146,28 +1151,47 @@ def capture(out, uid, gid, metadata):
                                **(note or {})}
 
     chat = {}
+    origin = {}
 
-    def load_conversation(index):
+    def load_conversation(index, conv_id):
+        """Open a sidebar conversation and wait until the chat view shows that conversation's messages."""
         rdp.set_open(actor, True)
         rdp.open_conversation(actor, index)
-        for _ in range(8):
-            count = rdp.conversation_state(actor)["message_count"]
-            if count:
-                return count
+        for _ in range(16):
+            state = rdp.conversation_state(actor)
+            if state["current_id"] == conv_id and state["ready_state"] == "complete" and state["message_count"]:
+                return state["message_count"]
             time.sleep(0.5)
         return 0
 
     def reopen_chat():
-        load_conversation(chat["index"])
+        load_conversation(chat["index"], chat["id"])
+
+    def restore_origin():
+        """Return to the conversation that was open before the chat checks, so creation starts from the same view."""
+        if not origin:
+            return
+        rdp.set_open(actor, True)
+        rdp.open_conversation(actor, origin["index"])
+        for _ in range(16):
+            if rdp.conversation_state(actor)["current_id"] == origin["id"]:
+                return
+            time.sleep(0.5)
+        raise RuntimeError("the original conversation did not come back")
 
     def choose_conversation():
         """Pick the existing conversation with the most messages; empty new chats are skipped."""
-        candidates = [c for c in rdp.chat_candidates(actor) if c["title"] != "Новый чат"][:4]
+        listed = rdp.chat_candidates(actor)
+        active = [c for c in listed if c["active"] and c["id"]]
+        if active and not origin:
+            origin.update(active[0])
+        candidates = [c for c in listed if c["title"] != "Новый чат" and c["id"]][:4]
         best = None
         for candidate in candidates:
-            count = load_conversation(candidate["index"])
+            count = load_conversation(candidate["index"], candidate["id"])
             if best is None or count > best["message_count"]:
-                best = {"index": candidate["index"], "title": candidate["title"], "message_count": count}
+                best = {"index": candidate["index"], "id": candidate["id"], "title": candidate["title"],
+                        "message_count": count}
         if best is None or best["message_count"] < 1:
             raise RuntimeError("no existing conversation has messages")
         chat.update(best)
@@ -1185,8 +1209,6 @@ def capture(out, uid, gid, metadata):
     close_surface("model", "#close-modal")
     matrix_step("system_status", "05-system-status.png", surface_openers["status"], surface="status",
                 opener=surface_openers["status"])
-    scroll_step("system_status_bottom", "20-system-status-bottom.png", ".logos-system-status-content", "bottom",
-                surface="status", opener=surface_openers["status"])
     close_surface("status", "#logos-system-status .logos-system-status-close")
     matrix_action("open_settings", surface_openers["settings"])
     for number, tab in enumerate(("gen", "output", "routing", "adv", "theme"), start=6):
@@ -1202,6 +1224,7 @@ def capture(out, uid, gid, metadata):
     matrix_action("chat_select", choose_conversation, opener=lambda: rdp.set_open(actor, True))
     scroll_step("chat_top", "17-chat-top.png", "#chatbox", "top", surface=None, opener=reopen_chat, note=chat)
     scroll_step("chat_bottom", "18-chat-bottom.png", "#chatbox", "bottom", surface=None, opener=reopen_chat, note=chat)
+    matrix_action("restore_origin_chat", restore_origin)
     matrix_action("restore_sidebar", lambda: rdp.set_open(actor, True))
     if dialogs_recorder is None:
         dialogs_video, dialogs_artifact, dialogs_failures = (
