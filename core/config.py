@@ -78,7 +78,6 @@ TEXT_MODELS = {
         "output": 1.20,
     },
     "yandexgpt-5-lite": {
-        "upstream": "yandexgpt-lite",
         "name": "YandexGPT Lite 5",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},

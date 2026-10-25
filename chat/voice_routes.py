@@ -152,7 +152,7 @@ def _chat(text: str, conversation_id: str | None, model: str) -> str:
     if not conversation_id:
         raise ValueError("conversation_id is required for voice chat")
     text_model = (
-        model if model in TEXT_MODELS else env_get("LOGOS_VOICE_CHAT_MODEL", "yandexgpt-5-lite")
+        model if model in TEXT_MODELS else env_get("LOGOS_VOICE_CHAT_MODEL", "yandexgpt-5-pro")
     )
     client = LogosClient(Config)
     response = client.ask_with_mcp(

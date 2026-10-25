@@ -9,7 +9,7 @@ import requests
 
 
 DEFAULT_BASE_URL = "http://127.0.0.1:5000"
-DEFAULT_MODEL = "yandexgpt-5-lite"
+DEFAULT_MODEL = "yandexgpt-5-pro"
 DEFAULT_TIMEOUT = 60.0
 
 

@@ -204,11 +204,11 @@
     "yandexgpt-5-lite": {
       "profile_id": "ultra-yandexgpt-5-lite",
       "model_key": "yandexgpt-5-lite",
-      "upstream_id": "yandexgpt-lite",
+      "upstream_id": "yandexgpt-5-lite",
       "kind": "text",
       "status": "prepared_not_activated",
       "transport": "responses",
-      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/yandexgpt-lite/latest",
+      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/yandexgpt-5-lite/latest",
       "lifecycle": {
         "state": "documented_end_date",
         "stop_and_recheck_on": "2026-11-15",

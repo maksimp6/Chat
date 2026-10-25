@@ -34,7 +34,7 @@ class LogosSDK:
         resp.raise_for_status()
         return resp.json()
 
-    def send_message(self, conv_id, message, model="yandexgpt-5-lite"):
+    def send_message(self, conv_id, message, model="yandexgpt-5-pro"):
         """Отправить сообщение в диалог"""
         payload = {
             "model": f"gpt://{self.project_id}/{upstream_model_id(model)}/latest",
@@ -64,5 +64,5 @@ if __name__ == "__main__":
     print(f"Создан диалог: {conv['id']}")
 
     # Отправить сообщение
-    resp = sdk.send_message(conv["id"], "Привет!", model="yandexgpt-5-lite")
+    resp = sdk.send_message(conv["id"], "Привет!", model="yandexgpt-5-pro")
     print(f"Ответ: {resp}")

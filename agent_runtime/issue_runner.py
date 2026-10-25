@@ -34,7 +34,7 @@ from agent_runtime.review_policy import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_MODEL = "yandexgpt-5-lite"
+DEFAULT_MODEL = "yandexgpt-5-pro"
 TOOL_CATEGORIES = ["filesystem"]
 MAX_SUMMARY_CHARS = 4000
 

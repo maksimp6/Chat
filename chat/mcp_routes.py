@@ -311,7 +311,7 @@ def chat():
     conv_id = None
     session_id = None
     message = None
-    model_key = "yandexgpt-5-lite"
+    model_key = "yandexgpt-5-pro"
     partial_output = None
     error_message = None
     selected_skill_metadata = []
@@ -327,7 +327,7 @@ def chat():
         params = dict(raw_params) if isinstance(raw_params, dict) else {}
         role = data.get("role") or params.pop("role", None)
         requested_skills = _normalize_requested_skills(data, params)
-        model_key = data.get("model") or params.get("model", "yandexgpt-5-lite")
+        model_key = data.get("model") or params.get("model", "yandexgpt-5-pro")
         params = _client_params(params)
 
         if not conv_id or not message:
@@ -766,14 +766,14 @@ def conversations():
         creation_trace.set_request(
             {
                 "operation": "create_conversation",
-                "model": data.get("model", "yandexgpt-5-lite"),
+                "model": data.get("model", "yandexgpt-5-pro"),
             }
         )
         # A Logos chat gets its local id at once. The provider conversation is created on the first
         # message, so a provider outage can no longer lose the chat itself.
         conv_id = str(uuid.uuid4())
         title = normalize_conversation_title(data.get("title"))
-        model = data.get("model", "yandexgpt-5-lite")
+        model = data.get("model", "yandexgpt-5-pro")
         set_owner(conv_id, owner_id)
         create_conversation(conv_id, title, model, provider_pending=True)
         creation_trace.add_event(
@@ -810,7 +810,7 @@ def execute_approved():
         conv_id = data.get("conversation_id")
         func_name = data.get("name")
         arguments = data.get("arguments", {})
-        model_key = data.get("model", "yandexgpt-5-lite")
+        model_key = data.get("model", "yandexgpt-5-pro")
 
         tool_config = registry.get_tool_meta(func_name)
         if not tool_config:
