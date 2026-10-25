@@ -596,6 +596,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const previewBox = document.getElementById("image-previews");
   // Photos chosen for the next message; each has a file name and a base64 data URL.
   let pendingImages = [];
+  let imagesInFlight = 0;
   const MAX_IMAGES = 4;
   const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
   const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
@@ -652,7 +653,8 @@ document.addEventListener("DOMContentLoaded", function () {
       const files = Array.from(imageInput.files || []);
       imageInput.value = "";
       for (const file of files) {
-        if (pendingImages.length >= MAX_IMAGES) {
+        // Count photos still being read, so two quick picks cannot pass the limit together.
+        if (pendingImages.length + imagesInFlight >= MAX_IMAGES) {
           addMessage("Можно прикрепить не больше " + MAX_IMAGES + " фото", "error", false, 0);
           break;
         }
@@ -660,11 +662,14 @@ document.addEventListener("DOMContentLoaded", function () {
           addMessage("Фото «" + file.name + "»: нужен PNG, JPEG или WebP до 5 МБ", "error", false, 0);
           continue;
         }
+        imagesInFlight += 1;
         try {
           pendingImages.push({ name: file.name, dataUrl: await readAsDataUrl(file) });
           renderPendingImages();
         } catch (error) {
           addMessage("Не удалось прочитать фото «" + file.name + "»", "error", false, 0);
+        } finally {
+          imagesInFlight -= 1;
         }
       }
     });

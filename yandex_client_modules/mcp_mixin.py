@@ -183,7 +183,10 @@ class YandexMcpMixin:
             active_cats = list(registry.get_available_categories())
 
         hosted_tools = []
-        conv_settings = get_conv_settings(conversation_id) or {} if conversation_id else {}
+        try:
+            conv_settings = get_conv_settings(conversation_id) or {} if conversation_id else {}
+        except Exception:
+            conv_settings = {}
         tools_config = (conv_settings or {}).get("tools_config") or params.get("tools_config") or {}
         if not isinstance(tools_config, dict):
             tools_config = {}

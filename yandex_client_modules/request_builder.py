@@ -30,16 +30,17 @@ def validate_generation_params(params):
 
 
 def _response_input(params, message):
-    """Text-only input, or one user turn with the attached photos after the text."""
+    """Text-only input, or one user turn with the attached photos after the text.
+    Attached photos are part of the message, so they take precedence over a raw input."""
+    images = params.get("input_images") or []
+    if images:
+        # Part shapes follow the Responses image input; confirm against the provider before enabling.
+        content = [{"type": "input_text", "text": message}]
+        content += [{"type": "input_image", "image_url": url} for url in images]
+        return [{"role": "user", "content": content}]
     if params.get("input"):
         return params["input"]
-    images = params.get("input_images") or []
-    if not images:
-        return [{"role": "user", "content": message}]
-    # Part shapes follow the Responses image input; confirm against the provider before enabling.
-    content = [{"type": "input_text", "text": message}]
-    content += [{"type": "input_image", "image_url": url} for url in images]
-    return [{"role": "user", "content": content}]
+    return [{"role": "user", "content": message}]
 
 
 def build_response_payload(
