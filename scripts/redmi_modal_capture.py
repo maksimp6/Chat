@@ -194,6 +194,13 @@ def capture(output, uid, gid, metadata):
 
     def open_trace():
         selector = '.logos-trace-open-viewer,.trace-viewer-auto-button'
+        browser('window.__modalTraceOpenErrors=[];window.addEventListener("error",e=>{'
+                'window.__modalTraceOpenErrors.push({type:e.error&&e.error.name||"Error",'
+                'message:String(e.message||"").replace(/https?:\\/\\/\\S+/g,"[url]").slice(0,180),'
+                'file:String(e.filename||"").split("?")[0].split("/").pop(),line:e.lineno});});return {observing:true};')
+        ready_until=time.monotonic()+3
+        while time.monotonic()<ready_until and not browser('return !!document.querySelector('+json.dumps(selector)+');'):
+            time.sleep(.2)
         if not browser('return !!document.querySelector(' + json.dumps(selector) + ');'):
             rdp.set_open(actor,True)
             candidates = rdp.chat_candidates(actor)
@@ -202,18 +209,30 @@ def capture(output, uid, gid, metadata):
                 time.sleep(.6)
                 if browser('return !!document.querySelector(' + json.dumps(selector) + ');'):
                     break
-            close_all()
-        browser('const b=document.querySelector(' + json.dumps(selector) + ');'
-                'if(!b)throw Error("no_existing_trace_button");'
-                'for(let p=b.parentElement;p;p=p.parentElement){if(p.tagName==="DETAILS")p.open=true;}'
-                'return {disclosures_open:true};')
-        rdp.click(actor,selector)
+            rdp.set_open(actor,False)
+        count=browser('return document.querySelectorAll('+json.dumps(selector)+').length;')
+        for position in reversed(range(count)):
+            browser('for(const x of document.querySelectorAll("[data-recording-trace]"))x.removeAttribute("data-recording-trace");'
+                    'const b=document.querySelectorAll('+json.dumps(selector)+')['+str(position)+'];'
+                    'if(!b)throw Error("no_existing_trace_button");'
+                    'for(let p=b.parentElement;p;p=p.parentElement){if(p.tagName==="DETAILS")p.open=true;}'
+                    'b.setAttribute("data-recording-trace","true");return {disclosures_open:true};')
+            rdp.click(actor,'[data-recording-trace="true"]')
+            time.sleep(.6)
+            errors=browser('return window.__modalTraceOpenErrors;')
+            mark('existing_trace_button_clicked',{'button_index':position,'button_count':count,'errors':errors})
+            if visible('.logos-trace-window'):
+                return
+        raise RuntimeError('existing_trace_buttons_did_not_open_viewer')
 
     try:
         close_all()
         start_index = int(metadata.get('start_index',0))
         if not 0 <= start_index < len(CASES):
             raise RuntimeError('invalid_recording_start_index')
+        if start_index>=19:
+            start_video()
+            snapshot('98-starting-view.png','body')
         for index, (name, opener, selector) in enumerate(CASES[start_index:],start=start_index):
             if recorder is None:
                 start_video()
