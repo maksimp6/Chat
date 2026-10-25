@@ -647,11 +647,16 @@ document.addEventListener("DOMContentLoaded", function () {
           if (typeof renderSidebar === "function") renderSidebar();
         }
       }
+      // A reply is persisted and comes back with the history; an approval request is not, so it waits for its chat.
+      if (data.requires_approval) {
+        deliverApprovalOutput(turn.conversationId, function () {
+          renderApprovalCard(data.tool_call, data.original_message || turn.text);
+        });
+        return;
+      }
       // The backend persists this turn; never paint its late answer into a different conversation.
       if (currentConvId !== turn.conversationId) return;
-      if (data.requires_approval) {
-        renderApprovalCard(data.tool_call, data.original_message || turn.text);
-      } else if (data.reply) {
+      if (data.reply) {
         addMessage(data.reply, "bot", false, data.cost || 0, data.timings,
           clientTotalMs, data.reasoning, data.usage, data.trace, { id: data.message_id });
       } else {
