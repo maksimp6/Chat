@@ -1,0 +1,239 @@
+{
+  "schema_version": 3,
+  "device": "Redmi 9",
+  "browser": "Iceraven",
+  "scenario": "all_application_modals",
+  "runtime_revision": "2807edacbf60824fb9b76a6dc6f3c7e6ed55ae50",
+  "browser_revision": "2807edacbf60824fb9b76a6dc6f3c7e6ed55ae50",
+  "workflow_revision": "817666e4e6a1d568c6bd229b9b566208426efa7b",
+  "github_run_url": "https://github.com/maksimp6/Chat/actions/runs/40215042240",
+  "captured_at": "2026-10-25T17:09:24.978122+00:00",
+  "preparation": {
+    "method": "Android/kernel wakeup, insecure keyguard dismissal, browser VIEW intent",
+    "before": {
+      "screen_on": true,
+      "interactive": true,
+      "power_wakefulness": "Awake",
+      "power_display_state": "ON",
+      "global_display_state": "ON",
+      "window_policy_screen_on": true,
+      "window_policy_interactive": true,
+      "keyguard_showing": false,
+      "input_restricted": false,
+      "keyguard_secure": true,
+      "browser_foreground": true
+    },
+    "wake_attempts": [
+      {
+        "method": "Android KEYCODE_WAKEUP",
+        "awake": true
+      }
+    ],
+    "ready": {
+      "screen_on": true,
+      "interactive": true,
+      "power_wakefulness": "Awake",
+      "power_display_state": "ON",
+      "global_display_state": "ON",
+      "window_policy_screen_on": true,
+      "window_policy_interactive": true,
+      "keyguard_showing": false,
+      "input_restricted": false,
+      "keyguard_secure": true,
+      "browser_foreground": true
+    },
+    "navigation": {
+      "tag": "40215042240-1-1792948138563240837",
+      "requested_at_ms": 1792948138563.9126,
+      "document_time_origin_ms": 1792948139182,
+      "rdp_location_replace_used": false
+    }
+  },
+  "guard": {
+    "installed": true,
+    "read_only": true,
+    "redaction": "CSS masks before modal insertion; field values and response bodies are not read"
+  },
+  "files": [
+    {
+      "path": "26-treasury-top.png",
+      "sha256": "c8443be1b269c5fe2511a9bb9bdc0cf8d11f2ae81cbf1f0d55f2fa3adcac17e7",
+      "size": 182451,
+      "root": "#treasury-modal",
+      "captured_at": "2026-10-25T17:09:04.709829+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "27-treasury-bottom.png",
+      "sha256": "c8443be1b269c5fe2511a9bb9bdc0cf8d11f2ae81cbf1f0d55f2fa3adcac17e7",
+      "size": 182451,
+      "root": "#treasury-modal",
+      "captured_at": "2026-10-25T17:09:06.641464+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "28-project-tree-top.png",
+      "sha256": "c2eacdf3521bf390b0ea58124bb97d7d85c4db596f5482f15f36ef4936163148",
+      "size": 201255,
+      "root": "#project-tree-modal",
+      "captured_at": "2026-10-25T17:09:09.777185+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "29-project-tree-bottom.png",
+      "sha256": "4654fc827432b3a69918f6262b48dc0f60d3f55262f5d143e1f620b1293ef921",
+      "size": 201445,
+      "root": "#project-tree-modal",
+      "captured_at": "2026-10-25T17:09:11.720516+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "30-memory-top.png",
+      "sha256": "12aa1a32695eb1f7f07406bb83de492f906eee96db01e809b1f187d999a947d7",
+      "size": 152498,
+      "root": "#memoryModal",
+      "captured_at": "2026-10-25T17:09:14.778708+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "31-memory-bottom.png",
+      "sha256": "12aa1a32695eb1f7f07406bb83de492f906eee96db01e809b1f187d999a947d7",
+      "size": 152498,
+      "root": "#memoryModal",
+      "captured_at": "2026-10-25T17:09:16.637687+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "32-departments-unavailable.png",
+      "sha256": "12aa1a32695eb1f7f07406bb83de492f906eee96db01e809b1f187d999a947d7",
+      "size": 152498,
+      "root": "body",
+      "captured_at": "2026-10-25T17:09:18.289649+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "34-partners-unavailable.png",
+      "sha256": "12aa1a32695eb1f7f07406bb83de492f906eee96db01e809b1f187d999a947d7",
+      "size": 152498,
+      "root": "body",
+      "captured_at": "2026-10-25T17:09:19.871257+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "36-environments-unavailable.png",
+      "sha256": "a9a3b80614032911adefdd25e8ec67b05b57a234cc6dab2b45e54bd00b294b04",
+      "size": 155369,
+      "root": "body",
+      "captured_at": "2026-10-25T17:09:21.362865+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "38-trace-unavailable.png",
+      "sha256": "bed96a26c4c0e73b1c01231cf1c54d6e87f1f12e6592f77436711bc81d9e542d",
+      "size": 180008,
+      "root": "body",
+      "captured_at": "2026-10-25T17:09:22.911007+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "40-trace-event-unavailable.png",
+      "sha256": "105693bcc97a24a34ecb3161516039f5fd438c25ebff654c157a2d4f67b9deb6",
+      "size": 179949,
+      "root": "body",
+      "captured_at": "2026-10-25T17:09:24.437842+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "all-modals-01.mp4",
+      "sha256": "8dac7f33740ae4485992df511a716898050894cd51817bb0467c4feb66bbd106",
+      "size": 945376
+    },
+    {
+      "path": "events.json",
+      "size": 20803,
+      "sha256": "28e80a881466f10c1d35e5701d9f9a2b3583988befb3971ea16d4ddc36c362f6"
+    }
+  ],
+  "modal_states": [
+    {
+      "name": "treasury",
+      "root": "#treasury-modal",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 0
+    },
+    {
+      "name": "project-tree",
+      "root": "#project-tree-modal",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 0
+    },
+    {
+      "name": "memory",
+      "root": "#memoryModal",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 0
+    },
+    {
+      "name": "departments",
+      "root": "#departments-modal",
+      "status": "NOT_CAPTURED",
+      "video": "all-modals-01.mp4",
+      "reason": "The browser action failed"
+    },
+    {
+      "name": "partners",
+      "root": "#partner-relations-modal",
+      "status": "NOT_CAPTURED",
+      "video": "all-modals-01.mp4",
+      "reason": "The browser action failed"
+    },
+    {
+      "name": "environments",
+      "root": "#environments-modal",
+      "status": "NOT_CAPTURED",
+      "video": "all-modals-01.mp4",
+      "reason": "The browser action failed"
+    },
+    {
+      "name": "trace",
+      "root": ".logos-trace-window",
+      "status": "NOT_CAPTURED",
+      "video": "all-modals-01.mp4",
+      "reason": "The browser action failed"
+    },
+    {
+      "name": "trace-event",
+      "root": ".logos-trace-window",
+      "status": "NOT_CAPTURED",
+      "video": "all-modals-01.mp4",
+      "reason": "The browser action failed"
+    }
+  ],
+  "planned_states": 8,
+  "inventory_total": 21,
+  "start_index": 13,
+  "captured_states": 3,
+  "mutating_requests_transmitted": 0,
+  "limits": [
+    "DOM button clicks do not prove physical touch input",
+    "MP4 frame clock must be read for exact alignment",
+    "Sensitive field values and raw trace text are masked; values are not validated",
+    "Cloud.ru IAM source is not loaded by the installed application template; no script was injected to fabricate that modal"
+  ]
+}
