@@ -24,9 +24,8 @@ jobs:
           set -euo pipefail
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
           photo="$PHOTO_DIR/photo.png"
-          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 60 \
-            "https://media.githubusercontent.com/media/maksimp6/Chat/$GITHUB_SHA/docs/screenshots/logos/2026-10-25/run-40212418021-1/18-chat-bottom.png" \
-            -o "$photo"
+          # The deployed app checkout on the phone holds the photo's bytes (Git LFS), so no download is needed.
+          cp /data/data/com.termux/files/home/logos-local/docs/screenshots/logos/2026-10-25/run-40212418021-1/18-chat-bottom.png "$photo"
           python - "$photo" <<'PY'
           import base64
           import hashlib
