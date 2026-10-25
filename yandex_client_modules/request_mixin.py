@@ -178,9 +178,12 @@ def _resolve_global_provider_credential(client, execution_trace=None):
 
 
 def _key_mask(api_key):
-    """Show only the last four characters of a provider key, as ****abcd for reports."""
-    if not isinstance(api_key, str) or len(api_key) <= 8:
+    """Show only the last four characters of a provider key, as ****abcd for reports.
+    A short key gets a bare **** so the report still shows that a mask applies."""
+    if not isinstance(api_key, str) or not api_key:
         return None
+    if len(api_key) <= 8:
+        return "****"
     return "****" + api_key[-4:]
 
 
