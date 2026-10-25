@@ -20,7 +20,7 @@ except ImportError:  # pragma: no cover
     decrypt_secret = None
     encrypt_secret = None
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
-from yandex_client_modules.request_builder import build_response_payload
+from yandex_client_modules.request_builder import build_response_payload, ultra_applied_event
 from yandex_client_modules.request_receipt import build_request_manifest
 from yandex_client_modules.errors import YandexClientError
 from provider_accounts.quotas import (
@@ -239,6 +239,8 @@ class YandexRequestMixin:
             conversation_id=conversation_id,
             yandex_conv_id=yandex_conv_id,
         )
+        if isinstance(execution_trace, ExecutionTrace):
+            execution_trace.add_event("ultra_profile_applied", ultra_applied_event(model_key, params, payload))
 
         # Reserved after the payload is built, so a request rejected for its parameters uses no quota.
         quota_reservation = None
