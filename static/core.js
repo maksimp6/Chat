@@ -75,14 +75,16 @@ window.changeModel = function (newModel, skipPatch) {
   newModel = LEGACY_MODEL_KEYS[newModel] || newModel;
   var textModels = modelsData.text || {};
   var voiceModels = modelsData.voice || {};
-  var catalogLoaded = Object.keys(textModels).length + Object.keys(voiceModels).length > 0;
+  var imageModels = modelsData.image || {};
+  var catalogLoaded =
+    Object.keys(textModels).length + Object.keys(voiceModels).length + Object.keys(imageModels).length > 0;
   // Without a catalog (offline or degraded) keep the requested key; the server validates it.
-  if (catalogLoaded && !textModels[newModel] && !voiceModels[newModel]) {
+  if (catalogLoaded && !textModels[newModel] && !voiceModels[newModel] && !imageModels[newModel]) {
     console.warn("[CORE] Unknown model:", newModel, "-> fallback to yandexgpt-5-lite");
     newModel = "yandexgpt-5-pro";
   }
   currentModel = newModel;
-  currentModelType = voiceModels[currentModel] ? "voice" : "text";
+  currentModelType = voiceModels[currentModel] ? "voice" : imageModels[currentModel] ? "image" : "text";
   localStorage.setItem("current_model", currentModel);
 
   if (!skipPatch && currentConvId) {

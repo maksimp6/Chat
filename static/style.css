@@ -1543,7 +1543,7 @@ body {
 }
 .logos-pro-app .md-math {
   font-family: "Cambria Math", "Times New Roman", serif;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .logos-pro-app .md-math-block {
   display: block;
@@ -1569,8 +1569,8 @@ body {
   border-bottom: 1px solid currentColor;
   padding: 0 2px;
 }
-.logos-pro-app sup,
-.logos-pro-app sub {
+.logos-pro-app .msg sup,
+.logos-pro-app .msg sub {
   font-size: 0.75em;
   line-height: 0;
 }

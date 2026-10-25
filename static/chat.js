@@ -178,9 +178,9 @@ function mathToHtml(tex) {
     .replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, '<span class="md-frac"><span>$1</span><span>$2</span></span>')
     .replace(/\\sqrt\{([^{}]*)\}/g, "√($1)")
     .replace(/\^\{([^{}]*)\}/g, "<sup>$1</sup>")
-    .replace(/\^(&[a-z]+;|[^{\s])/g, "<sup>$1</sup>")
+    .replace(/\^(&[a-z]+;|[^{\s\\])/g, "<sup>$1</sup>")
     .replace(/_\{([^{}]*)\}/g, "<sub>$1</sub>")
-    .replace(/_(&[a-z]+;|[^{\s])/g, "<sub>$1</sub>")
+    .replace(/_(&[a-z]+;|[^{\s\\])/g, "<sub>$1</sub>")
     .replace(/\\%/g, "%")
     .replace(/\\[,;]/g, " ")
     .replace(/\\([a-zA-Z]+)/g, function (m, name) {
@@ -213,6 +213,14 @@ function parseMarkdown(text) {
     return ph;
   });
 
+  // Inline code is taken out first, so a $ inside backticks is never read as a formula.
+  var codeSpans = [];
+  safe = safe.replace(/`([^`\n]+)`/g, function (m, code) {
+    var ph = "\x00IC" + codeSpans.length + "\x00";
+    codeSpans.push("<code>" + code + "</code>");
+    return ph;
+  });
+
   // Generated pictures arrive as base64 data URLs; only png and jpeg are accepted.
   var images = [];
   safe = safe.replace(/!\[([^\]\n]{0,200})\]\((data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+)\)/g, function (m, alt, src) {
@@ -223,7 +231,7 @@ function parseMarkdown(text) {
 
   // Formulas are taken out before the lines are split, so a $$ block may span several lines.
   var maths = [];
-  safe = safe.replace(/\$\$([\s\S]+?)\$\$|\$(?!\s)([^$\n]+?)(?<!\s)\$/g, function (m, block, inline) {
+  safe = safe.replace(/\$\$([\s\S]+?)\$\$|\$(?!\s)([^$\n]+?)(?<!\s)\$(?!\d)/g, function (m, block, inline) {
     var ph = "\x00MT" + maths.length + "\x00";
     if (block !== undefined) {
       maths.push('<div class="md-math md-math-block">' + mathToHtml(block.trim()) + "</div>");
@@ -361,6 +369,10 @@ function parseMarkdown(text) {
   for (var n = 0; n < images.length; n++)
     result = result.replace("\x00IM" + n + "\x00", function () {
       return images[n];
+    });
+  for (var c = 0; c < codeSpans.length; c++)
+    result = result.replace("\x00IC" + c + "\x00", function () {
+      return codeSpans[c];
     });
   return result;
 }
@@ -604,7 +616,9 @@ function addMessage(
       summary.className = "msg-meta-summary";
       const traceId = traceObj.trace_id ? String(traceObj.trace_id).substring(0, 8) : "local";
       const eventsCount = Array.isArray(traceObj.events) ? traceObj.events.length : 0;
-      summary.textContent = `🔍 Трасса [${traceId}...] (${eventsCount} соб.)`;
+      summary.textContent = Array.isArray(traceObj.events)
+        ? `🔍 Трасса [${traceId}...] (${eventsCount} соб.)`
+        : `🔍 Трасса [${traceId}...]`;
       traceEl.appendChild(summary);
 
       // The Trace Viewer is a first-class chat action. Do not rely only on
@@ -628,10 +642,13 @@ function addMessage(
           try {
             const res = await window.LogosDispatcher.request(
               `/api/invocations/${encodeURIComponent(traceObj.invocation_id)}/trace`,
+              {},
+              { timeoutMs: 60000 },
             );
             if (!res.ok) throw new Error("HTTP " + res.status);
             window.openTraceViewer(await res.json());
           } catch (err) {
+            summary.textContent = "🔍 Трасса недоступна";
             console.error("[CHAT] Trace load failed: " + err.message);
           }
           return;
@@ -811,32 +828,72 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // A picture takes one generation request, then long polls on the server until it is ready.
-  async function runImageTurn(turn) {
-    const started = await window.LogosDispatcher.request("/api/images/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        conversation_id: turn.conversationId,
-        message: turn.text,
-        model: turn.model,
-      }),
-    }, { timeoutMs: 60000 });
-    const startBody = await started.json().catch(() => ({}));
-    if (!started.ok || !startBody.operation_id) {
-      return { error: startBody.message || startBody.error || "HTTP " + started.status };
-    }
+  // Polls one picture operation. The server holds each request up to 25 seconds, so the loop
+  // needs no timer. A failed request keeps the operation id: a retry resumes this picture
+  // instead of paying for a new one.
+  async function pollImageOperation(conversationId, operationId) {
     const operationPath =
-      "/api/images/operations/" + encodeURIComponent(startBody.operation_id) +
-      "?conversation_id=" + encodeURIComponent(turn.conversationId);
+      "/api/images/operations/" + encodeURIComponent(operationId) +
+      "?conversation_id=" + encodeURIComponent(conversationId);
     for (let attempt = 0; attempt < 240; attempt++) {
-      const polled = await window.LogosDispatcher.request(operationPath, {}, { timeoutMs: 60000 });
-      const state = await polled.json().catch(() => ({}));
+      let polled;
+      try {
+        polled = await window.LogosDispatcher.request(operationPath, {}, { timeoutMs: 60000 });
+      } catch (err) {
+        return { error: "связь прервалась, картинка не потеряна, повторите", operationId: operationId };
+      }
+      const state = await polled.json().catch(() => null);
+      if (!state || typeof state !== "object") {
+        return { error: "HTTP " + polled.status, operationId: operationId };
+      }
       if (state.status === "done") return { reply: state.reply, cost: 0 };
       if (state.status === "failed" || !polled.ok) {
         return { error: state.error || "HTTP " + polled.status };
       }
     }
-    return { error: "image generation timed out" };
+    return { error: "image generation timed out", operationId: operationId };
+  }
+
+  // One generation: start it, then poll the same operation until it finishes.
+  async function runImageTurn(turn) {
+    if (turn.attachmentCount) {
+      return { error: "Alice AI ART не принимает фото: уберите фото или выберите другую модель" };
+    }
+    let started;
+    try {
+      started = await window.LogosDispatcher.request("/api/images/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversation_id: turn.conversationId,
+          message: turn.text,
+          model: turn.model,
+          retry: Boolean(turn.retry),
+        }),
+      }, { timeoutMs: 60000 });
+    } catch (err) {
+      return { error: "связь прервалась при запуске генерации, повторите" };
+    }
+    const startBody = await started.json().catch(() => ({}));
+    if (!started.ok || !startBody.operation_id) {
+      return { error: startBody.message || startBody.error || "HTTP " + started.status };
+    }
+    return pollImageOperation(turn.conversationId, startBody.operation_id);
+  }
+
+  // Retry after a failed poll: the same operation, never a new paid generation.
+  async function resumeImageTurn(turn, operationId) {
+    const data = await pollImageOperation(turn.conversationId, operationId);
+    if (currentConvId !== turn.conversationId) return;
+    if (data.error) {
+      addMessage("⚠️ Ошибка: " + data.error, "error", false, 0, null, null, null, null, null, {
+        onRetry: function () {
+          resumeImageTurn(turn, operationId);
+        },
+      });
+    } else {
+      addMessage(data.reply, "bot", false, 0);
+    }
   }
 
   function sendMessage() {
@@ -906,7 +963,7 @@ document.addEventListener("DOMContentLoaded", function () {
       let response;
       let data;
       if (isImageModel(turn.model)) {
-        data = await runImageTurn(turn);
+        data = await runImageTurn({ ...turn, retry: Boolean(retryRequest), attachmentCount: sentImages.length });
         response = { status: data.error ? 502 : 200, ok: !data.error };
       } else {
         response = await window.LogosDispatcher.request("/api/chat", {
@@ -948,7 +1005,8 @@ document.addEventListener("DOMContentLoaded", function () {
         addMessage(data.reply || "⚠️ Ошибка: " + data.error, "error", false, data.cost || 0, data.timings,
           clientTotalMs, data.reasoning, data.usage, data.trace, {
             onRetry: function () {
-              sendTurn({ text: turn.text, conversationId: turn.conversationId });
+              if (data.operationId) resumeImageTurn(turn, data.operationId);
+              else sendTurn({ text: turn.text, conversationId: turn.conversationId });
             },
           });
       } else if (data.reply) {
@@ -961,8 +1019,8 @@ document.addEventListener("DOMContentLoaded", function () {
           data.reasoning, data.usage, data.trace);
       }
     } catch (error) {
-      restoreImages();
       if (currentConvId === turn.conversationId) {
+        restoreImages();
         if (!input.value) input.value = rawText;
         addMessage("⚠️ Ошибка: " + (error.message || "Сетевой сбой"), "error", false, 0);
       }

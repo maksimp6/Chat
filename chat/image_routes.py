@@ -52,12 +52,16 @@ def generate_image():
     conv_id = data.get("conversation_id")
     model_key = data.get("model")
     prompt = str(data.get("message") or "").strip()
+    retry = bool(data.get("retry"))
     if model_key not in IMAGE_MODELS:
         return jsonify({"error": "not_an_image_model"}), 400
     if not conv_id or not prompt:
         return jsonify({"error": "conversation_id and message are required"}), 400
     if len(prompt) > MAX_PROMPT_CHARS:
         return jsonify({"error": "prompt_too_long", "limit": MAX_PROMPT_CHARS}), 400
+    if data.get("attachments"):
+        # Alice AI ART creates pictures from text; a photo sent with it would be dropped silently.
+        return jsonify({"error": "image_model_does_not_take_photos"}), 400
     if not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
 
@@ -76,7 +80,9 @@ def generate_image():
     except Exception as exc:
         return jsonify({"error": "provider_credential_unavailable", "message": type(exc).__name__}), 503
 
-    add_message(conv_id, "user", prompt, cost=None)
+    if not retry:
+        # A retry reuses the message that is already in the conversation.
+        add_message(conv_id, "user", prompt, cost=None)
     return jsonify({"operation_id": operation_id, "model": model_key})
 
 

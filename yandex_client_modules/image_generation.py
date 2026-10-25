@@ -17,6 +17,8 @@ OPERATION_URL = "https://operation.api.cloud.yandex.net/operations/"
 MIME_TYPE = "image/jpeg"
 MAX_IMAGE_BYTES = 4 * 1024 * 1024
 REQUEST_TIMEOUT_SECONDS = 60
+# A poll is answered from the provider within this bound; the chat route holds each poll for 25 seconds.
+OPERATION_TIMEOUT_SECONDS = 20
 
 
 class ImageGenerationError(RuntimeError):
@@ -44,7 +46,7 @@ def start_generation(headers: dict[str, str], payload: dict[str, Any]) -> str:
 
 def read_operation(headers: dict[str, str], operation_id: str) -> dict[str, Any]:
     response = requests.get(
-        OPERATION_URL + operation_id, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS
+        OPERATION_URL + operation_id, headers=headers, timeout=OPERATION_TIMEOUT_SECONDS
     )
     response.raise_for_status()
     data = response.json()

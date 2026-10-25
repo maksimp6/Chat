@@ -14,6 +14,7 @@ const harness = `<!doctype html>
 </head><body class="logos-pro-app" style="margin:0;background:#fff">
 <div id="chatbox" class="chatbox" style="width:420px;padding:12px"></div>
 <script>window.LogosDispatcher = { request: function () { return Promise.reject(new Error("offline test")); } };</script>
+<script>var currentConvId = null;</script>
 <script src="file://${root}/static/chat.js"></script>
 </body></html>`;
 const harnessPath = path.join(out, "harness.html");
@@ -93,7 +94,8 @@ fs.writeFileSync(harnessPath, harness, "utf-8");
     !report.imageReady ||
     report.images !== 1 ||
     report.fractions < 1 ||
-    report.mathBlocks < 3 ||
+    report.mathBlocks !== 6 ||
+    report.pageErrors.length > 0 ||
     report.rawLatex ||
     report.rawDollar;
   if (failed) process.exit(1);
