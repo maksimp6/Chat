@@ -4,7 +4,7 @@ Pricing is intentionally read from the existing model configuration. Unknown
 models never become a confirmed zero-cost invocation.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from core.config import (
     ALL_MODELS,
@@ -18,7 +18,7 @@ PRICING_VERSION = "config-v1"
 PROVIDER = "yandex_ai_studio"
 
 
-def extract_cached_tokens(usage: Dict[str, Any]) -> int:
+def extract_cached_tokens(usage: dict[str, Any]) -> int:
     # The raw provider usage nests the count in the input details; the normalized usage that the
     # parser returns carries it at the top level. Both are read, so a cached input is never billed
     # at the full price.
@@ -31,10 +31,10 @@ def extract_cached_tokens(usage: Dict[str, Any]) -> int:
 
 def build_ai_billing_item(
     model_key: Optional[str],
-    usage: Optional[Dict[str, Any]],
+    usage: Optional[dict[str, Any]],
     step: int,
     response_id: Optional[str] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     usage = usage if isinstance(usage, dict) else {}
     input_tokens = int(usage.get("input_tokens", 0) or 0)
     output_tokens = int(usage.get("output_tokens", 0) or 0)
@@ -43,7 +43,7 @@ def build_ai_billing_item(
     audio_stt = float(usage.get("audio_seconds_stt", 0) or 0)
     audio_tts = float(usage.get("audio_seconds_tts", 0) or 0)
 
-    item: Dict[str, Any] = {
+    item: dict[str, Any] = {
         "type": "ai",
         "step": step,
         "provider": PROVIDER,
@@ -98,7 +98,7 @@ def build_ai_billing_item(
     return item
 
 
-def aggregate_billing(items, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def aggregate_billing(items, context: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     known = [item for item in items if item.get("cost_status") == "calculated"]
     total = round(sum(float(item.get("total_cost") or 0) for item in known), 6)
     input_cost = round(sum(float(item.get("input_cost") or 0) for item in known), 6)
@@ -144,7 +144,7 @@ def aggregate_billing(items, context: Optional[Dict[str, Any]] = None) -> Dict[s
     return result
 
 
-def settle_billing_to_treasury(billing: Dict[str, Any], owner_id: Optional[str]) -> Dict[str, Any]:
+def settle_billing_to_treasury(billing: dict[str, Any], owner_id: Optional[str]) -> dict[str, Any]:
     """Post a fully calculated trace billing aggregate exactly once."""
     if not isinstance(billing, dict) or billing.get("cost_status") != "calculated":
         return {"status": "skipped", "reason": "billing_not_fully_calculated"}

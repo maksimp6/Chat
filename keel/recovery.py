@@ -1,6 +1,5 @@
 """Recovery: automated recovery from failures."""
 
-from typing import List, Optional, Any, Dict
 from dataclasses import dataclass
 import logging
 
@@ -16,7 +15,7 @@ class Snapshot:
     retention_days: int
 
 
-def list_snapshots(storage: str, lane: str) -> List[Snapshot]:
+def list_snapshots(storage: str, lane: str) -> list[Snapshot]:
     """
     List available snapshots for recovery.
 

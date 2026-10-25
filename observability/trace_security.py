@@ -5,10 +5,10 @@ split out incrementally without changing the existing public class API.
 """
 
 import re
-from typing import Any, Set
+from typing import Any
 
 
-SENSITIVE_KEYS: Set[str] = {
+SENSITIVE_KEYS: set[str] = {
     "api_key",
     "apikey",
     "authorization",

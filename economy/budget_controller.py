@@ -15,7 +15,7 @@ from decimal import ROUND_CEILING, Decimal, InvalidOperation as DecimalInvalidOp
 from enum import Enum
 import threading
 import uuid
-from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
+from typing import Any, Callable, Optional, TYPE_CHECKING
 
 from cloud.base import CloudProviderError
 from core.restrictions import restrictions_lifted
@@ -129,7 +129,7 @@ class BudgetAccount:
         return BudgetStatus.ACTIVE
 
 
-TraceSink = Callable[[Dict[str, Any]], None]
+TraceSink = Callable[[dict[str, Any]], None]
 Clock = Callable[[], datetime]
 PolicyCheck = Callable[[AccountType, Decimal], bool]
 
@@ -192,7 +192,7 @@ class BudgetController:
     def account(self, account_type: AccountType) -> BudgetAccount:
         return self.accounts[AccountType(account_type)]
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         with self._lock:
             now = self._now()
             return {
@@ -223,7 +223,7 @@ class BudgetController:
                 },
             }
 
-    def _allocate(self, account_type: AccountType, amount: Any, *, actor: str) -> Dict[str, Any]:
+    def _allocate(self, account_type: AccountType, amount: Any, *, actor: str) -> dict[str, Any]:
         # Private: money enters only through request_replenishment's policy check.
         with self._lock:
             self._require_actor(actor)
@@ -250,7 +250,7 @@ class BudgetController:
         *,
         requested_by: str,
         policy_check: PolicyCheck,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         with self._lock:
             self._require_actor(requested_by)
             account_type = AccountType(account_type)
@@ -267,7 +267,7 @@ class BudgetController:
                 raise AuthorizationRequired("policy denied replenishment")
             return self._allocate(account_type, amount, actor="policy-approved:" + requested_by)
 
-    def reserve(self, amount: Any, *, account_type: Optional[AccountType] = None) -> Dict[str, Any]:
+    def reserve(self, amount: Any, *, account_type: Optional[AccountType] = None) -> dict[str, Any]:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
             account = self.account(account_type)
@@ -302,7 +302,7 @@ class BudgetController:
         amount: Any,
         *,
         account_type: Optional[AccountType] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Convert an existing reservation into a spend atomically."""
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
@@ -329,7 +329,7 @@ class BudgetController:
             )
             return self.snapshot()
 
-    def spend(self, amount: Any, *, account_type: Optional[AccountType] = None) -> Dict[str, Any]:
+    def spend(self, amount: Any, *, account_type: Optional[AccountType] = None) -> dict[str, Any]:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
             account = self.account(account_type)
@@ -372,7 +372,7 @@ class BudgetController:
 
     def _record_win(
         self, amount: Any, *, account_type: Optional[AccountType] = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Record a provider-confirmed win. Private: nothing in the app may mint wins,
         and no provider settlement path exists yet to call this."""
         with self._lock:
@@ -394,7 +394,7 @@ class BudgetController:
 
     def release_reservation(
         self, amount: Any, *, account_type: Optional[AccountType] = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
             account = self.account(account_type)
@@ -414,7 +414,7 @@ class BudgetController:
             )
             return self.snapshot()
 
-    def refund(self, amount: Any, *, account_type: Optional[AccountType] = None) -> Dict[str, Any]:
+    def refund(self, amount: Any, *, account_type: Optional[AccountType] = None) -> dict[str, Any]:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
             account = self.account(account_type)
@@ -438,7 +438,7 @@ class BudgetController:
             )
             return self.snapshot()
 
-    def switch_to_demo(self, *, reason: str) -> Dict[str, Any]:
+    def switch_to_demo(self, *, reason: str) -> dict[str, Any]:
         with self._lock:
             if self.active_account is AccountType.DEMO:
                 return self.snapshot()
@@ -457,7 +457,7 @@ class BudgetController:
         *,
         actor: str,
         authorization_check: Callable[[], bool],
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Return DEMO -> REAL only after explicit external authorization."""
         with self._lock:
             self._require_actor(actor)
@@ -616,7 +616,7 @@ class CloudBudgetLimits:
         object.__setattr__(self, "currency", self.currency.strip().upper())
 
     @classmethod
-    def from_env(cls, env: Optional[Dict[str, str]] = None) -> "CloudBudgetLimits":
+    def from_env(cls, env: Optional[dict[str, str]] = None) -> "CloudBudgetLimits":
 
         source = env_snapshot() if env is None else env
         raw_limit = str(source.get("CLOUDRU_MONTHLY_BUDGET", "")).strip()
@@ -629,7 +629,7 @@ class CloudBudgetLimits:
         return cls(_money(raw_limit) if raw_limit else None, warn_ratio, currency)
 
 
-def evaluate_cloud_spend(spent: Any, limits: CloudBudgetLimits) -> Dict[str, Any]:
+def evaluate_cloud_spend(spent: Any, limits: CloudBudgetLimits) -> dict[str, Any]:
     """Classify current-period cloud spend against a monthly limit."""
     if limits.monthly_limit is None:
         return {"status": CloudSpendStatus.UNCONFIGURED.value, "currency": limits.currency}
@@ -680,11 +680,11 @@ class CloudBudgetGuard:
         self._cache_seconds = max(0, int(cache_seconds))
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._trace_sink = trace_sink
-        self._cached: Optional[Dict[str, Any]] = None
+        self._cached: Optional[dict[str, Any]] = None
         self._cached_at: Optional[datetime] = None
         self._lock = threading.Lock()
 
-    def status(self, *, refresh: bool = False) -> Dict[str, Any]:
+    def status(self, *, refresh: bool = False) -> dict[str, Any]:
         with self._lock:
             now = self._clock()
             period = self._period or now.strftime("%Y-%m")
@@ -705,7 +705,7 @@ class CloudBudgetGuard:
             self._emit_if_not_ok(result)
             return dict(result)
 
-    def _fetch(self, period: str) -> Dict[str, Any]:
+    def _fetch(self, period: str) -> dict[str, Any]:
         if self.limits.monthly_limit is None:
             return evaluate_cloud_spend(None, self.limits)
         try:
@@ -732,11 +732,11 @@ class CloudBudgetGuard:
         result["provider"] = summary.get("provider")
         return result
 
-    def _emit_if_not_ok(self, result: Dict[str, Any]) -> None:
+    def _emit_if_not_ok(self, result: dict[str, Any]) -> None:
         if result["status"] not in {CloudSpendStatus.OK.value, CloudSpendStatus.UNCONFIGURED.value}:
             self._emit("cloud_budget_" + result["status"], result)
 
-    def enforce(self, operation: str) -> Dict[str, Any]:
+    def enforce(self, operation: str) -> dict[str, Any]:
         result = self.status()
         if result["status"] == CloudSpendStatus.BLOCK.value and not restrictions_lifted():
             raise BudgetLimitExceeded(
@@ -745,6 +745,6 @@ class CloudBudgetGuard:
             )
         return result
 
-    def _emit(self, event_type: str, data: Dict[str, Any]) -> None:
+    def _emit(self, event_type: str, data: dict[str, Any]) -> None:
         if self._trace_sink is not None:
             self._trace_sink({"event": event_type, **data})

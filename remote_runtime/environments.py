@@ -9,7 +9,6 @@ contract through its deployment workflow.
 from __future__ import annotations
 from core.env import env_get
 
-import json
 import logging
 import os
 import queue
@@ -18,7 +17,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from storage.db import get_store, init_db as init_runtime_db
 from invocation.context import InvocationContext
@@ -156,18 +155,18 @@ def _runtime_thread_id(environment_id: str) -> Optional[int]:
     return worker.thread_id if worker else None
 
 
-def _row_to_dict(row) -> Dict[str, Any]:
+def _row_to_dict(row) -> dict[str, Any]:
     item = dict(row)
     item["runtime_thread_id"] = _runtime_thread_id(item["environment_id"])
     return item
 
 
-def _get(environment_id: str) -> Optional[Dict[str, Any]]:
+def _get(environment_id: str) -> Optional[dict[str, Any]]:
     row = get_store().get("environment/record/" + environment_id)
     return _row_to_dict(row) if row is not None else None
 
 
-def _require(environment_id: str, owner_id: Optional[str] = None) -> Dict[str, Any]:
+def _require(environment_id: str, owner_id: Optional[str] = None) -> dict[str, Any]:
     del owner_id
     item = _get(environment_id)
     if not item:
@@ -187,14 +186,14 @@ def _namespace(environment_id: str) -> str:
 
 
 def _record_trace(
-    environment: Dict[str, Any],
+    environment: dict[str, Any],
     operation: str,
     status: str,
     *,
     context: Optional[InvocationContext] = None,
     error: Optional[str] = None,
-    extra: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    extra: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     trace = create_invocation_trace(context) if context else ExecutionTrace()
     if not context:
         trace.set_context(
@@ -299,7 +298,7 @@ class EnvironmentRuntime:
     is executed only after RuntimeDispatcher binds the environment scope.
     """
 
-    def __init__(self, environment: Dict[str, Any]):
+    def __init__(self, environment: dict[str, Any]):
         self.environment = environment
         self.runtime_id = environment["environment_id"]
         self.root = Path(
@@ -390,7 +389,7 @@ class EnvironmentRuntime:
     def submit(
         self,
         operation: str,
-        payload: Optional[Dict[str, Any]] = None,
+        payload: Optional[dict[str, Any]] = None,
         *,
         timeout: float = 30.0,
     ) -> Any:
@@ -408,7 +407,7 @@ class EnvironmentRuntime:
 
     def submit_http(
         self,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         *,
         timeout: float = 30.0,
     ) -> RuntimeHTTPStream:
@@ -480,7 +479,7 @@ class EnvironmentRuntime:
 
         shutil.rmtree(self.worktree.parent, ignore_errors=True)
 
-    def _run_http(self, payload: Dict[str, Any], events: queue.Queue, cancel: threading.Event) -> None:
+    def _run_http(self, payload: dict[str, Any], events: queue.Queue, cancel: threading.Event) -> None:
         source = None
         try:
             base_path = str(payload.get("base_path") or "")
@@ -559,7 +558,7 @@ def authorize_environment_runtime(
 def dispatch_environment_operation(
     environment_id: str,
     operation: str,
-    payload: Optional[Dict[str, Any]] = None,
+    payload: Optional[dict[str, Any]] = None,
     *,
     timeout: float = 30.0,
 ) -> Any:
@@ -574,7 +573,7 @@ def dispatch_environment_operation(
 def dispatch_environment_revision(
     environment_id: str,
     operation: str,
-    payload: Optional[Dict[str, Any]] = None,
+    payload: Optional[dict[str, Any]] = None,
     *,
     timeout: float = 30.0,
 ) -> Any:
@@ -589,7 +588,7 @@ def dispatch_environment_revision(
 
 def dispatch_environment_http(
     environment_id: str,
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     *,
     timeout: float = 30.0,
 ) -> RuntimeHTTPStream:
@@ -607,7 +606,7 @@ def create_environment(
     owner_id: Optional[str] = None,
     *,
     context: Optional[InvocationContext] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     init_environment_tables()
     resolved = resolve_commit(branch, commit_sha)
     environment_id = str(uuid.uuid4())
@@ -637,7 +636,7 @@ def create_environment(
     return item
 
 
-def list_environments(owner_id: Optional[str] = None) -> list[Dict[str, Any]]:
+def list_environments(owner_id: Optional[str] = None) -> list[dict[str, Any]]:
     del owner_id
     init_environment_tables()
     rows = list(get_store().items(prefix="environment/record/").values())
@@ -650,7 +649,7 @@ def list_environments(owner_id: Optional[str] = None) -> list[Dict[str, Any]]:
 
 def start_environment(
     environment_id: str, owner_id: Optional[str] = None, *, context=None
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     item = _require(environment_id, owner_id)
     _transition(item["status"], "RUNNING")
     runtime = EnvironmentRuntime(item)
@@ -693,7 +692,7 @@ def start_environment(
 
 def stop_environment(
     environment_id: str, owner_id: Optional[str] = None, *, context=None
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     item = _require(environment_id, owner_id)
     _transition(item["status"], "STOPPED")
     with _RUNTIME_WORKERS_LOCK:
@@ -725,7 +724,7 @@ def stop_environment(
 
 def restart_environment(
     environment_id: str, owner_id: Optional[str] = None, *, context=None
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     item = _require(environment_id, owner_id)
     if item["status"] == "RUNNING":
         stop_environment(environment_id, owner_id, context=context)
@@ -734,7 +733,7 @@ def restart_environment(
 
 def delete_environment(
     environment_id: str, owner_id: Optional[str] = None, *, context=None
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     item = _require(environment_id, owner_id)
     if item["status"] == "RUNNING":
         stop_environment(environment_id, owner_id, context=context)
@@ -750,7 +749,7 @@ def delete_environment(
     return item
 
 
-def _persist_environment(environment_id: str, changes: Dict[str, Any]) -> None:
+def _persist_environment(environment_id: str, changes: dict[str, Any]) -> None:
     key = "environment/record/" + environment_id
     with get_store().transaction() as tx:
         old = tx.get(key)

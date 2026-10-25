@@ -7,7 +7,7 @@ recomputed with a newer tariff.
 
 import math
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Iterable, Optional
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ class PricingSnapshot:
         if self.effective_to is not None and self.effective_to <= self.effective_from:
             raise ValueError("effective_to must be after effective_from")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -100,8 +100,8 @@ class PricingRegistry:
 
 
 def attach_pricing_snapshot(
-    usage: Dict[str, Any], snapshot: PricingSnapshot, *, cost: Optional[float] = None
-) -> Dict[str, Any]:
+    usage: dict[str, Any], snapshot: PricingSnapshot, *, cost: Optional[float] = None
+) -> dict[str, Any]:
     """Return a usage record with an immutable pricing snapshot attached."""
     result = dict(usage)
     result["pricing"] = snapshot.to_dict()

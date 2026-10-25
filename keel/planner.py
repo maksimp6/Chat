@@ -2,7 +2,7 @@
 
 from enum import Enum
 from dataclasses import dataclass
-from typing import Any, Dict, List, Set
+from typing import Any
 
 
 class ActionType(Enum):
@@ -28,9 +28,9 @@ class Action:
 
 def plan_actions(
     lane: str,
-    desired: Dict[str, Any],
-    observed: Dict[str, Any],
-) -> List[Action]:
+    desired: dict[str, Any],
+    observed: dict[str, Any],
+) -> list[Action]:
     """
     Generate actions to reconcile desired vs observed state.
 
@@ -42,7 +42,7 @@ def plan_actions(
     Returns:
         List of actions to bring observed state to desired
     """
-    actions: List[Action] = []
+    actions: list[Action] = []
 
     # Extract info
     desired_services = desired.get("services", {})
@@ -53,7 +53,7 @@ def plan_actions(
     observed_containers = observed.get("containers", [])
 
     # Build maps for quick lookup
-    observed_by_service: Dict[str, Dict[str, Any]] = {}
+    observed_by_service: dict[str, dict[str, Any]] = {}
     for container in observed_containers:
         if container.get("lane") == lane:
             service = container.get("service")

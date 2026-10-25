@@ -8,7 +8,7 @@ import base64
 import hashlib
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from agent_memory.client import get_memory_client
 from storage.db import memory_file_path
@@ -93,7 +93,7 @@ def _resolve_request_session_id(session_id: str, conversation_id: str) -> str:
 def create_invocation(
     session_id: str,
     conversation_id: str,
-    metadata: Optional[Dict[str, Any]] = None,
+    metadata: Optional[dict[str, Any]] = None,
     user_id: Optional[str] = None,
     *,
     create_missing_session: bool = True,
@@ -363,7 +363,7 @@ def get_invocation_owner(invocation_id: str) -> Optional[str]:
     return value.get("user_id")
 
 
-def get_invocation(invocation_id: str) -> Optional[Dict[str, Any]]:
+def get_invocation(invocation_id: str) -> Optional[dict[str, Any]]:
     value = get_memory_client(memory_file_path()).get(_key(invocation_id))
     if value is None:
         return None

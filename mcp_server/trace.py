@@ -1,13 +1,13 @@
 """Trace correlation helpers for MCP activity managed by Yandex AI Studio."""
 
-from typing import Any, Dict, Iterable, List
+from typing import Any, Iterable
 
 
 _MCP_TYPE_MARKERS = ("mcp",)
 _MCP_KEY_MARKERS = ("mcp_call", "mcp_server", "mcp_tool", "mcp_list", "mcp_approval")
 
 
-def _looks_like_mcp_item(value: Dict[str, Any]) -> bool:
+def _looks_like_mcp_item(value: dict[str, Any]) -> bool:
     item_type = str(value.get("type", "")).lower()
     if item_type.startswith(_MCP_TYPE_MARKERS) or "_mcp_" in item_type:
         return True
@@ -15,7 +15,7 @@ def _looks_like_mcp_item(value: Dict[str, Any]) -> bool:
     return any(marker in key for key in keys for marker in _MCP_KEY_MARKERS)
 
 
-def _walk_mcp_items(value: Any) -> Iterable[Dict[str, Any]]:
+def _walk_mcp_items(value: Any) -> Iterable[dict[str, Any]]:
     if isinstance(value, dict):
         if _looks_like_mcp_item(value):
             yield value
@@ -26,7 +26,7 @@ def _walk_mcp_items(value: Any) -> Iterable[Dict[str, Any]]:
             yield from _walk_mcp_items(child)
 
 
-def _activity_key(item: Dict[str, Any], response_id: Any, step: Any) -> str:
+def _activity_key(item: dict[str, Any], response_id: Any, step: Any) -> str:
     call_id = item.get("call_id") or item.get("id") or item.get("tool_call_id")
     name = item.get("name") or item.get("tool_name")
     server = item.get("server_label") or item.get("server_name") or item.get("server_url")
@@ -54,7 +54,7 @@ def record_yandex_mcp_activity(trace: Any) -> int:
             continue
         step = response_entry.get("step")
         response_id = response_entry.get("response_id")
-        snapshots: List[Any] = []
+        snapshots: list[Any] = []
         raw = response_entry.get("raw")
         if raw is not None:
             snapshots.append(raw)

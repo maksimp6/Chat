@@ -1,7 +1,7 @@
 """Semantic economics for knowledge items and agent operations."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 CURRENCY = "RUB"
 PRICING_VERSION = "knowledge-config-v2"
@@ -63,7 +63,7 @@ def calculate_provider_storage_cost(
     days_in_month: int = 30,
     get_operations: int = 0,
     write_operations: int = 0,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Calculate provider-backed storage cost with documented free tiers."""
     gb_months = max(0.0, bytes_stored / (1024**3)) * max(0.0, lifetime_days) / max(1, days_in_month)
     billable_storage = max(0.0, gb_months - tariff.free_storage_gb_month)
@@ -106,7 +106,7 @@ def calculate_knowledge_cost(
     lifetime_days: float = 0,
     retrieval_count: int = 0,
     config: KnowledgeCostConfig,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     components = {
         "text": _cost(config.text_per_kb, text_bytes / 1024),
         "embedding": _cost(config.embedding_per_1k_tokens, embedding_tokens / 1000),
@@ -142,10 +142,10 @@ def record_knowledge_operation(
     trace_id: Optional[str] = None,
     session_id: Optional[str] = None,
     conversation_id: Optional[str] = None,
-    cost: Optional[Dict[str, Any]] = None,
+    cost: Optional[dict[str, Any]] = None,
     value: Optional[float] = None,
     quality: Optional[float] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     entry = {
         "knowledge_item_id": str(knowledge_item_id),
         "operation": operation,
@@ -198,7 +198,7 @@ class PolicyBudgetController:
         value: float,
         quality: Optional[float] = None,
         reason: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         cost = max(0.0, float(cost))
         value = float(value)
         if value >= self._policy.reward_value_threshold and cost == 0:

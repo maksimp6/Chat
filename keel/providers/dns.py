@@ -1,6 +1,6 @@
 """DNS provider - manage domain routing."""
 
-from typing import Any, Dict
+from typing import Any
 
 
 def create_dns_record(domain: str, service_endpoint: str, protocol: str) -> None:
@@ -18,7 +18,7 @@ def create_dns_record(domain: str, service_endpoint: str, protocol: str) -> None
     raise NotImplementedError("DNS provider deferred to next slice")
 
 
-def update_dns_records(domains: Dict[str, Any]) -> None:
+def update_dns_records(domains: dict[str, Any]) -> None:
     """
     Update all DNS records from config.
 

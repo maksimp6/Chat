@@ -1,7 +1,7 @@
 """Health checks derived from config."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any
 
 
 @dataclass
@@ -17,8 +17,8 @@ class HealthCheck:
 
 def generate_health_plan(
     lane: str,
-    config: Dict[str, Any],
-) -> List[HealthCheck]:
+    config: dict[str, Any],
+) -> list[HealthCheck]:
     """
     Generate health checks from config for a specific lane.
 
@@ -33,7 +33,7 @@ def generate_health_plan(
     Returns:
         List of health checks to monitor
     """
-    checks: List[HealthCheck] = []
+    checks: list[HealthCheck] = []
 
     # Get lane config
     lanes = config.get("lanes", {})

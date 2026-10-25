@@ -11,7 +11,7 @@ from core.env import env_get
 
 import logging
 import math
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def _positive_env_float(name: str) -> Optional[float]:
     return value
 
 
-def get_energy_pricing() -> Dict[str, Optional[float]]:
+def get_energy_pricing() -> dict[str, Optional[float]]:
     watts = _positive_env_float("LOGOS_CPU_WATTS_PER_CORE")
     return {
         "watts_per_core": DEFAULT_CPU_WATTS_PER_CORE if watts is None else watts,
@@ -47,12 +47,12 @@ def get_energy_pricing() -> Dict[str, Optional[float]]:
 def build_compute_billing_item(
     cpu_seconds: Optional[float],
     wall_seconds: Optional[float] = None,
-    pricing: Optional[Dict[str, Optional[float]]] = None,
-) -> Dict[str, Any]:
+    pricing: Optional[dict[str, Optional[float]]] = None,
+) -> dict[str, Any]:
     pricing = pricing or get_energy_pricing()
     watts = float(pricing["watts_per_core"])
     price = pricing.get("price_per_kwh")
-    item: Dict[str, Any] = {
+    item: dict[str, Any] = {
         "type": "compute",
         "provider": PROVIDER,
         "currency": PRICING_CURRENCY,
