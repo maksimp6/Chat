@@ -1,1 +1,2 @@
 docs/mirrors/yandex-ai-studio/source/** filter=lfs diff=lfs merge=lfs -text
+docs/screenshots/logos/**/*.png filter=lfs diff=lfs merge=lfs -text
