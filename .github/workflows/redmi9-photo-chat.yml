@@ -1,0 +1,94 @@
+name: Redmi 9 photo chat test
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: redmi9-app-server
+  cancel-in-progress: false
+
+jobs:
+  photo_chat:
+    runs-on: redmi9
+    timeout-minutes: 6
+    steps:
+      - name: Send one photo to the model through the Redmi 9 app
+        shell: bash
+        timeout-minutes: 5
+        env:
+          MODEL: qwen3.6-35b-a3b
+        run: |
+          set -euo pipefail
+          test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
+          photo="$RUNNER_TEMP/photo.png"
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 60 \
+            "https://media.githubusercontent.com/media/maksimp6/Chat/$GITHUB_SHA/docs/screenshots/logos/2026-10-25/run-40212418021-1/18-chat-bottom.png" \
+            -o "$photo"
+          python - "$photo" <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          import sys
+          import urllib.error
+          import urllib.request
+
+          BASE = "http://127.0.0.1:8080"
+          MODEL = os.environ["MODEL"]
+          QUESTION = "На изображении записан вопрос и ответ. Назови вопрос и ответ одной строкой."
+          PHOTO_SHA256 = "3202c326b926ccbfb30629bea5129a1c249d789a0aa93d8cde432f0a5adef9a9"
+          PHOTO_SIZE = 222314
+
+          photo = open(sys.argv[1], "rb").read()
+          if len(photo) != PHOTO_SIZE or hashlib.sha256(photo).hexdigest() != PHOTO_SHA256:
+              raise SystemExit("photo does not match the expected bytes")
+          data_url = "data:image/png;base64," + base64.b64encode(photo).decode("ascii")
+
+
+          def post(path, body, timeout):
+              request = urllib.request.Request(
+                  BASE + path,
+                  data=json.dumps(body).encode("utf-8"),
+                  headers={"Content-Type": "application/json"},
+                  method="POST",
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=timeout) as response:
+                      return response.status, json.loads(response.read().decode("utf-8") or "{}")
+              except urllib.error.HTTPError as error:
+                  return error.code, error.read().decode("utf-8", errors="replace")[:800]
+
+
+          conv_status, conv = post("/api/conversations", {"model": MODEL}, 30)
+          conv_id = conv.get("id") if isinstance(conv, dict) else None
+          print(json.dumps({"step": "conversation", "status": conv_status, "created": bool(conv_id)}))
+          if not conv_id:
+              raise SystemExit(1)
+
+          chat_status, chat = post(
+              "/api/chat",
+              {
+                  "conversation_id": conv_id,
+                  "message": QUESTION,
+                  "model": MODEL,
+                  "attachments": [{"data_url": data_url}],
+              },
+              180,
+          )
+          if isinstance(chat, dict):
+              summary = {
+                  "step": "chat",
+                  "status": chat_status,
+                  "reply": str(chat.get("reply", ""))[:1500],
+                  "usage": chat.get("usage"),
+                  "cost": chat.get("cost"),
+                  "error": chat.get("error"),
+              }
+          else:
+              summary = {"step": "chat", "status": chat_status, "body": chat}
+          print(json.dumps(summary, ensure_ascii=False))
+          if chat_status != 200:
+              raise SystemExit(1)
+          PY
