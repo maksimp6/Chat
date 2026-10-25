@@ -70,14 +70,18 @@ jobs:
           with open(sys.argv[1], encoding="utf-8") as stream:
               manifest = json.load(stream)
           scenario = manifest.get("creation_scenario", {})
+          matrix = manifest.get("matrix_scenario", {})
           artifacts = {entry.get("path") for entry in manifest.get("artifacts", [])}
           required_artifacts = {"15-conversation-create.mp4", "events.json"}
           print(json.dumps({"creation_scenario": scenario.get("verdict", "NOT_RUN"),
                             "failures": scenario.get("failures", []),
+                            "matrix_scenario": matrix.get("verdict", "NOT_RUN"),
+                            "matrix_failures": matrix.get("failures", []),
                             "video_and_events_present": required_artifacts <= artifacts}))
           if (scenario.get("verdict") != "PASS" or scenario.get("failures") != []
+                  or matrix.get("verdict") != "PASS" or matrix.get("failures") != []
                   or not required_artifacts <= artifacts):
-              raise SystemExit("Conversation creation failed its UI checks; evidence was published first")
+              raise SystemExit("Application UI checks failed; evidence was published first")
           PY
 
   verify_screenshots:

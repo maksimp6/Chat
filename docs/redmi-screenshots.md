@@ -6,6 +6,12 @@ One runner step wakes Redmi 9, dismisses its existing non-secure keyguard,
 opens `http://127.0.0.1:8080/` in the installed Iceraven browser, and captures
 native Android PNGs after checking the visible UI state.
 
+Every launch uses a unique query marker and requires a new navigation timestamp
+and the server-rendered boot revision. If Android returns a reused tab without
+navigating, one explicit browser navigation opens the fresh local URL. An old
+or modified document is not accepted as the current application. The script
+records an initial native frame before attempting the named transitions.
+
 The named matrix contains ten frames: sidebar open, closed, reopened; model
 picker; system status; and the five settings tabs (generation, output, routing,
 advanced, theme). It uses the original buttons without sending a model request,
@@ -51,7 +57,9 @@ the Android runner and verifies bytes and hashes. `verify_screenshots` repeats
 the remote verification without touching the screen.
 
 The runner stops if the device is not Redmi 9, a secure unlock is required,
-Iceraven or DevTools is unavailable, the application is obscured, or a requested
-surface fails its checks. It does not install software, disable a lock, restart
+Iceraven or DevTools is unavailable, or a safe application view cannot be
+verified. Failed UI transitions are captured and recorded in `matrix_scenario`
+while the observed application view remains safe; they cannot produce an
+overall successful verdict. It does not install software, disable a lock, restart
 RDC, or claim coverage of every possible application state. The local server
 and the existing browser DevTools setting must already be available.

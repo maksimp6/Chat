@@ -165,7 +165,7 @@ def wait_awake(seconds):
         time.sleep(0.2)
 
 
-def prepare_browser():
+def prepare_browser(metadata):
     """Use the existing insecure screen lock and installed browser; never change either."""
     device_model_guard()
     if not command(ROOT + "pm", "path", PACKAGE).strip().startswith(b"package:"):
@@ -205,12 +205,18 @@ def prepare_browser():
         if time.monotonic() >= deadline:
             raise RuntimeError("Redmi 9 did not reach an awake, unlocked screen")
         time.sleep(0.3)
+    navigation_tag = metadata["github_run_id"] + "-" + metadata["github_run_attempt"] + "-" + str(time.time_ns())
+    if not re.fullmatch(r"[0-9]+-[0-9]+-[0-9]+", navigation_tag):
+        raise RuntimeError("Invalid capture navigation tag")
+    fresh_url = LOGOS_URL + "?logos_capture_run=" + navigation_tag
+    launch_requested_ms = time.time() * 1000
     launched = command(ROOT + "am", "start", "-W", "--user", "0", "-a",
-                       "android.intent.action.VIEW", "-d", LOGOS_URL, "-p", PACKAGE)
+                       "android.intent.action.VIEW", "-d", fresh_url, "-p", PACKAGE)
     if b"Error:" in launched or b"Exception" in launched:
         raise RuntimeError("Android could not open the local Logos URL in Iceraven")
     deadline = time.monotonic() + 40
     last_error = "Iceraven has not reached the foreground"
+    forced_navigation = False
     while time.monotonic() < deadline:
         rdp = None
         try:
@@ -218,13 +224,25 @@ def prepare_browser():
             rdp = RDP(deadline=deadline)
             actor = rdp.find_logos()
             state = rdp.state(actor)
-            if (state["title"] != "Logos" or not state["sidebar"] or not state["menu"] or
-                    not isinstance(state.get("revision"), str) or
-                    not re.fullmatch(r"[0-9a-f]{40}", state["revision"])):
+            fresh = (state.get("navigation_tag") == navigation_tag and
+                     state.get("time_origin_ms", 0) >= launch_requested_ms - 1000)
+            if not fresh:
+                if not forced_navigation:
+                    rdp.evaluate(actor, "JSON.stringify((()=>{setTimeout(()=>location.replace(" +
+                                 json.dumps(fresh_url) + "),100);return {scheduled:true};})())")
+                    forced_navigation = True
+                raise RuntimeError("Waiting for a fresh Logos document instead of reusing an old browser tab")
+            if (state["title"] != "Logos" or state["document_ready_state"] != "complete" or
+                    not state["sidebar"] or not state["menu"] or
+                    not isinstance(state.get("template_revision"), str) or
+                    not re.fullmatch(r"[0-9a-f]{40}", state["template_revision"])):
                 raise RuntimeError("Local Logos has not finished loading")
             rdp.deadline = CAPTURE_DEADLINE
             return rdp, actor, {"method": "Android/kernel wakeup, insecure keyguard dismissal, browser VIEW intent",
-                                "before": before, "wake_attempts": wake_attempts, "ready": android_state()}
+                                "before": before, "wake_attempts": wake_attempts, "ready": android_state(),
+                                "navigation": {"tag": navigation_tag, "requested_at_ms": launch_requested_ms,
+                                               "document_time_origin_ms": state["time_origin_ms"],
+                                               "rdp_location_replace_used": forced_navigation}}
         except (OSError, RuntimeError, KeyError) as error:
             if rdp is not None:
                 rdp.s.close()
@@ -330,8 +348,17 @@ class RDP:
             const value=row.dataset.status;
             const status=['ready','running','waiting','degraded','blocked','revoked','error','stopped'].includes(value)?value:'unknown';
             statusCounts[status]=(statusCounts[status]||0)+1;}
-          return {url:location.origin+location.pathname,title:document.title,
-            visibility:document.visibilityState,revision:window.__LOGOS_APP_REVISION,
+          const runtimeRevision=window.__LOGOS_APP_REVISION;
+          const templateRevision=document.getElementById('logos-boot')?.dataset.appRevision;
+          const validRevision=value=>typeof value==='string'&&/^[0-9a-f]{40}$/.test(value);
+          const revision=validRevision(runtimeRevision)?runtimeRevision:templateRevision;
+          const navigation=performance.getEntriesByType('navigation')[0];
+          const navigationTag=new URL(navigation?.name||location.href).searchParams.get('logos_capture_run');
+          return {url:location.origin+location.pathname,title:document.title,document_ready_state:document.readyState,
+            visibility:document.visibilityState,revision,
+            template_revision:templateRevision,time_origin_ms:performance.timeOrigin,navigation_tag:navigationTag,
+            revision_source:validRevision(runtimeRevision)?'runtime_global':(validRevision(templateRevision)?'server_rendered_script_dataset':'unknown'),
+            boot_global_missing:!validRevision(runtimeRevision),core_api_missing:typeof window.LogosCoreAPI==='undefined',
             open:!!s&&s.classList.contains('open'),sidebar:box(s),
             menu:box(document.getElementById('menu-btn')),
             close:box(document.getElementById('close-sidebar-btn')),
@@ -588,7 +615,11 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
             failures.append("new_conversation_not_empty_" + phase)
 
     try:
-        app_state()
+        initial_view = app_state()
+        if initial_view["boot_global_missing"]:
+            failures.append("document_boot_global_missing")
+        if initial_view["core_api_missing"]:
+            failures.append("document_core_api_missing")
         before = rdp.conversation_state(actor)
         mark("scenario_started", before)
         if not Path(ROOT + "screenrecord").is_file():
@@ -605,10 +636,19 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
         frame("11-conversation-before.png")
         installed = rdp.start_creation_observer(actor)
         mark("network_observer_installed", installed)
+        mark("new_chat_button_attempted", rdp.conversation_state(actor))
         rdp.click(actor, "#new-chat-btn")
         mark("new_chat_button_clicked", rdp.conversation_state(actor))
-        rdp.wait_surface(actor, "model")
+        try:
+            rdp.wait_surface(actor, "model")
+        except CaptureSafetyError:
+            raise
+        except (OSError, RuntimeError, KeyError):
+            failures.append("new_chat_model_picker_did_not_open")
         frame("12-conversation-model-picker.png")
+        picker_open = app_state()["surfaces"] == ["model"]
+        if not picker_open:
+            failures.append("new_chat_model_picker_did_not_open")
         choice = rdp.conversation_state(actor)
         picker_observer = rdp.creation_observer(actor)
         premature_posts = [r for r in picker_observer["requests"] if r["method"] == "POST"]
@@ -618,7 +658,7 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
                 choice["active_ids"] != before["active_ids"]):
             failures.append("conversation_changed_before_model_choice")
         mark("model_picker_phase_observed", {"conversation": choice, "network": picker_observer})
-        if premature_posts or choice["model_choices"] != 1 or choice["current_model"] != before["current_model"]:
+        if not picker_open or premature_posts or choice["model_choices"] != 1 or choice["current_model"] != before["current_model"]:
             failures.append("same_current_model_choice_unavailable")
         else:
             mark("current_model_choice_started", choice)
@@ -755,6 +795,12 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
     except Exception as error:
         failures.append("conversation_observation_failed")
         mark("observation_error", {"exception_type": type(error).__name__})
+        try:
+            frame("13-conversation-observation-error.png")
+        except CaptureSafetyError:
+            raise
+        except Exception:
+            failures.append("conversation_failure_screenshot_unavailable")
     finally:
         try:
             collected = rdp.creation_observer(actor, stop=True)
@@ -820,7 +866,7 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
 def capture(out, uid, gid, metadata):
     global CAPTURE_DEADLINE
     CAPTURE_DEADLINE = time.monotonic() + 270
-    rdp, actor, preparation = prepare_browser()
+    rdp, actor, preparation = prepare_browser(metadata)
     device_guard()
     out.mkdir(parents=True, exist_ok=True)
     initial = rdp.state(actor)
@@ -883,46 +929,99 @@ def capture(out, uid, gid, metadata):
                                     "protected_selectors": list(redact_selectors),
                                     "selectors": redaction["selectors"], "overlays": redaction["overlays"]}})
 
-    for filename, wanted in (("01-sidebar-open.png", True),
-                             ("02-sidebar-closed.png", False),
+    matrix_failures = []
+    if initial["boot_global_missing"]:
+        matrix_failures.append("document_boot_global_missing")
+    if initial["core_api_missing"]:
+        matrix_failures.append("document_core_api_missing")
+    snapshot("00-application-initial.png")
+
+    def matrix_action(name, action):
+        try:
+            action()
+            return []
+        except CaptureSafetyError:
+            raise
+        except Exception:
+            failure = name + "_transition_failed"
+            matrix_failures.append(failure)
+            return [failure]
+
+    def observed_snapshot(filename):
+        state = rdp.state(actor)
+        surfaces = state["surfaces"]
+        if surfaces not in ([], ["model"], ["status"], ["settings"]):
+            raise CaptureSafetyError("The observed application surfaces cannot be masked safely")
+        surface = surfaces[0] if surfaces else None
+        selectors = settings_private_fields if surface == "settings" else (
+            ["#logos-system-status .logos-system-status-text > span"] if surface == "status" else [])
+        snapshot(filename, surface=surface, redact_selectors=selectors)
+        return files[-1]["browser"]
+
+    def matrix_step(name, filename, action, surface=None, sidebar=None, tab=None):
+        failures = matrix_action(name, action)
+        state = observed_snapshot(filename)
+        if state["surfaces"] != ([surface] if surface else []):
+            failures.append(name + "_surface_not_reached")
+        if sidebar is not None:
+            box = state["sidebar"]
+            settled = box and (abs(box["x"]) < 1 if sidebar else box["right"] < 1)
+            if state["open"] != sidebar or not settled or not state["reachable"]["newChat" if sidebar else "menu"]:
+                failures.append(name + "_sidebar_not_reached")
+            if state["expanded"] != ("true" if sidebar else "false"):
+                failures.append(name + "_sidebar_aria_mismatch")
+        if tab is not None and (state["settingsTab"] != tab or state["settingsPanels"] != [tab]):
+            failures.append(name + "_tab_not_reached")
+        matrix_failures.extend(failures)
+        files[-1]["matrix_expectation"] = {"state": name, "surface": surface, "sidebar": sidebar,
+                                           "tab": tab, "verdict": "FAIL" if failures else "PASS",
+                                           "failures": list(dict.fromkeys(failures))}
+
+    def close_surface(name, selector):
+        if name in rdp.state(actor)["surfaces"]:
+            matrix_action("close_" + name, lambda: (rdp.click(actor, selector), rdp.wait_surface(actor, None)))
+
+    for filename, wanted in (("01-sidebar-open.png", True), ("02-sidebar-closed.png", False),
                              ("03-sidebar-reopened.png", True)):
-        rdp.set_open(actor, wanted)
-        snapshot(filename, sidebar=wanted)
-    rdp.set_open(actor, False)
-    rdp.click(actor, "#model-btn")
-    rdp.wait_surface(actor, "model")
-    snapshot("04-model-picker.png", surface="model")
-    rdp.click(actor, "#close-modal")
-    rdp.wait_surface(actor, None)
-    rdp.click(actor, "#system-status-btn")
-    rdp.wait_surface(actor, "status")
-    snapshot("05-system-status.png", surface="status",
-             redact_selectors=["#logos-system-status .logos-system-status-text > span"])
-    rdp.click(actor, "#logos-system-status .logos-system-status-close")
-    rdp.wait_surface(actor, None)
-    rdp.click(actor, "#settings-btn")
-    rdp.wait_surface(actor, "settings")
+        matrix_step(filename[:-4], filename, lambda wanted=wanted: rdp.set_open(actor, wanted), sidebar=wanted)
+    matrix_step("model_picker", "04-model-picker.png",
+                lambda: (rdp.set_open(actor, False), rdp.click(actor, "#model-btn"), rdp.wait_surface(actor, "model")), surface="model")
+    close_surface("model", "#close-modal")
+    matrix_step("system_status", "05-system-status.png",
+                lambda: (rdp.click(actor, "#system-status-btn"), rdp.wait_surface(actor, "status")), surface="status")
+    close_surface("status", "#logos-system-status .logos-system-status-close")
+    matrix_action("open_settings", lambda: (rdp.click(actor, "#settings-btn"), rdp.wait_surface(actor, "settings")))
     for number, tab in enumerate(("gen", "output", "routing", "adv", "theme"), start=6):
         panel = "tab-" + tab
-        rdp.click(actor, '#settings-modal-custom .llm-tab-btn[data-tab="' + panel + '"]')
-        rdp.wait_surface(actor, "settings", tab=panel)
-        snapshot(str(number).zfill(2) + "-settings-" + tab + ".png", surface="settings", tab=panel,
-                 redact_selectors=settings_private_fields)
-    rdp.click(actor, "#set-close-btn")
-    rdp.wait_surface(actor, None)
-    rdp.set_open(actor, True)
+        matrix_step("settings_" + tab, str(number).zfill(2) + "-settings-" + tab + ".png",
+                    lambda panel=panel: (rdp.click(actor, '#settings-modal-custom .llm-tab-btn[data-tab="' + panel + '"]'),
+                                         rdp.wait_surface(actor, "settings", tab=panel)), surface="settings", tab=panel)
+    close_surface("settings", "#set-close-btn")
+    matrix_action("restore_sidebar", lambda: rdp.set_open(actor, True))
     device_guard()
     final = rdp.state(actor)
     if not final["open"] or final["surfaces"] or final["expanded"] != "true":
-        raise RuntimeError("The final sidebar state was not restored")
-    actor, creation_scenario, artifacts = record_creation(rdp, actor, out, uid, gid, snapshot)
+        matrix_failures.append("final_sidebar_state_not_restored")
+    if final["surfaces"] in ([], ["model"]):
+        actor, creation_scenario, artifacts = record_creation(rdp, actor, out, uid, gid, snapshot)
+    else:
+        creation_scenario = {"verdict": "FAIL", "failures": ["creation_not_run_because_clean_view_unavailable"]}
+        timeline = out / "events.json"
+        timeline.write_text(json.dumps({"schema_version": 1, "scenario": "create_conversation", "events": [],
+                                       "result": creation_scenario}, ensure_ascii=False, indent=2) + "\n")
+        timeline.chmod(0o600)
+        os.chown(timeline, uid, gid)
+        content = timeline.read_bytes()
+        artifacts = [{"path": timeline.name, "sha256": hashlib.sha256(content).hexdigest(), "size": len(content)}]
     try:
         final_sidebar_open = rdp.state(actor)["open"]
     except (OSError, RuntimeError, KeyError):
         final_sidebar_open = None
     rdp.s.close()
-    if files[0]["sha256"] == files[1]["sha256"]:
-        raise RuntimeError("Open and closed native screenshots are identical")
+    by_name = {entry["path"]: entry for entry in files}
+    if by_name["01-sidebar-open.png"]["sha256"] == by_name["02-sidebar-closed.png"]["sha256"]:
+        matrix_failures.append("sidebar_open_closed_native_screenshots_identical")
+    matrix_failures = list(dict.fromkeys(matrix_failures))
     manifest = {"schema_version": 2, "device": "Redmi 9", "browser": "Iceraven",
                 "capture_method": "Android screencap", "interaction_method": "Firefox DevTools button click",
                 "runtime_revision": runtime["runtime_revision"], "browser_revision": initial["revision"],
@@ -932,6 +1031,7 @@ def capture(out, uid, gid, metadata):
                 "preparation": preparation,
                 "captured_at": files[0]["captured_at"], "initial_sidebar_open": initial["open"],
                 "final_sidebar_open": final_sidebar_open, "files": files,
+                "matrix_scenario": {"verdict": "FAIL" if matrix_failures else "PASS", "failures": matrix_failures},
                 "creation_scenario": creation_scenario, "artifacts": artifacts, **metadata}
     path = out / "manifest.json"
     path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
