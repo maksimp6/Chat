@@ -90,9 +90,10 @@ class VirtualLowConsumptionServer:
             # The shell applies the limits. preexec_fn is unsafe in a multi-threaded server.
             limited = command
             if resource is not None and os.name == "posix":
+                # Each limit must succeed before the command runs; a failed limit stops the command.
                 limited = (
-                    f"ulimit -t {self.config.cpu_seconds} -v {self.config.memory_mb * 1024};"
-                    f" {command}"
+                    f"ulimit -t {self.config.cpu_seconds} || exit 1; "
+                    f"ulimit -v {self.config.memory_mb * 1024} || exit 1; {command}"
                 )
 
             started = time.perf_counter()

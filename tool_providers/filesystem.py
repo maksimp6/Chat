@@ -442,6 +442,18 @@ def _resolves_to_link_local(url: str) -> bool:
     return False
 
 
+class _LinkLocalGuardRedirect(urllib.request.HTTPRedirectHandler):
+    """Checks every redirect target, so a public URL cannot bounce the fetch to a link-local address."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not newurl.startswith(("http://", "https://")) or _resolves_to_link_local(newurl):
+            raise urllib.error.URLError("redirect to a blocked address")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_GUARDED_OPENER = urllib.request.build_opener(_LinkLocalGuardRedirect)
+
+
 def http_fetch(args: dict) -> dict:
     """Простой HTTP GET-запрос через стандартный urllib."""
     url = args.get("url")
@@ -462,7 +474,7 @@ def http_fetch(args: dict) -> dict:
         req = urllib.request.Request(
             url, headers={"User-Agent": "LogosPro-StdLib/1.0", "Accept": "*/*"}
         )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _GUARDED_OPENER.open(req, timeout=timeout) as resp:
             raw = resp.read(max_bytes)
             status_code = resp.getcode()
             headers = dict(resp.info())
