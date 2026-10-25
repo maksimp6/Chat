@@ -439,6 +439,9 @@ class RDP:
             time.sleep(0.1)
         raise RuntimeError("The requested application surface did not become visible: " + str(surface))
 
+    def present_selectors(self, actor, selectors):
+        return self.evaluate(actor, "JSON.stringify(" + json.dumps(selectors) + ".filter(s=>document.querySelector(s)))")
+
     def redact(self, actor, selectors):
         expiry_ms = int((remaining(270) + 10) * 1000)
         return self.evaluate(actor, "JSON.stringify((()=>{const selectors=" + json.dumps(selectors) +
@@ -603,55 +606,6 @@ def version():
         if response.geturl() != "http://127.0.0.1:8080/api/version":
             raise RuntimeError("Unexpected version redirect")
         return json.loads(response.read(65536))
-
-
-DIALOGS_VIDEO_NAME = "16-dialogs-walk.mp4"
-
-
-def start_screenrecord(video_path, time_limit, bit_rate):
-    """Start the device recorder, or return None when the device has no screenrecord binary."""
-    if not Path(ROOT + "screenrecord").is_file():
-        return None
-    return subprocess.Popen([ROOT + "screenrecord", "--bugreport", "--size", "720x1560",
-                             "--bit-rate", str(bit_rate), "--time-limit", str(time_limit), str(video_path)],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-
-def finish_screenrecord(recorder, video_path, uid, gid, max_bytes):
-    """Stop a device recording; keep it only when its MP4 container is complete."""
-    failures = []
-    video = {"path": video_path.name, "available": False}
-    artifact = None
-    if recorder.poll() is None:
-        try:
-            recorder.send_signal(signal.SIGINT)
-        except ProcessLookupError:
-            pass
-    try:
-        recorder.wait(timeout=8)
-    except subprocess.TimeoutExpired:
-        try:
-            recorder.kill()
-        except ProcessLookupError:
-            pass
-        recorder.wait(timeout=3)
-        failures.append("native_screenrecord_stop_failed")
-    video["exit_code"] = recorder.returncode
-    if video_path.is_file() and 16 <= video_path.stat().st_size <= max_bytes:
-        from publish_redmi_screenshots import validate_mp4
-        try:
-            validate_mp4(video_path)
-        except Exception:
-            pass
-        else:
-            content = video_path.read_bytes()
-            video["available"] = True
-            video_path.chmod(0o600)
-            os.chown(video_path, uid, gid)
-            artifact = {"path": video_path.name, "sha256": hashlib.sha256(content).hexdigest(), "size": len(content)}
-    if not video["available"]:
-        failures.append("native_video_artifact_unavailable")
-    return video, artifact, failures
 
 
 def record_creation(rdp, actor, out, uid, gid, snapshot):
@@ -1151,6 +1105,8 @@ def capture(out, uid, gid, metadata):
         surface = surfaces[0] if surfaces else None
         selectors = settings_private_fields if surface == "settings" else (
             ["#logos-system-status .logos-system-status-text > span"] if surface == "status" else [])
+        # Conversation titles and messages are user content: their text is hidden, the layout stays visible.
+        selectors = list(selectors) + rdp.present_selectors(actor, ["#conv-list .conv-title", "#chatbox .msg"])
         snapshot(filename, surface=surface, redact_selectors=selectors)
         return files[-1]["browser"]
 
@@ -1232,7 +1188,6 @@ def capture(out, uid, gid, metadata):
         chat.update(best)
         reopen_chat()
 
-    dialogs_recorder = start_screenrecord(out / DIALOGS_VIDEO_NAME, time_limit=180, bit_rate=1000000)
     for filename, wanted in (("01-sidebar-open.png", True), ("02-sidebar-closed.png", False),
                              ("03-sidebar-reopened.png", True)):
         matrix_step(filename[:-4], filename, lambda wanted=wanted: rdp.set_open(actor, wanted), sidebar=wanted,
@@ -1260,14 +1215,6 @@ def capture(out, uid, gid, metadata):
     scroll_step("chat_top", "17-chat-top.png", "#chatbox", "top", surface=None, opener=reopen_chat, note=chat)
     scroll_step("chat_bottom", "18-chat-bottom.png", "#chatbox", "bottom", surface=None, opener=reopen_chat, note=chat)
     matrix_action("restore_sidebar", lambda: rdp.set_open(actor, True))
-    if dialogs_recorder is None:
-        dialogs_video, dialogs_artifact, dialogs_failures = (
-            {"path": DIALOGS_VIDEO_NAME, "available": False}, None, ["native_screenrecord_unavailable"])
-    else:
-        dialogs_video, dialogs_artifact, dialogs_failures = finish_screenrecord(
-            dialogs_recorder, out / DIALOGS_VIDEO_NAME, uid, gid, max_bytes=24 * 1024 * 1024)
-    dialogs_artifacts = [dialogs_artifact] if dialogs_artifact else []
-    matrix_failures.extend(dialogs_failures)
     device_guard()
     final = rdp.state(actor)
     if not final["open"] or final["surfaces"] or final["expanded"] != "true":
@@ -1283,7 +1230,6 @@ def capture(out, uid, gid, metadata):
         os.chown(timeline, uid, gid)
         content = timeline.read_bytes()
         artifacts = [{"path": timeline.name, "sha256": hashlib.sha256(content).hexdigest(), "size": len(content)}]
-    artifacts = dialogs_artifacts + artifacts
     try:
         final_sidebar_open = rdp.state(actor)["open"]
     except (OSError, RuntimeError, KeyError):
@@ -1303,7 +1249,7 @@ def capture(out, uid, gid, metadata):
                 "captured_at": files[0]["captured_at"], "initial_sidebar_open": initial["open"],
                 "final_sidebar_open": final_sidebar_open, "files": files,
                 "matrix_scenario": {"verdict": "FAIL" if matrix_failures else "PASS", "failures": matrix_failures},
-                "creation_scenario": creation_scenario, "dialogs_video": dialogs_video,
+                "creation_scenario": creation_scenario,
                 "artifacts": artifacts, **metadata}
     path = out / "manifest.json"
     path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")

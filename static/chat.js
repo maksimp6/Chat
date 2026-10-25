@@ -148,8 +148,8 @@ function splitTableRow(line) {
 function parseMarkdown(text) {
   if (!text) return "";
   var strText = typeof text === "string" ? text : JSON.stringify(text);
-  // Leading and trailing blank lines would otherwise become empty space at the top of the bubble.
-  strText = strText.replace(/^\s+|\s+$/g, "");
+  // Drop blank lines at both ends; the indentation of the first real line is content and stays.
+  strText = strText.replace(/^(?:[ \t]*\r?\n)+/, "").replace(/\s+$/, "");
 
   strText = strText.replace(/^\s*```(?:markdown|md|html)?\s*\n([\s\S]*)\n?```\s*$/i, "$1");
 
