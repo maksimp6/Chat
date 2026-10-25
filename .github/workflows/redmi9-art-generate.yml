@@ -16,6 +16,7 @@ jobs:
     steps:
       - name: Generate one picture through the Redmi 9 app
         shell: bash
+        timeout-minutes: 10
         env:
           OUT_DIR: ${{ runner.temp }}/art-real
         run: |
