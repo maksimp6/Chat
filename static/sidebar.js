@@ -173,6 +173,8 @@ function selectConv(id, updateHistory) {
   var overlay = document.getElementById("overlay");
   if (sidebar) sidebar.classList.remove("open");
   if (overlay) overlay.classList.remove("visible");
+  var menuBtn = document.getElementById("menu-btn");
+  if (menuBtn) menuBtn.setAttribute("aria-expanded", "false");
   return historyReady;
 }
 
