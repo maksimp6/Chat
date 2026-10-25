@@ -525,7 +525,7 @@ class RDP:
                              "x.open('GET','/api/conversations/'+encodeURIComponent(" + json.dumps(conversation_id) +
                              ")+'/messages',false);x.send();if(x.status!==200)return {status:x.status,messages:[]};"
                              "return {status:x.status,messages:(JSON.parse(x.responseText).messages||[]).map(m=>({role:m.role,"
-                             "text:String(m.text||'').slice(0,400),"
+                             "text:String(m.text||'').slice(0,20000),"
                              "errors:((m.trace&&m.trace.errors)||[]).slice(0,10).map(e=>({source:String(e.source||'').slice(0,80),"
                              "type:String(e.type||'').slice(0,80),error:String(e.error||'').slice(0,300)}))}))};})())")
 
@@ -714,7 +714,7 @@ STUDENT_TASKS_QUESTION = (
 def student_tasks(rdp, actor, conversation_id):
     """Ask the model for student problems with worked answers. Recorded for review, never a failure."""
     status, text = ask_model(rdp, actor, conversation_id, STUDENT_TASKS_QUESTION)
-    answers = [line.strip() for line in (text or "").splitlines() if line.strip().startswith("Ответ")]
+    answers = [line for line in (text or "").splitlines() if line.strip().lstrip("*_#> ").startswith("Ответ")]
     return {"status": status, "answers_found": len(answers), "reply_text": text}
 
 
@@ -1010,6 +1010,8 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
                     failures.append("user_message_not_persisted")
                 if "assistant" not in roles:
                     failures.append("reply_not_persisted")
+                if reply_errors:
+                    failures.append("reply_trace_errors")
                 checkpoints["message_send"] = {"status": "FAIL" if len(failures) > send_validation_start else "PASS",
                                                "reply_status": reply_status,
                                                "reply_text": replies[-1] if replies else None,
@@ -1017,9 +1019,11 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
                                                "user_message_persisted": "user" in roles,
                                                "reply_persisted": "assistant" in roles}
                 if checkpoints["message_send"]["status"] == "PASS":
-                    checkpoints["self_assessment"] = self_assessment(rdp, actor, new_id)
-                    checkpoints["real_task"] = real_task(rdp, actor, new_id)
-                    checkpoints["student_tasks"] = student_tasks(rdp, actor, new_id)
+                    for name, check in (("self_assessment", self_assessment), ("real_task", real_task),
+                                        ("student_tasks", student_tasks)):
+                        mark("model_checkpoint_requested", name)
+                        checkpoints[name] = check(rdp, actor, new_id)
+                        mark("model_checkpoint_observed", {"name": name, "status": checkpoints[name]["status"]})
             else:
                 checkpoints["message_send"] = {"status": "NOT_RUN", "reason": "creation_not_confirmed"}
     except CaptureSafetyError:
