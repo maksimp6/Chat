@@ -225,6 +225,7 @@ def capture(output, uid, gid, metadata):
                 return
         raise RuntimeError('existing_trace_buttons_did_not_open_viewer')
 
+    current_case=None
     try:
         close_all()
         start_index = int(metadata.get('start_index',0))
@@ -234,6 +235,7 @@ def capture(output, uid, gid, metadata):
             start_video()
             snapshot('98-starting-view.png','body')
         for index, (name, opener, selector) in enumerate(CASES[start_index:],start=start_index):
+            current_case=name
             if recorder is None:
                 start_video()
             elif time.monotonic()-recording_started > 90:
@@ -285,6 +287,10 @@ def capture(output, uid, gid, metadata):
             results.append(case)
             close_all()
         stop_video()
+    except BaseException as error:
+        # Record where the walk stopped, so a short run is explained by its own evidence.
+        mark('walk_aborted',{'error':type(error).__name__,'reason':str(error)[:120],'case':current_case})
+        raise
     finally:
         if recorder is not None:
             try:
@@ -297,7 +303,9 @@ def capture(output, uid, gid, metadata):
         except Exception:
             pass
         requests = collected_requests + browser('return window.__modalRecordingRequests||[];')
-        mark('walk_finished',{'captured':sum(x['status']=='CAPTURED' for x in results),'planned':len(CASES)})
+        attempted={x['name'] for x in results}
+        mark('walk_finished',{'captured':sum(x['status']=='CAPTURED' for x in results),'planned':len(CASES),
+                              'not_attempted':[n for n,_,_ in CASES if n not in attempted]})
         timeline=output/'events.json'
         timeline.write_text(json.dumps({'scenario':'all_application_modals','events':events,'network':requests},ensure_ascii=False,indent=2)+'\n')
         artifacts.append({'path':'events.json','size':timeline.stat().st_size,'sha256':hashlib.sha256(timeline.read_bytes()).hexdigest()})
