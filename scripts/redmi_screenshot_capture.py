@@ -705,6 +705,19 @@ def real_task(rdp, actor, conversation_id):
     return {"status": status, "expected": REAL_TASK_EXPECTED[0], "correct": correct, "reply_text": text}
 
 
+STUDENT_TASKS_QUESTION = (
+    "Подбери три задачи по математике для школьников (уровень 7 класса) и реши каждую: "
+    "напиши условие, ход решения и отдельной строкой «Ответ: …»."
+)
+
+
+def student_tasks(rdp, actor, conversation_id):
+    """Ask the model for student problems with worked answers. Recorded for review, never a failure."""
+    status, text = ask_model(rdp, actor, conversation_id, STUDENT_TASKS_QUESTION)
+    answers = [line.strip() for line in (text or "").splitlines() if line.strip().startswith("Ответ")]
+    return {"status": status, "answers_found": len(answers), "reply_text": text}
+
+
 def record_creation(rdp, actor, out, uid, gid, snapshot):
     """Observe one real new-chat flow, preserving application failures as evidence."""
     events, failures, artifacts = [], [], []
@@ -1006,6 +1019,7 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
                 if checkpoints["message_send"]["status"] == "PASS":
                     checkpoints["self_assessment"] = self_assessment(rdp, actor, new_id)
                     checkpoints["real_task"] = real_task(rdp, actor, new_id)
+                    checkpoints["student_tasks"] = student_tasks(rdp, actor, new_id)
             else:
                 checkpoints["message_send"] = {"status": "NOT_RUN", "reason": "creation_not_confirmed"}
     except CaptureSafetyError:
