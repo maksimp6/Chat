@@ -29,6 +29,19 @@ def validate_generation_params(params):
     return params
 
 
+def _response_input(params, message):
+    """Text-only input, or one user turn with the attached photos after the text."""
+    if params.get("input"):
+        return params["input"]
+    images = params.get("input_images") or []
+    if not images:
+        return [{"role": "user", "content": message}]
+    # Part shapes follow the Responses image input; confirm against the provider before enabling.
+    content = [{"type": "input_text", "text": message}]
+    content += [{"type": "input_image", "image_url": url} for url in images]
+    return [{"role": "user", "content": content}]
+
+
 def build_response_payload(
     project_id,
     model_key,
@@ -62,7 +75,7 @@ def build_response_payload(
 
     payload = {
         "model": "gpt://" + project_id + "/" + upstream_model_id(model_key) + "/latest",
-        "input": params.get("input") or [{"role": "user", "content": message}],
+        "input": _response_input(params, message),
         "background": is_background,
         "store": params.get("store", True),
     }

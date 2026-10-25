@@ -591,6 +591,78 @@ document.addEventListener("DOMContentLoaded", function () {
   const pendingConversations = new Set();
   let creatingConversation = false;
 
+  const attachBtn = document.getElementById("attach-btn");
+  const imageInput = document.getElementById("image-input");
+  const previewBox = document.getElementById("image-previews");
+  // Photos chosen for the next message; each has a file name and a base64 data URL.
+  let pendingImages = [];
+  const MAX_IMAGES = 4;
+  const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+  const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+
+  function renderPendingImages() {
+    if (!previewBox) return;
+    previewBox.replaceChildren();
+    previewBox.hidden = pendingImages.length === 0;
+    pendingImages.forEach(function (image, index) {
+      const thumb = document.createElement("img");
+      thumb.src = image.dataUrl;
+      thumb.alt = image.name;
+      thumb.className = "image-preview";
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.textContent = "×";
+      remove.setAttribute("aria-label", "Убрать фото");
+      remove.addEventListener("click", function () {
+        pendingImages.splice(index, 1);
+        renderPendingImages();
+      });
+      const item = document.createElement("span");
+      item.className = "image-preview-item";
+      item.append(thumb, remove);
+      previewBox.appendChild(item);
+    });
+  }
+
+  function readAsDataUrl(file) {
+    return new Promise(function (resolve, reject) {
+      const reader = new FileReader();
+      reader.onload = function () {
+        resolve(reader.result);
+      };
+      reader.onerror = function () {
+        reject(reader.error);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (attachBtn && imageInput) {
+    attachBtn.addEventListener("click", function () {
+      imageInput.click();
+    });
+    imageInput.addEventListener("change", async function () {
+      const files = Array.from(imageInput.files || []);
+      imageInput.value = "";
+      for (const file of files) {
+        if (pendingImages.length >= MAX_IMAGES) {
+          addMessage("Можно прикрепить не больше " + MAX_IMAGES + " фото", "error", false, 0);
+          break;
+        }
+        if (!IMAGE_TYPES.includes(file.type) || file.size > MAX_IMAGE_BYTES) {
+          addMessage("Фото «" + file.name + "»: нужен PNG, JPEG или WebP до 5 МБ", "error", false, 0);
+          continue;
+        }
+        try {
+          pendingImages.push({ name: file.name, dataUrl: await readAsDataUrl(file) });
+          renderPendingImages();
+        } catch (error) {
+          addMessage("Не удалось прочитать фото «" + file.name + "»", "error", false, 0);
+        }
+      }
+    });
+  }
+
   async function sendMessage() {
     if (!input) return;
     const rawText = input.value;
@@ -604,6 +676,15 @@ document.addEventListener("DOMContentLoaded", function () {
     if (needsConversation) creatingConversation = true;
     else pendingConversations.add(turn.conversationId);
     let typingEl = null;
+    // Photos belong to this message only; they return to the tray if the send fails.
+    const sentImages = pendingImages.slice();
+    pendingImages = [];
+    renderPendingImages();
+    function restoreImages() {
+      if (pendingImages.length) return;
+      pendingImages = sentImages;
+      renderPendingImages();
+    }
     try {
       // Keep the submitted settings and text even if the user edits the next draft while waiting.
       const params = typeof window.getResponsesParams === "function" ? window.getResponsesParams() : {};
@@ -619,7 +700,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
       if (currentConvId === turn.conversationId) {
         if (input.value === rawText) input.value = "";
-        addMessage(turn.text, "user", false, 0);
+        addMessage(
+          sentImages.length ? turn.text + " · фото: " + sentImages.length : turn.text,
+          "user",
+          false,
+          0,
+        );
         const chatbox = document.getElementById("chatbox");
         typingEl = document.createElement("div");
         typingEl.className = "typing";
@@ -635,6 +721,9 @@ document.addEventListener("DOMContentLoaded", function () {
           conversation_id: turn.conversationId,
           model: turn.model,
           params: turn.params,
+          attachments: sentImages.map(function (image) {
+            return { data_url: image.dataUrl };
+          }),
         }),
       }, { timeoutMs: 300000 });
       const data = await response.json().catch(() => ({}));
@@ -660,11 +749,13 @@ document.addEventListener("DOMContentLoaded", function () {
         addMessage(data.reply, "bot", false, data.cost || 0, data.timings,
           clientTotalMs, data.reasoning, data.usage, data.trace, { id: data.message_id });
       } else {
+        restoreImages();
         addMessage("⚠️ Ошибка: " + (data.error || data.detail || data.title || "HTTP " + response.status),
           "error", false, data.cost || 0, data.timings, clientTotalMs,
           data.reasoning, data.usage, data.trace);
       }
     } catch (error) {
+      restoreImages();
       if (currentConvId === turn.conversationId) {
         if (!input.value) input.value = rawText;
         addMessage("⚠️ Ошибка: " + (error.message || "Сетевой сбой"), "error", false, 0);

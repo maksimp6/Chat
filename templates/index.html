@@ -291,6 +291,17 @@
               <option value="both">🔊+📝 Оба</option>
             </select>
           </div>
+          <div id="image-previews" hidden></div>
+          <button id="attach-btn" type="button" class="logos-btn" aria-label="Прикрепить фото">
+            📷
+          </button>
+          <input
+            id="image-input"
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            multiple
+            hidden
+          />
           <input id="msg-input" type="text" placeholder="Сообщение..." autocomplete="off" /><button
             id="send-btn"
             type="button"

@@ -5,6 +5,7 @@ import logging
 import json as _json
 import uuid
 from typing import Any
+import base64
 from yandex_client_modules.client import YandexResponsesClient
 from provider_accounts.claude_oauth import (
     ClaudeOAuthTransport,
@@ -130,6 +131,49 @@ _CLIENT_PARAM_KEYS = frozenset(
 
 def _client_params(raw: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in raw.items() if key in _CLIENT_PARAM_KEYS}
+
+
+# Models whose provider acceptance for image input is verified. Until one is listed,
+# a message with photos is refused instead of being sent without them.
+IMAGE_INPUT_MODEL_KEYS: frozenset[str] = frozenset()
+MAX_IMAGES_PER_MESSAGE = 4
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+
+def _has_image_signature(mime: str, image_bytes: bytes) -> bool:
+    if mime == "image/png":
+        return image_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+    if mime == "image/jpeg":
+        return image_bytes.startswith(b"\xff\xd8\xff")
+    if mime == "image/webp":
+        return image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP"
+    return False
+
+
+def _validated_images(raw: Any) -> list[str]:
+    """Return the attached images as data URLs, or raise ValueError for a bad attachment."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or len(raw) > MAX_IMAGES_PER_MESSAGE:
+        raise ValueError(f"attachments must be a list of at most {MAX_IMAGES_PER_MESSAGE} images")
+    data_urls = []
+    for item in raw:
+        url = item.get("data_url") if isinstance(item, dict) else None
+        if not isinstance(url, str):
+            raise ValueError("each attachment must have a data_url string")
+        header, separator, encoded = url.partition(",")
+        if not separator or not header.startswith("data:") or not header.endswith(";base64"):
+            raise ValueError("each attachment must be a base64 data URL")
+        if len(encoded) > MAX_IMAGE_BYTES * 4 // 3 + 4:
+            raise ValueError("each image must be at most 5 MB")
+        image_bytes = base64.b64decode(encoded, validate=True)
+        if len(image_bytes) > MAX_IMAGE_BYTES:
+            raise ValueError("each image must be at most 5 MB")
+        mime = header[len("data:") : -len(";base64")]
+        if not _has_image_signature(mime, image_bytes):
+            raise ValueError("image content does not match its type")
+        data_urls.append(url)
+    return data_urls
 
 
 class LogosClient(YandexResponsesClient):
@@ -285,6 +329,12 @@ def chat():
         if isinstance(model_key, str) and model_key in completion_model_keys():
             # These models speak the completion API; sending them through Responses is wrong.
             return jsonify({"error": "model_uses_completion_api", "endpoint": "/api/completion"}), 400
+        try:
+            images = _validated_images(data.get("attachments"))
+        except ValueError as exc:
+            return jsonify({"error": "invalid_attachments", "message": str(exc)}), 400
+        if images and model_key not in IMAGE_INPUT_MODEL_KEYS:
+            return jsonify({"error": "model_does_not_accept_images"}), 400
 
         owner_id = get_current_owner_id(required=False)
         if not check_access(conv_id, owner_id):
@@ -311,6 +361,9 @@ def chat():
                 "trace_id": invocation.trace_id,
             }
         )
+        # After set_request: the trace keeps no image bytes, only the request fields above.
+        if images:
+            params["input_images"] = images
 
         try:
             selected_skills = skill_registry.load_many(requested_skills, role=role)

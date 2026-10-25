@@ -2135,3 +2135,10 @@ body {
 .logos-pro-app .app-version[data-update-state="unknown"] {
   color: var(--text-main);
 }
+
+/* Photos chosen for the next message */
+#image-previews[hidden] { display: none; }
+#image-previews { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0; }
+.image-preview-item { position: relative; display: inline-block; }
+.image-preview { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; display: block; }
+.image-preview-item button { position: absolute; top: -6px; right: -6px; border: 0; border-radius: 50%; width: 20px; height: 20px; line-height: 18px; padding: 0; cursor: pointer; }
