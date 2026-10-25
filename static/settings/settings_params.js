@@ -16,7 +16,6 @@
 
   window.getResponsesParams = function () {
     var Storage = window.SettingsStorage;
-    var currentConvId = typeof window.currentConvId !== "undefined" ? window.currentConvId : null;
     var s = Storage.load(currentConvId) || {};
 
     var params = {

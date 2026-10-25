@@ -6,7 +6,6 @@
     var UI = window.SettingsUI;
     var CoreUI = window.LogosCoreAPI.ui;
     var Storage = window.SettingsStorage;
-    var currentConvId = typeof window.currentConvId !== "undefined" ? window.currentConvId : null;
     var settings = Storage.load(currentConvId);
     var cfg = settings.tools_config || {};
     var ws = cfg.web_search || {};
@@ -235,7 +234,6 @@
   window.openSettingsModal = function () {
     var UI = window.SettingsUI;
     var Storage = window.SettingsStorage;
-    var currentConvId = typeof window.currentConvId !== "undefined" ? window.currentConvId : null;
     var settings = Storage.load(currentConvId);
     var ultra = ultraProfileFor(typeof currentModel !== "undefined" ? currentModel : "");
     if (ultra) settings = applyUltraProfile(settings, ultra);
