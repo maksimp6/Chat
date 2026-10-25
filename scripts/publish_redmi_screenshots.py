@@ -19,6 +19,9 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 REPOSITORY = "maksimp6/Chat"
 REMOTE = "https://github.com/" + REPOSITORY + ".git"
 LFS_VERSION = b"version https://git-lfs.github.com/spec/v1\n"
+MAX_CAPTURE_PNGS = 20
+EXTRA_ARTIFACT_LIMITS = {"15-conversation-create.mp4": 20 * 1024 * 1024,
+                         "events.json": 1024 * 1024}
 
 
 class PublicationError(Exception):
@@ -38,13 +41,59 @@ def digest(path):
     return value.hexdigest()
 
 
+def is_lfs_file(name):
+    return name.endswith((".png", ".mp4"))
+
+
+def validate_mp4(path):
+    """Require a finalized container; an ftyp-only recorder output is insufficient."""
+    size = path.stat().st_size
+    seen = set()
+    offset = 0
+    with path.open("rb") as stream:
+        while offset < size:
+            require(size - offset >= 8, "truncated MP4 box header")
+            stream.seek(offset)
+            header = stream.read(8)
+            length, kind = int.from_bytes(header[:4], "big"), header[4:]
+            header_size = 8
+            if length == 1:
+                require(size - offset >= 16, "truncated MP4 large box header")
+                length = int.from_bytes(stream.read(8), "big")
+                header_size = 16
+            elif length == 0:
+                length = size - offset
+            require(header_size <= length <= size - offset, "invalid MP4 box size")
+            if kind in (b"ftyp", b"moov", b"mdat"):
+                require(length > header_size, "empty required MP4 box")
+                seen.add(kind)
+            offset += length
+    require({b"ftyp", b"moov", b"mdat"} <= seen, "video container was not finalized")
+
+
+def artifact_entries(data):
+    entries = data.get("artifacts", [])
+    require(isinstance(entries, list) and len(entries) <= len(EXTRA_ARTIFACT_LIMITS),
+            "unexpected supplementary capture artifacts")
+    seen = set()
+    for entry in entries:
+        require(isinstance(entry, dict), "invalid supplementary capture entry")
+        name, sha, size = entry.get("path"), entry.get("sha256"), entry.get("size")
+        require(name in EXTRA_ARTIFACT_LIMITS and name not in seen, "invalid supplementary filename")
+        require(isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{64}", sha), "invalid artifact hash")
+        require(type(size) is int and 0 < size <= EXTRA_ARTIFACT_LIMITS[name], "invalid artifact size")
+        seen.add(name)
+    return entries
+
+
 def capture_files(directory):
     directory = Path(directory).resolve(strict=True)
     manifest = directory / "manifest.json"
     require(manifest.is_file() and not manifest.is_symlink(), "invalid capture manifest")
     data = json.loads(manifest.read_text(encoding="utf-8"))
     entries = data.get("files")
-    require(isinstance(entries, list) and len(entries) == 3, "expected three capture PNGs")
+    require(isinstance(entries, list) and 3 <= len(entries) <= MAX_CAPTURE_PNGS,
+            "expected between three and twenty capture PNGs")
     files = {}
     for entry in entries:
         require(isinstance(entry, dict), "invalid capture entry")
@@ -56,11 +105,21 @@ def capture_files(directory):
         require(path.is_file() and not path.is_symlink(), "capture PNG is missing")
         sha, size = entry.get("sha256"), entry.get("size")
         require(isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{64}", sha), "invalid capture hash")
-        require(type(size) is int and size > 0 and path.stat().st_size == size,
+        require(type(size) is int and 0 < size <= 5 * 1024 * 1024 and path.stat().st_size == size,
                 "capture size mismatch")
         with path.open("rb") as stream:
             require(stream.read(8) == b"\x89PNG\r\n\x1a\n", "capture is not a PNG")
         require(digest(path) == sha, "capture hash mismatch")
+        files[name] = {"path": path, "sha256": sha, "size": size}
+    for entry in artifact_entries(data):
+        name, sha, size = entry["path"], entry["sha256"], entry["size"]
+        path = directory / name
+        require(path.is_file() and not path.is_symlink(), "supplementary capture is missing")
+        require(path.stat().st_size == size and digest(path) == sha, "supplementary capture changed")
+        if name.endswith(".mp4"):
+            validate_mp4(path)
+        else:
+            json.loads(path.read_text(encoding="utf-8"))
         files[name] = {"path": path, "sha256": sha, "size": size}
     files["manifest.json"] = {"path": manifest, "sha256": digest(manifest),
                               "size": manifest.stat().st_size}
@@ -73,6 +132,7 @@ def runner_environment():
     for name in ("RUNNER_NAME", "RUNNER_TEMP", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_TOKEN"):
         require(bool(os.environ.get(name)), "required runner context is missing")
     require(os.environ.get("GITHUB_REPOSITORY") == REPOSITORY, "unexpected job repository")
+    publication_ref(os.environ)
     run_id, attempt = os.environ["GITHUB_RUN_ID"], os.environ["GITHUB_RUN_ATTEMPT"]
     require(re.fullmatch(r"[1-9][0-9]*", run_id) and re.fullmatch(r"[1-9][0-9]*", attempt),
             "invalid runner identity")
@@ -90,6 +150,14 @@ def runner_environment():
                 "GIT_CONFIG_KEY_1": "credential.helper", "GIT_CONFIG_VALUE_1": "",
                 "GIT_CONFIG_KEY_2": "core.askPass", "GIT_CONFIG_VALUE_2": ""})
     return env, run_id, attempt
+
+
+def publication_ref(env):
+    ref = env.get("GITHUB_REF", "")
+    require(re.fullmatch(r"refs/heads/[A-Za-z0-9][A-Za-z0-9._/-]*", ref)
+            and ".." not in ref and "//" not in ref and not ref.endswith(("/", ".", ".lock"))
+            and ref != "refs/heads/master", "publication requires a non-master repository branch")
+    return ref
 
 
 def git(repo, env, *arguments, allow_failure=False):
@@ -125,7 +193,7 @@ def pointer(metadata):
 
 
 def validate_git_blob(blob, name, metadata):
-    if name.endswith(".png"):
+    if is_lfs_file(name):
         require(blob == pointer(metadata), "file is not the expected Git LFS pointer")
     else:
         require(len(blob) == metadata["size"] and hashlib.sha256(blob).hexdigest() == metadata["sha256"],
@@ -133,14 +201,15 @@ def validate_git_blob(blob, name, metadata):
 
 
 def publish(repo, env, files, relative, run_id, attempt):
+    target_ref = publication_ref(env)
     for retry in range(3):
-        git(repo, env, "fetch", "--quiet", "--depth=1", "--filter=blob:none", "origin", "refs/heads/develop")
+        git(repo, env, "fetch", "--quiet", "--depth=1", "--filter=blob:none", "origin", target_ref)
         git(repo, env, "checkout", "--quiet", "--detach", "FETCH_HEAD")
         destination = repo / relative
         destination.mkdir(parents=True, exist_ok=True)
         for name, metadata in files.items():
             target = destination / name
-            require(not target.exists(), "run output already exists on develop")
+            require(not target.exists(), "run output already exists on the publication branch")
             shutil.copyfile(metadata["path"], target)
             require(target.stat().st_size == metadata["size"] and digest(target) == metadata["sha256"],
                     "capture changed while copying")
@@ -151,15 +220,15 @@ def publish(repo, env, files, relative, run_id, attempt):
         git(repo, env, "commit", "--quiet", "-m",
             "docs(evidence): Redmi 9 screenshots, run " + run_id + " attempt " + attempt)
         commit = git(repo, env, "rev-parse", "HEAD").stdout.decode().strip()
-        oids = [metadata["sha256"] for name, metadata in files.items() if name.endswith(".png")]
+        oids = [metadata["sha256"] for name, metadata in files.items() if is_lfs_file(name)]
         git(repo, env, "lfs", "push", "--object-id", "origin", *oids)
-        pushed = git(repo, env, "push", "--porcelain", "origin", "HEAD:refs/heads/develop", allow_failure=True)
+        pushed = git(repo, env, "push", "--porcelain", "origin", "HEAD:" + target_ref, allow_failure=True)
         if pushed.returncode == 0:
             return commit
         diagnostic = (pushed.stdout + pushed.stderr).decode(errors="replace").lower()
         non_fast_forward = "(non-fast-forward)" in diagnostic or "(fetch first)" in diagnostic
-        require(non_fast_forward and retry < 2, "develop push failed; no force push was attempted")
-    raise PublicationError("develop advanced during publication")
+        require(non_fast_forward and retry < 2, "branch push failed; no force push was attempted")
+    raise PublicationError("publication branch advanced during publication")
 
 
 class SafeRedirect(HTTPRedirectHandler):
@@ -178,9 +247,9 @@ def download_objects(env, files, storage):
     # Git LFS Batch + Basic APIs: known OIDs only; no ls-tree over a promisor repo.
     # https://github.com/git-lfs/git-lfs/blob/main/docs/api/batch.md
     # https://github.com/git-lfs/git-lfs/blob/main/docs/api/basic-transfers.md
-    wanted = {item["sha256"]: item for name, item in files.items() if name.endswith(".png")}
+    wanted = {item["sha256"]: item for name, item in files.items() if is_lfs_file(name)}
     body = {"operation": "download", "transfers": ["basic"],
-            "ref": {"name": "refs/heads/develop"},
+            "ref": {"name": publication_ref(env)},
             "objects": [{"oid": sha, "size": item["size"]} for sha, item in wanted.items()]}
     authorization = env["GIT_CONFIG_VALUE_0"].split(":", 1)[1].strip()
     opener = build_opener(SafeRedirect())
@@ -212,14 +281,17 @@ def download_objects(env, files, storage):
         with opener.open(download, timeout=30) as response:
             content = response.read(metadata["size"] + 1)
         require(len(content) == metadata["size"] and hashlib.sha256(content).hexdigest() == sha,
-                "remote Git LFS bytes differ from the original PNG")
-        (storage / sha).write_bytes(content)
+                "remote Git LFS bytes differ from the original capture")
+        downloaded = storage / sha
+        downloaded.write_bytes(content)
+        if metadata["path"].suffix == ".mp4":
+            validate_mp4(downloaded)
     require(seen == set(wanted), "missing LFS download")
 
 
 def verify(repo, env, files, relative, storage):
     download_objects(env, files, storage)
-    git(repo, env, "fetch", "--quiet", "--depth=1", "--filter=blob:none", "origin", "refs/heads/develop")
+    git(repo, env, "fetch", "--quiet", "--depth=1", "--filter=blob:none", "origin", publication_ref(env))
     for name, metadata in files.items():
         remote_pointer = git(repo, env, "show", "FETCH_HEAD:" + relative + "/" + name).stdout
         validate_git_blob(remote_pointer, name, metadata)
@@ -254,7 +326,8 @@ def latest_capture(repo, env):
             and str(data.get("github_run_attempt")) == str(attempt),
             "capture manifest run identity differs from its folder")
     entries = data.get("files")
-    require(isinstance(entries, list) and len(entries) == 3, "expected three published capture PNGs")
+    require(isinstance(entries, list) and 3 <= len(entries) <= MAX_CAPTURE_PNGS,
+            "expected between three and twenty published capture PNGs")
     files = {}
     for entry in entries:
         require(isinstance(entry, dict), "invalid published capture entry")
@@ -270,6 +343,15 @@ def latest_capture(repo, env):
         validate_git_blob(blob, name, metadata)
         require(path.read_bytes() == blob, "capture pointer differs from its Git blob")
         files[name] = metadata
+    for entry in artifact_entries(data):
+        name, sha, size = entry["path"], entry["sha256"], entry["size"]
+        path = manifest.parent / name
+        require(path.is_file() and not path.is_symlink(), "published supplementary capture is missing")
+        metadata = {"path": path, "sha256": sha, "size": size}
+        blob = git(repo, env, "show", "HEAD:" + relative + "/" + name).stdout
+        validate_git_blob(blob, name, metadata)
+        require(path.read_bytes() == blob, "supplementary capture differs from its Git blob")
+        files[name] = metadata
     files["manifest.json"] = {"path": manifest, "sha256": hashlib.sha256(raw).hexdigest(), "size": len(raw)}
     return files, relative, str(run_id), str(attempt)
 
@@ -281,14 +363,14 @@ def verify_latest():
         repo = root / "repository"
         repo.mkdir()
         configure(repo, env)
-        git(repo, env, "fetch", "--quiet", "--depth=1", "--filter=blob:none", "origin", "refs/heads/develop")
+        git(repo, env, "fetch", "--quiet", "--depth=1", "--filter=blob:none", "origin", publication_ref(env))
         git(repo, env, "checkout", "--quiet", "--detach", "FETCH_HEAD")
         files, relative, capture_run, capture_attempt = latest_capture(repo, env)
         verify(repo, env, files, relative, root / "remote-lfs-verification")
         commit = git(repo, env, "rev-parse", "FETCH_HEAD").stdout.decode().strip()
         result = {"verification_run_id": run_id, "verification_run_attempt": attempt,
                   "capture_run_id": capture_run, "capture_run_attempt": capture_attempt,
-                  "commit": commit, "verified": True,
+                  "commit": commit, "ref": publication_ref(env), "verified": True,
                   "files": [{"path": relative + "/" + name, "sha256": metadata["sha256"],
                              "size": metadata["size"]} for name, metadata in files.items()]}
         summary = os.environ.get("GITHUB_STEP_SUMMARY")
@@ -319,7 +401,7 @@ def main():
         commit = publish(repo, env, files, relative, run_id, attempt)
         print(json.dumps({"published_commit": commit, "verification": "pending"}), flush=True)
         verify(repo, env, files, relative, root / "remote-lfs-verification")
-        result = {"commit": commit, "run_id": run_id, "run_attempt": attempt,
+        result = {"commit": commit, "ref": publication_ref(env), "run_id": run_id, "run_attempt": attempt,
                   "files": [{"path": relative + "/" + name, "sha256": metadata["sha256"],
                              "size": metadata["size"]} for name, metadata in files.items()]}
         summary = os.environ.get("GITHUB_STEP_SUMMARY")
