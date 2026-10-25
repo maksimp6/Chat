@@ -204,11 +204,41 @@
   };
 
   // === 2. Полное окно конфигурации параметров LLM ===
+  // The Ultra profile of the selected model, as published by /api/models, or null.
+  function ultraProfileFor(modelKey) {
+    var text = typeof modelsData !== "undefined" && modelsData.text ? modelsData.text : {};
+    var entry = text[modelKey];
+    return entry && entry.ultra_profile ? entry.ultra_profile : null;
+  }
+
+  // The profile's own parameters: no output cap, its truncation, and no effort when it has no depth control.
+  function applyUltraProfile(settings, profile) {
+    settings.max_output_tokens = 0;
+    if (profile.truncation) settings.truncation = profile.truncation;
+    if (!profile.reasoning_depth_control) settings.reasoning_effort = "disabled";
+    return settings;
+  }
+
+  function ultraProfileNote(profile) {
+    if (!profile) return "";
+    var depth = profile.reasoning_depth_control
+      ? "управляется настройкой ниже"
+      : "у модели нет управления глубиной, отключено";
+    return (
+      '<div style="margin-bottom:12px;font-size:13px;color:var(--m-text,#222);">' +
+      "Параметры Ultra-профиля модели: максимум токенов ответа — без ограничения; " +
+      "truncation — " + (profile.truncation || "по умолчанию") + "; глубина размышлений — " + depth + "." +
+      "</div>"
+    );
+  }
+
   window.openSettingsModal = function () {
     var UI = window.SettingsUI;
     var Storage = window.SettingsStorage;
     var currentConvId = typeof window.currentConvId !== "undefined" ? window.currentConvId : null;
     var settings = Storage.load(currentConvId);
+    var ultra = ultraProfileFor(typeof currentModel !== "undefined" ? currentModel : "");
+    if (ultra) settings = applyUltraProfile(settings, ultra);
 
     var existing = document.getElementById("settings-modal-custom");
     if (existing) existing.remove();
@@ -240,6 +270,7 @@
     var tabGen = [
       '<div id="tab-gen" class="llm-tab-content">',
       UI.section("Базовый сэмплинг"),
+      ultraProfileNote(ultra),
       UI.gap2(
         "<div>" +
           UI.lbl("Temperature") +
@@ -517,6 +548,14 @@
       if (e.target === ov) closeModal();
     });
 
+    // Fields the Ultra profile fixes are shown but cannot be changed.
+    if (ultra) {
+      ["set-tokens", "set-trunc", "set-reasoning"].forEach(function (id) {
+        var field = document.getElementById(id);
+        if (field) field.disabled = true;
+      });
+    }
+
     md.querySelectorAll(".llm-tab-btn").forEach(function (btn) {
       btn.addEventListener("click", function () {
         md.querySelectorAll(".llm-tab-btn").forEach(function (b) {
@@ -584,6 +623,7 @@
       settings.prompt_version = document.getElementById("set-prompt-ver").value.trim();
       settings.prompt_variables = document.getElementById("set-prompt-vars").value.trim();
       settings.conv_metadata = document.getElementById("set-conv-meta").value.trim();
+      if (ultra) applyUltraProfile(settings, ultra);
       Storage.save(settings, currentConvId).then(closeModal, showSaveError);
     });
   };

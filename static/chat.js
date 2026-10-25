@@ -647,4 +647,10 @@ document.addEventListener("DOMContentLoaded", function () {
         sendMessage();
       }
     });
+
+  // The server-rendered history must be replaced by the client renderer even if the
+  // startup sequence in core.js stopped before it reached loadHistory.
+  if (document.querySelector("#chatbox .server-rendered-conversation") && currentConvId) {
+    loadHistory(currentConvId);
+  }
 });

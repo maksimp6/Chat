@@ -69,6 +69,8 @@ def profile_summary(profile: dict[str, Any]) -> dict[str, Any]:
     context = profile.get("context") or {}
     output = profile.get("output") or {}
     lifecycle = profile.get("lifecycle") or {}
+    reasoning = profile.get("reasoning") or {}
+    wire = profile.get("wire_parameters") or {}
     return {
         "profile_id": profile.get("profile_id"),
         "status": profile.get("status"),
@@ -77,6 +79,9 @@ def profile_summary(profile: dict[str, Any]) -> dict[str, Any]:
         "stop_and_recheck_on": lifecycle.get("stop_and_recheck_on"),
         "context_window_tokens": context.get("window_tokens"),
         "output_ceiling_tokens": output.get("documented_hosted_ceiling_tokens"),
+        "output_selection": output.get("selection"),
+        "reasoning_depth_control": reasoning.get("depth_control") is True,
+        "truncation": wire.get("truncation"),
         "blockers": list(profile["blockers"]),
     }
 
