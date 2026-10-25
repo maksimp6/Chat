@@ -31,6 +31,14 @@ def command(*args):
 def device_guard():
     if command(ROOT + "getprop", "ro.product.model").strip() != b"Redmi 9":
         raise RuntimeError("The selected device is not Redmi 9")
+
+
+def native_focus_is_logos():
+    # The page check cannot see a native window drawn above the WebView, so ask Android who has focus.
+    windows = command(ROOT + "dumpsys", "window", "windows").decode("utf-8", "replace")
+    focus = [line for line in windows.splitlines() if "mCurrentFocus" in line]
+    if not focus or PACKAGE not in focus[-1]:
+        raise RuntimeError("A native window has focus above the application")
     policy = command(ROOT + "dumpsys", "window", "policy").decode()
     if not re.search(r"(?m)^\s*showing=false\s*$", policy):
         raise RuntimeError("The screen is locked or its state is unknown")
@@ -166,6 +174,7 @@ def capture(out, uid, gid, metadata):
     rdp = RDP()
     actor = rdp.find_logos()
     initial = rdp.state(actor)
+    native_focus_is_logos()
     runtime = version()
     if not isinstance(initial.get("revision"), str) or not re.fullmatch(r"[0-9a-f]{40}", initial["revision"]):
         raise RuntimeError("The browser revision is unknown")
@@ -181,6 +190,7 @@ def capture(out, uid, gid, metadata):
             raise RuntimeError("Application changed during capture")
         if state["unsafeModal"] or state["modalOpen"]:
             raise RuntimeError("An unexpected dialog appeared")
+        native_focus_is_logos()
         if not state["reachable"]["newChat" if wanted else "menu"]:
             raise RuntimeError("The requested sidebar control is obscured on screen")
         if state["expanded"] != ("true" if wanted else "false"):
