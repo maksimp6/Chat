@@ -1,0 +1,46 @@
+name: Yandex ART auth check
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  art_check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: One ART generation request and operation poll
+        shell: bash
+        env:
+          YANDEX_IAM_TOKEN: ${{ secrets.YANDEX_IAM_TOKEN }}
+          YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
+        run: |
+          set -uo pipefail
+          test -n "$YANDEX_IAM_TOKEN"
+          test -n "$YANDEX_FOLDER_ID"
+          for uri in "art://$YANDEX_FOLDER_ID/aliceai-image-art-3.0" "art://$YANDEX_FOLDER_ID/yandex-art/latest"; do
+            body=$(python3 -c 'import json,sys; print(json.dumps({"modelUri": sys.argv[1], "messages": [{"text": "красный круг на белом фоне"}], "generationOptions": {"mimeType": "image/jpeg"}}))' "$uri")
+            code=$(curl -sS -o "$RUNNER_TEMP/gen.json" -w '%{http_code}' --max-time 60 \
+              -X POST -H "Authorization: Bearer $YANDEX_IAM_TOKEN" -H 'Content-Type: application/json' \
+              --data "$body" https://llm.api.cloud.yandex.net/foundationModels/v1/imageGenerationAsync)
+            echo "uri=$uri generate_http=$code"
+            python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print({k: (v if k != "image" else len(v)) for k, v in d.items()})' "$RUNNER_TEMP/gen.json" 2>/dev/null || head -c 300 "$RUNNER_TEMP/gen.json"
+            op=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("id",""))' "$RUNNER_TEMP/gen.json" 2>/dev/null)
+            if [ -z "$op" ]; then
+              continue
+            fi
+            done_flag=""
+            for i in $(seq 1 30); do
+              pcode=$(curl -sS -o "$RUNNER_TEMP/op.json" -w '%{http_code}' --max-time 30 \
+                -H "Authorization: Bearer $YANDEX_IAM_TOKEN" "https://operation.api.cloud.yandex.net/operations/$op")
+              done_flag=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("done"))' "$RUNNER_TEMP/op.json" 2>/dev/null)
+              if [ "$done_flag" = "True" ]; then
+                break
+              fi
+              sleep 10
+            done
+            echo "operation poll_http=$pcode done=$done_flag"
+            python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); r=d.get("response") or {}; print({"error": d.get("error"), "response_keys": sorted(r.keys()) if isinstance(r, dict) else None, "image_base64_chars": len(r.get("image","")) if isinstance(r, dict) else None})' "$RUNNER_TEMP/op.json" 2>/dev/null || head -c 300 "$RUNNER_TEMP/op.json"
+            break
+          done
