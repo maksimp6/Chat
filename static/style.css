@@ -1962,6 +1962,10 @@ body {
   border-bottom-color: var(--accent);
   font-weight: 600;
 }
+/* The tab row must keep its height: the modal is a column flex box, and a shrunk row clips the 44px tab labels. */
+.logos-pro-app .llm-tabs {
+  flex: 0 0 auto;
+}
 
 /* Высокий контраст: контуры кнопок и ховер диалога (пункт 52) */
 [data-theme="high-contrast"] .logos-btn {

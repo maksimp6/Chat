@@ -265,7 +265,7 @@
       '    <h2 style="margin:0;font-size:18px;color:var(--m-text,#222);">⚙️ Конфигурация LLM & Responses API</h2>',
       '    <button class="logos-btn settings-contract-btn" id="set-close-btn">&times;</button>',
       "</div>",
-      '<div style="display:flex;gap:6px;border-bottom:1px solid var(--m-border,#ddd);margin-bottom:14px;overflow-x:auto;">',
+      '<div class="llm-tabs" style="display:flex;gap:6px;border-bottom:1px solid var(--m-border,#ddd);margin-bottom:14px;overflow-x:auto;">',
       '    <button class="logos-btn llm-tab-btn active settings-contract-btn" data-tab="tab-gen">Сэмплинг</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-output">Формат вывода</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-routing">Маршрутизация вызовов</button>',
