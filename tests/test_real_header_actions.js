@@ -63,7 +63,7 @@ const modelRuntime = modelShim.load(
   ["static/core_api.js", "static/ui_runtime.js", "static/models.js"],
   {
     modelsData: { text: {}, voice: {} },
-    currentModel: "logos-runtime",
+    currentModel: "yandexgpt-5-lite",
     conversations: [],
   },
 );

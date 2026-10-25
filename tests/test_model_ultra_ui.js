@@ -116,7 +116,7 @@ test("retired voice model is shown as unavailable with the microphone badge", ()
     {
       text: {},
       voice: {
-        "speech-realtime-260528": {
+        "speech-realtime-250923": {
           name: "Speech Realtime 260528",
           input: 0.1,
           output: 0.2,
@@ -125,7 +125,7 @@ test("retired voice model is shown as unavailable with the microphone badge", ()
         },
       },
     },
-    "speech-realtime-260528",
+    "speech-realtime-250923",
   );
   const [voice] = runtime.document.querySelectorAll(".model-option");
   assert.equal(voice.disabled, true);
@@ -142,7 +142,7 @@ test("Ultra line reports status, context window and blocker count", () => {
         output: 0.8,
         ultra_profile: PREPARED,
       },
-      "logos-runtime": { name: "Alice AI LLM", input: 0.5, output: 1.2 },
+      "yandexgpt-5-lite": { name: "Alice AI LLM", input: 0.5, output: 1.2 },
     },
     voice: {},
   });

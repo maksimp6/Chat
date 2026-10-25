@@ -89,7 +89,7 @@ def test_legacy_runtime_session_is_shared_and_reusable(clients):
     from storage.db import create_conversation
     from conversations.ownership import set_owner
 
-    create_conversation("legacy-chat", "Legacy", "logos-runtime")
+    create_conversation("legacy-chat", "Legacy", "yandexgpt-5-lite")
     set_owner("legacy-chat", "old-owner")
     create_session("legacy-session", metadata={"user_id": "old-owner"})
     old_invocation = create_invocation("legacy-session", "legacy-chat", user_id="old-owner")
@@ -140,7 +140,7 @@ def test_execute_approved_compatibility_route_no_longer_needs_token(clients, mon
     import chat.mcp_routes as routes
     from storage.db import create_conversation
 
-    create_conversation("tool-chat", "Tool", "logos-runtime")
+    create_conversation("tool-chat", "Tool", "yandexgpt-5-lite")
     monkeypatch.setattr(routes, "LogosClient", FakeClient)
     monkeypatch.setattr(routes.registry, "get_tool_meta", lambda name: {"description": "Offline"})
     calls = []
@@ -184,7 +184,7 @@ def test_tool_call_chain_runs_without_approval_pause(clients, monkeypatch):
 
     monkeypatch.setattr(client, "_ask_provider", fake_provider)
     monkeypatch.setattr(client, "_execute_single_tool", fake_execute)
-    response = client.ask_with_mcp("do it", "logos-runtime", params={"approval_mode": "pause"})
+    response = client.ask_with_mcp("do it", "yandexgpt-5-lite", params={"approval_mode": "pause"})
     assert response["id"] == "answer-step"
     assert len(executed) == 1
     assert len(requests_seen) == 2

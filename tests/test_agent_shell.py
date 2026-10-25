@@ -166,13 +166,13 @@ def test_logos_task_runs_the_issue_agent_and_keeps_its_summary(store):
         role="docs-engineer",
         title="t",
         kind="logos_task",
-        payload={**PAYLOAD, "model": "logos-runtime"},
+        payload={**PAYLOAD, "model": "yandexgpt-5-lite"},
     )
     run_next(store, {"logos_task": handler})
     task = store.get(task_id)
     assert task["status"] == "done"
     assert task["result"]["changed_files"] == ["README.md"]
-    assert calls == [(7, "Fix typo", "The README has a typo.", "logos-runtime")]
+    assert calls == [(7, "Fix typo", "The README has a typo.", "yandexgpt-5-lite")]
 
 
 def test_logos_task_fails_with_a_fixed_code_and_keeps_the_result(store):

@@ -74,7 +74,7 @@ test("a missing model in a loaded catalog falls back to the default model", asyn
   });
   await settle();
 
-  assert.equal(coreValue(context, "currentModel"), "logos-runtime");
+  assert.equal(coreValue(context, "currentModel"), "yandexgpt-5-lite");
 });
 
 test("a degraded catalog keeps the conversation's saved model instead of overwriting it", async () => {

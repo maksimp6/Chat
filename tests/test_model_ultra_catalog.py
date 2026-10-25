@@ -9,7 +9,7 @@ from core import model_profiles
 from core.config import ALL_MODELS, calculate_cost
 from provider_accounts.model_discovery import static_model_catalog
 
-RETIRED = {"qwen3-235b-a22b-fp8", "speech-realtime-260528", "speech-realtime-250923"}
+RETIRED = {"qwen3-235b-a22b-fp8", "speech-realtime-250923", "speech-realtime-250923"}
 
 
 class FakeDiscovery:
@@ -33,7 +33,7 @@ def fresh_profiles_cache():
 def test_catalog_covers_every_yandex_registry_model_exactly(fresh_profiles_cache):
     profiles = model_profiles.ultra_profiles()
 
-    assert len(profiles) == 14
+    assert len(profiles) == 7
     assert set(profiles) == {
         key for key, info in ALL_MODELS.items() if info.get("provider", "yandex") == "yandex"
     }
@@ -42,7 +42,7 @@ def test_catalog_covers_every_yandex_registry_model_exactly(fresh_profiles_cache
 def test_foreign_provider_does_not_invalidate_yandex_profiles(monkeypatch, fresh_profiles_cache):
     monkeypatch.setitem(ALL_MODELS, "foreign-model", {"provider": "other"})
     profiles = model_profiles.ultra_profiles()
-    assert len(profiles) == 14
+    assert len(profiles) == 7
     annotated = model_profiles.annotate_catalog(
         {"text": {"foreign-model": {"provider": "other"}}, "voice": {}}
     )
@@ -67,7 +67,7 @@ def test_static_catalog_exposes_retired_models_as_unavailable():
     catalog = static_model_catalog()
 
     assert catalog["text"]["qwen3-235b-a22b-fp8"]["available"] is False
-    assert catalog["voice"]["speech-realtime-260528"]["available"] is False
+    assert catalog["voice"]["speech-realtime-250923"]["available"] is False
     assert catalog["text"]["yandexgpt-5.1"].get("available", True) is True
 
 
@@ -163,6 +163,6 @@ def test_degraded_route_keeps_retired_voice_models_unavailable(monkeypatch):
     payload = app_module.app.test_client().get("/api/models").get_json()
 
     assert payload["degraded"] is True
-    assert payload["voice"]["speech-realtime-260528"]["available"] is False
-    assert payload["text"]["logos-runtime"]["ultra_profile"]["blockers"]
-    assert "available" not in payload["text"]["logos-runtime"]
+    assert payload["voice"]["speech-realtime-250923"]["available"] is False
+    assert payload["text"]["yandexgpt-5-lite"]["ultra_profile"]["blockers"]
+    assert "available" not in payload["text"]["yandexgpt-5-lite"]

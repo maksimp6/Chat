@@ -13,7 +13,7 @@ class TestPreApiTiming(unittest.TestCase):
     def test_pre_api_pipeline_is_recorded_from_request_initialization_to_api_send(self):
         trace = ExecutionTrace()
         trace.set_request(
-            {"conversation_id": "conv", "message": "hello", "model": "logos-runtime", "params": {}}
+            {"conversation_id": "conv", "message": "hello", "model": "yandexgpt-5-lite", "params": {}}
         )
 
         request_initialized = next(
@@ -108,7 +108,7 @@ class TestPreApiTiming(unittest.TestCase):
                     json={
                         "conversation_id": conversation_id,
                         "message": "hello",
-                        "model": "logos-runtime",
+                        "model": "yandexgpt-5-lite",
                         "params": {},
                     },
                 )
@@ -160,7 +160,7 @@ class TestPreApiTiming(unittest.TestCase):
                     json={
                         "conversation_id": "settlement-failure-test",
                         "message": "hello",
-                        "model": "logos-runtime",
+                        "model": "yandexgpt-5-lite",
                         "params": {},
                     },
                 )
@@ -201,7 +201,7 @@ class TestPreApiTiming(unittest.TestCase):
                     json={
                         "conversation_id": "post-finalize-test",
                         "message": "hello",
-                        "model": "logos-runtime",
+                        "model": "yandexgpt-5-lite",
                         "params": {},
                     },
                 )
@@ -294,7 +294,7 @@ class TestPreApiTiming(unittest.TestCase):
                     json={
                         "conversation_id": "trace-persist-failure-test",
                         "message": "hello",
-                        "model": "logos-runtime",
+                        "model": "yandexgpt-5-lite",
                         "params": {},
                     },
                 )

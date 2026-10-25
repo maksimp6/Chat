@@ -84,7 +84,7 @@ def _commands(tmp_path):
 def _result(tmp_path, **overrides):
     result = {
         "status": "no_changes",
-        "model": "logos-runtime",
+        "model": "yandexgpt-5-lite",
         "summary": "Ask @logos again",
         "reply": "Ask @logos again",
         "reply_state": "available",

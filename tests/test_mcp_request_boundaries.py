@@ -152,7 +152,7 @@ def test_the_follow_up_answer_after_an_approval_is_posted_to_the_treasury(monkey
             "conversation_id": "conv-1",
             "name": "inspect",
             "arguments": {},
-            "model": "logos-runtime",
+            "model": "yandexgpt-5-lite",
         },
     )
 

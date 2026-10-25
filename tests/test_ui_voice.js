@@ -32,7 +32,7 @@ function boot() {
       },
     },
     currentConvId: "c1",
-    currentModel: "speech-realtime-260528",
+    currentModel: "speech-realtime-250923",
   });
   return { window, document, requests };
 }

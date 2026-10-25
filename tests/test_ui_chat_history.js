@@ -35,7 +35,7 @@ function deferredBoot({ conversation = "c1" } = {}) {
   const { document, context } = shim.load(["static/core_api.js", "static/chat.js", "static/sidebar.js"], {
     LogosDispatcher: dispatcher,
     currentConvId: conversation,
-    currentModel: "logos-runtime",
+    currentModel: "yandexgpt-5-lite",
   });
   return { document, context, pending };
 }
@@ -53,7 +53,7 @@ function instantBoot({ conversation = "c1", responses = [], extra = {} } = {}) {
   const { document, context } = shim.load(["static/core_api.js", "static/chat.js", "static/sidebar.js"], {
     LogosDispatcher: dispatcher,
     currentConvId: conversation,
-    currentModel: "logos-runtime",
+    currentModel: "yandexgpt-5-lite",
     ...extra,
   });
   return { document, context };

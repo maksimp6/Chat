@@ -68,7 +68,7 @@ def test_cli_classes_use_neutral_names():
 
 
 def test_default_model_key_is_unchanged_for_the_backend_contract():
-    assert cli.DEFAULT_MODEL == "logos-runtime"
+    assert cli.DEFAULT_MODEL == "yandexgpt-5-lite"
 
 
 def test_backend_receives_the_unchanged_model_key(monkeypatch):
@@ -78,7 +78,7 @@ def test_backend_receives_the_unchanged_model_key(monkeypatch):
 
     client.create_conversation()
 
-    assert session.sent_json[-1]["model"] == "logos-runtime"
+    assert session.sent_json[-1]["model"] == "yandexgpt-5-lite"
 
 
 def test_logos_environment_variables_still_configure_the_client(monkeypatch):

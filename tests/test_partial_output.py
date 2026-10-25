@@ -334,7 +334,7 @@ class TestActiveChatRoute(unittest.TestCase):
                     json={
                         "conversation_id": "test-conv",
                         "message": "trigger failure",
-                        "model": "logos-runtime",
+                        "model": "yandexgpt-5-lite",
                         "params": {"conversation_metadata": test_conversation_metadata},
                     },
                 )

@@ -25,7 +25,7 @@ def _capture_web_tools(monkeypatch, settings=None, params=None):
     client = CapturingLogosClient()
     client.ask_with_mcp(
         "Find PETG nozzles",
-        "logosai-llm",
+        "yandexgpt-lite",
         conversation_id="marketplace-policy",
         params=params,
     )

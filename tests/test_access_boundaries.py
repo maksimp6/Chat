@@ -65,7 +65,7 @@ def _approval_request(client, arguments, token=None):
         "conversation_id": "c1",
         "name": "run_command",
         "arguments": arguments,
-        "model": "logos-runtime",
+        "model": "yandexgpt-5-lite",
     }
     if token is not None:
         body["approval_token"] = token

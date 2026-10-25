@@ -78,7 +78,7 @@ window.changeModel = function (newModel, skipPatch) {
   var catalogLoaded = Object.keys(textModels).length + Object.keys(voiceModels).length > 0;
   // Without a catalog (offline or degraded) keep the requested key; the server validates it.
   if (catalogLoaded && !textModels[newModel] && !voiceModels[newModel]) {
-    console.warn("[CORE] Unknown model:", newModel, "-> fallback to logos-runtime");
+    console.warn("[CORE] Unknown model:", newModel, "-> fallback to yandexgpt-5-lite");
     newModel = "yandexgpt-5-lite";
   }
   currentModel = newModel;

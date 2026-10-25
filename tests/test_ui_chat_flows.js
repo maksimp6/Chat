@@ -38,7 +38,7 @@ function boot({ conversation = "c1", responses = [] } = {}) {
   const loaded = shim.load(["static/core_api.js", "static/models.js", "static/chat.js"], {
     LogosDispatcher: dispatcher,
     currentConvId: conversation,
-    currentModel: "logos-runtime",
+    currentModel: "yandexgpt-5-lite",
     conversations: [],
     alert: (message) => alerts.push(message),
     selectConv: (id) => {
@@ -123,7 +123,7 @@ test("rapid Send during creation submits the original text/model/settings and ke
   await settle();
   assert.equal(requests.filter((r) => r.url === "/api/conversations").length, 1);
   assert.equal(requests[2].body.message, "original");
-  assert.equal(requests[2].body.model, "logos-runtime");
+  assert.equal(requests[2].body.model, "yandexgpt-5-lite");
   assert.equal(requests[2].body.params.reasoning.effort, "low");
   assert.equal(input.value, "next draft");
 });

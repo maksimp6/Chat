@@ -28,7 +28,7 @@ class ApiChatInvocationContextTests(unittest.TestCase):
         ):
             response = client.post(
                 "/api/chat",
-                json={"conversation_id": "conv-test", "message": "hello", "model": "logos-runtime"},
+                json={"conversation_id": "conv-test", "message": "hello", "model": "yandexgpt-5-lite"},
             )
 
         self.assertEqual(response.status_code, 200)

@@ -13,7 +13,7 @@ def _trace() -> ExecutionTrace:
     trace.add_response(
         {
             "id": "response-1",
-            "model": "logos-runtime",
+            "model": "yandexgpt-5-lite",
             "usage": {"input_tokens": 100, "output_tokens": 20, "total_tokens": 120},
         }
     )

@@ -48,7 +48,7 @@ class TestChatMemoryStoreIntegration(unittest.TestCase):
             ):
                 db.init_db()
                 db.create_conversation(
-                    conversation_id, "Kristall integration test", "logos-runtime"
+                    conversation_id, "Kristall integration test", "yandexgpt-5-lite"
                 )
 
                 app.config["TESTING"] = True
@@ -58,7 +58,7 @@ class TestChatMemoryStoreIntegration(unittest.TestCase):
                         json={
                             "conversation_id": conversation_id,
                             "message": "trigger failure",
-                            "model": "logos-runtime",
+                            "model": "yandexgpt-5-lite",
                             "params": {},
                         },
                     )

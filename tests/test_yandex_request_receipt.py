@@ -83,7 +83,7 @@ def test_receipt_matches_actual_payload_after_normalization_and_tool_cleaning(tr
     text = "Unicode данные 🔎\n" * 1000 + "\npassword=synthetic-password"
     client.ask(
         text,
-        "logos-runtime",
+        "yandexgpt-5-lite",
         conversation_id="local-conversation",
         params={
             "background": True,
@@ -142,7 +142,7 @@ def test_receipt_matches_actual_payload_after_normalization_and_tool_cleaning(tr
 
 def test_continuation_linkage_is_the_actual_input_and_conversation(transport):
     client, trace, posts = transport
-    client.ask("initial", "logos-runtime", conversation_id="local", execution_trace=trace)
+    client.ask("initial", "yandexgpt-5-lite", conversation_id="local", execution_trace=trace)
     continuation = [
         {"type": "reasoning", "encrypted_content": "synthetic-reasoning"},
         {"type": "function_call", "call_id": "call-1", "name": "read_file", "arguments": "{}"},
@@ -150,7 +150,7 @@ def test_continuation_linkage_is_the_actual_input_and_conversation(transport):
     ]
     client.ask(
         "unused fallback message",
-        "logos-runtime",
+        "yandexgpt-5-lite",
         conversation_id="local",
         params={"input": continuation, "previous_response_id": "not-forwarded-by-builder"},
         execution_trace=trace,
@@ -187,7 +187,7 @@ def test_missing_options_remain_not_sent_despite_local_params(transport):
     client, trace, posts = transport
     client.ask(
         "text",
-        "logos-runtime",
+        "yandexgpt-5-lite",
         params={
             "temperature": None,
             "max_output_tokens": 0,
@@ -256,7 +256,7 @@ def test_capture_occurs_after_logging_immediately_before_post(transport):
         kwargs["json"]["temperature"] = 0.31
 
     client._log_request = final_request_hook
-    client.ask("text", "logos-runtime", execution_trace=trace)
+    client.ask("text", "yandexgpt-5-lite", execution_trace=trace)
     assert (
         posts[0]["temperature"]
         == manifests(trace)[0]["manifest"]["settings"]["temperature"]["value"]
@@ -272,7 +272,7 @@ def test_requests_without_trace_do_not_compute_or_export_receipt(transport, monk
             json=lambda: {"status": "completed"}, raise_for_status=lambda: None
         )
     )
-    assert client.ask("text", "logos-runtime")["status"] == "completed"
+    assert client.ask("text", "yandexgpt-5-lite")["status"] == "completed"
 
 
 def test_private_callback_preserves_complete_initial_and_continuation_input_before_post(transport):
@@ -304,7 +304,7 @@ def test_private_callback_preserves_complete_initial_and_continuation_input_befo
     ]
     client.ask(
         text,
-        "logos-runtime",
+        "yandexgpt-5-lite",
         conversation_id="local",
         params={"instructions": instructions, "tools": tools, "on_provider_input": checkpoint},
         execution_trace=trace,
@@ -312,7 +312,7 @@ def test_private_callback_preserves_complete_initial_and_continuation_input_befo
     continuation = [{"type": "function_call_output", "call_id": "call-1", "output": text}]
     client.ask(
         "unused",
-        "logos-runtime",
+        "yandexgpt-5-lite",
         conversation_id="local",
         params={"input": continuation, "on_provider_input": checkpoint},
         execution_trace=trace,
@@ -352,7 +352,7 @@ def test_private_callback_failure_prevents_post_and_continuation(transport):
     with pytest.raises(OSError, match="private input storage"):
         client.ask(
             "initial",
-            "logos-runtime",
+            "yandexgpt-5-lite",
             params={"on_provider_input": unavailable},
             execution_trace=trace,
         )
@@ -361,11 +361,11 @@ def test_private_callback_failure_prevents_post_and_continuation(transport):
     assert trace.trace.get("api_requests", []) == []
     assert not any(event["type"] == "api_request_sent" for event in trace.trace["events"])
 
-    client.ask("initial", "logos-runtime", execution_trace=trace)
+    client.ask("initial", "yandexgpt-5-lite", execution_trace=trace)
     with pytest.raises(OSError, match="private input storage"):
         client.ask(
             "continue",
-            "logos-runtime",
+            "yandexgpt-5-lite",
             params={
                 "input": [{"type": "function_call_output", "call_id": "old", "output": "private"}],
                 "on_provider_input": unavailable,
@@ -386,7 +386,7 @@ def test_invalid_private_callback_is_rejected_before_credentials_or_post(transpo
     with pytest.raises(ValueError, match="on_provider_input"):
         client.ask(
             "text",
-            "logos-runtime",
+            "yandexgpt-5-lite",
             params={"on_provider_input": "not-callable"},
             execution_trace=trace,
         )
@@ -403,7 +403,7 @@ def test_private_writer_timeout_is_not_misreported_as_provider_failure(transport
     with pytest.raises(requests.Timeout) as caught:
         client.ask(
             "text",
-            "logos-runtime",
+            "yandexgpt-5-lite",
             params={"on_provider_input": unavailable},
             execution_trace=trace,
         )
@@ -424,7 +424,7 @@ def test_private_callback_without_trace_reports_unknown_linkage(transport):
         return SimpleNamespace(json=lambda: {"status": "completed"}, raise_for_status=lambda: None)
 
     client.session = SimpleNamespace(post=post)
-    client.ask("text", "logos-runtime", params={"on_provider_input": saved.append})
+    client.ask("text", "yandexgpt-5-lite", params={"on_provider_input": saved.append})
     assert saved[0]["step"] is saved[0]["trace_id"] is saved[0]["correlation_id"] is None
     assert saved[0]["data"] == {
         name: outgoing[0][name]

@@ -413,6 +413,6 @@ def test_web_chat_defaults_to_every_registered_category(monkeypatch):
         def ask(self, *args, **kwargs):
             return {"output": []}
 
-    Capturing().ask_with_mcp("hello", "logos-runtime")
+    Capturing().ask_with_mcp("hello", "yandexgpt-5-lite")
     assert requested == list(registry.get_available_categories())
     assert {"theme", "cloud", "government", "partner", "3d"} <= set(requested)

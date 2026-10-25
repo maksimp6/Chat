@@ -74,7 +74,7 @@ def test_create_conversation_does_not_call_provider(monkeypatch):
     client = app_module.app.test_client()
     response = client.post(
         "/api/conversations",
-        json={"model": "logos-runtime", "title": "Test"},
+        json={"model": "yandexgpt-5-lite", "title": "Test"},
     )
 
     assert response.status_code == 201

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-MODEL = "deepseek-v4.1-flash"
+MODEL = "gpt-oss-20b"
 CONTEXT_WINDOW = 1_048_576
 REQUESTED_OUTPUT_TOKENS = 393_216
 OWNER_DIRECTIVE = (

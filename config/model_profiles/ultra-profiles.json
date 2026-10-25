@@ -49,11 +49,11 @@
     "yandexgpt-5.1": {
       "profile_id": "ultra-yandexgpt-5.1",
       "model_key": "yandexgpt-5.1",
-      "upstream_id": "yandexgpt-5.1",
+      "upstream_id": "yandexgpt/rc",
       "kind": "text",
       "status": "prepared_not_activated",
       "transport": "text_generation_async",
-      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/yandexgpt-5.1",
+      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/yandexgpt/rc",
       "lifecycle": {
         "state": "listed",
         "stop_and_recheck_on": null,
@@ -130,11 +130,11 @@
     "yandexgpt-5-pro": {
       "profile_id": "ultra-yandexgpt-5-pro",
       "model_key": "yandexgpt-5-pro",
-      "upstream_id": "yandexgpt-5-pro",
+      "upstream_id": "yandexgpt/latest",
       "kind": "text",
       "status": "prepared_not_activated",
       "transport": "responses",
-      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/yandexgpt-5-pro/latest",
+      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/yandexgpt/latest",
       "lifecycle": {
         "state": "listed",
         "stop_and_recheck_on": null,
@@ -204,11 +204,11 @@
     "yandexgpt-5-lite": {
       "profile_id": "ultra-yandexgpt-5-lite",
       "model_key": "yandexgpt-5-lite",
-      "upstream_id": "yandexgpt-5-lite",
+      "upstream_id": "yandexgpt-lite",
       "kind": "text",
       "status": "prepared_not_activated",
       "transport": "responses",
-      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/yandexgpt-5-lite/latest",
+      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/yandexgpt-lite/latest",
       "lifecycle": {
         "state": "documented_end_date",
         "stop_and_recheck_on": "2026-11-15",
@@ -280,7 +280,7 @@
       "model_key": "qwen3-235b-a22b-fp8",
       "upstream_id": "qwen3-235b-a22b-fp8",
       "kind": "text",
-      "status": "blocked_retired",
+      "status": "prepared_not_activated",
       "transport": "responses",
       "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/qwen3-235b-a22b-fp8/latest",
       "lifecycle": {
@@ -512,7 +512,7 @@
       "model_key": "speech-realtime-250923",
       "upstream_id": "speech-realtime-250923",
       "kind": "voice",
-      "status": "blocked_retired",
+      "status": "prepared_not_activated",
       "transport": "realtime",
       "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/speech-realtime-250923",
       "lifecycle": {

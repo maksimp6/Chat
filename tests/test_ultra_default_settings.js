@@ -19,7 +19,7 @@ function runtime(model = "gpt-oss-120b", saved = {}) {
           profile_id: "ultra-gpt-oss-120b", default_profile: "ultra",
           settings_defaults: { max_output_tokens: 0, truncation: "disabled", reasoning_effort: "high" },
         } },
-        "qwen3.6-35b-a3b": { ultra_profile: {
+        "qwen3-235b-a22b-fp8": { ultra_profile: {
           profile_id: "ultra-qwen3.6-35b-a3b", default_profile: "ultra",
           settings_defaults: { max_output_tokens: 0, truncation: "disabled", reasoning_effort: "disabled" },
         } },
@@ -66,7 +66,7 @@ test("saved medium and output caps cannot override Ultra on load or request", ()
 test("switching models recalculates Ultra instead of reusing another model's effort", () => {
   const r = runtime();
   assert.equal(r.window.getResponsesParams().reasoning_effort, "high");
-  r.context.currentModel = "qwen3.6-35b-a3b";
+  r.context.currentModel = "qwen3-235b-a22b-fp8";
   const params = r.window.getResponsesParams();
   assert.equal(params.reasoning_effort, undefined);
   assert.equal(params.max_output_tokens, 0);

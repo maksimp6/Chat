@@ -264,7 +264,7 @@ def _create_conversation(session: requests.Session, base_url: str) -> str:
         "POST",
         base_url,
         "/api/conversations",
-        payload={"title": "Logos launch smoke", "model": "logos-runtime"},
+        payload={"title": "Logos launch smoke", "model": "yandexgpt-5-lite"},
         expected=(200, 201),
     )
     conversation_id = str(payload.get("id") or "").strip() if isinstance(payload, dict) else ""
@@ -289,7 +289,7 @@ def _send_live_chat(
             "conversation_id": conversation_id,
             "session_id": session_id,
             "message": "Reply with one short sentence confirming this launch smoke request.",
-            "model": "logos-runtime",
+            "model": "yandexgpt-5-lite",
         },
     )
     if not isinstance(payload, dict):

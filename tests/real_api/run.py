@@ -371,7 +371,7 @@ def parse_args(argv=None):
         "--installed-build", help="Operator-observed installed build; not a verified source SHA."
     )
     parser.add_argument(
-        "--model", required=True, help="Explicit Yandex model slug, e.g. logosai-llm-flash."
+        "--model", required=True, help="Explicit Yandex model slug, e.g. gpt-oss-20b."
     )
     parser.add_argument(
         "--state-root",

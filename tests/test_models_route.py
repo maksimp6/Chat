@@ -42,4 +42,4 @@ def test_models_route_degrades_to_static_catalog(monkeypatch):
     payload = response.get_json()
     assert payload["degraded"] is True
     assert payload["error"] == "model_discovery_unavailable"
-    assert "logos-runtime" in payload["text"]
+    assert "yandexgpt-5-lite" in payload["text"]

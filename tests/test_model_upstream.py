@@ -1,38 +1,40 @@
-"""The Logos model key maps to the Yandex model id that Yandex still knows (#1316).
+"""The registry key is ours. The upstream id is the Yandex model id that every request URI uses.
 
-The registry key is ours and may be renamed. The upstream id is what Yandex serves,
-so every request URI must keep using it. Keys that are not in the registry, such as
-keys stored in older conversations, pass through unchanged.
+Keys that are not in the registry pass through unchanged.
 """
+
+import pytest
 
 from core import config
 
 
-def test_registry_keys_map_to_the_unchanged_yandex_model_ids():
-    assert config.TEXT_MODELS["logos-runtime"]["upstream"] == "logosai-llm"
-    assert config.TEXT_MODELS["logos-runtime-flash"]["upstream"] == "logosai-llm-flash"
-    assert config.upstream_model_id("logos-runtime") == "logosai-llm"
-    assert config.upstream_model_id("logos-runtime-flash") == "logosai-llm-flash"
+def test_registry_keys_map_to_the_documented_yandex_model_ids():
+    assert config.upstream_model_id("yandexgpt-5-lite") == "yandexgpt-lite"
+    assert config.upstream_model_id("yandexgpt-5-pro") == "yandexgpt/latest"
+    assert config.upstream_model_id("yandexgpt-5.1") == "yandexgpt/rc"
+    assert config.upstream_model_id("gpt-oss-20b") == "gpt-oss-20b"
 
 
-def test_model_uri_uses_the_upstream_id_not_the_registry_key():
-    assert config.get_model_uri("folder", "logos-runtime") == "gpt://folder/logosai-llm/latest"
+def test_model_uri_uses_the_upstream_id_and_keeps_its_version():
+    assert config.get_model_uri("folder", "yandexgpt-5-lite") == "gpt://folder/yandexgpt-lite/latest"
+    assert config.get_model_uri("folder", "yandexgpt-5.1") == "gpt://folder/yandexgpt/rc"
+    assert config.get_model_uri("folder", "gpt-oss-20b") == "gpt://folder/gpt-oss-20b/latest"
+
+
+def test_unregistered_keys_pass_through_unchanged():
+    assert config.upstream_model_id("unregistered-model") == "unregistered-model"
     assert (
-        config.get_model_uri("folder", "logos-runtime-flash")
-        == "gpt://folder/logosai-llm-flash/latest"
+        config.get_model_uri("folder", "unregistered-model")
+        == "gpt://folder/unregistered-model/latest"
     )
 
 
-def test_unregistered_and_legacy_keys_pass_through_unchanged():
-    assert config.upstream_model_id("logosai-llm") == "logosai-llm"
-    assert config.get_model_uri("folder", "logosai-llm") == "gpt://folder/logosai-llm/latest"
+def test_unknown_model_info_is_an_error_not_a_fallback():
+    with pytest.raises(ValueError, match="no tariff"):
+        config.get_model_info("does-not-exist")
 
 
-def test_unknown_model_info_falls_back_to_the_logos_runtime_entry():
-    assert config.get_model_info("does-not-exist") == config.TEXT_MODELS["logos-runtime"]
-
-
-def test_creating_a_conversation_defaults_to_the_logos_model_key(monkeypatch):
+def test_creating_a_conversation_defaults_to_the_documented_lite_model(monkeypatch):
     from flask import Flask
 
     import chat.mcp_routes as mcp_routes
@@ -60,39 +62,18 @@ def test_creating_a_conversation_defaults_to_the_logos_model_key(monkeypatch):
 
     assert response.status_code == 201
     body = response.get_json()
-    assert body["model"] == "logos-runtime"
-    assert created == [(body["id"], "Test", "logos-runtime")]
-
-
-def test_legacy_keys_keep_their_pricing():
-    usage = {"input_tokens": 1000, "output_tokens": 1000}
-    flash = config.calculate_full_cost("logos-runtime-flash", usage)
-
-    assert config.calculate_full_cost("logosai-llm-flash", usage) == flash
-    assert config.calculate_full_cost("logosai-llm", usage) == config.calculate_full_cost(
-        "logos-runtime", usage
-    )
-    assert flash != config.calculate_full_cost("logos-runtime", usage)
-
-
-def test_legacy_billing_rows_are_calculated_not_unknown():
-    from economy.billing import build_ai_billing_item
-
-    item = build_ai_billing_item(
-        "logosai-llm-flash", {"input_tokens": 1000, "output_tokens": 1000}, step=1
-    )
-
-    assert item["cost_status"] == "calculated"
+    assert body["model"] == "yandexgpt-5-lite"
+    assert created == [(body["id"], "Test", "yandexgpt-5-lite")]
 
 
 def test_live_model_list_shows_the_registry_key_for_an_upstream_id():
     from provider_accounts.model_discovery import ModelDiscovery
 
-    entry = ModelDiscovery._normalize_model({"id": "gpt://folder/logosai-llm/latest"})
+    entry = ModelDiscovery._normalize_model({"id": "gpt://folder/yandexgpt-lite/latest"})
 
     assert entry is not None
-    assert entry["id"] == "logos-runtime"
-    assert entry["input"] == config.TEXT_MODELS["logos-runtime"]["input"]
+    assert entry["id"] == "yandexgpt-5-lite"
+    assert entry["input"] == config.TEXT_MODELS["yandexgpt-5-lite"]["input"]
 
 
 def test_live_model_list_keeps_ids_that_have_no_registry_entry():

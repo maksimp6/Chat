@@ -24,7 +24,7 @@ class ApiChatSessionContextTests(unittest.TestCase):
                     "conversation_id": "conv-session-test",
                     "session_id": "session-test",
                     "message": "hello",
-                    "model": "logos-runtime",
+                    "model": "yandexgpt-5-lite",
                 },
             )
         self.assertEqual(response.status_code, 200)

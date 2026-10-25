@@ -13,7 +13,7 @@ const HTML =
 
 const MODELS = {
   text: {
-    "logos-runtime": { name: "Logos", input: 0.5, output: 1.2, currency: "RUB" },
+    "yandexgpt-5-lite": { name: "Logos", input: 0.5, output: 1.2, currency: "RUB" },
     "free-model": { name: "Free", input: 0, output: 0, currency: "RUB" },
     "yandexgpt-5-lite": { name: "YandexGPT 5 Lite", input: 0.2, output: 0.2, currency: "RUB" },
   },
@@ -52,7 +52,7 @@ function boot() {
   return { document, window, context, requests };
 }
 
-function setState(context, { currentConvId, currentModel = "logos-runtime" }) {
+function setState(context, { currentConvId, currentModel = "yandexgpt-5-lite" }) {
   vm.runInContext(
     `modelsData = ${JSON.stringify(MODELS)};
      currentModel = ${JSON.stringify(currentModel)};

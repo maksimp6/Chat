@@ -127,7 +127,7 @@ def validate_catalog(catalog, registry, root):
                 _require(wire.get("reasoning") == {"effort": "high"}, key)
             else:
                 _require("reasoning" not in wire, f"{key}: unsupported reasoning claim")
-            if key == "qwen3.6-35b-a3b":
+            if key == "qwen3-235b-a22b-fp8":
                 _require(profile["reasoning"]["depth_control"] is False, key)
                 _require("reasoning_enable_wire_unverified" in profile["blockers"], key)
     return profiles

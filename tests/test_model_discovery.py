@@ -44,8 +44,8 @@ def test_discovers_and_normalizes_models():
 
     catalog = discovery.get_models()
 
-    assert "qwen3.6-35b-a3b" in catalog["text"]
-    assert catalog["text"]["qwen3.6-35b-a3b"]["type"] == "text"
+    assert "qwen3-235b-a22b-fp8" in catalog["text"]
+    assert catalog["text"]["qwen3-235b-a22b-fp8"]["type"] == "text"
     assert catalog["text"]["gpt-oss-120b"]["name"] == "GPT OSS 120B"
     assert catalog["voice"]
 

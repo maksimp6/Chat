@@ -21,13 +21,13 @@ def test_calls_record_a_copy_of_the_params():
     fake = FakeModelClient()
     params = {"instructions": "be brief"}
 
-    fake.ask("hi", "logos-runtime", "conv-1", params)
+    fake.ask("hi", "yandexgpt-5-lite", "conv-1", params)
     params["instructions"] = "changed later"
 
     assert fake.calls == [
         {
             "message": "hi",
-            "model_key": "logos-runtime",
+            "model_key": "yandexgpt-5-lite",
             "conversation_id": "conv-1",
             "params": {"instructions": "be brief"},
         }

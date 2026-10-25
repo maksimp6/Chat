@@ -142,9 +142,9 @@ class YandexRequestBuilderTests(unittest.TestCase):
 
     def test_ultra_does_not_invent_reasoning_for_other_active_chat_models(self):
         models = (
-            "logos-runtime", "logos-runtime-flash", "yandexgpt-5-pro",
-            "yandexgpt-5-lite", "deepseek-v4.1-flash", "deepseek-v4-flash",
-            "qwen3.6-35b-a3b",
+            "yandexgpt-5-lite", "gpt-oss-20b", "yandexgpt-5-pro",
+            "yandexgpt-5-lite", "gpt-oss-20b", "gpt-oss-120b",
+            "qwen3-235b-a22b-fp8",
         )
         for model in models:
             with self.subTest(model=model):
@@ -165,7 +165,7 @@ class YandexRequestBuilderTests(unittest.TestCase):
 
         for model in (
             "unknown-model", "yandexgpt-5.1",
-            "speech-realtime-deepseek-v4-flash", "qwen3-235b-a22b-fp8",
+            "speech-realtime-250923", "qwen3-235b-a22b-fp8",
         ):
             with self.subTest(model=model):
                 self.assertEqual(ultra_request_defaults(model), {})

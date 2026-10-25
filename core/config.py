@@ -58,6 +58,7 @@ PORT = 8080
 
 TEXT_MODELS = {
     "yandexgpt-5.1": {
+        "upstream": "yandexgpt/rc",
         "name": "YandexGPT Pro 5.1",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
@@ -67,6 +68,7 @@ TEXT_MODELS = {
         "output": 0.80,
     },
     "yandexgpt-5-pro": {
+        "upstream": "yandexgpt/latest",
         "name": "YandexGPT Pro 5",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
@@ -76,6 +78,7 @@ TEXT_MODELS = {
         "output": 1.20,
     },
     "yandexgpt-5-lite": {
+        "upstream": "yandexgpt-lite",
         "name": "YandexGPT Lite 5",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
@@ -174,7 +177,11 @@ def get_model_uri(project_id, model_key):
     """Build the Yandex model URI from the active provider credential."""
     if not isinstance(project_id, str) or not project_id.strip():
         raise ValueError("Yandex project_id is required")
-    return "gpt://" + project_id.strip() + "/" + upstream_model_id(model_key) + "/latest"
+    upstream = upstream_model_id(model_key)
+    # An upstream id that already names its version (yandexgpt/rc) is used as it is.
+    if "/" not in upstream:
+        upstream += "/latest"
+    return "gpt://" + project_id.strip() + "/" + upstream
 
 
 def calculate_cost(model_key, input_tokens, output_tokens=0, cached_tokens=0, tool_tokens=0):

@@ -43,7 +43,7 @@ def test_continuation_after_a_non_approval_tool_call_reissues_the_request(monkey
     monkeypatch.setattr(mcp_routes, "run_tool_loop", run_tool_loop_once)
 
     client = object.__new__(LogosClient)
-    final = client.ask_with_mcp(message="hi", model_key="logos-runtime", conversation_id="c1")
+    final = client.ask_with_mcp(message="hi", model_key="yandexgpt-5-lite", conversation_id="c1")
 
     assert final == {"id": "resp-2"}
     assert sent[1]["message"] == ""
@@ -91,7 +91,7 @@ def test_execute_approved_runs_the_tool_and_returns_the_synthesized_reply(monkey
             "conversation_id": "conv-1",
             "name": "inspect",
             "arguments": {"a": 1},
-            "model": "logos-runtime",
+            "model": "yandexgpt-5-lite",
         },
     )
 

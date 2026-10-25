@@ -58,7 +58,7 @@ def test_voice_session_lifecycle_and_pipeline(client, monkeypatch):
         "/api/voice/session",
         json={
             "conversation_id": None,
-            "model": "speech-realtime-260528",
+            "model": "speech-realtime-250923",
             "voice": "filipp",
             "response_mode": "audio",
         },
@@ -173,18 +173,18 @@ class _FakeLogosClient:
 def test_voice_chat_uses_text_model_and_conversation(monkeypatch):
     monkeypatch.setattr(voice_routes, "LogosClient", _FakeLogosClient)
     monkeypatch.setattr(_FakeLogosClient, "calls", [])
-    monkeypatch.setenv("LOGOS_VOICE_CHAT_MODEL", "logos-runtime")
+    monkeypatch.setenv("LOGOS_VOICE_CHAT_MODEL", "yandexgpt-5-lite")
 
-    assert voice_routes._chat("вопрос", "conv-1", "speech-realtime-260528") == "Ответ"
+    assert voice_routes._chat("вопрос", "conv-1", "speech-realtime-250923") == "Ответ"
     call = _FakeLogosClient.calls[0]
-    assert call["model_key"] == "logos-runtime"
+    assert call["model_key"] == "yandexgpt-5-lite"
     assert call["conversation_id"] == "conv-1"
 
 
 def test_voice_chat_requires_conversation_and_text_reply(monkeypatch):
     monkeypatch.setattr(voice_routes, "LogosClient", _FakeLogosClient)
     with pytest.raises(ValueError, match="conversation_id is required"):
-        voice_routes._chat("вопрос", None, "logos-runtime")
+        voice_routes._chat("вопрос", None, "yandexgpt-5-lite")
     monkeypatch.setattr(_FakeLogosClient, "reply", "")
     with pytest.raises(RuntimeError, match="no text response"):
-        voice_routes._chat("вопрос", "conv-1", "logos-runtime")
+        voice_routes._chat("вопрос", "conv-1", "yandexgpt-5-lite")

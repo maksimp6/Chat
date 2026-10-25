@@ -24,9 +24,9 @@ class UltraProfilesTest(unittest.TestCase):
 
     def test_complete_registry_and_aliases(self):
         profiles = self.validate()
-        self.assertEqual(len(profiles), 14)
-        self.assertEqual(profiles["logos-runtime"]["upstream_id"], "logosai-llm")
-        self.assertEqual(profiles["logos-runtime-flash"]["upstream_id"], "logosai-llm-flash")
+        self.assertEqual(len(profiles), 7)
+        self.assertEqual(profiles["yandexgpt-5-lite"]["upstream_id"], "yandexgpt-lite")
+        self.assertEqual(profiles["gpt-oss-20b"]["upstream_id"], "gpt-oss-20b")
 
     def test_new_registry_model_requires_new_profile(self):
         self.registry["new-provider-model"] = {"type": "text"}
@@ -43,8 +43,8 @@ class UltraProfilesTest(unittest.TestCase):
             ultra.require_executable_profile(self.catalog, "typo", date(2026, 10, 24))
 
     def test_alias_uri_cannot_silently_point_at_another_model(self):
-        self.catalog["profiles"]["logos-runtime"]["model_uri_template"] = (
-            "gpt://${YANDEX_PROJECT_ID}/logosai-llm-flash/latest"
+        self.catalog["profiles"]["yandexgpt-5-lite"]["model_uri_template"] = (
+            "gpt://${YANDEX_PROJECT_ID}/gpt-oss-20b/latest"
         )
         with self.assertRaisesRegex(ultra.ProfileError, "URI mismatch"):
             self.validate()
@@ -63,7 +63,7 @@ class UltraProfilesTest(unittest.TestCase):
             {
                 "qwen3-235b-a22b-fp8",
                 "speech-realtime-250923",
-                "speech-realtime-260528",
+                "speech-realtime-250923",
             },
         )
         self.assertIsNone(self.catalog["policy"]["model_fallback"])
@@ -76,19 +76,19 @@ class UltraProfilesTest(unittest.TestCase):
             ultra.require_executable_profile(self.catalog, "gpt-oss-120b", date(2026, 10, 30))
 
     def test_guessed_hosted_output_ceiling_is_rejected(self):
-        p = self.catalog["profiles"]["logos-runtime"]
+        p = self.catalog["profiles"]["yandexgpt-5-lite"]
         p["output"]["documented_hosted_ceiling_tokens"] = p["context"]["window_tokens"]
         with self.assertRaisesRegex(ultra.ProfileError, "undocumented"):
             self.validate()
 
     def test_context_cannot_be_copied_to_outbound_output(self):
-        p = self.catalog["profiles"]["qwen3.6-35b-a3b"]
+        p = self.catalog["profiles"]["qwen3-235b-a22b-fp8"]
         p["wire_parameters"]["max_output_tokens"] = p["context"]["window_tokens"]
         with self.assertRaisesRegex(ultra.ProfileError, "guessed"):
             self.validate()
 
     def test_unknown_qwen_reasoning_wire_is_not_invented(self):
-        self.catalog["profiles"]["qwen3.6-35b-a3b"]["wire_parameters"]["reasoning"] = {
+        self.catalog["profiles"]["qwen3-235b-a22b-fp8"]["wire_parameters"]["reasoning"] = {
             "effort": "high"
         }
         with self.assertRaisesRegex(ultra.ProfileError, "unsupported reasoning"):
@@ -115,13 +115,13 @@ class UltraProfilesTest(unittest.TestCase):
             self.validate()
 
     def test_realtime_uses_its_own_maximum_selector(self):
-        p = self.validate()["speech-realtime-deepseek-v4-flash"]
+        p = self.validate()["speech-realtime-250923"]
         self.assertEqual(p["wire_parameters"]["session"]["max_output_tokens"], "inf")
         self.assertEqual(p["wire_parameters"]["session"]["yc_timeout_seconds"], 3600)
         self.assertIsNone(p["reasoning"]["supported"])
 
     def test_responses_fields_cannot_leak_into_realtime(self):
-        p = self.catalog["profiles"]["speech-realtime-deepseek-v4-flash"]
+        p = self.catalog["profiles"]["speech-realtime-250923"]
         p["wire_parameters"]["session"]["truncation"] = "disabled"
         with self.assertRaisesRegex(ultra.ProfileError, "foreign API"):
             self.validate()
@@ -132,7 +132,7 @@ class UltraProfilesTest(unittest.TestCase):
         with self.assertRaisesRegex(ultra.ProfileError, "retries"):
             self.validate()
         self.catalog = bad
-        self.catalog["profiles"]["logos-runtime"]["context"]["overflow"] = "truncate"
+        self.catalog["profiles"]["yandexgpt-5-lite"]["context"]["overflow"] = "truncate"
         with self.assertRaises(ultra.ProfileError):
             self.validate()
 

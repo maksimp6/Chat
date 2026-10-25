@@ -676,7 +676,7 @@ def test_dialogue_uses_native_tools_and_repository_rules_without_extra_call_caps
 
     assert result["status"] == "completed"
     request = client.calls[0]
-    assert request["model_key"] == dialogue.DEFAULT_MODEL == "deepseek-v4.1-flash"
+    assert request["model_key"] == dialogue.DEFAULT_MODEL == "gpt-oss-20b"
     assert "Вопрос пользователя" in request["message"]
     assert "Use the existing runtime and report actual evidence." in request["message"]
     from tool_providers.registry import registry

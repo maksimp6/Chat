@@ -53,8 +53,8 @@ function items(document) {
 }
 
 const CONVERSATIONS = [
-  { id: "c1", title: "Первый", model: "logos-runtime" },
-  { id: "c2", title: "Второй", model: "logos-runtime" },
+  { id: "c1", title: "Первый", model: "yandexgpt-5-lite" },
+  { id: "c2", title: "Второй", model: "yandexgpt-5-lite" },
 ];
 
 test("sidebar lists conversations and marks the current one active", () => {
