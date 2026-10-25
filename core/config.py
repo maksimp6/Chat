@@ -115,6 +115,56 @@ TEXT_MODELS = {
         "tool": 0.10,
         "output": 0.10,
     },
+    "logos-runtime": {
+        "name": "Alice AI LLM",
+        "upstream": "aliceai-llm",
+        "type": "text",
+        "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
+        "input": 0.50,
+        "cached": 0.50,
+        "tool": 0.13,
+        "output": 1.20,
+    },
+    "logos-runtime-flash": {
+        "name": "Alice AI LLM Flash",
+        "upstream": "aliceai-llm-flash",
+        "type": "text",
+        "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
+        "input": 0.10,
+        "cached": 0.025,
+        "tool": 0.025,
+        "output": 0.20,
+    },
+    "deepseek-v4.1-flash": {
+        "name": "DeepSeek V4.1 Flash",
+        "type": "text",
+        "capabilities": {"tools": True, "function_calling": True, "multimodal": None},
+        "context_window": 1048576,
+        # Yandex common-instance RUB/1000 tokens. Hosted tool/session charges are additional.
+        "input": 0.30,
+        "cached": 0.075,
+        "tool": 0.075,
+        "output": 0.50,
+    },
+    "deepseek-v4-flash": {
+        "name": "DeepSeek V4 Flash",
+        # Listed as deprecated on the Yandex model page, shutdown 2026-11-15.
+        "type": "text",
+        "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
+        "input": 0.30,
+        "cached": 0.075,
+        "tool": 0.075,
+        "output": 0.50,
+    },
+    "qwen3.6-35b-a3b": {
+        "name": "Qwen3.6 35B",
+        "type": "text",
+        "capabilities": {"tools": None, "function_calling": None, "multimodal": True},
+        "input": 0.20,
+        "cached": 0.05,
+        "tool": 0.05,
+        "output": 0.30,
+    },
 }
 
 VOICE_MODELS = {
@@ -128,6 +178,15 @@ VOICE_MODELS = {
         "cached": 0.20,
         "tool": 0.20,
         "output": 0.80,
+    },
+    "speech-realtime-deepseek-v4-flash": {
+        "name": "Speech Realtime DeepSeek V4 Flash",
+        "type": "voice",
+        "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
+        "input": 0.30,
+        "cached": 0.075,
+        "tool": 0.075,
+        "output": 0.50,
     },
 }
 

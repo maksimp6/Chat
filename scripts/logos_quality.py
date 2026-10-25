@@ -10,8 +10,8 @@ from __future__ import annotations
 from typing import Any
 
 MODEL = "gpt-oss-20b"
-CONTEXT_WINDOW = 1_048_576
-REQUESTED_OUTPUT_TOKENS = 393_216
+CONTEXT_WINDOW = 131_072
+REQUESTED_OUTPUT_TOKENS = 131_072
 OWNER_DIRECTIVE = (
     "Владелец поручил предоставить Логосу наилучшие доступные совместимые модель, "
     "рассуждение, контекст и инструменты. Качество порученной работы не снижать ради "

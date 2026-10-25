@@ -48,6 +48,36 @@
       "cached": 0.2,
       "tool": 0.2,
       "output": 0.8
+    },
+    "logos-runtime": {
+      "input": 0.5,
+      "cached": 0.5,
+      "tool": 0.13,
+      "output": 1.2
+    },
+    "logos-runtime-flash": {
+      "input": 0.1,
+      "cached": 0.025,
+      "tool": 0.025,
+      "output": 0.2
+    },
+    "deepseek-v4.1-flash": {
+      "input": 0.3,
+      "cached": 0.075,
+      "tool": 0.075,
+      "output": 0.5
+    },
+    "deepseek-v4-flash": {
+      "input": 0.3,
+      "cached": 0.075,
+      "tool": 0.075,
+      "output": 0.5
+    },
+    "qwen3.6-35b-a3b": {
+      "input": 0.2,
+      "cached": 0.05,
+      "tool": 0.05,
+      "output": 0.3
     }
   },
   "async_rub_per_1000_tokens": {
