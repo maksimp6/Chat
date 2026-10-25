@@ -34,10 +34,10 @@ def sanitize_for_log(obj):
     if isinstance(obj, list):
         return [sanitize_for_log(item) for item in obj]
     if isinstance(obj, str):
-        if len(obj) > _BINARY_THRESHOLD:
-            if obj.startswith("data:"):
-                return f"<DATA_URI MASKED: {len(obj)} chars>"
-            if _BASE64_RE.match(obj):
-                return f"<BASE64 MASKED: {len(obj)} chars>"
+        # Any data URI is binary content, however small: photos never reach logs or traces.
+        if obj.startswith("data:"):
+            return f"<DATA_URI MASKED: {len(obj)} chars>"
+        if len(obj) > _BINARY_THRESHOLD and _BASE64_RE.match(obj):
+            return f"<BASE64 MASKED: {len(obj)} chars>"
         return obj
     return obj

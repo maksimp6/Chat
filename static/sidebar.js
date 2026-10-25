@@ -147,6 +147,7 @@ function selectConv(id, updateHistory) {
   if (updateHistory === undefined) updateHistory = true;
   currentConvId = id;
   localStorage.setItem("current_conv_id", id);
+  window.dispatchEvent(new CustomEvent("logos:conversation-selected", { detail: { id: id } }));
   if (updateHistory) {
     var newUrl = new URL(window.location);
     newUrl.searchParams.set("conversation_id", id);

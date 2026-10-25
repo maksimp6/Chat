@@ -637,6 +637,13 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
+  // Photos are for the chat they were attached in; switching chats drops them.
+  window.addEventListener("logos:conversation-selected", function () {
+    if (!pendingImages.length) return;
+    pendingImages = [];
+    renderPendingImages();
+  });
+
   if (attachBtn && imageInput) {
     attachBtn.addEventListener("click", function () {
       imageInput.click();
@@ -680,9 +687,12 @@ document.addEventListener("DOMContentLoaded", function () {
     const sentImages = pendingImages.slice();
     pendingImages = [];
     renderPendingImages();
+    let imagesRestored = false;
     function restoreImages() {
-      if (pendingImages.length) return;
-      pendingImages = sentImages;
+      if (imagesRestored || !sentImages.length) return;
+      imagesRestored = true;
+      // Photos added while this send was pending stay in the tray, after the restored ones.
+      pendingImages = sentImages.concat(pendingImages).slice(0, MAX_IMAGES);
       renderPendingImages();
     }
     try {

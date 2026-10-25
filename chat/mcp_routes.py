@@ -361,7 +361,7 @@ def chat():
                 "trace_id": invocation.trace_id,
             }
         )
-        # After set_request: the trace keeps no image bytes, only the request fields above.
+        # Added after set_request, so the trace records the request fields without the photos.
         if images:
             params["input_images"] = images
 
