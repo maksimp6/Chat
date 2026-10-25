@@ -63,7 +63,6 @@ window.LogosTheme = {
 // Keys renamed in #1316; stored conversations may still carry the old names.
 const LEGACY_MODEL_KEYS = {
   "logosai-llm": "logos-runtime",
-  "logosai-llm-flash": "logos-runtime-flash",
 };
 
 const savedTheme = window.LogosTheme.getStored();

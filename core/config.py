@@ -94,41 +94,8 @@ TEXT_MODELS = {
         "tool": 0.20,
         "output": 0.20,
     },
-    "logos-runtime-flash": {
-        "name": "Logos Runtime Flash",
-        "upstream": "logosai-llm-flash",
-        "type": "text",
-        "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
-        "input": 0.10,
-        "cached": 0.025,
-        "tool": 0.025,
-        "output": 0.20,
-    },
-    "deepseek-v4.1-flash": {
-        "name": "DeepSeek V4.1 Flash",
-        "type": "text",
-        "capabilities": {"tools": True, "function_calling": True, "multimodal": None},
-        "context_window": 1048576,
-        # Yandex common-instance RUB/1000 tokens, checked 2026-10-22.
-        # Hosted tool/session charges are additional; this is not a billed total.
-        "input": 0.30,
-        "cached": 0.075,
-        "tool": 0.075,
-        "output": 0.50,
-    },
-    "deepseek-v4-flash": {
-        "name": "DeepSeek V4 Flash",
-        "type": "text",
-        "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
-        "input": 0.30,
-        "cached": 0.075,
-        "tool": 0.075,
-        "output": 0.50,
-    },
     "qwen3-235b-a22b-fp8": {
         "name": "Qwen3 235B A22B FP8",
-        # Retired by the provider on 2026-09-30: kept for accounting, not selectable.
-        "available": False,
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.50,
@@ -154,48 +121,17 @@ TEXT_MODELS = {
         "tool": 0.10,
         "output": 0.10,
     },
-    "qwen3.6-35b-a3b": {
-        "name": "Qwen3.6 35B A3B",
-        "type": "text",
-        "capabilities": {"tools": None, "function_calling": None, "multimodal": True},
-        "input": 0.20,
-        "cached": 0.05,
-        "tool": 0.05,
-        "output": 0.30,
-    },
 }
 
 VOICE_MODELS = {
-    "speech-realtime-260528": {
-        "name": "Speech Realtime 260528",
-        # Retired by the provider on 2026-10-12: kept for accounting, not selectable.
-        "available": False,
-        "type": "voice",
-        "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
-        "input": 0.10,
-        "cached": 0.025,
-        "tool": 0.025,
-        "output": 0.20,
-    },
     "speech-realtime-250923": {
         "name": "Speech Realtime 250923",
-        # Retired by the provider on 2026-10-12: kept for accounting, not selectable.
-        "available": False,
         "type": "voice",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.80,
         "cached": 0.20,
         "tool": 0.20,
         "output": 0.80,
-    },
-    "speech-realtime-deepseek-v4-flash": {
-        "name": "Speech Realtime DeepSeek V4 Flash",
-        "type": "voice",
-        "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
-        "input": 0.30,
-        "cached": 0.075,
-        "tool": 0.075,
-        "output": 0.50,
     },
 }
 
@@ -213,14 +149,10 @@ class Config:
     PORT = PORT
 
 
-# Keys renamed in #1316, and models the provider retired whose successor the project approved.
+# Keys renamed in #1316. Stored conversations and older clients may still send the old id.
 # Stored conversations and older clients may still send them: requests go to the successor.
 LEGACY_MODEL_KEYS = {
     "logosai-llm": "logos-runtime",
-    "logosai-llm-flash": "logos-runtime-flash",
-    "qwen3-235b-a22b-fp8": "qwen3.6-35b-a3b",
-    "speech-realtime-250923": "speech-realtime-deepseek-v4-flash",
-    "speech-realtime-260528": "speech-realtime-deepseek-v4-flash",
 }
 
 

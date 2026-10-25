@@ -229,7 +229,7 @@ def create_voice_session():
         session_id=uuid.uuid4().hex,
         owner_id=owner_id,
         conversation_id=conversation_id,
-        model=str(data.get("model") or "speech-realtime-deepseek-v4-flash"),
+        model=str(data.get("model") or "speech-realtime-250923"),
         voice=str(data.get("voice") or "filipp"),
         response_mode=str(data.get("response_mode") or "audio"),
     )

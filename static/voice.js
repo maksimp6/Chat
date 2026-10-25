@@ -323,8 +323,8 @@
     }
 
     var modelKey =
-      (typeof currentModel !== "undefined" ? currentModel : "speech-realtime-deepseek-v4-flash") ||
-      "speech-realtime-deepseek-v4-flash";
+      (typeof currentModel !== "undefined" ? currentModel : "speech-realtime-250923") ||
+      "speech-realtime-250923";
     isConnecting = true;
     setStatus("Подключение...");
     try {
