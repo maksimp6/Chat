@@ -1,0 +1,144 @@
+{
+  "schema_version": 3,
+  "device": "Redmi 9",
+  "browser": "Iceraven",
+  "scenario": "all_application_modals",
+  "runtime_revision": "782250c865faabd1adccef061710b3bcb5f03290",
+  "browser_revision": "782250c865faabd1adccef061710b3bcb5f03290",
+  "workflow_revision": "24a7224912db7e247153b80bc388eb1a492e2403",
+  "github_run_url": "https://github.com/maksimp6/Chat/actions/runs/40218542153",
+  "captured_at": "2026-10-25T17:52:47.063433+00:00",
+  "preparation": {
+    "method": "Android/kernel wakeup, insecure keyguard dismissal, browser VIEW intent",
+    "before": {
+      "screen_on": true,
+      "interactive": true,
+      "power_wakefulness": "Awake",
+      "power_display_state": "ON",
+      "global_display_state": "ON",
+      "window_policy_screen_on": true,
+      "window_policy_interactive": true,
+      "keyguard_showing": false,
+      "input_restricted": false,
+      "keyguard_secure": false,
+      "browser_foreground": true
+    },
+    "wake_attempts": [
+      {
+        "method": "Android KEYCODE_WAKEUP",
+        "awake": true
+      }
+    ],
+    "ready": {
+      "screen_on": true,
+      "interactive": true,
+      "power_wakefulness": "Awake",
+      "power_display_state": "ON",
+      "global_display_state": "ON",
+      "window_policy_screen_on": true,
+      "window_policy_interactive": true,
+      "keyguard_showing": false,
+      "input_restricted": false,
+      "keyguard_secure": false,
+      "browser_foreground": true
+    },
+    "navigation": {
+      "tag": "40218542153-1-1792950743215453300",
+      "requested_at_ms": 1792950743216.2642,
+      "document_time_origin_ms": 1792950743930,
+      "rdp_location_replace_used": false
+    }
+  },
+  "guard": {
+    "installed": true,
+    "read_only": true,
+    "redaction": "CSS masks before modal insertion; field values and response bodies are not read"
+  },
+  "files": [
+    {
+      "path": "98-starting-view.png",
+      "sha256": "d920a8f6f81779f0e56ffabe4ae642d3e265846b71938ba03cc998525817a294",
+      "size": 198097,
+      "root": "body",
+      "captured_at": "2026-10-25T17:52:29.124874+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "38-trace-top.png",
+      "sha256": "c97f27abdfd6fca0c74533cbd16ada8c3c4aa2a827b7e74fda8b5f4f51dc456b",
+      "size": 210842,
+      "root": ".logos-trace-window",
+      "captured_at": "2026-10-25T17:52:34.358976+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "39-trace-bottom.png",
+      "sha256": "e2b4dfa74bbb141037d4eefcd86e5c724658b8db7b9f88ef6d3221d66a01d7d4",
+      "size": 208675,
+      "root": ".logos-trace-window",
+      "captured_at": "2026-10-25T17:52:36.170992+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "40-trace-event-top.png",
+      "sha256": "d2c2fe280518fa2c50497fd0e2eeea86a4ff439b898e6f2ec5905db16840e35f",
+      "size": 206582,
+      "root": ".logos-trace-window",
+      "captured_at": "2026-10-25T17:52:42.290678+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "41-trace-event-bottom.png",
+      "sha256": "8b5947e6b577469b7e5c43080b7d398cb861e974ae7712b244bc1c38cebec1e8",
+      "size": 205806,
+      "root": ".logos-trace-window",
+      "captured_at": "2026-10-25T17:52:44.053386+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "all-modals-01.mp4",
+      "sha256": "05eab22b34c5b738f89ffbd66b79d69486c6d7f2d6a7410b1814a0dd3c4c3f91",
+      "size": 1746738
+    },
+    {
+      "path": "events.json",
+      "size": 13030,
+      "sha256": "be2f042be8a74cb7f2ac7397aff7af707dcd02fbcb1a543a0f13f2a7c7c7a57b"
+    }
+  ],
+  "modal_states": [
+    {
+      "name": "trace",
+      "root": ".logos-trace-window",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 1
+    },
+    {
+      "name": "trace-event",
+      "root": ".logos-trace-window",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 2
+    }
+  ],
+  "planned_states": 2,
+  "inventory_total": 21,
+  "start_index": 19,
+  "captured_states": 2,
+  "mutating_requests_transmitted": 0,
+  "limits": [
+    "DOM button clicks do not prove physical touch input",
+    "MP4 frame clock must be read for exact alignment",
+    "Each window is opened in a fresh document; close-button behavior is not certified by that isolation",
+    "Sensitive field values and raw trace text are masked; values are not validated",
+    "Cloud.ru IAM source is not loaded by the installed application template; no script was injected to fabricate that modal"
+  ]
+}
