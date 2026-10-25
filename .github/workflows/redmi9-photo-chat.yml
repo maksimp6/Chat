@@ -19,10 +19,11 @@ jobs:
         timeout-minutes: 10
         env:
           MODEL: qwen3.6-35b-a3b
+          PHOTO_DIR: ${{ runner.temp }}
         run: |
           set -euo pipefail
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
-          photo="$RUNNER_TEMP/photo.png"
+          photo="$PHOTO_DIR/photo.png"
           curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 60 \
             "https://media.githubusercontent.com/media/maksimp6/Chat/$GITHUB_SHA/docs/screenshots/logos/2026-10-25/run-40212418021-1/18-chat-bottom.png" \
             -o "$photo"
