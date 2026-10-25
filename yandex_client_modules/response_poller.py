@@ -3,6 +3,14 @@
 import json
 import time
 
+# Short answers keep a 3-second poll so they arrive promptly. Only long background jobs
+# poll less often; a 30-second cap from the start delayed finished answers by up to 30 s.
+SHORT_WAIT_SECONDS = 120
+
+
+def poll_delay_cap(elapsed):
+    return 3 if elapsed < SHORT_WAIT_SECONDS else 15
+
 
 def wait_for_response(
     *,
@@ -39,7 +47,7 @@ def wait_for_response(
                         },
                     )
                 time.sleep(delay)
-                delay = min(delay * 1.5, 30)
+                delay = min(delay * 1.5, poll_delay_cap(time.time() - start))
                 continue
             resp.raise_for_status()
             data = resp.json()
@@ -56,7 +64,7 @@ def wait_for_response(
                     },
                 )
             time.sleep(delay)
-            delay = min(delay * 1.5, 30)
+            delay = min(delay * 1.5, poll_delay_cap(time.time() - start))
             continue
 
         poll_end = time.time()
@@ -92,7 +100,7 @@ def wait_for_response(
             return data
 
         time.sleep(delay)
-        delay = min(delay * 1.5, 30)
+        delay = min(delay * 1.5, poll_delay_cap(time.time() - start))
 
     if execution_trace is not None:
         execution_trace.add_event(
