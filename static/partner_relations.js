@@ -132,7 +132,7 @@
                 })
                 .then(showDetails)
                 .catch(function (err) {
-                  alert("Ошибка: " + err.message);
+                  LogosToast.show("Ошибка: " + err.message);
                 });
             };
             list.appendChild(row);
@@ -194,7 +194,7 @@
             });
           })
           .catch(function (err) {
-            alert("Ошибка: " + err.message);
+            LogosToast.show("Ошибка: " + err.message);
           });
       };
       detail.appendChild(status);
@@ -273,7 +273,7 @@
                 });
               })
               .catch(function (err) {
-                alert("Ошибка: " + err.message);
+                LogosToast.show("Ошибка: " + err.message);
               });
           };
           line.appendChild(done);
@@ -307,7 +307,7 @@
           return load();
         })
         .catch(function (err) {
-          alert("Ошибка: " + err.message);
+          LogosToast.show("Ошибка: " + err.message);
         })
         .finally(function () {
           create.disabled = false;

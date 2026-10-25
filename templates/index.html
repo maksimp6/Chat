@@ -21,6 +21,7 @@
     </script>
     {% set static_root = (preview_base_path ~ "/static") if preview_base_path else "/static" %}
     <link rel="stylesheet" href="{{ static_root }}/style.css?v={{ static_version }}" />
+    <link rel="stylesheet" href="{{ static_root }}/toast.css?v={{ static_version }}" />
     <link
       rel="icon"
       type="image/svg+xml"
@@ -41,6 +42,7 @@
       defer
       data-critical-script="core-api"
     ></script>
+    <script src="{{ static_root }}/toast.js?v={{ static_version }}" defer></script>
     <script
       src="{{ static_root }}/ui_runtime.js?v={{ static_version }}"
       defer

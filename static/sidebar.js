@@ -93,12 +93,12 @@ function renderSidebar() {
               localStorage.setItem("conversations", JSON.stringify(conversations));
               renderSidebar();
             } else {
-              alert("Ошибка переименования: " + (data.error || "Неизвестная ошибка"));
+              LogosToast.show("Ошибка переименования: " + (data.error || "Неизвестная ошибка"));
             }
           })
           .catch((err) => {
             console.error("[SIDEBAR] Rename error:", err);
-            alert("Ошибка сети при переименовании");
+            LogosToast.show("Ошибка сети при переименовании");
           });
       }
     });
@@ -117,7 +117,7 @@ function renderSidebar() {
           })
           .catch((err) => {
             console.error("[SIDEBAR] Delete error:", err);
-            alert("Ошибка сети при удалении");
+            LogosToast.show("Ошибка сети при удалении");
           });
       }
     });
