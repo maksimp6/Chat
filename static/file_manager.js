@@ -227,7 +227,7 @@ window.fetchVectorStores = function () {
               button.disabled = false;
               button.textContent = originalText;
               button.textContent = "Удалить";
-              LogosToast.error("Ошибка: " + error.message);
+              LogosToast.error("Не удалось удалить. Попробуйте ещё раз.");
             });
         });
       });
@@ -284,7 +284,7 @@ window.fetchVectorStores = function () {
           loadVsList();
         })
         .catch(function (e) {
-          LogosToast.error("Ошибка: " + e.message);
+          LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
         })
         .finally(function () {
           var btn = document.getElementById("btn-create-vs");
@@ -415,7 +415,7 @@ window.fetchVectorStores = function () {
             loadVsList();
           })
           .catch(function (e) {
-            LogosToast.error("Ошибка: " + e.message);
+            LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
           })
           .finally(function () {
             if (!document.getElementById("vs-add-confirm")) return;
@@ -524,7 +524,7 @@ window.fetchVectorStores = function () {
                 })
                 .catch(function (e) {
                   restoreDeleteBtn();
-                  LogosToast.error("Ошибка сети: " + e.message);
+                  LogosToast.error("Ошибка сети. Проверьте соединение.");
                 });
             });
           });

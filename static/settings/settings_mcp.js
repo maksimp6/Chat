@@ -125,7 +125,7 @@
               refreshList();
             })
             .catch(function (e) {
-              LogosToast.error("Ошибка: " + e);
+              LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
             });
         });
       });
@@ -284,7 +284,7 @@
           })
           .catch(function (e) {
             saveBtn.disabled = false;
-            LogosToast.error("Ошибка: " + e.message);
+            LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
           });
       });
     }

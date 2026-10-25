@@ -132,7 +132,7 @@
                 })
                 .then(showDetails)
                 .catch(function (err) {
-                  LogosToast.error("Ошибка: " + err.message);
+                  LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
                 });
             };
             list.appendChild(row);
@@ -194,7 +194,7 @@
             });
           })
           .catch(function (err) {
-            LogosToast.error("Ошибка: " + err.message);
+            LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
           });
       };
       detail.appendChild(status);
@@ -273,7 +273,7 @@
                 });
               })
               .catch(function (err) {
-                LogosToast.error("Ошибка: " + err.message);
+                LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
               });
           };
           line.appendChild(done);
@@ -307,7 +307,7 @@
           return load();
         })
         .catch(function (err) {
-          LogosToast.error("Ошибка: " + err.message);
+          LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
         })
         .finally(function () {
           create.disabled = false;

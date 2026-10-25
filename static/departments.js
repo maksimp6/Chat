@@ -77,7 +77,7 @@
                 row.querySelector("span").textContent = "Сессия: " + result.data.session.id;
               })
               .catch(function (error) {
-                LogosToast.error("Ошибка: " + error.message);
+                LogosToast.error("Не удалось начать сессию. Попробуйте ещё раз.");
               });
           };
           list.appendChild(row);
