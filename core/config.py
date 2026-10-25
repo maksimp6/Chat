@@ -88,6 +88,8 @@ TEXT_MODELS = {
         "output": 0.20,
     },
     "qwen3-235b-a22b-fp8": {
+        # Retired by the provider (2026-09-30): kept for accounting, not selectable.
+        "available": False,
         "name": "Qwen3 235B",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
@@ -118,6 +120,8 @@ TEXT_MODELS = {
 
 VOICE_MODELS = {
     "speech-realtime-250923": {
+        # Retired by the provider (2026-10-12): kept for accounting, not selectable.
+        "available": False,
         "name": "speech-realtime-250923",
         "type": "voice",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},

@@ -42,7 +42,7 @@ jobs:
           if [ -d "$backups" ]; then
             ls -1t "$backups"/*.memory 2>/dev/null | tail -n +2 | xargs -r rm -f
           fi
-          find . -maxdepth 1 -name '.logos-*' -type d -mmin +10 -exec rm -rf {} +
+          find . -maxdepth 1 \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' \) -type d -mmin +60 -exec rm -rf {} +
           bash scripts/redmi_app_server.sh deploy
 
   screenshots:
@@ -60,7 +60,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
-          find . -maxdepth 1 -name '.logos-*' -type d -mmin +10 -exec rm -rf {} +
+          find . -maxdepth 1 \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' \) -type d -mmin +60 -exec rm -rf {} +
           capture_job_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-screenshots-", dir=".")).resolve())')
           export RUNNER_TEMP="$capture_job_temp"
           export TMPDIR="$capture_job_temp"

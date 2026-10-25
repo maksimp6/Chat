@@ -280,7 +280,7 @@
       "model_key": "qwen3-235b-a22b-fp8",
       "upstream_id": "qwen3-235b-a22b-fp8",
       "kind": "text",
-      "status": "prepared_not_activated",
+      "status": "blocked_retired",
       "transport": "responses",
       "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/qwen3-235b-a22b-fp8/latest",
       "lifecycle": {
@@ -512,7 +512,7 @@
       "model_key": "speech-realtime-250923",
       "upstream_id": "speech-realtime-250923",
       "kind": "voice",
-      "status": "prepared_not_activated",
+      "status": "blocked_retired",
       "transport": "realtime",
       "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/speech-realtime-250923",
       "lifecycle": {
