@@ -513,7 +513,7 @@ def chat():
             str(reply),
             cost=cost,
             timings=timings,
-            trace=trace_data,
+            trace={"trace_id": invocation.trace_id, "invocation_id": invocation.invocation_id, "storage": "invocation"},
         )
         finish_invocation(
             invocation.invocation_id,
@@ -628,7 +628,7 @@ def chat():
             if invocation is not None:
                 persist_invocation_trace(invocation.invocation_id, trace_data)
             if can_write:
-                add_message(conv_id, "assistant", reply, trace=trace_data, source="error")
+                add_message(conv_id, "assistant", reply, trace={"trace_id": invocation.trace_id, "invocation_id": invocation.invocation_id, "storage": "invocation"} if invocation else {}, source="error")
             if invocation is not None:
                 fail_invocation(invocation.invocation_id, error={"message": error_message})
 
