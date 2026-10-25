@@ -234,7 +234,21 @@ def index():
 
 @app.route("/healthz", methods=["GET"])
 def healthz():
-    return jsonify({"status": "ok"})
+    """Process liveness only; it does not certify chat persistence or model access."""
+    return jsonify({"status": "ok", "scope": "process", "chat_verified": False})
+
+
+@app.route("/readyz", methods=["GET"])
+def readyz():
+    """Read-only storage readiness; a successful read is not a chat E2E proof."""
+    try:
+        if not _storage_ready:
+            _initialize_storage()
+        get_store().get("chat/next-message-id")
+    except Exception:
+        app.logger.exception("Storage readiness failed")
+        return jsonify({"status": "unavailable", "scope": "storage_read"}), 503
+    return jsonify({"status": "ok", "scope": "storage_read", "chat_write_verified": False})
 
 
 @app.route("/api/version", methods=["GET"])
