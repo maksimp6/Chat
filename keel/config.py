@@ -1,6 +1,5 @@
 """Config loading and validation for Keel Platform."""
 
-import json
 import re
 from pathlib import Path
 from typing import Any, Dict, Set
@@ -52,10 +51,7 @@ def _validate_no_plaintext_secrets(
                     _validate_no_plaintext_secrets(item, f"{path}.{key}[{i}]", is_secrets_file)
         elif isinstance(value, str):
             # In secrets section, only refs are allowed
-            if is_secrets_file and not value.startswith("logos/"):
-                raise ConfigError(f"Plaintext secret detected at {path}.{key}")
-            # Everywhere, check for secret patterns
-            elif _is_secret_pattern(value):
+            if is_secrets_file and not value.startswith("logos/") or _is_secret_pattern(value):
                 raise ConfigError(f"Plaintext secret detected at {path}.{key}")
 
 
@@ -210,7 +206,7 @@ def validate_service_references(
             if isinstance(lane_services, list):
                 deployed_services.update(lane_services)
 
-    for service_name in services.keys():
+    for service_name in services:
         if service_name not in deployed_services:
             raise ConfigError(f"Service '{service_name}' not deployed in any lane")
 
@@ -289,7 +285,7 @@ def load_config(config_dir: Path) -> Dict[str, Any]:
     # Load platform.yaml (required)
     platform_file = config_dir / "platform.yaml"
     if not platform_file.exists():
-        raise ConfigError(f"Missing required file: platform.yaml")
+        raise ConfigError("Missing required file: platform.yaml")
 
     with open(platform_file) as f:
         platform_data = yaml.safe_load(f) or {}

@@ -183,7 +183,7 @@ def write_file(args: dict) -> dict:
         old_content = ""
         if os.path.isfile(abs_path):
             try:
-                with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
+                with open(abs_path, encoding="utf-8", errors="replace") as f:
                     old_content = f.read()
                 # Created on first use: importing this module must not create directories.
                 os.makedirs(BACKUP_DIR, exist_ok=True)
@@ -238,7 +238,7 @@ def apply_patch(args: dict, cfg: dict = None) -> dict:
         if not os.path.isfile(abs_path):
             return {"success": False, "error": f"Файл не найден: {path}"}
 
-        with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(abs_path, encoding="utf-8", errors="replace") as f:
             content = f.read()
 
         if search_text not in content:
@@ -262,7 +262,7 @@ def python_ast_outline(args: dict) -> dict:
         if not os.path.isfile(abs_path):
             return {"error": f"Файл '{path}' не найден"}
 
-        with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(abs_path, encoding="utf-8", errors="replace") as f:
             code = f.read()
 
         try:
@@ -644,7 +644,7 @@ def grep_search(args: dict) -> dict:
                 rel_path = os.path.relpath(file_path, BASE_DIR)
                 try:
                     file_path = _get_abs_path(rel_path)
-                    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    with open(file_path, encoding="utf-8", errors="ignore") as f:
                         for line_num, line in enumerate(f, start=1):
                             if regex.search(line):
                                 results.append(

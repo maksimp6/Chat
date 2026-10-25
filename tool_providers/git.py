@@ -158,13 +158,12 @@ def _run_git(args: list, cfg: dict = None, repo_name: str = None, is_read: bool 
                 "output": out or "(успешно)",
                 "is_bare": is_bare,
             }
-        else:
-            return {
-                "success": False,
-                "repo": rel_name,
-                "error": err or out or f"Код: {res.returncode}",
-                "is_bare": is_bare,
-            }
+        return {
+            "success": False,
+            "repo": rel_name,
+            "error": err or out or f"Код: {res.returncode}",
+            "is_bare": is_bare,
+        }
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -267,11 +266,11 @@ def git_remote(args: dict, cfg: dict) -> dict:
             return {"success": False, "error": "URL не может начинаться с '-'"}
     if action == "add":
         return _run_git(["remote", "add", name, url], cfg, repo, is_read=False)
-    elif action == "set_url":
+    if action == "set_url":
         return _run_git(["remote", "set-url", name, url], cfg, repo, is_read=False)
-    elif action == "remove":
+    if action == "remove":
         return _run_git(["remote", "remove", name], cfg, repo, is_read=False)
-    elif action == "show":
+    if action == "show":
         return _run_git(["remote", "show", name], cfg, repo, is_read=True)
     return {"success": False, "error": f"Неизвестное действие: {action}"}
 
