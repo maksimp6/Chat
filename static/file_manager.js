@@ -227,7 +227,7 @@ window.fetchVectorStores = function () {
               button.disabled = false;
               button.textContent = originalText;
               button.textContent = "Удалить";
-              LogosToast.show("Ошибка: " + error.message);
+              LogosToast.error("Ошибка: " + error.message);
             });
         });
       });
@@ -266,7 +266,7 @@ window.fetchVectorStores = function () {
     document.getElementById("btn-create-vs").addEventListener("click", function () {
       var name = document.getElementById("vs-name-input").value.trim();
       if (!name) {
-        LogosToast.show("Введите название");
+        LogosToast.error("Введите название");
         return;
       }
       this.disabled = true;
@@ -284,7 +284,7 @@ window.fetchVectorStores = function () {
           loadVsList();
         })
         .catch(function (e) {
-          LogosToast.show("Ошибка: " + e.message);
+          LogosToast.error("Ошибка: " + e.message);
         })
         .finally(function () {
           var btn = document.getElementById("btn-create-vs");
@@ -389,7 +389,7 @@ window.fetchVectorStores = function () {
           checked.push(chk.value);
         });
         if (checked.length === 0) {
-          LogosToast.show("Выберите файлы");
+          LogosToast.error("Выберите файлы");
           return;
         }
 
@@ -415,7 +415,7 @@ window.fetchVectorStores = function () {
             loadVsList();
           })
           .catch(function (e) {
-            LogosToast.show("Ошибка: " + e.message);
+            LogosToast.error("Ошибка: " + e.message);
           })
           .finally(function () {
             if (!document.getElementById("vs-add-confirm")) return;
@@ -519,12 +519,12 @@ window.fetchVectorStores = function () {
                     }
                   } else {
                     restoreDeleteBtn();
-                    LogosToast.show("Ошибка: " + (res.error || "неизвестно"));
+                    LogosToast.error("Ошибка: " + (res.error || "неизвестно"));
                   }
                 })
                 .catch(function (e) {
                   restoreDeleteBtn();
-                  LogosToast.show("Ошибка сети: " + e.message);
+                  LogosToast.error("Ошибка сети: " + e.message);
                 });
             });
           });

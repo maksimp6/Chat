@@ -2,6 +2,8 @@
   "use strict";
 
   var HIDE_AFTER_MS = 4000;
+  // Errors stay long enough to read and can be dismissed by a click.
+  var ERROR_HIDE_AFTER_MS = 8000;
   var REMOVE_AFTER_MS = 300;
   var stack = null;
 
@@ -22,14 +24,22 @@
     item.setAttribute("role", isError ? "alert" : "status");
     item.textContent = message == null ? "" : String(message);
     ensureStack().appendChild(item);
+    item.addEventListener("click", function () {
+      item.remove();
+    });
     setTimeout(function () {
       item.classList.add("logos-toast-hide");
       setTimeout(function () {
         item.remove();
       }, REMOVE_AFTER_MS);
-    }, HIDE_AFTER_MS);
+    }, isError ? ERROR_HIDE_AFTER_MS : HIDE_AFTER_MS);
     return item;
   }
 
-  window.LogosToast = { show: show };
+  window.LogosToast = {
+    show: show,
+    error: function (message) {
+      return show(message, { type: "error" });
+    },
+  };
 })();

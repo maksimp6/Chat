@@ -125,7 +125,7 @@
               refreshList();
             })
             .catch(function (e) {
-              LogosToast.show("Ошибка: " + e);
+              LogosToast.error("Ошибка: " + e);
             });
         });
       });
@@ -262,7 +262,7 @@
         if (!payload.authorization) delete payload.authorization;
         if (!payload.headers) delete payload.headers;
         if (!payload.name || (!payload.server_url && !payload.connector_id)) {
-          LogosToast.show("Заполните название и URL/Connector");
+          LogosToast.error("Заполните название и URL/Connector");
           return;
         }
         var method = isNew ? "POST" : "PUT";
@@ -284,7 +284,7 @@
           })
           .catch(function (e) {
             saveBtn.disabled = false;
-            LogosToast.show("Ошибка: " + e.message);
+            LogosToast.error("Ошибка: " + e.message);
           });
       });
     }

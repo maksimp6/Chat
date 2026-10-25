@@ -89,7 +89,7 @@
       defer(function () {
         setButtonState(button, "⇩ JSON", false);
       }, 1600);
-      LogosToast.show(error.message || "Не удалось подготовить трейс");
+      LogosToast.error(error.message || "Не удалось подготовить трейс");
     }
   }
 
@@ -98,7 +98,7 @@
     try {
       payload = buildPayload();
     } catch (error) {
-      LogosToast.show(error.message || "Не удалось подготовить трейс");
+      LogosToast.error(error.message || "Не удалось подготовить трейс");
       return;
     }
 
@@ -129,7 +129,7 @@
       })
       .catch(function (error) {
         var reason = error instanceof TypeError ? "нет связи с сервером" : error.message;
-        LogosToast.show("Не удалось загрузить трейс: " + reason);
+        LogosToast.error("Не удалось загрузить трейс: " + reason);
       })
       .finally(function () {
         var currentButton = document.getElementById(uploadButtonId);

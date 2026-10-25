@@ -399,7 +399,7 @@ function addMessage(
       .then(() => navigator.clipboard.writeText(text))
       .then(
         () => window.LogosToast.show("Скопировано"),
-        () => window.LogosToast.show("Не удалось скопировать", { type: "error" }),
+        () => window.LogosToast.error("Не удалось скопировать"),
       );
   });
   actions.appendChild(copyBtn);
