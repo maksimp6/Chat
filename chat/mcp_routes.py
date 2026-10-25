@@ -318,6 +318,8 @@ def chat():
         conv_id = data.get("conversation_id")
         session_id = data.get("session_id") or conv_id
         message = data.get("message")
+        # A retry re-runs the last message already stored, so it must not store that message twice.
+        retry = bool(data.get("retry"))
         raw_params = data.get("params")
         params = dict(raw_params) if isinstance(raw_params, dict) else {}
         role = data.get("role") or params.pop("role", None)
@@ -403,7 +405,8 @@ def chat():
         if active_tools is not None:
             params["active_tool_categories"] = active_tools
 
-        add_message(invocation.conversation_id, "user", message)
+        if not retry:
+            add_message(invocation.conversation_id, "user", message)
         conversation_title = maybe_update_conversation_title(
             invocation.conversation_id,
             message,
@@ -601,7 +604,7 @@ def chat():
             if invocation is not None:
                 persist_invocation_trace(invocation.invocation_id, trace_data)
             if can_write:
-                add_message(conv_id, "assistant", reply, trace=trace_data)
+                add_message(conv_id, "assistant", reply, trace=trace_data, source="error")
             if invocation is not None:
                 fail_invocation(invocation.invocation_id, error={"message": error_message})
 

@@ -142,6 +142,7 @@ def get_messages(conv_id: str) -> list[dict[str, Any]]:
             "created_at": item["created_at"],
             "timings": item["timings"],
             "trace": item["trace"],
+            "source": item.get("source"),
         }
         for item in sorted(records, key=lambda item: item["id"])
     ]
@@ -181,6 +182,7 @@ def add_message(
                 "created_at": now,
                 "timings": timings or [],
                 "trace": trace or {},
+                "source": source,
             },
         )
         tx.set(key, {**record, "updated_at": now})

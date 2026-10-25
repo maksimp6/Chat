@@ -369,8 +369,6 @@ body {
   background: var(--bg-bubble-bot);
   color: var(--text-bubble-bot);
   border-bottom-left-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  border: 1px solid var(--border-color);
 }
 .logos-pro-app .msg.error {
   align-self: flex-start;
@@ -382,16 +380,42 @@ body {
 
 .logos-pro-app .billing-bubble {
   display: inline-block;
-  margin-top: 4px;
-  padding: 2px 8px;
-  background: rgba(0, 0, 0, 0.05);
   color: var(--text-secondary);
-  border-radius: 4px;
   font-size: 12px;
-  font-family: monospace;
 }
-[data-theme="dark"] .logos-pro-app .billing-bubble {
-  background: rgba(255, 255, 255, 0.1);
+
+/* Copy and retry sit beside the answer; diagnostics fold into one line under it. */
+.logos-pro-app .msg-actions {
+  position: absolute;
+  top: -10px;
+  right: -6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.logos-pro-app .msg:hover .msg-actions,
+.logos-pro-app .msg-actions:focus-within {
+  opacity: 1;
+}
+@media (hover: none) {
+  .logos-pro-app .msg-actions {
+    opacity: 1;
+  }
+}
+.logos-pro-app .copy-btn {
+  margin-left: 0;
+}
+.logos-pro-app .msg-retry-btn {
+  margin-top: 6px;
+  font-size: 13px;
+}
+.logos-pro-app .msg-details {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.logos-pro-app .msg-details-summary {
+  cursor: pointer;
+  list-style: none;
 }
 
 /* Voice UI */
@@ -1223,15 +1247,12 @@ body {
 
 .logos-pro-app .msg-meta-details {
   font-size: 12px;
-  background: var(--chip-bg);
-  border-radius: 6px;
-  padding: 3px 8px;
   cursor: pointer;
   color: var(--text-secondary);
 }
 
 .logos-pro-app .msg-meta-summary {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .logos-pro-app .msg-meta-detail-list {
@@ -1993,21 +2014,6 @@ body {
 .logos-pro-app .execution-surface {
   flex-basis: 100%;
   width: 100%;
-}
-/* Подпись роли над пузырём: «Вы» или «Logos» (пункт 18) */
-.logos-pro-app .msg.user::before {
-  content: "Вы";
-  display: block;
-  font-size: 12px;
-  color: var(--text-bubble-user);
-  margin-bottom: 4px;
-}
-.logos-pro-app .msg.bot::before {
-  content: "Logos";
-  display: block;
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-bottom: 4px;
 }
 
 /* Шапка, сайдбар и безопасные зоны (пункты 54, 55, 57, 59, 60) */

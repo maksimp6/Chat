@@ -320,6 +320,22 @@ function findRenderedMessage(chatbox, messageId) {
   );
 }
 
+// Folds the per-message diagnostics into one line, so the answer keeps the focus.
+function buildDetails(content, usage, totalDurationMs, cost) {
+  const parts = [];
+  if (usage && usage.total_tokens) parts.push(`${usage.total_tokens} токенов`);
+  if (cost && cost > 0) parts.push(`≈ ${cost.toFixed(2)} ₽`);
+  if (totalDurationMs) parts.push(`${(totalDurationMs / 1000).toFixed(1)} с`);
+  const details = document.createElement("details");
+  details.className = "msg-details";
+  const summary = document.createElement("summary");
+  summary.className = "msg-details-summary";
+  summary.textContent = parts.length ? "Детали · " + parts.join(" · ") : "Детали";
+  details.appendChild(summary);
+  details.appendChild(content);
+  return details;
+}
+
 function addMessage(
   text,
   role,
@@ -355,24 +371,39 @@ function addMessage(
   bubble.innerHTML = htmlContent;
   msg.appendChild(bubble);
 
+  if (uiRole === "error" && options && typeof options.onRetry === "function") {
+    const retryBtn = document.createElement("button");
+    retryBtn.type = "button";
+    retryBtn.className = "logos-btn msg-retry-btn";
+    retryBtn.textContent = "Повторить";
+    retryBtn.addEventListener("click", function () {
+      retryBtn.disabled = true;
+      options.onRetry();
+    });
+    msg.appendChild(retryBtn);
+  }
+
+  // Copy sits over the bubble corner, so it takes no row of its own.
+  const actions = document.createElement("div");
+  actions.className = "msg-actions";
   const copyBtn = document.createElement("button");
+  copyBtn.type = "button";
   copyBtn.className = "logos-btn copy-btn";
   copyBtn.textContent = "📋";
   copyBtn.title = "Копировать";
+  copyBtn.setAttribute("aria-label", "Копировать сообщение");
 
   copyBtn.addEventListener("click", function () {
     // A denied or missing clipboard must show a result, not an unhandled rejection.
     Promise.resolve()
       .then(() => navigator.clipboard.writeText(text))
       .then(
-        () => (copyBtn.textContent = "✅"),
-        () => (copyBtn.textContent = "⚠️"),
-      )
-      .then(() => {
-        window.LogosCoreAPI.scheduler.defer(() => (copyBtn.textContent = "📋"), 2000);
-      });
+        () => window.LogosToast.show("Скопировано"),
+        () => window.LogosToast.show("Не удалось скопировать", { type: "error" }),
+      );
   });
-  msg.appendChild(copyBtn);
+  actions.appendChild(copyBtn);
+  msg.appendChild(actions);
 
   const metaWrap = document.createElement("div");
   metaWrap.className = "msg-meta";
@@ -525,7 +556,7 @@ function addMessage(
     }
   }
 
-  if (metaWrap.children.length > 0) msg.appendChild(metaWrap);
+  if (metaWrap.children.length > 0) msg.appendChild(buildDetails(metaWrap, usage, totalDurationMs, cost));
   chatbox.appendChild(msg);
   chatbox.scrollTop = chatbox.scrollHeight;
   return msg;
@@ -548,7 +579,7 @@ function loadHistory(convId) {
         (data.messages || []).forEach((msg) => {
           const node = addMessage(
             msg.text,
-            msg.role,
+            msg.source === "error" ? "error" : msg.role,
             false,
             msg.cost || 0,
             msg.timings,
@@ -675,11 +706,17 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  async function sendMessage() {
+  function sendMessage() {
+    return sendTurn(null);
+  }
+
+  // retryRequest is { text, conversationId } when «Повторить» re-sends a failed message.
+  async function sendTurn(retryRequest) {
     if (!input) return;
-    const rawText = input.value;
-    const text = rawText.trim();
+    const rawText = retryRequest ? "" : input.value;
+    const text = retryRequest ? retryRequest.text : rawText.trim();
     if (!text) return;
+    if (retryRequest && currentConvId !== retryRequest.conversationId) return;
     const selectedAtSubmit = currentConvId;
     if (selectedAtSubmit ? pendingConversations.has(selectedAtSubmit) : creatingConversation) return;
 
@@ -689,9 +726,11 @@ document.addEventListener("DOMContentLoaded", function () {
     else pendingConversations.add(turn.conversationId);
     let typingEl = null;
     // Photos belong to this message only; they return to the tray if the send fails.
-    const sentImages = pendingImages.slice();
-    pendingImages = [];
-    renderPendingImages();
+    const sentImages = retryRequest ? [] : pendingImages.slice();
+    if (!retryRequest) {
+      pendingImages = [];
+      renderPendingImages();
+    }
     let imagesRestored = false;
     function restoreImages() {
       if (imagesRestored || !sentImages.length) return;
@@ -714,13 +753,16 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       if (currentConvId === turn.conversationId) {
-        if (input.value === rawText) input.value = "";
-        addMessage(
-          sentImages.length ? turn.text + " · фото: " + sentImages.length : turn.text,
-          "user",
-          false,
-          0,
-        );
+        // A retry already has its user message in the chat, so it is not painted twice.
+        if (!retryRequest) {
+          if (input.value === rawText) input.value = "";
+          addMessage(
+            sentImages.length ? turn.text + " · фото: " + sentImages.length : turn.text,
+            "user",
+            false,
+            0,
+          );
+        }
         const chatbox = document.getElementById("chatbox");
         typingEl = document.createElement("div");
         typingEl.className = "typing";
@@ -734,6 +776,7 @@ document.addEventListener("DOMContentLoaded", function () {
         body: JSON.stringify({
           message: turn.text,
           conversation_id: turn.conversationId,
+          retry: Boolean(retryRequest),
           model: turn.model,
           params: turn.params,
           attachments: sentImages.map(function (image) {
@@ -760,12 +803,20 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       // The backend persists this turn; never paint its late answer into a different conversation.
       if (currentConvId !== turn.conversationId) return;
-      if (data.reply) {
+      if (data.error) {
+        restoreImages();
+        addMessage(data.reply || "⚠️ Ошибка: " + data.error, "error", false, data.cost || 0, data.timings,
+          clientTotalMs, data.reasoning, data.usage, data.trace, {
+            onRetry: function () {
+              sendTurn({ text: turn.text, conversationId: turn.conversationId });
+            },
+          });
+      } else if (data.reply) {
         addMessage(data.reply, "bot", false, data.cost || 0, data.timings,
           clientTotalMs, data.reasoning, data.usage, data.trace, { id: data.message_id });
       } else {
         restoreImages();
-        addMessage("⚠️ Ошибка: " + (data.error || data.detail || data.title || "HTTP " + response.status),
+        addMessage("⚠️ Ошибка: " + (data.detail || data.title || "HTTP " + response.status),
           "error", false, data.cost || 0, data.timings, clientTotalMs,
           data.reasoning, data.usage, data.trace);
       }
