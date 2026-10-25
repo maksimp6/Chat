@@ -73,48 +73,67 @@ function renderApprovalCard(toolCall, origMsg) {
       .then((result) => {
         const data = result.data || {};
         card.remove();
-        if (currentConvId !== cardConvId) return;
-        if (data.requires_approval) {
-          renderApprovalCard(data.tool_call, origMsg);
-        } else if (data.reply) {
-          if (data.execution_result && typeof window.applyThemeAssistantResult === "function") {
-            window.applyThemeAssistantResult(data.execution_result);
+        deliverApprovalOutput(cardConvId, function () {
+          if (data.requires_approval) {
+            renderApprovalCard(data.tool_call, origMsg);
+          } else if (data.reply) {
+            if (data.execution_result && typeof window.applyThemeAssistantResult === "function") {
+              window.applyThemeAssistantResult(data.execution_result);
+            }
+            addMessage(
+              data.reply,
+              "bot",
+              false,
+              data.cost || 0,
+              data.timings,
+              null,
+              data.reasoning,
+              data.usage,
+              data.trace,
+            );
+          } else {
+            addMessage(
+              "⚠️ Ошибка выполнения: " + (data.error || `HTTP ${result.status}`),
+              "error",
+              false,
+              0,
+              null,
+              null,
+              null,
+              null,
+              data.trace,
+            );
           }
-          addMessage(
-            data.reply,
-            "bot",
-            false,
-            data.cost || 0,
-            data.timings,
-            null,
-            data.reasoning,
-            data.usage,
-            data.trace,
-          );
-        } else {
-          addMessage(
-            "⚠️ Ошибка выполнения: " + (data.error || `HTTP ${result.status}`),
-            "error",
-            false,
-            0,
-            null,
-            null,
-            null,
-            null,
-            data.trace,
-          );
-        }
+        });
       })
       .catch(() => {
         card.remove();
-        if (currentConvId !== cardConvId) return;
-        addMessage("Сетевая ошибка при выполнении действия", "error", false, 0);
+        deliverApprovalOutput(cardConvId, function () {
+          addMessage("Сетевая ошибка при выполнении действия", "error", false, 0);
+        });
       });
   });
 
   rejectBtn.addEventListener("click", function () {
     card.remove();
     addMessage(`⛔ Действие "${toolCall.name}" отклонено пользователем.`, "bot", true, 0);
+  });
+}
+
+// Output of an approved action, kept per chat: shown now if that chat is open, else when it is opened again.
+const pendingApprovalOutputs = {};
+
+function deliverApprovalOutput(convId, render) {
+  if (convId === currentConvId) return render();
+  (pendingApprovalOutputs[convId] = pendingApprovalOutputs[convId] || []).push(render);
+}
+
+function flushApprovalOutputs(convId) {
+  if (convId !== currentConvId) return;
+  const renders = pendingApprovalOutputs[convId] || [];
+  delete pendingApprovalOutputs[convId];
+  renders.forEach(function (render) {
+    render();
   });
 }
 
@@ -554,6 +573,7 @@ function loadHistory(convId) {
         error.textContent = "Ошибка отрисовки истории: " + renderErr.message;
         chatbox.replaceChildren(error);
       }
+      flushApprovalOutputs(convId);
     })
     .catch((err) => {
       if (convId !== currentConvId) return;
