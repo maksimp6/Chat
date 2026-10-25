@@ -4,13 +4,18 @@
 No cache files, bytecode or coverage files are written by this runner.
 Test code itself may write files. Only Python unittest-style tests are supported.
 """
+import sys
+
+# Disable bytecode writes in this interpreter before importing test modules.
+# Setting PYTHONDONTWRITEBYTECODE after startup alone has no such effect.
+sys.dont_write_bytecode = True
+
 import argparse
 import hashlib
 import json
 import os
 from pathlib import Path
 import subprocess
-import sys
 import time
 import unittest
 import urllib.error
