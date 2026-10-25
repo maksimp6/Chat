@@ -133,8 +133,33 @@ click count, and validated owned-page frame metadata.
 
 ## Evidence status
 
-This document defines the interface and acceptance criteria. It records no
-successful native E2E run. `status`, a successful `probe`, a daemon ACK, or a
-valid PNG alone must not be reported as `PASS` or `VERIFIED` input. Record an
-acceptance result only with the actual Actions run/job and its owned-page report
-and frame artifacts; otherwise report the concrete failure or `NOT_RUN` reason.
+The [native acceptance job](https://github.com/maksimp6/Chat/actions/runs/40192174130/job/121165309069)
+passed on 25 October 2026 at 12:14 UTC, on runner `redmi9-python` (ID 21).
+The tested source SHA was `173d1509a6effab10a66fcf890e6d7c3f09ca8aa`;
+the adapter implementation was published in `8bf849b65d42d4fc3ce74d8f93e4a95cfc2c7614`.
+The intervening commit changed only the application's `static/style.css`.
+
+| Evidence | Actual result |
+| --- | --- |
+| Unit controls, executed on the phone inside Actions | 35 passed |
+| Device / root | Redmi 9 / galahad / UID 0 |
+| Existing C mouse peer and executable hash | Verified |
+| Programmatic negative control | Untrusted click ignored; accepted counter remained 0 |
+| Physical input | Exactly 1 trusted click via the existing C mouse |
+| Native frame | 1080 × 2340; red counter 0 changed to green counter 1 |
+| Before PNG SHA-256 | `65ccaa07e683a66a1b3187dbf054dfd80aa73d270fbaa793b4bd3c9750eacab8` |
+| After PNG SHA-256 | `baa94bddf1d428aa75a145738df7dc725f59238cc6ccae8509280f26d9ba3585` |
+| Overall E2E | `PASS_TRUSTED_BROWSER_EVENT_AND_CHANGED_PNG` |
+
+The display was already on in this successful run: `wake` returned
+`already_awake: true`, `input_operations: NOT_RUN`. Waking an asleep display
+with the fixed mouse event therefore remains unverified on hardware; its
+request/ACK/no-retry controls were unit-tested in the runner. The CLI must stop
+if the display-on check fails.
+
+`status`, a successful `probe`, a daemon ACK, or a valid PNG alone do not prove
+visible input. The successful result above depends on the trusted event,
+exact counter transition, and independently validated native green frame.
+PNG files were retained in the successful phone job workspace; this native
+runner does not upload standard Actions artifacts. Frame hashes and the full
+sanitized acceptance report are in the linked job log.
