@@ -117,6 +117,7 @@ class ScreenAndInputControls(unittest.TestCase):
         policy = b"showing=false\nmInputRestricted=false\nmKeyguardOccluded=false\n"
         window = b"mCurrentFocus=Window{abc u0 com.example.fixture/MainActivity}\n"
         cases = ((policy, True),
+                 (policy.replace(b"mKeyguardOccluded=false\n", b"mKeyguardOccluded=false mKeyguardOccludedChanged=false\n"), True),
                  (policy.replace(b"showing=false", b"showing=true"), False),
                  (policy.replace(b"mInputRestricted=false\n", b""), False),
                  (policy + b"showing=true\n", False),

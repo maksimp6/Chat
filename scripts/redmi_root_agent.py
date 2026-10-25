@@ -79,7 +79,7 @@ def screen_state():
     policy = bounded_command(["/system/bin/dumpsys", "window", "policy"]).decode("utf-8", "replace")
     flags = []
     for key in ("showing", "mInputRestricted", "mKeyguardOccluded"):
-        values = re.findall(r"(?m)^\s*" + key + r"\s*=\s*(true|false)\s*$", policy)
+        values = re.findall(r"(?<![A-Za-z0-9_])" + key + r"\s*=\s*(true|false)\b", policy)
         flags.append(bool(values) and all(value == "false" for value in values))
     window = bounded_command(["/system/bin/dumpsys", "window"]).decode("utf-8", "replace")
     windows = re.findall(r"(?m)^\s*mCurrentFocus=([^\r\n]*)", window)
