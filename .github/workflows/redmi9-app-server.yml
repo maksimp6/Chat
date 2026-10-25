@@ -11,16 +11,6 @@ on:
         default: deploy
         type: choice
         options: [deploy, screenshots, verify_screenshots, rootagent_native_check, art_generate]
-      conversation_id:
-        description: art_generate only - conversation to poll; leave empty to start a picture
-        required: false
-        default: ""
-        type: string
-      operation_id:
-        description: art_generate only - operation to poll once; leave empty to start a picture
-        required: false
-        default: ""
-        type: string
 
 permissions: {}
 
@@ -164,7 +154,7 @@ jobs:
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
           export OUT_DIR="$HOME/logos-art-real"
           mkdir -p "$OUT_DIR"
-          python - "${{ inputs.conversation_id }}" "${{ inputs.operation_id }}" <<'PY'
+          python - <<'PY'
           import base64
           import hashlib
           import json
@@ -203,13 +193,16 @@ jobs:
               sys.exit(code)
 
 
-          # The dispatch inputs arrive as arguments: this runner sets no event file, and an expression in env: stops the job.
-          conv_id = sys.argv[1] or None
-          operation_id = sys.argv[2] or None
-          if conv_id and not re.fullmatch(r"[0-9a-f-]{36}", conv_id):
-              raise SystemExit("conversation_id is not a conversation id")
-          if operation_id and not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", operation_id):
-              raise SystemExit("operation_id is not an operation id")
+          # The picture in progress lives on the phone: the start run writes its ids, the next run polls them.
+          # No expression or input reaches this job, because the runner stops such a job before its steps.
+          pending_path = os.path.join(OUT, "pending.json")
+          conv_id = None
+          operation_id = None
+          if os.path.exists(pending_path):
+              with open(pending_path, encoding="utf-8") as handle:
+                  saved = json.load(handle)
+              conv_id = saved.get("conversation_id")
+              operation_id = saved.get("operation_id")
           report["conversation_id"] = conv_id
           report["operation_id"] = operation_id
 
@@ -230,7 +223,9 @@ jobs:
                   report["result"] = "generation was not started"
                   finish(1)
               report["operation_id"] = started["operation_id"]
-              report["result"] = "started: run again with conversation_id and operation_id to poll it"
+              with open(pending_path, "w", encoding="utf-8") as handle:
+                  json.dump({"conversation_id": conv_id, "operation_id": started["operation_id"]}, handle)
+              report["result"] = "started: run art_generate again to poll it"
               finish(2)
 
           # Poll one operation once; the server answers within about 25 seconds.
@@ -251,11 +246,13 @@ jobs:
                   handle.write(raw)
               report["result"] = {"image_bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),
                                   "mime": "image/" + match.group(1)}
+              os.remove(pending_path)
               finish(0)
           if isinstance(state, dict) and state.get("status") == "failed":
               report["result"] = {"failed": state.get("error")}
+              os.remove(pending_path)
               finish(1)
-          report["result"] = "pending: run again with the same operation_id"
+          report["result"] = "pending: run art_generate again to poll it"
           finish(2)
           PY
           if [ -f "$OUT_DIR/art.jpg" ]; then
