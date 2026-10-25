@@ -142,7 +142,7 @@ test("Ultra line reports status, context window and blocker count", () => {
         output: 0.8,
         ultra_profile: PREPARED,
       },
-      "logos-runtime": { name: "Logos Runtime", input: 0.5, output: 1.2 },
+      "logos-runtime": { name: "Alice AI LLM", input: 0.5, output: 1.2 },
     },
     voice: {},
   });

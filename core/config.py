@@ -58,7 +58,7 @@ PORT = 8080
 
 TEXT_MODELS = {
     "logos-runtime": {
-        "name": "Logos Runtime",
+        "name": "Alice AI LLM",
         "upstream": "logosai-llm",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
