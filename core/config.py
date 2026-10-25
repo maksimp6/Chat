@@ -58,7 +58,7 @@ PORT = 8080
 
 TEXT_MODELS = {
     "yandexgpt-5.1": {
-        "name": "YandexGPT 5.1 Pro",
+        "name": "YandexGPT Pro 5.1",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.80,
@@ -67,7 +67,7 @@ TEXT_MODELS = {
         "output": 0.80,
     },
     "yandexgpt-5-pro": {
-        "name": "YandexGPT 5 Pro",
+        "name": "YandexGPT Pro 5",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 1.20,
@@ -76,7 +76,7 @@ TEXT_MODELS = {
         "output": 1.20,
     },
     "yandexgpt-5-lite": {
-        "name": "YandexGPT 5 Lite",
+        "name": "YandexGPT Lite 5",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.20,
@@ -85,7 +85,7 @@ TEXT_MODELS = {
         "output": 0.20,
     },
     "qwen3-235b-a22b-fp8": {
-        "name": "Qwen3 235B A22B FP8",
+        "name": "Qwen3 235B",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.50,
@@ -94,7 +94,7 @@ TEXT_MODELS = {
         "output": 0.50,
     },
     "gpt-oss-120b": {
-        "name": "GPT OSS 120B",
+        "name": "gpt-oss-120b",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.30,
@@ -103,7 +103,7 @@ TEXT_MODELS = {
         "output": 0.30,
     },
     "gpt-oss-20b": {
-        "name": "GPT OSS 20B",
+        "name": "gpt-oss-20b",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.10,
@@ -115,7 +115,7 @@ TEXT_MODELS = {
 
 VOICE_MODELS = {
     "speech-realtime-250923": {
-        "name": "Speech Realtime 250923",
+        "name": "speech-realtime-250923",
         "type": "voice",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.80,
