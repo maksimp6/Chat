@@ -53,6 +53,10 @@ jobs:
         run: |
           set -euo pipefail
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
+          if [ -z "${RUNNER_TEMP:-}" ]; then
+            RUNNER_TEMP=$(mktemp -d "${TMPDIR:?}/logos-runner-temp.XXXXXX")
+            export RUNNER_TEMP
+          fi
           scripts_dir=$(mktemp -d "$RUNNER_TEMP/logos-screenshot-scripts.XXXXXX")
           for script in redmi_screenshot_capture.py publish_redmi_screenshots.py; do
             curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
