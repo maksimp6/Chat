@@ -35,8 +35,6 @@ def test_index_renders_preview_prefixed_assets_and_api_paths(monkeypatch):
 
     assert response.status_code == 200
     assert 'href="/preview/pr-203/static/style.css?v=' in html
-    assert 'src="/preview/pr-203/static/eruda_init.js?v=' in html
-    assert "/preview/pr-203/static/eruda.js?v={{" not in html
     assert 'data-base-path="/preview/pr-203"' in html
     assert 'src="/preview/pr-203/static/memory_panel.js?v=' in html
 
@@ -70,7 +68,6 @@ def test_application_javascript_parses_when_node_is_available():
         Path("static/settings/settings_mcp.js"),
         Path("static/settings/settings_modal.js"),
         Path("static/settings/ssh_runtime_modal.js"),
-        Path("static/eruda_init.js"),
     ]
     for path in files:
         result = subprocess.run(

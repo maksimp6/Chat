@@ -65,7 +65,7 @@ def is_dispatcher(path: Path) -> bool:
 
 
 def is_vendor(path: Path) -> bool:
-    return path.name in {"eruda.js"} or "vendor" in path.parts
+    return "vendor" in path.parts
 
 
 def is_policy_exempt(path: Path) -> bool:
