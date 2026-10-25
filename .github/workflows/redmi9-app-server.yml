@@ -10,7 +10,7 @@ on:
         required: true
         default: deploy
         type: choice
-        options: [deploy, screenshots, verify_screenshots]
+        options: [deploy, screenshots, verify_screenshots, rootagent_check]
 
 permissions: {}
 
@@ -86,3 +86,90 @@ jobs:
           curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
             "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/publish_redmi_screenshots.py" -o "$verification_job_temp/publish_redmi_screenshots.py"
           python "$verification_job_temp/publish_redmi_screenshots.py" --verify-latest
+
+  rootagent_check:
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'rootagent_check'
+    runs-on: redmi9
+    timeout-minutes: 3
+    permissions: {}
+    steps:
+      - name: Check installed RootAgent without changing device state
+        shell: bash
+        timeout-minutes: 2
+        run: |
+          python - <<'PY'
+          import json, os, socket, subprocess, sys, urllib.error, urllib.request
+          from pathlib import Path
+          
+          required = ("GITHUB_RUN_ID", "GITHUB_SHA", "RUNNER_NAME", "RUNNER_TEMP")
+          if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("CI") != "true" or not all(os.environ.get(k) for k in required):
+              raise SystemExit("NOT_RUN: this check requires an actual GitHub Actions job")
+          
+          def command(args, timeout=8):
+              try:
+                  p = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+                  return p.returncode, p.stdout.strip()
+              except (OSError, subprocess.TimeoutExpired) as exc:
+                  return -1, type(exc).__name__
+          
+          def port_open(port):
+              with socket.socket() as s:
+                  s.settimeout(1)
+                  return s.connect_ex(("127.0.0.1", port)) == 0
+          
+          report = {
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "source_sha": os.environ["GITHUB_SHA"],
+              "runner_name": os.environ["RUNNER_NAME"],
+              "scope": "read-only installed RootAgent availability",
+              "authenticated_rootagent_operations": "NOT_RUN",
+              "screen_and_input_operations": "NOT_RUN",
+          }
+          _, report["model"] = command(["/system/bin/getprop", "ro.product.model"])
+          _, report["device"] = command(["/system/bin/getprop", "ro.product.device"])
+          if (report["model"], report["device"]) != ("Redmi 9", "galahad"):
+              report["result"] = "FAIL_WRONG_DEVICE"
+          else:
+              _, uid = command(["/system/bin/id", "-u"])
+              report["runner_uid"] = uid if uid.isdecimal() else "unavailable"
+              _, su_uid = command(["su", "-c", "/system/bin/id -u"])
+              report["runner_su_uid"] = su_uid if su_uid.isdecimal() else "unavailable"
+              rc, package_output = command(["su", "-c", "/system/bin/pm list packages"])
+              report["package_query_ok"] = rc == 0
+              candidates = []
+              if rc == 0:
+                  for line in package_output.splitlines():
+                      if not line.startswith("package:"):
+                          continue
+                      package = line.removeprefix("package:").strip()
+                      if "rootagent" in package.lower() or package in ("com.logospro.mobile", "com.logospro.mobile.test", "com.alicepro.mobile"):
+                          candidates.append(package)
+              report["candidate_packages"] = sorted(set(candidates))
+              report["listener_8765_live_server"] = port_open(8765)
+              report["listener_8766_rootagent"] = port_open(8766)
+              if not report["listener_8766_rootagent"]:
+                  report["result"] = "FAIL_ROOTAGENT_NOT_LISTENING"
+              else:
+                  try:
+                      with urllib.request.urlopen("http://127.0.0.1:8766/v1/status", timeout=3) as response:
+                          report["anonymous_status_http"] = response.status
+                  except urllib.error.HTTPError as exc:
+                      report["anonymous_status_http"] = exc.code
+                  except (OSError, urllib.error.URLError) as exc:
+                      report["anonymous_status_error"] = type(exc).__name__
+                  if report.get("anonymous_status_http") == 401:
+                      report["result"] = "BLOCKED_AUTHENTICATED_HARDWARE_CHECK_REQUIRED"
+                  else:
+                      report["result"] = "FAIL_ROOTAGENT_IDENTITY_OR_AUTH_NOT_VERIFIED"
+          
+          text = json.dumps(report, ensure_ascii=False, indent=2)
+          print(text)
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with Path(summary).open("a", encoding="utf-8") as f:
+                  f.write("## RootAgent read-only runner check\n\n")
+                  f.write("Runner root is not proof of RootAgent app-UID root access.\n\n")
+                  f.write("\u0060\u0060\u0060json\n" + text + "\n\u0060\u0060\u0060\n")
+                  f.write("\nNo service restart, installation, credential-file access, UI input, or screen capture was performed.\n")
+          sys.exit(2 if report["result"].startswith("BLOCKED_") else 1)
+          PY
