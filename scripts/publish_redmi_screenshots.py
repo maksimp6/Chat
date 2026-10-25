@@ -12,6 +12,8 @@ import subprocess
 import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 REPOSITORY = "maksimp6/Chat"
@@ -160,16 +162,63 @@ def publish(repo, env, files, relative, run_id, attempt):
     raise PublicationError("develop advanced during publication")
 
 
+class SafeRedirect(HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, target):
+        old, new = urlsplit(request.full_url), urlsplit(target)
+        require(new.scheme == "https" and not new.username and not new.password,
+                "unsafe LFS download redirect")
+        redirected = super().redirect_request(request, response, code, message, headers, target)
+        if redirected is not None and (old.scheme, old.netloc) != (new.scheme, new.netloc):
+            redirected.remove_header("Authorization")
+            redirected.remove_header("Cookie")
+        return redirected
+
+
+def download_objects(env, files, storage):
+    # Git LFS Batch + Basic APIs: known OIDs only; no ls-tree over a promisor repo.
+    # https://github.com/git-lfs/git-lfs/blob/main/docs/api/batch.md
+    # https://github.com/git-lfs/git-lfs/blob/main/docs/api/basic-transfers.md
+    wanted = {item["sha256"]: item for name, item in files.items() if name.endswith(".png")}
+    body = {"operation": "download", "transfers": ["basic"],
+            "ref": {"name": "refs/heads/develop"},
+            "objects": [{"oid": sha, "size": item["size"]} for sha, item in wanted.items()]}
+    authorization = env["GIT_CONFIG_VALUE_0"].split(":", 1)[1].strip()
+    opener = build_opener(SafeRedirect())
+    request = Request(REMOTE + "/info/lfs/objects/batch", data=json.dumps(body).encode(),
+                      headers={"Accept": "application/vnd.git-lfs+json",
+                               "Content-Type": "application/vnd.git-lfs+json",
+                               "Authorization": authorization}, method="POST")
+    with opener.open(request, timeout=30) as response:
+        batch = json.loads(response.read(1024 * 1024))
+    require(batch.get("transfer", "basic") == "basic", "unsupported LFS transfer")
+    objects = batch.get("objects", [])
+    require(isinstance(objects, list) and len(objects) == len(wanted), "unexpected LFS object count")
+    seen = set()
+    storage.mkdir(parents=True)
+    for item in objects:
+        sha = item.get("oid")
+        require(sha in wanted and sha not in seen and not item.get("error"), "LFS object unavailable")
+        seen.add(sha)
+        metadata = wanted[sha]
+        require(item.get("size") == metadata["size"], "LFS size differs from capture")
+        action = item.get("actions", {}).get("download", {})
+        url = action.get("href", "")
+        parsed = urlsplit(url)
+        require(parsed.scheme == "https" and parsed.netloc and not parsed.username and not parsed.password,
+                "unsafe LFS download action")
+        download_headers = dict(action.get("header", {}))
+        # The job token is sent only to the fixed GitHub batch endpoint, never copied to storage.
+        download = Request(url, headers=download_headers, method="GET")
+        with opener.open(download, timeout=30) as response:
+            content = response.read(metadata["size"] + 1)
+        require(len(content) == metadata["size"] and hashlib.sha256(content).hexdigest() == sha,
+                "remote Git LFS bytes differ from the original PNG")
+        (storage / sha).write_bytes(content)
+    require(seen == set(wanted), "missing LFS download")
+
+
 def verify(repo, env, files, relative, storage):
-    git(repo, env, "-c", "lfs.storage=" + str(storage), "-c", "lfs.fetchrecentalways=false",
-        "lfs", "fetch", "--include=" + relative + "/**", "--exclude=", "origin", "HEAD")
-    for name, metadata in files.items():
-        if not name.endswith(".png"):
-            continue
-        sha = metadata["sha256"]
-        downloaded = storage / "objects" / sha[:2] / sha[2:4] / sha
-        require(downloaded.is_file() and downloaded.stat().st_size == metadata["size"]
-                and digest(downloaded) == sha, "remote Git LFS object verification failed")
+    download_objects(env, files, storage)
     git(repo, env, "fetch", "--quiet", "--depth=1", "--filter=blob:none", "origin", "refs/heads/develop")
     for name, metadata in files.items():
         remote_pointer = git(repo, env, "show", "FETCH_HEAD:" + relative + "/" + name).stdout
@@ -188,6 +237,7 @@ def main():
         repo.mkdir()
         configure(repo, env)
         commit = publish(repo, env, files, relative, run_id, attempt)
+        print(json.dumps({"published_commit": commit, "verification": "pending"}), flush=True)
         verify(repo, env, files, relative, root / "remote-lfs-verification")
         result = {"commit": commit, "run_id": run_id, "run_attempt": attempt,
                   "files": [{"path": relative + "/" + name, "sha256": metadata["sha256"],
