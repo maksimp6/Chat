@@ -1202,7 +1202,6 @@ def capture(out, uid, gid, metadata):
                                **(note or {})}
 
     chat = {}
-    origin = {}
 
     def load_conversation(index, conv_id):
         """Open a sidebar conversation and wait until the chat view shows that conversation's messages."""
@@ -1218,24 +1217,9 @@ def capture(out, uid, gid, metadata):
     def reopen_chat():
         load_conversation(chat["index"], chat["id"])
 
-    def restore_origin():
-        """Return to the conversation that was open before the chat checks, so creation starts from the same view."""
-        if not origin:
-            return
-        rdp.set_open(actor, True)
-        rdp.open_conversation(actor, origin["index"])
-        for _ in range(16):
-            if rdp.conversation_state(actor)["current_id"] == origin["id"]:
-                return
-            time.sleep(0.5)
-        raise RuntimeError("the original conversation did not come back")
-
     def choose_conversation():
         """Pick the existing conversation with the most messages; empty new chats are skipped."""
         listed = rdp.chat_candidates(actor)
-        active = [c for c in listed if c["active"] and c["id"]]
-        if active and not origin:
-            origin.update(active[0])
         candidates = [c for c in listed if c["title"] != "Новый чат" and c["id"]][:4]
         best = None
         for candidate in candidates:
@@ -1275,7 +1259,6 @@ def capture(out, uid, gid, metadata):
     matrix_action("chat_select", choose_conversation, opener=lambda: rdp.set_open(actor, True))
     scroll_step("chat_top", "17-chat-top.png", "#chatbox", "top", surface=None, opener=reopen_chat, note=chat)
     scroll_step("chat_bottom", "18-chat-bottom.png", "#chatbox", "bottom", surface=None, opener=reopen_chat, note=chat)
-    matrix_action("restore_origin_chat", restore_origin)
     matrix_action("restore_sidebar", lambda: rdp.set_open(actor, True))
     if dialogs_recorder is None:
         dialogs_video, dialogs_artifact, dialogs_failures = (
