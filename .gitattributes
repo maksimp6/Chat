@@ -1,2 +1,6 @@
 docs/mirrors/yandex-ai-studio/source/** filter=lfs diff=lfs merge=lfs -text
 docs/screenshots/logos/**/*.png filter=lfs diff=lfs merge=lfs -text
+printing3d/**/*.stl filter=lfs diff=lfs merge=lfs -text
+printing3d/**/*.3mf filter=lfs diff=lfs merge=lfs -text
+3d-models/**/*.stl filter=lfs diff=lfs merge=lfs -text
+3d-models/**/*.3mf filter=lfs diff=lfs merge=lfs -text
