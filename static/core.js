@@ -1,6 +1,6 @@
 let currentConvId = null;
 let conversations = [];
-let currentModel = "yandexgpt-5.1";
+let currentModel = "yandexgpt-5-lite";
 let currentModelType = "text";
 let modelsData = { text: {}, voice: {} };
 let coreInitialized = false;
@@ -79,7 +79,7 @@ window.changeModel = function (newModel, skipPatch) {
   // Without a catalog (offline or degraded) keep the requested key; the server validates it.
   if (catalogLoaded && !textModels[newModel] && !voiceModels[newModel]) {
     console.warn("[CORE] Unknown model:", newModel, "-> fallback to logos-runtime");
-    newModel = "yandexgpt-5.1";
+    newModel = "yandexgpt-5-lite";
   }
   currentModel = newModel;
   currentModelType = voiceModels[currentModel] ? "voice" : "text";
