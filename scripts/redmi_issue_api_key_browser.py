@@ -61,9 +61,11 @@ def child_issue(folder_id):
 
 
 def post_import(payload, token):
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = "Bearer " + token
     request = urllib.request.Request(
-        IMPORT_URL, data=json.dumps(payload).encode(), method="POST",
-        headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"})
+        IMPORT_URL, data=json.dumps(payload).encode(), method="POST", headers=headers)
     with urllib.request.urlopen(request, timeout=30) as response:
         return json.loads(response.read().decode())
 
@@ -75,8 +77,6 @@ def main():
     if os.environ.get("GITHUB_ACTIONS") != "true" or not os.environ.get("RUNNER_TEMP"):
         raise RuntimeError("Run the issuance inside the existing GitHub Actions runner")
     token = os.environ.get("LOGOS_PROVIDER_CREDENTIALS_TOKEN", "")
-    if not token:
-        raise RuntimeError("LOGOS_PROVIDER_CREDENTIALS_TOKEN is not set")
     folder = os.environ.get("YANDEX_FOLDER_ID", "")
     if not re.fullmatch(r"[a-z0-9]{20}", folder):
         raise RuntimeError("YANDEX_FOLDER_ID must be the 20-character folder id")
