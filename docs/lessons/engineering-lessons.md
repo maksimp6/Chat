@@ -16,7 +16,7 @@ Memory — данные и их жизненный цикл. Чат остаёт
 
 Существующие [AI pipeline](../architecture/ai-execution-pipeline.md),
 [Universal Tool Platform](../architecture/universal_tool_platform.md) и
-[runtime debugging skill](../../.agents/skills/logos-runtime-debugging/SKILL.md)
+`../../.agents/skills/logos-runtime-debugging/SKILL.md`
 остаются каноническими. Usage/cost считает детерминированный код; текст модели
 может объяснять результат, но не становится расчётным источником.
 
@@ -32,7 +32,7 @@ H04: сохранение работало, но request assembler читал `a
 без нужного преобразования `tools_config` и `selected_skills`. Повторная смена
 хранилища не устраняла ошибку. Сегодня проверять надо актуальные
 [settings modules](../../static/settings/settings_params.js),
-[chat boundary](../../mcp_routes.py) и
+[chat boundary](../../chat/mcp_routes.py) и
 [request shaping](../../yandex_client_modules/request_mixin.py), а не переносить
 исторический диагноз без сверки. Новая процедура:
 [settings-payload-verification](../../.agents/skills/settings-payload-verification/SKILL.md).

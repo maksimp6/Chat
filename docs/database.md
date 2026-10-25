@@ -64,7 +64,7 @@ filesystem under it change.
 - **Shared or cloud deployment:** a journal on a persistent filesystem under the
   approved `data_root`, with exactly one writer process. An ephemeral container
   filesystem is not durable storage, and cloud object storage is a backup target,
-  not the live journal (see [`deploy/cloudru/README.md`](../deploy/cloudru/README.md),
+  not the live journal (see `../deploy/cloudru/README.md`,
   "Native storage transition").
 
 ## One writer per journal

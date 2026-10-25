@@ -28,7 +28,7 @@ consent, устройства, принтеры и deployment не вызыва�
 [index.html](../../templates/index.html) и [static modules](../../static/core.js).
 Один shell содержит sidebar/modals; deep link — `/?conversation_id=…`, backend
 умеет передать выбранный разговор в template.
-[r/frontend/src/App.tsx](../../r/frontend/src/App.tsx) — Vite/React starter с counter,
+`../../r/frontend/src/App.tsx` — Vite/React starter с counter,
 не второй готовый Logos frontend. Service-local страницы и native Android UI
 учтены отдельно.
 
@@ -36,17 +36,17 @@ consent, устройства, принтеры и deployment не вызыва�
 
 | Сценарий | UI / component | Backend / CLI / tool и граница |
 | --- | --- | --- |
-| Чат, история, approval | [chat.js](../../static/chat.js), [sidebar.js](../../static/sidebar.js), [models.js](../../static/models.js) | [mcp_routes.py](../../mcp_routes.py): chat, conversations/messages, execute-approved. Ответы, ошибки и approval cards есть |
-| Execution Trace | [execution_surface.js](../../static/execution_surface.js), [trace_viewer.js](../../static/trace_viewer.js), [trace_download.js](../../static/trace_download.js) | [runtime_api.py](../../runtime_api.py): invocation status/trace; [invocation/api.py](../../invocation/api.py) safe projection. Compact summary, timeline, viewer/export есть |
+| Чат, история, approval | [chat.js](../../static/chat.js), [sidebar.js](../../static/sidebar.js), [models.js](../../static/models.js) | [mcp_routes.py](../../chat/mcp_routes.py): chat, conversations/messages, execute-approved. Ответы, ошибки и approval cards есть |
+| Execution Trace | [execution_surface.js](../../static/execution_surface.js), [trace_viewer.js](../../static/trace_viewer.js), [trace_download.js](../../static/trace_download.js) | `../../runtime_api.py`: invocation status/trace; [invocation/api.py](../../invocation/api.py) safe projection. Compact summary, timeline, viewer/export есть |
 | Настройки/tools/skills | [settings_modal.js](../../static/settings/settings_modal.js), [settings_params.js](../../static/settings/settings_params.js), [settings_storage.js](../../static/settings/settings_storage.js) | Settings/tools API, [SkillRegistry](../../agent_skills/registry.py), `/api/skills`. Sampling/tools controls есть; skill selection не подключён к chat request |
 | MCP servers | [settings_mcp.js](../../static/settings/settings_mcp.js): add/edit/delete | `/api/mcp-servers` в mcp_routes.py; CRUD не является OAuth/discovery/health workflow |
-| Provider connection | [provider_credentials.js](../../static/provider_credentials.js) | [provider_credentials_routes.py](../../provider_credentials_routes.py): credentials/status; подключение и ошибки уже имеют UI |
-| OAuth/browser | GitHub login link; service consent/takeover pages; [BrowserTakeoverActivity.kt](../../android/app/src/main/java/com/logospro/mobile/BrowserTakeoverActivity.kt) | [github_oauth.py](../../identity/github_oauth.py), [chrome worker](../../deploy/chrome-worker/server.mjs), [chrome OAuth](../../deploy/chrome-worker/oauth.mjs), [RDC OAuth](../../deploy/remote-desktop-commander/oauth.mjs). Browser status/control/takeover есть в отдельном сервисе; deployment не проверен |
-| Устройства/runtime | SSH settings/test modal; Android local-agent UI | [local_agent_gateway.py](../../local_agent_gateway.py): register/heartbeat/poll/result/health; [pairing.py](../../rdc_connection/pairing.py): `/rdc`. Health требует bootstrap authority; redirect может вернуть 401/503 |
+| Provider connection | [provider_credentials.js](../../static/provider_credentials.js) | `../../provider_credentials_routes.py`: credentials/status; подключение и ошибки уже имеют UI |
+| OAuth/browser | GitHub login link; service consent/takeover pages; `../../android/app/src/main/java/com/logospro/mobile/BrowserTakeoverActivity.kt` | `../../identity/github_oauth.py`, `../../deploy/chrome-worker/server.mjs`, `../../deploy/chrome-worker/oauth.mjs`, `../../deploy/remote-desktop-commander/oauth.mjs`. Browser status/control/takeover есть в отдельном сервисе; deployment не проверен |
+| Устройства/runtime | SSH settings/test modal; Android local-agent UI | `../../local_agent_gateway.py`: register/heartbeat/poll/result/health; [pairing.py](../../rdc_connection/pairing.py): `/rdc`. Health требует bootstrap authority; redirect может вернуть 401/503 |
 | Память | [memory_panel.js](../../static/memory_panel.js), server-rendered modal | [app.py](../../app.py): manage/config/clear. Facts, enable/limit/clear есть |
-| Backup/replay | Web controls не найдены | [backup.py](../../agent_memory/backup.py), [file_memory_db.py](../../agent_memory/file_memory_db.py), [backup tests](../../tests/test_memory_backup.py). Library capabilities, не operational HTTP restore API |
-| Бюджеты/ошибки | [treasury.js](../../static/treasury.js), execution summary, [system_status.js](../../static/system_status.js) | Treasury API, [provider_quota_routes.py](../../provider_quota_routes.py), [budget_controller.py](../../budget_controller.py). Paper balance, provider quota и budget policy — разные сущности |
-| 3D business | Chat tools; dashboard отсутствует | [printing3d/routes.py](../../printing3d/routes.py): quote/orders/status/settle/summary/finance; [tools.py](../../printing3d/tools.py). Это business slice, не printer controller |
+| Backup/replay | Web controls не найдены | `../../agent_memory/backup.py`, `../../agent_memory/file_memory_db.py`, [backup tests](../../tests/test_memory_backup.py). Library capabilities, не operational HTTP restore API |
+| Бюджеты/ошибки | [treasury.js](../../static/treasury.js), execution summary, [system_status.js](../../static/system_status.js) | Treasury API, `../../provider_quota_routes.py`, [budget_controller.py](../../economy/budget_controller.py). Paper balance, provider quota и budget policy — разные сущности |
+| 3D business | Chat tools; dashboard отсутствует | `../../printing3d/routes.py`: quote/orders/status/settle/summary/finance; `../../printing3d/tools.py`. Это business slice, не printer controller |
 | Model Editor / slicing / transfer | В master/develop нет viewport/scene editor/print-job UI | #1098/#1101/#1109 только drafts; [printing3d.md](../printing3d.md). Production transport/queue не доказаны |
 | Задачи/результаты | Chat Execution Surface есть; task workbench нет | [agent_shell CLI](../../agent_shell/__main__.py), [store.py](../../agent_shell/store.py), [task_state.py](../../agent_office/task_state.py). CLI и GitHub evidence lifecycle отдельны; общего web task API в проверенных routes нет |
 
@@ -60,7 +60,7 @@ Security/ownership нужны до UI writes. Отсутствующая control
 ### G01 / P1 — восстановление после таймаута чата
 
 **Тип:** frontend + неполный backend handoff. [chat.js](../../static/chat.js)
-не использует invocation status/trace endpoints из [runtime_api.py](../../runtime_api.py).
+не использует invocation status/trace endpoints из `../../runtime_api.py`.
 [dispatcher.js](../../static/dispatcher.js) по умолчанию ограничивает запрос
 10 секундами через `AbortSignal.timeout`, если браузер это поддерживает.
 Client timeout не доказывает остановку server execution. Синхронный chat path
@@ -101,7 +101,7 @@ DELETE тоже должен проверять HTTP status, а не тольк�
 
 ### G04 / P1 — выбор проектных skills не доходит до chat request
 
-**Тип:** UI/settings integration. [mcp_routes.py](../../mcp_routes.py) имеет
+**Тип:** UI/settings integration. [mcp_routes.py](../../chat/mcp_routes.py) имеет
 `/api/skills`, принимает `skills` из request/params, применяет role policy и пишет
 metadata в Trace. `selected_skills` существует в
 [settings_storage.js](../../static/settings/settings_storage.js), но application JS
@@ -120,7 +120,7 @@ targeted payload tests; исторический общий дефект tools_c
 ### G05 / P1 — provider quota невидима до отказа
 
 **Тип:** преимущественно UI; self-read backend существует.
-[provider_quota_routes.py](../../provider_quota_routes.py) имеет
+`../../provider_quota_routes.py` имеет
 `GET /api/provider-quota/me`, но UI его не вызывает. Quota blocker в Execution
 Surface не заменяет usage/limit view.
 
@@ -135,9 +135,9 @@ allowance. Для BudgetController нужен отдельно согласов�
 ### G06 / P1 — нет общей безопасной панели устройств
 
 **Тип:** UI + owner-facing API/security adapter.
-[local_agent_gateway.py](../../local_agent_gateway.py) хранит heartbeat/capabilities,
+`../../local_agent_gateway.py` хранит heartbeat/capabilities,
 но health требует bootstrap token и перечисляет агентов. Web device list нет.
-[Android MainActivity](../../android/app/src/main/java/com/logospro/mobile/MainActivity.kt)
+`../../android/app/src/main/java/com/logospro/mobile/MainActivity.kt`
 уже умеет подключать local agent; нельзя утверждать, что device UI отсутствует вообще.
 
 **Не хватает:** выбранного устройства, capability, last-seen/stale и понятной
@@ -168,7 +168,7 @@ Service-local pages не переписывать. Production acceptance отд�
 
 ### G08 / P1 — backup/replay без owner-facing workflow
 
-**Тип:** library есть; operational API и UI нет. [backup.py](../../agent_memory/backup.py)
+**Тип:** library есть; operational API и UI нет. `../../agent_memory/backup.py`
 реализует create/restore/copy verification, FileMemoryDB — journal recovery.
 Memory facts modal решает другую задачу.
 
@@ -202,7 +202,7 @@ partial различены. Артефакт доступен пользоват
 ### G10 / P2 — 3D business API без review/dashboard UI
 
 **Тип:** UI gap при существующем business backend.
-[printing3d/routes.py](../../printing3d/routes.py) и [tools.py](../../printing3d/tools.py)
+`../../printing3d/routes.py` и `../../printing3d/tools.py`
 дают quote/orders/settlement/P&L/finance, но static/template не содержит `/api/3d` consumer.
 
 **Не хватает:** review quote с inputs/unknowns, order list, понятных status/settlement

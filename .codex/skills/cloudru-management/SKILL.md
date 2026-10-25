@@ -12,11 +12,11 @@ the repository's production/data/secret approval rules to actual live changes.
 
 1. Identify the interface in the table below. Do not interchange keys.
 2. Read [EDS reference](references/eds.md) for CLI work, or the
-   [deployment runbook](../../../deploy/cloudru/README.md) for Logos rollout.
+   `../../../deploy/cloudru/README.md` for Logos rollout.
 3. Read [Evolution service and identity reference](references/evolution-services.md)
    for DNS, Gateway, workflow, logs, users/keys, secrets/certificates and AI.
    For JSON stdout and cloud log-stream configuration, also read
-   [`deploy/cloudru/logging/README.md`](../../../deploy/cloudru/logging/README.md).
+   `../../../deploy/cloudru/logging/README.md`.
    Reuse existing authorized credentials without printing their values. Report
    missing variable **names**. Do not dump environment, config, DSNs or raw API
    responses. `eds config` exposes key prefixes/suffixes; skip it in agent logs.
@@ -82,11 +82,11 @@ separate classic Cloud DNS service). Evolution API Gateway has no public
 management API; do not automate against it.
 Discover zones and records first; the DNS service `parentId` is its Service
 Instance ID, not the project UUID. Follow
-[`deploy/cloudru/dns/README.md`](../../../deploy/cloudru/dns/README.md) and
+`../../../deploy/cloudru/dns/README.md` and
 preserve the zone/record snapshot before any authorized write. Do not reuse EDS
 or Cloud Advanced credentials as Evolution IAM credentials.
 
 For the requested service rollout and current pricing caveats, read the
-[service matrix](../../../deploy/cloudru/services.md). Recheck official
+`../../../deploy/cloudru/services.md`. Recheck official
 documentation before live provisioning; Preview does not make dependent
 compute, storage or traffic universally free.
