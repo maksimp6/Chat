@@ -171,7 +171,8 @@ VOICE_MODELS = {
 IMAGE_MODELS = {
     "alice-ai-art": {
         "name": "Alice AI ART",
-        "upstream": "aliceai-image-art-3.0",
+        # The Yandex docs give the picture model URI as art://<folder>/yandex-art/latest.
+        "upstream": "yandex-art/latest",
         "type": "image",
         "provider": "yandex_image",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
