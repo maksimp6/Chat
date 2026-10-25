@@ -159,9 +159,6 @@ jobs:
       - name: Start one picture, or poll one operation, through the Redmi 9 app
         shell: bash
         timeout-minutes: 1
-        env:
-          INPUT_CONVERSATION_ID: ${{ inputs.conversation_id }}
-          INPUT_OPERATION_ID: ${{ inputs.operation_id }}
         run: |
           set -euo pipefail
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
@@ -206,8 +203,11 @@ jobs:
               sys.exit(code)
 
 
-          conv_id = os.environ.get("INPUT_CONVERSATION_ID") or None
-          operation_id = os.environ.get("INPUT_OPERATION_ID") or None
+          # The dispatch inputs come from the event file; an expression in env: stops this job before its steps.
+          with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as stream:
+              dispatch_inputs = (json.load(stream).get("inputs") or {})
+          conv_id = dispatch_inputs.get("conversation_id") or None
+          operation_id = dispatch_inputs.get("operation_id") or None
           report["conversation_id"] = conv_id
           report["operation_id"] = operation_id
 
