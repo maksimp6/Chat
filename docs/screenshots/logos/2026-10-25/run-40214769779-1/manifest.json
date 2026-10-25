@@ -1,0 +1,407 @@
+{
+  "schema_version": 3,
+  "device": "Redmi 9",
+  "browser": "Iceraven",
+  "scenario": "all_application_modals",
+  "runtime_revision": "ad383dc032b45023d0d487bcd1b6704053d342f5",
+  "browser_revision": "ad383dc032b45023d0d487bcd1b6704053d342f5",
+  "workflow_revision": "995963ce565bee40f4dcf057ecb04b028c826f0d",
+  "github_run_url": "https://github.com/maksimp6/Chat/actions/runs/40214769779",
+  "captured_at": "2026-10-25T17:06:51.276753+00:00",
+  "preparation": {
+    "method": "Android/kernel wakeup, insecure keyguard dismissal, browser VIEW intent",
+    "before": {
+      "screen_on": true,
+      "interactive": true,
+      "power_wakefulness": "Awake",
+      "power_display_state": "ON",
+      "global_display_state": "ON",
+      "window_policy_screen_on": true,
+      "window_policy_interactive": true,
+      "keyguard_showing": false,
+      "input_restricted": false,
+      "keyguard_secure": true,
+      "browser_foreground": true
+    },
+    "wake_attempts": [
+      {
+        "method": "Android KEYCODE_WAKEUP",
+        "awake": true
+      }
+    ],
+    "ready": {
+      "screen_on": true,
+      "interactive": true,
+      "power_wakefulness": "Awake",
+      "power_display_state": "ON",
+      "global_display_state": "ON",
+      "window_policy_screen_on": true,
+      "window_policy_interactive": true,
+      "keyguard_showing": false,
+      "input_restricted": false,
+      "keyguard_secure": true,
+      "browser_foreground": true
+    },
+    "navigation": {
+      "tag": "40214769779-1-1792947940457762056",
+      "requested_at_ms": 1792947940459.0417,
+      "document_time_origin_ms": 1792947941042,
+      "rdp_location_replace_used": false
+    }
+  },
+  "guard": {
+    "installed": true,
+    "read_only": true,
+    "redaction": "CSS masks before modal insertion; field values and response bodies are not read"
+  },
+  "files": [
+    {
+      "path": "00-models-top.png",
+      "sha256": "c04589a3b22a6f8e066c701c6004f1297df0a1c1dfad8fa088e145101be1609c",
+      "size": 244585,
+      "root": "#model-modal",
+      "captured_at": "2026-10-25T17:05:46.556201+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "01-models-bottom.png",
+      "sha256": "b5167693506a43fe3ac2e8d714f16edf899e603efa0812bfd049965587154709",
+      "size": 253117,
+      "root": "#model-modal",
+      "captured_at": "2026-10-25T17:05:48.438187+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "02-system-status-top.png",
+      "sha256": "3e612a83e922bf234f3772e892256aa750e2b92c143376ca6fda3e29fdf85cee",
+      "size": 180108,
+      "root": "#logos-system-status",
+      "captured_at": "2026-10-25T17:05:51.635546+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "03-system-status-bottom.png",
+      "sha256": "3e612a83e922bf234f3772e892256aa750e2b92c143376ca6fda3e29fdf85cee",
+      "size": 180108,
+      "root": "#logos-system-status",
+      "captured_at": "2026-10-25T17:05:53.643870+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "04-tools-top.png",
+      "sha256": "8519b1139ed4876e86998e879cc8c654ae844f0fbc2705e213b4fa8bd4201995",
+      "size": 251848,
+      "root": "#tools-modal-custom",
+      "captured_at": "2026-10-25T17:05:56.912955+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "05-tools-bottom.png",
+      "sha256": "79a06454a2fced07b35cce8a72e5ff6e2155ab33165676ae9e1fb0d53b5adfaa",
+      "size": 207973,
+      "root": "#tools-modal-custom",
+      "captured_at": "2026-10-25T17:05:58.756170+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "06-ssh-top.png",
+      "sha256": "6e639212780cdbac0f1c6d30b2bbf706149ba2006609e49ce0a4fdbd1c7205b0",
+      "size": 257773,
+      "root": "#ssh-runtime-modal-custom",
+      "captured_at": "2026-10-25T17:06:01.821226+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "07-ssh-bottom.png",
+      "sha256": "82f5a160e2dfbd0929844f8eacee744ea80cc8bf53be9e0400ffa0962e95d0d6",
+      "size": 251843,
+      "root": "#ssh-runtime-modal-custom",
+      "captured_at": "2026-10-25T17:06:03.474629+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "08-mcp-top.png",
+      "sha256": "0af28b65fb13736f12eae5287f9969f96d7ccfc11a864494097707b62344f040",
+      "size": 211833,
+      "root": "#mcp-manager-modal",
+      "captured_at": "2026-10-25T17:06:06.609802+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "09-mcp-bottom.png",
+      "sha256": "0af28b65fb13736f12eae5287f9969f96d7ccfc11a864494097707b62344f040",
+      "size": 211833,
+      "root": "#mcp-manager-modal",
+      "captured_at": "2026-10-25T17:06:08.591525+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "10-mcp-editor-top.png",
+      "sha256": "739f26d35f060aa88f80e764e88f38efd3a5b6c948201405bfef9683eaa9cdda",
+      "size": 167506,
+      "root": "#mcp-manager-modal",
+      "captured_at": "2026-10-25T17:06:12.505409+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "11-mcp-editor-bottom.png",
+      "sha256": "e7078e95bdafbbd34c929d3a4f7aedf731685b99c4235f28c70defe0be7593dc",
+      "size": 160722,
+      "root": "#mcp-manager-modal",
+      "captured_at": "2026-10-25T17:06:14.309335+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "12-settings-gen-top.png",
+      "sha256": "93644fc4c096c95cc110786a416136a8e802a2bef752c6b5c287b6d046f9f9ca",
+      "size": 213402,
+      "root": "#settings-modal-custom",
+      "captured_at": "2026-10-25T17:06:17.530476+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "13-settings-gen-bottom.png",
+      "sha256": "11a41513afbad53ebb8e6dd21461919bbb675a5113ba0e903fd02a60f08857f5",
+      "size": 216465,
+      "root": "#settings-modal-custom",
+      "captured_at": "2026-10-25T17:06:19.432074+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "14-settings-output-top.png",
+      "sha256": "42eb23e56dceb3c0dcc3474f0986707cf5225ce47cee4a90ff140bbbc3ed04f9",
+      "size": 208422,
+      "root": "#settings-modal-custom",
+      "captured_at": "2026-10-25T17:06:22.581962+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "15-settings-output-bottom.png",
+      "sha256": "42eb23e56dceb3c0dcc3474f0986707cf5225ce47cee4a90ff140bbbc3ed04f9",
+      "size": 208422,
+      "root": "#settings-modal-custom",
+      "captured_at": "2026-10-25T17:06:24.435369+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "16-settings-routing-top.png",
+      "sha256": "776b1e25babba1950b11f61cdd308edf420d014c2b6573fa39c9adad459c7d15",
+      "size": 211129,
+      "root": "#settings-modal-custom",
+      "captured_at": "2026-10-25T17:06:27.674219+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "17-settings-routing-bottom.png",
+      "sha256": "776b1e25babba1950b11f61cdd308edf420d014c2b6573fa39c9adad459c7d15",
+      "size": 211129,
+      "root": "#settings-modal-custom",
+      "captured_at": "2026-10-25T17:06:29.621153+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "18-settings-adv-top.png",
+      "sha256": "5a5073bef88d3e15ce4c024c743b99ad79563785e87c451f90a9bf54f9b1e153",
+      "size": 202564,
+      "root": "#settings-modal-custom",
+      "captured_at": "2026-10-25T17:06:32.852350+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "19-settings-adv-bottom.png",
+      "sha256": "5a5073bef88d3e15ce4c024c743b99ad79563785e87c451f90a9bf54f9b1e153",
+      "size": 202564,
+      "root": "#settings-modal-custom",
+      "captured_at": "2026-10-25T17:06:34.743518+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "20-settings-theme-top.png",
+      "sha256": "38d6569fb1768b950c8b4d6d45f2b079750e24e6c88fba24416f49336efbd912",
+      "size": 211563,
+      "root": "#settings-modal-custom",
+      "captured_at": "2026-10-25T17:06:37.964188+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "21-settings-theme-bottom.png",
+      "sha256": "38d6569fb1768b950c8b4d6d45f2b079750e24e6c88fba24416f49336efbd912",
+      "size": 211563,
+      "root": "#settings-modal-custom",
+      "captured_at": "2026-10-25T17:06:39.875012+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "22-files-top.png",
+      "sha256": "e6286dffadc674b968618ddd2244d04569c75dff986dc65758aa2971a7ed46e1",
+      "size": 217996,
+      "root": "#file-manager-modal",
+      "captured_at": "2026-10-25T17:06:42.623717+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "23-files-bottom.png",
+      "sha256": "ae5c6b2504dd9471435ad616b2d8be49cc2a3b04a548e825d8bf0868eb180a42",
+      "size": 257499,
+      "root": "#file-manager-modal",
+      "captured_at": "2026-10-25T17:06:44.525041+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "24-vector-add-files-top.png",
+      "sha256": "df3a92c396382c2fe85c90f0beee9d1aaa8411fefae0ee307996ccab0588f6d0",
+      "size": 295024,
+      "root": "#vs-add-files-modal",
+      "captured_at": "2026-10-25T17:06:48.292130+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    },
+    {
+      "path": "25-vector-add-files-bottom.png",
+      "sha256": "c61e621bea9492671439d9d7e8e23176d2b4ff31768dcf5b235b477b79a88486",
+      "size": 347000,
+      "root": "#vs-add-files-modal",
+      "captured_at": "2026-10-25T17:06:50.255580+00:00",
+      "redacted": true,
+      "video": "all-modals-01.mp4"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "all-modals-01.mp4",
+      "sha256": "790720e48fc2e291ec2976591c92661954b665fade82f4ce37de526c70d041bd",
+      "size": 5879073
+    },
+    {
+      "path": "events.json",
+      "size": 46638,
+      "sha256": "e05a880f2c2e3f9c62e44df895f249b3f1b5c5757bdcf1977dd815dc36afd83a"
+    }
+  ],
+  "modal_states": [
+    {
+      "name": "models",
+      "root": "#model-modal",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 1
+    },
+    {
+      "name": "system-status",
+      "root": "#logos-system-status",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 0
+    },
+    {
+      "name": "tools",
+      "root": "#tools-modal-custom",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 1
+    },
+    {
+      "name": "ssh",
+      "root": "#ssh-runtime-modal-custom",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 1
+    },
+    {
+      "name": "mcp",
+      "root": "#mcp-manager-modal",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 0
+    },
+    {
+      "name": "mcp-editor",
+      "root": "#mcp-manager-modal",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 1
+    },
+    {
+      "name": "settings-gen",
+      "root": "#settings-modal-custom",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 1
+    },
+    {
+      "name": "settings-output",
+      "root": "#settings-modal-custom",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 0
+    },
+    {
+      "name": "settings-routing",
+      "root": "#settings-modal-custom",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 0
+    },
+    {
+      "name": "settings-adv",
+      "root": "#settings-modal-custom",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 0
+    },
+    {
+      "name": "settings-theme",
+      "root": "#settings-modal-custom",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 0
+    },
+    {
+      "name": "files",
+      "root": "#file-manager-modal",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 3
+    },
+    {
+      "name": "vector-add-files",
+      "root": "#vs-add-files-modal",
+      "status": "CAPTURED",
+      "video": "all-modals-01.mp4",
+      "scroll_containers": 1
+    }
+  ],
+  "planned_states": 21,
+  "captured_states": 13,
+  "mutating_requests_transmitted": 0,
+  "limits": [
+    "DOM button clicks do not prove physical touch input",
+    "MP4 frame clock must be read for exact alignment",
+    "Sensitive field values and raw trace text are masked; values are not validated",
+    "Cloud.ru IAM source is not loaded by the installed application template; no script was injected to fabricate that modal"
+  ]
+}
