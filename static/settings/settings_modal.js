@@ -203,30 +203,36 @@
   };
 
   // === 2. Полное окно конфигурации параметров LLM ===
-  // The Ultra profile of the selected model, as published by /api/models, or null.
   function ultraProfileFor(modelKey) {
+    var storage = window.SettingsStorage;
     var text = typeof modelsData !== "undefined" && modelsData.text ? modelsData.text : {};
-    var entry = text[modelKey];
-    return entry && entry.ultra_profile ? entry.ultra_profile : null;
+    var profile = typeof storage.ultraProfileFor === "function"
+      ? storage.ultraProfileFor(modelKey)
+      : (text[modelKey] || {}).ultra_profile;
+    return profile && profile.default_profile === "ultra" && profile.settings_defaults
+      ? profile : null;
   }
 
-  // The profile's own parameters: no output cap, its truncation, and no effort when it has no depth control.
   function applyUltraProfile(settings, profile) {
-    settings.max_output_tokens = 0;
-    if (profile.truncation) settings.truncation = profile.truncation;
-    if (!profile.reasoning_depth_control) settings.reasoning_effort = "disabled";
+    Object.keys(profile.settings_defaults).forEach(function (key) {
+      settings[key] = profile.settings_defaults[key];
+    });
+    settings.model_profile = "ultra";
+    settings.model_profile_id = profile.profile_id;
     return settings;
   }
 
   function ultraProfileNote(profile) {
     if (!profile) return "";
-    var depth = profile.reasoning_depth_control
-      ? "управляется настройкой ниже"
-      : "у модели нет управления глубиной, отключено";
+    var defaults = profile.settings_defaults;
+    var depth = defaults.reasoning_effort === "disabled"
+      ? "параметр не передаётся для этой модели"
+      : defaults.reasoning_effort;
     return (
       '<div style="margin-bottom:12px;font-size:13px;color:var(--m-text,#222);">' +
-      "Параметры Ultra-профиля модели: максимум токенов ответа — без ограничения; " +
-      "truncation — " + (profile.truncation || "по умолчанию") + "; глубина размышлений — " + depth + "." +
+      "<strong>Профиль: Ultra — по умолчанию</strong><br>" +
+      "Ответ — максимум провайдера без потолка приложения; контекст не обрезается; " +
+      "глубина размышлений — " + window.SettingsUI.escapeHtml(depth) + "." +
       "</div>"
     );
   }
@@ -281,8 +287,8 @@
       ),
       UI.gap2(
         "<div>" +
-          UI.lbl("Максимум токенов ответа") +
-          UI.inp("set-tokens", "number", settings.max_output_tokens, ' step="100" min="1"') +
+          UI.lbl("Токены ответа (0 — максимум провайдера)") +
+          UI.inp("set-tokens", "number", settings.max_output_tokens, ' step="100" min="0"') +
           "</div>",
         "<div>" +
           UI.lbl("Truncation") +

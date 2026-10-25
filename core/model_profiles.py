@@ -1,10 +1,10 @@
 """Runtime view of the prepared Ultra model profiles.
 
-The catalog describes the model picker. Its only effect on provider requests is
-``ultra_request_defaults``, which fills in unset truncation and reasoning effort.
-Every profile keeps explicit blockers until a separately reviewed adapter, provider
-evidence and an owner-approved run budget exist. Registry entries marked
-``available: False`` stay listed for accounting but cannot be selected.
+Active Yandex Responses models use their Ultra settings by default, including
+requests from clients with older saved settings. The model catalog publishes the
+same settings for the browser. Provider acceptance and unresolved capabilities
+remain separate from this local default policy. Retired registry entries remain
+listed for accounting and never receive active defaults.
 """
 
 from __future__ import annotations
@@ -71,8 +71,11 @@ def profile_summary(profile: dict[str, Any]) -> dict[str, Any]:
     lifecycle = profile.get("lifecycle") or {}
     reasoning = profile.get("reasoning") or {}
     wire = profile.get("wire_parameters") or {}
+    defaults = ultra_request_defaults(profile.get("model_key", ""))
     return {
         "profile_id": profile.get("profile_id"),
+        "default_profile": "ultra" if defaults else None,
+        "settings_defaults": defaults,
         "status": profile.get("status"),
         "transport": profile.get("transport"),
         "lifecycle_state": lifecycle.get("state"),
@@ -87,21 +90,29 @@ def profile_summary(profile: dict[str, Any]) -> dict[str, Any]:
 
 
 def ultra_request_defaults(model_key: str) -> dict[str, Any]:
-    """Return the Ultra defaults for a Responses request that the caller did not set.
+    """Canonical local Ultra settings for an active Yandex Responses model.
 
-    Only ``truncation`` and ``reasoning_effort`` are applied. No output ceiling is set,
-    because the catalog publishes no ``documented_hosted_ceiling_tokens`` for any model.
+    Zero omits an application output cap; it is not a claim about the provider's
+    output ceiling. Only reasoning effort present in this model's wire profile
+    is selected. Unknown or unsupported reasoning is omitted from the request.
     """
     profile = ultra_profiles().get(model_key)
-    if profile is None or profile.get("transport") != "responses":
-        # Completion-API models (text_generation_async, e.g. yandexgpt-5.1) keep their own wire shape.
+    if (
+        profile is None
+        or profile.get("transport") != "responses"
+        or profile.get("status") == "blocked_retired"
+        or ALL_MODELS.get(model_key, {}).get("available") is False
+    ):
         return {}
     wire = profile.get("wire_parameters") or {}
-    defaults: dict[str, Any] = {}
+    defaults: dict[str, Any] = {
+        "max_output_tokens": 0,
+        "reasoning_effort": "disabled",
+    }
     if wire.get("truncation") == "disabled":
         defaults["truncation"] = "disabled"
     effort = (wire.get("reasoning") or {}).get("effort")
-    if effort:
+    if effort and (profile.get("reasoning") or {}).get("depth_control") is True:
         defaults["reasoning_effort"] = effort
     return defaults
 

@@ -60,10 +60,36 @@
     return STORAGE_KEY + "_conv_" + convId;
   }
 
+  // The server publishes one canonical set of Ultra parameters per model.
+  function ultraProfileFor(modelKey) {
+    modelKey = modelKey || (typeof currentModel !== "undefined" ? currentModel : "");
+    var catalog = typeof modelsData !== "undefined" && modelsData ? modelsData : {};
+    var entry = (catalog.text || {})[modelKey];
+    return entry && entry.ultra_profile ? entry.ultra_profile : null;
+  }
+
+  function applyUltraSettings(settings, modelKey) {
+    var profile = ultraProfileFor(modelKey);
+    var defaults = profile && profile.settings_defaults;
+    if (!defaults || !Object.keys(defaults).length) {
+      if (settings.model_profile === "ultra") {
+        delete settings.model_profile;
+        delete settings.model_profile_id;
+      }
+      return settings;
+    }
+    Object.keys(defaults).forEach(function (key) {
+      settings[key] = defaults[key];
+    });
+    settings.model_profile = "ultra";
+    settings.model_profile_id = profile.profile_id;
+    return settings;
+  }
+
   // Settings saved before the Ultra default still hold the old 2000-token cap; drop it so they match the new default.
   function withoutLegacyTokenCap(settings) {
     if (settings && settings.max_output_tokens === 2000) settings.max_output_tokens = 0;
-    return settings;
+    return applyUltraSettings(settings || {});
   }
 
   // Синхронная загрузка (из кэша или localStorage для обратной совместимости)
@@ -94,6 +120,7 @@
   // Сохранение локально сразу; для диалога — и на сервер (нативное хранилище Kristall).
   // Промис отклоняется, если сервер не принял копию, чтобы окно могло остаться открытым.
   function save(settings, convId) {
+    settings = applyUltraSettings(Object.assign({}, settings));
     convId =
       convId || (typeof currentConvId !== "undefined" && currentConvId ? currentConvId : null);
     if (!convId) {
@@ -148,6 +175,7 @@
   };
 
   window.resetSettings = function (convId) {
+    var defaults = applyUltraSettings(JSON.parse(JSON.stringify(DEFAULTS)));
     convId =
       convId || (typeof currentConvId !== "undefined" && currentConvId ? currentConvId : null);
     if (convId) {
@@ -156,19 +184,21 @@
       window.LogosDispatcher.request("/api/conversations/" + convId + "/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(DEFAULTS),
+        body: JSON.stringify(defaults),
       }).catch(function () {});
     } else {
       localStorage.removeItem(STORAGE_KEY);
       globalSettingsCache = "";
     }
-    return JSON.parse(JSON.stringify(DEFAULTS));
+    return defaults;
   };
 
   window.SettingsStorage = {
     DEFAULTS: DEFAULTS,
     STORAGE_KEY: STORAGE_KEY,
     SKILLS_BACKUP_KEY: SKILLS_BACKUP_KEY,
+    ultraProfileFor: ultraProfileFor,
+    applyUltraSettings: applyUltraSettings,
     load: load,
     save: save,
   };

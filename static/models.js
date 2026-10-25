@@ -18,7 +18,8 @@ function formatUltraSummary(summary) {
     parts.push("снята");
     return parts.join(" · ");
   }
-  if (summary.status === "prepared_not_activated") parts.push("не активирован");
+  if (summary.default_profile === "ultra") parts.push("по умолчанию");
+  else if (summary.status === "prepared_not_activated") parts.push("не активирован");
   if (summary.context_window_tokens) {
     parts.push("контекст " + summary.context_window_tokens + " ток.");
   }

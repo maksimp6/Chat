@@ -38,11 +38,14 @@ def build_response_payload(
     yandex_conv_id=None,
 ):
     """Build a Yandex Responses API payload from client parameters."""
-    # A copy, so Ultra defaults never leak back into the caller's params.
+    # A copy, so applying the model profile never mutates saved caller settings.
     params = dict(params or {})
-    for name, value in ultra_request_defaults(model_key).items():
-        if params.get(name) in (None, ""):
-            params[name] = value
+    defaults = ultra_request_defaults(model_key)
+    if defaults:
+        # Older browsers still send medium reasoning, auto truncation and output
+        # caps. The model's Ultra policy owns these fields on every request.
+        params.update(defaults)
+        params.pop("reasoning", None)
     is_background = params.get("background", True)
 
     if is_background:

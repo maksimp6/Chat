@@ -118,5 +118,71 @@ class YandexRequestBuilderTests(unittest.TestCase):
             )
 
 
+    def test_ultra_replaces_old_browser_limits_and_structured_reasoning(self):
+        stale = {
+            "background": False,
+            "max_output_tokens": 2000,
+            "truncation": "auto",
+            "reasoning_effort": "medium",
+            "reasoning": {"effort": "low"},
+            "instructions": "Keep this instruction",
+            "temperature": 0.2,
+        }
+        for model in ("gpt-oss-120b", "gpt-oss-20b"):
+            with self.subTest(model=model):
+                payload = build_response_payload("project", model, "hello", params=stale)
+                self.assertEqual(payload["reasoning"], {"effort": "high"})
+                self.assertEqual(payload["truncation"], "disabled")
+                self.assertNotIn("max_output_tokens", payload)
+                self.assertEqual(payload["instructions"], stale["instructions"])
+                self.assertEqual(payload["temperature"], 0.2)
+        self.assertEqual(stale["reasoning"], {"effort": "low"})
+        self.assertEqual(stale["reasoning_effort"], "medium")
+        self.assertEqual(stale["max_output_tokens"], 2000)
+
+    def test_ultra_does_not_invent_reasoning_for_other_active_chat_models(self):
+        models = (
+            "logos-runtime", "logos-runtime-flash", "yandexgpt-5-pro",
+            "yandexgpt-5-lite", "deepseek-v4.1-flash", "deepseek-v4-flash",
+            "qwen3.6-35b-a3b",
+        )
+        for model in models:
+            with self.subTest(model=model):
+                payload = build_response_payload(
+                    "project", model, "hello", params={
+                        "reasoning": {"effort": "high"},
+                        "reasoning_effort": "medium",
+                        "max_output_tokens": 512,
+                        "truncation": "auto",
+                    },
+                )
+                self.assertNotIn("reasoning", payload)
+                self.assertNotIn("max_output_tokens", payload)
+                self.assertEqual(payload["truncation"], "disabled")
+
+    def test_ultra_defaults_leave_foreign_and_other_transports_unmodified(self):
+        from core.model_profiles import ultra_request_defaults
+
+        for model in (
+            "claude-opus-5-5", "unknown-model", "yandexgpt-5.1",
+            "speech-realtime-deepseek-v4-flash", "qwen3-235b-a22b-fp8",
+        ):
+            with self.subTest(model=model):
+                self.assertEqual(ultra_request_defaults(model), {})
+
+    def test_public_ultra_settings_match_the_enforced_oss_profile(self):
+        from core.model_profiles import profile_summary, ultra_profiles
+
+        summary = profile_summary(ultra_profiles()["gpt-oss-120b"])
+        self.assertEqual(summary["default_profile"], "ultra")
+        self.assertEqual(summary["settings_defaults"], {
+            "max_output_tokens": 0,
+            "truncation": "disabled",
+            "reasoning_effort": "high",
+        })
+        self.assertEqual(summary["status"], "prepared_not_activated")
+        self.assertTrue(summary["blockers"])
+
+
 if __name__ == "__main__":
     unittest.main()

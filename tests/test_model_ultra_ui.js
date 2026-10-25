@@ -206,3 +206,30 @@ test("catalog loaded from the API marks retired models and their Ultra status", 
   options[0].dispatchEvent({ type: "click" });
   assert.deepEqual(selected, ["yandexgpt-5.1"]);
 });
+
+
+test("active Ultra defaults are labelled as the selected application policy", () => {
+  const runtime = renderPicker({
+    text: {
+      "gpt-oss-120b": {
+        name: "GPT OSS 120B",
+        input: 0.3,
+        output: 0.3,
+        ultra_profile: {
+          ...PREPARED,
+          profile_id: "ultra-gpt-oss-120b",
+          default_profile: "ultra",
+          settings_defaults: {
+            max_output_tokens: 0,
+            truncation: "disabled",
+            reasoning_effort: "high",
+          },
+        },
+      },
+    },
+    voice: {},
+  }, "gpt-oss-120b");
+  const line = runtime.document.querySelector(".model-option-ultra").textContent;
+  assert.match(line, /Ultra · по умолчанию/);
+  assert.doesNotMatch(line, /не активирован/);
+});
