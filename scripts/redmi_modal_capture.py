@@ -81,7 +81,7 @@ def capture(output, uid, gid, metadata):
         raise RuntimeError('The initial application view is not clean')
     runtime = native.version()
     installed = rdp.evaluate(actor, INSTALL)
-    files, artifacts, events, results = [], [], [], []
+    files, artifacts, events, results, collected_requests = [], [], [], [], []
     recorder = None
     video_path = None
     part = 0
@@ -166,25 +166,31 @@ def capture(output, uid, gid, metadata):
         mark('screencap_finished',entry)
 
     def close_all():
-        for _ in range(6):
-            target = browser('const selector=\'.logos-trace-window .logos-trace-btn[title="Close"],'
-                             '#partner-relations-modal button[aria-label="Закрыть"],'
-                             '#settings-modal-custom #set-close-btn,'
-                             '#logos-system-status:not([hidden]) .logos-system-status-close,'
-                             '.modal.visible .modal-close,#model-modal.visible #close-modal\';'
-                             'for(const old of document.querySelectorAll("[data-recording-close]"))old.removeAttribute("data-recording-close");'
-                             'for(const b of [...document.querySelectorAll(selector)].reverse()) {'
-                             'if(!b.getBoundingClientRect().width||!b.getBoundingClientRect().height)continue;'
-                             'b.scrollIntoView({block:"nearest",inline:"nearest"});const r=b.getBoundingClientRect();'
-                             'const x=r.x+r.width/2,y=r.y+r.height/2,h=document.elementFromPoint(x,y);'
-                             'if(x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(h===b||b.contains(h))){'
-                             'b.setAttribute("data-recording-close","true");return true;}}return false;')
-            if not target:
-                break
-            rdp.click(actor,'[data-recording-close="true"]')
+        # Start each window in a fresh document, so an unclosed predecessor cannot
+        # obscure its header button. This records openings; it does not certify X buttons.
+        nonlocal actor
+        collected_requests.extend(browser('return window.__modalRecordingRequests||[];'))
+        origin=rdp.state(actor)['time_origin_ms']
+        mark('fresh_document_requested')
+        browser('setTimeout(()=>location.reload(),100);return {scheduled:true};')
+        deadline=time.monotonic()+18
+        while time.monotonic()<deadline:
+            try:
+                candidate=rdp.find_logos()
+                state=rdp.state(candidate)
+                if state['time_origin_ms']!=origin and state['document_ready_state']=='complete':
+                    if state['revision']!=initial['revision']:
+                        raise native.CaptureSafetyError('application_revision_changed')
+                    actor=candidate
+                    rdp.evaluate(actor,INSTALL)
+                    mark('fresh_document_ready')
+                    return
+            except native.CaptureSafetyError:
+                raise
+            except (OSError,RuntimeError,KeyError):
+                pass
             time.sleep(.3)
-        browser('const s=document.getElementById("sidebar");if(s&&s.classList.contains("open"))'
-                '{document.getElementById("close-sidebar-btn").click();}return {closed:true};')
+        raise RuntimeError('fresh_document_did_not_load')
 
     def open_trace():
         selector = '.logos-trace-open-viewer,.trace-viewer-auto-button'
@@ -271,7 +277,7 @@ def capture(output, uid, gid, metadata):
             close_all()
         except Exception:
             pass
-        requests = browser('return window.__modalRecordingRequests||[];')
+        requests = collected_requests + browser('return window.__modalRecordingRequests||[];')
         mark('walk_finished',{'captured':sum(x['status']=='CAPTURED' for x in results),'planned':len(CASES)})
         timeline=output/'events.json'
         timeline.write_text(json.dumps({'scenario':'all_application_modals','events':events,'network':requests},ensure_ascii=False,indent=2)+'\n')
@@ -285,6 +291,7 @@ def capture(output, uid, gid, metadata):
                   'captured_states':sum(x['status']=='CAPTURED' for x in results),
                   'mutating_requests_transmitted':sum(x['method'] not in ('GET','HEAD') and not x['blocked'] for x in requests),
                   'limits':['DOM button clicks do not prove physical touch input','MP4 frame clock must be read for exact alignment',
+                            'Each window is opened in a fresh document; close-button behavior is not certified by that isolation',
                             'Sensitive field values and raw trace text are masked; values are not validated',
                             'Cloud.ru IAM source is not loaded by the installed application template; no script was injected to fabricate that modal']}
         (output/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')

@@ -24,7 +24,7 @@ jobs:
         timeout-minutes: 12
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          MODAL_RECORDING_START_INDEX: "13"
+          MODAL_RECORDING_START_INDEX: "16"
         run: |
           set -euo pipefail
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
@@ -66,5 +66,6 @@ jobs:
                             'missing':[x for x in m['modal_states'] if x['status']!='CAPTURED'],
                             'mutating_requests_transmitted':m['mutating_requests_transmitted']},ensure_ascii=False))
           if m['mutating_requests_transmitted']:raise SystemExit('Read-only recording violated')
+          if m['captured_states']!=m['planned_states']:raise SystemExit('Some requested modal states were not captured; evidence preserved')
           PY
           exit "$capture_exit_code"
