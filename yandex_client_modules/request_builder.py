@@ -5,6 +5,7 @@ It deliberately has no HTTP, database, tracing, or MCP side effects.
 """
 
 from core.config import upstream_model_id
+from yandex_client_modules.errors import YandexClientError
 from core.model_profiles import ultra_profiles, ultra_reasoning_controllable, ultra_request_defaults
 from yandex_client_modules.metadata_validator import validate_metadata
 
@@ -64,13 +65,20 @@ def build_chat_image_payload(
     instructions=None,
     temperature=None,
     max_tokens=None,
+    history=None,
 ):
-    """Chat Completions body for a message with photos, in the shape the Yandex docs show for image input."""
+    """Chat Completions body for a message with photos, in the shape the Yandex docs show for image input.
+
+    ``history`` is the earlier turns of the conversation as {"role", "text"} items; Chat Completions
+    keeps no server-side state, so the earlier turns must travel with every request.
+    """
     content = [{"type": "text", "text": message}]
     content += [{"type": "image_url", "image_url": {"url": url}} for url in images]
     messages = []
     if instructions:
         messages.append({"role": "system", "content": instructions})
+    for turn in history or []:
+        messages.append({"role": turn["role"], "content": turn["text"]})
     messages.append({"role": "user", "content": content})
     payload = {
         "model": "gpt://" + project_id + "/" + upstream_model_id(model_key),
@@ -84,21 +92,33 @@ def build_chat_image_payload(
 
 
 def chat_completion_to_response(data):
-    """Reshape a Chat Completions answer into the Responses shape the rest of the client reads."""
-    if not isinstance(data, dict):
-        return data
-    choices = data.get("choices") or []
-    first = choices[0] if choices and isinstance(choices[0], dict) else {}
+    """Reshape a Chat Completions answer into the Responses shape the rest of the client reads.
+
+    The finish reason decides the status: a truncated answer is "incomplete" with its reason kept,
+    a filtered or empty answer is an error, so a partial text never passes as a finished one.
+    """
+    choices = data.get("choices") if isinstance(data, dict) else None
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+        raise YandexClientError("chat completion has no choices")
+    first = choices[0]
+    finish_reason = first.get("finish_reason")
     text = (first.get("message") or {}).get("content")
+    if finish_reason == "content_filter":
+        raise YandexClientError("answer was withheld by the content filter")
+    if not isinstance(text, str) or not text.strip():
+        raise YandexClientError("chat completion returned no text")
     usage = data.get("usage") or {}
+    incomplete = finish_reason == "length"
     return {
         "id": data.get("id"),
-        "status": "completed",
+        "status": "incomplete" if incomplete else "completed",
+        "incomplete_details": {"reason": finish_reason} if incomplete else None,
+        "finish_reason": finish_reason,
         "output": [
             {
                 "type": "message",
                 "role": "assistant",
-                "content": [{"type": "output_text", "text": text if isinstance(text, str) else ""}],
+                "content": [{"type": "output_text", "text": text}],
             }
         ],
         "usage": {

@@ -120,7 +120,7 @@ jobs:
                   report["result"] = {"failed": state.get("error")}
                   finish(1)
           report["result"] = "pending: poll again with operation_id"
-          finish(0)
+          finish(2)
           PY
           if [ -f "$OUT_DIR/art.jpg" ]; then
             echo "picture bytes: $(wc -c < "$OUT_DIR/art.jpg")"

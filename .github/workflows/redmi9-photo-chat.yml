@@ -12,11 +12,11 @@ concurrency:
 jobs:
   photo_chat:
     runs-on: redmi9
-    timeout-minutes: 6
+    timeout-minutes: 10
     steps:
-      - name: Send one photo to the model through the Redmi 9 app
+      - name: Send the photo and the same question without it through the Redmi 9 app
         shell: bash
-        timeout-minutes: 5
+        timeout-minutes: 10
         env:
           MODEL: qwen3.6-35b-a3b
         run: |
@@ -37,7 +37,8 @@ jobs:
 
           BASE = "http://127.0.0.1:8080"
           MODEL = os.environ["MODEL"]
-          QUESTION = "На изображении записан вопрос и ответ. Назови вопрос и ответ одной строкой."
+          QUESTION = "На изображении записан вопрос и ответ. Назови число из ответа и ничего больше."
+          EXPECTED = "397"  # the answer printed on the screenshot is 397,8
           PHOTO_SHA256 = "3202c326b926ccbfb30629bea5129a1c249d789a0aa93d8cde432f0a5adef9a9"
           PHOTO_SIZE = 222314
 
@@ -61,34 +62,35 @@ jobs:
                   return error.code, error.read().decode("utf-8", errors="replace")[:800]
 
 
+          def ask(conv_id, attachments):
+              body = {"conversation_id": conv_id, "message": QUESTION, "model": MODEL}
+              if attachments:
+                  body["attachments"] = [{"data_url": data_url}]
+              return post("/api/chat", body, 180)
+
+
           conv_status, conv = post("/api/conversations", {"model": MODEL}, 30)
           conv_id = conv.get("id") if isinstance(conv, dict) else None
           print(json.dumps({"step": "conversation", "status": conv_status, "created": bool(conv_id)}))
           if not conv_id:
               raise SystemExit(1)
 
-          chat_status, chat = post(
-              "/api/chat",
-              {
-                  "conversation_id": conv_id,
-                  "message": QUESTION,
-                  "model": MODEL,
-                  "attachments": [{"data_url": data_url}],
-              },
-              180,
-          )
-          if isinstance(chat, dict):
-              summary = {
-                  "step": "chat",
-                  "status": chat_status,
-                  "reply": str(chat.get("reply", ""))[:1500],
-                  "usage": chat.get("usage"),
-                  "cost": chat.get("cost"),
-                  "error": chat.get("error"),
-              }
-          else:
-              summary = {"step": "chat", "status": chat_status, "body": chat}
-          print(json.dumps(summary, ensure_ascii=False))
-          if chat_status != 200:
+          failures = []
+          for label, attachments in (("with_photo", True), ("without_photo", False)):
+              status, chat = ask(conv_id, attachments)
+              reply = str(chat.get("reply", "")) if isinstance(chat, dict) else str(chat)
+              found = EXPECTED in reply
+              print(json.dumps({"step": label, "status": status, "reply": reply[:500],
+                                "expected_found": found, "error": chat.get("error") if isinstance(chat, dict) else None},
+                               ensure_ascii=False))
+              if status != 200:
+                  failures.append(label + ": http " + str(status))
+              elif attachments and not found:
+                  failures.append("with_photo: the reply does not contain " + EXPECTED)
+              elif not attachments and found:
+                  failures.append("without_photo: the reply contains " + EXPECTED + " without the photo")
+          if failures:
+              print(json.dumps({"result": "FAIL", "failures": failures}, ensure_ascii=False))
               raise SystemExit(1)
+          print(json.dumps({"result": "PASS"}))
           PY

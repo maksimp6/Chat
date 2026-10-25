@@ -244,13 +244,13 @@ class YandexRequestMixin:
             conversation_id=conversation_id,
             yandex_conv_id=yandex_conv_id,
         )
-        if isinstance(execution_trace, ExecutionTrace):
-            execution_trace.add_event("ultra_profile_applied", ultra_applied_event(model_key, params, payload))
-
         url = self.responses_url
         images = params.get("input_images") or []
         if images:
             # Photos go through Chat Completions, the shape the Yandex docs show for image input.
+            # That path keeps no tool loop, so a request with tools is refused rather than sent without them.
+            if params.get("tools"):
+                raise YandexClientError("tools_not_supported_with_images")
             payload = build_chat_image_payload(
                 project_id=credential.project_id,
                 model_key=model_key,
@@ -259,8 +259,12 @@ class YandexRequestMixin:
                 instructions=params.get("instructions"),
                 temperature=params.get("temperature"),
                 max_tokens=params.get("max_output_tokens"),
+                history=params.get("chat_history"),
             )
             url = self.chat_completions_url
+        # Recorded for the payload that is actually sent, after the photo branch has chosen it.
+        if isinstance(execution_trace, ExecutionTrace):
+            execution_trace.add_event("ultra_profile_applied", ultra_applied_event(model_key, params, payload))
 
         # Reserved after the payload is built, so a request rejected for its parameters uses no quota.
         quota_reservation = None
@@ -364,7 +368,12 @@ class YandexRequestMixin:
 
         data = resp.json()
         if images:
-            data = chat_completion_to_response(data)
+            try:
+                data = chat_completion_to_response(data)
+            except YandexClientError:
+                # The provider answered without a usable reply, so the reserved request is not charged.
+                release_request(quota_reservation)
+                raise
 
         if execution_trace and isinstance(execution_trace, ExecutionTrace):
             execution_trace.add_response(

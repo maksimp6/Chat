@@ -2,6 +2,7 @@
 
 from flask import Blueprint, request, jsonify
 import logging
+import re
 import json as _json
 import uuid
 from typing import Any
@@ -135,6 +136,22 @@ def _client_params(raw: dict[str, Any]) -> dict[str, Any]:
 # Models whose provider acceptance for image input is verified. Until one is listed,
 # a message with photos is refused instead of being sent without them.
 IMAGE_INPUT_MODEL_KEYS: frozenset[str] = frozenset({"qwen3.6-35b-a3b"})
+IMAGE_HISTORY_TURNS = 20
+IMAGE_HISTORY_TEXT_CHARS = 4000
+_MARKDOWN_PICTURE = re.compile(r"!\[[^\]]*\]\(data:image/[^)]*\)")
+
+
+def _image_turn_history(conv_id):
+    """Earlier turns for a Chat Completions request: text only, pictures replaced by a marker."""
+    turns = [m for m in get_messages(conv_id) if m.get("role") in ("user", "assistant")]
+    if turns and turns[-1]["role"] == "user":
+        turns = turns[:-1]  # the current message is sent separately
+    history = []
+    for turn in turns[-IMAGE_HISTORY_TURNS:]:
+        text = _MARKDOWN_PICTURE.sub("[картинка]", str(turn.get("text") or ""))[:IMAGE_HISTORY_TEXT_CHARS]
+        if text.strip():
+            history.append({"role": turn["role"], "text": text})
+    return history
 MAX_IMAGES_PER_MESSAGE = 4
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
@@ -410,6 +427,8 @@ def chat():
 
         if not retry:
             add_message(invocation.conversation_id, "user", message)
+        if images:
+            params["chat_history"] = _image_turn_history(invocation.conversation_id)
         conversation_title = maybe_update_conversation_title(
             invocation.conversation_id,
             message,
