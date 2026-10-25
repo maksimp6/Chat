@@ -57,16 +57,6 @@ HOST = "127.0.0.1"
 PORT = 8080
 
 TEXT_MODELS = {
-    "logos-runtime": {
-        "name": "Alice AI LLM",
-        "upstream": "logosai-llm",
-        "type": "text",
-        "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
-        "input": 0.50,
-        "cached": 0.50,
-        "tool": 0.13,
-        "output": 1.20,
-    },
     "yandexgpt-5.1": {
         "name": "YandexGPT 5.1 Pro",
         "type": "text",
@@ -151,9 +141,7 @@ class Config:
 
 # Keys renamed in #1316. Stored conversations and older clients may still send the old id.
 # Stored conversations and older clients may still send them: requests go to the successor.
-LEGACY_MODEL_KEYS = {
-    "logosai-llm": "logos-runtime",
-}
+LEGACY_MODEL_KEYS = {}
 
 
 def canonical_model_key(model_key: str) -> str:

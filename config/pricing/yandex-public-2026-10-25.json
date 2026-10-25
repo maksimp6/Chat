@@ -19,12 +19,6 @@
       "tool": 0.1,
       "output": 0.1
     },
-    "logos-runtime": {
-      "input": 0.5,
-      "cached": 0.5,
-      "tool": 0.13,
-      "output": 1.2
-    },
     "yandexgpt-5.1": {
       "input": 0.8,
       "cached": 0.8,
@@ -57,10 +51,6 @@
     }
   },
   "async_rub_per_1000_tokens": {
-    "logos-runtime": {
-      "input": 0.25,
-      "output": 1.02
-    },
     "yandexgpt-5.1": {
       "input": 0.41,
       "output": 0.41

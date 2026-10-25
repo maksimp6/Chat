@@ -34,7 +34,7 @@ from agent_runtime.review_policy import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_MODEL = "logos-runtime"
+DEFAULT_MODEL = "yandexgpt-5.1"
 TOOL_CATEGORIES = ["filesystem"]
 MAX_SUMMARY_CHARS = 4000
 

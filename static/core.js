@@ -1,6 +1,6 @@
 let currentConvId = null;
 let conversations = [];
-let currentModel = "logos-runtime";
+let currentModel = "yandexgpt-5.1";
 let currentModelType = "text";
 let modelsData = { text: {}, voice: {} };
 let coreInitialized = false;
@@ -62,7 +62,6 @@ window.LogosTheme = {
 
 // Keys renamed in #1316; stored conversations may still carry the old names.
 const LEGACY_MODEL_KEYS = {
-  "logosai-llm": "logos-runtime",
 };
 
 const savedTheme = window.LogosTheme.getStored();
@@ -80,7 +79,7 @@ window.changeModel = function (newModel, skipPatch) {
   // Without a catalog (offline or degraded) keep the requested key; the server validates it.
   if (catalogLoaded && !textModels[newModel] && !voiceModels[newModel]) {
     console.warn("[CORE] Unknown model:", newModel, "-> fallback to logos-runtime");
-    newModel = "logos-runtime";
+    newModel = "yandexgpt-5.1";
   }
   currentModel = newModel;
   currentModelType = voiceModels[currentModel] ? "voice" : "text";

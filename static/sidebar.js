@@ -158,7 +158,7 @@ function selectConv(id, updateHistory) {
   });
   if (conv) {
     if (typeof window.changeModel === "function") {
-      window.changeModel(conv.model || "logos-runtime", true);
+      window.changeModel(conv.model || "yandexgpt-5.1", true);
     }
   }
   if (typeof window.loadServerConvSettings === "function") {
@@ -205,7 +205,7 @@ function deleteConv(id) {
         chatbox.appendChild(empty);
       }
       if (typeof window.changeModel === "function") {
-        window.changeModel("logos-runtime", true);
+        window.changeModel("yandexgpt-5.1", true);
       }
     }
   }
