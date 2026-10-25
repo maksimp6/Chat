@@ -64,7 +64,8 @@ def import_yandex_key(payload):
         raise ImportRejected("invalid_api_key")
     issued, expires = _date(payload.get("issued_at")), _date(payload.get("expires_at"))
     now = datetime.now(timezone.utc)
-    if issued > now + timedelta(minutes=5) or expires <= now or not timedelta(0) < expires-issued <= timedelta(hours=13):
+    # Runner IAM keys live 12 hours; console API keys can live up to 90 days.
+    if issued > now + timedelta(minutes=5) or expires <= now or not timedelta(0) < expires-issued <= timedelta(days=90):
         raise ImportRejected("invalid_key_lifetime")
     db = get_store()
     current = issuance_status()["credential"]

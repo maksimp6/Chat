@@ -1,0 +1,27 @@
+name: Redmi 9 issue API key from browser
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  issue:
+    runs-on: redmi9
+    timeout-minutes: 5
+    steps:
+      - name: logos
+        shell: bash
+        timeout-minutes: 5
+        env:
+          YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
+          LOGOS_PROVIDER_CREDENTIALS_TOKEN: ${{ secrets.LOGOS_PROVIDER_CREDENTIALS_TOKEN }}
+        run: |
+          set -euo pipefail
+          test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
+          issue_dir=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-issue-", dir=".")).resolve())')
+          for name in redmi_issue_api_key_browser.py redmi_browser_probe.py redmi_screenshot_capture.py; do
+            curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
+              "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/$name" -o "$issue_dir/$name"
+          done
+          RUNNER_TEMP="$issue_dir" python "$issue_dir/redmi_issue_api_key_browser.py"
