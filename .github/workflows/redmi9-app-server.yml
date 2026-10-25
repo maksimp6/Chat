@@ -97,6 +97,11 @@ jobs:
         shell: bash
         timeout-minutes: 2
         run: |
+          set -euo pipefail
+          rootagent_job_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-rootagent-check-", dir=".")).resolve())')
+          export RUNNER_TEMP="$rootagent_job_temp"
+          export TMPDIR="$rootagent_job_temp"
+          trap 'rmdir "$rootagent_job_temp"' EXIT
           python - <<'PY'
           import http.client, json, os, socket, subprocess, sys
           from pathlib import Path
