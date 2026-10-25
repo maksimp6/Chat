@@ -101,11 +101,6 @@ jobs:
           report["result"] = "timed out"
           finish(1)
           PY
-
-      - name: Keep the picture and the report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: redmi9-art-real
-          path: ${{ runner.temp }}/art-real
-          if-no-files-found: warn
+          if [ -f "$OUT_DIR/art.jpg" ]; then
+            echo "picture bytes: $(wc -c < "$OUT_DIR/art.jpg")"
+          fi

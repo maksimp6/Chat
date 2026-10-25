@@ -69,9 +69,12 @@ def generate_image():
     except ImageGenerationError as exc:
         return jsonify({"error": "image_generation_failed", "message": str(exc)[:200]}), 502
     except requests.RequestException as exc:
-        return jsonify({"error": "image_generation_unavailable", "message": type(exc).__name__}), 502
-    except Exception:
-        return jsonify({"error": "provider_credential_unavailable"}), 503
+        response = getattr(exc, "response", None)
+        status = response.status_code if response is not None else None
+        detail = response.text[:300] if response is not None else type(exc).__name__
+        return jsonify({"error": "image_generation_unavailable", "status": status, "message": detail}), 502
+    except Exception as exc:
+        return jsonify({"error": "provider_credential_unavailable", "message": type(exc).__name__}), 503
 
     add_message(conv_id, "user", prompt, cost=None)
     return jsonify({"operation_id": operation_id, "model": model_key})
