@@ -98,7 +98,7 @@ jobs:
         timeout-minutes: 2
         run: |
           python - <<'PY'
-          import json, os, socket, subprocess, sys, urllib.error, urllib.request
+          import http.client, json, os, socket, subprocess, sys
           from pathlib import Path
           
           required = ("GITHUB_RUN_ID", "GITHUB_SHA", "RUNNER_NAME", "RUNNER_TEMP")
@@ -150,13 +150,14 @@ jobs:
               if not report["listener_8766_rootagent"]:
                   report["result"] = "FAIL_ROOTAGENT_NOT_LISTENING"
               else:
+                  connection = http.client.HTTPConnection("127.0.0.1", 8766, timeout=3)
                   try:
-                      with urllib.request.urlopen("http://127.0.0.1:8766/v1/status", timeout=3) as response:
-                          report["anonymous_status_http"] = response.status
-                  except urllib.error.HTTPError as exc:
-                      report["anonymous_status_http"] = exc.code
-                  except (OSError, urllib.error.URLError) as exc:
+                      connection.request("GET", "/v1/status")
+                      report["anonymous_status_http"] = connection.getresponse().status
+                  except (OSError, http.client.HTTPException) as exc:
                       report["anonymous_status_error"] = type(exc).__name__
+                  finally:
+                      connection.close()
                   if report.get("anonymous_status_http") == 401:
                       report["result"] = "BLOCKED_AUTHENTICATED_HARDWARE_CHECK_REQUIRED"
                   else:
