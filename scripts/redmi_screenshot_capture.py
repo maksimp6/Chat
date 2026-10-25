@@ -1244,6 +1244,8 @@ def capture(out, uid, gid, metadata):
     close_surface("model", "#close-modal")
     matrix_step("system_status", "05-system-status.png", surface_openers["status"], surface="status",
                 opener=surface_openers["status"])
+    scroll_step("system_status_bottom", "20-system-status-bottom.png", ".logos-system-status-content", "bottom",
+                surface="status", opener=surface_openers["status"])
     close_surface("status", "#logos-system-status .logos-system-status-close")
     matrix_action("open_settings", surface_openers["settings"])
     for number, tab in enumerate(("gen", "output", "routing", "adv", "theme"), start=6):

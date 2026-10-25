@@ -148,13 +148,11 @@ def annotate_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
     }
     annotated = deepcopy(catalog)
     for section in ("text", "voice"):
-        entries = annotated.get(section) or {}
-        # Models the provider retired are not offered; their successors are listed instead.
-        for key in [key for key in entries if ALL_MODELS.get(key, {}).get("available") is False]:
-            del entries[key]
-        for key, entry in entries.items():
+        for key, entry in (annotated.get(section) or {}).items():
             if not isinstance(entry, dict):
                 continue
+            if ALL_MODELS.get(key, {}).get("available") is False:
+                entry["available"] = False
             profile = profiles.get(key)
             if profile is not None:
                 entry["ultra_profile"] = profile_summary(profile)
