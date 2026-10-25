@@ -39,6 +39,8 @@ def fingerprint(paths):
     h = hashlib.sha256()
     h.update(("ram-tests-v1|" + sys.version + "|" + sys.platform).encode())
     for name in paths:
+        if not (name.endswith((".py", ".toml", ".ini", ".cfg", ".sh", ".yml", ".yaml", ".json")) or name in ("AGENTS.md", "requirements.txt")):
+            continue
         path = ROOT / name
         if not path.is_file():
             continue
@@ -104,9 +106,16 @@ def main():
         digest = fingerprint(git_paths())
         repo = os.environ["GITHUB_REPOSITORY"]
         sha = os.environ["GITHUB_SHA"]
-        if not args.force and previous_pass(repo, sha, token, digest):
-            print(json.dumps({"status": "CACHED_PASS", "digest": digest, "executed": 0}))
-            return 0
+        if not args.force:
+            commits = subprocess.run(
+                ["git", "-C", str(ROOT), "rev-list", "-n", "12", "HEAD"],
+                capture_output=True, text=True, check=True,
+            ).stdout.splitlines()
+            for candidate in dict.fromkeys([sha] + commits):
+                if previous_pass(repo, candidate, token, digest):
+                    print(json.dumps({"status": "CACHED_PASS", "digest": digest,
+                                      "executed": 0, "source_commit": candidate}))
+                    return 0
     except (OSError, subprocess.CalledProcessError, urllib.error.URLError, ValueError) as exc:
         print("CACHE_READ_ERROR (fail closed): " + str(exc), file=sys.stderr)
         return 2
