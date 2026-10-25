@@ -9,6 +9,7 @@ import re
 import shlex
 import signal
 import socket
+import stat
 import struct
 import subprocess
 import sys
@@ -52,6 +53,8 @@ def device_model_guard():
 
 def android_state():
     policy = command(ROOT + "dumpsys", "window", "policy").decode()
+    power = command(ROOT + "dumpsys", "power").decode()
+    display = command(ROOT + "dumpsys", "display").decode()
     activity = command(ROOT + "dumpsys", "activity", "activities").decode()
     resumed = re.findall(r"(?m)^.*(?:mResumedActivity|topResumedActivity):.*$", activity)
 
@@ -59,8 +62,19 @@ def android_state():
         found = re.search(r"(?m)^\s*" + re.escape(name) + r"=(true|false)\s*$", policy)
         return found.group(1) == "true" if found else None
 
-    return {"screen_on": bool(re.search(r"(?m)^\s*screenState=SCREEN_STATE_ON\s*$", policy)),
-            "interactive": bool(re.search(r"(?m)^\s*interactiveState=INTERACTIVE_STATE_AWAKE\s*$", policy)),
+    def field(pattern, source):
+        found = re.search(pattern, source, re.MULTILINE)
+        return found.group(1) if found else None
+
+    wakefulness = field(r"^\s*mWakefulness=(Awake|Asleep|Dozing|Dreaming)\s*$", power)
+    display_power = field(r"^\s*Display Power:\s*state=([A-Z_]+)\s*$", power)
+    global_display = field(r"^\s*mGlobalDisplayState=([A-Z_]+)\s*$", display)
+    return {"screen_on": display_power == "ON" and global_display == "ON",
+            "interactive": wakefulness == "Awake",
+            "power_wakefulness": wakefulness, "power_display_state": display_power,
+            "global_display_state": global_display,
+            "window_policy_screen_on": bool(re.search(r"(?m)^\s*screenState=SCREEN_STATE_ON\s*$", policy)),
+            "window_policy_interactive": bool(re.search(r"(?m)^\s*interactiveState=INTERACTIVE_STATE_AWAKE\s*$", policy)),
             "keyguard_showing": flag("showing"), "input_restricted": flag("mInputRestricted"),
             "keyguard_secure": flag("secure"),
             "browser_foreground": bool(resumed) and all(PACKAGE + "/" in line for line in resumed)}
@@ -91,14 +105,96 @@ def checked_device_guard():
         raise CaptureSafetyError("Iceraven is not the foreground application")
 
 
+def input_node(expected_name, key_label):
+    candidates = []
+    for entry in Path("/sys/class/input").glob("event*"):
+        if not re.fullmatch(r"event[0-9]+", entry.name):
+            continue
+        try:
+            if (entry / "device/name").read_text().strip() == expected_name:
+                candidates.append(Path("/dev/input") / entry.name)
+        except OSError:
+            continue
+    if len(candidates) != 1:
+        raise CaptureSafetyError("The expected Redmi 9 kernel input device is unavailable")
+    node = candidates[0]
+    if not stat.S_ISCHR(node.stat().st_mode):
+        raise CaptureSafetyError("The selected input path is not a character device")
+    capabilities = command(ROOT + "getevent", "-pl", str(node)).decode(errors="replace")
+    if not re.search(r"\b" + re.escape(key_label) + r"\b", capabilities):
+        raise CaptureSafetyError("The expected wake key is not supported by its input device")
+    return node
+
+
+def kernel_key_pulse(node, key_code):
+    """Atomic evdev equivalent of sendevent, avoiding a held POWER between processes."""
+    event = struct.Struct("@llHHI")
+    if event.size != 24:
+        raise CaptureSafetyError("Unexpected native input-event ABI on Redmi 9")
+    sync = event.pack(0, 0, 0, 0, 0)
+    release = event.pack(0, 0, 1, key_code, 0) + sync
+    packet = event.pack(0, 0, 1, key_code, 1) + sync + release
+    fd = os.open(node, os.O_WRONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        if os.write(fd, packet) != len(packet):
+            raise CaptureSafetyError("The kernel wake pulse was not fully written")
+    finally:
+        # Releasing a key must not be skipped because the capture deadline expired.
+        try:
+            if os.write(fd, release) != len(release):
+                raise CaptureSafetyError("The kernel wake key release was not fully written")
+        finally:
+            os.close(fd)
+
+
+def awake_screen(state):
+    return state["screen_on"] and state["interactive"]
+
+
+def strictly_asleep(state):
+    return (state["power_wakefulness"] == "Asleep" and state["power_display_state"] == "OFF" and
+            state["global_display_state"] == "OFF")
+
+
+def wait_awake(seconds):
+    deadline = time.monotonic() + seconds
+    while True:
+        state = android_state()
+        if awake_screen(state) or time.monotonic() >= deadline:
+            return state
+        time.sleep(0.2)
+
+
 def prepare_browser():
     """Use the existing insecure screen lock and installed browser; never change either."""
     device_model_guard()
     if not command(ROOT + "pm", "path", PACKAGE).strip().startswith(b"package:"):
         raise RuntimeError("Iceraven is not installed on Redmi 9")
     before = android_state()
+    wake_attempts = []
     command(ROOT + "input", "keyevent", "KEYCODE_WAKEUP")
-    deadline = time.monotonic() + 15
+    awake = wait_awake(2)
+    wake_attempts.append({"method": "Android KEYCODE_WAKEUP", "awake": awake_screen(awake)})
+    if not awake_screen(awake):
+        node = input_node("fpc_irq@fingerprint", "KEY_WAKEUP")
+        kernel_key_pulse(node, 143)
+        awake = wait_awake(4)
+        wake_attempts.append({"method": "atomic evdev KEY_WAKEUP", "device": node.name,
+                              "device_name": "fpc_irq@fingerprint", "awake": awake_screen(awake)})
+    if not awake_screen(awake):
+        node = input_node("mtk-kpd", "KEY_POWER")
+        fresh = android_state()
+        if not strictly_asleep(fresh):
+            raise CaptureSafetyError("Refusing a POWER pulse because Redmi 9 is not confirmed Asleep and OFF")
+        kernel_key_pulse(node, 116)
+        awake = wait_awake(10)
+        wake_attempts.append({"method": "single atomic evdev KEY_POWER from confirmed Asleep/OFF",
+                              "device": node.name, "device_name": "mtk-kpd", "awake": awake_screen(awake)})
+    if not awake_screen(awake):
+        raise RuntimeError("Redmi 9 did not wake through its validated kernel input devices")
+    if awake["keyguard_secure"] is False:
+        command(ROOT + "wm", "dismiss-keyguard")
+    deadline = time.monotonic() + 8
     while True:
         awake = android_state()
         if unlocked_screen(awake):
@@ -127,8 +223,8 @@ def prepare_browser():
                     not re.fullmatch(r"[0-9a-f]{40}", state["revision"])):
                 raise RuntimeError("Local Logos has not finished loading")
             rdp.deadline = CAPTURE_DEADLINE
-            return rdp, actor, {"method": "Android wakeup, insecure keyguard dismissal, browser VIEW intent",
-                                "before": before, "ready": android_state()}
+            return rdp, actor, {"method": "Android/kernel wakeup, insecure keyguard dismissal, browser VIEW intent",
+                                "before": before, "wake_attempts": wake_attempts, "ready": android_state()}
         except (OSError, RuntimeError, KeyError) as error:
             if rdp is not None:
                 rdp.s.close()
@@ -367,7 +463,8 @@ class RDP:
             if(!observer.active)return;
             const sidebar=document.getElementById('sidebar');
             const state={current_id:typeof currentConvId==='string'?currentConvId:null,
-              conversation_ids:typeof conversations!=='undefined'&&Array.isArray(conversations)?conversations.map(c=>c.id):[],
+              conversation_ids:typeof conversations!=='undefined'&&Array.isArray(conversations)?
+                conversations.map(c=>c&&c.id).filter(id=>typeof id==='string'):[],
               active_ids:[...document.querySelectorAll('#conv-list .conv-item.active .conv-link[aria-current="page"]')]
                 .map(a=>new URL(a.href,location.href).searchParams.get('conversation_id')),
               message_count:document.querySelectorAll('#chatbox .msg').length,
