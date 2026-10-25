@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-IMPORT_URL = "http://127.0.0.1:8080/api/provider-credentials/yandex/import"
+IMPORT_URL = "http://127.0.0.1:8080/api/provider-credentials/yandex/issued"
 LIFETIME = timedelta(days=90)
 
 CREATE_JS = """JSON.stringify((()=>{
