@@ -19,13 +19,15 @@ for command in age age-keygen tar sha256sum timeout; do command -v "$command" >/
 [[ -s $key ]] || { echo 'Archive encryption identity is missing from the phone' >&2; exit 1; }
 [[ $(timeout 5 su -c 'id -u') == 0 ]] || { echo 'Android root access unavailable' >&2; exit 1; }
 [[ $(timeout 5 su -c '/system/bin/getprop ro.product.model') == 'Redmi 9' ]] || exit 1
-mkdir -p "$dest/raw"
 if [[ -f $dest/manifest.json ]]; then
   (cd "$dest" && sha256sum -c archive.sha256)
   echo "ANDROID_ARCHIVE_REUSED run=$run"
-  grep -q '"logcat_exit":0,"perfetto_exit":0,' "$dest/manifest.json"
+  grep -q '"logcat_exit":0,"perfetto_exit":0,"app_trace_exit":0,' "$dest/manifest.json"
   exit $?
 fi
+# A failed/cancelled attempt is evidence too. Never overwrite its private inputs.
+[[ ! -e $dest ]] || { echo 'Partial archive exists; use a new run attempt' >&2; exit 1; }
+mkdir -p "$dest/raw"
 chmod 600 "$key"
 age-keygen -y "$key" >"$base/keys/recipient.txt"
 raw=$dest/raw
@@ -61,6 +63,17 @@ if [[ $trace_status == 0 ]]; then
 fi
 timeout 5 su -c "rm -f '$trace'" >/dev/null 2>&1 || true
 
+# Extend this encrypted channel, not the public screenshot/events publisher.
+# The existing installation supplies native Kristall and application dependencies.
+app=${LOGOS_APP_DIR:-$HOME/logos-local}
+state=${LOGOS_STATE_DIR:-$HOME/logos-local-state}
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+app_status=0
+timeout 120 "$app/.venv/bin/python" "$script_dir/redmi_app_trace_snapshot.py" \
+  --memory "$state/logos.memory" --logs "${LOGOS_LOG_DIR:-$app/logs}" \
+  --backend-log "$state/backend.log" --output "$raw/application" \
+  >"$raw/application-snapshot-status.txt" 2>&1 || app_status=$?
+
 tar -C "$raw" -czf "$dest/diagnostics.tar.gz" .
 age -R "$base/keys/recipient.txt" -o "$dest/diagnostics.tar.gz.age.tmp" "$dest/diagnostics.tar.gz"
 mv "$dest/diagnostics.tar.gz.age.tmp" "$dest/diagnostics.tar.gz.age"
@@ -69,9 +82,9 @@ age -d -i "$key" "$dest/diagnostics.tar.gz.age" | cmp - "$dest/diagnostics.tar.g
 (cd "$dest" && sha256sum diagnostics.tar.gz.age >archive.sha256)
 digest=$(cut -d ' ' -f 1 "$dest/archive.sha256")
 size=$(wc -c <"$dest/diagnostics.tar.gz.age")
-printf '{"run_id":"%s","attempt":%s,"source_commit":"%s","captured_at":"%s","archive_sha256":"%s","archive_bytes":%s,"logcat_exit":%s,"perfetto_exit":%s,"trace_seconds":10,"encrypted":true}\n' \
-  "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$(date -u +%FT%TZ)" "$digest" "$size" "$log_status" "$trace_status" >"$dest/manifest.json.tmp"
+printf '{"run_id":"%s","attempt":%s,"source_commit":"%s","captured_at":"%s","archive_sha256":"%s","archive_bytes":%s,"logcat_exit":%s,"perfetto_exit":%s,"app_trace_exit":%s,"trace_seconds":10,"encrypted":true}\n' \
+  "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$(date -u +%FT%TZ)" "$digest" "$size" "$log_status" "$trace_status" "$app_status" >"$dest/manifest.json.tmp"
 mv "$dest/manifest.json.tmp" "$dest/manifest.json"
 sync -f "$base"
-echo "ANDROID_ARCHIVE_CREATED run=$run bytes=$size sha256=$digest logcat_exit=$log_status perfetto_exit=$trace_status"
-[[ $log_status == 0 && $trace_status == 0 ]]
+echo "ANDROID_ARCHIVE_CREATED run=$run bytes=$size sha256=$digest logcat_exit=$log_status perfetto_exit=$trace_status app_trace_exit=$app_status"
+[[ $log_status == 0 && $trace_status == 0 && $app_status == 0 ]]

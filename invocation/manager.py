@@ -266,7 +266,7 @@ def _discard_prepared_chunks(
         return
 
 
-def _read_chunked_value(invocation_id: str, field: str, manifest: Any) -> Any:
+def _read_chunked_value(invocation_id: str, field: str, manifest: Any, *, store=None) -> Any:
     if (
         not isinstance(manifest, dict)
         or manifest.get("format") != "kristall-invocation-value-v1"
@@ -280,7 +280,8 @@ def _read_chunked_value(invocation_id: str, field: str, manifest: Any) -> Any:
         or not re.fullmatch(r"[0-9a-f]{64}", manifest["sha256"])
     ):
         raise KristallError("invalid invocation value manifest")
-    store = get_memory_client(memory_file_path())
+    if store is None:
+        store = get_memory_client(memory_file_path())
     prefix = f"{_VALUE_CHUNK_PREFIX}{invocation_id}:{field}:{manifest['generation']}:"
     pieces = []
     for index in range(manifest["chunks"]):

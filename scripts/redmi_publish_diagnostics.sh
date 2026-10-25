@@ -16,7 +16,7 @@ base=${ANDROID_DIAGNOSTICS_HOME:-$HOME/backups/android-diagnostics}
 run=$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT
 dest=$base/runs/$run
 [[ -s $dest/manifest.json && -s $dest/diagnostics.tar.gz.age ]] || exit 1
-grep -q '"logcat_exit":0,"perfetto_exit":0,' "$dest/manifest.json"
+grep -q '"logcat_exit":0,"perfetto_exit":0,"app_trace_exit":0,' "$dest/manifest.json"
 (cd "$dest" && sha256sum -c archive.sha256)
 age -d -i "$base/keys/archive.agekey" "$dest/diagnostics.tar.gz.age" | cmp - "$dest/diagnostics.tar.gz"
 exec 9>"$base/.publish.lock"
