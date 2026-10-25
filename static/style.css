@@ -8,7 +8,7 @@
 :root {
   --bg-app: #f5f5f7;
   --bg-sidebar: #ffffff;
-  --bg-header: #007aff;
+  --bg-header: #0062cc;
   --bg-input: #ffffff;
   --bg-bubble-user: #0062cc;
   --bg-bubble-bot: #f2f2f7;
@@ -387,7 +387,7 @@ body {
   background: rgba(0, 0, 0, 0.05);
   color: var(--text-secondary);
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 12px;
   font-family: monospace;
 }
 [data-theme="dark"] .logos-pro-app .billing-bubble {
@@ -476,6 +476,11 @@ body {
   background: var(--bg-app);
   color: var(--text-main);
   overflow: hidden;
+}
+
+.logos-pro-app #msg-input:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .logos-pro-app #send-btn {
@@ -583,7 +588,7 @@ body {
   background: var(--accent-soft);
 }
 .logos-pro-app .model-price {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
@@ -1091,7 +1096,7 @@ body {
   opacity: 0.7;
 }
 .logos-pro-app .model-option-price {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 .logos-pro-app .model-option-unavailable {
@@ -1099,7 +1104,7 @@ body {
   cursor: not-allowed;
 }
 .logos-pro-app .model-option-ultra {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 .logos-pro-app #voice-ui,
@@ -1217,7 +1222,7 @@ body {
 }
 
 .logos-pro-app .msg-meta-details {
-  font-size: 11px;
+  font-size: 12px;
   background: var(--chip-bg);
   border-radius: 6px;
   padding: 3px 8px;
@@ -1235,7 +1240,7 @@ body {
   flex-direction: column;
   gap: 2px;
   font-family: monospace;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .logos-pro-app .msg-meta-error {
@@ -1292,7 +1297,7 @@ body {
 }
 
 .logos-pro-app .logos-trace-open-viewer {
-  font-size: 11px;
+  font-size: 12px;
   background: transparent;
   border: 0;
   padding: 2px 0;
@@ -1307,7 +1312,7 @@ body {
 }
 
 .logos-pro-app .trace-viewer-auto-button {
-  font-size: 11px;
+  font-size: 12px;
   background: transparent;
   border: 0;
   padding: 0;
@@ -1388,7 +1393,7 @@ body {
 }
 .logos-pro-app .provider-status-meta {
   margin-top: 7px;
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.65;
 }
 .logos-pro-app .provider-credentials-modal {
@@ -1553,7 +1558,7 @@ body {
   color: var(--m-text, #222);
 }
 .logos-pro-app .file-manager-vs-meta {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--m-muted, #666);
 }
 .logos-pro-app .file-manager-copy-id {
@@ -1567,7 +1572,7 @@ body {
   background: var(--m-card, #fff);
   border-radius: 4px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
 }
 .logos-pro-app .file-manager-secondary-btn {
   color: var(--m-text, #222);
@@ -1614,7 +1619,7 @@ body {
 .logos-pro-app .file-manager-add-size {
   margin-left: auto;
   color: var(--m-muted, #666);
-  font-size: 11px;
+  font-size: 12px;
 }
 .logos-pro-app .file-manager-primary-btn {
   width: 100%;
@@ -1833,7 +1838,7 @@ body {
   border-radius: 7px;
   background: var(--btn-bg);
   color: var(--text-main);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .logos-pro-app .file-manager-vs-create-btn,
@@ -1993,14 +1998,14 @@ body {
 .logos-pro-app .msg.user::before {
   content: "Вы";
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-bubble-user);
   margin-bottom: 4px;
 }
 .logos-pro-app .msg.bot::before {
   content: "Logos";
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
   margin-bottom: 4px;
 }
@@ -2038,10 +2043,10 @@ body {
   font-size: 20px;
 }
 .logos-pro-app .logos-trace-open-viewer {
-  font-size: 11px;
+  font-size: 12px;
 }
 .logos-pro-app .logos-system-status-revoke {
-  font-size: 11px;
+  font-size: 12px;
 }
 .logos-pro-app .memory-modal-close {
   font-size: 24px;
@@ -2127,7 +2132,7 @@ body {
 .logos-pro-app .app-version {
   color: var(--text-secondary);
   padding: 3px 12px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
