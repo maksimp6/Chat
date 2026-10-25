@@ -648,9 +648,6 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
 
-  // The server-rendered history must be replaced by the client renderer even if the
-  // startup sequence in core.js stopped before it reached loadHistory.
-  if (document.querySelector("#chatbox .server-rendered-conversation") && currentConvId) {
-    loadHistory(currentConvId);
-  }
+  // Single history trigger: it does not depend on the conversation list or model catalog.
+  if (currentConvId) loadHistory(currentConvId);
 });

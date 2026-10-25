@@ -281,25 +281,7 @@
           Версия {{ app_revision[:8] if app_revision != 'unknown' else static_version[:8] }}
         </div>
         <div id="chatbox">
-          {% if selected_conversation %}
-          <div
-            class="server-rendered-conversation"
-            data-conversation-id="{{ selected_conversation.id }}"
-            data-server-rendered="true"
-          >
-            <h2 class="server-conversation-title">{{ selected_conversation.title }}</h2>
-            {% for message in selected_messages %}
-            <article class="server-message server-message-{{ message.role }}">
-              <header class="server-message-role">
-                {{ "Вы" if message.role == "user" else "Logos" }}
-              </header>
-              <div class="server-message-content">{{ message.text }}</div>
-            </article>
-            {% endfor %}
-          </div>
-          {% else %}
           <div class="empty-state">Начните диалог или выберите модель</div>
-          {% endif %}
         </div>
         <div id="voice-ui">
           <canvas id="waveform"></canvas>

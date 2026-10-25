@@ -222,23 +222,12 @@ def _initialize_storage_on_first_request():
 
 @app.route("/")
 def index():
-    selected_conversation = None
-    selected_messages = []
-    conversation_id = (request.args.get("conversation_id") or "").strip()
-    if conversation_id:
-        owner_id = get_current_owner_id(required=False)
-        if owner_id:
-            selected_conversation = get_owned_conversation(conversation_id, owner_id)
-        if selected_conversation:
-            selected_messages = get_messages(conversation_id)
-
+    # Messages are rendered only by the client (static/chat.js loadHistory).
     return render_template(
         "index.html",
         preview_base_path=preview_base_path(),
         static_version=STATIC_ASSET_VERSION,
         app_revision=APP_VERSION["runtime_revision"],
-        selected_conversation=selected_conversation,
-        selected_messages=selected_messages,
         donation_url=get_donation_url(),
     )
 
