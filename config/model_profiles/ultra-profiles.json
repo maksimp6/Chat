@@ -7,7 +7,7 @@
     "path": "core/config.py",
     "base_commit": "081d07af8f854c81201c9341c46c7ed5d3ee9ecf",
     "scope": "ALL_MODELS (TEXT_MODELS + VOICE_MODELS)",
-    "expected_model_count": 13
+    "expected_model_count": 11
   },
   "policy": {
     "automatic_generation": false,
@@ -210,10 +210,10 @@
       "transport": "responses",
       "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/yandexgpt-5-lite/latest",
       "lifecycle": {
-        "state": "documented_end_date",
+        "state": "deprecated",
         "stop_and_recheck_on": "2026-11-15",
         "evidence": [
-          "releases"
+          "model_page"
         ]
       },
       "context": {
@@ -275,74 +275,6 @@
         "include_hosted_tool_and_session_charges": true
       }
     },
-    "qwen3-235b-a22b-fp8": {
-      "profile_id": "ultra-qwen3-235b-a22b-fp8",
-      "model_key": "qwen3-235b-a22b-fp8",
-      "upstream_id": "qwen3-235b-a22b-fp8",
-      "kind": "text",
-      "status": "blocked_retired",
-      "transport": "responses",
-      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/qwen3-235b-a22b-fp8/latest",
-      "lifecycle": {
-        "state": "retired",
-        "stop_and_recheck_on": "2026-09-30",
-        "evidence": [
-          "releases"
-        ]
-      },
-      "context": {
-        "window_tokens": null,
-        "source": null,
-        "input": "complete_applicable_context",
-        "overflow": "fail_without_truncation",
-        "local_tokenization_required": true
-      },
-      "output": {
-        "selection": "maximum_supported",
-        "wire_field": "max_output_tokens",
-        "requested": null,
-        "documented_hosted_ceiling_tokens": null,
-        "basis": "provider_ceiling_unpublished_do_not_use_context_as_output",
-        "evidence": [
-          "models"
-        ]
-      },
-      "reasoning": {
-        "supported": null,
-        "depth_control": null,
-        "wire_parameters": {},
-        "basis": "retired_model_no_request",
-        "evidence": []
-      },
-      "tools": {
-        "selection": "all_compatible_registered_and_authorized",
-        "function_calling": null,
-        "web_search": null,
-        "file_search": null,
-        "code_interpreter": null,
-        "mcp": null,
-        "requires_schema_and_dependency_validation": true,
-        "approval_policy": "existing_executor_approvals_unchanged",
-        "evidence": []
-      },
-      "wire_parameters": {},
-      "blockers": [
-        "model_retired_no_replacement_authorized"
-      ],
-      "verification": {
-        "offline_contract": "validated_by_scripts/validate_ultra_profiles.py",
-        "provider_acceptance": "NOT_RUN",
-        "effective_parameters": "UNKNOWN",
-        "quality_acceptance": "NOT_RUN"
-      },
-      "cost": {
-        "currency": "RUB",
-        "pricing_source": "pricing",
-        "rates_verified_on": null,
-        "provider_billed_total": null,
-        "include_hosted_tool_and_session_charges": true
-      }
-    },
     "gpt-oss-120b": {
       "profile_id": "ultra-gpt-oss-120b",
       "model_key": "gpt-oss-120b",
@@ -352,10 +284,10 @@
       "transport": "responses",
       "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/gpt-oss-120b/latest",
       "lifecycle": {
-        "state": "documented_end_date",
+        "state": "available_until",
         "stop_and_recheck_on": "2026-10-30",
         "evidence": [
-          "releases"
+          "model_page"
         ]
       },
       "context": {
@@ -434,10 +366,10 @@
       "transport": "responses",
       "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/gpt-oss-20b/latest",
       "lifecycle": {
-        "state": "documented_end_date",
+        "state": "available_until",
         "stop_and_recheck_on": "2026-10-30",
         "evidence": [
-          "releases"
+          "model_page"
         ]
       },
       "context": {
@@ -492,74 +424,6 @@
         "full_tool_compatibility_unverified",
         "runtime_profile_adapter_not_integrated",
         "provider_acceptance_not_run"
-      ],
-      "verification": {
-        "offline_contract": "validated_by_scripts/validate_ultra_profiles.py",
-        "provider_acceptance": "NOT_RUN",
-        "effective_parameters": "UNKNOWN",
-        "quality_acceptance": "NOT_RUN"
-      },
-      "cost": {
-        "currency": "RUB",
-        "pricing_source": "pricing",
-        "rates_verified_on": null,
-        "provider_billed_total": null,
-        "include_hosted_tool_and_session_charges": true
-      }
-    },
-    "speech-realtime-250923": {
-      "profile_id": "ultra-speech-realtime-250923",
-      "model_key": "speech-realtime-250923",
-      "upstream_id": "speech-realtime-250923",
-      "kind": "voice",
-      "status": "blocked_retired",
-      "transport": "realtime",
-      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/speech-realtime-250923",
-      "lifecycle": {
-        "state": "retired",
-        "stop_and_recheck_on": "2026-10-12",
-        "evidence": [
-          "releases"
-        ]
-      },
-      "context": {
-        "window_tokens": null,
-        "source": null,
-        "input": "complete_applicable_context",
-        "overflow": "fail_without_truncation",
-        "local_tokenization_required": true
-      },
-      "output": {
-        "selection": "maximum_supported",
-        "wire_field": "max_output_tokens",
-        "requested": null,
-        "documented_hosted_ceiling_tokens": null,
-        "basis": "provider_ceiling_unpublished_do_not_use_context_as_output",
-        "evidence": [
-          "realtime"
-        ]
-      },
-      "reasoning": {
-        "supported": null,
-        "depth_control": null,
-        "wire_parameters": {},
-        "basis": "retired_model_no_request",
-        "evidence": []
-      },
-      "tools": {
-        "selection": "all_compatible_registered_and_authorized",
-        "function_calling": null,
-        "web_search": null,
-        "file_search": null,
-        "code_interpreter": null,
-        "mcp": null,
-        "requires_schema_and_dependency_validation": true,
-        "approval_policy": "existing_executor_approvals_unchanged",
-        "evidence": []
-      },
-      "wire_parameters": {},
-      "blockers": [
-        "model_retired_no_replacement_authorized"
       ],
       "verification": {
         "offline_contract": "validated_by_scripts/validate_ultra_profiles.py",
@@ -815,10 +679,10 @@
       "transport": "responses",
       "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/deepseek-v4-flash/latest",
       "lifecycle": {
-        "state": "documented_end_date",
+        "state": "deprecated",
         "stop_and_recheck_on": "2026-11-15",
         "evidence": [
-          "releases"
+          "model_page"
         ]
       },
       "context": {

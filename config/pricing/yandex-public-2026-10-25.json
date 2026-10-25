@@ -37,12 +37,6 @@
       "tool": 0.2,
       "output": 0.2
     },
-    "qwen3-235b-a22b-fp8": {
-      "input": 0.5,
-      "cached": 0.5,
-      "tool": 0.5,
-      "output": 0.5
-    },
     "speech-realtime-250923": {
       "input": 0.8,
       "cached": 0.2,

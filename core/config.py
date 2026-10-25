@@ -86,17 +86,6 @@ TEXT_MODELS = {
         "tool": 0.20,
         "output": 0.20,
     },
-    "qwen3-235b-a22b-fp8": {
-        # Retired by the provider (2026-09-30): kept for accounting, not selectable.
-        "available": False,
-        "name": "Qwen3 235B",
-        "type": "text",
-        "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
-        "input": 0.50,
-        "cached": 0.50,
-        "tool": 0.50,
-        "output": 0.50,
-    },
     "gpt-oss-120b": {
         "name": "gpt-oss-120b",
         "type": "text",
@@ -168,17 +157,6 @@ TEXT_MODELS = {
 }
 
 VOICE_MODELS = {
-    "speech-realtime-250923": {
-        # Retired by the provider (2026-10-12): kept for accounting, not selectable.
-        "available": False,
-        "name": "speech-realtime-250923",
-        "type": "voice",
-        "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
-        "input": 0.80,
-        "cached": 0.20,
-        "tool": 0.20,
-        "output": 0.80,
-    },
     "speech-realtime-deepseek-v4-flash": {
         "name": "Speech Realtime DeepSeek V4 Flash",
         "type": "voice",
