@@ -1322,9 +1322,26 @@ def capture(out, uid, gid, metadata):
     print(json.dumps({"captured": len(files), "runtime_revision": runtime["runtime_revision"]}))
 
 
+def restore_clean_page():
+    """Leave the phone on the plain app page: no open picker and no capture query in the address bar."""
+    try:
+        rdp = RDP()
+        try:
+            actor = rdp.find_logos()
+            rdp.evaluate(actor, "JSON.stringify((()=>{setTimeout(()=>location.replace(" +
+                         json.dumps(LOGOS_URL) + "),100);return {scheduled:true};})())")
+        finally:
+            rdp.s.close()
+    except Exception:
+        pass
+
+
 def main():
     if len(sys.argv) == 6 and sys.argv[1] == "_capture":
-        capture(Path(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), json.loads(sys.argv[5]))
+        try:
+            capture(Path(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), json.loads(sys.argv[5]))
+        finally:
+            restore_clean_page()
         return
     required = ("GITHUB_ACTIONS", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "RUNNER_NAME", "RUNNER_TEMP", "GITHUB_SHA")
     if os.environ.get("GITHUB_ACTIONS") != "true" or any(not os.environ.get(k) for k in required):
