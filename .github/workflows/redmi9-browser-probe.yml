@@ -2,6 +2,12 @@ name: Redmi 9 browser probe
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: read (page structure) or open_api_key_form (open the create-key form, submit nothing)
+        type: choice
+        options: [read, open_api_key_form]
+        default: read
 
 permissions: {}
 
@@ -21,4 +27,6 @@ jobs:
             curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
               "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/$name" -o "$probe_dir/$name"
           done
-          RUNNER_TEMP="$probe_dir" python "$probe_dir/redmi_browser_probe.py"
+          RUNNER_TEMP="$probe_dir" PROBE_MODE="$PROBE_MODE" python "$probe_dir/redmi_browser_probe.py"
+        env:
+          PROBE_MODE: ${{ inputs.mode }}
