@@ -55,6 +55,15 @@ def request_json(method, url, headers=None, payload=None):
         raise Failed("request_failed") from None
 
 
+def _expired(credential):
+    """True when the stored provider key has passed its expiry, so a new key may replace it."""
+    try:
+        expires = datetime.fromisoformat(str((credential or {}).get("expires_at")).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return expires.tzinfo is not None and expires <= datetime.now(timezone.utc)
+
+
 def issue_and_deliver(env, pending, call=request_json):
     names = ("YANDEX_IAM_TOKEN", "YANDEX_SERVICE_ACCOUNT_ID", "YANDEX_FOLDER_ID")
     if any(not env.get(name, "").strip() for name in names):
@@ -71,7 +80,7 @@ def issue_and_deliver(env, pending, call=request_json):
     status = call("GET", APP + "/issuance-status", local_headers)
     if status.get("encryption_ready") is not True:
         raise Failed("app_encryption_not_ready")
-    if status.get("configured") is not False:
+    if status.get("configured") is not False and not _expired(status.get("credential")):
         raise Failed("provider_already_configured")
     headers = {"Authorization": "Bearer " + env["YANDEX_IAM_TOKEN"]}
     account = call("GET", IAM + "/serviceAccounts/" + env[names[1]], headers)

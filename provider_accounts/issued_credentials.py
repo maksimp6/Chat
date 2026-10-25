@@ -5,6 +5,7 @@ import re
 
 from provider_accounts.credentials import (
     bootstrap_credential, fingerprint_key, get_active_credential, record_health_check,
+    replace_active_credential,
 )
 from secret_store.credential_crypto import encrypt_secret, decrypt_secret
 from storage.db import get_store
@@ -68,7 +69,9 @@ def import_yandex_key(payload):
     db = get_store()
     current = issuance_status()["credential"]
     fingerprint = fingerprint_key(secret)
-    if current and (
+    # An expired key is replaced by the runner's new key; a key still valid is never overwritten.
+    replacing = bool(current) and _date(current["expires_at"]) <= now
+    if current and not replacing and (
         current["fingerprint"] != fingerprint
         or current["provider_key_id"] != payload["provider_key_id"]
         or current["project_id"] != payload["project_id"]
@@ -77,11 +80,17 @@ def import_yandex_key(payload):
         raise ImportRejected("provider_already_configured", 409)
     # The native transaction also rejects a competing initial writer.
     try:
-        bootstrap_credential(
-            db, secret, payload["project_id"], encrypt_secret, now=issued,
-            decrypt=decrypt_secret, provider="yandex",
-            provider_key_id=payload["provider_key_id"], ttl=expires-issued,
-        )
+        if replacing:
+            replace_active_credential(
+                db, secret, payload["project_id"], encrypt_secret, "yandex",
+                provider_key_id=payload["provider_key_id"], now=issued, ttl=expires-issued,
+            )
+        else:
+            bootstrap_credential(
+                db, secret, payload["project_id"], encrypt_secret, now=issued,
+                decrypt=decrypt_secret, provider="yandex",
+                provider_key_id=payload["provider_key_id"], ttl=expires-issued,
+            )
     except Exception:
         raise ImportRejected("credential_storage_failed", 503) from None
     stored = get_active_credential(db, decrypt_secret, provider="yandex")
