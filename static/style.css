@@ -1980,6 +1980,19 @@ body {
 [data-theme="high-contrast"] .logos-btn {
   border: 2px solid #000;
 }
+/* Icon-only buttons are identified by their glyph; a box around each one only adds noise. */
+[data-theme="high-contrast"] .logos-btn.copy-btn,
+[data-theme="high-contrast"] .logos-btn.delete-btn {
+  border-color: transparent;
+}
+/* Settings tabs are marked by their underline, not by a box around every label. */
+[data-theme="high-contrast"] .logos-btn.llm-tab-btn {
+  border-width: 0 0 2px;
+  border-color: transparent;
+}
+[data-theme="high-contrast"] .logos-btn.llm-tab-btn.active {
+  border-bottom-color: var(--accent);
+}
 [data-theme="high-contrast"] .conv-item:hover {
   outline: 2px solid #000;
 }
