@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+EXCLUDED_PREFIXES = ("tests/", "node_modules/", "android/", "scripts/", "deploy/")
 RESPONSE_BUILDERS = {"jsonify", "problem"}
 
 # Legacy {"error": ...} bodies still to convert to problem().

@@ -81,7 +81,8 @@ def _tool_call_parts(tool_call: dict[str, Any]) -> tuple[str | None, dict[str, A
     if isinstance(arguments, str):
         try:
             arguments = _json.loads(arguments)
-        except Exception:
+        except ValueError:
+            logger.warning("[CHAT] Tool call arguments are not valid JSON; using empty arguments")
             arguments = {}
     if not isinstance(arguments, dict):
         arguments = {}

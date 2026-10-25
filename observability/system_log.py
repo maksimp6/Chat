@@ -41,8 +41,8 @@ class TraceContextFilter(logging.Filter):
         if trace is not None:
             trace_id = getattr(trace, "trace_id", None)
             invocation_id = trace.trace.get("invocation_id") or trace_id
-        setattr(record, "trace_id", trace_id)
-        setattr(record, "invocation_id", invocation_id)
+        record.trace_id = trace_id
+        record.invocation_id = invocation_id
         return True
 
 

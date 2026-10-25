@@ -82,28 +82,29 @@ class VirtualLowConsumptionServer:
             # Only what a shell needs: the backend's own environment holds provider and deployment secrets.
             env = {name: env_require(name) for name in _COMMAND_ENV_NAMES if name in env_snapshot()}
             env.update({str(k): str(v) for k, v in self.config.env.items()})
-            timeout = max(1, min(int(timeout or self.config.command_timeout_seconds), 3600))
+            try:
+                timeout = max(1, min(int(timeout or self.config.command_timeout_seconds), 3600))
+            except (TypeError, ValueError):
+                raise ValueError("timeout must be an integer") from None
 
-            def limits() -> None:
-                if resource is None:
-                    return
-                resource.setrlimit(
-                    resource.RLIMIT_CPU, (self.config.cpu_seconds, self.config.cpu_seconds)
+            # The shell applies the limits. preexec_fn is unsafe in a multi-threaded server.
+            limited = command
+            if resource is not None and os.name == "posix":
+                limited = (
+                    f"ulimit -t {self.config.cpu_seconds} -v {self.config.memory_mb * 1024};"
+                    f" {command}"
                 )
-                memory = self.config.memory_mb * 1024 * 1024
-                resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
 
             started = time.perf_counter()
             try:
                 completed = subprocess.run(
-                    command,
+                    limited,
                     shell=True,
                     cwd=self.config.cwd,
                     env=env,
                     capture_output=True,
                     text=True,
                     timeout=timeout,
-                    preexec_fn=limits if resource is not None and os.name == "posix" else None,
                 )
                 self._touch()
                 return {

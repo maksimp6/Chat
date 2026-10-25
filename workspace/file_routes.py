@@ -254,7 +254,9 @@ def list_local_files():
                     "size": entry.stat().st_size if entry.is_file() else 0,
                 }
             )
-        return jsonify({"success": True, "path": target_dir, "items": items})
+        rel = os.path.relpath(target_dir, root_dir)
+        shown = "/" if rel == "." else "/" + rel.replace(os.sep, "/")
+        return jsonify({"success": True, "path": shown, "items": items})
     except Exception:
         logger.exception("[FILES] Local listing failed")
         return jsonify({"error": "Не удалось прочитать каталог"}), 500

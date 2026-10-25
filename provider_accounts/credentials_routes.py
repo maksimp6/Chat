@@ -397,7 +397,7 @@ def bootstrap_cloudru():
         ), 400
     try:
         service_account_id = str(uuid.UUID(requested_sa_id))
-    except (ValueError, AttributeError) as exc:
+    except (ValueError, AttributeError):
         return jsonify(
             {
                 "error": "invalid_service_account_id",

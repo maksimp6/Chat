@@ -56,8 +56,8 @@ def environments_start(environment_id):
         return jsonify({"error": "environment_not_found"}), 404
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 409
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+    except Exception:
+        return jsonify({"error": "environment_operation_failed"}), 500
 
 
 @environment_bp.post("/<environment_id>/stop")
@@ -78,8 +78,8 @@ def environments_restart(environment_id):
         return jsonify({"error": "environment_not_found"}), 404
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 409
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+    except Exception:
+        return jsonify({"error": "environment_operation_failed"}), 500
 
 
 @environment_bp.delete("/<environment_id>")
@@ -90,8 +90,8 @@ def environments_delete(environment_id):
         return jsonify({"error": "environment_not_found"}), 404
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 409
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+    except Exception:
+        return jsonify({"error": "environment_operation_failed"}), 500
 
 
 def _runtime_http_request(context, payload):

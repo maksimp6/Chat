@@ -216,7 +216,6 @@ class YandexRequestMixin:
         if on_provider_input is not None and not callable(on_provider_input):
             raise ValueError("on_provider_input must be callable or None")
         is_background = params.get("background", True)
-        is_stream = params.get("stream", False)
         if is_background:
             params["store"] = True
 

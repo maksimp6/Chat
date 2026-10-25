@@ -11,6 +11,7 @@ old resource must not be revoked after a successful reissue.
 from __future__ import annotations
 from core.env import env_get
 
+import time
 from datetime import datetime
 from typing import Optional
 
@@ -43,7 +44,7 @@ class CloudRuApiKeyProvider:
         if not api_key:
             raise ValueError("Cloud.ru API key is empty")
         trace = get_current_trace()
-        started = datetime.now()
+        started = time.perf_counter()
         if trace:
             trace.add_event(
                 "provider_api_request",
@@ -75,7 +76,7 @@ class CloudRuApiKeyProvider:
                         "method": "GET",
                         "path": "/models",
                         "http_status": response.status_code,
-                        "timing_ms": round((datetime.now() - started).total_seconds() * 1000, 2),
+                        "timing_ms": round((time.perf_counter() - started) * 1000, 2),
                         "success": True,
                     },
                 )
@@ -91,7 +92,7 @@ class CloudRuApiKeyProvider:
                         "method": "GET",
                         "path": "/models",
                         "http_status": status,
-                        "timing_ms": round((datetime.now() - started).total_seconds() * 1000, 2),
+                        "timing_ms": round((time.perf_counter() - started) * 1000, 2),
                         "success": False,
                     },
                 )

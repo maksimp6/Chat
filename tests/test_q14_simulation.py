@@ -336,7 +336,9 @@ class ReviewTests(unittest.TestCase):
             {"data": {"data": [None, {}]}},
         ):
 
-            def send(method: str, path: str, payload: ai.JsonObject | None) -> ai.JsonObject:
+            def send(
+                method: str, path: str, payload: ai.JsonObject | None, value=value
+            ) -> ai.JsonObject:
                 return copy.deepcopy(value)
 
             self.assertEqual(ai.probe_access(send)["status"], "API_ACCESS_CHECK_FAILED")

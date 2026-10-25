@@ -423,9 +423,9 @@ def test_ssh_runtime_connection():
         return jsonify(result)
     except TreasuryIdentityError as exc:
         return jsonify({"error": str(exc)}), 401
-    except Exception as exc:
+    except Exception:
         logger.exception("SSH Runtime connection test failed")
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return jsonify({"success": False, "error": "ssh_connection_test_failed"}), 400
 
 
 if __name__ == "__main__":

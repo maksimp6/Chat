@@ -39,7 +39,7 @@ def wait_for_response(
                         },
                     )
                 time.sleep(delay)
-                delay = min(delay * 1.5, 3)
+                delay = min(delay * 1.5, 30)
                 continue
             resp.raise_for_status()
             data = resp.json()
@@ -56,7 +56,7 @@ def wait_for_response(
                     },
                 )
             time.sleep(delay)
-            delay = min(delay * 1.5, 3)
+            delay = min(delay * 1.5, 30)
             continue
 
         poll_end = time.time()
@@ -92,7 +92,7 @@ def wait_for_response(
             return data
 
         time.sleep(delay)
-        delay = min(delay * 1.5, 3)
+        delay = min(delay * 1.5, 30)
 
     if execution_trace is not None:
         execution_trace.add_event(

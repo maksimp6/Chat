@@ -54,7 +54,7 @@ def get_donation_url():
     return raw
 
 
-HOST = "0.0.0.0"
+HOST = "127.0.0.1"
 PORT = 8080
 
 TEXT_MODELS = {

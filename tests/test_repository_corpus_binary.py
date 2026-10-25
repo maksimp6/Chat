@@ -156,9 +156,9 @@ def test_shared_expansion_budget_and_archive_depth(monkeypatch):
     raw = tar([("file", b"123", tarfile.REGTYPE)])
     assert extract(sink, raw)
     assert not sink.sources and sink.expanded_bytes == 8
-    for raw in (raw, gzip.compress(b"value"), b"%PDF-1.4\n"):
+    for payload in (raw, gzip.compress(b"value"), b"%PDF-1.4\n"):
         bounded = Sink()
-        assert extract(bounded, raw, depth=2)
+        assert extract(bounded, payload, depth=2)
         assert [gap["reason"] for gap in bounded.gaps] == ["archive_depth_limit"]
 
 

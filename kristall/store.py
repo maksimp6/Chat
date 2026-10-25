@@ -794,7 +794,8 @@ class Kristall:
             raise KristallError("prefix must be a string")
         with self._engine._lock:
             self._engine._ensure_open()
-            self._engine.last_commit
+            # Reading last_commit raises KristallError while recovery is required.
+            _ = self._engine.last_commit
             values = self._engine._state.get(self._NAMESPACE, {})
             names = set(values) | set(self._pending)
             return {

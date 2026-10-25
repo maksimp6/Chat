@@ -25,9 +25,12 @@ import zipfile
 import logging
 import tempfile
 import platform
+import ipaddress
+import socket
 import subprocess
-import urllib.request
 import urllib.error
+import urllib.parse
+import urllib.request
 
 logger = logging.getLogger("filesystem_mcp")
 
@@ -421,6 +424,24 @@ def zip_extract(args: dict) -> dict:
         return {"error": f"Ошибка распаковки архива: {str(e)}"}
 
 
+def _resolves_to_link_local(url: str) -> bool:
+    """True when the URL host resolves to a link-local address, such as the cloud metadata endpoint."""
+    host = urllib.parse.urlsplit(url).hostname
+    if not host:
+        return False
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return False
+    for info in infos:
+        try:
+            if ipaddress.ip_address(info[4][0].split("%")[0]).is_link_local:
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 def http_fetch(args: dict) -> dict:
     """Простой HTTP GET-запрос через стандартный urllib."""
     url = args.get("url")
@@ -428,8 +449,13 @@ def http_fetch(args: dict) -> dict:
         return {"error": "Параметр 'url' обязателен"}
     if not (url.startswith("http://") or url.startswith("https://")):
         return {"error": "URL должен начинаться с http:// или https://"}
+    if _resolves_to_link_local(url):
+        return {"error": "Адреса link-local, включая метаданные облака, недоступны"}
 
-    timeout = int(args.get("timeout", 10))
+    try:
+        timeout = max(1, min(int(args.get("timeout", 10)), 300))
+    except (TypeError, ValueError):
+        return {"error": "Параметр 'timeout' должен быть целым числом"}
     max_bytes = 256 * 1024
 
     try:
@@ -699,8 +725,8 @@ def run_command(args: dict) -> dict:
         }
     except subprocess.TimeoutExpired:
         return {"success": False, "error": f"Превышено время ожидания команды ({timeout} сек)"}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+    except Exception:
+        return {"success": False, "error": "Не удалось выполнить команду"}
 
 
 def get_system_info(args: dict) -> dict:

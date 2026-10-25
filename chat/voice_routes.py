@@ -212,8 +212,8 @@ def _process(session: VoiceSession) -> None:
             )
 
         _emit(session, "response.done")
-    except Exception as exc:
-        _emit(session, "error", error={"message": str(exc)[:500]})
+    except Exception:
+        _emit(session, "error", error={"message": "Внутренняя ошибка обработки голоса"})
         _emit(session, "response.done")
 
 

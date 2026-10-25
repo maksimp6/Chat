@@ -268,7 +268,8 @@ def local_agent_result(agent_id: str, job_id: str):
     key = "local-job/" + job_id
     try:
         with get_store().transaction() as tx:
-            agent = _require_agent(agent_id)
+            # Raises LookupError for an unknown agent, which becomes a 404 below.
+            _require_agent(agent_id)
             row = tx.get(key)
             if row is None or row["agent_id"] != agent_id:
                 return jsonify({"error": "job_not_found"}), 404
