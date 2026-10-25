@@ -56,6 +56,8 @@ class CliClient:
         try:
             data = response.json()
         except ValueError as exc:
+            if response.status_code >= 400:
+                raise CliError(f"Logos HTTP {response.status_code}: request failed") from exc
             raise CliError("Logos backend returned invalid JSON") from exc
 
         if response.status_code >= 400:

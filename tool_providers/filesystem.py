@@ -161,7 +161,14 @@ def write_file(args: dict) -> dict:
 
         if abs_path.endswith(".py"):
             verify = subprocess.run(
-                ["python3", "-m", "py_compile", tmp_path], capture_output=True, text=True
+                [
+                    "python3",
+                    "-c",
+                    "import sys; compile(open(sys.argv[1], 'rb').read(), sys.argv[1], 'exec')",
+                    tmp_path,
+                ],
+                capture_output=True,
+                text=True,
             )
             if verify.returncode != 0:
                 if os.path.exists(tmp_path):

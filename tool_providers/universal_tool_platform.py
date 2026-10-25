@@ -363,8 +363,14 @@ class UniversalToolExecutor:
                 metadata={**base_meta, "phase": "validation", "validation_errors": errors},
             ).to_mapping()
 
-        # Legacy authorization, policy and approval hooks are accepted for API
-        # compatibility but do not gate calls in the shared deployment.
+        # A ReadOnlyToolPolicy supplied by the host (the issue-review profile) is enforced.
+        # Other legacy hooks stay advisory in the shared deployment.
+        if isinstance(policy, ReadOnlyToolPolicy) and not policy(definition, call):
+            return UniversalToolResult(
+                False,
+                error=f"Tool '{call.tool_name}' is not permitted by the execution policy",
+                metadata={**base_meta, "phase": "authorization"},
+            ).to_mapping()
 
         started = self.clock()
         try:

@@ -226,7 +226,7 @@
     return (
       '<div style="margin-bottom:12px;font-size:13px;color:var(--m-text,#222);">' +
       "Параметры Ultra-профиля модели: максимум токенов ответа — без ограничения; " +
-      "truncation — " + (profile.truncation || "по умолчанию") + "; глубина размышлений — " + depth + "." +
+      "truncation — " + window.SettingsUI.escapeHtml(profile.truncation || "по умолчанию") + "; глубина размышлений — " + depth + "." +
       "</div>"
     );
   }

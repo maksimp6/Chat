@@ -569,7 +569,7 @@ window.fetchVectorStores = function () {
             })
             .then(function (res) {
               div.remove();
-              renderFile(res);
+              loadFiles();
             })
             .catch(function (err) {
               div.innerHTML = [

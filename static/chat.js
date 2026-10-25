@@ -268,7 +268,7 @@ function parseMarkdown(text) {
 
   var result = out.join("\n");
   for (var j = 0; j < codeBlocks.length; j++)
-    result = result.replace("\x00CB" + j + "\x00", codeBlocks[j]);
+    result = result.replace("\x00CB" + j + "\x00", () => codeBlocks[j]);
   return result;
 }
 

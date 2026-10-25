@@ -44,6 +44,11 @@ class YandexPollingMixin:
                 resp.raise_for_status()
                 data = resp.json()
             except requests.RequestException as e:
+                status = getattr(e.response, "status_code", None)
+                if status is not None and 400 <= status < 500 and status not in (404, 429):
+                    raise YandexClientError(
+                        f"HTTP {status} while polling response", status_code=status
+                    ) from e
                 if execution_trace and isinstance(execution_trace, ExecutionTrace):
                     execution_trace.add_event(
                         "api_poll_error",
