@@ -177,6 +177,8 @@ TRACE = _object(
         "billing": JSON_OBJECT,
         "provider_key": NULLABLE_JSON,
         "provider_keys": _list(ANY_JSON),
+        "api_requests": _list(ANY_JSON),
+        "reasoning_plan": ANY_JSON,
         "skills": _list(TRACE_SKILL),
     },
 )
