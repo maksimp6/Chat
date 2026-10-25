@@ -35,8 +35,10 @@ CREATE_JS = """JSON.stringify((()=>{
 
 RESULT_JS = """JSON.stringify((()=>{
   const body = document.body.innerText || '';
-  const secret = (body.match(/AQVN[A-Za-z0-9_-]{20,}/) || [null])[0];
-  const ids = [...new Set(body.match(/\\b[a-z0-9]{20}\\b/g) || [])];
+  const fields = [...document.querySelectorAll('input,textarea')].map(e => e.value || '').join('\\n');
+  const text = body + '\\n' + fields;
+  const secret = (text.match(/AQVN[A-Za-z0-9_-]{20,}/) || [null])[0];
+  const ids = [...new Set(text.match(/\\b[a-z0-9]{20}\\b/g) || [])];
   return {secret: secret, id_candidates: ids.slice(0, 20)};
 })())"""
 
@@ -51,9 +53,12 @@ def child_issue(folder_id):
         actor, url = aistudio_actor(rdp)
         if folder_id not in urlparse(url).path:
             raise RuntimeError("The open AI Studio page is not the expected folder")
-        rdp.evaluate(actor, CREATE_JS)
-        time.sleep(3)
+        # A result still open from an earlier attempt is read first, so no second key is created.
         result = rdp.evaluate(actor, RESULT_JS)
+        if not result.get("secret"):
+            rdp.evaluate(actor, CREATE_JS)
+            time.sleep(3)
+            result = rdp.evaluate(actor, RESULT_JS)
     finally:
         rdp.s.close()
     # Returned to the parent process through a pipe only; never printed here.
