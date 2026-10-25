@@ -53,7 +53,8 @@ def device_model_guard():
 
 def native_focus_is_logos():
     # The page check cannot see a native window drawn above the WebView, so ask Android who has focus.
-    windows = command(ROOT + "dumpsys", "window", "windows").decode("utf-8", "replace")
+    # mCurrentFocus is printed by the full window dump, not by the "windows" subcommand.
+    windows = command(ROOT + "dumpsys", "window").decode("utf-8", "replace")
     focus = [line for line in windows.splitlines() if "mCurrentFocus" in line]
     if not focus or PACKAGE not in focus[-1]:
         # Name what has focus, so a failed run shows which window is on top of the application.
