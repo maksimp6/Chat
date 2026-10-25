@@ -179,6 +179,10 @@ TRACE = _object(
         "provider_keys": _list(ANY_JSON),
         "api_requests": _list(ANY_JSON),
         "reasoning_plan": ANY_JSON,
+        "retrieval_operations": _list(ANY_JSON),
+        "knowledge_operations": _list(ANY_JSON),
+        "context_cache_operations": _list(ANY_JSON),
+        "mcp_activity": _list(ANY_JSON),
         "skills": _list(TRACE_SKILL),
     },
 )
