@@ -2173,4 +2173,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid var(--control-border);
+  border-radius: 22px;
+  background: var(--bg-input);
 }
