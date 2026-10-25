@@ -114,9 +114,9 @@ class PngValidation(unittest.TestCase):
 
 class ScreenAndInputControls(unittest.TestCase):
     def test_only_explicit_unlocked_policy_is_accepted(self):
-        policy = (b"showing=false\nmInputRestricted=false\nmKeyguardOccluded=false\n"
+        policy = b"showing=false\nmInputRestricted=false\nmKeyguardOccluded=false\n"
+        window = (b"mCurrentFocus=Window{abc u0 com.example.fixture/MainActivity}\n"
                   b"mScreenOnEarly=true mScreenOnFully=true\n")
-        window = b"mCurrentFocus=Window{abc u0 com.example.fixture/MainActivity}\n"
         cases = ((policy, True),
                  (policy.replace(b"mKeyguardOccluded=false\n", b"mKeyguardOccluded=false mKeyguardOccludedChanged=false\n"), True),
                  (policy.replace(b"showing=false", b"showing=true"), False),
@@ -130,22 +130,42 @@ class ScreenAndInputControls(unittest.TestCase):
                 self.assertIs(state["unlocked"], unlocked)
                 self.assertEqual(state["package"], "com.example.fixture")
                 self.assertEqual(state["focus_window"], "Window{abc u0 com.example.fixture/MainActivity}")
+                self.assertTrue(state["display_on"])
 
     def test_display_requires_both_explicit_true_flags(self):
-        policy = (b"showing=false mInputRestricted=false mKeyguardOccluded=false\n"
+        policy = b"showing=false mInputRestricted=false mKeyguardOccluded=false\n"
+        window = (b"mCurrentFocus=Window{abc u0 com.example.fixture/MainActivity}\n"
                   b"mScreenOnEarly=true mScreenOnFully=true\n")
-        window = b"mCurrentFocus=Window{abc u0 com.example.fixture/MainActivity}\n"
-        cases = ((policy, True),
-                 (policy.replace(b"mScreenOnEarly=true", b"mScreenOnEarly=false"), False),
-                 (policy.replace(b"mScreenOnFully=true", b"mScreenOnFully=false"), False),
-                 (policy.replace(b"mScreenOnFully=true", b""), False),
-                 (policy + b"mScreenOnFully=false\n", False))
+        cases = ((window, True),
+                 (window.replace(b"mScreenOnEarly=true", b"mScreenOnEarly=false"), False),
+                 (window.replace(b"mScreenOnFully=true", b"mScreenOnFully=false"), False),
+                 (window.replace(b"mScreenOnFully=true", b""), False),
+                 (window + b"mScreenOnFully=false\n", False))
         for raw, display_on in cases:
-            with self.subTest(policy=raw):
-                with mock.patch.object(agent, "bounded_command", side_effect=[raw, window]):
+            with self.subTest(window=raw):
+                with mock.patch.object(agent, "bounded_command", side_effect=[policy, raw]):
                     state = agent.screen_state()
                 self.assertIs(state["display_on"], display_on)
                 self.assertTrue(state["unlocked"])
+
+    def test_policy_only_display_flags_cannot_authorize_capture(self):
+        policy = (b"showing=false mInputRestricted=false mKeyguardOccluded=false\n"
+                  b"mScreenOnEarly=true mScreenOnFully=true\n")
+        window = b"mCurrentFocus=Window{abc u0 com.example.fixture/MainActivity}\n"
+        with mock.patch.object(agent, "bounded_command", side_effect=[policy, window]):
+            state = agent.screen_state()
+        self.assertIs(state["display_on"], False)
+
+    def test_secondary_off_display_does_not_override_default_display(self):
+        policy = b"showing=false mInputRestricted=false mKeyguardOccluded=false\n"
+        window = (b"mCurrentFocus=Window{abc u0 com.example.fixture/MainActivity}\n"
+                  b"Display: mDisplayId=0\nmScreenOnEarly=true mScreenOnFully=true\n"
+                  b"Display: mDisplayId=1\nmScreenOnEarly=false mScreenOnFully=false\n")
+        with mock.patch.object(agent, "bounded_command", side_effect=[policy, window]):
+            self.assertIs(agent.screen_state()["display_on"], True)
+        reversed_states = window.replace(b"=true", b"=temporary").replace(b"=false", b"=true").replace(b"=temporary", b"=false")
+        with mock.patch.object(agent, "bounded_command", side_effect=[policy, reversed_states]):
+            self.assertIs(agent.screen_state()["display_on"], False)
 
     def test_status_never_connects_to_mouse(self):
         state = screen_fixture("com.example.private", unlocked=False)
@@ -282,6 +302,75 @@ class ScreenAndInputControls(unittest.TestCase):
                     with self.assertRaisesRegex(agent.AgentError, "do_not_retry"):
                         agent.worker(mouse_request())
                 connection.sendall.assert_called_once()
+
+
+class WakeControls(unittest.TestCase):
+    def test_wake_sends_only_fixed_hover_and_ack_never_proves_wakeup(self):
+        for display_on in (False, None):
+            with self.subTest(display_on=display_on):
+                connection = connection_fixture()
+                state = {"unlocked": False, "display_on": display_on,
+                         "package": None, "focus_window": None}
+                with (mock.patch.object(agent, "device_guard") as guard,
+                      mock.patch.object(agent, "screen_state", return_value=state),
+                      mock.patch.object(agent, "require_screen") as screen_guard,
+                      mock.patch.object(agent, "mouse_connection", return_value=connection) as connect):
+                    result = agent.worker({"command": "wake"})
+                guard.assert_called_once()
+                connect.assert_called_once()
+                screen_guard.assert_not_called()
+                connection.sendall.assert_called_once_with(b"move 1 1\n")
+                self.assertEqual(result["command"], "wake")
+                self.assertIs(result["submitted"], True)
+                self.assertIs(result["verified"], False)
+                self.assertEqual(result["coordinates"], "relative")
+
+    def test_already_awake_never_connects_or_sends(self):
+        with (mock.patch.object(agent, "device_guard"),
+              mock.patch.object(agent, "screen_state", return_value=screen_fixture()),
+              mock.patch.object(agent, "mouse_connection") as connect):
+            result = agent.worker({"command": "wake"})
+        connect.assert_not_called()
+        self.assertTrue(result["already_awake"])
+        self.assertEqual(result["input_operations"], "NOT_RUN")
+        self.assertIs(result["verified"], False)
+        self.assertNotIn("submitted", result)
+
+    def test_wake_rechecks_awake_state_before_sending(self):
+        connection = connection_fixture()
+        with (mock.patch.object(agent, "device_guard"),
+              mock.patch.object(agent, "screen_state", side_effect=[
+                  screen_fixture(display_on=False), screen_fixture()]),
+              mock.patch.object(agent, "mouse_connection", return_value=connection)):
+            result = agent.worker({"command": "wake"})
+        connection.sendall.assert_not_called()
+        self.assertTrue(result["already_awake"])
+
+    def test_wake_rejects_any_caller_controlled_payload(self):
+        for extra in ({"dx": 100}, {"dx": 1, "dy": 1},
+                      {"expected_package": "com.example.fixture"}, {"command_args": "click 1 1"}):
+            with self.subTest(extra=extra):
+                with (mock.patch.object(agent, "device_guard") as guard,
+                      mock.patch.object(agent, "mouse_connection") as connect):
+                    with self.assertRaisesRegex(agent.AgentError, "invalid_worker_request"):
+                        agent.worker({"command": "wake", **extra})
+                guard.assert_not_called()
+                connect.assert_not_called()
+
+    def test_wake_unknown_ack_or_timeout_never_retries_or_reports_success(self):
+        for reply in (b"ERR\n", socket.timeout("synthetic timeout")):
+            with self.subTest(reply_type=type(reply).__name__):
+                connection = connection_fixture()
+                if isinstance(reply, Exception):
+                    connection.recv.side_effect = reply
+                else:
+                    connection.recv.return_value = reply
+                with (mock.patch.object(agent, "device_guard"),
+                      mock.patch.object(agent, "screen_state", return_value=screen_fixture(display_on=False)),
+                      mock.patch.object(agent, "mouse_connection", return_value=connection)):
+                    with self.assertRaisesRegex(agent.AgentError, "do_not_retry"):
+                        agent.worker({"command": "wake"})
+                connection.sendall.assert_called_once_with(b"move 1 1\n")
 
 
 class RunnerBoundaryControls(unittest.TestCase):

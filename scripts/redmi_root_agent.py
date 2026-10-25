@@ -81,11 +81,19 @@ def screen_state():
     for key in ("showing", "mInputRestricted", "mKeyguardOccluded"):
         values = re.findall(r"(?<![A-Za-z0-9_])" + key + r"\s*=\s*(true|false)\b", policy)
         flags.append(bool(values) and all(value == "false" for value in values))
+    window = bounded_command(["/system/bin/dumpsys", "window"]).decode("utf-8", "replace")
+    display_source = window
+    display_ids = set(re.findall(r"\bmDisplayId\s*=\s*(\d+)\b", window))
+    if len(display_ids) > 1:
+        blocks = re.split(r"(?m)(?=^\s*Display:\s*mDisplayId=)", window)
+        primary = [block for block in blocks if re.match(r"\s*Display:\s*mDisplayId=0\b", block)]
+        display_source = primary[0] if len(primary) == 1 else ""
+    elif display_ids and "0" not in display_ids:
+        display_source = ""
     display_flags = []
     for key in ("mScreenOnEarly", "mScreenOnFully"):
-        values = re.findall(r"(?<![A-Za-z0-9_])" + key + r"\s*=\s*(true|false)\b", policy)
+        values = re.findall(r"(?<![A-Za-z0-9_])" + key + r"\s*=\s*(true|false)\b", display_source)
         display_flags.append(bool(values) and all(value == "true" for value in values))
-    window = bounded_command(["/system/bin/dumpsys", "window"]).decode("utf-8", "replace")
     windows = re.findall(r"(?m)^\s*mCurrentFocus=([^\r\n]*)", window)
     focus_window = windows[0].strip() if len(windows) == 1 else None
     focus = re.search(r"\b(" + PACKAGE.pattern + r")/", focus_window or "")
@@ -195,12 +203,28 @@ def mouse_connection():
         raise
 
 
+def submit_mouse(connection, command, dx, dy):
+    """One internal protocol write; an uncertain delivery must never be retried."""
+    try:
+        connection.sendall(f"{command} {dx} {dy}\n".encode("ascii"))
+        reply = bytearray()
+        while len(reply) < 16 and not reply.endswith(b"\n"):
+            chunk = connection.recv(16 - len(reply))
+            if not chunk:
+                break
+            reply.extend(chunk)
+    except OSError:
+        raise AgentError("mouse_delivery_unknown_do_not_retry") from None
+    if reply != b"OK\n":
+        raise AgentError("mouse_ack_unconfirmed_do_not_retry")
+
+
 def worker(request):
     command = request.get("command")
     keys = {"command", "dx", "dy", "expected_package"} if command in ("move", "click") else {"command"}
     if command == "capture" and "expected_package" in request:
         keys.add("expected_package")
-    if set(request) != keys or command not in ("status", "probe", "capture", "move", "click"):
+    if set(request) != keys or command not in ("status", "probe", "capture", "move", "click", "wake"):
         raise AgentError("invalid_worker_request")
     device_guard()
     if command == "status":
@@ -218,6 +242,18 @@ def worker(request):
         with mouse_connection():
             return {"root_uid": 0, "mouse_peer_verified": True,
                     "daemon_sha256": DAEMON_SHA256, "input_operations": "NOT_RUN"}
+    if command == "wake":
+        def already_awake():
+            return {"command": "wake", "already_awake": True,
+                    "input_operations": "NOT_RUN", "verified": False}
+        if screen_state().get("display_on") is True:
+            return already_awake()
+        with mouse_connection() as connection:
+            if screen_state().get("display_on") is True:
+                return already_awake()
+            submit_mouse(connection, "move", 1, 1)
+        return {"command": "wake", "submitted": True, "verified": False,
+                "coordinates": "relative"}
     if command == "capture":
         expected = request.get("expected_package")
         if "expected_package" in request and (not isinstance(expected, str) or PACKAGE.fullmatch(expected) is None):
@@ -235,18 +271,7 @@ def worker(request):
         raise AgentError("invalid_mouse_request")
     with mouse_connection() as connection:
         require_screen(request["expected_package"])
-        try:
-            connection.sendall(f"{command} {request['dx']} {request['dy']}\n".encode("ascii"))
-            reply = bytearray()
-            while len(reply) < 16 and not reply.endswith(b"\n"):
-                chunk = connection.recv(16 - len(reply))
-                if not chunk:
-                    break
-                reply.extend(chunk)
-        except OSError:
-            raise AgentError("mouse_delivery_unknown_do_not_retry") from None
-        if reply != b"OK\n":
-            raise AgentError("mouse_ack_unconfirmed_do_not_retry")
+        submit_mouse(connection, command, request["dx"], request["dy"])
     return {"command": command, "submitted": True, "verified": False, "coordinates": "relative"}
 
 
@@ -276,7 +301,7 @@ def main():
         return 0
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    for command in ("status", "probe", "capture", "move", "click"):
+    for command in ("status", "probe", "capture", "move", "click", "wake"):
         sub = commands.add_parser(command)
         if command == "capture":
             sub.add_argument("--output", required=True)

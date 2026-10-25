@@ -57,6 +57,7 @@ worker internally.
 | --- | --- |
 | `status` | Sanitized device, root, Keyguard, focus-presence, and socket metadata; no input |
 | `probe` | Connect to the existing socket and verify root peer/executable hash; send no input command |
+| `wake` | If display-on is unconfirmed, submit one fixed relative `move 1 1`, without clicking; verify actual wake separately |
 | `capture --output PATH [--expected-package PACKAGE]` | Capture and validate PNG; require stable native focus/window identity before and after capture |
 | `move DX DY --expected-package PACKAGE` | Submit bounded relative movement after unlocked/foreground checks |
 | `click DX DY --expected-package PACKAGE` | Submit one bounded relative movement and left click after unlocked/foreground checks |
@@ -85,8 +86,10 @@ green with counter `1` after one accepted trusted click. The temporary HTTP
 server exists only for this test and is closed afterward; production input
 continues through the existing root-only Unix socket.
 
-The E2E wakes the display with `KEYCODE_WAKEUP` inside the actual runner and
-repeats that reversible setup before capture and input. It never dismisses
+The E2E tries to wake the display through the verified existing mouse peer with
+one fixed relative `move 1 1`, without a click. It repeats the display check
+before capture and input, sending no wake event while the display is on. A
+daemon ACK alone does not confirm wake. It never dismisses
 Keyguard, enters a PIN, or changes the screen timeout. It waits for display-on
 flags, a focused native window, a nonzero browser viewport and painted frames.
 

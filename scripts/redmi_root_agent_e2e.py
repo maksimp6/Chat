@@ -128,12 +128,10 @@ def run_cli(helper, *args):
     return data
 
 
-def wake_display():
-    # Reversible test setup only. This does not dismiss Keyguard or enter a PIN.
-    result = subprocess.run(['su', '-c', '/system/bin/input keyevent KEYCODE_WAKEUP'],
-                            capture_output=True, timeout=15)
-    if result.returncode:
-        raise RuntimeError('DISPLAY_WAKE_FAILED')
+def wake_display(helper):
+    # One fixed hover event through the verified existing hardware input peer.
+    # No click, Keyguard dismissal, PIN entry, or persistent power setting.
+    return run_cli(helper, 'wake')
 
 
 def frame_color(path, target, expected_size=None):
@@ -247,11 +245,11 @@ def main():
               "runner": os.environ.get("RUNNER_NAME"), "result": "FAIL", "input_backend": "existing_root_mouse"}
     try:
         report["probe"] = run_cli(args.helper, "probe")
-        wake_display()
+        report['wake'] = wake_display(args.helper)
         wait_for(lambda: run_cli(args.helper, 'status').get('display_on') is True,
                  8, 'DISPLAY_NOT_AWAKE')
         report["status"] = run_cli(args.helper, "status")
-        report['display_setup'] = 'KEYCODE_WAKEUP_WITHOUT_UNLOCK'
+        report['display_setup'] = 'EXISTING_MOUSE_ONE_PIXEL_WITHOUT_CLICK_OR_UNLOCK'
         if report["status"].get("keyguard_locked_or_unknown") is not False:
             raise RuntimeError("SCREEN_LOCKED_OR_UNKNOWN")
         url = origin + page_path
@@ -268,7 +266,7 @@ def main():
         report["negative_control"] = "PASS_UNTRUSTED_CLICK_IGNORED"
         report['page'] = witness.snapshot()['page']
         wait_for(witness.active, 5, 'OWN_PAGE_NOT_FOCUSED')
-        wake_display()
+        wake_display(args.helper)
         report["before"] = run_cli(args.helper, "capture", "--expected-package", args.package,
                                    "--output", args.output / "before.png")
         if not witness.active():
@@ -278,12 +276,12 @@ def main():
         # independently reports a fresh trusted pointer inside its own button.
         width, height = frame_color(args.output / 'before.png', (213, 68, 56))
         for _ in range(math.ceil(max(width, height) / 500) + 2):
-            wake_display()
+            wake_display(args.helper)
             if not witness.active():
                 raise RuntimeError('OWN_PAGE_FOCUS_LOST_BEFORE_MOVE')
             run_cli(args.helper, "move", -500, -500, "--expected-package", args.package)
         previous_move = witness.snapshot()['move_seq']
-        wake_display()
+        wake_display(args.helper)
         final_move_started = time.time()
         run_cli(args.helper, "move", 200, 350, "--expected-package", args.package)
         wait_for(lambda: witness.active() and witness.snapshot()['inside']
@@ -293,13 +291,13 @@ def main():
                  3, "TRUSTED_POINTER_NOT_OBSERVED_IN_TEST_BUTTON")
         if not witness.active() or not witness.snapshot()['inside']:
             raise RuntimeError('OWN_BUTTON_NOT_UNDER_POINTER')
-        wake_display()
+        wake_display(args.helper)
         run_cli(args.helper, "click", 0, 0, "--expected-package", args.package)
         wait_for(lambda: witness.snapshot()["clicks"] == 1 and witness.snapshot()["painted"],
                  5, "TRUSTED_CLICK_NOT_OBSERVED")
         if not witness.active():
             raise RuntimeError('OWN_PAGE_FOCUS_LOST_AFTER_CLICK')
-        wake_display()
+        wake_display(args.helper)
         report["after"] = run_cli(args.helper, "capture", "--expected-package", args.package,
                                   "--output", args.output / "after.png")
         if not witness.active():
