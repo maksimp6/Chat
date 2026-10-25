@@ -159,6 +159,16 @@ var MATH_SYMBOLS = {
   infty: "∞",
   ldots: "…",
   cdots: "⋯",
+  sin: "sin",
+  cos: "cos",
+  tan: "tan",
+  cot: "cot",
+  log: "log",
+  ln: "ln",
+  exp: "exp",
+  lim: "lim",
+  min: "min",
+  max: "max",
 };
 
 // Plain-HTML approximation of common LaTeX. The input is already HTML-escaped, so the only tags here are the ones made below.

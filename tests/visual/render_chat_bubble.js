@@ -42,7 +42,7 @@ fs.writeFileSync(harnessPath, harness, "utf-8");
     const text = [
       "Формулы: $y = x^3 - 3x + 1$, $e^{x}$, $\\sqrt{x}$, $\\frac{1}{2}$.",
       "Расчёт: $2340 \\times 0{,}17 = 397{,}8$.",
-      "$$x(t) = \\sin(3t), \; y(t) = \\sin(4t)$$",
+      "$$x(t) = \\sin(3t), \\; y(t) = \\sin(4t)$$",
       "![Alice AI ART](" + picture + ")",
     ].join("\n\n");
     if (typeof addMessage !== "function") return { addMessageAvailable: false };
@@ -69,7 +69,7 @@ fs.writeFileSync(harnessPath, harness, "utf-8");
       imageWidth: image ? image.naturalWidth : 0,
       fractions: document.querySelectorAll(".md-frac").length,
       mathBlocks: document.querySelectorAll(".md-math").length,
-      rawLatex: /\\times|\\frac|\\sqrt|\$\$/.test(bubbleText),
+      rawLatex: /\\[a-zA-Z]+|\$\$/.test(bubbleText),
       rawDollar: bubbleText.indexOf("$") !== -1,
     };
   });
