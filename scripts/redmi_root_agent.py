@@ -81,16 +81,22 @@ def screen_state():
     for key in ("showing", "mInputRestricted", "mKeyguardOccluded"):
         values = re.findall(r"(?<![A-Za-z0-9_])" + key + r"\s*=\s*(true|false)\b", policy)
         flags.append(bool(values) and all(value == "false" for value in values))
+    display_flags = []
+    for key in ("mScreenOnEarly", "mScreenOnFully"):
+        values = re.findall(r"(?<![A-Za-z0-9_])" + key + r"\s*=\s*(true|false)\b", policy)
+        display_flags.append(bool(values) and all(value == "true" for value in values))
     window = bounded_command(["/system/bin/dumpsys", "window"]).decode("utf-8", "replace")
     windows = re.findall(r"(?m)^\s*mCurrentFocus=([^\r\n]*)", window)
     focus_window = windows[0].strip() if len(windows) == 1 else None
     focus = re.search(r"\b(" + PACKAGE.pattern + r")/", focus_window or "")
-    return {"unlocked": all(flags), "package": focus.group(1) if focus else None,
+    return {"unlocked": all(flags), "display_on": all(display_flags), "package": focus.group(1) if focus else None,
             "focus_window": focus_window if focus else None}
 
 
 def require_screen(expected=None):
     state = screen_state()
+    if state.get("display_on") is not True:
+        raise AgentError("screen_not_awake")
     if not state["unlocked"] or not state["package"] or not state.get("focus_window"):
         raise AgentError("screen_locked_or_unknown")
     if expected is not None and state["package"] != expected:
@@ -206,6 +212,7 @@ def worker(request):
             mouse_ready = False
         return {"model": "Redmi 9", "device": "galahad", "root_uid": 0,
                 "keyguard_locked_or_unknown": not state["unlocked"],
+                "display_on": state["display_on"],
                 "focus_present": bool(state["package"]), "mouse_metadata_valid": mouse_ready}
     if command == "probe":
         with mouse_connection():

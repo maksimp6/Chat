@@ -29,7 +29,7 @@ button.done{background:#176c47}</style>
 const button=document.getElementById('target');let count=0,seq=0,queue=Promise.resolve();
 const binding='RUN_BINDING';
 function send(data){data.created_ms??=Date.now();data.seq=++seq;queue=queue.then(()=>fetch('/event',{method:'POST',headers:{'Content-Type':'application/json','X-RootAgent-Run':binding},body:JSON.stringify(data)}));return queue}
-function heartbeat(){send({kind:'heartbeat',visible:document.visibilityState==='visible',focused:document.hasFocus()})}
+function heartbeat(){send({kind:'heartbeat',visible:document.visibilityState==='visible',focused:document.hasFocus(),width:innerWidth,height:innerHeight})}
 setInterval(heartbeat,100);addEventListener('blur',heartbeat);addEventListener('focus',heartbeat);
 button.addEventListener('pointermove',event=>{
  if(event.isTrusted)send({kind:'move',trusted:true,inside:event.target===button,x:event.clientX,y:event.clientY,created_ms:performance.timeOrigin+event.timeStamp});
@@ -41,8 +41,12 @@ button.addEventListener('click',event=>{
  send({kind:'click',trusted:true});
  requestAnimationFrame(()=>requestAnimationFrame(()=>send({kind:'paint',trusted:true})));
 });
-send({kind:'ready',width:innerWidth,height:innerHeight,dpr:devicePixelRatio,background:getComputedStyle(button).backgroundColor});heartbeat();
 button.click();
+function ready(){
+ if(innerWidth<=100||innerHeight<=100){requestAnimationFrame(ready);return}
+ requestAnimationFrame(()=>{send({kind:'ready',width:innerWidth,height:innerHeight,dpr:devicePixelRatio,background:getComputedStyle(button).backgroundColor});heartbeat()});
+}
+requestAnimationFrame(ready);
 </script>"""
 
 
@@ -72,12 +76,13 @@ class Witness:
             self.seq = serial
             kind = data.get("kind")
             if kind == "ready":
-                self.ready = True
+                self.ready = data.get('width', 0) > 100 and data.get('height', 0) > 100
                 self.page = {k: data.get(k) for k in ('width', 'height', 'dpr', 'background')}
             elif kind == "negative" and data.get("trusted") is False:
                 self.negative += 1
             elif kind == 'heartbeat':
-                self.focused = data.get('visible') is True and data.get('focused') is True
+                self.focused = (data.get('visible') is True and data.get('focused') is True
+                                and data.get('width', 0) > 100 and data.get('height', 0) > 100)
                 self.heartbeat_time = created / 1000
             elif kind == "move" and data.get("trusted") is True:
                 self.inside = data.get('inside') is True
@@ -121,6 +126,14 @@ def run_cli(helper, *args):
     if result.returncode:
         raise RuntimeError("ROOTAGENT_" + str(data.get("error", "FAILED")))
     return data
+
+
+def wake_display():
+    # Reversible test setup only. This does not dismiss Keyguard or enter a PIN.
+    result = subprocess.run(['su', '-c', '/system/bin/input keyevent KEYCODE_WAKEUP'],
+                            capture_output=True, timeout=15)
+    if result.returncode:
+        raise RuntimeError('DISPLAY_WAKE_FAILED')
 
 
 def frame_color(path, target, expected_size=None):
@@ -234,7 +247,11 @@ def main():
               "runner": os.environ.get("RUNNER_NAME"), "result": "FAIL", "input_backend": "existing_root_mouse"}
     try:
         report["probe"] = run_cli(args.helper, "probe")
+        wake_display()
+        wait_for(lambda: run_cli(args.helper, 'status').get('display_on') is True,
+                 8, 'DISPLAY_NOT_AWAKE')
         report["status"] = run_cli(args.helper, "status")
+        report['display_setup'] = 'KEYCODE_WAKEUP_WITHOUT_UNLOCK'
         if report["status"].get("keyguard_locked_or_unknown") is not False:
             raise RuntimeError("SCREEN_LOCKED_OR_UNKNOWN")
         url = origin + page_path
@@ -251,6 +268,7 @@ def main():
         report["negative_control"] = "PASS_UNTRUSTED_CLICK_IGNORED"
         report['page'] = witness.snapshot()['page']
         wait_for(witness.active, 5, 'OWN_PAGE_NOT_FOCUSED')
+        wake_display()
         report["before"] = run_cli(args.helper, "capture", "--expected-package", args.package,
                                    "--output", args.output / "before.png")
         if not witness.active():
@@ -260,12 +278,14 @@ def main():
         # independently reports a fresh trusted pointer inside its own button.
         width, height = frame_color(args.output / 'before.png', (213, 68, 56))
         for _ in range(math.ceil(max(width, height) / 500) + 2):
+            wake_display()
             if not witness.active():
                 raise RuntimeError('OWN_PAGE_FOCUS_LOST_BEFORE_MOVE')
             run_cli(args.helper, "move", -500, -500, "--expected-package", args.package)
         previous_move = witness.snapshot()['move_seq']
+        wake_display()
         final_move_started = time.time()
-        run_cli(args.helper, "move", 350, 500, "--expected-package", args.package)
+        run_cli(args.helper, "move", 200, 350, "--expected-package", args.package)
         wait_for(lambda: witness.active() and witness.snapshot()['inside']
                  and witness.snapshot()['move_seq'] > previous_move
                  and witness.snapshot()['move_time'] >= final_move_started
@@ -273,11 +293,13 @@ def main():
                  3, "TRUSTED_POINTER_NOT_OBSERVED_IN_TEST_BUTTON")
         if not witness.active() or not witness.snapshot()['inside']:
             raise RuntimeError('OWN_BUTTON_NOT_UNDER_POINTER')
+        wake_display()
         run_cli(args.helper, "click", 0, 0, "--expected-package", args.package)
         wait_for(lambda: witness.snapshot()["clicks"] == 1 and witness.snapshot()["painted"],
                  5, "TRUSTED_CLICK_NOT_OBSERVED")
         if not witness.active():
             raise RuntimeError('OWN_PAGE_FOCUS_LOST_AFTER_CLICK')
+        wake_display()
         report["after"] = run_cli(args.helper, "capture", "--expected-package", args.package,
                                   "--output", args.output / "after.png")
         if not witness.active():

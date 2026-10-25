@@ -60,8 +60,8 @@ def mouse_request(command="click", dx=8, dy=-2):
             "expected_package": "com.example.fixture"}
 
 
-def screen_fixture(package="com.example.fixture", window_id="abc", unlocked=True):
-    return {"unlocked": unlocked, "package": package,
+def screen_fixture(package="com.example.fixture", window_id="abc", unlocked=True, display_on=True):
+    return {"unlocked": unlocked, "display_on": display_on, "package": package,
             "focus_window": f"Window{{{window_id} u0 {package}/MainActivity}}"}
 
 
@@ -114,7 +114,8 @@ class PngValidation(unittest.TestCase):
 
 class ScreenAndInputControls(unittest.TestCase):
     def test_only_explicit_unlocked_policy_is_accepted(self):
-        policy = b"showing=false\nmInputRestricted=false\nmKeyguardOccluded=false\n"
+        policy = (b"showing=false\nmInputRestricted=false\nmKeyguardOccluded=false\n"
+                  b"mScreenOnEarly=true mScreenOnFully=true\n")
         window = b"mCurrentFocus=Window{abc u0 com.example.fixture/MainActivity}\n"
         cases = ((policy, True),
                  (policy.replace(b"mKeyguardOccluded=false\n", b"mKeyguardOccluded=false mKeyguardOccludedChanged=false\n"), True),
@@ -130,6 +131,22 @@ class ScreenAndInputControls(unittest.TestCase):
                 self.assertEqual(state["package"], "com.example.fixture")
                 self.assertEqual(state["focus_window"], "Window{abc u0 com.example.fixture/MainActivity}")
 
+    def test_display_requires_both_explicit_true_flags(self):
+        policy = (b"showing=false mInputRestricted=false mKeyguardOccluded=false\n"
+                  b"mScreenOnEarly=true mScreenOnFully=true\n")
+        window = b"mCurrentFocus=Window{abc u0 com.example.fixture/MainActivity}\n"
+        cases = ((policy, True),
+                 (policy.replace(b"mScreenOnEarly=true", b"mScreenOnEarly=false"), False),
+                 (policy.replace(b"mScreenOnFully=true", b"mScreenOnFully=false"), False),
+                 (policy.replace(b"mScreenOnFully=true", b""), False),
+                 (policy + b"mScreenOnFully=false\n", False))
+        for raw, display_on in cases:
+            with self.subTest(policy=raw):
+                with mock.patch.object(agent, "bounded_command", side_effect=[raw, window]):
+                    state = agent.screen_state()
+                self.assertIs(state["display_on"], display_on)
+                self.assertTrue(state["unlocked"])
+
     def test_status_never_connects_to_mouse(self):
         state = screen_fixture("com.example.private", unlocked=False)
         with (mock.patch.object(agent, "device_guard"),
@@ -140,14 +157,15 @@ class ScreenAndInputControls(unittest.TestCase):
         connect.assert_not_called()
         self.assertTrue(result["keyguard_locked_or_unknown"])
         self.assertTrue(result["focus_present"])
+        self.assertTrue(result["display_on"])
         self.assertNotIn("package", result)
         self.assertNotIn("com.example.private", str(result))
 
     def test_locked_or_unknown_capture_never_invokes_screencap(self):
         states = (screen_fixture(unlocked=False),
-                  {"unlocked": False, "package": None, "focus_window": None},
-                  {"unlocked": True, "package": None, "focus_window": None},
-                  {"unlocked": True, "package": "com.example.fixture", "focus_window": None})
+                  {"unlocked": False, "display_on": True, "package": None, "focus_window": None},
+                  {"unlocked": True, "display_on": True, "package": None, "focus_window": None},
+                  {"unlocked": True, "display_on": True, "package": "com.example.fixture", "focus_window": None})
         for state in states:
             with self.subTest(state=state):
                 with (mock.patch.object(agent, "device_guard"),
@@ -157,9 +175,33 @@ class ScreenAndInputControls(unittest.TestCase):
                         agent.worker({"command": "capture"})
                 command.assert_not_called()
 
+    def test_sleeping_or_unknown_display_never_captures_or_sends_input(self):
+        for display_on in (False, None):
+            for request in ({"command": "capture"}, mouse_request("move")):
+                with self.subTest(display_on=display_on, command=request["command"]):
+                    connection = connection_fixture()
+                    with (mock.patch.object(agent, "device_guard"),
+                          mock.patch.object(agent, "screen_state", return_value=screen_fixture(display_on=display_on)),
+                          mock.patch.object(agent, "bounded_command") as command,
+                          mock.patch.object(agent, "mouse_connection", return_value=connection)):
+                        with self.assertRaisesRegex(agent.AgentError, "screen_not_awake"):
+                            agent.worker(request)
+                    command.assert_not_called()
+                    connection.sendall.assert_not_called()
+
+    def test_status_reports_sleep_without_exposing_focus_content(self):
+        with (mock.patch.object(agent, "device_guard"),
+              mock.patch.object(agent, "screen_state", return_value=screen_fixture("com.example.private", display_on=False)),
+              mock.patch.object(agent, "mouse_metadata")):
+            result = agent.worker({"command": "status"})
+        self.assertIs(result["display_on"], False)
+        self.assertIs(result["keyguard_locked_or_unknown"], False)
+        self.assertNotIn("package", result)
+        self.assertNotIn("com.example.private", str(result))
+
     def test_capture_discards_image_if_focus_changes_or_screen_locks(self):
         before = screen_fixture()
-        for after in (screen_fixture("com.other.app"), screen_fixture(unlocked=False),
+        for after in (screen_fixture("com.other.app"), screen_fixture(unlocked=False), screen_fixture(display_on=False),
                       screen_fixture(window_id="different")):
             with self.subTest(after=after):
                 with (mock.patch.object(agent, "device_guard"),

@@ -18,6 +18,8 @@ The private `_worker` entry point is internal to the CLI's `su` invocation.
 
 The device guard requires model `Redmi 9`, device `galahad`, and a root worker.
 Capture and input fail closed when Keyguard or foreground state is unknown.
+They also require Android's early/fully-on display flags; an unlocked Keyguard
+alone does not establish that the display is awake.
 The CLI does not unlock the phone, enter a PIN, restart RDC, install software,
 restart the mouse daemon, or change its boot service.
 
@@ -82,6 +84,11 @@ automatically: the click may already have happened.
 green with counter `1` after one accepted trusted click. The temporary HTTP
 server exists only for this test and is closed afterward; production input
 continues through the existing root-only Unix socket.
+
+The E2E wakes the display with `KEYCODE_WAKEUP` inside the actual runner and
+repeats that reversible setup before capture and input. It never dismisses
+Keyguard, enters a PIN, or changes the screen timeout. It waits for display-on
+flags, a focused native window, a nonzero browser viewport and painted frames.
 
 Acceptance requires all of the following in the same real Actions job:
 
