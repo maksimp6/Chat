@@ -551,7 +551,7 @@ def chat():
         error_message = (
             "Некорректное значение temperature"
             if is_temperature_error
-            else "Внутренняя ошибка обработки запроса"
+            else f"Внутренняя ошибка обработки запроса ({type(e).__name__}: {internal_error_message[:200]})"
         )
 
         try:

@@ -523,8 +523,11 @@ class RDP:
     def persisted_messages(self, actor, conversation_id):
         return self.evaluate(actor, "JSON.stringify((()=>{const x=new XMLHttpRequest();"
                              "x.open('GET','/api/conversations/'+encodeURIComponent(" + json.dumps(conversation_id) +
-                             ")+'/messages',false);x.send();if(x.status!==200)return {status:x.status,roles:[]};"
-                             "return {status:x.status,roles:(JSON.parse(x.responseText).messages||[]).map(m=>m.role)};})())")
+                             ")+'/messages',false);x.send();if(x.status!==200)return {status:x.status,messages:[]};"
+                             "return {status:x.status,messages:(JSON.parse(x.responseText).messages||[]).map(m=>({role:m.role,"
+                             "text:String(m.text||'').slice(0,400),"
+                             "errors:((m.trace&&m.trace.errors)||[]).slice(0,10).map(e=>({source:String(e.source||'').slice(0,80),"
+                             "type:String(e.type||'').slice(0,80),error:String(e.error||'').slice(0,300)}))}))};})())")
 
     def start_creation_observer(self, actor):
         return self.evaluate(actor, r"""JSON.stringify((()=>{
@@ -939,13 +942,17 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
                 if reply_status != "answered":
                     failures.append("message_reply_" + reply_status)
                 persisted = rdp.persisted_messages(actor, new_id)
-                roles = persisted["roles"]
+                roles = [m["role"] for m in persisted["messages"]]
+                replies = [m["text"] for m in persisted["messages"] if m["role"] == "assistant"]
+                reply_errors = [e for m in persisted["messages"] if m["role"] == "assistant" for e in m["errors"]]
                 if persisted["status"] != 200 or "user" not in roles:
                     failures.append("user_message_not_persisted")
                 if "assistant" not in roles:
                     failures.append("reply_not_persisted")
                 checkpoints["message_send"] = {"status": "FAIL" if len(failures) > send_validation_start else "PASS",
                                                "reply_status": reply_status,
+                                               "reply_text": replies[-1] if replies else None,
+                                               "reply_trace_errors": reply_errors,
                                                "user_message_persisted": "user" in roles,
                                                "reply_persisted": "assistant" in roles}
             else:
