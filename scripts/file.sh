@@ -31,7 +31,6 @@ if [ -z "$GIT_FILES" ]; then
         ! -name "*.db" \
         ! -name "*.tar.gz" \
         ! -name "project_dump.txt" \
-        ! -name "eruda.js" \
         ! -name "*.pyc" \
         | sed 's|^\./||' | sort)
 fi

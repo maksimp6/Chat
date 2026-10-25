@@ -31,7 +31,6 @@ This is the initial evidence-based audit before the next implementation slice. I
 2. file_manager.js, treasury.js, settings modules, core.js, theme/sidebar/models/chat/trace/voice and diagnostics are deferred.
 3. Several modules still register DOMContentLoaded handlers independently.
 4. Some modules expose global functions consumed by other modules, so load order is an implicit dependency.
-5. eruda_init.js is optional/debug functionality and must never be a critical-path dependency.
 6. Memory controls were already moved to an HTML-first/idempotent implementation by #313 and are intentionally not repeated here.
 
 ## Immediate implementation slice
