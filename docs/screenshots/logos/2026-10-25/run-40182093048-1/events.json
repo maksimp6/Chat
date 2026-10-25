@@ -1,0 +1,477 @@
+{
+  "schema_version": 1,
+  "scenario": "create_conversation",
+  "events": [
+    {
+      "event": "scenario_started",
+      "wall_utc": "2026-10-25T09:47:57.990791+00:00",
+      "monotonic_ns": 145461079463668,
+      "browser": {
+        "current_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "current_model": "qwen3.6-35b-a3b",
+        "conversation_ids": [
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "93f9dce8-6517-4b42-bd46-1620207457c9"
+        ],
+        "active_rows": 1,
+        "url_id": null,
+        "stored_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 10,
+        "empty_state": false,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1792921677986,
+        "performance_ms": 24786,
+        "time_origin_ms": 1792921653199
+      }
+    },
+    {
+      "event": "recorder_launch_requested",
+      "wall_utc": "2026-10-25T09:47:57.991630+00:00",
+      "monotonic_ns": 145461080237207
+    },
+    {
+      "event": "recorder_start_observed",
+      "wall_utc": "2026-10-25T09:47:58.494719+00:00",
+      "monotonic_ns": 145461583372591,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:11-conversation-before.png",
+      "wall_utc": "2026-10-25T09:47:58.796049+00:00",
+      "monotonic_ns": 145461884658745,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:11-conversation-before.png",
+      "wall_utc": "2026-10-25T09:47:59.475681+00:00",
+      "monotonic_ns": 145462564315437,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:11-conversation-before.png",
+      "wall_utc": "2026-10-25T09:48:00.117469+00:00",
+      "monotonic_ns": 145463206126514,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:11-conversation-before.png",
+      "wall_utc": "2026-10-25T09:48:00.121106+00:00",
+      "monotonic_ns": 145463209715361,
+      "recorder_running": true
+    },
+    {
+      "event": "network_observer_installed",
+      "wall_utc": "2026-10-25T09:48:00.142282+00:00",
+      "monotonic_ns": 145463230925899,
+      "browser": {
+        "installed": true,
+        "date_ms": 1792921680137,
+        "performance_ms": 26938,
+        "time_origin_ms": 1792921653199
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "new_chat_button_attempted",
+      "wall_utc": "2026-10-25T09:48:00.156363+00:00",
+      "monotonic_ns": 145463245001899,
+      "browser": {
+        "current_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "current_model": "qwen3.6-35b-a3b",
+        "conversation_ids": [
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "93f9dce8-6517-4b42-bd46-1620207457c9"
+        ],
+        "active_rows": 1,
+        "url_id": null,
+        "stored_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 10,
+        "empty_state": false,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1792921680153,
+        "performance_ms": 26953,
+        "time_origin_ms": 1792921653199
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "new_chat_button_clicked",
+      "wall_utc": "2026-10-25T09:48:00.244855+00:00",
+      "monotonic_ns": 145463333477899,
+      "browser": {
+        "current_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "current_model": "qwen3.6-35b-a3b",
+        "conversation_ids": [
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "93f9dce8-6517-4b42-bd46-1620207457c9"
+        ],
+        "active_rows": 1,
+        "url_id": null,
+        "stored_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 10,
+        "empty_state": false,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1792921680238,
+        "performance_ms": 27038,
+        "time_origin_ms": 1792921653199
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:12-conversation-model-picker.png",
+      "wall_utc": "2026-10-25T09:48:00.796362+00:00",
+      "monotonic_ns": 145463885015668,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:12-conversation-model-picker.png",
+      "wall_utc": "2026-10-25T09:48:01.457322+00:00",
+      "monotonic_ns": 145464545942822,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:12-conversation-model-picker.png",
+      "wall_utc": "2026-10-25T09:48:02.124158+00:00",
+      "monotonic_ns": 145465212822745,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:12-conversation-model-picker.png",
+      "wall_utc": "2026-10-25T09:48:02.129634+00:00",
+      "monotonic_ns": 145465218268361,
+      "recorder_running": true
+    },
+    {
+      "event": "model_picker_phase_observed",
+      "wall_utc": "2026-10-25T09:48:02.490022+00:00",
+      "monotonic_ns": 145465578655361,
+      "browser": {
+        "conversation": {
+          "current_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "current_model": "qwen3.6-35b-a3b",
+          "conversation_ids": [
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "active_ids": [
+            "93f9dce8-6517-4b42-bd46-1620207457c9"
+          ],
+          "active_rows": 1,
+          "url_id": null,
+          "stored_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "storage_available": true,
+          "model_choices": 1,
+          "message_count": 10,
+          "empty_state": false,
+          "error_state": false,
+          "ready_state": "complete",
+          "date_ms": 1792921682475,
+          "performance_ms": 29276,
+          "time_origin_ms": 1792921653199
+        },
+        "network": {
+          "available": true,
+          "intact": true,
+          "expired": false,
+          "requests": [],
+          "samples": [
+            {
+              "current_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+              "conversation_ids": [
+                "93f9dce8-6517-4b42-bd46-1620207457c9",
+                "93e2e852-0bcc-4658-be14-78f561135342",
+                "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+              ],
+              "active_ids": [
+                "93f9dce8-6517-4b42-bd46-1620207457c9"
+              ],
+              "message_count": 10,
+              "empty_state": false,
+              "error_state": false,
+              "sidebar_open": true,
+              "expanded": "true",
+              "date_ms": 1792921680137,
+              "performance_ms": 26938,
+              "reason": "initial"
+            }
+          ],
+          "sample_overflow": false
+        }
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "current_model_choice_started",
+      "wall_utc": "2026-10-25T09:48:02.490220+00:00",
+      "monotonic_ns": 145465578791668,
+      "browser": {
+        "current_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "current_model": "qwen3.6-35b-a3b",
+        "conversation_ids": [
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "93f9dce8-6517-4b42-bd46-1620207457c9"
+        ],
+        "active_rows": 1,
+        "url_id": null,
+        "stored_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 10,
+        "empty_state": false,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1792921682475,
+        "performance_ms": 29276,
+        "time_origin_ms": 1792921653199
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "current_model_choice_clicked",
+      "wall_utc": "2026-10-25T09:48:02.539636+00:00",
+      "monotonic_ns": 145465628262745,
+      "recorder_running": true
+    },
+    {
+      "event": "creation_result_observed",
+      "wall_utc": "2026-10-25T09:48:03.444793+00:00",
+      "monotonic_ns": 145466533397899,
+      "browser": {
+        "current_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "current_model": "qwen3.6-35b-a3b",
+        "conversation_ids": [
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "93f9dce8-6517-4b42-bd46-1620207457c9"
+        ],
+        "active_rows": 1,
+        "url_id": null,
+        "stored_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 10,
+        "empty_state": false,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1792921683441,
+        "performance_ms": 30242,
+        "time_origin_ms": 1792921653199
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "sidebar_after_creation",
+      "wall_utc": "2026-10-25T09:48:03.779340+00:00",
+      "monotonic_ns": 145466868095976,
+      "browser": {
+        "open": true,
+        "expanded": "true"
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:13-conversation-created.png",
+      "wall_utc": "2026-10-25T09:48:04.138785+00:00",
+      "monotonic_ns": 145467227438515,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:13-conversation-created.png",
+      "wall_utc": "2026-10-25T09:48:04.879353+00:00",
+      "monotonic_ns": 145467967943976,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:13-conversation-created.png",
+      "wall_utc": "2026-10-25T09:48:05.506707+00:00",
+      "monotonic_ns": 145468595366822,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:13-conversation-created.png",
+      "wall_utc": "2026-10-25T09:48:05.511063+00:00",
+      "monotonic_ns": 145468599669515,
+      "recorder_running": true
+    },
+    {
+      "event": "recorder_stop_requested",
+      "wall_utc": "2026-10-25T09:48:05.876566+00:00",
+      "monotonic_ns": 145468965183669,
+      "recorder_running": true
+    },
+    {
+      "event": "recorder_stop_observed",
+      "wall_utc": "2026-10-25T09:48:06.193938+00:00",
+      "monotonic_ns": 145469282629899,
+      "recorder_running": false
+    },
+    {
+      "event": "scenario_finished",
+      "wall_utc": "2026-10-25T09:48:06.393416+00:00",
+      "monotonic_ns": 145469482034822,
+      "browser": {
+        "verdict": "FAIL",
+        "failures": [
+          "creation_request_did_not_return_201",
+          "created_response_id_differs_from_selected_id",
+          "new_conversation_empty_history_not_verified",
+          "old_messages_visible_under_new_conversation",
+          "new_conversation_id_missing_after_create",
+          "created_chat_view_obscured_after_create",
+          "reload_not_run_without_new_conversation"
+        ]
+      },
+      "recorder_running": false
+    }
+  ],
+  "result": {
+    "verdict": "FAIL",
+    "failures": [
+      "creation_request_did_not_return_201",
+      "created_response_id_differs_from_selected_id",
+      "new_conversation_empty_history_not_verified",
+      "old_messages_visible_under_new_conversation",
+      "new_conversation_id_missing_after_create",
+      "created_chat_view_obscured_after_create",
+      "reload_not_run_without_new_conversation"
+    ],
+    "before": {
+      "current_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+      "current_model": "qwen3.6-35b-a3b",
+      "conversation_ids": [
+        "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "93e2e852-0bcc-4658-be14-78f561135342",
+        "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+      ],
+      "active_ids": [
+        "93f9dce8-6517-4b42-bd46-1620207457c9"
+      ],
+      "active_rows": 1,
+      "url_id": null,
+      "stored_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+      "storage_available": true,
+      "model_choices": 1,
+      "message_count": 10,
+      "empty_state": false,
+      "error_state": false,
+      "ready_state": "complete",
+      "date_ms": 1792921677986,
+      "performance_ms": 24786,
+      "time_origin_ms": 1792921653199
+    },
+    "after_create": {
+      "current_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+      "current_model": "qwen3.6-35b-a3b",
+      "conversation_ids": [
+        "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "93e2e852-0bcc-4658-be14-78f561135342",
+        "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+      ],
+      "active_ids": [
+        "93f9dce8-6517-4b42-bd46-1620207457c9"
+      ],
+      "active_rows": 1,
+      "url_id": null,
+      "stored_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+      "storage_available": true,
+      "model_choices": 1,
+      "message_count": 10,
+      "empty_state": false,
+      "error_state": false,
+      "ready_state": "complete",
+      "date_ms": 1792921683441,
+      "performance_ms": 30242,
+      "time_origin_ms": 1792921653199
+    },
+    "after_reload": null,
+    "network": {
+      "available": true,
+      "intact": true,
+      "expired": false,
+      "requests": [
+        {
+          "id": 1,
+          "path": "/api/conversations",
+          "method": "POST",
+          "started": {
+            "date_ms": 1792921682517,
+            "performance_ms": 29317
+          },
+          "finished": {
+            "date_ms": 1792921682635,
+            "performance_ms": 29435
+          },
+          "status": 502,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": null,
+          "response_message_count": null,
+          "blocked": false
+        }
+      ],
+      "samples": [
+        {
+          "current_id": "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "conversation_ids": [
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "active_ids": [
+            "93f9dce8-6517-4b42-bd46-1620207457c9"
+          ],
+          "message_count": 10,
+          "empty_state": false,
+          "error_state": false,
+          "sidebar_open": true,
+          "expanded": "true",
+          "date_ms": 1792921680137,
+          "performance_ms": 26938,
+          "reason": "initial"
+        }
+      ],
+      "sample_overflow": false
+    },
+    "reload_network": {
+      "available": false,
+      "requests": []
+    },
+    "video": {
+      "path": "15-conversation-create.mp4",
+      "available": true,
+      "time_limit_seconds": 60,
+      "clock_note": "Process timestamps bound recording; they do not identify the exact first video frame.",
+      "exit_code": 0
+    }
+  }
+}
