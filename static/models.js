@@ -18,12 +18,11 @@ function formatUltraSummary(summary) {
     parts.push("снята");
     return parts.join(" · ");
   }
-  if (summary.default_profile === "ultra") parts.push("по умолчанию");
-  else if (summary.status === "prepared_not_activated") parts.push("не активирован");
+  if (summary.default_profile === "ultra") parts.push("настройки по умолчанию");
   if (summary.context_window_tokens) {
-    parts.push("контекст " + summary.context_window_tokens + " ток.");
+    parts.push("контекст " + Number(summary.context_window_tokens).toLocaleString("ru-RU") + " ток.");
   }
-  parts.push("блокеров: " + (summary.blockers || []).length);
+  parts.push("ограничений: " + (summary.blockers || []).length);
   return parts.join(" · ");
 }
 
