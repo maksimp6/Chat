@@ -102,3 +102,26 @@ def test_trace_contract_rejects_top_level_drift():
     }
     with pytest.raises(ContractViolation, match="unexpected fields: mystery"):
         validate_api_contract("runtime.invocation.trace.response", trace)
+
+
+def test_trace_contract_accepts_operation_keys_written_by_the_runtime():
+    trace = {
+        "trace_id": "trace-1",
+        "context": {
+            "invocation_id": "inv-1",
+            "session_id": "sess-1",
+            "conversation_id": "conv-1",
+            "trace_id": "trace-1",
+        },
+        "responses": [],
+        "tool_calls": [],
+        "events": [],
+        "errors": [],
+        "api_requests": [],
+        "reasoning_plan": {},
+        "retrieval_operations": [],
+        "knowledge_operations": [],
+        "context_cache_operations": [],
+        "mcp_activity": [],
+    }
+    assert validate_api_contract("runtime.invocation.trace.response", trace) is trace
