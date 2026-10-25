@@ -16,7 +16,7 @@ import sys
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Optional
 
 from agent_runtime.logos_launch_hold import (
     NativeLogosLaunchBlocked,
@@ -131,7 +131,7 @@ def seed_provider_credential() -> None:
     bootstrap_credential(conn, api_key, project_id, encrypt_secret, decrypt=decrypt_secret)
 
 
-def changed_files(repo_root: Path = ROOT) -> List[str]:
+def changed_files(repo_root: Path = ROOT) -> list[str]:
     output = subprocess.run(
         ["git", "status", "--porcelain", "--untracked-files=all"],
         cwd=repo_root,
@@ -142,7 +142,7 @@ def changed_files(repo_root: Path = ROOT) -> List[str]:
     return sorted(line[3:] for line in output.splitlines() if line.strip())
 
 
-def _billing_summary(billing: Dict[str, Any]) -> Dict[str, Any]:
+def _billing_summary(billing: dict[str, Any]) -> dict[str, Any]:
     keys = (
         "currency",
         "cost_status",
@@ -241,7 +241,7 @@ def run_issue_task(
     client_factory: Optional[Callable[[], Any]] = None,
     repo_root: Path = ROOT,
     checkpoint_file: Path | None = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     try:
         enforce_native_launch_hold()
     except NativeLogosLaunchBlocked:
@@ -274,7 +274,7 @@ def run_issue_task(
     invocation = create_invocation(session, session, metadata={"source": "logos.yml"})
     trace = create_invocation_trace(invocation)
     start_invocation(invocation.invocation_id)
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "issue": issue_number,
         "model": model_key,
         "execution_profile": ISSUE_REVIEW_POLICY.name,
@@ -358,7 +358,7 @@ def run_issue_task(
     return result
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--issue", type=int, required=True)
     parser.add_argument("--title-file", type=Path, required=True)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, Tuple
+from typing import Optional
 
 
 _KNOWN_BACKEND_STATUSES: frozenset[str] = frozenset({"completed", "failed"})
@@ -22,7 +22,7 @@ class AgentTaskEvidence:
     workflow_conclusion: Optional[str] = None
     backend_triggered: bool = False
     backend_status: Optional[str] = None
-    deliverable_refs: Tuple[str, ...] = field(default_factory=tuple)
+    deliverable_refs: tuple[str, ...] = field(default_factory=tuple)
     validation_status: Optional[str] = None
     review_complete: bool = False
     blocker: Optional[str] = None

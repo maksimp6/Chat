@@ -89,7 +89,7 @@
       defer(function () {
         setButtonState(button, "⇩ JSON", false);
       }, 1600);
-      window.alert(error.message || "Не удалось подготовить трейс");
+      LogosToast.error(error.message || "Не удалось подготовить трейс");
     }
   }
 
@@ -98,7 +98,7 @@
     try {
       payload = buildPayload();
     } catch (error) {
-      window.alert(error.message || "Не удалось подготовить трейс");
+      LogosToast.error(error.message || "Не удалось подготовить трейс");
       return;
     }
 
@@ -125,11 +125,11 @@
           });
       })
       .then(function () {
-        window.alert("Трейс загружен в файловый менеджер.");
+        LogosToast.show("Трейс загружен в файловый менеджер.");
       })
       .catch(function (error) {
         var reason = error instanceof TypeError ? "нет связи с сервером" : error.message;
-        window.alert("Не удалось загрузить трейс: " + reason);
+        LogosToast.error("Не удалось загрузить трейс: " + reason);
       })
       .finally(function () {
         var currentButton = document.getElementById(uploadButtonId);

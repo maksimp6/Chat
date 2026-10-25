@@ -17,7 +17,7 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 try:
     import resource
@@ -32,7 +32,7 @@ _COMMAND_ENV_NAMES = ("PATH", "HOME", "LANG", "LC_ALL", "TERM", "TMPDIR", "USER"
 class VirtualServerConfig:
     runtime: str = "python"
     cwd: str = "."
-    env: Dict[str, str] = field(default_factory=dict)
+    env: dict[str, str] = field(default_factory=dict)
     memory_mb: int = 256
     cpu_seconds: int = 30
     command_timeout_seconds: int = 30
@@ -73,7 +73,7 @@ class VirtualLowConsumptionServer:
             self._touch()
             return self.runtime_id
 
-    def execute(self, command: str, timeout: Optional[int] = None) -> Dict[str, Any]:
+    def execute(self, command: str, timeout: Optional[int] = None) -> dict[str, Any]:
         if not isinstance(command, str) or not command.strip():
             raise ValueError("command must be a non-empty string")
 
@@ -90,9 +90,10 @@ class VirtualLowConsumptionServer:
             # The shell applies the limits. preexec_fn is unsafe in a multi-threaded server.
             limited = command
             if resource is not None and os.name == "posix":
+                # Each limit must succeed before the command runs; a failed limit stops the command.
                 limited = (
-                    f"ulimit -t {self.config.cpu_seconds} -v {self.config.memory_mb * 1024};"
-                    f" {command}"
+                    f"ulimit -t {self.config.cpu_seconds} || exit 1; "
+                    f"ulimit -v {self.config.memory_mb * 1024} || exit 1; {command}"
                 )
 
             started = time.perf_counter()
@@ -156,7 +157,7 @@ class VirtualLowConsumptionServer:
                 return True
             return False
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         return {
             "session_id": self.session_id,
             "runtime_id": self.runtime_id,
@@ -178,9 +179,9 @@ class ReadyMadeSession:
     model: str = ""
     system_prompt: str = ""
     tools: list[str] = field(default_factory=list)
-    environment: Dict[str, Any] = field(default_factory=dict)
+    environment: dict[str, Any] = field(default_factory=dict)
     files: list[str] = field(default_factory=list)
-    state: Dict[str, Any] = field(default_factory=dict)
+    state: dict[str, Any] = field(default_factory=dict)
     virtual_server: VirtualServerConfig = field(default_factory=VirtualServerConfig)
     template: bool = False
 

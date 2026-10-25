@@ -145,7 +145,7 @@ def _blob(api: Github, sha: str) -> bytes:
         raise PublishError("invalid GitHub blob data") from exc
     if len(raw) != reported_size:
         raise PublishError("GitHub model blob length mismatch")
-    object_hash = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
+    object_hash = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw, usedforsecurity=False).hexdigest()
     if object_hash != sha:
         raise PublishError("GitHub model blob SHA mismatch")
     return raw

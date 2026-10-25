@@ -1,6 +1,6 @@
 """REST helpers for persisted invocation lifecycle and traces."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from invocation.manager import get_invocation
 
@@ -15,7 +15,7 @@ def _sanitize_trace(value: Any) -> Any:
         return value
 
 
-def _visible_invocation(invocation: Dict[str, Any]) -> Dict[str, Any]:
+def _visible_invocation(invocation: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": invocation.get("id"),
         "session_id": invocation.get("session_id"),
@@ -31,14 +31,14 @@ def _visible_invocation(invocation: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def get_invocation_status(invocation_id: str) -> Optional[Dict[str, Any]]:
+def get_invocation_status(invocation_id: str) -> Optional[dict[str, Any]]:
     invocation = get_invocation(invocation_id)
     if invocation is None:
         return None
     return _visible_invocation(invocation)
 
 
-def get_invocation_trace(invocation_id: str) -> Optional[Dict[str, Any]]:
+def get_invocation_trace(invocation_id: str) -> Optional[dict[str, Any]]:
     """Return the trace persisted directly on the invocation.
 
     Message-level trace storage remains a compatibility fallback for older

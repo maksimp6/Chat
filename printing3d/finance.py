@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Literal, overload
 
@@ -106,7 +106,7 @@ def set_financing_plan(store: PrintStore, owner_id: str, data: dict[str, Any]) -
 
     currency = str(data.get("currency") or "RUB").strip().upper()
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(UTC).replace(tzinfo=None).isoformat()
     started_at = str(data.get("started_at") or now).strip() or now
 
     record = {
@@ -170,7 +170,7 @@ def get_payback_status(
     if plan is None:
         return {"plan": None, "status": "not_configured"}
 
-    selected_month = month or datetime.utcnow().strftime("%Y-%m")
+    selected_month = month or datetime.now(UTC).strftime("%Y-%m")
     if not _MONTH_RE.fullmatch(selected_month):
         raise ValueError("month must use YYYY-MM format")
 
@@ -291,7 +291,7 @@ def assess_financing(store: PrintStore, owner_id: str, data: dict[str, Any]) -> 
             if value is None:
                 missing_fields.append(name)
 
-    observed_month = datetime.utcnow().strftime("%Y-%m")
+    observed_month = datetime.now(UTC).strftime("%Y-%m")
     observed_monthly_profit = _month_profit(store, owner_id, currency, observed_month)
     cumulative_profit = _cumulative_profit(store, owner_id, currency)
 

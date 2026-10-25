@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Mapping, Optional
 import uuid
 
 
@@ -53,12 +53,12 @@ class InvocationContext:
             metadata=metadata or {},
         )
 
-    def child_metadata(self, **updates: Any) -> Dict[str, Any]:
+    def child_metadata(self, **updates: Any) -> dict[str, Any]:
         result = dict(self.metadata)
         result.update(updates)
         return result
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         result = {
             "session_id": self.session_id,
             "conversation_id": self.conversation_id,
@@ -76,7 +76,7 @@ class InvocationContext:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "InvocationContext":
+    def from_dict(cls, data: dict[str, Any]) -> "InvocationContext":
         required = ("session_id", "conversation_id", "invocation_id", "trace_id")
         missing = [key for key in required if not data.get(key)]
         if missing:

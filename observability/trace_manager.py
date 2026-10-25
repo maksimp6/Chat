@@ -9,7 +9,7 @@ import uuid
 import traceback
 from contextvars import ContextVar
 from functools import wraps
-from typing import Any, Dict, Optional, Callable
+from typing import Any, Optional, Callable
 
 _current_trace: ContextVar["ExecutionTrace | None"] = ContextVar(
     "logos_execution_trace", default=None
@@ -28,6 +28,10 @@ from observability.trace_timing import (
     request_timing_for_step,
     step_correlation_id,
 )
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def get_current_trace() -> Optional["ExecutionTrace"]:
@@ -72,7 +76,7 @@ def traced_operation(operation: str, *, include_request: bool = True):
                     elif flask_request.form:
                         payload["form_keys"] = sorted(flask_request.form.keys())
                 except Exception:
-                    pass
+                    logger.debug("[TRACE] request body not captured", exc_info=True)
             trace.set_request(payload)
             trace.add_event("operation_started", {"operation": operation})
             token = _current_trace.set(trace)
@@ -141,10 +145,10 @@ class ExecutionTrace:
         self._start_thread_cpu = time.thread_time()
         self._owner_thread = threading.get_ident()
         self._finalized = False
-        self._final_result: Optional[Dict[str, Any]] = None
+        self._final_result: Optional[dict[str, Any]] = None
         self._sensitive_values: set[str] = set()
         self._sensitive_values_lock = threading.RLock()
-        self.trace: Dict[str, Any] = {
+        self.trace: dict[str, Any] = {
             "trace_id": self.trace_id,
             "schema_version": self.SCHEMA_VERSION,
             "created_at": time.time(),
@@ -235,7 +239,7 @@ class ExecutionTrace:
 
         return redact(value)
 
-    def get_metadata(self) -> Dict[str, str]:
+    def get_metadata(self) -> dict[str, str]:
         return {"trace_id": str(self.trace_id)}
 
     @_guarded
@@ -331,7 +335,7 @@ class ExecutionTrace:
         self.add_event("skill_loaded", entry)
 
     @_guarded
-    def set_request(self, payload: Dict[str, Any]) -> None:
+    def set_request(self, payload: dict[str, Any]) -> None:
         self._ensure_mutable()
         clean_payload = (
             {k: v for k, v in payload.items() if k not in ("trace", "execution_trace")}
@@ -349,7 +353,7 @@ class ExecutionTrace:
     def _safe_repr(cls, value: Any, depth: int = 0) -> Any:
         return safe_repr(value, depth)
 
-    def _capture_exception_state(self, exc: BaseException) -> Dict[str, Any]:
+    def _capture_exception_state(self, exc: BaseException) -> dict[str, Any]:
         frames = []
         tb = exc.__traceback__
         for frame, lineno in traceback.walk_tb(tb):
@@ -395,7 +399,7 @@ class ExecutionTrace:
     @_guarded
     def add_api_request(
         self,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         step_index: int = 1,
         start_timestamp: Optional[float] = None,
         provider_key_id: Optional[str] = None,
@@ -427,7 +431,7 @@ class ExecutionTrace:
         return sanitize_trace_value(value, depth)
 
     def _update_billing_for_response(
-        self, clean_raw: Dict[str, Any], step_index: int, response_id: Optional[str]
+        self, clean_raw: dict[str, Any], step_index: int, response_id: Optional[str]
     ) -> None:
         if not isinstance(clean_raw, dict) or not isinstance(clean_raw.get("usage"), dict):
             return
@@ -470,7 +474,7 @@ class ExecutionTrace:
     @_guarded
     def add_response(
         self,
-        raw_json: Dict[str, Any],
+        raw_json: dict[str, Any],
         step_index: int = 1,
         start_timestamp: Optional[float] = None,
         end_timestamp: Optional[float] = None,
@@ -584,14 +588,14 @@ class ExecutionTrace:
     def track_tool_execution(
         self,
         name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         executor_fn,
         *args,
         call_id: Optional[str] = None,
         parent_id: Optional[str] = None,
         step: Optional[int] = None,
         server: Optional[str] = None,
-        trace_arguments: Optional[Dict[str, Any]] = None,
+        trace_arguments: Optional[dict[str, Any]] = None,
         **kwargs,
     ) -> Any:
         self._ensure_mutable()
@@ -665,7 +669,7 @@ class ExecutionTrace:
             )
 
     @_guarded
-    def set_reasoning_plan(self, plan: Dict[str, Any]) -> None:
+    def set_reasoning_plan(self, plan: dict[str, Any]) -> None:
         """Attach a sanitized structured reasoning plan to this execution trace."""
         self._ensure_mutable()
         clean_plan = self._sanitize_trace_value(plan)
@@ -685,7 +689,7 @@ class ExecutionTrace:
     def record_reasoning_event(
         self,
         event_type: str,
-        payload: Optional[Dict[str, Any]] = None,
+        payload: Optional[dict[str, Any]] = None,
     ) -> None:
         """Record explicit planning state without storing private model reasoning."""
         self._ensure_mutable()
@@ -702,7 +706,7 @@ class ExecutionTrace:
         self.add_event(event_type, self._sanitize_trace_value(payload or {}))
 
     @_guarded
-    def add_event(self, event_type: str, payload: Optional[Dict[str, Any]] = None) -> None:
+    def add_event(self, event_type: str, payload: Optional[dict[str, Any]] = None) -> None:
         self._ensure_mutable()
         if event_type in self._INTERNAL_EVENT_TYPES:
             return
@@ -730,7 +734,7 @@ class ExecutionTrace:
         )
 
     @staticmethod
-    def _compute_billing_item(timings: Dict[str, Any]) -> Dict[str, Any]:
+    def _compute_billing_item(timings: dict[str, Any]) -> dict[str, Any]:
         cpu_ms = timings.get("billable_cpu_ms")
         wall_ms = timings.get("billable_wall_ms")
         try:
@@ -793,13 +797,13 @@ class ExecutionTrace:
         return safe_repr(obj)
 
     @_guarded
-    def _snapshot_copy(self, trace: Dict[str, Any]) -> Dict[str, Any]:
+    def _snapshot_copy(self, trace: dict[str, Any]) -> dict[str, Any]:
         """Return a JSON-safe independent trace copy, without altering the source."""
         snapshot = json.loads(json.dumps(trace, default=self._json_default))
         return self._redact_registered_values(snapshot)
 
     @_guarded
-    def _build_snapshot(self, *, end_perf: Optional[float] = None) -> Dict[str, Any]:
+    def _build_snapshot(self, *, end_perf: Optional[float] = None) -> dict[str, Any]:
         """Build a read-only view and derive billing solely from source billing items."""
         snapshot = self._snapshot_copy(self.trace)
         if end_perf is not None:
@@ -823,13 +827,13 @@ class ExecutionTrace:
         return self._snapshot_copy(snapshot)
 
     @_guarded
-    def make_snapshot(self) -> Dict[str, Any]:
+    def make_snapshot(self) -> dict[str, Any]:
         """Return an independent, non-persisting snapshot of the current trace."""
         if self._finalized:
             return self._redact_registered_values(copy.deepcopy(self._final_result))
         return self._build_snapshot()
 
-    def finalize(self) -> Dict[str, Any]:
+    def finalize(self) -> dict[str, Any]:
         """Freeze one validated terminal snapshot; repeated calls are idempotent."""
         with self._sensitive_values_lock:
             if self._finalized:

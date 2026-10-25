@@ -65,7 +65,7 @@ def _get_abs_path(path: str) -> str:
         if common != BASE_DIR:
             raise PermissionError("Доступ запрещен: выход за пределы директории проекта")
     except ValueError:
-        raise PermissionError("Доступ запрещен: недопустимый путь к файлу")
+        raise PermissionError("Доступ запрещен: недопустимый путь к файлу") from None
     _refuse_protected(target)
     return target
 
@@ -183,7 +183,7 @@ def write_file(args: dict) -> dict:
         old_content = ""
         if os.path.isfile(abs_path):
             try:
-                with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
+                with open(abs_path, encoding="utf-8", errors="replace") as f:
                     old_content = f.read()
                 # Created on first use: importing this module must not create directories.
                 os.makedirs(BACKUP_DIR, exist_ok=True)
@@ -238,7 +238,7 @@ def apply_patch(args: dict, cfg: dict = None) -> dict:
         if not os.path.isfile(abs_path):
             return {"success": False, "error": f"Файл не найден: {path}"}
 
-        with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(abs_path, encoding="utf-8", errors="replace") as f:
             content = f.read()
 
         if search_text not in content:
@@ -262,7 +262,7 @@ def python_ast_outline(args: dict) -> dict:
         if not os.path.isfile(abs_path):
             return {"error": f"Файл '{path}' не найден"}
 
-        with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(abs_path, encoding="utf-8", errors="replace") as f:
             code = f.read()
 
         try:
@@ -442,6 +442,18 @@ def _resolves_to_link_local(url: str) -> bool:
     return False
 
 
+class _LinkLocalGuardRedirect(urllib.request.HTTPRedirectHandler):
+    """Checks every redirect target, so a public URL cannot bounce the fetch to a link-local address."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not newurl.startswith(("http://", "https://")) or _resolves_to_link_local(newurl):
+            raise urllib.error.URLError("redirect to a blocked address")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_GUARDED_OPENER = urllib.request.build_opener(_LinkLocalGuardRedirect)
+
+
 def http_fetch(args: dict) -> dict:
     """Простой HTTP GET-запрос через стандартный urllib."""
     url = args.get("url")
@@ -462,7 +474,7 @@ def http_fetch(args: dict) -> dict:
         req = urllib.request.Request(
             url, headers={"User-Agent": "LogosPro-StdLib/1.0", "Accept": "*/*"}
         )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _GUARDED_OPENER.open(req, timeout=timeout) as resp:
             raw = resp.read(max_bytes)
             status_code = resp.getcode()
             headers = dict(resp.info())
@@ -632,7 +644,7 @@ def grep_search(args: dict) -> dict:
                 rel_path = os.path.relpath(file_path, BASE_DIR)
                 try:
                     file_path = _get_abs_path(rel_path)
-                    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    with open(file_path, encoding="utf-8", errors="ignore") as f:
                         for line_num, line in enumerate(f, start=1):
                             if regex.search(line):
                                 results.append(

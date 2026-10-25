@@ -1,6 +1,6 @@
 """Reconciler: apply actions to bring reality to desired state."""
 
-from typing import List, Any, Dict
+from typing import Any
 import logging
 
 from keel.planner import Action, ActionType
@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 def reconcile(
     lane: str,
-    actions: List[Action],
-    config: Dict[str, Any],
+    actions: list[Action],
+    config: dict[str, Any],
 ) -> None:
     """
     Apply actions to reconcile reality to desired state.

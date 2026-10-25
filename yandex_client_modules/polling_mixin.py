@@ -4,6 +4,7 @@ import requests
 
 from observability.trace_manager import ExecutionTrace
 from yandex_client_modules.errors import YandexClientError
+from yandex_client_modules.response_poller import poll_delay_cap
 
 
 class YandexPollingMixin:
@@ -39,7 +40,7 @@ class YandexPollingMixin:
                             error_type="PollNotFound",
                         )
                     time.sleep(delay)
-                    delay = min(delay * 1.5, 30)
+                    delay = min(delay * 1.5, poll_delay_cap(time.time() - start))
                     continue
                 resp.raise_for_status()
                 data = resp.json()
@@ -63,7 +64,7 @@ class YandexPollingMixin:
                         error_type=type(e).__name__,
                     )
                 time.sleep(delay)
-                delay = min(delay * 1.5, 30)
+                delay = min(delay * 1.5, poll_delay_cap(time.time() - start))
                 continue
 
             poll_end = time.time()
@@ -130,7 +131,7 @@ class YandexPollingMixin:
                     raise YandexClientError("Task cancelled")
                 return data
             time.sleep(delay)
-            delay = min(delay * 1.5, 30)
+            delay = min(delay * 1.5, poll_delay_cap(time.time() - start))
 
         if execution_trace and isinstance(execution_trace, ExecutionTrace):
             execution_trace.add_event(

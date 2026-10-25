@@ -8,7 +8,7 @@ the built-in template or another clone.
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from sessions.manager import create_session, get_session
 from sessions.runtime import DEFAULT_SESSIONS, ReadyMadeSession
@@ -17,22 +17,22 @@ from sessions.runtime import DEFAULT_SESSIONS, ReadyMadeSession
 _PROFILE_MAP = {profile.id: profile for profile in DEFAULT_SESSIONS}
 
 
-def _serialize(profile: ReadyMadeSession) -> Dict[str, Any]:
+def _serialize(profile: ReadyMadeSession) -> dict[str, Any]:
     data = asdict(profile)
     data["virtual_server"] = asdict(profile.virtual_server)
     return data
 
 
-def list_profiles() -> list[Dict[str, Any]]:
+def list_profiles() -> list[dict[str, Any]]:
     return [_serialize(profile) for profile in _PROFILE_MAP.values()]
 
 
-def get_profile(profile_id: str) -> Optional[Dict[str, Any]]:
+def get_profile(profile_id: str) -> Optional[dict[str, Any]]:
     profile = _PROFILE_MAP.get(profile_id)
     return _serialize(profile) if profile else None
 
 
-def clone_profile(profile_id: str, name: Optional[str] = None) -> Dict[str, Any]:
+def clone_profile(profile_id: str, name: Optional[str] = None) -> dict[str, Any]:
     profile = _PROFILE_MAP.get(profile_id)
     if profile is None:
         raise KeyError(profile_id)
@@ -51,7 +51,7 @@ def clone_profile(profile_id: str, name: Optional[str] = None) -> Dict[str, Any]
     }
 
 
-def session_profile(session_id: str) -> Optional[Dict[str, Any]]:
+def session_profile(session_id: str) -> Optional[dict[str, Any]]:
     session = get_session(session_id)
     if not session:
         return None

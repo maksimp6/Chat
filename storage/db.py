@@ -57,7 +57,7 @@ def get_conversations() -> list[dict[str, Any]]:
     return sorted(records, key=lambda record: record["updated_at"], reverse=True)
 
 
-def create_conversation(conv_id: str, title: str, model: str) -> None:
+def create_conversation(conv_id: str, title: str, model: str, provider_pending: bool = False) -> None:
     now = int(time.time())
     with get_store().transaction() as tx:
         tx.set(
@@ -68,6 +68,8 @@ def create_conversation(conv_id: str, title: str, model: str) -> None:
                 "model": model,
                 "created_at": now,
                 "updated_at": now,
+                # True until the first message creates the provider conversation.
+                "provider_pending": provider_pending,
             },
         )
 
@@ -142,6 +144,7 @@ def get_messages(conv_id: str) -> list[dict[str, Any]]:
             "created_at": item["created_at"],
             "timings": item["timings"],
             "trace": item["trace"],
+            "source": item.get("source"),
         }
         for item in sorted(records, key=lambda item: item["id"])
     ]
@@ -181,6 +184,7 @@ def add_message(
                 "created_at": now,
                 "timings": timings or [],
                 "trace": trace or {},
+                "source": source,
             },
         )
         tx.set(key, {**record, "updated_at": now})
@@ -202,6 +206,11 @@ def get_yandex_conversation(conv_id: str) -> str | None:
 def set_yandex_conversation(conv_id: str, yandex_id: str) -> None:
     with get_store().transaction() as tx:
         tx.set("chat/yandex/" + conv_id, yandex_id)
+
+
+def is_provider_pending(conv_id: str) -> bool:
+    record = get_store().get("chat/conversation/" + conv_id) or {}
+    return bool(record.get("provider_pending"))
 
 
 def init_config_table() -> None:

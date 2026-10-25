@@ -5,15 +5,11 @@ import html
 import ipaddress
 import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from pathlib import Path
 import secrets
-import socket
-import sys
 import time
-from urllib.parse import urlsplit
 from bambu_camera_snapshot import CODE_FILE, private_write, auth_packet, snapshot, OUTPUT, PIN_FILE
 
-HOST = "192.168.31.29"
+HOST = os.environ.get("BAMBU_PAIR_HOST", "192.168.31.29")
 PORT = 8765
 SESSION = secrets.token_urlsafe(24)
 VALID_UNTIL = time.monotonic() + 900

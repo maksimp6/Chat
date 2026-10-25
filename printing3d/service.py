@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import json
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
@@ -133,7 +132,7 @@ def create_order(store: PrintStore, owner_id: str, data: dict) -> dict:
     if actual_cost is not None:
         actual_cost = float(_decimal(actual_cost, "actual_cost"))
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(UTC).replace(tzinfo=None).isoformat()
     order_id = str(uuid4())
     record = {
         "id": order_id,
@@ -188,7 +187,7 @@ def update_order_status(
             # other status would drop its revenue and profit from the totals.
             if row.get("settled_at"):
                 raise ValueError("settled order status cannot change")
-            tx.set(key, {**row, "status": status, "updated_at": datetime.utcnow().isoformat()})
+            tx.set(key, {**row, "status": status, "updated_at": datetime.now(UTC).replace(tzinfo=None).isoformat()})
     return get_order(store, owner_id, order_id)
 
 
@@ -232,7 +231,7 @@ def settle_order(
 
     revenue = _money(_decimal(revenue_source, "actual_revenue"))
     cost = _money(_decimal(cost_source, "actual_cost"))
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(UTC).replace(tzinfo=None).isoformat()
 
     _publish_settlement(store, owner_id, order_id, revenue, cost, now)
     return get_order(store, owner_id, order_id)

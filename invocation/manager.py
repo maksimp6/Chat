@@ -8,7 +8,7 @@ import base64
 import hashlib
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from agent_memory.client import get_memory_client
 from storage.db import memory_file_path
@@ -16,6 +16,10 @@ from invocation.context import InvocationContext
 from sessions.manager import create_session, restore_session
 from kristall import KristallError
 from kristall.store import MAX_JOURNAL_FRAME_BYTES
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 _INVOCATION_PREFIX = "runtime_invocation:"
 _VALUE_CHUNK_PREFIX = "runtime_invocation_value:"
@@ -82,14 +86,14 @@ def _resolve_request_session_id(session_id: str, conversation_id: str) -> str:
             if explicit:
                 return str(explicit)
     except Exception:
-        pass
+        logger.debug("[INVOCATION] session id not read from request", exc_info=True)
     return session_id
 
 
 def create_invocation(
     session_id: str,
     conversation_id: str,
-    metadata: Optional[Dict[str, Any]] = None,
+    metadata: Optional[dict[str, Any]] = None,
     user_id: Optional[str] = None,
     *,
     create_missing_session: bool = True,
@@ -359,7 +363,7 @@ def get_invocation_owner(invocation_id: str) -> Optional[str]:
     return value.get("user_id")
 
 
-def get_invocation(invocation_id: str) -> Optional[Dict[str, Any]]:
+def get_invocation(invocation_id: str) -> Optional[dict[str, Any]]:
     value = get_memory_client(memory_file_path()).get(_key(invocation_id))
     if value is None:
         return None

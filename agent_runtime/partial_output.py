@@ -1,9 +1,9 @@
 """Shared extraction of user-visible text from Yandex Responses API output."""
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 
-def extract_response_text(data: Dict[str, Any]) -> Tuple[str, str]:
+def extract_response_text(data: dict[str, Any]) -> tuple[str, str]:
     """Return (reasoning, user-visible text) from one Responses API response."""
     if not isinstance(data, dict):
         return "", ""
@@ -33,7 +33,7 @@ def extract_response_text(data: Dict[str, Any]) -> Tuple[str, str]:
     return "\n\n".join(reasoning_parts), text
 
 
-def extract_last_response_text(responses: list) -> Tuple[str, Optional[Dict[str, Any]]]:
+def extract_last_response_text(responses: list) -> tuple[str, Optional[dict[str, Any]]]:
     """Return the last non-empty user-visible response text and its trace entry."""
     if not isinstance(responses, list):
         return "", None

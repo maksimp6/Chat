@@ -39,7 +39,7 @@ role-scoped выбору Logos**. Это отдельная будущая ин�
 | Надо передать модель/слайс/готовый файл без ложного успеха | [3d-artifact-handoff](../../.agents/skills/3d-artifact-handoff/SKILL.md) | H14–H16; стадии и реальные байты отдельно |
 | Требуется найти недостающие взаимодействия UI | [frontend-capability-audit](../../.agents/skills/frontend-capability-audit/SKILL.md) | H02, H17 и текущий аудит; UI/backend/PR/deploy отдельно |
 | Добавляются агенты, модели или tools | [Архитектурный урок](engineering-lessons.md#architecture) + [issue-to-pr](../../.agents/skills/issue-to-pr/SKILL.md) | H02; продолжать существующую архитектуру |
-| Расходятся invocation/session/trace IDs | [logos-runtime-debugging](../../.agents/skills/logos-runtime-debugging/SKILL.md) | H05; один request-scoped контекст |
+| Расходятся invocation/session/trace IDs | `../../.agents/skills/logos-runtime-debugging/SKILL.md` | H05; один request-scoped контекст |
 | PR завис или старое зелёное CI не соответствует head | [github-pr-readiness](../../.agents/skills/github-pr-readiness/SKILL.md), [github-ci-diagnosis](../../.agents/skills/github-ci-diagnosis/SKILL.md) | H07, H18; точный head и события workflow |
 | Нужна проверка release/deployment evidence | [release-readiness](../../.agents/skills/release-readiness/SKILL.md), [cloudru-change](../../.agents/skills/cloudru-change/SKILL.md) | H09, H11; новый навык дополняет проверкой происхождения артефакта |
 | Утечки, неверные scopes или доверие к внешним данным | [security-review](../../.agents/skills/security-review/SKILL.md) | H08, H14; конкретный trust boundary |

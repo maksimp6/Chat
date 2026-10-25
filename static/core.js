@@ -208,7 +208,6 @@ async function enhanceCore() {
   coreEnhancementStarted = true;
 
   try {
-    console.log("[CORE] Загрузка диалогов...");
     var conversationsRes = await fetchWithTimeout(
       "/api/conversations",
       { credentials: "same-origin", cache: "no-store" },
@@ -225,7 +224,6 @@ async function enhanceCore() {
     localStorage.setItem("conversations", JSON.stringify(conversations));
     if (typeof renderSidebar === "function") renderSidebar();
 
-    console.log("[CORE] Загрузка моделей...");
     try {
       await loadModels();
     } catch (error) {
@@ -274,7 +272,6 @@ function initCore() {
   if (coreInitialized) return;
   coreInitialized = true;
 
-  console.log("[CORE] Shell initialization. currentConvId:", currentConvId);
   if (window.LogosCoreAPI && window.LogosCoreAPI.status) {
     window.LogosCoreAPI.status.set("core", "running", "Ядро выполняет инициализацию", {
       revocable: false,

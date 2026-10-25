@@ -29,6 +29,9 @@ from economy.treasury_identity import get_current_owner_id
 from tool_providers.registry import registry
 from storage.db import (
     create_conversation,
+    get_yandex_conversation,
+    is_provider_pending,
+    set_yandex_conversation,
     get_messages,
     add_message,
     get_conv_settings,
@@ -296,6 +299,22 @@ def _append_post_final_error(trace_data, source, message, error_type):
     )
 
 
+def _provider_conversation_id(client, conv_id, trace):
+    """Return the provider conversation behind a local chat, creating it on the first message."""
+    mapped = get_yandex_conversation(conv_id)
+    if mapped:
+        return mapped
+    if not is_provider_pending(conv_id):
+        # Chats created before this change already use the provider's id as their own id.
+        return conv_id
+    created = client.create_conversation(execution_trace=trace)
+    provider_id = created.get("id") if isinstance(created, dict) else None
+    if not provider_id:
+        raise RuntimeError("Yandex conversation creation returned no ID")
+    set_yandex_conversation(conv_id, provider_id)
+    return provider_id
+
+
 @mcp_bp.route("/api/chat", methods=["POST"])
 def chat():
     import time as _time
@@ -318,6 +337,8 @@ def chat():
         conv_id = data.get("conversation_id")
         session_id = data.get("session_id") or conv_id
         message = data.get("message")
+        # A retry re-runs the last message already stored, so it must not store that message twice.
+        retry = bool(data.get("retry"))
         raw_params = data.get("params")
         params = dict(raw_params) if isinstance(raw_params, dict) else {}
         role = data.get("role") or params.pop("role", None)
@@ -403,17 +424,23 @@ def chat():
         if active_tools is not None:
             params["active_tool_categories"] = active_tools
 
-        add_message(invocation.conversation_id, "user", message)
+        if not retry:
+            add_message(invocation.conversation_id, "user", message)
         conversation_title = maybe_update_conversation_title(
             invocation.conversation_id,
             message,
         )
         client = LogosClient(Config)
+        provider_conversation_id = (
+            invocation.conversation_id
+            if is_claude_model(model_key)
+            else _provider_conversation_id(client, invocation.conversation_id, trace)
+        )
 
         response = client.ask_with_mcp(
             message=message,
             model_key=model_key,
-            conversation_id=invocation.conversation_id,
+            conversation_id=provider_conversation_id,
             params=params,
             trace=trace,
         )
@@ -601,7 +628,7 @@ def chat():
             if invocation is not None:
                 persist_invocation_trace(invocation.invocation_id, trace_data)
             if can_write:
-                add_message(conv_id, "assistant", reply, trace=trace_data)
+                add_message(conv_id, "assistant", reply, trace=trace_data, source="error")
             if invocation is not None:
                 fail_invocation(invocation.invocation_id, error={"message": error_message})
 
@@ -755,7 +782,6 @@ def conversations():
         data = request.get_json(silent=True) or {}
         if not isinstance(data, dict):
             return jsonify({"error": "JSON object is required"}), 400
-        client = LogosClient(Config)
         creation_trace = ExecutionTrace()
         creation_trace.set_request(
             {
@@ -763,14 +789,17 @@ def conversations():
                 "model": data.get("model", "logos-runtime"),
             }
         )
+        # A Logos chat gets its local id at once. The provider conversation is created on the first
+        # message, so a provider outage can no longer lose the chat itself.
+        provider_pending = not is_claude_model(data.get("model"))
         try:
-            if is_claude_model(data.get("model")):
-                y_conv = create_local_conversation(creation_trace)
+            if provider_pending:
+                conv_id = str(uuid.uuid4())
             else:
-                y_conv = client.create_conversation(execution_trace=creation_trace)
-            conv_id = y_conv.get("id") if isinstance(y_conv, dict) else None
-            if not conv_id:
-                raise RuntimeError("Yandex conversation creation returned no ID")
+                y_conv = create_local_conversation(creation_trace)
+                conv_id = y_conv.get("id") if isinstance(y_conv, dict) else None
+                if not conv_id:
+                    raise RuntimeError("Local conversation creation returned no ID")
         except Exception as exc:
             creation_trace.record_error(
                 "conversation_create",
@@ -788,7 +817,7 @@ def conversations():
         title = normalize_conversation_title(data.get("title"))
         model = data.get("model", "logos-runtime")
         set_owner(conv_id, owner_id)
-        create_conversation(conv_id, title, model)
+        create_conversation(conv_id, title, model, provider_pending=provider_pending)
         creation_trace.add_event(
             "conversation_local_persisted",
             {
@@ -866,7 +895,10 @@ def execute_approved():
             f"Результат: {execution_data}.\nДай краткий ответ о завершении."
         )
         synth_response = client.ask(
-            prompt, model_key, conv_id, {"instructions": "Ты системный ассистент."}
+            prompt,
+            model_key,
+            conv_id if is_claude_model(model_key) else _provider_conversation_id(client, conv_id, ExecutionTrace()),
+            {"instructions": "Ты системный ассистент."},
         )
         reply = client.extract_text(synth_response) or f"Действие {func_name} успешно выполнено."
         usage = client.extract_usage(synth_response)

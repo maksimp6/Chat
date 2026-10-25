@@ -71,13 +71,13 @@
               })
               .then(function (result) {
                 if (!result.ok) {
-                  alert(result.data.error || "Не удалось начать сессию");
+                  LogosToast.error(result.data.error || "Не удалось начать сессию");
                   return;
                 }
                 row.querySelector("span").textContent = "Сессия: " + result.data.session.id;
               })
               .catch(function (error) {
-                alert("Ошибка: " + error.message);
+                LogosToast.error("Ошибка: " + error.message);
               });
           };
           list.appendChild(row);

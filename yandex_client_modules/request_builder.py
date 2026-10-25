@@ -5,7 +5,7 @@ It deliberately has no HTTP, database, tracing, or MCP side effects.
 """
 
 from core.config import upstream_model_id
-from core.model_profiles import ultra_reasoning_controllable, ultra_request_defaults
+from core.model_profiles import ultra_profiles, ultra_reasoning_controllable, ultra_request_defaults
 from yandex_client_modules.metadata_validator import validate_metadata
 
 
@@ -41,6 +41,19 @@ def _response_input(params, message):
     if params.get("input"):
         return params["input"]
     return [{"role": "user", "content": message}]
+
+
+def ultra_applied_event(model_key, params, payload):
+    """Describe the Ultra values that reached the provider, so a trace can confirm the chosen profile."""
+    profile = ultra_profiles().get(model_key) or {}
+    return {
+        "model": model_key,
+        "catalog_profile_id": profile.get("profile_id"),
+        "requested_profile_id": (params or {}).get("model_profile_id"),
+        "reasoning": payload.get("reasoning"),
+        "truncation": payload.get("truncation"),
+        "max_output_tokens": payload.get("max_output_tokens"),
+    }
 
 
 def build_response_payload(

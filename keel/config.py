@@ -1,9 +1,8 @@
 """Config loading and validation for Keel Platform."""
 
-import json
 import re
 from pathlib import Path
-from typing import Any, Dict, Set
+from typing import Any
 
 import yaml
 
@@ -33,7 +32,7 @@ def _is_secret_pattern(value: Any) -> bool:
 
 
 def _validate_no_plaintext_secrets(
-    data: Dict[str, Any], path: str = "config", is_secrets_file: bool = False
+    data: dict[str, Any], path: str = "config", is_secrets_file: bool = False
 ) -> None:
     """Recursively check for plaintext secrets in config."""
     for key, value in data.items():
@@ -52,15 +51,12 @@ def _validate_no_plaintext_secrets(
                     _validate_no_plaintext_secrets(item, f"{path}.{key}[{i}]", is_secrets_file)
         elif isinstance(value, str):
             # In secrets section, only refs are allowed
-            if is_secrets_file and not value.startswith("logos/"):
-                raise ConfigError(f"Plaintext secret detected at {path}.{key}")
-            # Everywhere, check for secret patterns
-            elif _is_secret_pattern(value):
+            if is_secrets_file and not value.startswith("logos/") or _is_secret_pattern(value):
                 raise ConfigError(f"Plaintext secret detected at {path}.{key}")
 
 
 def _has_cycle(
-    graph: Dict[str, Set[str]], node: str, visited: Set[str], rec_stack: Set[str]
+    graph: dict[str, set[str]], node: str, visited: set[str], rec_stack: set[str]
 ) -> bool:
     """Check if there's a cycle in the dependency graph."""
     visited.add(node)
@@ -77,10 +73,10 @@ def _has_cycle(
     return False
 
 
-def _validate_no_cycles(services: Dict[str, Dict[str, Any]]) -> None:
+def _validate_no_cycles(services: dict[str, dict[str, Any]]) -> None:
     """Check for cycles in service dependencies."""
     # Build dependency graph
-    graph: Dict[str, Set[str]] = {}
+    graph: dict[str, set[str]] = {}
     for service_name, service_config in services.items():
         deps = service_config.get("depends_on", [])
         if not isinstance(deps, list):
@@ -96,14 +92,14 @@ def _validate_no_cycles(services: Dict[str, Dict[str, Any]]) -> None:
         graph[service_name] = set(deps)
 
     # Check for cycles
-    visited: Set[str] = set()
+    visited: set[str] = set()
     for node in graph:
         if node not in visited:
             if _has_cycle(graph, node, visited, set()):
                 raise ConfigError(f"Circular dependency detected involving service '{node}'")
 
 
-def _validate_scaling(service_name: str, service_config: Dict[str, Any]) -> None:
+def _validate_scaling(service_name: str, service_config: dict[str, Any]) -> None:
     """Validate bounded Container Apps scaling fields."""
     min_instances = service_config.get("min_instances")
     max_instances = service_config.get("max_instances")
@@ -130,7 +126,7 @@ def _validate_scaling(service_name: str, service_config: Dict[str, Any]) -> None
         raise ConfigError(f"Service '{service_name}': min_instances cannot exceed max_instances")
 
 
-def _validate_schema(data: Dict[str, Any]) -> None:
+def _validate_schema(data: dict[str, Any]) -> None:
     """Validate config against schema rules."""
     allowed_keys = {"services", "lanes", "domains", "storage", "secrets", "schema"}
     for key in data:
@@ -171,28 +167,28 @@ def _validate_schema(data: Dict[str, Any]) -> None:
         _validate_scaling(service_name, service_config)
 
 
-def validate_no_cycles(services: Dict[str, Dict[str, Any]]) -> None:
+def validate_no_cycles(services: dict[str, dict[str, Any]]) -> None:
     """Exported function for testing."""
     _validate_no_cycles(services)
 
 
-def validate_no_plaintext_secrets(data: Dict[str, Any]) -> None:
+def validate_no_plaintext_secrets(data: dict[str, Any]) -> None:
     """Exported function for testing."""
     _validate_no_plaintext_secrets(data)
 
 
-def validate_schema(data: Dict[str, Any]) -> None:
+def validate_schema(data: dict[str, Any]) -> None:
     """Exported function for testing."""
     _validate_schema(data)
 
 
-def validate_no_http_in_production(domains: Dict[str, Any], lanes: Dict[str, Any]) -> None:
+def validate_no_http_in_production(domains: dict[str, Any], lanes: dict[str, Any]) -> None:
     """Exported function for testing."""
     validate_http_in_production(domains, lanes)
 
 
 def validate_service_references(
-    domains: Dict[str, Any], services: Dict[str, Any], lanes: Dict[str, Any]
+    domains: dict[str, Any], services: dict[str, Any], lanes: dict[str, Any]
 ) -> None:
     """Validate that all service references are valid."""
     # Check domains reference existing services
@@ -203,19 +199,19 @@ def validate_service_references(
                 raise ConfigError(f"Domain '{domain}' references nonexistent service '{service}'")
 
     # Check all services are deployed in at least one lane
-    deployed_services: Set[str] = set()
+    deployed_services: set[str] = set()
     for lane_name, lane_config in lanes.items():
         if isinstance(lane_config, dict):
             lane_services = lane_config.get("services", [])
             if isinstance(lane_services, list):
                 deployed_services.update(lane_services)
 
-    for service_name in services.keys():
+    for service_name in services:
         if service_name not in deployed_services:
             raise ConfigError(f"Service '{service_name}' not deployed in any lane")
 
 
-def validate_http_in_production(domains: Dict[str, Any], lanes: Dict[str, Any]) -> None:
+def validate_http_in_production(domains: dict[str, Any], lanes: dict[str, Any]) -> None:
     """Reject HTTP in production lane."""
     is_production = "production" in lanes
 
@@ -228,9 +224,9 @@ def validate_http_in_production(domains: Dict[str, Any], lanes: Dict[str, Any]) 
                 )
 
 
-def validate_lane_invariants(lanes: Dict[str, Dict[str, Any]]) -> None:
+def validate_lane_invariants(lanes: dict[str, dict[str, Any]]) -> None:
     """Validate lane-specific rules."""
-    lane_secret_refs: Dict[str, Set[str]] = {}  # Track which lanes reference which secrets
+    lane_secret_refs: dict[str, set[str]] = {}  # Track which lanes reference which secrets
 
     for lane_name, lane_config in lanes.items():
         if not isinstance(lane_config, dict):
@@ -264,7 +260,7 @@ def validate_lane_invariants(lanes: Dict[str, Dict[str, Any]]) -> None:
                     lane_secret_refs[lane_name].add(value)
 
     # Check that lanes don't share secret references
-    all_refs: Dict[str, list] = {}  # ref -> [lanes using it]
+    all_refs: dict[str, list] = {}  # ref -> [lanes using it]
     for lane_name, refs in lane_secret_refs.items():
         for ref in refs:
             if ref not in all_refs:
@@ -279,17 +275,17 @@ def validate_lane_invariants(lanes: Dict[str, Dict[str, Any]]) -> None:
             )
 
 
-def load_config(config_dir: Path) -> Dict[str, Any]:
+def load_config(config_dir: Path) -> dict[str, Any]:
     """Load and validate config from directory."""
     config_dir = Path(config_dir)
 
     # Load all YAML files
-    data: Dict[str, Any] = {}
+    data: dict[str, Any] = {}
 
     # Load platform.yaml (required)
     platform_file = config_dir / "platform.yaml"
     if not platform_file.exists():
-        raise ConfigError(f"Missing required file: platform.yaml")
+        raise ConfigError("Missing required file: platform.yaml")
 
     with open(platform_file) as f:
         platform_data = yaml.safe_load(f) or {}

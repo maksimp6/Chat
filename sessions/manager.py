@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from agent_memory.client import get_memory_client
 from storage.db import memory_file_path
@@ -40,8 +40,8 @@ def _key(session_id: str) -> str:
 
 
 def create_session(
-    session_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    session_id: Optional[str] = None, metadata: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     session_id = session_id or str(uuid.uuid4())
     now = _now()
     record = {
@@ -59,7 +59,7 @@ def create_session(
     return record
 
 
-def get_session(session_id: str) -> Optional[Dict[str, Any]]:
+def get_session(session_id: str) -> Optional[dict[str, Any]]:
     value = get_memory_client(memory_file_path()).get(_key(session_id))
     if value is None:
         return None
@@ -69,7 +69,7 @@ def get_session(session_id: str) -> Optional[Dict[str, Any]]:
     return value
 
 
-def restore_session(session_id: str) -> Optional[Dict[str, Any]]:
+def restore_session(session_id: str) -> Optional[dict[str, Any]]:
     key = _key(session_id)
     with get_memory_client(memory_file_path()).transaction() as tx:
         record = tx.get(key)
@@ -84,8 +84,8 @@ def restore_session(session_id: str) -> Optional[Dict[str, Any]]:
 
 
 def update_session(
-    session_id: str, metadata: Optional[Dict[str, Any]] = None, status: Optional[str] = None
-) -> Optional[Dict[str, Any]]:
+    session_id: str, metadata: Optional[dict[str, Any]] = None, status: Optional[str] = None
+) -> Optional[dict[str, Any]]:
     if status is not None and status not in {"active", "completed", "failed", "cancelled"}:
         raise ValueError(f"Unsupported session status: {status}")
     key = _key(session_id)
