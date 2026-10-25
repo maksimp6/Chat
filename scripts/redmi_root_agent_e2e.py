@@ -27,11 +27,11 @@ button.done{background:#176c47}</style>
 <script>
 const button=document.getElementById('target');let count=0,seq=0,queue=Promise.resolve();
 const binding='RUN_BINDING';
-function send(data){data.seq=++seq;queue=queue.then(()=>fetch('/event',{method:'POST',headers:{'Content-Type':'application/json','X-RootAgent-Run':binding},body:JSON.stringify(data)}));return queue}
+function send(data){data.created_ms??=Date.now();data.seq=++seq;queue=queue.then(()=>fetch('/event',{method:'POST',headers:{'Content-Type':'application/json','X-RootAgent-Run':binding},body:JSON.stringify(data)}));return queue}
 function heartbeat(){send({kind:'heartbeat',visible:document.visibilityState==='visible',focused:document.hasFocus()})}
 setInterval(heartbeat,100);addEventListener('blur',heartbeat);addEventListener('focus',heartbeat);
 button.addEventListener('pointermove',event=>{
- if(event.isTrusted)send({kind:'move',trusted:true,inside:event.target===button,x:event.clientX,y:event.clientY});
+ if(event.isTrusted)send({kind:'move',trusted:true,inside:event.target===button,x:event.clientX,y:event.clientY,created_ms:performance.timeOrigin+event.timeStamp});
 });
 button.addEventListener('pointerleave',event=>{if(event.isTrusted)send({kind:'leave',trusted:true})});
 button.addEventListener('click',event=>{
@@ -64,6 +64,9 @@ class Witness:
             serial = data.get('seq')
             if type(serial) is not int or serial != self.seq + 1:
                 raise ValueError('event_sequence')
+            created = data.get('created_ms')
+            if type(created) not in (int, float) or not math.isfinite(created):
+                raise ValueError('event_timestamp')
             self.seq = serial
             kind = data.get("kind")
             if kind == "ready":
@@ -72,10 +75,10 @@ class Witness:
                 self.negative += 1
             elif kind == 'heartbeat':
                 self.focused = data.get('visible') is True and data.get('focused') is True
-                self.heartbeat_time = time.monotonic()
+                self.heartbeat_time = created / 1000
             elif kind == "move" and data.get("trusted") is True:
                 self.inside = data.get('inside') is True
-                self.move_time = time.monotonic()
+                self.move_time = created / 1000
                 self.move_seq = serial
             elif kind == 'leave' and data.get('trusted') is True:
                 self.inside = False
@@ -92,7 +95,7 @@ class Witness:
 
     def active(self):
         state = self.snapshot()
-        return state['focused'] and time.monotonic() - state['heartbeat_time'] < 0.6
+        return state['focused'] and 0 <= time.time() - state['heartbeat_time'] < 0.6
 
 
 def wait_for(predicate, seconds, label):
@@ -166,7 +169,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--helper", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--package", default="com.yandex.browser")
+    parser.add_argument("--package", default="io.github.forkmaintainers.iceraven")
     args = parser.parse_args()
     if os.environ.get("GITHUB_ACTIONS") != "true" or not os.environ.get("GITHUB_RUN_ID"):
         raise SystemExit("NOT_RUN: actual Actions job required")
@@ -230,7 +233,7 @@ def main():
         command = " ".join(shlex.quote(x) for x in
                            ["/system/bin/am", "start", "-a", "android.intent.action.VIEW", "-d", url, "-p", args.package])
         opened = subprocess.run(["su", "-c", command], capture_output=True, timeout=15)
-        if opened.returncode:
+        if opened.returncode or b'Error:' in opened.stdout or b'Error:' in opened.stderr:
             raise RuntimeError("TEST_BROWSER_OPEN_FAILED")
         wait_for(lambda: witness.snapshot()["ready"] and witness.snapshot()["negative"] == 1,
                  20, "TEST_PAGE_NOT_READY")
@@ -252,10 +255,12 @@ def main():
                 raise RuntimeError('OWN_PAGE_FOCUS_LOST_BEFORE_MOVE')
             run_cli(args.helper, "move", -500, -500, "--expected-package", args.package)
         previous_move = witness.snapshot()['move_seq']
+        final_move_started = time.time()
         run_cli(args.helper, "move", 350, 500, "--expected-package", args.package)
         wait_for(lambda: witness.active() and witness.snapshot()['inside']
                  and witness.snapshot()['move_seq'] > previous_move
-                 and time.monotonic() - witness.snapshot()["move_time"] < 2,
+                 and witness.snapshot()['move_time'] >= final_move_started
+                 and 0 <= time.time() - witness.snapshot()["move_time"] < 2,
                  3, "TRUSTED_POINTER_NOT_OBSERVED_IN_TEST_BUTTON")
         if not witness.active() or not witness.snapshot()['inside']:
             raise RuntimeError('OWN_BUTTON_NOT_UNDER_POINTER')
