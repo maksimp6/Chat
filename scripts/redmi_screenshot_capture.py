@@ -509,6 +509,23 @@ class RDP:
             date_ms:Date.now(),performance_ms:performance.now(),time_origin_ms:performance.timeOrigin};
         })())""")
 
+    def message_counts(self, actor):
+        return self.evaluate(actor, "JSON.stringify({user:document.querySelectorAll('#chatbox .msg.user').length,"
+                                    "bot:document.querySelectorAll('#chatbox .msg.bot').length,"
+                                    "error:document.querySelectorAll('#chatbox .msg.error').length})")
+
+    def send_chat_message(self, actor, text):
+        self.evaluate(actor, "JSON.stringify((()=>{const input=document.getElementById('msg-input');"
+                      "input.focus();input.value=" + json.dumps(text) + ";"
+                      "input.dispatchEvent(new Event('input',{bubbles:true}));return {typed:true};})())")
+        self.click(actor, "#send-btn")
+
+    def persisted_messages(self, actor, conversation_id):
+        return self.evaluate(actor, "JSON.stringify((()=>{const x=new XMLHttpRequest();"
+                             "x.open('GET','/api/conversations/'+encodeURIComponent(" + json.dumps(conversation_id) +
+                             ")+'/messages',false);x.send();if(x.status!==200)return {status:x.status,roles:[]};"
+                             "return {status:x.status,roles:(JSON.parse(x.responseText).messages||[]).map(m=>m.role)};})())")
+
     def start_creation_observer(self, actor):
         return self.evaluate(actor, r"""JSON.stringify((()=>{
           const key='__logosCaptureCreationObserver';if(window[key])throw Error('Capture observer already present');
@@ -642,12 +659,13 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
     events, failures, artifacts = [], [], []
     recorder = None
     video_path = out / "15-conversation-create.mp4"
-    video = {"path": video_path.name, "available": False, "time_limit_seconds": 60,
+    video = {"path": video_path.name, "available": False, "time_limit_seconds": 90,
              "clock_note": "Process timestamps bound recording; they do not identify the exact first video frame."}
     observer = {"available": False, "requests": []}
     reload_observer = {"available": False, "requests": []}
     checkpoints = {"new_conversation_postconditions": {"status": "NOT_RUN", "reason": "creation_not_confirmed"},
-                   "reload_persistence": {"status": "NOT_RUN", "reason": "creation_not_confirmed"}}
+                   "reload_persistence": {"status": "NOT_RUN", "reason": "creation_not_confirmed"},
+                   "message_send": {"status": "NOT_RUN", "reason": "creation_not_confirmed"}}
     before = after = reloaded = None
 
     def mark(name, browser=None):
@@ -658,7 +676,8 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
         if recorder is not None:
             event["recorder_running"] = recorder.poll() is None
         if name in ("new_chat_button_clicked", "current_model_choice_started", "current_model_choice_clicked",
-                    "creation_result_observed", "reload_result_observed", "native_screencap_finished:14-conversation-after-reload.png"):
+                    "creation_result_observed", "reload_result_observed", "native_screencap_finished:14-conversation-after-reload.png",
+                    "message_send_clicked", "message_reply_observed"):
             if not event.get("recorder_running"):
                 failures.append("native_video_ended_before_scenario_complete")
         events.append(event)
@@ -707,7 +726,7 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
         else:
             mark("recorder_launch_requested")
             recorder = subprocess.Popen([ROOT + "screenrecord", "--bugreport", "--size", "720x1560",
-                                         "--bit-rate", "2000000", "--time-limit", "60", str(video_path)],
+                                         "--bit-rate", "2000000", "--time-limit", "90", str(video_path)],
                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             time.sleep(0.5)
             mark("recorder_start_observed")
@@ -899,6 +918,38 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
                 checkpoints["reload_persistence"] = {"status": "FAIL" if len(failures) > reload_validation_start else "PASS"}
             else:
                 checkpoints["reload_persistence"] = {"status": "NOT_RUN", "reason": not_run_reason}
+            if checkpoints["reload_persistence"]["status"] == "PASS":
+                send_validation_start = len(failures)
+                counts_before = rdp.message_counts(actor)
+                rdp.send_chat_message(actor, "привет")
+                mark("message_send_clicked", rdp.conversation_state(actor))
+                reply_status = "timeout"
+                deadline = time.monotonic() + 120
+                while time.monotonic() < deadline:
+                    device_guard()
+                    counts = rdp.message_counts(actor)
+                    if counts["error"] > counts_before["error"]:
+                        reply_status = "error"
+                        break
+                    if counts["bot"] > counts_before["bot"]:
+                        reply_status = "answered"
+                        break
+                    time.sleep(1)
+                mark("message_reply_observed", {"reply_status": reply_status})
+                if reply_status != "answered":
+                    failures.append("message_reply_" + reply_status)
+                persisted = rdp.persisted_messages(actor, new_id)
+                roles = persisted["roles"]
+                if persisted["status"] != 200 or "user" not in roles:
+                    failures.append("user_message_not_persisted")
+                if "assistant" not in roles:
+                    failures.append("reply_not_persisted")
+                checkpoints["message_send"] = {"status": "FAIL" if len(failures) > send_validation_start else "PASS",
+                                               "reply_status": reply_status,
+                                               "user_message_persisted": "user" in roles,
+                                               "reply_persisted": "assistant" in roles}
+            else:
+                checkpoints["message_send"] = {"status": "NOT_RUN", "reason": "creation_not_confirmed"}
     except CaptureSafetyError:
         raise
     except Exception as error:
