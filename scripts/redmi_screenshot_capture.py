@@ -56,7 +56,9 @@ def native_focus_is_logos():
     windows = command(ROOT + "dumpsys", "window", "windows").decode("utf-8", "replace")
     focus = [line for line in windows.splitlines() if "mCurrentFocus" in line]
     if not focus or PACKAGE not in focus[-1]:
-        raise CaptureSafetyError("A native window has focus above the application")
+        # Name what has focus, so a failed run shows which window is on top of the application.
+        shown = focus[-1].strip()[:300] if focus else "no focused window reported"
+        raise CaptureSafetyError("A native window has focus above the application: " + shown)
 
 
 def android_state():
