@@ -1,0 +1,3364 @@
+{
+  "scenario": "all_application_modals",
+  "events": [
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:55:22.765251+00:00",
+      "monotonic_ns": 6539548976927,
+      "video": null,
+      "recorder_running": false
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:55:23.605060+00:00",
+      "monotonic_ns": 6540388720619,
+      "video": null,
+      "recorder_running": false
+    },
+    {
+      "event": "recorder_launch_requested",
+      "wall_utc": "2026-10-25T17:55:23.605317+00:00",
+      "monotonic_ns": 6540388945850,
+      "video": "all-modals-01.mp4",
+      "recorder_running": false
+    },
+    {
+      "event": "recorder_started",
+      "wall_utc": "2026-10-25T17:55:24.210482+00:00",
+      "monotonic_ns": 6540994162235,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:55:24.233648+00:00",
+      "monotonic_ns": 6541017316619,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:55:25.474107+00:00",
+      "monotonic_ns": 6542257818466,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:55:25.474477+00:00",
+      "monotonic_ns": 6542258132696,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "models",
+        "opener": "#model-btn",
+        "root": "#model-modal"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:55:26.995022+00:00",
+      "monotonic_ns": 6543778775773,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "models",
+        "root": "#model-modal"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:55:27.646570+00:00",
+      "monotonic_ns": 6544430269235,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "00-models-top.png",
+        "root": "#model-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:55:28.489961+00:00",
+      "monotonic_ns": 6545273581312,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "00-models-top.png",
+        "sha256": "abf781c072c0521f6aa8573bb9668ed31557e42575169cb26f9daf542950815a",
+        "size": 245653,
+        "root": "#model-modal",
+        "captured_at": "2026-10-25T17:55:28.489833+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:55:29.719721+00:00",
+      "monotonic_ns": 6546503377620,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "01-models-bottom.png",
+        "root": "#model-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:55:30.337492+00:00",
+      "monotonic_ns": 6547121147774,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "01-models-bottom.png",
+        "sha256": "6585c99c4ee8da1d33fa4a96d52d5155293577835d03f37ba8928f005af0fb6f",
+        "size": 254209,
+        "root": "#model-modal",
+        "captured_at": "2026-10-25T17:55:30.337302+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:55:30.338073+00:00",
+      "monotonic_ns": 6547121740697,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "models",
+        "root": "#model-modal",
+        "status": "CAPTURED",
+        "video": "all-modals-01.mp4",
+        "scroll_containers": 1
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:55:30.379012+00:00",
+      "monotonic_ns": 6547162733004,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:55:32.082156+00:00",
+      "monotonic_ns": 6548865860081,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:55:32.108722+00:00",
+      "monotonic_ns": 6548892374158,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:55:33.249064+00:00",
+      "monotonic_ns": 6550032769543,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:55:33.249386+00:00",
+      "monotonic_ns": 6550033037235,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "system-status",
+        "opener": "#system-status-btn",
+        "root": "#logos-system-status"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:55:34.692248+00:00",
+      "monotonic_ns": 6551476162543,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "system-status",
+        "root": "#logos-system-status"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:55:35.258701+00:00",
+      "monotonic_ns": 6552042439697,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "02-system-status-top.png",
+        "root": "#logos-system-status",
+        "geometry": {
+          "x": 0,
+          "y": 102,
+          "width": 396,
+          "height": 615.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:55:35.897760+00:00",
+      "monotonic_ns": 6552681413005,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "02-system-status-top.png",
+        "sha256": "1654b34b3133714d649e5fcee4093fc3b87813d002439f0a16fd49f89686aae0",
+        "size": 181361,
+        "root": "#logos-system-status",
+        "captured_at": "2026-10-25T17:55:35.897592+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:55:37.138601+00:00",
+      "monotonic_ns": 6553922260312,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "03-system-status-bottom.png",
+        "root": "#logos-system-status",
+        "geometry": {
+          "x": 0,
+          "y": 102,
+          "width": 396,
+          "height": 615.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:55:37.767194+00:00",
+      "monotonic_ns": 6554550829620,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "03-system-status-bottom.png",
+        "sha256": "1654b34b3133714d649e5fcee4093fc3b87813d002439f0a16fd49f89686aae0",
+        "size": 181361,
+        "root": "#logos-system-status",
+        "captured_at": "2026-10-25T17:55:37.767073+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:55:37.767539+00:00",
+      "monotonic_ns": 6554551186159,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "system-status",
+        "root": "#logos-system-status",
+        "status": "CAPTURED",
+        "video": "all-modals-01.mp4",
+        "scroll_containers": 0
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:55:37.805278+00:00",
+      "monotonic_ns": 6554588963466,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:55:39.227308+00:00",
+      "monotonic_ns": 6556011043390,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:55:39.266338+00:00",
+      "monotonic_ns": 6556050063082,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:55:40.201312+00:00",
+      "monotonic_ns": 6556984944620,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:55:40.201418+00:00",
+      "monotonic_ns": 6556985015466,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "tools",
+        "opener": "#tools-btn",
+        "root": "#tools-modal-custom"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:55:41.612910+00:00",
+      "monotonic_ns": 6558396598851,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "tools",
+        "root": "#tools-modal-custom"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:55:42.069973+00:00",
+      "monotonic_ns": 6558853698236,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "04-tools-top.png",
+        "root": "#tools-modal-custom",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:55:42.710804+00:00",
+      "monotonic_ns": 6559494456928,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "04-tools-top.png",
+        "sha256": "fef4722cac4a980c53d0e6f37d46f45749e4ec433bb355fe5d69196807e69fc1",
+        "size": 252970,
+        "root": "#tools-modal-custom",
+        "captured_at": "2026-10-25T17:55:42.710625+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:55:43.919115+00:00",
+      "monotonic_ns": 6560702778467,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "05-tools-bottom.png",
+        "root": "#tools-modal-custom",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:55:44.548143+00:00",
+      "monotonic_ns": 6561331796005,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "05-tools-bottom.png",
+        "sha256": "a9ec5c598e7679bff2aa0d6cdd22f4df9646434730044f606027bcde92790b31",
+        "size": 209056,
+        "root": "#tools-modal-custom",
+        "captured_at": "2026-10-25T17:55:44.547984+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:55:44.548683+00:00",
+      "monotonic_ns": 6561332357313,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "tools",
+        "root": "#tools-modal-custom",
+        "status": "CAPTURED",
+        "video": "all-modals-01.mp4",
+        "scroll_containers": 1
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:55:44.584858+00:00",
+      "monotonic_ns": 6561368578851,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:55:46.026677+00:00",
+      "monotonic_ns": 6562810363082,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:55:46.045521+00:00",
+      "monotonic_ns": 6562829192005,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:55:47.282956+00:00",
+      "monotonic_ns": 6564066616621,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:55:47.283139+00:00",
+      "monotonic_ns": 6564066758544,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "ssh",
+        "opener": "#ssh-runtime-btn",
+        "root": "#ssh-runtime-modal-custom"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:55:48.792900+00:00",
+      "monotonic_ns": 6565576657313,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "ssh",
+        "root": "#ssh-runtime-modal-custom"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:55:49.249136+00:00",
+      "monotonic_ns": 6566032793929,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "06-ssh-top.png",
+        "root": "#ssh-runtime-modal-custom",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:55:49.953613+00:00",
+      "monotonic_ns": 6566737267159,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "06-ssh-top.png",
+        "sha256": "da97c56ba0ef7802317feba908f48657359bb91f73983b5b9d6f9d281241728e",
+        "size": 253218,
+        "root": "#ssh-runtime-modal-custom",
+        "captured_at": "2026-10-25T17:55:49.953429+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:55:51.205588+00:00",
+      "monotonic_ns": 6567989279775,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "07-ssh-bottom.png",
+        "root": "#ssh-runtime-modal-custom",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:55:51.836360+00:00",
+      "monotonic_ns": 6568620157313,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "07-ssh-bottom.png",
+        "sha256": "da97c56ba0ef7802317feba908f48657359bb91f73983b5b9d6f9d281241728e",
+        "size": 253218,
+        "root": "#ssh-runtime-modal-custom",
+        "captured_at": "2026-10-25T17:55:51.836190+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:55:51.836973+00:00",
+      "monotonic_ns": 6568620746775,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "ssh",
+        "root": "#ssh-runtime-modal-custom",
+        "status": "CAPTURED",
+        "video": "all-modals-01.mp4",
+        "scroll_containers": 1
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:55:51.877307+00:00",
+      "monotonic_ns": 6568661029544,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:55:53.287247+00:00",
+      "monotonic_ns": 6570070895775,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:55:53.312704+00:00",
+      "monotonic_ns": 6570096374160,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:55:54.734219+00:00",
+      "monotonic_ns": 6571517891160,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:55:54.734438+00:00",
+      "monotonic_ns": 6571518074237,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "mcp",
+        "opener": "#mcp-btn",
+        "root": "#mcp-manager-modal"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:55:56.205342+00:00",
+      "monotonic_ns": 6572989015160,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "mcp",
+        "root": "#mcp-manager-modal"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:55:56.619786+00:00",
+      "monotonic_ns": 6573403442237,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "08-mcp-top.png",
+        "root": "#mcp-manager-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:55:57.221806+00:00",
+      "monotonic_ns": 6574005416314,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "08-mcp-top.png",
+        "sha256": "982c74951238d1b8f372f90eb419dcf7bbae77680d372d45881406fc85feb877",
+        "size": 199928,
+        "root": "#mcp-manager-modal",
+        "captured_at": "2026-10-25T17:55:57.221714+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:55:58.434601+00:00",
+      "monotonic_ns": 6575218268006,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "09-mcp-bottom.png",
+        "root": "#mcp-manager-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:55:59.052881+00:00",
+      "monotonic_ns": 6575836502775,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "09-mcp-bottom.png",
+        "sha256": "982c74951238d1b8f372f90eb419dcf7bbae77680d372d45881406fc85feb877",
+        "size": 199928,
+        "root": "#mcp-manager-modal",
+        "captured_at": "2026-10-25T17:55:59.052751+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:55:59.053172+00:00",
+      "monotonic_ns": 6575836806545,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "mcp",
+        "root": "#mcp-manager-modal",
+        "status": "CAPTURED",
+        "video": "all-modals-01.mp4",
+        "scroll_containers": 0
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:55:59.078546+00:00",
+      "monotonic_ns": 6575862205929,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:56:00.453456+00:00",
+      "monotonic_ns": 6577237126160,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:56:00.487965+00:00",
+      "monotonic_ns": 6577271625006,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:56:01.789408+00:00",
+      "monotonic_ns": 6578573069545,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:56:01.789585+00:00",
+      "monotonic_ns": 6578573200391,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "mcp-editor",
+        "opener": "#mcp-btn",
+        "root": "#mcp-manager-modal"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:56:03.947510+00:00",
+      "monotonic_ns": 6580731271699,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "mcp-editor",
+        "root": "#mcp-manager-modal"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:56:04.379907+00:00",
+      "monotonic_ns": 6581163588699,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "10-mcp-editor-top.png",
+        "root": "#mcp-manager-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:56:05.227998+00:00",
+      "monotonic_ns": 6582011654468,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "10-mcp-editor-top.png",
+        "sha256": "7665d0bc97aa63bb3b7d9fe55cbd408f1620f8c60232c711eb2e30df555d48fa",
+        "size": 169336,
+        "root": "#mcp-manager-modal",
+        "captured_at": "2026-10-25T17:56:05.227805+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:56:06.456988+00:00",
+      "monotonic_ns": 6583240689314,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "11-mcp-editor-bottom.png",
+        "root": "#mcp-manager-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:56:07.086888+00:00",
+      "monotonic_ns": 6583870501314,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "11-mcp-editor-bottom.png",
+        "sha256": "0a2b096ae8727baabda643093fd454b88f001d112cc79cfb3354f513d471860f",
+        "size": 162375,
+        "root": "#mcp-manager-modal",
+        "captured_at": "2026-10-25T17:56:07.086778+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:56:07.087214+00:00",
+      "monotonic_ns": 6583870835391,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "mcp-editor",
+        "root": "#mcp-manager-modal",
+        "status": "CAPTURED",
+        "video": "all-modals-01.mp4",
+        "scroll_containers": 1
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:56:07.114743+00:00",
+      "monotonic_ns": 6583898436622,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:56:08.450476+00:00",
+      "monotonic_ns": 6585234157007,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:56:08.468722+00:00",
+      "monotonic_ns": 6585252408391,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:56:09.733246+00:00",
+      "monotonic_ns": 6586516979161,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:56:09.733582+00:00",
+      "monotonic_ns": 6586517216084,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "settings-gen",
+        "opener": "#settings-btn",
+        "root": "#settings-modal-custom"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:56:11.273974+00:00",
+      "monotonic_ns": 6588057734468,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "settings-gen",
+        "root": "#settings-modal-custom"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:56:11.722424+00:00",
+      "monotonic_ns": 6588506104699,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "12-settings-gen-top.png",
+        "root": "#settings-modal-custom",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:56:12.378408+00:00",
+      "monotonic_ns": 6589162060699,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "12-settings-gen-top.png",
+        "sha256": "b21ff76d86cd6c55d053fa9dc69c74c3e5459d3d595c491776ad2dacda3ffd7e",
+        "size": 218034,
+        "root": "#settings-modal-custom",
+        "captured_at": "2026-10-25T17:56:12.378249+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:56:13.588992+00:00",
+      "monotonic_ns": 6590372660392,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "13-settings-gen-bottom.png",
+        "root": "#settings-modal-custom",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:56:14.224407+00:00",
+      "monotonic_ns": 6591008232699,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "13-settings-gen-bottom.png",
+        "sha256": "b21ff76d86cd6c55d053fa9dc69c74c3e5459d3d595c491776ad2dacda3ffd7e",
+        "size": 218034,
+        "root": "#settings-modal-custom",
+        "captured_at": "2026-10-25T17:56:14.224234+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:56:14.225054+00:00",
+      "monotonic_ns": 6591008721007,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "settings-gen",
+        "root": "#settings-modal-custom",
+        "status": "CAPTURED",
+        "video": "all-modals-01.mp4",
+        "scroll_containers": 1
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:56:14.261938+00:00",
+      "monotonic_ns": 6591045643161,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:56:15.830715+00:00",
+      "monotonic_ns": 6592614395084,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:56:15.856940+00:00",
+      "monotonic_ns": 6592642017622,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:56:17.086723+00:00",
+      "monotonic_ns": 6593870405007,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:56:17.086967+00:00",
+      "monotonic_ns": 6593870603161,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "settings-output",
+        "opener": "#settings-btn",
+        "root": "#settings-modal-custom"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:56:18.659464+00:00",
+      "monotonic_ns": 6595443185007,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "settings-output",
+        "root": "#settings-modal-custom"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:56:19.044391+00:00",
+      "monotonic_ns": 6595828213623,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "14-settings-output-top.png",
+        "root": "#settings-modal-custom",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:56:19.691453+00:00",
+      "monotonic_ns": 6596475108315,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "14-settings-output-top.png",
+        "sha256": "5c9818165e8eb79b016f59a7b5b492762d76a4bc24209325ff084a10bc910bdc",
+        "size": 208417,
+        "root": "#settings-modal-custom",
+        "captured_at": "2026-10-25T17:56:19.691287+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:56:20.972822+00:00",
+      "monotonic_ns": 6597756500315,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "15-settings-output-bottom.png",
+        "root": "#settings-modal-custom",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:56:21.617506+00:00",
+      "monotonic_ns": 6598401161315,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "15-settings-output-bottom.png",
+        "sha256": "5c9818165e8eb79b016f59a7b5b492762d76a4bc24209325ff084a10bc910bdc",
+        "size": 208417,
+        "root": "#settings-modal-custom",
+        "captured_at": "2026-10-25T17:56:21.617324+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:56:21.617990+00:00",
+      "monotonic_ns": 6598401656315,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "settings-output",
+        "root": "#settings-modal-custom",
+        "status": "CAPTURED",
+        "video": "all-modals-01.mp4",
+        "scroll_containers": 0
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:56:21.664923+00:00",
+      "monotonic_ns": 6598448640700,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:56:23.253154+00:00",
+      "monotonic_ns": 6600036886469,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:56:23.279485+00:00",
+      "monotonic_ns": 6600063167084,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:56:24.536049+00:00",
+      "monotonic_ns": 6601319775700,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:56:24.536508+00:00",
+      "monotonic_ns": 6601320148085,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "settings-routing",
+        "opener": "#settings-btn",
+        "root": "#settings-modal-custom"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:56:26.119006+00:00",
+      "monotonic_ns": 6602902698162,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "settings-routing",
+        "root": "#settings-modal-custom"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:56:26.561608+00:00",
+      "monotonic_ns": 6603345389546,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "16-settings-routing-top.png",
+        "root": "#settings-modal-custom",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:56:27.260160+00:00",
+      "monotonic_ns": 6604043814546,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "16-settings-routing-top.png",
+        "sha256": "14c911744ed40311438312de0e1fee955420968bc01ceac49fa372a11618a33d",
+        "size": 212960,
+        "root": "#settings-modal-custom",
+        "captured_at": "2026-10-25T17:56:27.259969+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:56:28.509587+00:00",
+      "monotonic_ns": 6605293239700,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "17-settings-routing-bottom.png",
+        "root": "#settings-modal-custom",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:56:29.150126+00:00",
+      "monotonic_ns": 6605933779392,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "17-settings-routing-bottom.png",
+        "sha256": "14c911744ed40311438312de0e1fee955420968bc01ceac49fa372a11618a33d",
+        "size": 212960,
+        "root": "#settings-modal-custom",
+        "captured_at": "2026-10-25T17:56:29.149951+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:56:29.150590+00:00",
+      "monotonic_ns": 6605934257546,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "settings-routing",
+        "root": "#settings-modal-custom",
+        "status": "CAPTURED",
+        "video": "all-modals-01.mp4",
+        "scroll_containers": 0
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:56:29.193465+00:00",
+      "monotonic_ns": 6605977193008,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:56:30.711915+00:00",
+      "monotonic_ns": 6607495587085,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:56:30.743549+00:00",
+      "monotonic_ns": 6607527230777,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:56:31.691609+00:00",
+      "monotonic_ns": 6608475365854,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:56:31.692008+00:00",
+      "monotonic_ns": 6608475691393,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "settings-adv",
+        "opener": "#settings-btn",
+        "root": "#settings-modal-custom"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:56:33.192168+00:00",
+      "monotonic_ns": 6609975947700,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "settings-adv",
+        "root": "#settings-modal-custom"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:56:33.621389+00:00",
+      "monotonic_ns": 6610405050854,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "18-settings-adv-top.png",
+        "root": "#settings-modal-custom",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:56:34.321197+00:00",
+      "monotonic_ns": 6611104810470,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "18-settings-adv-top.png",
+        "sha256": "aa2894f082f8d622a9e24ae973867acbb005276e91fe65d2dfff4d0f9b9d31ce",
+        "size": 204114,
+        "root": "#settings-modal-custom",
+        "captured_at": "2026-10-25T17:56:34.321080+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:56:35.569475+00:00",
+      "monotonic_ns": 6612353145547,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "19-settings-adv-bottom.png",
+        "root": "#settings-modal-custom",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:56:36.179288+00:00",
+      "monotonic_ns": 6612962943393,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "19-settings-adv-bottom.png",
+        "sha256": "aa2894f082f8d622a9e24ae973867acbb005276e91fe65d2dfff4d0f9b9d31ce",
+        "size": 204114,
+        "root": "#settings-modal-custom",
+        "captured_at": "2026-10-25T17:56:36.179067+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:56:36.179795+00:00",
+      "monotonic_ns": 6612963482239,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "settings-adv",
+        "root": "#settings-modal-custom",
+        "status": "CAPTURED",
+        "video": "all-modals-01.mp4",
+        "scroll_containers": 0
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:56:36.245734+00:00",
+      "monotonic_ns": 6613029395162,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:56:37.872258+00:00",
+      "monotonic_ns": 6614655923162,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:56:37.895667+00:00",
+      "monotonic_ns": 6614679425547,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:56:39.085233+00:00",
+      "monotonic_ns": 6615868880701,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:56:39.085385+00:00",
+      "monotonic_ns": 6615869001316,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "settings-theme",
+        "opener": "#settings-btn",
+        "root": "#settings-modal-custom"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:56:40.604957+00:00",
+      "monotonic_ns": 6617388680009,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "settings-theme",
+        "root": "#settings-modal-custom"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:56:41.037891+00:00",
+      "monotonic_ns": 6617821543162,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "20-settings-theme-top.png",
+        "root": "#settings-modal-custom",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:56:41.538110+00:00",
+      "monotonic_ns": 6618321724086,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "20-settings-theme-top.png",
+        "sha256": "0361dabc6eccf9cf9688e237f02009637ea69c6f51c01143655f861f0d8d0af5",
+        "size": 213636,
+        "root": "#settings-modal-custom",
+        "captured_at": "2026-10-25T17:56:41.538019+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:56:42.714071+00:00",
+      "monotonic_ns": 6619497721624,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "21-settings-theme-bottom.png",
+        "root": "#settings-modal-custom",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:56:43.334176+00:00",
+      "monotonic_ns": 6620117802778,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "21-settings-theme-bottom.png",
+        "sha256": "0361dabc6eccf9cf9688e237f02009637ea69c6f51c01143655f861f0d8d0af5",
+        "size": 213636,
+        "root": "#settings-modal-custom",
+        "captured_at": "2026-10-25T17:56:43.334066+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:56:43.334457+00:00",
+      "monotonic_ns": 6620118094470,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "settings-theme",
+        "root": "#settings-modal-custom",
+        "status": "CAPTURED",
+        "video": "all-modals-01.mp4",
+        "scroll_containers": 0
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:56:43.362292+00:00",
+      "monotonic_ns": 6620145971163,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:56:44.885070+00:00",
+      "monotonic_ns": 6621668781009,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:56:44.909260+00:00",
+      "monotonic_ns": 6621692927086,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:56:46.179536+00:00",
+      "monotonic_ns": 6622963192009,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:56:46.179713+00:00",
+      "monotonic_ns": 6622963340009,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "files",
+        "opener": "#file-manager-btn",
+        "root": "#file-manager-modal"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:56:47.646288+00:00",
+      "monotonic_ns": 6624429969317,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "files",
+        "root": "#file-manager-modal"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:56:48.027875+00:00",
+      "monotonic_ns": 6624811532624,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "22-files-top.png",
+        "root": "#file-manager-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:56:48.840978+00:00",
+      "monotonic_ns": 6625624612701,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "22-files-top.png",
+        "sha256": "efa6821f486c0565e37f4726366e68c90555054325f27213faa5e9281430a8ff",
+        "size": 219577,
+        "root": "#file-manager-modal",
+        "captured_at": "2026-10-25T17:56:48.840838+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:56:50.068706+00:00",
+      "monotonic_ns": 6626852400701,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "23-files-bottom.png",
+        "root": "#file-manager-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:56:50.790906+00:00",
+      "monotonic_ns": 6627574562778,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "23-files-bottom.png",
+        "sha256": "31c362e952722759c8519168f3e44d5c5d7809f29eafeb2d765b83f9573079a0",
+        "size": 259492,
+        "root": "#file-manager-modal",
+        "captured_at": "2026-10-25T17:56:50.790726+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:56:50.791403+00:00",
+      "monotonic_ns": 6627575070855,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "files",
+        "root": "#file-manager-modal",
+        "status": "CAPTURED",
+        "video": "all-modals-01.mp4",
+        "scroll_containers": 3
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:56:50.831207+00:00",
+      "monotonic_ns": 6627614925855,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:56:52.211207+00:00",
+      "monotonic_ns": 6628994862548,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:56:52.320538+00:00",
+      "monotonic_ns": 6629104259778,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:56:53.787737+00:00",
+      "monotonic_ns": 6630571393009,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:56:53.787917+00:00",
+      "monotonic_ns": 6630571545932,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "vector-add-files",
+        "opener": "#file-manager-btn",
+        "root": "#vs-add-files-modal"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:56:55.869481+00:00",
+      "monotonic_ns": 6632653208702,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "vector-add-files",
+        "root": "#vs-add-files-modal"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:56:56.269501+00:00",
+      "monotonic_ns": 6633053153009,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "24-vector-add-files-top.png",
+        "root": "#vs-add-files-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:56:56.915567+00:00",
+      "monotonic_ns": 6633699221010,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "24-vector-add-files-top.png",
+        "sha256": "e592975ce4e2110a2764fe6f1327d2dd0c61f56e19507122bff2ce69b88ae458",
+        "size": 296624,
+        "root": "#vs-add-files-modal",
+        "captured_at": "2026-10-25T17:56:56.915385+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:56:58.155580+00:00",
+      "monotonic_ns": 6634939297317,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "25-vector-add-files-bottom.png",
+        "root": "#vs-add-files-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:56:58.829605+00:00",
+      "monotonic_ns": 6635613242779,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "25-vector-add-files-bottom.png",
+        "sha256": "9e5d0af5f7d3483348e9ff1b9c7970ea3226776f9ab81042bee8008693f0a84e",
+        "size": 348564,
+        "root": "#vs-add-files-modal",
+        "captured_at": "2026-10-25T17:56:58.829435+00:00",
+        "redacted": true,
+        "video": "all-modals-01.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:56:58.830079+00:00",
+      "monotonic_ns": 6635613733240,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "vector-add-files",
+        "root": "#vs-add-files-modal",
+        "status": "CAPTURED",
+        "video": "all-modals-01.mp4",
+        "scroll_containers": 1
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:56:58.867298+00:00",
+      "monotonic_ns": 6635650979087,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:57:00.361744+00:00",
+      "monotonic_ns": 6637145444394,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "recorder_stop_requested",
+      "wall_utc": "2026-10-25T17:57:00.362050+00:00",
+      "monotonic_ns": 6637145711087,
+      "video": "all-modals-01.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "recorder_stopped",
+      "wall_utc": "2026-10-25T17:57:00.914298+00:00",
+      "monotonic_ns": 6637697965241,
+      "video": "all-modals-01.mp4",
+      "recorder_running": false,
+      "data": {
+        "path": "all-modals-01.mp4",
+        "available": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "event": "recorder_launch_requested",
+      "wall_utc": "2026-10-25T17:57:00.914557+00:00",
+      "monotonic_ns": 6637698178779,
+      "video": "all-modals-02.mp4",
+      "recorder_running": false
+    },
+    {
+      "event": "recorder_started",
+      "wall_utc": "2026-10-25T17:57:01.517591+00:00",
+      "monotonic_ns": 6638301336394,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:57:01.551128+00:00",
+      "monotonic_ns": 6638334852702,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:57:02.965899+00:00",
+      "monotonic_ns": 6639749569010,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:57:02.966109+00:00",
+      "monotonic_ns": 6639749746241,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "treasury",
+        "opener": "#treasury-btn",
+        "root": "#treasury-modal"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:57:04.667547+00:00",
+      "monotonic_ns": 6641451308010,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "treasury",
+        "root": "#treasury-modal"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:57:05.177003+00:00",
+      "monotonic_ns": 6641960688933,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "26-treasury-top.png",
+        "root": "#treasury-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:57:05.870791+00:00",
+      "monotonic_ns": 6642654406779,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "26-treasury-top.png",
+        "sha256": "8fce5d753828bae8f0f3f17ab780d6524e486c1b89d340991a8ff35c047526e2",
+        "size": 183936,
+        "root": "#treasury-modal",
+        "captured_at": "2026-10-25T17:57:05.870678+00:00",
+        "redacted": true,
+        "video": "all-modals-02.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:57:07.062377+00:00",
+      "monotonic_ns": 6643846058856,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "27-treasury-bottom.png",
+        "root": "#treasury-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:57:07.692650+00:00",
+      "monotonic_ns": 6644476277626,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "27-treasury-bottom.png",
+        "sha256": "8fce5d753828bae8f0f3f17ab780d6524e486c1b89d340991a8ff35c047526e2",
+        "size": 183936,
+        "root": "#treasury-modal",
+        "captured_at": "2026-10-25T17:57:07.692509+00:00",
+        "redacted": true,
+        "video": "all-modals-02.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:57:07.693036+00:00",
+      "monotonic_ns": 6644476671779,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "treasury",
+        "root": "#treasury-modal",
+        "status": "CAPTURED",
+        "video": "all-modals-02.mp4",
+        "scroll_containers": 0
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:57:07.723550+00:00",
+      "monotonic_ns": 6644507229549,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:57:09.329698+00:00",
+      "monotonic_ns": 6646113362241,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:57:09.357436+00:00",
+      "monotonic_ns": 6646141138779,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:57:11.004373+00:00",
+      "monotonic_ns": 6647788181318,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:57:11.004968+00:00",
+      "monotonic_ns": 6647788606549,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "project-tree",
+        "opener": "#project-tree-btn",
+        "root": "#project-tree-modal"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:57:12.465076+00:00",
+      "monotonic_ns": 6649248825318,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "project-tree",
+        "root": "#project-tree-modal"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:57:12.963626+00:00",
+      "monotonic_ns": 6649747283703,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "28-project-tree-top.png",
+        "root": "#project-tree-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:57:13.606437+00:00",
+      "monotonic_ns": 6650390088395,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "28-project-tree-top.png",
+        "sha256": "f2ed71e073773bd3c601b70f4550c75b92f9cd705b065ae4f41514031416de57",
+        "size": 202955,
+        "root": "#project-tree-modal",
+        "captured_at": "2026-10-25T17:57:13.606267+00:00",
+        "redacted": true,
+        "video": "all-modals-02.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:57:14.846399+00:00",
+      "monotonic_ns": 6651630055780,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "29-project-tree-bottom.png",
+        "root": "#project-tree-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:57:15.370283+00:00",
+      "monotonic_ns": 6652153935395,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "29-project-tree-bottom.png",
+        "sha256": "f2ed71e073773bd3c601b70f4550c75b92f9cd705b065ae4f41514031416de57",
+        "size": 202955,
+        "root": "#project-tree-modal",
+        "captured_at": "2026-10-25T17:57:15.370115+00:00",
+        "redacted": true,
+        "video": "all-modals-02.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:57:15.370729+00:00",
+      "monotonic_ns": 6652154394164,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "project-tree",
+        "root": "#project-tree-modal",
+        "status": "CAPTURED",
+        "video": "all-modals-02.mp4",
+        "scroll_containers": 0
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:57:15.410136+00:00",
+      "monotonic_ns": 6652193856395,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:57:16.430376+00:00",
+      "monotonic_ns": 6653214001241,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:57:16.494843+00:00",
+      "monotonic_ns": 6653278520011,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:57:17.916666+00:00",
+      "monotonic_ns": 6654700340626,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:57:17.916889+00:00",
+      "monotonic_ns": 6654700524703,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "memory",
+        "opener": "#memory-btn",
+        "root": "#memoryModal"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:57:19.409907+00:00",
+      "monotonic_ns": 6656193581934,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "memory",
+        "root": "#memoryModal"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:57:19.768407+00:00",
+      "monotonic_ns": 6656552101549,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "30-memory-top.png",
+        "root": "#memoryModal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:57:20.324710+00:00",
+      "monotonic_ns": 6657108326780,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "30-memory-top.png",
+        "sha256": "b583aa8f942483f69f2e72a59dcd8d9db32c596086f652bfe56d71f1f6eb3449",
+        "size": 154165,
+        "root": "#memoryModal",
+        "captured_at": "2026-10-25T17:57:20.324559+00:00",
+        "redacted": true,
+        "video": "all-modals-02.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:57:21.583098+00:00",
+      "monotonic_ns": 6658366815473,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "31-memory-bottom.png",
+        "root": "#memoryModal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:57:22.304076+00:00",
+      "monotonic_ns": 6659087700396,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "31-memory-bottom.png",
+        "sha256": "b583aa8f942483f69f2e72a59dcd8d9db32c596086f652bfe56d71f1f6eb3449",
+        "size": 154165,
+        "root": "#memoryModal",
+        "captured_at": "2026-10-25T17:57:22.303971+00:00",
+        "redacted": true,
+        "video": "all-modals-02.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:57:22.304319+00:00",
+      "monotonic_ns": 6659087952934,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "memory",
+        "root": "#memoryModal",
+        "status": "CAPTURED",
+        "video": "all-modals-02.mp4",
+        "scroll_containers": 0
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:57:22.328239+00:00",
+      "monotonic_ns": 6659111974165,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:57:23.994344+00:00",
+      "monotonic_ns": 6660778020088,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:57:24.015321+00:00",
+      "monotonic_ns": 6660798974165,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:57:25.590023+00:00",
+      "monotonic_ns": 6662373782550,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:57:25.590418+00:00",
+      "monotonic_ns": 6662374057242,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "departments",
+        "opener": "#departments-btn",
+        "root": "#departments-modal"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:57:27.069176+00:00",
+      "monotonic_ns": 6663852910781,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "departments",
+        "root": "#departments-modal"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:57:27.571499+00:00",
+      "monotonic_ns": 6664355163704,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "32-departments-top.png",
+        "root": "#departments-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:57:28.186980+00:00",
+      "monotonic_ns": 6664970633242,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "32-departments-top.png",
+        "sha256": "5ca3ea8aac527c4f76d57cfe5e398da5e78f432f1710705a4139341595901a07",
+        "size": 211638,
+        "root": "#departments-modal",
+        "captured_at": "2026-10-25T17:57:28.186836+00:00",
+        "redacted": true,
+        "video": "all-modals-02.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:57:29.420985+00:00",
+      "monotonic_ns": 6666204658473,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "33-departments-bottom.png",
+        "root": "#departments-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:57:30.034533+00:00",
+      "monotonic_ns": 6666818188319,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "33-departments-bottom.png",
+        "sha256": "5ca3ea8aac527c4f76d57cfe5e398da5e78f432f1710705a4139341595901a07",
+        "size": 211638,
+        "root": "#departments-modal",
+        "captured_at": "2026-10-25T17:57:30.034351+00:00",
+        "redacted": true,
+        "video": "all-modals-02.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:57:30.035008+00:00",
+      "monotonic_ns": 6666818676088,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "departments",
+        "root": "#departments-modal",
+        "status": "CAPTURED",
+        "video": "all-modals-02.mp4",
+        "scroll_containers": 0
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:57:30.075198+00:00",
+      "monotonic_ns": 6666858919704,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:57:31.659754+00:00",
+      "monotonic_ns": 6668443408089,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:57:31.688177+00:00",
+      "monotonic_ns": 6668471901550,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:57:32.905247+00:00",
+      "monotonic_ns": 6669688891089,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:57:32.905400+00:00",
+      "monotonic_ns": 6669689019089,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "partners",
+        "opener": "#departments-btn",
+        "root": "#partner-relations-modal"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:57:34.420367+00:00",
+      "monotonic_ns": 6671204224089,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "partners",
+        "root": "#partner-relations-modal"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:57:34.955921+00:00",
+      "monotonic_ns": 6671739615396,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "34-partners-top.png",
+        "root": "#partner-relations-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:57:35.535385+00:00",
+      "monotonic_ns": 6672319000320,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "34-partners-top.png",
+        "sha256": "62a732713cb0f6c58e842085ba48af54ff7729764e542c073923db6ba73b49a7",
+        "size": 191413,
+        "root": "#partner-relations-modal",
+        "captured_at": "2026-10-25T17:57:35.535304+00:00",
+        "redacted": true,
+        "video": "all-modals-02.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:57:36.823594+00:00",
+      "monotonic_ns": 6673607270243,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "35-partners-bottom.png",
+        "root": "#partner-relations-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:57:37.422167+00:00",
+      "monotonic_ns": 6674205821627,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "35-partners-bottom.png",
+        "sha256": "62a732713cb0f6c58e842085ba48af54ff7729764e542c073923db6ba73b49a7",
+        "size": 191413,
+        "root": "#partner-relations-modal",
+        "captured_at": "2026-10-25T17:57:37.421990+00:00",
+        "redacted": true,
+        "video": "all-modals-02.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:57:37.422622+00:00",
+      "monotonic_ns": 6674206288397,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "partners",
+        "root": "#partner-relations-modal",
+        "status": "CAPTURED",
+        "video": "all-modals-02.mp4",
+        "scroll_containers": 0
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:57:37.458843+00:00",
+      "monotonic_ns": 6674242544704,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:57:39.146875+00:00",
+      "monotonic_ns": 6675930523166,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:57:39.171881+00:00",
+      "monotonic_ns": 6675955552704,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:57:41.000536+00:00",
+      "monotonic_ns": 6677784209551,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:57:41.000736+00:00",
+      "monotonic_ns": 6677784352935,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "environments",
+        "opener": "#environments-btn",
+        "root": "#environments-modal"
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:57:42.507038+00:00",
+      "monotonic_ns": 6679290789012,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "environments",
+        "root": "#environments-modal"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:57:42.979139+00:00",
+      "monotonic_ns": 6679762799474,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "36-environments-top.png",
+        "root": "#environments-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:57:43.630925+00:00",
+      "monotonic_ns": 6680414575474,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "36-environments-top.png",
+        "sha256": "543af0dbfd191a8757d76c4fbf4e9b37120a0e6d7dac7d72d481f2e454ace62a",
+        "size": 181536,
+        "root": "#environments-modal",
+        "captured_at": "2026-10-25T17:57:43.630784+00:00",
+        "redacted": true,
+        "video": "all-modals-02.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:57:44.864404+00:00",
+      "monotonic_ns": 6681648218782,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "37-environments-bottom.png",
+        "root": "#environments-modal",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:57:45.473986+00:00",
+      "monotonic_ns": 6682257640320,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "37-environments-bottom.png",
+        "sha256": "543af0dbfd191a8757d76c4fbf4e9b37120a0e6d7dac7d72d481f2e454ace62a",
+        "size": 181536,
+        "root": "#environments-modal",
+        "captured_at": "2026-10-25T17:57:45.473805+00:00",
+        "redacted": true,
+        "video": "all-modals-02.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:57:45.474447+00:00",
+      "monotonic_ns": 6682258115089,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "environments",
+        "root": "#environments-modal",
+        "status": "CAPTURED",
+        "video": "all-modals-02.mp4",
+        "scroll_containers": 0
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:57:45.546905+00:00",
+      "monotonic_ns": 6682330607166,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:57:47.326628+00:00",
+      "monotonic_ns": 6684110278859,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:57:47.351361+00:00",
+      "monotonic_ns": 6684135011782,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:57:48.709409+00:00",
+      "monotonic_ns": 6685493083474,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:57:48.709627+00:00",
+      "monotonic_ns": 6685493252705,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "trace",
+        "opener": null,
+        "root": ".logos-trace-window"
+      }
+    },
+    {
+      "event": "existing_trace_button_clicked",
+      "wall_utc": "2026-10-25T17:57:49.970770+00:00",
+      "monotonic_ns": 6686754470859,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "button_index": 3,
+        "button_count": 4,
+        "errors": []
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:57:51.101629+00:00",
+      "monotonic_ns": 6687885387474,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "trace",
+        "root": ".logos-trace-window"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:57:51.591922+00:00",
+      "monotonic_ns": 6688375578859,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "38-trace-top.png",
+        "root": ".logos-trace-window",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:57:52.255136+00:00",
+      "monotonic_ns": 6689038789321,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "38-trace-top.png",
+        "sha256": "de3a772ef237a73ab92d3fc31388a795de417c948ab5178e7175984b9e6728ff",
+        "size": 210663,
+        "root": ".logos-trace-window",
+        "captured_at": "2026-10-25T17:57:52.254966+00:00",
+        "redacted": true,
+        "video": "all-modals-02.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:57:53.484132+00:00",
+      "monotonic_ns": 6690267824321,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "39-trace-bottom.png",
+        "root": ".logos-trace-window",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:57:54.066752+00:00",
+      "monotonic_ns": 6690850363782,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "39-trace-bottom.png",
+        "sha256": "16295de86fdef328251d455a267517b4ff4446e8c67d0267c6d52cd4793a2a5c",
+        "size": 208862,
+        "root": ".logos-trace-window",
+        "captured_at": "2026-10-25T17:57:54.066684+00:00",
+        "redacted": true,
+        "video": "all-modals-02.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:57:54.066919+00:00",
+      "monotonic_ns": 6690850535398,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "trace",
+        "root": ".logos-trace-window",
+        "status": "CAPTURED",
+        "video": "all-modals-02.mp4",
+        "scroll_containers": 1
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:57:54.097962+00:00",
+      "monotonic_ns": 6690881679398,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:57:55.673257+00:00",
+      "monotonic_ns": 6692456919705,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:57:55.700036+00:00",
+      "monotonic_ns": 6692483713244,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:57:57.130703+00:00",
+      "monotonic_ns": 6693914386244,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "modal_open_requested",
+      "wall_utc": "2026-10-25T17:57:57.131257+00:00",
+      "monotonic_ns": 6693914931705,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "trace-event",
+        "opener": null,
+        "root": ".logos-trace-window"
+      }
+    },
+    {
+      "event": "existing_trace_button_clicked",
+      "wall_utc": "2026-10-25T17:57:58.150091+00:00",
+      "monotonic_ns": 6694933760398,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "button_index": 3,
+        "button_count": 4,
+        "errors": []
+      }
+    },
+    {
+      "event": "modal_visible",
+      "wall_utc": "2026-10-25T17:57:59.359991+00:00",
+      "monotonic_ns": 6696143723167,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "trace-event",
+        "root": ".logos-trace-window"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:57:59.710679+00:00",
+      "monotonic_ns": 6696494328090,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "40-trace-event-top.png",
+        "root": ".logos-trace-window",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:58:00.200180+00:00",
+      "monotonic_ns": 6696983793244,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "40-trace-event-top.png",
+        "sha256": "ad1dcb61a321a1d92b7a145ba4b7e45145aa8126954b2b58d7f802cfe11340af",
+        "size": 206778,
+        "root": ".logos-trace-window",
+        "captured_at": "2026-10-25T17:58:00.200083+00:00",
+        "redacted": true,
+        "video": "all-modals-02.mp4"
+      }
+    },
+    {
+      "event": "screencap_started",
+      "wall_utc": "2026-10-25T17:58:01.369479+00:00",
+      "monotonic_ns": 6698153128013,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "41-trace-event-bottom.png",
+        "root": ".logos-trace-window",
+        "geometry": {
+          "x": 0,
+          "y": 0,
+          "width": 396,
+          "height": 717.2000122070312,
+          "viewport": {
+            "width": 396,
+            "height": 717
+          }
+        }
+      }
+    },
+    {
+      "event": "screencap_finished",
+      "wall_utc": "2026-10-25T17:58:01.991261+00:00",
+      "monotonic_ns": 6698774916090,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "path": "41-trace-event-bottom.png",
+        "sha256": "1715a63c9c5b42cac55d1cf8b5d716d8b3fb9fd16a5338e1f5500a9e675a7210",
+        "size": 206366,
+        "root": ".logos-trace-window",
+        "captured_at": "2026-10-25T17:58:01.991075+00:00",
+        "redacted": true,
+        "video": "all-modals-02.mp4"
+      }
+    },
+    {
+      "event": "modal_capture_finished",
+      "wall_utc": "2026-10-25T17:58:01.991742+00:00",
+      "monotonic_ns": 6698775410244,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true,
+      "data": {
+        "name": "trace-event",
+        "root": ".logos-trace-window",
+        "status": "CAPTURED",
+        "video": "all-modals-02.mp4",
+        "scroll_containers": 2
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:58:02.025395+00:00",
+      "monotonic_ns": 6698809119783,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:58:03.785792+00:00",
+      "monotonic_ns": 6700569471090,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "recorder_stop_requested",
+      "wall_utc": "2026-10-25T17:58:03.786069+00:00",
+      "monotonic_ns": 6700569692706,
+      "video": "all-modals-02.mp4",
+      "recorder_running": true
+    },
+    {
+      "event": "recorder_stopped",
+      "wall_utc": "2026-10-25T17:58:04.202522+00:00",
+      "monotonic_ns": 6700986206552,
+      "video": "all-modals-02.mp4",
+      "recorder_running": false,
+      "data": {
+        "path": "all-modals-02.mp4",
+        "available": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "event": "fresh_document_requested",
+      "wall_utc": "2026-10-25T17:58:04.246700+00:00",
+      "monotonic_ns": 6701030369860,
+      "video": "all-modals-02.mp4",
+      "recorder_running": false
+    },
+    {
+      "event": "fresh_document_ready",
+      "wall_utc": "2026-10-25T17:58:05.750939+00:00",
+      "monotonic_ns": 6702534632091,
+      "video": "all-modals-02.mp4",
+      "recorder_running": false
+    },
+    {
+      "event": "walk_finished",
+      "wall_utc": "2026-10-25T17:58:05.763131+00:00",
+      "monotonic_ns": 6702546842552,
+      "video": "all-modals-02.mp4",
+      "recorder_running": false,
+      "data": {
+        "captured": 21,
+        "planned": 21,
+        "not_attempted": []
+      }
+    }
+  ],
+  "network": [
+    {
+      "method": "GET",
+      "path": "/api/conversations/38f7195d-4813-4264-8d63-5ef31aeb2734/settings",
+      "started": {
+        "date_ms": 1792950923634,
+        "performance_ms": 755
+      },
+      "finished": {
+        "date_ms": 1792950923941,
+        "performance_ms": 1062
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations/38f7195d-4813-4264-8d63-5ef31aeb2734/settings",
+      "started": {
+        "date_ms": 1792950940298,
+        "performance_ms": 844
+      },
+      "finished": {
+        "date_ms": 1792950940827,
+        "performance_ms": 1374
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/tools/categories",
+      "started": {
+        "date_ms": 1792950940419,
+        "performance_ms": 966
+      },
+      "finished": {
+        "date_ms": 1792950940488,
+        "performance_ms": 1035
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations/38f7195d-4813-4264-8d63-5ef31aeb2734/tools",
+      "started": {
+        "date_ms": 1792950940425,
+        "performance_ms": 971
+      },
+      "finished": {
+        "date_ms": 1792950940830,
+        "performance_ms": 1376
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/ssh-runtime/settings",
+      "started": {
+        "date_ms": 1792950947607,
+        "performance_ms": 1451
+      },
+      "finished": {
+        "date_ms": 1792950947657,
+        "performance_ms": 1502
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/mcp-servers",
+      "started": {
+        "date_ms": 1792950955070,
+        "performance_ms": 1645
+      },
+      "finished": {
+        "date_ms": 1792950955096,
+        "performance_ms": 1672
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/mcp-servers",
+      "started": {
+        "date_ms": 1792950962161,
+        "performance_ms": 1564
+      },
+      "finished": {
+        "date_ms": 1792950962197,
+        "performance_ms": 1600
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations/38f7195d-4813-4264-8d63-5ef31aeb2734/settings",
+      "started": {
+        "date_ms": 1792950991734,
+        "performance_ms": 867
+      },
+      "finished": {
+        "date_ms": 1792950992030,
+        "performance_ms": 1164
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/vector-stores",
+      "started": {
+        "date_ms": 1792951006491,
+        "performance_ms": 1461
+      },
+      "finished": {
+        "date_ms": 1792951007004,
+        "performance_ms": 1973
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/files",
+      "started": {
+        "date_ms": 1792951006494,
+        "performance_ms": 1464
+      },
+      "finished": {
+        "date_ms": 1792951007109,
+        "performance_ms": 2079
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/vector-stores",
+      "started": {
+        "date_ms": 1792951014116,
+        "performance_ms": 1663
+      },
+      "finished": {
+        "date_ms": 1792951014347,
+        "performance_ms": 1894
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/files",
+      "started": {
+        "date_ms": 1792951014119,
+        "performance_ms": 1666
+      },
+      "finished": {
+        "date_ms": 1792951014401,
+        "performance_ms": 1948
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/files",
+      "started": {
+        "date_ms": 1792951015277,
+        "performance_ms": 2824
+      },
+      "finished": {
+        "date_ms": 1792951015558,
+        "performance_ms": 3105
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/treasury/account",
+      "started": {
+        "date_ms": 1792951023516,
+        "performance_ms": 1854
+      },
+      "finished": {
+        "date_ms": 1792951023548,
+        "performance_ms": 1887
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/project-tree",
+      "started": {
+        "date_ms": 1792951031313,
+        "performance_ms": 1844
+      },
+      "finished": {
+        "date_ms": 1792951031345,
+        "performance_ms": 1877
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/memory/manage",
+      "started": {
+        "date_ms": 1792951038264,
+        "performance_ms": 1658
+      },
+      "finished": {
+        "date_ms": 1792951038297,
+        "performance_ms": 1693
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/departments",
+      "started": {
+        "date_ms": 1792951045900,
+        "performance_ms": 1778
+      },
+      "finished": {
+        "date_ms": 1792951045944,
+        "performance_ms": 1823
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/departments",
+      "started": {
+        "date_ms": 1792951053209,
+        "performance_ms": 1413
+      },
+      "finished": {
+        "date_ms": 1792951053248,
+        "performance_ms": 1451
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/partners",
+      "started": {
+        "date_ms": 1792951053819,
+        "performance_ms": 2023
+      },
+      "finished": {
+        "date_ms": 1792951053864,
+        "performance_ms": 2068
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/environments",
+      "started": {
+        "date_ms": 1792951061343,
+        "performance_ms": 2040
+      },
+      "finished": {
+        "date_ms": 1792951061379,
+        "performance_ms": 2076
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/invocations/8b8334b9-845b-4711-8a2e-36a6c8ff4319/trace",
+      "started": {
+        "date_ms": 1792951069284,
+        "performance_ms": 1819
+      },
+      "finished": {
+        "date_ms": 1792951069707,
+        "performance_ms": 2243
+      },
+      "status": 200,
+      "blocked": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/invocations/8b8334b9-845b-4711-8a2e-36a6c8ff4319/trace",
+      "started": {
+        "date_ms": 1792951077537,
+        "performance_ms": 1731
+      },
+      "finished": {
+        "date_ms": 1792951077927,
+        "performance_ms": 2121
+      },
+      "status": 200,
+      "blocked": false
+    }
+  ]
+}
