@@ -58,12 +58,18 @@
     return STORAGE_KEY + "_conv_" + convId;
   }
 
+  // Settings saved before the Ultra default still hold the old 2000-token cap; drop it so they match the new default.
+  function withoutLegacyTokenCap(settings) {
+    if (settings && settings.max_output_tokens === 2000) settings.max_output_tokens = 0;
+    return settings;
+  }
+
   // Синхронная загрузка (из кэша или localStorage для обратной совместимости)
   function load(convId) {
     convId =
       convId || (typeof currentConvId !== "undefined" && currentConvId ? currentConvId : null);
     if (convId && serverSettingsCache[convId]) {
-      return JSON.parse(JSON.stringify(serverSettingsCache[convId]));
+      return withoutLegacyTokenCap(JSON.parse(JSON.stringify(serverSettingsCache[convId])));
     }
     var base = JSON.parse(JSON.stringify(DEFAULTS));
     try {
@@ -80,7 +86,7 @@
         if (conv) base = window.SettingsUI.deepMerge(base, JSON.parse(conv));
       } catch (e) {}
     }
-    return base;
+    return withoutLegacyTokenCap(base);
   }
 
   // Сохранение локально сразу; для диалога — и на сервер (нативное хранилище Kristall).
@@ -127,8 +133,8 @@
         if (data && Object.keys(data).length > 0) {
           base = window.SettingsUI.deepMerge(base, data);
         }
-        serverSettingsCache[convId] = base;
-        return base;
+        serverSettingsCache[convId] = withoutLegacyTokenCap(base);
+        return serverSettingsCache[convId];
       })
       .catch(function () {
         return load(convId);
