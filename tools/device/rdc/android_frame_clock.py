@@ -1,7 +1,6 @@
 """Timestamped Android capture metadata, not hardware VSync."""
 
 import hashlib
-import json
 import subprocess
 import time
 from pathlib import Path
@@ -11,7 +10,7 @@ def capture_frame(image, actions):
     """Capture one frame and return traceable capture interval."""
     start_mono = time.monotonic_ns()
     start_wall = time.time_ns()
-    result = subprocess.run(
+    subprocess.run(
         ["python", str(actions), "screenshot"],
         capture_output=True,
         text=True,

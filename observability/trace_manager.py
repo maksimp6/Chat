@@ -29,6 +29,10 @@ from observability.trace_timing import (
     step_correlation_id,
 )
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def get_current_trace() -> Optional["ExecutionTrace"]:
     """Return the trace active for the current request/task, if any."""
@@ -72,7 +76,7 @@ def traced_operation(operation: str, *, include_request: bool = True):
                     elif flask_request.form:
                         payload["form_keys"] = sorted(flask_request.form.keys())
                 except Exception:
-                    pass
+                    logger.debug("[TRACE] request body not captured", exc_info=True)
             trace.set_request(payload)
             trace.add_event("operation_started", {"operation": operation})
             token = _current_trace.set(trace)

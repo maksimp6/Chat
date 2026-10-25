@@ -76,7 +76,7 @@ def audit_job(path: str | Path, passport: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("invalid sliced archive")
         gcode_bytes = archive.read("Metadata/plate_1.gcode")
         expected_md5 = archive.read("Metadata/plate_1.gcode.md5").decode("ascii").strip()
-        if hashlib.md5(gcode_bytes).hexdigest().lower() != expected_md5.lower():
+        if hashlib.md5(gcode_bytes, usedforsecurity=False).hexdigest().lower() != expected_md5.lower():
             raise ValueError("G-code MD5 mismatch")
         settings = json.loads(archive.read("Metadata/project_settings.config"))
         plate = json.loads(archive.read("Metadata/plate_1.json"))

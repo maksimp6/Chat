@@ -65,7 +65,7 @@ def _get_abs_path(path: str) -> str:
         if common != BASE_DIR:
             raise PermissionError("Доступ запрещен: выход за пределы директории проекта")
     except ValueError:
-        raise PermissionError("Доступ запрещен: недопустимый путь к файлу")
+        raise PermissionError("Доступ запрещен: недопустимый путь к файлу") from None
     _refuse_protected(target)
     return target
 

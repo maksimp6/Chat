@@ -17,6 +17,10 @@ from sessions.manager import create_session, restore_session
 from kristall import KristallError
 from kristall.store import MAX_JOURNAL_FRAME_BYTES
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 _INVOCATION_PREFIX = "runtime_invocation:"
 _VALUE_CHUNK_PREFIX = "runtime_invocation_value:"
 _VALUE_CHUNK_BYTES = MAX_JOURNAL_FRAME_BYTES // 4
@@ -82,7 +86,7 @@ def _resolve_request_session_id(session_id: str, conversation_id: str) -> str:
             if explicit:
                 return str(explicit)
     except Exception:
-        pass
+        logger.debug("[INVOCATION] session id not read from request", exc_info=True)
     return session_id
 
 

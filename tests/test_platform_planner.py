@@ -1,9 +1,7 @@
 """Tests for Keel Platform planner (desired vs observed state)."""
 
-import pytest
 from keel.planner import (
     plan_actions,
-    Action,
     ActionType,
 )
 
@@ -97,7 +95,7 @@ class TestProductionGates:
         assert len(actions) > 0
         for action in actions:
             if action.type in [ActionType.CREATE, ActionType.UPDATE]:
-                assert action.needs_approval == True
+                assert action.needs_approval
 
     def test_test_action_no_approval(self):
         """Test lane actions don't need approval."""
@@ -112,7 +110,7 @@ class TestProductionGates:
         # Test actions don't need approval
         for action in actions:
             if action.type in [ActionType.CREATE, ActionType.UPDATE]:
-                assert action.needs_approval == False
+                assert not action.needs_approval
 
 
 class TestDryRun:
@@ -131,4 +129,4 @@ class TestDryRun:
         # Actions generated but not applied
         assert len(actions) > 0
         for action in actions:
-            assert action.applied == False
+            assert not action.applied

@@ -181,7 +181,7 @@ def test_pr_file_limit_and_blob_sha_verification():
             ]
         )
     good = tetra_stl()
-    key = hashlib.sha1(b"blob " + str(len(good)).encode() + b"\0" + good).hexdigest()
+    key = hashlib.sha1(b"blob " + str(len(good)).encode() + b"\0" + good, usedforsecurity=False).hexdigest()
 
     class FakeAPI:
         prefix = "/repos/maksimp6/Chat"
@@ -213,7 +213,7 @@ class StubGitHub:
                 "status": "added",
                 "filename": "printing3d/models/demo.stl",
                 "sha": hashlib.sha1(
-                    b"blob " + str(len(tetra_stl())).encode() + b"\0" + tetra_stl()
+                    b"blob " + str(len(tetra_stl())).encode() + b"\0" + tetra_stl(), usedforsecurity=False
                 ).hexdigest(),
             }
         ]

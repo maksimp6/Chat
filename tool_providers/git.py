@@ -128,8 +128,8 @@ def _run_git(args: list, cfg: dict = None, repo_name: str = None, is_read: bool 
             if time.time() - os.path.getmtime(lock_file) > 2.0:
                 os.remove(lock_file)
                 time.sleep(0.05)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("[GIT] lock cleanup skipped: %s", exc)
 
     cmd = ["git"]
     if is_read:
