@@ -166,21 +166,23 @@ def capture(output, uid, gid, metadata):
         mark('screencap_finished',entry)
 
     def close_all():
-        selectors = ['.logos-trace-window .logos-trace-btn[title="Close"]',
-                     '#partner-relations-modal button[aria-label="Закрыть"]',
-                     '#settings-modal-custom #set-close-btn',
-                     '#logos-system-status:not([hidden]) .logos-system-status-close',
-                     '.modal.visible .modal-close', '#model-modal.visible #close-modal']
         for _ in range(6):
-            clicked = False
-            for selector in selectors:
-                if visible(selector):
-                    rdp.click(actor, selector)
-                    time.sleep(.25)
-                    clicked = True
-                    break
-            if not clicked:
+            target = browser('const selector=\'.logos-trace-window .logos-trace-btn[title="Close"],'
+                             '#partner-relations-modal button[aria-label="Закрыть"],'
+                             '#settings-modal-custom #set-close-btn,'
+                             '#logos-system-status:not([hidden]) .logos-system-status-close,'
+                             '.modal.visible .modal-close,#model-modal.visible #close-modal\';'
+                             'for(const old of document.querySelectorAll("[data-recording-close]"))old.removeAttribute("data-recording-close");'
+                             'for(const b of [...document.querySelectorAll(selector)].reverse()) {'
+                             'if(!b.getBoundingClientRect().width||!b.getBoundingClientRect().height)continue;'
+                             'b.scrollIntoView({block:"nearest",inline:"nearest"});const r=b.getBoundingClientRect();'
+                             'const x=r.x+r.width/2,y=r.y+r.height/2,h=document.elementFromPoint(x,y);'
+                             'if(x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(h===b||b.contains(h))){'
+                             'b.setAttribute("data-recording-close","true");return true;}}return false;')
+            if not target:
                 break
+            rdp.click(actor,'[data-recording-close="true"]')
+            time.sleep(.3)
         browser('const s=document.getElementById("sidebar");if(s&&s.classList.contains("open"))'
                 '{document.getElementById("close-sidebar-btn").click();}return {closed:true};')
 
@@ -203,7 +205,10 @@ def capture(output, uid, gid, metadata):
 
     try:
         close_all()
-        for index, (name, opener, selector) in enumerate(CASES):
+        start_index = int(metadata.get('start_index',0))
+        if not 0 <= start_index < len(CASES):
+            raise RuntimeError('invalid_recording_start_index')
+        for index, (name, opener, selector) in enumerate(CASES[start_index:],start=start_index):
             if recorder is None:
                 start_video()
             elif time.monotonic()-recording_started > 90:
@@ -275,7 +280,8 @@ def capture(output, uid, gid, metadata):
                   'runtime_revision':runtime['runtime_revision'],'browser_revision':initial['revision'],
                   'workflow_revision':metadata['workflow_revision'],'github_run_url':metadata['github_run_url'],
                   'captured_at':datetime.now(timezone.utc).isoformat(),'preparation':preparation,'guard':installed,
-                  'files':files,'artifacts':artifacts,'modal_states':results,'planned_states':len(CASES),
+                  'files':files,'artifacts':artifacts,'modal_states':results,'planned_states':len(CASES)-start_index,
+                  'inventory_total':len(CASES),'start_index':start_index,
                   'captured_states':sum(x['status']=='CAPTURED' for x in results),
                   'mutating_requests_transmitted':sum(x['method'] not in ('GET','HEAD') and not x['blocked'] for x in requests),
                   'limits':['DOM button clicks do not prove physical touch input','MP4 frame clock must be read for exact alignment',
@@ -287,7 +293,7 @@ def capture(output, uid, gid, metadata):
             os.chown(path,uid,gid)
         rdp.s.close()
         native.restore_clean_page()
-    print(json.dumps({'captured_states':manifest['captured_states'],'planned_states':len(CASES),'videos':part,
+    print(json.dumps({'captured_states':manifest['captured_states'],'planned_states':manifest['planned_states'],'videos':part,
                       'missing':[x['name'] for x in results if x['status']!='CAPTURED']},ensure_ascii=False))
 
 
@@ -305,6 +311,7 @@ def main():
         raise RuntimeError('Output must be inside RUNNER_TEMP')
     metadata={'github_run_id':os.environ['GITHUB_RUN_ID'],'github_run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],
               'workflow_revision':os.environ['GITHUB_SHA'],'runner_name':os.environ['RUNNER_NAME'],
+              'start_index':int(os.environ.get('MODAL_RECORDING_START_INDEX','0')),
               'github_run_url':'https://github.com/maksimp6/Chat/actions/runs/'+os.environ['GITHUB_RUN_ID']}
     argv=[sys.executable,str(Path(__file__).resolve()),'_capture',str(output),str(os.getuid()),str(os.getgid()),json.dumps(metadata)]
     env={'PATH':os.environ.get('PATH','/system/bin'),'TMPDIR':os.environ.get('TMPDIR',str(output.parent))}

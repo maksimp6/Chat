@@ -24,6 +24,7 @@ jobs:
         timeout-minutes: 12
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          MODAL_RECORDING_START_INDEX: "13"
         run: |
           set -euo pipefail
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
