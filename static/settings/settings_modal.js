@@ -214,9 +214,12 @@
   }
 
   function applyUltraProfile(settings, profile) {
+    var userCap = parseInt(settings.max_output_tokens, 10) || 0;
     Object.keys(profile.settings_defaults).forEach(function (key) {
       settings[key] = profile.settings_defaults[key];
     });
+    // An output cap the user set is kept; 0 means no cap.
+    if (userCap > 0) settings.max_output_tokens = userCap;
     settings.model_profile = "ultra";
     settings.model_profile_id = profile.profile_id;
     return settings;
@@ -231,7 +234,7 @@
     return (
       '<div style="margin-bottom:12px;font-size:13px;color:var(--m-text,#222);">' +
       "<strong>Профиль: Ultra — по умолчанию</strong><br>" +
-      "Ответ — максимум провайдера без потолка приложения; контекст не обрезается; " +
+      "Ответ — максимум провайдера, если поле токенов пустое или 0; контекст не обрезается; " +
       "глубина размышлений — " + window.SettingsUI.escapeHtml(depth) + "." +
       "</div>"
     );
@@ -552,9 +555,9 @@
       if (e.target === ov) closeModal();
     });
 
-    // Fields the Ultra profile fixes are shown but cannot be changed.
+    // Truncation and reasoning are fixed by the Ultra profile; the output cap stays editable.
     if (ultra) {
-      ["set-tokens", "set-trunc", "set-reasoning"].forEach(function (id) {
+      ["set-trunc", "set-reasoning"].forEach(function (id) {
         var field = document.getElementById(id);
         if (field) field.disabled = true;
       });

@@ -43,8 +43,12 @@ def build_response_payload(
     defaults = ultra_request_defaults(model_key)
     if defaults:
         # Older browsers still send medium reasoning, auto truncation and output
-        # caps. The model's Ultra policy owns these fields on every request.
+        # caps. The model's Ultra policy owns these fields, except an output cap
+        # the user set explicitly (0 means no cap).
+        user_cap = int(params.get("max_output_tokens") or 0)
         params.update(defaults)
+        if user_cap > 0:
+            params["max_output_tokens"] = user_cap
         params.pop("reasoning", None)
     is_background = params.get("background", True)
 

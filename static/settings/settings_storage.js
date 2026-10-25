@@ -78,9 +78,12 @@
       }
       return settings;
     }
+    var userCap = parseInt(settings.max_output_tokens, 10) || 0;
     Object.keys(defaults).forEach(function (key) {
       settings[key] = defaults[key];
     });
+    // An output cap the user set is kept; 0 means no cap.
+    if (userCap > 0) settings.max_output_tokens = userCap;
     settings.model_profile = "ultra";
     settings.model_profile_id = profile.profile_id;
     return settings;
