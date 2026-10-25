@@ -52,6 +52,8 @@
   var STORAGE_KEY = "logos_settings";
   var SKILLS_BACKUP_KEY = "logos_skills_backup";
   var serverSettingsCache = {};
+  // Bumped on every save, so a load that started before it cannot overwrite it.
+  var settingsSaveVersion = {};
   var globalSettingsCache = null; // cache
 
   function convKey(convId) {
@@ -99,6 +101,7 @@
       localStorage.setItem(STORAGE_KEY, globalSettingsCache);
       return Promise.resolve();
     }
+    settingsSaveVersion[convId] = (settingsSaveVersion[convId] || 0) + 1;
     serverSettingsCache[convId] = settings;
     localStorage.setItem(convKey(convId), JSON.stringify(settings));
     return window.LogosDispatcher.request("/api/conversations/" + convId + "/settings", {
@@ -113,6 +116,7 @@
   // Загрузка настроек с сервера при смене диалога
   window.loadServerConvSettings = function (convId) {
     if (!convId) return Promise.resolve(load(convId));
+    var versionAtRequest = settingsSaveVersion[convId] || 0;
     return window.LogosDispatcher.request("/api/conversations/" + convId + "/settings", null, {
       timeoutMs: 5000,
     })
@@ -121,6 +125,8 @@
         return r.json();
       })
       .then(function (data) {
+        // A save made while this GET was in flight is newer than the server snapshot it returned.
+        if ((settingsSaveVersion[convId] || 0) !== versionAtRequest) return load(convId);
         var base = JSON.parse(JSON.stringify(DEFAULTS));
         try {
           var global = globalSettingsCache;

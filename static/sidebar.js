@@ -184,8 +184,8 @@ function deleteConv(id) {
 
   if (currentConvId === id) {
     currentConvId = conversations.length ? conversations[0].id : null;
-    localStorage.setItem("current_conv_id", currentConvId);
     if (currentConvId) {
+      localStorage.setItem("current_conv_id", currentConvId);
       selectConv(currentConvId);
     } else {
       var chatbox = document.getElementById("chatbox");

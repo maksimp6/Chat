@@ -46,10 +46,12 @@ function renderApprovalCard(toolCall, origMsg) {
   chatbox.scrollTop = chatbox.scrollHeight;
 
   approveBtn.addEventListener("click", function () {
+    // The result belongs to the chat where the action was approved, not to whichever chat is open later.
+    const cardConvId = currentConvId;
     card.classList.add("is-executing");
     card.replaceChildren(document.createTextNode("Выполняется..."));
     var approvalPayload = {
-      conversation_id: currentConvId,
+      conversation_id: cardConvId,
       model: currentModel,
       name: toolCall.name,
       arguments: toolCall.arguments,
@@ -71,6 +73,7 @@ function renderApprovalCard(toolCall, origMsg) {
       .then((result) => {
         const data = result.data || {};
         card.remove();
+        if (currentConvId !== cardConvId) return;
         if (data.requires_approval) {
           renderApprovalCard(data.tool_call, origMsg);
         } else if (data.reply) {
@@ -104,6 +107,7 @@ function renderApprovalCard(toolCall, origMsg) {
       })
       .catch(() => {
         card.remove();
+        if (currentConvId !== cardConvId) return;
         addMessage("Сетевая ошибка при выполнении действия", "error", false, 0);
       });
   });
@@ -112,6 +116,14 @@ function renderApprovalCard(toolCall, origMsg) {
     card.remove();
     addMessage(`⛔ Действие "${toolCall.name}" отклонено пользователем.`, "bot", true, 0);
   });
+}
+
+// Only the outer pipes are dropped: an empty inner cell keeps its column.
+function splitTableRow(line) {
+  var cells = line.trim().split("|");
+  if (cells.length && cells[0].trim() === "") cells.shift();
+  if (cells.length && cells[cells.length - 1].trim() === "") cells.pop();
+  return cells;
 }
 
 function parseMarkdown(text) {
@@ -155,7 +167,7 @@ function parseMarkdown(text) {
       }
       inTable = true;
       tableHtml = '<table class="md-table"><thead><tr>';
-      var hdr = line.split("|").filter((c) => c.trim() !== "");
+      var hdr = splitTableRow(line);
       hdr.forEach((c) => {
         tableHtml += "<th>" + formatInline(c.trim()) + "</th>";
       });
@@ -166,7 +178,7 @@ function parseMarkdown(text) {
 
     if (inTable) {
       if (/^\s*\|.*\|\s*$/.test(line)) {
-        var cells = line.split("|").filter((c) => c.trim() !== "");
+        var cells = splitTableRow(line);
         tableHtml += "<tr>";
         cells.forEach((c) => {
           var cellContent = c

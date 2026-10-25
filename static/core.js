@@ -14,7 +14,9 @@ if (urlConvId) {
   currentConvId = urlConvId;
   localStorage.setItem("current_conv_id", urlConvId);
 } else {
+  // A value written as "null" by an older build is not a conversation id.
   currentConvId = localStorage.getItem("current_conv_id") || null;
+  if (currentConvId === "null") currentConvId = null;
 }
 
 const LOGOS_THEMES = {

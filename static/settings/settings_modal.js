@@ -497,7 +497,7 @@
       },
     )
       .map(function (key) {
-        var label = (window.LogosTheme.themes || {})[key] || key;
+        var label = ((window.LogosTheme && window.LogosTheme.themes) || {})[key] || key;
         return (
           '<option value="' +
           UI.escapeHtml(key) +
