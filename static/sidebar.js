@@ -188,6 +188,11 @@ function deleteConv(id) {
       localStorage.setItem("current_conv_id", currentConvId);
       selectConv(currentConvId);
     } else {
+      // Nothing is left to reopen: do not restore the deleted id on reload.
+      localStorage.removeItem("current_conv_id");
+      var newUrl = new URL(window.location);
+      newUrl.searchParams.delete("conversation_id");
+      window.history.replaceState(null, "", newUrl);
       var chatbox = document.getElementById("chatbox");
       if (chatbox) {
         chatbox.replaceChildren();
