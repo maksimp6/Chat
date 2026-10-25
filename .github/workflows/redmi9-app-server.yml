@@ -36,6 +36,13 @@ jobs:
             curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
               "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/$file" -o "$file"
           done
+          # The phone runs out of space when old deploy backups and screenshot folders pile up.
+          # Keep only the newest backup of the app memory and drop finished capture folders.
+          backups=/data/data/com.termux/files/home/logos-local-state/deploy-backups
+          if [ -d "$backups" ]; then
+            ls -1t "$backups"/*.memory 2>/dev/null | tail -n +2 | xargs -r rm -f
+          fi
+          find . -maxdepth 1 -name '.logos-*' -type d -mmin +10 -exec rm -rf {} +
           bash scripts/redmi_app_server.sh deploy
 
   screenshots:
@@ -53,6 +60,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
+          find . -maxdepth 1 -name '.logos-*' -type d -mmin +10 -exec rm -rf {} +
           capture_job_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-screenshots-", dir=".")).resolve())')
           export RUNNER_TEMP="$capture_job_temp"
           export TMPDIR="$capture_job_temp"
