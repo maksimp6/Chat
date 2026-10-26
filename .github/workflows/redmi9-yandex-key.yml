@@ -1,32 +1,202 @@
-name: Redmi 9 issue model key
+name: Redmi 9 image generation access
 
 on:
-  workflow_dispatch:
   push:
-    branches: [feat/redmi-yandex-key-issuance]
-    paths:
-      - scripts/redmi_issue_yandex_key.py
-      - scripts/redmi_issue_yandex_key.sh
-      - .github/workflows/redmi9-yandex-key.yml
+    branches: [ops/yandex-image-generation-access-20261026]
+    paths: [.github/workflows/redmi9-yandex-key.yml]
+  workflow_dispatch:
 
 permissions: {}
 
 jobs:
-  issue:
+  image_access:
     runs-on: redmi9
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
-      - name: logos
+      - name: Grant image generation to the active key service account
         shell: bash
+        timeout-minutes: 4
         env:
           YANDEX_IAM_TOKEN: ${{ secrets.YANDEX_IAM_TOKEN }}
           YANDEX_SERVICE_ACCOUNT_ID: ${{ secrets.YANDEX_SERVICE_ACCOUNT_ID }}
           YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
           LOGOS_PROVIDER_CREDENTIALS_TOKEN: ${{ secrets.LOGOS_PROVIDER_CREDENTIALS_TOKEN }}
         run: |
-          mkdir -p scripts
-          for name in redmi_issue_yandex_key.py redmi_issue_yandex_key.sh; do
-            curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
-              "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/$name" -o "scripts/$name"
-          done
-          bash scripts/redmi_issue_yandex_key.sh
+          set -euo pipefail
+          set +x
+          test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import shutil
+          import subprocess
+          import sys
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          
+          ROLE = "ai.imageGeneration.user"
+          IAM = "https://iam.api.cloud.yandex.net/iam/v1"
+          RM = "https://resource-manager.api.cloud.yandex.net/resource-manager/v1"
+          APP = "http://127.0.0.1:8080/api/provider-credentials/yandex/issuance-status"
+          report = {"status": "BLOCKED", "role": ROLE, "model_request_sent": False, "key_created": False}
+          TOKEN = os.environ.get("YANDEX_IAM_TOKEN", "").strip()
+          YC = shutil.which("yc")
+          
+          
+          class Blocked(Exception):
+              pass
+          
+          
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+          
+          
+          def http(method, url, body=None, local=False):
+              data = None if body is None else json.dumps(body).encode()
+              headers = {"Content-Type": "application/json"}
+              if local:
+                  local_token = os.environ.get("LOGOS_PROVIDER_CREDENTIALS_TOKEN", "")
+                  if local_token:
+                      headers["Authorization"] = "Bearer " + local_token
+              else:
+                  headers["Authorization"] = "Bearer " + TOKEN
+              req = urllib.request.Request(url, data=data, headers=headers, method=method)
+              handlers = [NoRedirect()]
+              if local:
+                  handlers.append(urllib.request.ProxyHandler({}))
+              try:
+                  with urllib.request.build_opener(*handlers).open(req, timeout=20) as response:
+                      raw = response.read(1048577)
+                  if len(raw) > 1048576:
+                      raise Blocked("response_too_large")
+                  result = json.loads(raw or b"{}")
+                  if not isinstance(result, dict):
+                      raise Blocked("invalid_response")
+                  return result
+              except urllib.error.HTTPError as exc:
+                  raise Blocked(("app_" if local else "iam_") + "http_" + str(exc.code)) from None
+              except (urllib.error.URLError, TimeoutError, ValueError):
+                  raise Blocked("request_unavailable") from None
+          
+          
+          def cli(*args):
+              if not YC:
+                  raise Blocked("no_iam_token_or_yc_cli")
+              try:
+                  result = subprocess.run([YC, *args, "--format", "json"], capture_output=True, timeout=25)
+              except (OSError, subprocess.TimeoutExpired):
+                  raise Blocked("yc_cli_unavailable") from None
+              if result.returncode:
+                  raise Blocked("yc_cli_auth_or_permission_unavailable")
+              try:
+                  return json.loads(result.stdout or b"{}")
+              except ValueError:
+                  raise Blocked("yc_cli_invalid_json") from None
+          
+          
+          def valid_id(value):
+              return isinstance(value, str) and re.fullmatch(r"[a-z0-9]{20}", value) is not None
+          
+          
+          def field(value, camel, snake):
+              return value.get(camel, value.get(snake))
+          
+          
+          def bindings(folder):
+              if not TOKEN:
+                  data = cli("resource-manager", "folder", "list-access-bindings", folder)
+                  return data if isinstance(data, list) else data.get("access_bindings", data.get("accessBindings", []))
+              entries = []
+              page = ""
+              for _ in range(20):
+                  query = "?pageSize=1000" + ("&pageToken=" + urllib.parse.quote(page, safe="") if page else "")
+                  data = http("GET", RM + "/folders/" + folder + ":listAccessBindings" + query)
+                  entries.extend(data.get("accessBindings", []))
+                  page = data.get("nextPageToken", "")
+                  if not page:
+                      return entries
+              raise Blocked("access_bindings_pagination_incomplete")
+          
+          
+          def assigned(entries, account):
+              return sorted({field(b, "roleId", "role_id") for b in entries
+                             if b.get("subject", {}).get("id") == account
+                             and b.get("subject", {}).get("type") == "serviceAccount"
+                             and isinstance(field(b, "roleId", "role_id"), str)})
+          
+          
+          def main():
+              report["iam_token_available"] = bool(TOKEN)
+              report["yc_cli_available"] = bool(YC)
+              current = http("GET", APP, local=True)
+              credential = current.get("credential") or {}
+              key_id, folder = credential.get("provider_key_id"), credential.get("project_id")
+              if current.get("configured") is not True or not valid_id(key_id) or not valid_id(folder):
+                  raise Blocked("active_app_key_metadata_missing")
+              report.update({"provider_key_id": key_id, "folder_id": folder})
+              if not TOKEN and not YC:
+                  raise Blocked("no_iam_token_or_yc_cli")
+              key = http("GET", IAM + "/apiKeys/" + key_id) if TOKEN else cli("iam", "api-key", "get", key_id)
+              account_id = field(key, "serviceAccountId", "service_account_id")
+              if key.get("id") != key_id or not valid_id(account_id):
+                  raise Blocked("active_key_owner_unverified")
+              expected_account = os.environ.get("YANDEX_SERVICE_ACCOUNT_ID", "").strip()
+              expected_folder = os.environ.get("YANDEX_FOLDER_ID", "").strip()
+              if expected_account and expected_account != account_id:
+                  raise Blocked("configured_service_account_mismatch")
+              if expected_folder and expected_folder != folder:
+                  raise Blocked("configured_folder_mismatch")
+              account = (http("GET", IAM + "/serviceAccounts/" + account_id) if TOKEN
+                         else cli("iam", "service-account", "get", account_id))
+              if account.get("id") != account_id or field(account, "folderId", "folder_id") != folder:
+                  raise Blocked("service_account_folder_mismatch")
+              report["service_account_id"] = account_id
+              report["service_account_name"] = account.get("name")
+              scopes = key.get("scopes", [])
+              if not scopes and key.get("scope"):
+                  scopes = [key["scope"]]
+              report["image_scope_present"] = bool(set(scopes) & {"yc.ai.imageGeneration.execute", "yc.ai.foundationModels.execute"})
+              report["key_scopes"] = scopes
+              before = assigned(bindings(folder), account_id)
+              report["roles_before"] = before
+              if ROLE not in before:
+                  if TOKEN:
+                      operation = http("POST", RM + "/folders/" + folder + ":updateAccessBindings", {
+                          "accessBindingDeltas": [{"action": "ADD", "accessBinding": {
+                              "roleId": ROLE, "subject": {"id": account_id, "type": "serviceAccount"}}}]})
+                      report["operation_id"] = operation.get("id")
+                      if operation.get("error"):
+                          raise Blocked("role_update_operation_failed")
+                  else:
+                      cli("resource-manager", "folder", "add-access-binding", folder,
+                          "--role", ROLE, "--service-account-id", account_id)
+                  report["role_add_submitted"] = True
+              else:
+                  report["role_add_submitted"] = False
+              for attempt in range(4):
+                  after = assigned(bindings(folder), account_id)
+                  report["roles_after"] = after
+                  if ROLE in after:
+                      if not set(before) <= set(after):
+                          raise Blocked("preexisting_roles_changed")
+                      report["status"] = "VERIFIED"
+                      report["result"] = "role_present_on_active_key_service_account"
+                      return
+                  if attempt < 3:
+                      time.sleep(2)
+              raise Blocked("role_readback_not_confirmed")
+          
+          
+          try:
+              main()
+          except Blocked as exc:
+              report["error"] = str(exc)
+          except Exception:
+              report["error"] = "unexpected_failure_details_suppressed"
+          print(json.dumps(report, ensure_ascii=False))
+          sys.exit(0 if report["status"] == "VERIFIED" else 1)
+          PY
