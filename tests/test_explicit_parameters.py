@@ -12,6 +12,8 @@ from yandex_client_modules.request_builder import (
 
 QWEN = "qwen3.6-35b-a3b"
 RESPONSES_PARAMETERS = {
+    "input",
+    "instructions",
     "background",
     "store",
     "stream",
@@ -21,6 +23,11 @@ RESPONSES_PARAMETERS = {
     "truncation",
     "reasoning",
     "service_tier",
+    "text",
+    "prompt_cache_key",
+    "previous_response_id",
+    "conversation",
+    "tools",
     "tool_choice",
     "max_tool_calls",
     "parallel_tool_calls",

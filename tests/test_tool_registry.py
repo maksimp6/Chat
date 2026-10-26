@@ -31,7 +31,7 @@ class ToolRegistryCategoryTests(unittest.TestCase):
         self.assertEqual(tools[0]["type"], "function")
         self.assertEqual(tools[0]["name"], "git_status")
         self.assertTrue(tools[0]["strict"])
-        self.assertFalse(tools[0]["defer_loading"])
+        self.assertNotIn("defer_loading", tools[0])
 
     def test_get_tools_by_category_applies_strict_schema(self):
         tools = self.registry.get_tools_by_category("git")
