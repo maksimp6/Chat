@@ -18,7 +18,7 @@ function formatUltraSummary(summary) {
     parts.push("снята");
     return parts.join(" · ");
   }
-  if (summary.default_profile === "ultra") parts.push("настройки по умолчанию");
+  if (summary.default_profile === "ultra") parts.push("профиль по умолчанию");
   if (summary.context_window_tokens) {
     parts.push("контекст " + Number(summary.context_window_tokens).toLocaleString("ru-RU") + "\u00a0ток.");
   }

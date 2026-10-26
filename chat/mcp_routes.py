@@ -533,7 +533,9 @@ def chat():
             str(reply),
             cost=cost,
             timings=timings,
+            usage=usage,
             trace={"trace_id": invocation.trace_id, "invocation_id": invocation.invocation_id, "storage": "invocation"},
+            total_duration_ms=total_ms,
         )
         finish_invocation(
             invocation.invocation_id,

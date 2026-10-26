@@ -138,11 +138,14 @@ def get_messages(conv_id: str) -> list[dict[str, Any]]:
     ]
     return [
         {
+            "id": item["id"],
             "role": item["role"],
             "text": item["content"],
             "cost": item["cost"],
             "created_at": item["created_at"],
             "timings": item["timings"],
+            "usage": item.get("usage") or {},
+            "total_duration_ms": item.get("total_duration_ms"),
             "trace": item["trace"],
             "source": item.get("source"),
             "attachments": item.get("attachments") or {},
@@ -162,6 +165,7 @@ def add_message(
     source: Any = None,
     trace: Any = None,
     attachments: Any = None,
+    total_duration_ms: Any = None,
 ) -> None:
     if not isinstance(content, str):
         content = json.dumps(content, ensure_ascii=False) if content is not None else ""
@@ -185,6 +189,9 @@ def add_message(
                 "cost": cost,
                 "created_at": now,
                 "timings": timings or [],
+                # The reply's tokens and duration come back with the history, so a reload shows the same details.
+                "usage": usage or {},
+                "total_duration_ms": total_duration_ms,
                 "trace": trace or {},
                 "source": source,
                 "attachments": attachments or {},
