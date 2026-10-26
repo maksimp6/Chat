@@ -6,6 +6,7 @@ from core.output import limit_output
 
 import math
 import os
+import shutil
 import subprocess
 from typing import Any
 
@@ -97,7 +98,7 @@ def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
 
     try:
         completed = subprocess.run(
-            ["/bin/bash", "-lc", command],
+            [shutil.which("bash") or "sh", "-lc", command],
             shell=False,
             check=False,
             stdin=subprocess.DEVNULL,

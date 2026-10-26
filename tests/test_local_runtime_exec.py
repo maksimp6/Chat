@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 from unittest.mock import patch
 
@@ -31,7 +32,7 @@ def test_local_runtime_exec_runs_on_backend_host(tmp_path):
     assert result["stdout"] == f"{tmp_path}\n"
 
     argv = run.call_args.args[0]
-    assert argv == ["/bin/bash", "-lc", "pwd"]
+    assert argv == [shutil.which("bash") or "sh", "-lc", "pwd"]
     assert run.call_args.kwargs["shell"] is False
     assert run.call_args.kwargs["stdin"] is subprocess.DEVNULL
     assert run.call_args.kwargs["cwd"] == str(tmp_path)
