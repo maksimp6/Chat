@@ -750,6 +750,15 @@ document.addEventListener("DOMContentLoaded", function () {
   const activeChatRequests = new Map();
   let creatingConversation = false;
 
+  // A photo error names its cause; other server codes are shown as they are.
+  function errorReasonText(data) {
+    if (data.error === "invalid_attachments") return "Фото не приняты: " + (data.message || "проверьте файлы");
+    if (data.error === "model_does_not_accept_images") {
+      return "Эта модель не принимает фото. Выберите модель с поддержкой фото.";
+    }
+    return data.error;
+  }
+
   // Shows the reason in Russian. The browser's own message (for example «The operation was aborted») stays out of the chat.
   function chatErrorText(error) {
     if (error && error.name === "AbortError") {
@@ -969,10 +978,11 @@ document.addEventListener("DOMContentLoaded", function () {
     let typingEl = null;
     // Photos belong to this message only; they return to the tray if the send fails.
     const sentImages = retryRequest ? retryRequest.images || [] : pendingImages.slice();
-    if (!retryRequest) {
-      pendingImages = [];
-      renderPendingImages();
-    }
+    // Sent photos leave the tray. A retry finds them there again after a failed send, so they are removed here too.
+    pendingImages = pendingImages.filter(function (image) {
+      return !sentImages.includes(image);
+    });
+    renderPendingImages();
     let imagesRestored = false;
     function restoreImages() {
       if (imagesRestored || !sentImages.length) return;
@@ -1060,7 +1070,7 @@ document.addEventListener("DOMContentLoaded", function () {
         restoreImages();
         // The failed text goes back to the field, unless the user already started a new draft.
         if (!input.value) input.value = turn.text;
-        addMessage(data.reply || "⚠️ Ошибка: " + data.error, "error", false, data.cost || 0, data.timings,
+        addMessage(data.reply || "⚠️ Ошибка: " + errorReasonText(data), "error", false, data.cost || 0, data.timings,
           clientTotalMs, data.reasoning, data.usage, data.trace, {
             onRetry: function () {
               if (data.operationId) resumeImageTurn(turn, data.operationId);
@@ -1079,7 +1089,7 @@ document.addEventListener("DOMContentLoaded", function () {
     } catch (error) {
       if (currentConvId === turn.conversationId) {
         restoreImages();
-        if (!input.value) input.value = rawText;
+        if (!input.value) input.value = turn.text;
         addMessage(chatErrorText(error), "error", false, 0);
       }
     } finally {
