@@ -31,11 +31,14 @@ jobs:
           LOGOS_REQUIRE_WIFI: "1"
         run: |
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
-          for file in scripts/redmi_app_server.sh scripts/redmi_app_launcher.py scripts/redmi_wifi_probe.py .github/workflows/redmi9-app-server.yml; do
+          for file in scripts/redmi_app_server.sh scripts/redmi_app_launcher.py scripts/redmi_wifi_probe.py scripts/redmi_remove_autoupdate.py .github/workflows/redmi9-app-server.yml; do
             mkdir -p "$(dirname "$file")"
             curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
               "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/$file" -o "$file"
           done
+          # The runner is the only updater. Retire the former independent loop
+          # after its in-flight controller finishes, preserving its evidence.
+          python scripts/redmi_remove_autoupdate.py
           # The phone runs out of space when old deploy backups and screenshot folders pile up.
           # The concurrency group runs one workflow at a time, so no capture is active during this step.
           # Keep only the newest backup of the app memory, and only when that backup is non-empty.
@@ -258,4 +261,3 @@ jobs:
           if [ -f "$OUT_DIR/art.jpg" ]; then
             echo "picture bytes: $(wc -c < "$OUT_DIR/art.jpg")"
           fi
-

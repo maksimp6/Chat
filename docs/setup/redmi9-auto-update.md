@@ -1,57 +1,57 @@
-# Redmi 9 automatic application updates
+# Redmi 9 updates through the GitHub runner
 
-The installed application follows `maksimp6/Chat:develop` through a native Termux
-supervisor. It checks the public branch every 30 seconds and runs the existing
-`scripts/redmi_app_server.sh deploy` when the branch changes or the application
-is no longer healthy. It does not depend on the GitHub Actions job queue.
+The existing `redmi9-python` runner is the only automatic application updater.
+Every push to `maksimp6/Chat:develop` starts the `server` job in
+`.github/workflows/redmi9-app-server.yml`. Manual dispatch with `action=deploy`
+uses the same job. Its concurrency group serializes updates without cancelling
+an in-flight deployment.
 
-The supervisor is independent of RDC. It uses the existing Python, Bash, Git,
-Git LFS and flock commands and does not register another runner or install packages.
-Termux:Boot starts it after a phone restart. Android force-stopping Termux still
-requires reopening Termux; a shell process cannot override Android force-stop.
+There is no independent Termux updater, supervisor, or 30-second Git polling loop.
+The former `redmi_app_autoupdate.py` and its boot supervisor have been removed.
+Termux:Boot starts the existing runner through `50-github-python-runner`; no
+separate application-update boot entry is installed. If Android force-stops
+Termux, reopen it. After a phone reboot, use the runner's deploy job to start the
+application; this change does not claim verified autonomous reboot recovery.
 
-The deployment controller continues to serialize updates, fetch and verify LFS
-before stopping the old application, preserve the durable memory journal, and
-restore the previous code if the new application fails readiness. A matching
-revision with a healthy owned process is left running.
+## Retirement of the previous installation
 
-The controller records `trigger=local_autoupdate` for native automatic updates,
-`github_actions` for runner updates and `manual` for explicit control commands.
-Automatic update status records the observed public revision and the resulting
-running revision/PID. An unsuccessful deployment is an error, including a rollback;
-it is retried by later checks and is never reported as the requested update succeeding.
+Before deployment, the runner executes `scripts/redmi_remove_autoupdate.py` once
+as needed. It sets the old disabled marker, waits for the existing worker's lock
+instead of killing an in-flight deployment, validates and terminates only the old
+supervisor, and removes `60-logos-app-autoupdate` and both active state scripts.
+Their contents and prior status receipts are retained as private, non-executable
+files under `~/logos-local-state/retired-autoupdate/`. The supervisor log and all
+application data remain in place. Subsequent deploys report `already_removed`.
 
-Creating `autoupdate.disabled` in `~/logos-local-state` pauses the native updater.
-Removing that marker resumes it on the next check. An intentional maintenance stop
-should create the marker before stopping the application.
+The removal receipt is `~/logos-local-state/autoupdate-removal.json`.
+It records the retired paths and SHA-256 hashes, the stopped supervisor PID,
+the absence of the boot entry, and backend PIDs before and after removal.
+The independent RDC connection and runner lifecycle are not modified.
 
-Only `.github/workflows/redmi9-app-server.yml` remains in GitHub Actions, as a
-second trigger through the same deployment lock. The archive, Android diagnostics
-and Yandex key issuance workflow files have been removed. Their scripts and stored
-data remain available; the native updater continues independently of Actions.
+## Deployment and verification
 
-Validation must include a fresh push followed by an automatic SHA and process
-transition on the physical Redmi 9, without calling the deployment command manually.
-A successful workflow or localhost HTTP response alone does not prove that chain.
+The existing `scripts/redmi_app_server.sh deploy` fetches the current develop tip
+and verifies LFS before stopping an outdated backend. It preserves the journal
+and restores previous code if startup/readiness fails. A matching healthy backend
+is reused. The controller records `trigger=github_actions` for runner operations
+and `manual` for explicit maintenance commands. `local_autoupdate` is rejected.
+See [the controller documentation](../redmi-app-server.md) for its exact scope.
+
+Delivery is established by the actual runner job, removal receipt, absence of the
+old boot entry and supervisor, and the phone's `/api/version` matching the delivered
+revision. A workflow success alone is insufficient. Health/readiness checks do
+not invoke a model or prove a complete chat or access from another phone.
+Code tests are not started by this change; their status is `NOT_RUN`.
 
 ## Loaded interface version
 
 `GET /api/version` returns `runtime_revision`, `ui_version`, `process_id` and
-`started_at` captured when the backend starts. The revision does not change when
-someone changes the checkout while an older process is still running. `ui_version`
-is a SHA-256 digest of static resources and templates, rather than file timestamps.
-The interface badge shows the version loaded by that tab.
+`started_at` captured when the backend starts. Changing the checkout does not
+change an older process's revision. `ui_version` hashes static resources and
+templates. The interface badge shows the version loaded by that tab.
 
-The browser checks the UI fingerprint every 30 seconds. It reloads the current URL
-only when no request, draft, recording or editing dialog would be interrupted.
-An already open tab running the older client without this mechanism needs one
-initial reload to load it. A matching server SHA does not prove that an existing
-browser tab has loaded its scripts.
-
-The deployment target is `develop`. Changes left only in a feature branch do not
-reach the phone until they are reviewed and delivered to `develop`.
-
-The health contract is `"status": "ok"`. The updater checks only that field, so the
-process fields `scope` and `chat_verified` do not fail it. The state copy of the updater
-refreshes only after a successful check. The first deployment of a fixed updater therefore
-needs one manual run from the checkout: `.venv/bin/python scripts/redmi_app_autoupdate.py --once`.
+The browser's 30-second UI-fingerprint check is separate from application
+deployment. It reloads only when no request, draft, recording or editing dialog
+would be interrupted. An older client without this mechanism needs one initial
+reload. A matching backend SHA does not prove that an already open tab has
+loaded its current scripts.
