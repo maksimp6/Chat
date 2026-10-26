@@ -188,3 +188,53 @@ def test_voice_chat_requires_conversation_and_text_reply(monkeypatch):
     monkeypatch.setattr(_FakeLogosClient, "reply", "")
     with pytest.raises(RuntimeError, match="no text response"):
         voice_routes._chat("вопрос", "conv-1", "yandexgpt-5-lite")
+
+
+def test_voice_chat_sends_the_provider_conversation(monkeypatch):
+    monkeypatch.setattr(voice_routes, "LogosClient", _FakeLogosClient)
+    monkeypatch.setattr(_FakeLogosClient, "calls", [])
+    monkeypatch.setattr(
+        voice_routes, "_provider_conversation_id", lambda client, conv_id, trace: "provider-9"
+    )
+
+    voice_routes._chat("вопрос", "local-1", "yandexgpt-5-lite")
+    assert _FakeLogosClient.calls[0]["conversation_id"] == "provider-9"
+
+
+def test_voice_credentials_prefer_the_stored_key(monkeypatch):
+    import storage.db as db
+    from provider_accounts.credentials import YANDEX, replace_active_credential
+
+    replace_active_credential(
+        db.get_store(),
+        "stored-voice-key",
+        "stored-folder",
+        lambda value: "cipher:" + value,
+        YANDEX,
+        provider_key_id="voice-key-1",
+    )
+    monkeypatch.setattr(voice_routes, "decrypt_secret", lambda value: value.removeprefix("cipher:"))
+    monkeypatch.setenv("YANDEX_API_KEY", "env-key")
+
+    assert voice_routes._credentials() == ("stored-voice-key", None, "stored-folder")
+    assert voice_routes._folder_id() == "stored-folder"
+
+
+def test_voice_exchange_is_saved_to_its_conversation(monkeypatch):
+    import storage.db as db
+
+    monkeypatch.setattr(voice_routes, "_stt", lambda audio, content_type: "вопрос")
+    monkeypatch.setattr(voice_routes, "_chat", lambda text, conversation_id, model: "ответ")
+    session = voice_routes.VoiceSession(
+        session_id="saved-session",
+        owner_id=None,
+        conversation_id="conv-saved",
+        model="yandexgpt-5-lite",
+        voice="filipp",
+        response_mode="text",
+    )
+
+    voice_routes._process(session)
+
+    saved = {(item["role"], item["text"]) for item in db.get_messages("conv-saved")}
+    assert {("user", "вопрос"), ("assistant", "ответ")} <= saved

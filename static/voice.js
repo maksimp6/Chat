@@ -14,6 +14,8 @@
   var pcmChunks = [];
   var isRecording = false;
   var isConnecting = false;
+  var isFinishing = false;
+  var voiceConvId = null;
   var eventSource = null;
   var currentTranscript = "";
   var currentReply = "";
@@ -237,13 +239,18 @@
     };
   }
 
+  // A voice exchange belongs to the chat it started in; other chats are not shown it.
+  function sessionChatIsOpen() {
+    return voiceConvId === (typeof currentConvId !== "undefined" ? currentConvId : null);
+  }
+
   function handleServerEvent(data) {
     var type = data.type;
     if (type === "input_audio_buffer.speech_stopped") {
       setStatus("Распознаю...");
     } else if (type === "conversation.item.input_audio_transcription.completed") {
       currentTranscript = String(data.transcript || "").trim();
-      if (currentTranscript && !userMsgSent && typeof addMessage === "function") {
+      if (currentTranscript && !userMsgSent && sessionChatIsOpen() && typeof addMessage === "function") {
         addMessage(currentTranscript, "user", false, 0, null, 0, null, null, null, {
           id: data.item_id ? "voice-" + data.item_id : null,
         });
@@ -252,7 +259,7 @@
       setStatus("Вы: " + currentTranscript);
     } else if (type === "response.output_text.done") {
       currentReply = data.text || "";
-      if (currentReply && !botMsgSent && typeof addMessage === "function") {
+      if (currentReply && !botMsgSent && sessionChatIsOpen() && typeof addMessage === "function") {
         addMessage(currentReply, "bot", false, 0, null, 0, null, null, null, {
           id: data.response_id ? "voice-reply-" + data.response_id : null,
         });
@@ -278,8 +285,10 @@
   }
 
   async function toggleVoice() {
+    if (isFinishing) return;
     if (isRecording) {
       isRecording = false;
+      isFinishing = true;
       if (micBtn) micBtn.classList.remove("recording");
       setStatus("Обрабатываю...");
       try {
@@ -306,6 +315,7 @@
         }
         sessionId = null;
       } finally {
+        isFinishing = false;
         if (audioContext) {
           audioContext.close();
           audioContext = null;
@@ -326,6 +336,7 @@
       (typeof currentModel !== "undefined" ? currentModel : "speech-realtime-deepseek-v4-flash") ||
       "speech-realtime-deepseek-v4-flash";
     isConnecting = true;
+    voiceConvId = typeof currentConvId !== "undefined" ? currentConvId : null;
     setStatus("Подключение...");
     try {
       var res = await request("/api/voice/session", {

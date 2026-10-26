@@ -15,9 +15,17 @@ import requests
 from flask import Blueprint, Response, jsonify, request, stream_with_context
 
 from core.config import Config, TEXT_MODELS
-from chat.mcp_routes import LogosClient
+from chat.mcp_routes import LogosClient, _provider_conversation_id
 from conversations.ownership import check_access
 from economy.treasury_identity import get_current_owner_id
+from provider_accounts.credentials import (
+    YANDEX,
+    ExpiredCredentialError,
+    NoActiveCredentialError,
+    get_active_credential,
+)
+from secret_store.credential_crypto import decrypt_secret
+from storage.db import add_message, get_store
 
 
 voice_bp = Blueprint("voice", __name__)
@@ -48,12 +56,17 @@ _sessions: dict[str, VoiceSession] = {}
 _sessions_lock = threading.RLock()
 
 
-def _credentials() -> tuple[str | None, str | None]:
-    return env_get("YANDEX_API_KEY"), env_get("YANDEX_IAM_TOKEN")
+def _credentials() -> tuple[str | None, str | None, str | None]:
+    """Return (api_key, iam_token, project_id): the active stored key first, else the environment."""
+    try:
+        credential = get_active_credential(get_store(), decrypt_secret, provider=YANDEX)
+    except (NoActiveCredentialError, ExpiredCredentialError):
+        return env_get("YANDEX_API_KEY"), env_get("YANDEX_IAM_TOKEN"), None
+    return credential.api_key, None, credential.project_id or None
 
 
 def _auth_headers() -> dict[str, str]:
-    api_key, iam_token = _credentials()
+    api_key, iam_token, _ = _credentials()
     if api_key:
         return {"Authorization": f"Api-Key {api_key}"}
     if iam_token:
@@ -62,7 +75,8 @@ def _auth_headers() -> dict[str, str]:
 
 
 def _folder_id() -> str | None:
-    return env_get("YANDEX_PROJECT_ID") or env_get("YANDEX_FOLDER_ID")
+    _, _, project_id = _credentials()
+    return project_id or env_get("YANDEX_PROJECT_ID") or env_get("YANDEX_FOLDER_ID")
 
 
 def _cleanup_sessions() -> None:
@@ -158,7 +172,7 @@ def _chat(text: str, conversation_id: str | None, model: str) -> str:
     response = client.ask_with_mcp(
         message=text,
         model_key=text_model,
-        conversation_id=conversation_id,
+        conversation_id=_provider_conversation_id(client, conversation_id, None),
         params={},
         trace=None,
     )
@@ -188,6 +202,12 @@ def _tts(text: str, voice: str) -> bytes:
     return response.content
 
 
+def _save_turn(conversation_id: str, transcript: str, reply: str) -> None:
+    """Keep the voice exchange in the chat history, so it survives a reload."""
+    add_message(conversation_id, "user", transcript)
+    add_message(conversation_id, "assistant", reply)
+
+
 def _process(session: VoiceSession) -> None:
     try:
         _emit(session, "input_audio_buffer.speech_stopped")
@@ -199,6 +219,7 @@ def _process(session: VoiceSession) -> None:
         )
 
         reply = _chat(transcript, session.conversation_id, session.model)
+        _save_turn(session.conversation_id, transcript, reply)
         if session.response_mode in {"text", "both", "audio"}:
             _emit(session, "response.output_text.done", text=reply)
 
