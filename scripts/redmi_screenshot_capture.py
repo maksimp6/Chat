@@ -480,13 +480,28 @@ class RDP:
                              "errors:((m.trace&&m.trace.errors)||[]).slice(0,10).map(e=>({source:String(e.source||'').slice(0,80),"
                              "type:String(e.type||'').slice(0,80),error:String(e.error||'').slice(0,300)}))}))};})())")
 
-    def invocation_trace_errors(self, actor, invocation_id):
+    def reply_receipt(self, actor, invocation_id):
+        # Billing carries token counts and prices only; tool arguments and results stay out of the evidence.
         return self.evaluate(actor, "JSON.stringify((()=>{const x=new XMLHttpRequest();"
                              "x.open('GET','/api/invocations/'+encodeURIComponent(" + json.dumps(invocation_id) +
-                             ")+'/trace',false);x.send();if(x.status!==200)return {status:x.status,errors:[]};"
-                             "const errors=(JSON.parse(x.responseText).errors||[]);"
-                             "return {status:x.status,errors:errors.slice(0,50).map(e=>({source:String(e.source||'').slice(0,80),"
-                             "type:String(e.type||'').slice(0,80),error:String(e.error||'').slice(0,300)}))};})())")
+                             ")+'/trace',false);x.send();if(x.status!==200)return {http_status:x.status,errors:[]};"
+                             "const t=JSON.parse(x.responseText),b=t.billing||{};"
+                             "const pick=(o,keys)=>Object.fromEntries(keys.filter(k=>k in o).map(k=>[k,o[k]]));"
+                             "return {http_status:x.status,"
+                             "billing:pick(b,['input_tokens','cached_input_tokens','output_tokens','total_tokens',"
+                             "'compute_cost','total_cost','cost_status']),"
+                             "items:(b.items||[]).map(i=>pick(i,['type','step','model','input_tokens','cached_input_tokens',"
+                             "'output_tokens','total_tokens','total_cost','cost_status'])),"
+                             "tool_calls:(t.tool_calls||[]).map(c=>c.name||c.tool_name),"
+                             "errors:(t.errors||[]).slice(0,50).map(e=>({source:String(e.source||'').slice(0,80),"
+                             "type:String(e.type||'').slice(0,80),error:String(e.error||'').slice(0,300)})),"
+                             "events:(t.events||[]).filter(e=>e.type==='api_request_manifest'||e.event==='api_request_manifest')};})())")
+
+    def reply_details(self, actor):
+        # The one-line details of the latest reply, as the user reads it: tokens, rubles and seconds.
+        return self.evaluate(actor, "JSON.stringify((()=>{const m=[...document.querySelectorAll('#chatbox .msg.bot')].pop();"
+                             "const d=m&&m.querySelector('.msg-details');const s=d&&(d.querySelector('summary')||d);"
+                             "return {text:s?s.textContent.trim():null};})())")
 
     def tools_inventory(self, actor, conversation_id):
         return self.evaluate(actor, "JSON.stringify((()=>{const get=p=>{const x=new XMLHttpRequest();"
@@ -996,18 +1011,46 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                 mark("message_reply_observed", {"reply_status": reply_status})
                 if reply_status != "answered":
                     failures.append("message_reply_" + reply_status)
+                details = rdp.reply_details(actor) if reply_status == "answered" else {"text": None}
                 persisted = rdp.persisted_messages(actor, new_id)
                 roles = [m["role"] for m in persisted["messages"]]
                 replies = [m["text"] for m in persisted["messages"] if m["role"] == "assistant"]
                 assistant_messages = [m for m in persisted["messages"] if m["role"] == "assistant"]
                 reply_errors = [e for m in assistant_messages for e in m["errors"]]
+                receipt = None
                 for m in assistant_messages:
+                    # A reply without an invocation has no trace to read, so «no trace errors» would prove nothing.
                     if not m["invocation_id"]:
+                        failures.append("reply_invocation_missing")
                         continue
-                    trace = rdp.invocation_trace_errors(actor, m["invocation_id"])
-                    if trace["status"] != 200:
+                    receipt = {"invocation_id": m["invocation_id"], **rdp.reply_receipt(actor, m["invocation_id"])}
+                    if receipt["http_status"] != 200:
                         failures.append("reply_trace_unavailable")
-                    reply_errors.extend(trace["errors"])
+                    reply_errors.extend(receipt["errors"])
+                # The details line must show the turn the trace billed: every model call's tokens and the calculated cost.
+                details_check = {"status": "NOT_RUN",
+                                 "reason": "reply_not_answered" if reply_status != "answered" else "reply_trace_unavailable"}
+                if reply_status == "answered" and receipt and receipt["http_status"] == 200:
+                    billing = receipt["billing"]
+                    # A reply without a details line shows no tokens and no cost, which is compared like any other.
+                    shown = details["text"] or ""
+                    shown_tokens = re.search(r"(\d+) токенов", shown)
+                    shown_rub = re.search(r"≈ (\d+(?:\.\d+)?) ₽", shown)
+                    # The line leaves out a zero count and a zero or uncalculated cost, so those are expected absent.
+                    expected_tokens = billing.get("total_tokens") or None
+                    expected_rub = billing.get("total_cost") if billing.get("cost_status") == "calculated" else None
+                    expected_rub = expected_rub or None
+                    shown_count = int(shown_tokens.group(1)) if shown_tokens else None
+                    shown_cost = float(shown_rub.group(1)) if shown_rub else None
+                    # Without billed model calls the line shows the provider's usage, which the trace does not total.
+                    tokens_match = not receipt["items"] or shown_count == expected_tokens
+                    rub_match = (shown_cost is None if expected_rub is None else
+                                 shown_cost is not None and abs(shown_cost - expected_rub) <= 0.005 + 1e-9)
+                    details_check = {"status": "PASS" if tokens_match and rub_match else "FAIL",
+                                     "shown_tokens": shown_count, "trace_total_tokens": expected_tokens,
+                                     "shown_rub": shown_cost, "trace_total_cost": expected_rub}
+                    if details_check["status"] == "FAIL":
+                        failures.append("reply_details_mismatch_trace")
                 prompt_persisted = any(m["role"] == "user" and m["text"] == POETS_DIALOGUE_PROMPT
                                        for m in persisted["messages"])
                 if persisted["status"] != 200 or not prompt_persisted:
@@ -1020,6 +1063,9 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                                                "reply_status": reply_status,
                                                "reply_text": replies[-1] if replies else None,
                                                "reply_trace_errors": reply_errors,
+                                               "reply_receipt": receipt,
+                                               "browser_details": details["text"],
+                                               "details_vs_trace": details_check,
                                                "question": POETS_DIALOGUE_PROMPT,
                                                "user_message_persisted": prompt_persisted,
                                                "reply_persisted": "assistant" in roles}
@@ -1035,9 +1081,12 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                               for name in ("Пушкин", "Есенин")}
                     empty_turns = spoken.count(False)
                     alternating = all(left != right for left, right in zip(speakers, speakers[1:]))
-                    dialogue_ok = all(count >= 2 for count in counts.values()) and alternating and not empty_turns
+                    # The prompt asks for six turns, three each, starting with Pushkin.
+                    expected_speakers = ["Пушкин", "Есенин"] * 3
+                    dialogue_ok = speakers == expected_speakers and not empty_turns
                     checkpoints["poets_dialogue"] = {
                         "status": "PASS" if dialogue_ok else "FAIL", "speakers": speakers,
+                        "expected_speakers": expected_speakers,
                         "turn_counts": counts, "empty_turns": empty_turns, "alternating": alternating,
                         "scope": "spoken turns, speaker labels and alternation, not literary quality or independent agents"}
                     if not dialogue_ok:
@@ -1249,6 +1298,9 @@ def capture(out, uid, gid, metadata):
                 failures.append(name + "_sidebar_aria_mismatch")
         if tab is not None and (state["settingsTab"] != tab or state["settingsPanels"] != [tab]):
             failures.append(name + "_tab_not_reached")
+        # Every status row must carry a known state; rows of «undefined» are a broken panel, not a ready one.
+        if surface == "status" and (not state["statusCounts"] or state["statusCounts"].get("unknown")):
+            failures.append(name + "_status_rows_unknown")
         matrix_failures.extend(failures)
         files[-1]["matrix_expectation"] = {"state": name, "surface": surface, "sidebar": sidebar,
                                            "tab": tab, "verdict": "FAIL" if failures else "PASS",
