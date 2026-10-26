@@ -282,7 +282,14 @@ class LogosClient(YandexResponsesClient):
 
             def continue_request(input_items, previous_response):
                 continuation_params = dict(base_params)
-                continuation_params["input"] = input_items
+                # A provider conversation stores the answered calls itself, so only the new outputs are sent.
+                if self._resolve_yandex_conv_id(conversation_id):
+                    continuation_params["input"] = [
+                        item for item in input_items
+                        if isinstance(item, dict) and item.get("type") == "function_call_output"
+                    ]
+                else:
+                    continuation_params["input"] = input_items
                 continuation_params["background"] = base_params.get("background", True)
                 response = self._ask_provider(
                     message="",

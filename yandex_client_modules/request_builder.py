@@ -294,7 +294,8 @@ def build_response_payload(
                 payload["parallel_tool_calls"] = True
 
     if yandex_conv_id:
-        payload["conversation"] = {"id": yandex_conv_id}
+        # The Responses reference and the examples pass the conversation id as a string.
+        payload["conversation"] = yandex_conv_id
 
     return payload
 
