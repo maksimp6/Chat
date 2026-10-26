@@ -216,6 +216,14 @@ def test_fingerprint_changes_with_actual_content_and_options_not_key_order():
     assert payload["input"][0]["content"] == "one"
 
 
+def test_model_uri_without_version_is_exported_and_credentials_still_are_not():
+    receipt = build_request_manifest({"model": "gpt://folder/qwen3.6-35b-a3b", "input": "one"})
+    assert receipt["model"]["value"] == "gpt://folder/qwen3.6-35b-a3b"
+
+    receipt = build_request_manifest({"model": "gpt://project/sk-synthetic-secret", "input": "one"})
+    assert "value" not in receipt["model"]
+
+
 def test_only_safe_model_and_setting_values_are_exported():
     sensitive = "Bearer synthetic-never-export"
     payload = {
