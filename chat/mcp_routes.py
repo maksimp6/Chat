@@ -39,6 +39,7 @@ from storage.db import (
 from agent_runtime.partial_output import extract_last_response_text, format_partial_output_message
 from agent_runtime.responses_tool_loop import run_tool_loop, extract_function_calls
 from economy.billing import aggregate_billing, build_ai_billing_item, settle_billing_to_treasury
+from economy.treasury import get_account
 from provider_accounts.quotas import ProviderQuotaExceeded
 from agent_skills.registry import SkillRegistry, SkillRegistryError, compose_skill_instructions
 from tool_providers.universal_tool_platform import (
@@ -364,6 +365,12 @@ def chat():
         owner_id = get_current_owner_id(required=False)
         if not check_access(conv_id, owner_id):
             return jsonify({"error": "conversation_not_found"}), 404
+        # Settlement debits the treasury after the reply, so an empty balance would hand out a free reply.
+        if owner_id and float(get_account(owner_id)["balance"]) <= 0:
+            return jsonify({
+                "error": "insufficient_balance",
+                "message": "На балансе нет средств. Пополните баланс, чтобы получить ответ.",
+            }), 402
         invocation = create_invocation(
             session_id,
             conv_id,
