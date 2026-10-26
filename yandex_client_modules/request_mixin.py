@@ -258,6 +258,7 @@ class YandexRequestMixin:
                 images=images,
                 instructions=params.get("instructions"),
                 temperature=params.get("temperature"),
+                top_p=params.get("top_p"),
                 max_tokens=params.get("max_output_tokens"),
                 history=params.get("chat_history"),
             )

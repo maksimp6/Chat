@@ -37,6 +37,52 @@ def _response_input(params, message):
     return [{"role": "user", "content": message}]
 
 
+# Every request parameter is named the way an Ultra profile names each setting: the value that
+# was sent, or the reason it was left to the provider. Nothing is silently absent.
+_RESPONSES_PARAMETERS = (
+    "background",
+    "store",
+    "stream",
+    "temperature",
+    "top_p",
+    "max_output_tokens",
+    "truncation",
+    "reasoning",
+    "service_tier",
+    "tool_choice",
+    "max_tool_calls",
+    "parallel_tool_calls",
+)
+_CHAT_PARAMETERS = ("stream", "temperature", "top_p", "max_tokens", "tools")
+_TOOL_PARAMETERS = {"tool_choice", "max_tool_calls", "parallel_tool_calls"}
+
+
+def explicit_parameters(model_key, payload):
+    """Each parameter of the final payload with its sent value, or why it is not sent."""
+    profile = ultra_profiles().get(model_key) or {}
+    output = profile.get("output") or {}
+    reasoning = profile.get("reasoning") or {}
+    result = {}
+    for name in _CHAT_PARAMETERS if "messages" in payload else _RESPONSES_PARAMETERS:
+        if name in payload:
+            result[name] = {"sent": True, "value": payload[name]}
+            continue
+        if name in ("max_output_tokens", "max_tokens"):
+            reason = output.get("basis") or "no_application_output_cap"
+        elif name == "reasoning":
+            reason = reasoning.get("basis") if reasoning.get("depth_control") is False else "reasoning_effort_disabled"
+        elif name == "tools":
+            reason = "photo_request_has_no_tool_loop"
+        elif name in _TOOL_PARAMETERS:
+            reason = "no_tools_in_request"
+        elif name == "service_tier":
+            reason = "provider_default"
+        else:
+            reason = "not_set_by_request"
+        result[name] = {"sent": False, "value": None, "reason": reason}
+    return result
+
+
 def ultra_applied_event(model_key, params, payload):
     """Describe the Ultra values that reached the provider, so a trace can confirm the chosen profile."""
     profile = ultra_profiles().get(model_key) or {}
@@ -47,6 +93,7 @@ def ultra_applied_event(model_key, params, payload):
         "reasoning": payload.get("reasoning"),
         "truncation": payload.get("truncation"),
         "max_output_tokens": payload.get("max_output_tokens"),
+        "parameters": explicit_parameters(model_key, payload),
     }
 
 
@@ -57,6 +104,7 @@ def build_chat_image_payload(
     images,
     instructions=None,
     temperature=None,
+    top_p=None,
     max_tokens=None,
     history=None,
 ):
@@ -76,9 +124,13 @@ def build_chat_image_payload(
     payload = {
         "model": "gpt://" + project_id + "/" + upstream_model_id(model_key),
         "messages": messages,
+        # The answer is read as one JSON body, never as a stream.
+        "stream": False,
     }
     if temperature is not None:
         payload["temperature"] = float(temperature)
+    if top_p is not None:
+        payload["top_p"] = float(top_p)
     if max_tokens:
         payload["max_tokens"] = int(max_tokens)
     return payload
@@ -158,6 +210,8 @@ def build_response_payload(
         "input": _response_input(params, message),
         "background": is_background,
         "store": params.get("store", True),
+        # The reply is polled, never read as a stream, so a stream request is never sent.
+        "stream": False,
     }
 
     validated_metadata = validate_metadata(metadata)
