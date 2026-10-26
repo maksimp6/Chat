@@ -211,7 +211,12 @@ def print_failure_tail(result: dict) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, help="New evidence directory inside RUNNER_TEMP")
+    parser.add_argument("--focus", choices=("all", "stl_readiness"), default="all")
     args = parser.parse_args()
+    selected_groups = GROUPS if args.focus == "all" else (("stl-readiness-followup", (
+        "tests/test_printing3d_gcode_edges.py::test_readiness_rejects_unknown_model_and_records_evidence",
+        "tests/test_printing3d_gcode_edges.py::test_readiness_operator_gate_requires_every_other_check",
+    )),)
     required = ("GITHUB_RUN_ID", "RUNNER_NAME", "RUNNER_TEMP", "GITHUB_SHA")
     if (os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("CI") != "true"
             or any(not os.environ.get(name) for name in required)):
@@ -239,6 +244,7 @@ def main() -> int:
               if (path / "cryptography").is_dir()]
     report = {
         "scope": "offline_regressions_on_physical_runner_not_live_e2e",
+        "focus": args.focus,
         "source_sha": sha, "device_model": model,
         "run_id": os.environ["GITHUB_RUN_ID"], "runner_name": os.environ["RUNNER_NAME"],
         "free_bytes_before": shutil.disk_usage(evidence).free,
@@ -288,13 +294,14 @@ def main() -> int:
     if result["verdict"] != "PASS":
         report["verdict"] = "FAIL"
         report["groups"] = [{"name": name, "verdict": "NOT_RUN", "reason": "negative_control_failed"}
-                            for name, _ in GROUPS]
-        report["groups"].append({"name": "javascript", "verdict": "NOT_RUN", "reason": "negative_control_failed"})
+                            for name, _ in selected_groups]
+        if args.focus == "all":
+            report["groups"].append({"name": "javascript", "verdict": "NOT_RUN", "reason": "negative_control_failed"})
         save()
         print_failure_tail(result)
         print(json.dumps(report, ensure_ascii=False), flush=True)
         return 1
-    for name, tests in GROUPS:
+    for name, tests in selected_groups:
         group = private_directory(evidence / name)
         junit = group / "junit.xml"
         command = [sys.executable, "-m", "pytest", "-q", "--tb=short", "-p", "pr1621_isolation",
@@ -315,7 +322,7 @@ def main() -> int:
     node_group = private_directory(evidence / "javascript")
     node = shutil.which("node")
     node_results = []
-    if node:
+    if node and args.focus == "all":
         for name in ("test_browser_emulator.js", "test_voice_recording.js"):
             node_results.append(run_command(
                 [node, "--require", str(harness / "node-guard.cjs"), str(ROOT / "tests" / name)],
@@ -323,11 +330,12 @@ def main() -> int:
             ))
             if node_results[-1]["exit_code"] != 0:
                 print_failure_tail(node_results[-1])
-    report["groups"].append({
-        "name": "javascript", "commands": node_results,
-        "verdict": "PASS" if len(node_results) == 2 and all(x["exit_code"] == 0 for x in node_results) else "FAIL",
-        "reason": None if node else "node_not_installed_no_install_attempted",
-    })
+    if args.focus == "all":
+        report["groups"].append({
+            "name": "javascript", "commands": node_results,
+            "verdict": "PASS" if len(node_results) == 2 and all(x["exit_code"] == 0 for x in node_results) else "FAIL",
+            "reason": None if node else "node_not_installed_no_install_attempted",
+        })
     report["verdict"] = "PASS" if (report["negative_control"]["verdict"] == "PASS" and all(
         group["verdict"] == "PASS" for group in report["groups"])) else "FAIL"
     report["free_bytes_after"] = shutil.disk_usage(evidence).free

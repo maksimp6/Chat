@@ -10,7 +10,7 @@ on:
         required: true
         default: deploy
         type: choice
-        options: [deploy, screenshots, tools_self_check, tools_self_check_tests, pr1621_regressions, verify_screenshots, rootagent_native_check, art_generate]
+        options: [deploy, screenshots, tools_self_check, tools_self_check_tests, pr1621_regressions, pr1621_stl_followup, verify_screenshots, rootagent_native_check, art_generate]
 
 permissions: {}
 
@@ -29,7 +29,8 @@ jobs:
         timeout-minutes: 10
         env:
           CI: "true"
-        run: |
+          PR1621_FOCUS: all
+        run: &pr1621_validation |
           set -euo pipefail
           umask 077
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
@@ -53,9 +54,36 @@ jobs:
           git -C "$check_root/source" fetch --quiet --depth=1 origin "$GITHUB_SHA"
           git -C "$check_root/source" -c advice.detachedHead=false checkout --quiet --detach FETCH_HEAD
           test "$(git -C "$check_root/source" rev-parse HEAD)" = "$GITHUB_SHA"
-          # Hydrate only the small STL fixtures needed by the inventory regressions.
-          # Other repository LFS objects (including recordings) remain untouched.
-          git -C "$check_root/source" lfs pull origin --include='printing3d/assets/**/*.stl' --exclude=''
+          # Fetch exact committed LFS objects and verify their bytes before any code tests.
+          python - "$check_root/source" "$GITHUB_SHA" <<'PY'
+          import hashlib, json, pathlib, re, sys, urllib.parse, urllib.request
+          root = pathlib.Path(sys.argv[1]).resolve()
+          revision = sys.argv[2]
+          manifest = json.loads((root / "printing3d/assets/models_manifest.json").read_text())
+          verified = []
+          for model in manifest["models"]:
+              for member in model["members_manifest"]:
+                  name = member["path"]
+                  if not name.endswith(".stl"):
+                      continue
+                  path = (root / name).resolve()
+                  if not path.is_relative_to(root / "printing3d/assets"):
+                      raise SystemExit("STL fixture path leaves its source directory")
+                  data = path.read_bytes()
+                  expected, size = member["sha256"], member["bytes"]
+                  if hashlib.sha256(data).hexdigest() != expected:
+                      pointer = re.fullmatch(rb'version https://git-lfs.github.com/spec/v1\noid sha256:([0-9a-f]{64})\nsize (\d+)\n', data)
+                      if not pointer or pointer[1].decode() != expected or int(pointer[2]) != size:
+                          raise SystemExit("Unexpected STL source bytes: " + name)
+                      url = "https://media.githubusercontent.com/media/maksimp6/Chat/" + revision + "/" + urllib.parse.quote(name, safe="/")
+                      with urllib.request.urlopen(url, timeout=20) as response:
+                          data = response.read(size + 1)
+                      if len(data) != size or hashlib.sha256(data).hexdigest() != expected:
+                          raise SystemExit("Downloaded STL object failed size/hash verification: " + name)
+                      path.write_bytes(data)
+                  verified.append({"path": name, "bytes": len(data), "sha256": expected})
+          print(json.dumps({"scope": "stl_fixture_hydration", "source_sha": revision, "verified": verified}))
+          PY
           native_site=$(python - <<'PY'
           from pathlib import Path
           matches = list((Path.home() / "logos-local-state/native-deps").glob("**/site-packages/cryptography"))
@@ -67,7 +95,7 @@ jobs:
           export PYTHONPATH="$check_root/source:$native_site"
           cd "$check_root/source"
           regression_exit=0
-          "$HOME/logos-local/.venv/bin/python" scripts/pr1621_regressions.py --out "$check_root/results" || regression_exit=$?
+          "$HOME/logos-local/.venv/bin/python" scripts/pr1621_regressions.py --focus "$PR1621_FOCUS" --out "$check_root/results" || regression_exit=$?
           python - "$check_root/results/report.json" <<'PY'
           import json, pathlib, sys
           report_path = pathlib.Path(sys.argv[1])
@@ -83,6 +111,19 @@ jobs:
               print("\n".join(lines[-90:]))
           PY
           exit "$regression_exit"
+
+  pr1621_stl_followup:
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && github.ref != 'refs/heads/master' && inputs.action == 'pr1621_stl_followup'
+    runs-on: redmi9
+    timeout-minutes: 10
+    steps:
+      - name: PR 1621 STL follow-up only
+        shell: bash
+        timeout-minutes: 10
+        env:
+          CI: "true"
+          PR1621_FOCUS: stl_readiness
+        run: *pr1621_validation
 
   server:
     if: github.event_name == 'push' || inputs.action == 'deploy'
