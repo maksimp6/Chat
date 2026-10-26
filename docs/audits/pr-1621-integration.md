@@ -2,7 +2,10 @@
 
 ## Scope and evidence
 
-This is a source review and conflict-resolution record, not a device execution report.
+This records source integration and conflict decisions. Subsequent isolated code
+regressions ran on the existing Redmi 9 Actions runner; their exact scopes and
+results are in [the validation record](pr-1621-validation/README.md). Neither
+source review nor those regressions establish live application E2E.
 
 - Original PR head: `e02750299d3292371a7f38bcb0750614117008ce`.
 - Original merge base: `90a030292a8c6d2e83754bc2fd9cc5167dc32c9b`.
@@ -35,14 +38,15 @@ Master, protections, secrets and remote-access settings are outside the change.
 
 The current runner workflow, controller, launcher, readiness gate, local Bash
 resolution, project/file roots and subsequent frontend changes come from develop.
-They are not replaced with their old PR-base versions. No workflow is newly added
-or manually dispatched by this reconciliation.
+They are not replaced with their old PR-base versions. The initial source
+reconciliation dispatched no jobs; the later authorized validation actions and
+their three actual runs are documented in the separate validation record.
 
 ## Disposition of the original batches
 
 | Batch | Retained or adjusted behavior | Verification boundary |
 | --- | --- | --- |
-| A | Redact free-text log messages, exceptions and repr fallbacks using existing sanitizers | Source review only; not a claim that every possible secret format is covered |
+| A | Redact free-text log messages, exceptions and repr fallbacks using existing sanitizers | Named runner regression cases passed; not a claim that every possible secret format is covered |
 | B | Preserve same-key provider identity; permit replacing an expired credential; check replacement identity in the transaction; use `configured` for local-only Yandex health | No real credential replacement, revocation or provider call |
 | C | Use the provider chat and stored credential; persist voice turns; keep voice UI attached to its chat and block overlap until processing ends | STT/TTS, browser microphone and physical-device behavior NOT_RUN |
 | D | Store large generated images outside bounded message values; bind files to a hashed conversation namespace; publish private complete files atomically | Existing inline messages remain readable; device storage, backup and retention UNKNOWN |
@@ -102,14 +106,16 @@ or manually dispatched by this reconciliation.
 | Read current AGENTS.md, PR, issue and commit history | Completed |
 | Compare original PR, current develop and each conflict | Completed by source review |
 | Independent reviews of messages, protocol/browser, runner/tools and lifecycle | Completed; corrections incorporated |
-| Regression scenarios | Written/updated, NOT_RUN |
-| Unit, integration, browser, build and parse checks | NOT_RUN |
-| GitHub Runner test workflow | NOT_RUN; not requested or dispatched |
-| Redmi 9 disk/process/runtime reading, deployment, restart | NOT_RUN |
+| Regression scenarios | Three actual runner scopes recorded; 167/169 distinct Python cases passed, two hard-link cases blocked; both JS suites passed |
+| Other unit/integration/browser checks, builds and separate parse checks | NOT_RUN outside the named validation scopes |
+| GitHub Runner test workflow | Full runs 40381634312 and 40382706143 failed; focused STL run 40383967914 passed only its two cases; combined status BLOCKED |
+| Redmi 9 job identity/free-space observations | Recorded by the runner; see timestamped reports |
+| Installed runtime/process reading, deployment, restart | NOT_RUN |
 | Real provider/model/tool, live chat/voice/image E2E | NOT_RUN |
 | User acceptance | Pending and separate from merge |
 
-AGENTS.md prohibits test execution without a separate explicit order and permits
-authorized tests only inside GitHub Actions runner. No local environment-variable
-spoofing or test-guard bypass is used. Successful source reconciliation or a clean
+AGENTS.md prohibits test execution without a separate order and permits
+authorized tests only inside GitHub Actions runner. The user continued the
+offered runner-test stage before these jobs were dispatched. No local environment-variable
+spoofing or test-guard bypass was used. Successful source reconciliation or a clean
 Git mergeability result is not a VERIFIED result on the physical device.

@@ -39,11 +39,32 @@ microphone, camera, browser-control or printing E2E.
 - Git LFS pull returned zero, but the two STL-readiness cases still saw incorrect
   source hashes. That exit status did not establish hydration of the asset bytes.
 
-The next action is a focused follow-up of those two STL-readiness cases after
-changing the download method. It does not repeat the denied hard-link calls,
-remove them from the full suite or turn their earlier failures into PASS. Even
-if the focused checks pass, the full suite remains blocked by the two hard-link
-cases on this Android permission domain.
+The follow-up changes the STL download method. It does not repeat the denied
+hard-link calls, remove them from the full suite or turn their failures into PASS.
+
+## Focused STL follow-up: two cases passed
+
+- [Run 40383967914 / job 121787212366](https://github.com/maksimp6/Chat/actions/runs/40383967914/job/121787212366)
+- Source: `2afa92965668cc0b9f7c36457b352d6785e9d7b2`.
+- Focus: `stl_readiness`, exactly two previously failing STL-readiness cases.
+- **PASS within that scope**: two tests passed, no failures/errors/skips; the
+  separate expected-failure control also passed.
+- All 14 committed STL objects were verified by byte length and SHA-256 before
+  the tests. Total: 659,676 bytes. The manifest and expected hashes were not changed.
+- [Structured report and per-file asset proof](run-40383967914.json).
+- [Actions screenshot](stl-run-40383967914.jpg) confirms only this focused run;
+  its green status must not be used as a full-suite or live-application PASS.
+
+## Combined disposition: BLOCKED, not a full-suite PASS
+
+Across the full second run and the focused follow-up, **167 of 169 distinct
+Python tests passed**, plus both JavaScript suites. This combines two explicit
+scopes; there is no single green full-suite run. Application source was unchanged
+between these two revisions; only validation setup, scope and evidence changed.
+The two hard-link cases remain **BLOCKED by Android's permission denial**, with
+their actual failed attempts preserved in both full-run reports. No test is
+removed, skipped or relabelled PASS to hide that limitation. Draft remains
+appropriate; these results do not authorize merge or establish live E2E.
 
 ## Corrections after the first run
 
@@ -83,3 +104,7 @@ negative control are not PASS. The intentional negative-control failure is
 recorded separately from product test counts. Passing these regressions cannot
 establish installed-runner compatibility, long-outage result durability, image
 backup/retention, all G-code compatibility or readiness to show the live app.
+
+At the focused run's end the job filesystem reported 114,442,240 free bytes.
+This is that timestamped runner observation, not a guarantee of current free
+space or a storage/retention fix. Test evidence and earlier workspaces were retained.
