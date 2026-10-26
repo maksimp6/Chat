@@ -64,10 +64,9 @@ needed by the external services themselves.
 
 Repository CI acceptance, code-policy and pre-push gates have been removed.
 Code tests require a separate owner request and run only inside GitHub Actions
-runner; see [AGENTS.md](AGENTS.md). Application delivery uses the
-[phone server workflow](.github/workflows/redmi9-app-server.yml). Additional
-diagnostic and integration definitions remain in the [workflow directory](.github/workflows);
-their presence does not prove execution. Deployment verifies the process and HTTP
+runner; see [AGENTS.md](AGENTS.md). The
+[phone server workflow](.github/workflows/redmi9-app-server.yml) is the only
+remaining workflow. Deployment verifies the process and HTTP
 readiness and preserves its backup/rollback behavior.
 `develop` is the integration branch; `master` remains the owner's personal branch.
 Repository code changes do not by themselves prove the installed phone version or
