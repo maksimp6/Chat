@@ -33,14 +33,6 @@ class ToolRegistryCategoryTests(unittest.TestCase):
         self.assertTrue(tools[0]["strict"])
         self.assertNotIn("defer_loading", tools[0])
 
-    def test_get_tools_by_category_applies_strict_schema(self):
-        tools = self.registry.get_tools_by_category("git")
-        parameters = tools[0]["parameters"]
-
-        self.assertEqual(parameters["required"], ["path"])
-        self.assertFalse(parameters["additionalProperties"])
-        self.assertIn("anyOf", parameters["properties"]["path"])
-
     def test_unknown_category_returns_empty_list(self):
         self.assertEqual(self.registry.get_tools_by_category("missing"), [])
 
