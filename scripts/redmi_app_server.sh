@@ -8,7 +8,7 @@ trigger=${LOGOS_DEPLOY_TRIGGER:-}
 if [[ -z $trigger ]]; then
   if [[ ${GITHUB_ACTIONS:-} == true ]]; then trigger=github_actions; else trigger=manual; fi
 fi
-case "$trigger" in manual|github_actions|local_autoupdate) ;; *) echo 'Invalid deployment trigger' >&2; exit 2 ;; esac
+case "$trigger" in manual|github_actions) ;; *) echo 'Invalid deployment trigger' >&2; exit 2 ;; esac
 case "$action" in start|restart|status|stop|deploy) ;; *) echo 'Use start, restart, status, stop or deploy' >&2; exit 2 ;; esac
 app=${LOGOS_APP_DIR:-$HOME/logos-local}
 state=${LOGOS_STATE_DIR:-$HOME/logos-local-state}
@@ -68,6 +68,8 @@ ready() {
   [[ -n $pid ]] && owned "$pid" || return 1
   curl --noproxy '*' --fail --silent --max-time 3 "$base/healthz" -o "$probe/health" || return 1
   grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"' "$probe/health" || return 1
+  curl --noproxy '*' --fail --silent --max-time 3 "$base/readyz" -o "$probe/storage" || return 1
+  grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"' "$probe/storage" || return 1
   curl --noproxy '*' --fail --silent --max-time 3 "$base/" -o "$probe/index" || return 1
   grep -q '<title>Logos</title>' "$probe/index" || return 1
   local asset
@@ -123,7 +125,7 @@ start_app() {
     LD_PRELOAD="${LD_PRELOAD:-}" LANG="${LANG:-C.UTF-8}" \
     ANDROID_ROOT="${ANDROID_ROOT:-}" ANDROID_DATA="${ANDROID_DATA:-}" \
     LOGOS_APP_DIR="$app" LOGOS_STATE_DIR="$state" LOGOS_PORT="$port" \
-    LOGOS_APP_REVISION="$revision" \
+    LOGOS_APP_REVISION="$revision" LOGOS_LOCAL_REPO_DIR="$app" LOGOS_PROJECT_ROOT="$app" \
     "$python" - "$state/start-logos.py" "$state" >"$state/runner-launch.log" 2>&1 9>&- <<'PY'
 import os, pathlib, runpy, sys
 state = pathlib.Path(sys.argv[2])

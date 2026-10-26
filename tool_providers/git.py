@@ -118,18 +118,8 @@ def _run_git(args: list, cfg: dict = None, repo_name: str = None, is_read: bool 
         if not (args and args[0] == "init"):
             return {"success": False, "error": f"В каталоге {repo_path} нет .git"}
 
-    lock_file = (
-        os.path.join(repo_path, "index.lock")
-        if is_bare
-        else os.path.join(repo_path, ".git", "index.lock")
-    )
-    if not is_read and os.path.exists(lock_file):
-        # A running Git process may hold this lock; removing it by age could corrupt its index update.
-        return {
-            "success": False,
-            "error": f"Индекс занят файлом {os.path.relpath(lock_file, repo_path)}. "
-            "Удалите его вручную, если Git не запущен.",
-        }
+    # Git owns its locks (including worktree-specific locks). Never remove a lock by age
+    # or block unrelated commands such as fetch/push just because an index lock exists.
 
     cmd = ["git"]
     if is_read:

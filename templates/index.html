@@ -277,7 +277,7 @@
              data-update-state="loaded" title="Версия интерфейса, загруженная этой вкладкой">
           Версия {{ app_revision[:8] if app_revision != 'unknown' else static_version[:8] }}
         </div>
-        <div id="chatbox">
+        <div id="chatbox" role="log" aria-live="polite" aria-label="Переписка">
           <div class="empty-state">Начните диалог или выберите модель</div>
         </div>
         <div id="voice-ui">
@@ -304,10 +304,18 @@
             multiple
             hidden
           />
-          <input id="msg-input" type="text" placeholder="Сообщение..." autocomplete="off" /><button
+          <input
+            id="msg-input"
+            type="text"
+            placeholder="Сообщение..."
+            aria-label="Сообщение"
+            enterkeyhint="send"
+            autocomplete="off"
+          /><button
             id="send-btn"
             type="button"
             class="logos-btn"
+            aria-label="Отправить"
           >
             ➤
           </button>

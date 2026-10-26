@@ -363,37 +363,70 @@ def zip_compress(args: dict) -> dict:
     if not source_path or not out_archive:
         return {"error": "Параметры 'source_path' и 'archive_path' обязательны"}
 
+    tmp_path = None
     try:
         abs_src = _get_abs_path(source_path)
         abs_out = _get_abs_path(out_archive)
-        if abs_src == abs_out:
-            # Opening the archive for writing would empty the source before it is read.
+        if abs_src == abs_out or (
+            os.path.exists(abs_src) and os.path.exists(abs_out) and os.path.samefile(abs_src, abs_out)
+        ):
+            # A source file must never be replaced by its own archive, including a hard-link alias.
             return {"error": "Архив не может совпадать с исходным путём"}
         if not os.path.exists(abs_src):
             return {"error": f"Исходный путь '{source_path}' не существует"}
 
         os.makedirs(os.path.dirname(abs_out), exist_ok=True)
+        previous_stat = os.stat(abs_out) if os.path.exists(abs_out) else None
         count = 0
-        with zipfile.ZipFile(abs_out, "w", zipfile.ZIP_DEFLATED) as zf:
-            if os.path.isfile(abs_src):
-                zf.write(abs_src, arcname=os.path.basename(abs_src))
-                count = 1
-            else:
-                for root, _, files in os.walk(abs_src):
-                    for file in files:
-                        full_f = os.path.join(root, file)
-                        rel_f = os.path.relpath(full_f, abs_src)
-                        zf.write(full_f, arcname=rel_f)
-                        count += 1
+        # Build next to the destination so replacement is atomic and an interrupted build
+        # leaves the old archive intact. Archives inside the source directory remain supported.
+        with tempfile.NamedTemporaryFile(
+            "w+b", dir=os.path.dirname(abs_out), prefix=".zip_", suffix=".tmp", delete=False
+        ) as tmp:
+            tmp_path = tmp.name
+            temp_stat = os.fstat(tmp.fileno())
+            excluded_paths = {os.path.realpath(abs_out), os.path.realpath(tmp_path)}
+            excluded_inodes = {(temp_stat.st_dev, temp_stat.st_ino)}
+            if previous_stat is not None:
+                excluded_inodes.add((previous_stat.st_dev, previous_stat.st_ino))
+            with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
+                if os.path.isfile(abs_src):
+                    zf.write(abs_src, arcname=os.path.basename(abs_src))
+                    count = 1
+                else:
+                    for root, _, files in os.walk(abs_src):
+                        for file in files:
+                            full_f = os.path.join(root, file)
+                            if os.path.realpath(full_f) in excluded_paths:
+                                continue
+                            member_stat = os.stat(full_f)
+                            if (member_stat.st_dev, member_stat.st_ino) in excluded_inodes:
+                                continue
+                            rel_f = os.path.relpath(full_f, abs_src)
+                            zf.write(full_f, arcname=rel_f)
+                            count += 1
+            tmp.flush()
+            if previous_stat is not None:
+                os.fchmod(tmp.fileno(), previous_stat.st_mode & 0o7777)
+            os.fsync(tmp.fileno())
+            archive_size = os.fstat(tmp.fileno()).st_size
+        os.replace(tmp_path, abs_out)
+        tmp_path = None
 
         return {
             "success": True,
             "archive_path": out_archive,
             "files_archived": count,
-            "archive_size_bytes": os.path.getsize(abs_out),
+            "archive_size_bytes": archive_size,
         }
     except Exception as e:
         return {"error": f"Ошибка создания архива: {str(e)}"}
+    finally:
+        if tmp_path is not None:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
 
 
 def zip_extract(args: dict) -> dict:
@@ -555,6 +588,8 @@ def delete_path(args: dict) -> dict:
         if name in ("", ".", ".."):
             return {"error": "Некорректный путь для удаления"}
         abs_path = os.path.join(_get_abs_path(os.path.dirname(path) or "."), name)
+        # Keep the existing protection for the leaf without dereferencing its symlink.
+        _refuse_protected(abs_path)
         if abs_path == BASE_DIR:
             return {"error": "Запрещено удалять корневую директорию проекта"}
         if ".git" in abs_path.split(os.sep):

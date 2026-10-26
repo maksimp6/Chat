@@ -20,7 +20,7 @@ function formatUltraSummary(summary) {
   }
   if (summary.default_profile === "ultra") parts.push("настройки по умолчанию");
   if (summary.context_window_tokens) {
-    parts.push("контекст " + Number(summary.context_window_tokens).toLocaleString("ru-RU") + " ток.");
+    parts.push("контекст " + Number(summary.context_window_tokens).toLocaleString("ru-RU") + "\u00a0ток.");
   }
   parts.push("ограничений: " + (summary.blockers || []).length);
   return parts.join(" · ");

@@ -59,7 +59,7 @@ class TestPreApiTiming(unittest.TestCase):
         conversation_id = "pre-api-timing-test"
 
         class FakeClient:
-            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None, *, settings_conversation_id=None):
                 self.assert_trace(trace)
                 init_ts = next(
                     e["timestamp"]
@@ -125,7 +125,7 @@ class TestPreApiTiming(unittest.TestCase):
         internal_marker = "treasury-settlement-internal-marker"
 
         class FakeClient:
-            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None, *, settings_conversation_id=None):
                 trace.add_response(
                     {"id": "resp-test", "status": "completed", "output": []},
                     step_index=1,
@@ -210,7 +210,7 @@ class TestPreApiTiming(unittest.TestCase):
         from provider_accounts.quotas import ProviderQuotaExceeded
 
         class QuotaClient:
-            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None, *, settings_conversation_id=None):
                 raise ProviderQuotaExceeded(
                     reason="rate_limit",
                     user_id="user-1",
@@ -232,7 +232,7 @@ class TestPreApiTiming(unittest.TestCase):
 
     def test_failure_after_trace_is_frozen_keeps_trace_in_response(self):
         class ReplyClient:
-            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None, *, settings_conversation_id=None):
                 trace.add_response({"id": "resp-late", "status": "completed", "output": []})
                 return {"output": [], "usage": {}}
 
@@ -257,7 +257,7 @@ class TestPreApiTiming(unittest.TestCase):
 
     def test_temperature_error_is_recorded_as_validation_failure(self):
         class TemperatureClient:
-            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None, *, settings_conversation_id=None):
                 raise ValueError("temperature must be between 0 and 1")
 
         response = self._post_chat(lambda _config: TemperatureClient())
@@ -274,7 +274,7 @@ class TestPreApiTiming(unittest.TestCase):
         db.init_db()
 
         class FailingClient:
-            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None, *, settings_conversation_id=None):
                 raise RuntimeError("pipeline-internal-marker")
 
         with (

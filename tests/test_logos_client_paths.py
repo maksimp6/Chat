@@ -8,6 +8,7 @@ by fakes, so these tests stay deterministic.
 from types import SimpleNamespace
 
 from flask import Flask
+import pytest
 
 import chat.mcp_routes as mcp_routes
 from chat.mcp_routes import LogosClient
@@ -51,12 +52,15 @@ def test_continuation_after_a_non_approval_tool_call_reissues_the_request(monkey
     assert sent[1]["params"]["background"] is True
 
 
-def test_execute_approved_runs_the_tool_and_returns_the_synthesized_reply(monkeypatch):
+@pytest.mark.parametrize("summary_raises", [False, True])
+def test_execute_approved_keeps_tool_result_even_when_summary_fails(monkeypatch, summary_raises):
     class FakeClient:
         def __init__(self, config):
             pass
 
         def ask(self, prompt, model_key, conv_id, extra):
+            if summary_raises:
+                raise RuntimeError("summary unavailable")
             return {"text": prompt}
 
         def extract_text(self, response):
@@ -66,21 +70,28 @@ def test_execute_approved_runs_the_tool_and_returns_the_synthesized_reply(monkey
             return None
 
     added = []
+    saved_trace = []
+    execution_calls = []
     monkeypatch.setattr(mcp_routes, "LogosClient", FakeClient)
     monkeypatch.setattr(
         mcp_routes, "registry", SimpleNamespace(get_tool_meta=lambda name: {"name": name})
     )
     monkeypatch.setattr(mcp_routes, "get_current_owner_id", lambda required=False: "owner-1")
     monkeypatch.setattr(mcp_routes, "check_access", lambda conv_id, owner_id: True)
+    monkeypatch.setattr(mcp_routes, "_provider_conversation_id", lambda client, conv_id, trace: conv_id)
     monkeypatch.setattr(
         mcp_routes,
         "UniversalToolExecutor",
-        lambda registry: SimpleNamespace(execute=lambda call: {"success": True, "data": {"ok": 1}}),
+        lambda registry: SimpleNamespace(execute=lambda call: (
+            execution_calls.append(call) or {"success": True, "data": {"ok": 1, "token": "private-test-value"}}
+        )),
     )
     monkeypatch.setattr(
         mcp_routes,
         "add_message",
-        lambda conv_id, role, text, cost=0.0: added.append((conv_id, role, text, cost)),
+        lambda conv_id, role, text, cost=0.0, **kwargs: (
+            added.append((conv_id, role, text, cost)), saved_trace.append(kwargs["trace"])
+        ),
     )
 
     app = Flask(__name__)
@@ -97,6 +108,9 @@ def test_execute_approved_runs_the_tool_and_returns_the_synthesized_reply(monkey
 
     assert response.status_code == 200
     body = response.get_json()
-    assert body["reply"] == "Готово"
-    assert body["cost"] == 0.0
-    assert added == [("conv-1", "assistant", "Готово", 0.0)]
+    expected_reply = "Действие inspect успешно выполнено." if summary_raises else "Готово"
+    assert body["reply"] == expected_reply
+    assert body["cost"] is None
+    assert added == [("conv-1", "assistant", expected_reply, None)]
+    assert len(execution_calls) == 1
+    assert saved_trace[0]["approved_tool_result"]["data"] == {"ok": 1, "token": "<redacted>"}

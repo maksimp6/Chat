@@ -19,6 +19,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Optional
 
+from core.clock import unix_seconds
 from storage.db import get_store, init_db as init_runtime_db
 from invocation.context import InvocationContext
 from invocation.trace import create_invocation_trace
@@ -53,10 +54,6 @@ def _invoke_revision_runtime(context, payload):
 
 
 _RUNTIME_DISPATCHER.register_operation("revision.invoke", _invoke_revision_runtime)
-
-
-def _now() -> int:
-    return int(time.time())
 
 
 def _repo_root() -> Path:
@@ -138,8 +135,8 @@ def init_environment_tables() -> None:
                         "status": "STOPPED",
                         "runtime_pid": None,
                         "runtime_port": None,
-                        "updated_at": _now(),
-                        "stopped_at": row["stopped_at"] or _now(),
+                        "updated_at": unix_seconds(),
+                        "stopped_at": row["stopped_at"] or unix_seconds(),
                     },
                 )
 
@@ -235,7 +232,7 @@ def _record_trace(
                 "status": status,
                 "trace_id": trace.trace_id,
                 "trace_json": trace_json,
-                "created_at": _now(),
+                "created_at": unix_seconds(),
             },
         )
     return trace_json
@@ -321,6 +318,7 @@ class EnvironmentRuntime:
         self._stream_lock = threading.RLock()
         self._active_streams: dict[threading.Event, queue.Queue] = {}
         self._http_threads: set[threading.Thread] = set()
+        self._stopping = False
 
     @property
     def thread_id(self) -> Optional[int]:
@@ -394,10 +392,13 @@ class EnvironmentRuntime:
         *,
         timeout: float = 30.0,
     ) -> Any:
-        if not self._thread.is_alive():
-            raise RuntimeError("environment runtime is not running")
         result: queue.Queue = queue.Queue(maxsize=1)
-        self._jobs.put(("call", operation, dict(payload or {}), result))
+        with self._stream_lock:
+            if self._stopping:
+                raise RuntimeError("environment runtime is stopping")
+            if not self._thread.is_alive():
+                raise RuntimeError("environment runtime is not running")
+            self._jobs.put(("call", operation, dict(payload or {}), result))
         try:
             kind, value = result.get(timeout=timeout)
         except queue.Empty as exc:
@@ -412,12 +413,8 @@ class EnvironmentRuntime:
         *,
         timeout: float = 30.0,
     ) -> RuntimeHTTPStream:
-        if not self._thread.is_alive():
-            raise RuntimeError("environment runtime is not running")
         events: queue.Queue = queue.Queue(maxsize=8)
         cancel = threading.Event()
-        with self._stream_lock:
-            self._active_streams[cancel] = events
         # Each HTTP request gets its own thread, so one slow response cannot block the environment's
         # other calls.
         http_thread = threading.Thread(
@@ -427,9 +424,21 @@ class EnvironmentRuntime:
             daemon=True,
         )
         with self._stream_lock:
+            if self._stopping:
+                raise RuntimeError("environment runtime is stopping")
+            if not self._thread.is_alive():
+                raise RuntimeError("environment runtime is not running")
             self._http_threads = {thread for thread in self._http_threads if thread.is_alive()}
+            self._active_streams[cancel] = events
             self._http_threads.add(http_thread)
-        http_thread.start()
+            # Admission and start share stop's lock: it cannot overlook a thread
+            # that was registered but has not started yet.
+            try:
+                http_thread.start()
+            except Exception:
+                self._http_threads.discard(http_thread)
+                self._active_streams.pop(cancel, None)
+                raise
         try:
             first = events.get(timeout=timeout)
         except queue.Empty as exc:
@@ -449,6 +458,9 @@ class EnvironmentRuntime:
 
     def stop(self) -> None:
         with self._stream_lock:
+            # Keep admission closed if shutdown times out; callers may retry stop
+            # after the outstanding handler finishes without losing its data.
+            self._stopping = True
             active_streams = tuple(self._active_streams.items())
         for cancel, events in active_streams:
             cancel.set()
@@ -480,6 +492,11 @@ class EnvironmentRuntime:
         close_memory_clients(self.data_dir / "logos.memory")
 
     def remove(self) -> None:
+        with _RUNTIME_WORKERS_LOCK:
+            if self.runtime_id in _RUNTIME_WORKERS:
+                raise RuntimeError("environment runtime must stop before removal")
+        if self._thread.is_alive():
+            raise RuntimeError("environment runtime must stop before removal")
         if self._running_http_requests():
             raise RuntimeError("environment HTTP request is still running")
         if self.worktree.exists():
@@ -636,8 +653,8 @@ def create_environment(
         "runtime_port": None,
         "data_namespace": _namespace(environment_id),
         "owner_id": owner_id,
-        "created_at": _now(),
-        "updated_at": _now(),
+        "created_at": unix_seconds(),
+        "updated_at": unix_seconds(),
         "started_at": None,
         "stopped_at": None,
         "deleted_at": None,
@@ -677,7 +694,7 @@ def start_environment(
                 "status": "RUNNING",
                 "runtime_pid": None,
                 "runtime_port": None,
-                "started_at": _now(),
+                "started_at": unix_seconds(),
                 "error": None,
             },
         )
@@ -687,7 +704,7 @@ def start_environment(
                 "runtime_pid": None,
                 "runtime_port": None,
                 "runtime_thread_id": thread_id,
-                "started_at": _now(),
+                "started_at": unix_seconds(),
                 "error": None,
             }
         )
@@ -723,7 +740,7 @@ def stop_environment(
             raise
     _persist_environment(
         environment_id,
-        {"status": "STOPPED", "runtime_pid": None, "runtime_port": None, "stopped_at": _now()},
+        {"status": "STOPPED", "runtime_pid": None, "runtime_port": None, "stopped_at": unix_seconds()},
     )
     item.update(
         {
@@ -731,7 +748,7 @@ def stop_environment(
             "runtime_pid": None,
             "runtime_port": None,
             "runtime_thread_id": None,
-            "stopped_at": _now(),
+            "stopped_at": unix_seconds(),
         }
     )
     _record_trace(item, "STOP_ENVIRONMENT", "SUCCESS", context=context)
@@ -751,11 +768,17 @@ def delete_environment(
     environment_id: str, owner_id: Optional[str] = None, *, context=None
 ) -> dict[str, Any]:
     item = _require(environment_id, owner_id)
-    if item["status"] == "RUNNING":
+    with _RUNTIME_WORKERS_LOCK:
+        runtime = _RUNTIME_WORKERS.get(environment_id)
+    # A timed-out stop records FAILED while the runtime remains registered.
+    # Stop that worker before deleting its record or data, too.
+    if item["status"] == "RUNNING" or (runtime is not None and item["status"] == "FAILED"):
         stop_environment(environment_id, owner_id, context=context)
         item = _require(environment_id, owner_id)
+    elif runtime is not None:
+        runtime.stop()
     _transition(item["status"], "DELETING")
-    item.update({"status": "DELETING", "deleted_at": _now()})
+    item.update({"status": "DELETING", "deleted_at": unix_seconds()})
     _record_trace(item, "DELETE_ENVIRONMENT", "SUCCESS", context=context)
     # The record goes first: if the files were removed and the record then survived, the record
     # would claim an environment whose source and data are gone.
@@ -771,4 +794,4 @@ def _persist_environment(environment_id: str, changes: dict[str, Any]) -> None:
         old = tx.get(key)
         if old is None:
             raise KeyError("environment_not_found")
-        tx.set(key, {**old, **changes, "updated_at": _now()})
+        tx.set(key, {**old, **changes, "updated_at": unix_seconds()})

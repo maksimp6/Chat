@@ -19,6 +19,8 @@ const PAGES = {
   "https://example.test/about": "<title>About</title><p>About page</p>",
 };
 
+const publicLookup = async () => ({ address: "93.184.216.34", family: 4 });
+
 function makeFetch(calls) {
   return async (url, init = {}) => {
     calls.push({ url, init });
@@ -33,7 +35,7 @@ function makeFetch(calls) {
 
 (async () => {
   const calls = [];
-  const session = new EmulatorSession({ fetch: makeFetch(calls) });
+  const session = new EmulatorSession({ fetch: makeFetch(calls), lookup: publicLookup });
 
   await assert.rejects(() => session.execute("inspect", "body"), EmulatorError);
   await assert.rejects(() => session.execute("navigate", "file:///etc/passwd"), /only http/);
@@ -81,12 +83,40 @@ function makeFetch(calls) {
   await session.execute("navigate", "https://example.test/");
   assert.equal((await session.execute("click", "#about")).title, "About");
 
-  const tiny = new EmulatorSession({ fetch: makeFetch([]), maxBytes: 10 });
+  const tiny = new EmulatorSession({ fetch: makeFetch([]), lookup: publicLookup, maxBytes: 10 });
   await assert.rejects(() => tiny.navigate("https://example.test/"), /size limit/);
+
+  for (const redirectStatus of [301, 302, 303, 307, 308]) {
+    const redirectedCalls = [];
+    let cancelled = false;
+    const redirected = new EmulatorSession({
+      lookup: publicLookup,
+      fetch: async (url, init) => {
+        redirectedCalls.push({ url, init });
+        if (redirectedCalls.length === 1) return {
+          status: redirectStatus,
+          headers: new Headers({ location: "/destination" }),
+          body: { cancel: async () => { cancelled = true; } },
+        };
+        return { status: 200, text: async () => "<title>Done</title>" };
+      },
+    });
+    await redirected.navigate("https://example.test/submit", { method: "POST", body: "value=1" });
+    assert.equal(cancelled, true);
+    const preserved = [307, 308].includes(redirectStatus);
+    assert.equal(redirectedCalls[1].init.method, preserved ? "POST" : "GET");
+    assert.equal(redirectedCalls[1].init.body, preserved ? "value=1" : undefined);
+  }
+
+  const privateDns = new EmulatorSession({
+    lookup: async () => ({ address: "127.0.0.1", family: 4 }),
+    fetch: async () => { throw new Error("private DNS address reached fetch"); },
+  });
+  await assert.rejects(() => privateDns.navigate("https://example.test/"), /address is not public/);
 
   const input = new PassThrough();
   const output = new PassThrough();
-  serve(input, output, new EmulatorSession({ fetch: makeFetch([]) }));
+  serve(input, output, new EmulatorSession({ fetch: makeFetch([]), lookup: publicLookup }));
   const responses = [];
   output.on("data", (chunk) => responses.push(...String(chunk).trim().split("\n")));
   input.write('{"action":"navigate","target":"https://example.test/about"}\n');

@@ -5,7 +5,7 @@ import time
 from urllib.parse import quote
 
 import requests
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, current_app, jsonify, request
 
 from chat.image_blobs import INLINE_LIMIT_CHARS, load_image, save_image
 from chat.mcp_routes import LogosClient
@@ -92,7 +92,7 @@ def _image_url(data_url: str, conv_id: str) -> str:
     """Keep a small picture inline; keep a large one as a file that the chat can link to."""
     if len(data_url) <= INLINE_LIMIT_CHARS:
         return data_url
-    blob_id = save_image(data_url)
+    blob_id = save_image(data_url, conv_id)
     return f"/api/images/blobs/{blob_id}?conversation_id={quote(conv_id)}"
 
 
@@ -102,7 +102,7 @@ def read_image_blob(blob_id):
     conv_id = request.args.get("conversation_id")
     if not conv_id or not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
-    image = load_image(blob_id)
+    image = load_image(blob_id, conv_id)
     if image is None:
         return jsonify({"error": "image_not_found"}), 404
     mime, data = image
@@ -139,7 +139,13 @@ def read_image_operation(operation_id):
     except Exception:
         return jsonify({"status": "failed", "error": "provider_credential_unavailable"}), 503
 
-    reply = "![Alice AI ART](" + _image_url(data_url, conv_id) + ")"
+    try:
+        reply = "![Alice AI ART](" + _image_url(data_url, conv_id) + ")"
+    except (OSError, ValueError):
+        current_app.logger.exception("Unable to persist generated image")
+        # The provider operation already completed. Keep its id reusable for a later poll;
+        # do not start another generation or silently discard the original picture.
+        return jsonify({"status": "failed", "error": "image_storage_unavailable"}), 503
     add_message(
         conv_id,
         "assistant",

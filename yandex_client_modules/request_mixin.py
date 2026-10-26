@@ -258,6 +258,7 @@ class YandexRequestMixin:
                 images=images,
                 instructions=params.get("instructions"),
                 temperature=params.get("temperature"),
+                top_p=params.get("top_p"),
                 max_tokens=params.get("max_output_tokens"),
                 history=params.get("chat_history"),
             )
@@ -366,7 +367,29 @@ class YandexRequestMixin:
         request_end_timestamp = time.time()
         request_duration_ms = round((time.perf_counter() - request_start_perf) * 1000, 2)
 
-        data = resp.json()
+        try:
+            data = resp.json()
+        except ValueError as e:
+            # A 200 answer without JSON is not a usable reply, so the reserved request is not charged.
+            release_request(quota_reservation)
+            if execution_trace and isinstance(execution_trace, ExecutionTrace):
+                execution_trace.add_event(
+                    "api_response_invalid_json",
+                    {
+                        "method": "POST",
+                        "url": url,
+                        "step": trace_step_number,
+                        "model": payload.get("model"),
+                        "status_code": resp.status_code,
+                        "error": str(e),
+                        "start_timestamp": request_start_timestamp,
+                        "end_timestamp": request_end_timestamp,
+                    },
+                )
+            raise YandexClientError(
+                "Provider returned a response that is not valid JSON",
+                status_code=resp.status_code,
+            ) from e
         if images:
             try:
                 data = chat_completion_to_response(data)

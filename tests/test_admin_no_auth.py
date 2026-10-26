@@ -86,7 +86,7 @@ def test_agent_register_poll_heartbeat_and_result_without_tokens(client):
     assert client.post("/api/local-agents/phone-fixture/heartbeat").status_code == 200
     job = client.get("/api/local-agents/phone-fixture/poll").get_json()["job"]
     assert job["id"] == job_id
-    response = client.post(f"/api/local-agents/phone-fixture/jobs/{job_id}/result", json={"status": "completed", "result": {"value": 7}})
+    response = client.post(f"/api/local-agents/phone-fixture/jobs/{job_id}/result", json={"status": "completed", "result": {"value": 7}, "claim_token": job["claim_token"]})
     assert response.status_code == 200
     assert client.get("/api/local-agents/phone-fixture/poll").get_json()["job"] is None
     assert client.get("/api/local-agents/unknown/poll").status_code == 404
@@ -105,6 +105,33 @@ def test_agent_client_registers_without_bootstrap_token(client, monkeypatch):
     worker, legacy_token = agent_client.start_agent("http://gateway", agent_id="worker-fixture")
     assert worker.agent_id == "worker-fixture"
     assert legacy_token == ""
+
+
+def test_local_job_result_requires_current_nonempty_claim(client):
+    client.post("/api/local-agents/register", json={"agent_id": "claim-fixture"})
+    job_id = gateway.enqueue_local_tool_job("claim-fixture", "fixture.echo", {})
+    job = client.get("/api/local-agents/claim-fixture/poll").get_json()["job"]
+    url = f"/api/local-agents/claim-fixture/jobs/{job_id}/result"
+    payload = {"status": "completed", "result": {"success": True}}
+    assert client.post(url, json=payload).status_code == 409
+    assert client.post(url, json={**payload, "claim_token": "stale-claim"}).status_code == 409
+    assert gateway.get_store().get("local-job/" + job_id)["status"] == "running"
+    assert client.post(url, json={**payload, "claim_token": job["claim_token"]}).status_code == 200
+    assert client.post(url, json={**payload, "claim_token": job["claim_token"]}).get_json()["idempotent"] is True
+
+
+def test_legacy_running_job_cannot_complete_without_a_claim(client):
+    client.post("/api/local-agents/register", json={"agent_id": "legacy-claim-fixture"})
+    job_id = gateway.enqueue_local_tool_job("legacy-claim-fixture", "fixture.echo", {})
+    key = "local-job/" + job_id
+    with gateway.get_store().transaction() as tx:
+        tx.set(key, {**tx.get(key), "status": "running"})
+    response = client.post(
+        f"/api/local-agents/legacy-claim-fixture/jobs/{job_id}/result",
+        json={"status": "completed", "result": {"success": True}},
+    )
+    assert response.status_code == 409
+    assert gateway.get_store().get(key)["status"] == "running"
 
 
 def test_environment_routes_share_preexisting_records_without_owner_filter(client, monkeypatch):
@@ -138,7 +165,7 @@ def test_agent_http_client_round_trip_without_login(tmp_path, monkeypatch):
         job = agent_client._request("GET", base + "/api/local-agents/socket-fixture/poll")["job"]
         assert job["id"] == job_id
         worker = agent_client.LocalToolAgent(base, "socket-fixture")
-        worker._submit(job_id, "completed", {"success": True, "data": {"value": 11}})
+        worker._submit(job_id, "completed", {"success": True, "data": {"value": 11}}, job["claim_token"])
         assert agent_client._request("GET", base + "/api/local-agents/socket-fixture/poll")["job"] is None
         record = gateway.get_store().get("local-job/" + job_id)
         assert record["status"] == "completed"
@@ -158,7 +185,7 @@ def test_remote_tool_executor_uses_real_local_job_result(client, monkeypatch):
         job_id = enqueue(*args, **kwargs)
         job = client.get("/api/local-agents/executor-fixture/poll").get_json()["job"]
         assert job["id"] == job_id
-        response = client.post(f"/api/local-agents/executor-fixture/jobs/{job_id}/result", json={"status": "completed", "result": {"success": True, "data": {"value": 17}}})
+        response = client.post(f"/api/local-agents/executor-fixture/jobs/{job_id}/result", json={"status": "completed", "result": {"success": True, "data": {"value": 17}}, "claim_token": job["claim_token"]})
         assert response.status_code == 200
         return job_id
     monkeypatch.setattr(gateway, "enqueue_local_tool_job", complete_immediately)
@@ -178,6 +205,6 @@ def test_local_job_wait_timeout_and_failure_are_bounded(client):
     started = time.monotonic()
     assert gateway.wait_for_local_tool_job(job_id, timeout_seconds=0) is None
     assert time.monotonic() - started < 0.1
-    client.get("/api/local-agents/wait-fixture/poll")
-    client.post(f"/api/local-agents/wait-fixture/jobs/{job_id}/result", json={"status": "failed", "error": {"reason": "fixture failure"}})
+    job = client.get("/api/local-agents/wait-fixture/poll").get_json()["job"]
+    client.post(f"/api/local-agents/wait-fixture/jobs/{job_id}/result", json={"status": "failed", "error": {"reason": "fixture failure"}, "claim_token": job["claim_token"]})
     assert gateway.wait_for_local_tool_job(job_id, timeout_seconds=0) == {"success": False, "data": None, "error": {"reason": "fixture failure"}}

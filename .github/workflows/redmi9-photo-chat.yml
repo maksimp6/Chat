@@ -88,6 +88,10 @@ jobs:
                   failures.append("with_photo: the reply does not contain " + EXPECTED)
               elif not attachments and found:
                   failures.append("without_photo: the reply contains " + EXPECTED + " without the photo")
+              trace = chat.get("trace") if isinstance(chat, dict) else None
+              trace_errors = (trace or {}).get("errors") or []
+              if trace_errors:
+                  failures.append(label + ": trace has errors (" + ", ".join(sorted({str(e.get("type", "")) if isinstance(e, dict) else str(e) for e in trace_errors})) + ")")
           if failures:
               print(json.dumps({"result": "FAIL", "failures": failures}, ensure_ascii=False))
               raise SystemExit(1)

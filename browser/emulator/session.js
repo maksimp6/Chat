@@ -70,6 +70,7 @@ async function readCapped(response, maxBytes) {
 class EmulatorSession {
   constructor(options = {}) {
     this.fetch = options.fetch || globalThis.fetch;
+    this.lookup = options.lookup || dns.lookup;
     this.maxBytes = options.maxBytes || DEFAULT_MAX_BYTES;
     this.textLimit = options.textLimit || DEFAULT_TEXT_LIMIT;
     this.timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
@@ -103,7 +104,7 @@ class EmulatorSession {
   async _assertPublicUrl(url) {
     if (this.allowNonPublicHosts) return;
     if (isNonPublicHost(url.hostname)) throw new EmulatorError("address is not public: " + url.hostname);
-    const { address } = await dns.lookup(url.hostname.replace(/^\[|\]$/g, ""));
+    const { address } = await this.lookup(url.hostname.replace(/^\[|\]$/g, ""));
     if (isNonPublicHost(address)) throw new EmulatorError("address is not public: " + address);
   }
 
@@ -119,11 +120,29 @@ class EmulatorSession {
         signal: AbortSignal.timeout(this.timeoutMs),
       });
       const location =
-        response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
+        [301, 302, 303, 307, 308].includes(response.status) ? response.headers.get("location") : null;
       if (!location) break;
+      if (response.body && typeof response.body.cancel === "function") await response.body.cancel();
       if (hop >= MAX_REDIRECTS) throw new EmulatorError("too many redirects");
-      url = new URL(location, url);
-      requestInit = {};
+      const nextUrl = new URL(location, url);
+      if (!["http:", "https:"].includes(nextUrl.protocol)) {
+        throw new EmulatorError("only http(s) URLs are allowed");
+      }
+      const method = (requestInit.method || "GET").toUpperCase();
+      if ((response.status === 303 && method !== "HEAD") ||
+          ([301, 302].includes(response.status) && method === "POST")) {
+        const headers = new Headers(requestInit.headers);
+        for (const name of ["content-type", "content-length", "content-encoding", "content-language", "content-location"]) {
+          headers.delete(name);
+        }
+        requestInit = { ...requestInit, method: "GET", body: undefined, headers };
+      }
+      if (nextUrl.origin !== url.origin) {
+        const headers = new Headers(requestInit.headers);
+        for (const name of ["authorization", "proxy-authorization", "cookie"]) headers.delete(name);
+        requestInit = { ...requestInit, headers };
+      }
+      url = nextUrl;
     }
     const html = await readCapped(response, this.maxBytes);
     this.document = new DocumentShim(html);

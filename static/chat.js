@@ -361,7 +361,10 @@ function parseMarkdown(text) {
 
   var result = out.join("\n");
   for (var j = 0; j < codeBlocks.length; j++)
-    result = result.replace("\x00CB" + j + "\x00", codeBlocks[j]);
+    // A function keeps "$$", "$&" and "$'" in the code literal; a string would read them as patterns.
+    result = result.replace("\x00CB" + j + "\x00", function () {
+      return codeBlocks[j];
+    });
   for (var k = 0; k < maths.length; k++)
     result = result.replace("\x00MT" + k + "\x00", function () {
       return maths[k];
@@ -412,6 +415,13 @@ function buildDetails(content, usage, totalDurationMs, cost) {
   if (usage && usage.total_tokens) parts.push(`${usage.total_tokens} токенов`);
   if (cost && cost > 0) parts.push(`≈ ${cost.toFixed(2)} ₽`);
   if (totalDurationMs) parts.push(`${(totalDurationMs / 1000).toFixed(1)} с`);
+  // The cost is shown once, in this line; with nothing else to unfold it is a plain line.
+  if (!content.children.length) {
+    const line = document.createElement("div");
+    line.className = "msg-details";
+    line.textContent = parts.length ? "Детали · " + parts.join(" · ") : "Детали";
+    return line;
+  }
   const details = document.createElement("details");
   details.className = "msg-details";
   const summary = document.createElement("summary");
@@ -522,13 +532,6 @@ function addMessage(
     metaWrap.appendChild(usageBadge);
   }
 
-  if (cost && cost > 0) {
-    const billing = document.createElement("div");
-    billing.className = "billing-bubble";
-    billing.textContent = `≈ ${cost.toFixed(2)} ₽`;
-    metaWrap.appendChild(billing);
-  }
-
   if (timings && timings.length > 0) {
     const total = totalDurationMs ? `${totalDurationMs} мс` : "";
     const badge = document.createElement("details");
@@ -635,6 +638,7 @@ function addMessage(
         event.stopPropagation();
         if (typeof window.openTraceViewer !== "function") {
           console.error("[CHAT] Execution Trace Viewer is not loaded");
+          window.LogosToast.error("Просмотр трассы не загрузился. Обновите страницу.");
           return;
         }
         // A stored message keeps only a reference to its trace; the full trace is read from the invocation.
@@ -649,6 +653,7 @@ function addMessage(
             window.openTraceViewer(await res.json());
           } catch (err) {
             summary.textContent = "🔍 Трасса недоступна";
+            window.LogosToast.error("Не удалось загрузить трассу. Попробуйте позже.");
             console.error("[CHAT] Trace load failed: " + err.message);
           }
           return;
@@ -660,7 +665,7 @@ function addMessage(
     }
   }
 
-  if (metaWrap.children.length > 0) msg.appendChild(buildDetails(metaWrap, usage, totalDurationMs, cost));
+  if (metaWrap.children.length > 0 || (cost && cost > 0)) msg.appendChild(buildDetails(metaWrap, usage, totalDurationMs, cost));
   chatbox.appendChild(msg);
   chatbox.scrollTop = chatbox.scrollHeight;
   return msg;
@@ -684,8 +689,10 @@ function loadHistory(convId) {
           // A stored error answers the user message right before it; «Повторить» re-sends that message.
           const previous = index > 0 ? all[index - 1] : null;
           const retryText = msg.source === "error" && previous && previous.role === "user" ? previous.text : null;
+          // A user message that carried photos shows their count, as it did when it was sent.
+          const photos = msg.role === "user" && msg.attachments ? msg.attachments.images : 0;
           const node = addMessage(
-            msg.text,
+            photos ? msg.text + " · фото: " + photos : msg.text,
             msg.source === "error" ? "error" : msg.role,
             false,
             msg.cost || 0,
@@ -723,7 +730,16 @@ function loadHistory(convId) {
       console.error("[CHAT] Fetch history error:", err);
       const error = document.createElement("div");
       error.className = "empty-state error-state";
-      error.textContent = "Ошибка сети: " + err.message;
+      const text = document.createElement("p");
+      text.textContent = "Не удалось загрузить диалог. Проверьте соединение.";
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "logos-btn";
+      retry.textContent = "Повторить";
+      retry.addEventListener("click", function () {
+        loadHistory(convId);
+      });
+      error.append(text, retry);
       chatbox.replaceChildren(error);
     });
 }
@@ -732,7 +748,37 @@ document.addEventListener("DOMContentLoaded", function () {
   const sendBtn = document.getElementById("send-btn");
   const input = document.getElementById("msg-input");
   const pendingConversations = new Set();
+  // The chat request in flight for each conversation; «Стоп» aborts it from the UI.
+  const activeChatRequests = new Map();
   let creatingConversation = false;
+
+  // A photo error names its cause; other server codes are shown as they are.
+  function errorReasonText(data) {
+    if (data.error === "invalid_attachments") return "Фото не приняты: " + (data.message || "проверьте файлы");
+    if (data.error === "model_does_not_accept_images") {
+      return "Эта модель не принимает фото. Выберите модель с поддержкой фото.";
+    }
+    return data.error;
+  }
+
+  // Shows the reason in Russian. The browser's own message (for example «The operation was aborted») stays out of the chat.
+  function chatErrorText(error) {
+    if (error && error.name === "AbortError") {
+      return "Ответ остановлен. Сервер мог продолжить работу, проверьте диалог позже.";
+    }
+    if (error && error.name === "TimeoutError") {
+      return "Ответ не пришёл за 5 минут. Повторите запрос.";
+    }
+    return "Не удалось получить ответ. Проверьте соединение и повторите.";
+  }
+
+  // The send button becomes «Stop» while the chat in the open conversation is still answering.
+  function syncSendButton() {
+    if (!sendBtn) return;
+    const running = Boolean(currentConvId && activeChatRequests.has(currentConvId));
+    sendBtn.textContent = running ? "■" : "➤";
+    sendBtn.setAttribute("aria-label", running ? "Остановить ответ" : "Отправить");
+  }
 
   const attachBtn = document.getElementById("attach-btn");
   const imageInput = document.getElementById("image-input");
@@ -805,11 +851,11 @@ document.addEventListener("DOMContentLoaded", function () {
       for (const file of files) {
         // Count photos still being read, so two quick picks cannot pass the limit together.
         if (pendingImages.length + imagesInFlight >= MAX_IMAGES) {
-          addMessage("Можно прикрепить не больше " + MAX_IMAGES + " фото", "error", false, 0);
+          window.LogosToast.error("Можно прикрепить не больше " + MAX_IMAGES + " фото");
           break;
         }
         if (!IMAGE_TYPES.includes(file.type) || file.size > MAX_IMAGE_BYTES) {
-          addMessage("Фото «" + file.name + "»: нужен PNG, JPEG или WebP до 5 МБ", "error", false, 0);
+          window.LogosToast.error("Фото «" + file.name + "»: нужен PNG, JPEG или WebP до 5 МБ");
           continue;
         }
         imagesInFlight += 1;
@@ -817,7 +863,7 @@ document.addEventListener("DOMContentLoaded", function () {
           pendingImages.push({ name: file.name, dataUrl: await readAsDataUrl(file) });
           renderPendingImages();
         } catch (error) {
-          addMessage("Не удалось прочитать фото «" + file.name + "»", "error", false, 0);
+          window.LogosToast.error("Не удалось прочитать фото «" + file.name + "»");
         } finally {
           imagesInFlight -= 1;
         }
@@ -904,8 +950,15 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function sendMessage() {
+    const running = currentConvId ? activeChatRequests.get(currentConvId) : null;
+    if (running) {
+      running.abort();
+      return;
+    }
     return sendTurn(null);
   }
+
+  window.addEventListener("logos:conversation-selected", syncSendButton);
 
   // retryRequest is { text, conversationId } when «Повторить» re-sends a failed message.
   async function sendTurn(retryRequest) {
@@ -915,7 +968,10 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!text) return;
     if (retryRequest && currentConvId !== retryRequest.conversationId) return;
     const selectedAtSubmit = currentConvId;
-    if (selectedAtSubmit ? pendingConversations.has(selectedAtSubmit) : creatingConversation) return;
+    if (selectedAtSubmit ? pendingConversations.has(selectedAtSubmit) : creatingConversation) {
+      window.LogosToast.show("Ответ ещё формируется, дождитесь его окончания.");
+      return;
+    }
 
     const turn = { conversationId: selectedAtSubmit, model: currentModel, text: text };
     const needsConversation = !selectedAtSubmit;
@@ -924,10 +980,11 @@ document.addEventListener("DOMContentLoaded", function () {
     let typingEl = null;
     // Photos belong to this message only; they return to the tray if the send fails.
     const sentImages = retryRequest ? retryRequest.images || [] : pendingImages.slice();
-    if (!retryRequest) {
-      pendingImages = [];
-      renderPendingImages();
-    }
+    // Sent photos leave the tray. A retry finds them there again after a failed send, so they are removed here too.
+    pendingImages = pendingImages.filter(function (image) {
+      return !sentImages.includes(image);
+    });
+    renderPendingImages();
     let imagesRestored = false;
     function restoreImages() {
       if (imagesRestored || !sentImages.length) return;
@@ -973,8 +1030,12 @@ document.addEventListener("DOMContentLoaded", function () {
         data = await runImageTurn({ ...turn, retry: Boolean(retryRequest), attachmentCount: sentImages.length });
         response = { status: data.error ? 502 : 200, ok: !data.error };
       } else {
+        const chatController = new AbortController();
+        activeChatRequests.set(turn.conversationId, chatController);
+        syncSendButton();
         response = await window.LogosDispatcher.request("/api/chat", {
           method: "POST",
+          signal: chatController.signal,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             message: turn.text,
@@ -1009,7 +1070,9 @@ document.addEventListener("DOMContentLoaded", function () {
       if (currentConvId !== turn.conversationId) return;
       if (data.error) {
         restoreImages();
-        addMessage(data.reply || "⚠️ Ошибка: " + data.error, "error", false, data.cost || 0, data.timings,
+        // The failed text goes back to the field, unless the user already started a new draft.
+        if (!input.value) input.value = turn.text;
+        addMessage(data.reply || "⚠️ Ошибка: " + errorReasonText(data), "error", false, data.cost || 0, data.timings,
           clientTotalMs, data.reasoning, data.usage, data.trace, {
             onRetry: function () {
               if (data.operationId) resumeImageTurn(turn, data.operationId);
@@ -1028,12 +1091,14 @@ document.addEventListener("DOMContentLoaded", function () {
     } catch (error) {
       if (currentConvId === turn.conversationId) {
         restoreImages();
-        if (!input.value) input.value = rawText;
-        addMessage("⚠️ Ошибка: " + (error.message || "Сетевой сбой"), "error", false, 0);
+        if (!input.value) input.value = turn.text;
+        addMessage(chatErrorText(error), "error", false, 0);
       }
     } finally {
       if (typingEl) typingEl.remove();
       if (turn.conversationId) pendingConversations.delete(turn.conversationId);
+      if (turn.conversationId) activeChatRequests.delete(turn.conversationId);
+      syncSendButton();
       if (needsConversation) creatingConversation = false;
     }
   }
@@ -1041,12 +1106,14 @@ document.addEventListener("DOMContentLoaded", function () {
   if (sendBtn) sendBtn.addEventListener("click", sendMessage);
   if (input)
     input.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" && !e.shiftKey) {
+      // Enter that confirms an IME word is not a send.
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
         e.preventDefault();
         sendMessage();
       }
     });
 
   // Single history trigger: it does not depend on the conversation list or model catalog.
+  syncSendButton();
   if (currentConvId) loadHistory(currentConvId);
 });

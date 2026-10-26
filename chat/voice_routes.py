@@ -16,7 +16,7 @@ from flask import Blueprint, Response, jsonify, request, stream_with_context
 
 from core.config import Config, TEXT_MODELS
 from chat.mcp_routes import LogosClient, _provider_conversation_id
-from conversations.ownership import check_access
+from conversations.ownership import check_access, set_owner
 from economy.treasury_identity import get_current_owner_id
 from provider_accounts.credentials import (
     YANDEX,
@@ -25,7 +25,7 @@ from provider_accounts.credentials import (
     get_active_credential,
 )
 from secret_store.credential_crypto import decrypt_secret
-from storage.db import add_message, get_store
+from storage.db import add_message, create_conversation, get_store, maybe_update_conversation_title
 
 
 voice_bp = Blueprint("voice", __name__)
@@ -49,6 +49,7 @@ class VoiceSession:
     audio_content_type: str = "application/octet-stream"
     output_audio: bytes | None = None
     closed: bool = False
+    processing_done: bool = False
     events: queue.Queue = field(default_factory=queue.Queue)
 
 
@@ -203,24 +204,21 @@ def _tts(text: str, voice: str) -> bytes:
     return response.content
 
 
-def _save_turn(conversation_id: str, transcript: str, reply: str) -> None:
-    """Keep the voice exchange in the chat history, so it survives a reload."""
-    add_message(conversation_id, "user", transcript)
-    add_message(conversation_id, "assistant", reply)
-
-
 def _process(session: VoiceSession) -> None:
     try:
         _emit(session, "input_audio_buffer.speech_stopped")
         transcript = _stt(bytes(session.audio), session.audio_content_type)
         if not transcript:
             raise ValueError("speech was not recognized")
+        # Preserve the recognized question even if the subsequent model request fails.
+        add_message(session.conversation_id, "user", transcript, source="voice")
+        maybe_update_conversation_title(session.conversation_id, transcript)
         _emit(
             session, "conversation.item.input_audio_transcription.completed", transcript=transcript
         )
 
         reply = _chat(transcript, session.conversation_id, session.model)
-        _save_turn(session.conversation_id, transcript, reply)
+        add_message(session.conversation_id, "assistant", reply, source="voice")
         if session.response_mode in {"text", "both", "audio"}:
             _emit(session, "response.output_text.done", text=reply)
 
@@ -236,6 +234,8 @@ def _process(session: VoiceSession) -> None:
     except Exception:
         _emit(session, "error", error={"message": "Внутренняя ошибка обработки голоса"})
         _emit(session, "response.done")
+    finally:
+        session.processing_done = True
 
 
 @voice_bp.post("/api/voice/session")
@@ -246,6 +246,16 @@ def create_voice_session():
     conversation_id = data.get("conversation_id")
     if conversation_id and not check_access(conversation_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
+    if not conversation_id:
+        # A first voice turn gets the same durable local chat as a first typed turn.
+        conversation_id = str(uuid.uuid4())
+        set_owner(conversation_id, owner_id)
+        create_conversation(
+            conversation_id,
+            "Новый чат",
+            str(data.get("model") or "speech-realtime-deepseek-v4-flash"),
+            provider_pending=True,
+        )
 
     session = VoiceSession(
         session_id=uuid.uuid4().hex,
@@ -257,7 +267,7 @@ def create_voice_session():
     )
     with _sessions_lock:
         _sessions[session.session_id] = session
-    return jsonify({"session_id": session.session_id})
+    return jsonify({"session_id": session.session_id, "conversation_id": conversation_id})
 
 
 @voice_bp.post("/api/voice/audio")
@@ -293,6 +303,10 @@ def voice_events():
             try:
                 event = session.events.get(timeout=15)
             except queue.Empty:
+                if session.processing_done:
+                    # EventSource may reconnect after the terminal event left the queue.
+                    yield 'data: {"type": "response.done"}\n\n'
+                    break
                 yield ": keep-alive\n\n"
                 continue
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
@@ -331,6 +345,7 @@ def close_voice_session():
         session.closed = True
 
     if not session.audio:
+        session.processing_done = True
         _emit(session, "error", error={"message": "audio is empty"})
         _emit(session, "response.done")
         return jsonify({"status": "closed"})

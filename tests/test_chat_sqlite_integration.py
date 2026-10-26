@@ -17,7 +17,7 @@ class TestChatMemoryStoreIntegration(unittest.TestCase):
         conversation_id = "memory-integration-test"
 
         class FakeClient:
-            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None, *, settings_conversation_id=None):
                 if not isinstance(trace, ExecutionTrace):
                     raise AssertionError("ExecutionTrace must be passed explicitly")
                 trace.add_response(

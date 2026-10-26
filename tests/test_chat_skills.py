@@ -38,7 +38,7 @@ def test_chat_lazily_loads_selected_skill_into_instructions_and_trace():
     captured = {}
 
     class FakeClient:
-        def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+        def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None, *, settings_conversation_id=None):
             captured["instructions"] = params.get("instructions")
             return {"output": [], "usage": {}}
 

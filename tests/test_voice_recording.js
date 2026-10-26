@@ -20,6 +20,8 @@ async function main() {
   );
   const requests = [];
   const recorders = [];
+  const eventSources = [];
+  const createdConversations = [];
 
   class FakeMediaRecorder {
     static isTypeSupported(mime) {
@@ -56,12 +58,20 @@ async function main() {
     },
   };
 
-  browser.load([path.join(ROOT, "static", "voice.js")], {
+  const loaded = browser.load([path.join(ROOT, "static", "voice.js")], {
     LogosDispatcher: dispatcher,
     fetch: () => {
       throw new Error("voice.js must use LogosDispatcher instead of fetch");
     },
     Blob,
+    currentConvId: null,
+    createConversation: async (model, options) => {
+      createdConversations.push({ model, options });
+      return "voice-conversation";
+    },
+    selectConv: async (id) => {
+      loaded.context.currentConvId = id;
+    },
     MediaRecorder: FakeMediaRecorder,
     AudioContext: class {
       createMediaStreamSource() {
@@ -71,6 +81,9 @@ async function main() {
       close() {}
     },
     EventSource: class {
+      constructor() {
+        eventSources.push(this);
+      }
       close() {}
     },
     navigator: {
@@ -82,6 +95,8 @@ async function main() {
   await settle();
 
   assert.strictEqual(requests[0].url, "/api/voice/session");
+  assert.strictEqual(createdConversations.length, 1, "first voice turn creates one local conversation");
+  assert.strictEqual(JSON.parse(requests[0].init.body).conversation_id, "voice-conversation");
   assert.ok(requests[0].options.timeoutMs > 0, "requests must carry a dispatcher timeout");
   assert.strictEqual(recorders.length, 1);
   const recorder = recorders[0];
@@ -98,6 +113,14 @@ async function main() {
     requests.map((request) => request.url),
     ["/api/voice/session", "/api/voice/audio?session_id=voice-1", "/api/voice/close"],
   );
+
+  browser.document.getElementById("mic-btn").click();
+  await settle();
+  assert.strictEqual(recorders.length, 1, "a processing session must not be replaced after close returns");
+  eventSources[0].onmessage({ data: JSON.stringify({ type: "response.done" }) });
+  browser.document.getElementById("mic-btn").click();
+  await settle();
+  assert.strictEqual(recorders.length, 2, "another recording is allowed when processing has completed");
 
   console.log("voice recording tests passed");
 }

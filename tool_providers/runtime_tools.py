@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 from core.env import env_require, env_snapshot
+from core.output import limit_output
 
 import math
 import os
+import shutil
 import subprocess
 from typing import Any
 
@@ -60,19 +62,6 @@ def _runtime_args(args: dict, cfg: dict | None) -> dict:
     }
 
 
-def _limit_local_output(value: str | bytes | None, max_bytes: int = 1048576) -> str:
-    if value is None:
-        return ""
-    text = value.decode("utf-8", errors="replace") if isinstance(value, bytes) else str(value)
-    raw = text.encode("utf-8", errors="replace")
-    if len(raw) <= max_bytes:
-        return text
-    suffix = "\n...[output truncated]"
-    suffix_bytes = suffix.encode("utf-8")
-    budget = max(0, max_bytes - len(suffix_bytes))
-    return raw[:budget].decode("utf-8", errors="ignore") + suffix
-
-
 _COMMAND_ENV_NAMES = ("PATH", "HOME", "LANG", "LC_ALL", "TERM", "TMPDIR", "USER", "LOGNAME", "SHELL")
 
 
@@ -109,7 +98,7 @@ def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
 
     try:
         completed = subprocess.run(
-            ["/bin/bash", "-lc", command],
+            [shutil.which("bash") or "sh", "-lc", command],
             shell=False,
             check=False,
             stdin=subprocess.DEVNULL,
@@ -123,8 +112,8 @@ def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
         result = {
             "success": False,
             "error": f"Local command timed out after {timeout:g}s",
-            "stdout": _limit_local_output(exc.stdout),
-            "stderr": _limit_local_output(exc.stderr),
+            "stdout": limit_output(exc.stdout),
+            "stderr": limit_output(exc.stderr),
             "exit_code": None,
             "cwd": cwd,
             "timeout_seconds": timeout,
@@ -164,8 +153,8 @@ def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
 
     result = {
         "success": completed.returncode == 0,
-        "stdout": _limit_local_output(completed.stdout),
-        "stderr": _limit_local_output(completed.stderr),
+        "stdout": limit_output(completed.stdout),
+        "stderr": limit_output(completed.stderr),
         "exit_code": completed.returncode,
         "cwd": cwd,
         "timeout_seconds": timeout,

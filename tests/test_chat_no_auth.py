@@ -33,7 +33,7 @@ class FakeClient:
     def create_conversation(self, execution_trace=None):
         return {"id": "shared-conversation"}
 
-    def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+    def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None, *, settings_conversation_id=None):
         trace.add_response({"id": "offline-response", "status": "completed", "output": []})
         return {"output": [], "usage": {}}
 

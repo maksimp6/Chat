@@ -12,11 +12,54 @@ import inspect
 import logging
 import re
 import shutil
+from importlib import import_module
 from typing import Any, Mapping, Optional
 
 from tool_providers.universal_tool_platform import UniversalToolDefinition, validate_json_schema
 
 logger = logging.getLogger("tool_registry")
+
+_GIT_READ_TOOLS = frozenset({"git_status", "git_log", "git_diff", "git_branches"})
+_GIT_WRITE_TOOLS = frozenset({"git_add", "git_commit", "git_remote", "git_push", "git_pull", "git_fetch"})
+
+# (category, module, attribute, log label, exception logged instead of raised)
+_TOOL_SOURCES: tuple[tuple[str, str, str, str, type[BaseException]], ...] = (
+    ("git", "tool_providers.git", "GIT_TOOLS", "Git", Exception),
+    ("termux", "tool_providers.termux", "TERMUX_TOOLS", "Termux", Exception),
+    ("system", "tool_providers.termux_system", "SYSTEM_TOOLS", "System", Exception),
+    ("filesystem", "tool_providers.filesystem", "FILESYSTEM_TOOLS", "Filesystem", Exception),
+    ("wikipedia", "tool_providers.wikipedia", "WIKIPEDIA_TOOLS", "Wikipedia", Exception),
+    ("profiler", "tool_providers.profiler", "PROFILER_TOOLS", "Profiler", Exception),
+    ("theme", "tool_providers.theme", "THEME_TOOLS", "Theme", Exception),
+    ("runtime", "tool_providers.runtime_tools", "RUNTIME_TOOLS", "Runtime", Exception),
+    ("government", "organization.government", "GOVERNMENT_TOOLS", "Government", Exception),
+    ("partner", "organization.partner_relations", "PARTNER_TOOLS", "Partner Relations", Exception),
+    ("3d", "forge.tools", "PRINTING3D_TOOLS", "3D Printing", Exception),
+    ("3d", "model_editor.tools", "MODEL_EDITOR_TOOLS", "Model Editor", ImportError),
+    ("cloud", "cloud.tools", "CLOUD_TOOLS", "Cloud tools", Exception),
+)
+
+
+def _git_policy(name: str, cfg: Mapping[str, Any]) -> Mapping[str, Any]:
+    if name in _GIT_READ_TOOLS:
+        return {
+            **cfg,
+            "capabilities": ["git", "read", "mcp"],
+            "risk_level": "low",
+            "read_only": True,
+            "requires_approval": False,
+            "supported_transports": ["responses_api", "local_agent", "mcp"],
+        }
+    if name in _GIT_WRITE_TOOLS:
+        return {
+            **cfg,
+            "capabilities": ["git", "write", "mcp"],
+            "risk_level": "high",
+            "read_only": False,
+            "requires_approval": True,
+            "supported_transports": ["responses_api", "local_agent", "mcp"],
+        }
+    return cfg
 
 
 class ToolRegistry:
@@ -77,135 +120,17 @@ class ToolRegistry:
         self._register(category, name, cfg)
 
     def _load_all(self):
-        try:
-            from tool_providers.git import GIT_TOOLS
-
-            mcp_read_tools = {"git_status", "git_log", "git_diff", "git_branches"}
-            mcp_write_tools = {
-                "git_add",
-                "git_commit",
-                "git_remote",
-                "git_push",
-                "git_pull",
-                "git_fetch",
-            }
-            for name, cfg in GIT_TOOLS.items():
-                if name in mcp_read_tools:
-                    cfg = {
-                        **cfg,
-                        "capabilities": ["git", "read", "mcp"],
-                        "risk_level": "low",
-                        "read_only": True,
-                        "requires_approval": False,
-                        "supported_transports": ["responses_api", "local_agent", "mcp"],
-                    }
-                elif name in mcp_write_tools:
-                    cfg = {
-                        **cfg,
-                        "capabilities": ["git", "write", "mcp"],
-                        "risk_level": "high",
-                        "read_only": False,
-                        "requires_approval": True,
-                        "supported_transports": ["responses_api", "local_agent", "mcp"],
-                    }
-                self._register("git", name, cfg)
-        except Exception as e:
-            logger.error(f"[REGISTRY] Ошибка загрузки Git: {e}")
-
-        try:
-            from tool_providers.termux import TERMUX_TOOLS
-
-            for name, cfg in TERMUX_TOOLS.items():
-                self._register("termux", name, cfg)
-        except Exception as e:
-            logger.error(f"[REGISTRY] Ошибка загрузки Termux: {e}")
-
-        try:
-            from tool_providers.termux_system import SYSTEM_TOOLS
-
-            for name, cfg in SYSTEM_TOOLS.items():
-                self._register("system", name, cfg)
-        except Exception as e:
-            logger.error(f"[REGISTRY] Ошибка загрузки System: {e}")
-
-        try:
-            from tool_providers.filesystem import FILESYSTEM_TOOLS
-
-            for name, cfg in FILESYSTEM_TOOLS.items():
-                self._register("filesystem", name, cfg)
-        except Exception as e:
-            logger.error(f"[REGISTRY] Ошибка загрузки Filesystem: {e}")
-
-        try:
-            from tool_providers.wikipedia import WIKIPEDIA_TOOLS
-
-            for name, cfg in WIKIPEDIA_TOOLS.items():
-                self._register("wikipedia", name, cfg)
-        except Exception as e:
-            logger.error(f"[REGISTRY] Ошибка загрузки Wikipedia: {e}")
-
-        try:
-            from tool_providers.profiler import PROFILER_TOOLS
-
-            for name, cfg in PROFILER_TOOLS.items():
-                self._register("profiler", name, cfg)
-        except Exception as e:
-            logger.error(f"[REGISTRY] Ошибка загрузки Profiler: {e}")
-
-        try:
-            from tool_providers.theme import THEME_TOOLS
-
-            for name, cfg in THEME_TOOLS.items():
-                self._register("theme", name, cfg)
-        except Exception as e:
-            logger.error(f"[REGISTRY] Ошибка загрузки Theme: {e}")
-
-        try:
-            from tool_providers.runtime_tools import RUNTIME_TOOLS
-
-            for name, cfg in RUNTIME_TOOLS.items():
-                self._register("runtime", name, cfg)
-        except Exception as e:
-            logger.error(f"[REGISTRY] Ошибка загрузки Runtime: {e}")
-        try:
-            from organization.government import GOVERNMENT_TOOLS
-
-            for name, cfg in GOVERNMENT_TOOLS.items():
-                self._register("government", name, cfg)
-        except Exception as e:
-            logger.error(f"[REGISTRY] Ошибка загрузки Government: {e}")
-
-        try:
-            from organization.partner_relations import PARTNER_TOOLS
-
-            for name, cfg in PARTNER_TOOLS.items():
-                self._register("partner", name, cfg)
-        except Exception as e:
-            logger.error(f"[REGISTRY] Ошибка загрузки Partner Relations: {e}")
-
-        try:
-            from forge.tools import PRINTING3D_TOOLS
-
-            for name, cfg in PRINTING3D_TOOLS.items():
-                self._register("3d", name, cfg)
-        except Exception as e:
-            logger.error(f"[REGISTRY] Ошибка загрузки 3D Printing: {e}")
-
-        try:
-            from model_editor.tools import MODEL_EDITOR_TOOLS
-
-            for name, cfg in MODEL_EDITOR_TOOLS.items():
-                self._register("3d", name, cfg)
-        except ImportError as e:
-            logger.error(f"[REGISTRY] Ошибка загрузки Model Editor: {e}")
-
-        try:
-            from cloud.tools import CLOUD_TOOLS
-
-            for name, cfg in CLOUD_TOOLS.items():
-                self._register("cloud", name, cfg)
-        except Exception as e:
-            logger.error(f"[REGISTRY] Ошибка загрузки Cloud tools: {e}")
+        for category, module_name, attribute, label, failure in _TOOL_SOURCES:
+            try:
+                tools = getattr(import_module(module_name), attribute, None)
+                if tools is None:
+                    raise ImportError(f"{module_name} does not export {attribute}")
+                for name, cfg in tools.items():
+                    if category == "git":
+                        cfg = _git_policy(name, cfg)
+                    self._register(category, name, cfg)
+            except failure as e:
+                logger.error(f"[REGISTRY] Ошибка загрузки {label}: {e}")
 
     @staticmethod
     def _is_open_object(schema: Any) -> bool:

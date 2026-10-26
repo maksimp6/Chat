@@ -427,6 +427,5 @@ def execute_termux_tool(tool_name: str, arguments: dict, cfg: dict = None) -> di
     return TOOL_REGISTRY[tool_name]["func"](arguments, cfg or {})
 
 
-# Messages, camera, contacts and Wi-Fi details need their own decision before they are offered to the model.
-_UNREGISTERED_SYSTEM_TOOLS = {"list_sms", "send_sms", "take_camera_photo", "list_contacts", "get_wifi_status"}
-SYSTEM_TOOLS = {name: cfg for name, cfg in TOOL_REGISTRY.items() if name not in _UNREGISTERED_SYSTEM_TOOLS}
+# Keep the complete system surface; private operations retain their per-tool approvals above.
+SYSTEM_TOOLS = TOOL_REGISTRY

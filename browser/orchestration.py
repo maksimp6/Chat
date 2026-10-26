@@ -334,6 +334,23 @@ class BrowserRoleDag:
                             pending.remove(task_id)
                             changed = True
 
+                # A timed-out write can still be changing its session. Do not wait forever for
+                # that worker or queue more work behind it; report the affected tasks explicitly.
+                quarantined_tasks = {
+                    task.task_id: task for future, task in quarantined.items() if not future.done()
+                }
+                for task_id in sorted(tuple(pending)):
+                    task = self._task_map[task_id]
+                    if not self._session_can_start(task, quarantined_tasks):
+                        results[task_id] = BrowserTaskResult(
+                            task_id,
+                            "blocked",
+                            task.role,
+                            task.session_id,
+                            error="session still busy after a task timed out",
+                        )
+                        pending.remove(task_id)
+
                 available_slots = self.budget.max_parallel_workers - len(running)
                 if available_slots > 0:
                     running_tasks = {
@@ -418,7 +435,7 @@ class BrowserRoleDag:
 
         duration = max(0.0, self.clock() - started)
         statuses = {result.status for result in results.values()}
-        status = "failed" if "failed" in statuses else "succeeded"
+        status = "failed" if statuses & {"failed", "blocked", "cancelled"} else "succeeded"
 
         return BrowserDagResult(
             status=status,

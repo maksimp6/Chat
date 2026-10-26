@@ -9,21 +9,13 @@ from economy.budget_controller import BudgetLimitExceeded, CloudBudgetGuard
 from cloud.base import CloudProviderError
 from cloud.registry import ensure_default_providers, resolve_provider_name
 from tool_providers.runtime_tools import ssh_runtime_exec
+from tool_providers.schema import object_schema
 from observability.trace_manager import get_current_trace
 
 
 def _provider(args: dict[str, Any]):
     name = resolve_provider_name(args)
     return ensure_default_providers().get(name)
-
-
-def _schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
-    return {
-        "type": "object",
-        "properties": properties,
-        "required": required,
-        "additionalProperties": False,
-    }
 
 
 def _result(fn):
@@ -218,7 +210,7 @@ CLOUD_TOOLS = {
         cloud_capabilities,
         read_only=True,
         requires_approval=False,
-        schema=_schema(_PROVIDER, []),
+        schema=object_schema(_PROVIDER, []),
         title="Cloud Capabilities",
         description="Return provider-neutral cloud service capabilities.",
     ),
@@ -226,7 +218,7 @@ CLOUD_TOOLS = {
         cloud_resources_list,
         read_only=True,
         requires_approval=False,
-        schema=_schema(
+        schema=object_schema(
             {
                 **_PROVIDER,
                 "service": {"type": "string", "minLength": 1, "maxLength": 64},
@@ -242,7 +234,7 @@ CLOUD_TOOLS = {
         cloud_resources_get,
         read_only=True,
         requires_approval=False,
-        schema=_schema(
+        schema=object_schema(
             {
                 **_PROVIDER,
                 "service": {"anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]},
@@ -258,7 +250,7 @@ CLOUD_TOOLS = {
         cloud_compute,
         read_only=True,
         requires_approval=False,
-        schema=_schema(
+        schema=object_schema(
             {
                 **_PROVIDER,
                 "operation": {"type": "string", "const": "list"},
@@ -274,7 +266,7 @@ CLOUD_TOOLS = {
         cloud_compute,
         read_only=True,
         requires_approval=False,
-        schema=_schema(
+        schema=object_schema(
             {
                 **_PROVIDER,
                 "operation": {"type": "string", "const": "status"},
@@ -290,7 +282,7 @@ CLOUD_TOOLS = {
         cloud_compute,
         read_only=False,
         requires_approval=True,
-        schema=_schema(
+        schema=object_schema(
             {
                 **_PROVIDER,
                 "operation": {"type": "string", "const": "start"},
@@ -306,7 +298,7 @@ CLOUD_TOOLS = {
         cloud_compute,
         read_only=False,
         requires_approval=True,
-        schema=_schema(
+        schema=object_schema(
             {
                 **_PROVIDER,
                 "operation": {"type": "string", "const": "stop"},
@@ -322,7 +314,7 @@ CLOUD_TOOLS = {
         cloud_compute,
         read_only=False,
         requires_approval=True,
-        schema=_schema(
+        schema=object_schema(
             {
                 **_PROVIDER,
                 "operation": {"type": "string", "const": "reboot"},
@@ -338,7 +330,7 @@ CLOUD_TOOLS = {
         cloud_logs_query,
         read_only=True,
         requires_approval=False,
-        schema=_schema(
+        schema=object_schema(
             {
                 **_PROVIDER,
                 "query": {"type": "string", "minLength": 1, "maxLength": 8000},
@@ -356,7 +348,7 @@ CLOUD_TOOLS = {
         cloud_metrics_query,
         read_only=True,
         requires_approval=False,
-        schema=_schema(
+        schema=object_schema(
             {
                 **_PROVIDER,
                 "query": {"type": "string", "minLength": 1, "maxLength": 8000},
@@ -375,7 +367,7 @@ CLOUD_TOOLS = {
         cloud_backup,
         read_only=False,
         requires_approval=True,
-        schema=_schema(
+        schema=object_schema(
             {
                 **_PROVIDER,
                 "operation": {"type": "string", "const": "create"},
@@ -391,7 +383,7 @@ CLOUD_TOOLS = {
         cloud_costs_summary,
         read_only=True,
         requires_approval=False,
-        schema=_schema(
+        schema=object_schema(
             {
                 **_PROVIDER,
                 "period": {"anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]},
@@ -406,7 +398,7 @@ CLOUD_TOOLS = {
         cloud_budget_status,
         read_only=True,
         requires_approval=False,
-        schema=_schema(
+        schema=object_schema(
             {
                 **_PROVIDER,
                 "refresh": {"anyOf": [{"type": "boolean"}, {"type": "null"}]},
@@ -423,7 +415,7 @@ CLOUD_TOOLS = {
         cloud_ssh_exec,
         read_only=False,
         requires_approval=True,
-        schema=_schema(
+        schema=object_schema(
             {
                 "target": {"type": "string", "minLength": 1, "maxLength": 128},
                 "command": {"type": "string", "minLength": 1, "maxLength": 20000},

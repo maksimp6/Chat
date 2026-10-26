@@ -30,6 +30,16 @@
     });
   }
 
+  // Aborts when either signal aborts; keeps the reason of the one that did.
+  function combineSignals(first, second) {
+    const controller = new AbortController();
+    [first, second].forEach(function (signal) {
+      if (signal.aborted) controller.abort(signal.reason);
+      else signal.addEventListener("abort", function () { controller.abort(signal.reason); }, { once: true });
+    });
+    return controller.signal;
+  }
+
   function request(input, init, options) {
     const settings = options || {};
     const requestedTimeout = Number(settings.timeoutMs);
@@ -41,7 +51,10 @@
     );
     const requestInit = Object.assign({}, init || {});
     if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
-      requestInit.signal = AbortSignal.timeout(timeoutMs);
+      // The caller's signal (for example «Stop») and the timeout both end the request.
+      requestInit.signal = requestInit.signal
+        ? combineSignals(requestInit.signal, AbortSignal.timeout(timeoutMs))
+        : AbortSignal.timeout(timeoutMs);
     }
 
     const trace = beginRequestTrace(input);

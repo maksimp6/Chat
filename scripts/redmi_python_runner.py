@@ -13,7 +13,6 @@ import os
 from pathlib import Path
 import platform
 import re
-import shutil
 import signal
 import subprocess
 import sys
@@ -287,17 +286,6 @@ def job_secrets(job):
     return {str(k).upper(): str(v.get("value", ""))
             for k, v in job.get("variables", {}).items() if v.get("isSecret") is True}
 
-WORK_RETENTION = 3
-
-
-def _prune_old_work_dirs(root, keep):
-    """Keep the newest job workspaces; older screenshots and videos would fill the device storage."""
-    stale = sorted((p for p in root.iterdir() if p.is_dir() and p != keep),
-                   key=lambda p: p.stat().st_mtime, reverse=True)
-    for path in stale[WORK_RETENTION - 1:]:
-        shutil.rmtree(path, ignore_errors=True)
-
-
 def decode_env(value, github, secrets=None, inputs=None):
     """Resolve explicit token, secret and workflow-input names only; never evaluate arbitrary expressions."""
     if isinstance(value, dict) and "expr" in value:
@@ -308,7 +296,15 @@ def decode_env(value, github, secrets=None, inputs=None):
             return (secrets or {}).get(expression.split(".", 1)[1].upper(), "")
         match = re.fullmatch(r"inputs\.([A-Za-z_][A-Za-z0-9_-]*)", expression)
         if match and match.group(1) in (inputs or {}):
-            return str((inputs or {})[match.group(1)])
+            value = (inputs or {})[match.group(1)]
+            # Match the workflow expression representation of typed boolean inputs.
+            if isinstance(value, bool):
+                return "true" if value else "false"
+            if value is None:
+                return ""
+            if isinstance(value, (str, int, float)):
+                return str(value)
+            raise ValueError("Only scalar workflow inputs are supported")
         raise ValueError("Unsupported environment expression")
     if isinstance(value, dict) and "map" in value:
         return {decode(x.get("key", x.get("Key"))): decode_env(x.get("value", x.get("Value")), github, secrets, inputs)
@@ -465,7 +461,6 @@ class Job:
             github = validate_job(self.message, self.listener.config["repo"])
             work = self.listener.state / "work" / self.id
             work.mkdir(mode=0o700, parents=True, exist_ok=True)
-            _prune_old_work_dirs(self.listener.state / "work", keep=work)
             runner_temp = work / "_runner_temp"
             runner_temp.mkdir(mode=0o700, exist_ok=True)
             env = {k: v for k, v in os.environ.items() if k in

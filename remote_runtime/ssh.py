@@ -6,6 +6,7 @@ remote OS identity, so Linux permissions remain the authorization boundary.
 
 from __future__ import annotations
 from core.env import env_get
+from core.output import limit_output
 
 import json
 import os
@@ -160,17 +161,6 @@ class SSHRuntime:
         return target, user
 
     @staticmethod
-    def _limit_output(value: str, max_bytes: int) -> str:
-        text = value or ""
-        raw = text.encode("utf-8", errors="replace")
-        if len(raw) <= max_bytes:
-            return text
-        suffix = "\n...[output truncated]"
-        suffix_bytes = suffix.encode("utf-8")
-        budget = max(0, max_bytes - len(suffix_bytes))
-        return raw[:budget].decode("utf-8", errors="ignore") + suffix
-
-    @staticmethod
     def _validate_remote_path(path: str) -> str:
         value = str(path or "").strip()
         if not value or "\x00" in value:
@@ -276,8 +266,8 @@ class SSHRuntime:
             "host": resolved_target.host,
             "linux_user": user,
             "command": command,
-            "stdout": self._limit_output(completed.stdout, resolved_target.max_output_bytes),
-            "stderr": self._limit_output(completed.stderr, resolved_target.max_output_bytes),
+            "stdout": limit_output(completed.stdout, resolved_target.max_output_bytes),
+            "stderr": limit_output(completed.stderr, resolved_target.max_output_bytes),
             "exit_code": completed.returncode,
         }
 
@@ -387,8 +377,8 @@ class SSHRuntime:
             "path": remote_path,
             "operation": "write_file",
             "bytes_written": len(str(content).encode("utf-8")),
-            "stdout": self._limit_output(completed.stdout, resolved_target.max_output_bytes),
-            "stderr": self._limit_output(completed.stderr, resolved_target.max_output_bytes),
+            "stdout": limit_output(completed.stdout, resolved_target.max_output_bytes),
+            "stderr": limit_output(completed.stderr, resolved_target.max_output_bytes),
             "exit_code": completed.returncode,
         }
 

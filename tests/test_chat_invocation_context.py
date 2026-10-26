@@ -11,7 +11,7 @@ def test_chat_uses_invocation_context_identifiers():
     captured = {}
 
     class FakeClient:
-        def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+        def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None, *, settings_conversation_id=None):
             captured["conversation_id"] = conversation_id
             captured["trace"] = trace
             trace.add_response(
@@ -60,7 +60,7 @@ def test_chat_context_is_fresh_for_each_request():
     trace_ids = []
 
     class FakeClient:
-        def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+        def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None, *, settings_conversation_id=None):
             trace_ids.append(trace.trace_id)
             return {"output": [], "usage": {}}
 

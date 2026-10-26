@@ -1,4 +1,5 @@
 import json
+import queue
 import struct
 import time
 
@@ -8,6 +9,16 @@ import pytest
 
 import chat.voice_routes as voice_routes
 from app import app
+
+
+@pytest.fixture(autouse=True)
+def voice_memory(tmp_path, monkeypatch):
+    from agent_memory.client import close_memory_clients
+
+    monkeypatch.setenv("LOGOS_MEMORY_PATH", str(tmp_path / "voice.memory"))
+    close_memory_clients()
+    yield
+    close_memory_clients()
 
 
 def _wav():
@@ -26,8 +37,11 @@ def _wav():
 
 @pytest.fixture()
 def client(monkeypatch):
+    from storage.db import create_conversation
+
     monkeypatch.setenv("YANDEX_API_KEY", "test-key")
     monkeypatch.setenv("YANDEX_PROJECT_ID", "test-project")
+    create_conversation("voice-conv", "Voice", "yandexgpt-5-lite")
     app.config.update(TESTING=True)
     with app.test_client() as c:
         yield c
@@ -57,7 +71,7 @@ def test_voice_session_lifecycle_and_pipeline(client, monkeypatch):
     session = client.post(
         "/api/voice/session",
         json={
-            "conversation_id": None,
+            "conversation_id": "voice-conv",
             "model": "speech-realtime-250923",
             "voice": "filipp",
             "response_mode": "audio",
@@ -106,6 +120,34 @@ def test_voice_audio_size_limit(client):
     assert response.status_code == 413
 
 
+def test_first_voice_session_has_a_durable_local_conversation(client):
+    import storage.db as db
+
+    response = client.post("/api/voice/session", json={"model": "speech-realtime-250923"})
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["conversation_id"]
+    assert voice_routes._require_session(data["session_id"]).conversation_id == data["conversation_id"]
+    assert any(item["id"] == data["conversation_id"] for item in db.get_conversations())
+    assert db.is_provider_pending(data["conversation_id"])
+
+
+def test_completed_voice_stream_replays_terminal_event_after_reconnect(client, monkeypatch):
+    session_id = client.post("/api/voice/session", json={}).get_json()["session_id"]
+    session = voice_routes._require_session(session_id)
+    session.processing_done = True
+
+    def empty_queue(**kwargs):
+        raise queue.Empty
+
+    monkeypatch.setattr(session.events, "get", empty_queue)
+    response = client.get(f"/api/voice/events?session_id={session_id}")
+
+    assert response.status_code == 200
+    assert '"type": "response.done"' in response.get_data(as_text=True)
+
+
 def test_voice_events_is_sse(client, monkeypatch):
     monkeypatch.setattr(
         voice_routes, "_stt", lambda audio, content_type="application/octet-stream": "тест"
@@ -113,7 +155,7 @@ def test_voice_events_is_sse(client, monkeypatch):
     monkeypatch.setattr(voice_routes, "_chat", lambda text, conversation_id, model: "ответ")
     monkeypatch.setattr(voice_routes, "_tts", lambda text, voice: b"audio")
 
-    session_id = client.post("/api/voice/session", json={"response_mode": "text"}).get_json()[
+    session_id = client.post("/api/voice/session", json={"response_mode": "text", "conversation_id": "voice-conv"}).get_json()[
         "session_id"
     ]
     client.post(f"/api/voice/audio?session_id={session_id}", data=b"audio")
@@ -173,6 +215,7 @@ class _FakeLogosClient:
 def test_voice_chat_uses_text_model_and_conversation(monkeypatch):
     monkeypatch.setattr(voice_routes, "LogosClient", _FakeLogosClient)
     monkeypatch.setattr(_FakeLogosClient, "calls", [])
+    monkeypatch.setattr(voice_routes, "_provider_conversation_id", lambda client, conv_id, trace: conv_id)
     monkeypatch.setenv("LOGOS_VOICE_CHAT_MODEL", "yandexgpt-5-lite")
 
     assert voice_routes._chat("вопрос", "conv-1", "speech-realtime-250923") == "Ответ"
@@ -183,6 +226,7 @@ def test_voice_chat_uses_text_model_and_conversation(monkeypatch):
 
 def test_voice_chat_requires_conversation_and_text_reply(monkeypatch):
     monkeypatch.setattr(voice_routes, "LogosClient", _FakeLogosClient)
+    monkeypatch.setattr(voice_routes, "_provider_conversation_id", lambda client, conv_id, trace: conv_id)
     with pytest.raises(ValueError, match="conversation_id is required"):
         voice_routes._chat("вопрос", None, "yandexgpt-5-lite")
     monkeypatch.setattr(_FakeLogosClient, "reply", "")
@@ -199,6 +243,7 @@ def test_voice_chat_sends_the_provider_conversation(monkeypatch):
 
     voice_routes._chat("вопрос", "local-1", "yandexgpt-5-lite")
     assert _FakeLogosClient.calls[0]["conversation_id"] == "provider-9"
+    assert _FakeLogosClient.calls[0]["settings_conversation_id"] == "local-1"
 
 
 def test_voice_credentials_prefer_the_stored_key(monkeypatch):
@@ -225,6 +270,7 @@ def test_voice_exchange_is_saved_to_its_conversation(monkeypatch):
 
     monkeypatch.setattr(voice_routes, "_stt", lambda audio, content_type: "вопрос")
     monkeypatch.setattr(voice_routes, "_chat", lambda text, conversation_id, model: "ответ")
+    db.create_conversation("conv-saved", "Voice", "yandexgpt-5-lite")
     session = voice_routes.VoiceSession(
         session_id="saved-session",
         owner_id=None,
@@ -238,3 +284,24 @@ def test_voice_exchange_is_saved_to_its_conversation(monkeypatch):
 
     saved = {(item["role"], item["text"]) for item in db.get_messages("conv-saved")}
     assert {("user", "вопрос"), ("assistant", "ответ")} <= saved
+
+
+def test_recognized_question_survives_model_failure(monkeypatch):
+    import storage.db as db
+
+    db.create_conversation("voice-failed", "Voice", "yandexgpt-5-lite")
+    monkeypatch.setattr(voice_routes, "_stt", lambda audio, content_type: "Сохранённый вопрос")
+
+    def fail_chat(*args):
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(voice_routes, "_chat", fail_chat)
+    session = voice_routes.VoiceSession(
+        session_id="failed-session", owner_id=None, conversation_id="voice-failed",
+        model="yandexgpt-5-lite", voice="filipp", response_mode="text",
+    )
+
+    voice_routes._process(session)
+
+    saved = db.get_messages("voice-failed")
+    assert [(item["role"], item["text"]) for item in saved] == [("user", "Сохранённый вопрос")]

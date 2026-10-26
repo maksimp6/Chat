@@ -289,7 +289,7 @@ class TestActiveChatRoute(unittest.TestCase):
         test_conversation_metadata = {"test_request": "true"}
 
         class FakeClient:
-            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None, *, settings_conversation_id=None):
                 self.params = params
                 self.metadata = params.get("conversation_metadata")
                 self.trace = trace

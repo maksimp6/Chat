@@ -15,7 +15,7 @@
     cancelled: "🚫 Отменено",
   };
 
-  var STAGE_MARKS = { done: "✓", active: "●", pending: "○" };
+  var STAGE_MARKS = { done: "✓", active: "●", pending: "○", partial: "◐", error: "✕" };
 
   var BLOCKING_EVENTS = {
     provider_quota_denied: "Квота провайдера",
@@ -134,6 +134,18 @@
     };
   }
 
+  // A stage with a failed call is not shown as done: the marks must agree with the reason line.
+  function toolFailed(call) {
+    var result = call && call.result;
+    return Boolean(call && call.error) || Boolean(result && typeof result === "object" && (result.error || result.success === false));
+  }
+
+  function finishStatus(state) {
+    if (state === "partial") return "partial";
+    if (state === "error" || state === "timeout" || state === "cancelled") return "error";
+    return "done";
+  }
+
   function stages(trace, responses, tools, state) {
     var requested = list(trace.api_requests).length > 0 || responses.length > 0;
     var finished = ["done", "partial", "error", "timeout", "cancelled"].indexOf(state) >= 0;
@@ -145,8 +157,10 @@
         status: responses.length ? "done" : requested ? "active" : "pending",
       },
     ];
-    if (tools.length) result.push({ id: "tools", label: "Инструменты", status: "done" });
-    result.push({ id: "finish", label: "Итог", status: finished ? "done" : "pending" });
+    if (tools.length) {
+      result.push({ id: "tools", label: "Инструменты", status: tools.some(toolFailed) ? "error" : "done" });
+    }
+    result.push({ id: "finish", label: "Итог", status: finished ? finishStatus(state) : "pending" });
     return result;
   }
 

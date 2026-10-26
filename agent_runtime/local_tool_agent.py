@@ -108,8 +108,9 @@ class LocalToolAgent:
         self.agent_id = agent_id
         self.poll_interval = max(0.5, float(poll_interval))
         self.stop_event = stop_event or threading.Event()
-        # Results the gateway did not confirm. They are re-sent before any new job is taken, so a lost
-        # response never leads to running the same tool again.
+        # Results the gateway did not confirm. This process re-sends them before taking another job.
+        # This outbox is in memory: process loss or an outage beyond the lease can still lose a
+        # result or allow another worker to repeat a side effect.
         self._undelivered: dict[str, tuple[str, str, Mapping[str, Any]]] = {}
 
     def run_forever(self) -> None:
@@ -229,9 +230,20 @@ class LocalToolAgent:
         return False
 
     def _redeliver_pending(self) -> None:
-        for job_id, (status, claim_token, result) in list(self._undelivered.items()):
-            if self._send(job_id, status, result, claim_token):
-                self._undelivered.pop(job_id, None)
+        if not self._undelivered:
+            return
+        # Result delivery can take longer than a lease, just like tool execution. Keep the
+        # existing heartbeat alive while waiting for confirmation; do not execute the tool again.
+        stop = threading.Event()
+        renewer = threading.Thread(target=self._renew_leases, args=(stop,), daemon=True)
+        renewer.start()
+        try:
+            for job_id, (status, claim_token, result) in list(self._undelivered.items()):
+                if self._send(job_id, status, result, claim_token):
+                    self._undelivered.pop(job_id, None)
+        finally:
+            stop.set()
+            renewer.join(timeout=5)
 
 
 def start_agent(

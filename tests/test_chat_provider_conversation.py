@@ -49,3 +49,49 @@ def test_photo_exchange_is_repeated_for_the_text_follow_up(monkeypatch):
     assert "Что на фото?" in context
     assert "Кот на диване" in context
     assert "Объясни ответ" not in context
+
+
+def test_photo_context_recognizes_current_photo_count_without_claiming_later_answer(monkeypatch):
+    monkeypatch.setattr(
+        mcp_routes,
+        "get_messages",
+        lambda conv_id: [
+            {"role": "user", "text": "Фото без ответа", "attachments": {"images": 1}},
+            {"role": "user", "text": "Другой вопрос"},
+            {"role": "assistant", "text": "Ответ на другой вопрос"},
+        ],
+    )
+
+    context = mcp_routes._photo_exchange_context("chat-1")
+
+    assert "Фото без ответа" in context
+    assert "Ответ на другой вопрос" not in context
+
+
+def test_real_logos_client_keeps_local_settings_id_through_tool_continuation(monkeypatch):
+    sent = []
+    proposals = iter([
+        {"id": "tool-step", "output": [{
+            "type": "function_call", "name": "offline_tool", "call_id": "call-1", "arguments": "{}"
+        }]},
+        {"id": "final-step", "output": []},
+    ])
+    client = object.__new__(mcp_routes.LogosClient)
+
+    def fake_provider(**kwargs):
+        sent.append(kwargs)
+        return next(proposals)
+
+    monkeypatch.setattr(client, "_ask_provider", fake_provider)
+    monkeypatch.setattr(client, "_execute_single_tool", lambda *args, **kwargs: {"result": "done"})
+    monkeypatch.setattr(mcp_routes.mcp_storage, "list_servers", lambda **kwargs: [])
+    monkeypatch.setattr(mcp_routes, "get_current_owner_id", lambda: "owner")
+
+    response = client.ask_with_mcp(
+        "run", "yandexgpt-5-lite", conversation_id="provider-id", settings_conversation_id="local-id"
+    )
+
+    assert response["id"] == "final-step"
+    assert len(sent) == 2
+    assert all(call["conversation_id"] == "provider-id" for call in sent)
+    assert all(call["settings_conversation_id"] == "local-id" for call in sent)

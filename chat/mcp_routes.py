@@ -12,6 +12,7 @@ from yandex_client_modules.client import YandexResponsesClient
 from core.config import TEXT_MODELS, Config
 from core.model_profiles import completion_model_keys
 from observability.trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
+from observability.trace_security import sanitize_trace_value
 from invocation.manager import (
     create_invocation,
     start_invocation,
@@ -162,9 +163,14 @@ def _photo_exchange_context(conv_id):
     turns = get_messages(conv_id)
     blocks = []
     for index, turn in enumerate(turns):
-        if turn.get("source") != "photo" or turn["role"] != "user":
+        if turn["role"] != "user" or not (
+            turn.get("source") == "photo" or (turn.get("attachments") or {}).get("images")
+        ):
             continue
-        answer = next((t for t in turns[index + 1 :] if t["role"] == "assistant"), None)
+        # Do not attribute a later turn's answer to an unanswered photo question.
+        answer = turns[index + 1] if index + 1 < len(turns) else None
+        if answer is not None and answer.get("role") != "assistant":
+            answer = None
         question = str(turn.get("text") or "")[:IMAGE_HISTORY_TEXT_CHARS]
         reply = _MARKDOWN_PICTURE.sub("[картинка]", str((answer or {}).get("text") or ""))
         blocks.append(f"Пользователь прислал фото с вопросом: {question}\nОтвет: {reply[:IMAGE_HISTORY_TEXT_CHARS]}")
@@ -250,6 +256,7 @@ class LogosClient(YandexResponsesClient):
         params=None,
         trace=None,
         *,
+        settings_conversation_id=None,
         execution_policy=None,
     ):
         policy_kwargs = (
@@ -262,6 +269,7 @@ class LogosClient(YandexResponsesClient):
             conversation_id=conversation_id,
             params=params,
             trace=trace,
+            settings_conversation_id=settings_conversation_id,
             **policy_kwargs,
         )
 
@@ -287,6 +295,7 @@ class LogosClient(YandexResponsesClient):
                     conversation_id=conversation_id,
                     params=continuation_params,
                     trace=trace,
+                    settings_conversation_id=settings_conversation_id,
                     **policy_kwargs,
                 )
 
@@ -456,7 +465,14 @@ def chat():
             params["active_tool_categories"] = active_tools
 
         if not retry:
-            add_message(invocation.conversation_id, "user", message, source="photo" if images else None)
+            # The photo count is kept with the message, so a reloaded chat still shows which turn had photos.
+            add_message(
+                invocation.conversation_id,
+                "user",
+                message,
+                source="photo" if images else None,
+                attachments={"images": len(images)} if images else None,
+            )
         if images:
             params["chat_history"] = _image_turn_history(invocation.conversation_id)
         else:
@@ -519,7 +535,7 @@ def chat():
 
         reasoning, reply = client.extract_reasoning_and_text(response)
         if not reply:
-            raise RuntimeError("Responses API завершил tool-call цепочку без текстового ответа")
+            raise RuntimeError("Модель не вернула текстовый ответ. Повторите запрос.")
         usage = client.extract_usage(response)
         timings = response.get("step_timings", []) if isinstance(response, dict) else []
         total_ms = round((_time.perf_counter() - t_start) * 1000)
@@ -532,10 +548,12 @@ def chat():
             )
         except Exception as settlement_error:
             logger.exception("[BILLING] Treasury settlement failed")
+            # The full exception stays in the server log above; the trace gets only fixed text and a known code.
+            failure_code = "insufficient_balance" if str(settlement_error) == "insufficient balance" else None
             _append_post_final_error(
                 trace_data,
                 "treasury_settlement",
-                "treasury settlement failed",
+                "treasury settlement failed" + (f": {failure_code}" if failure_code else ""),
                 type(settlement_error).__name__,
             )
             settlement = {"status": "failed", "reason": "treasury_settlement_failed"}
@@ -543,6 +561,15 @@ def chat():
         trace_data.setdefault("billing", {})["settlement"] = settlement
         billing = trace_data.get("billing") or {}
         cost = _turn_cost(billing)
+        if billing.get("items"):
+            # The reply shows the tokens of the whole turn, every model call, the same total its cost is billed on.
+            usage = {
+                **(usage if isinstance(usage, dict) else {}),
+                "input_tokens": billing.get("input_tokens", 0),
+                "output_tokens": billing.get("output_tokens", 0),
+                "cached_tokens": billing.get("cached_input_tokens", 0),
+                "total_tokens": billing.get("total_tokens", 0),
+            }
 
         persist_invocation_trace(invocation.invocation_id, trace_data)
         add_message(
@@ -906,7 +933,7 @@ def execute_approved():
 
         execution_data = exec_res.get("data")
         reply = f"Действие {func_name} успешно выполнено."
-        cost = 0.0
+        cost = None
         try:
             client = LogosClient(Config)
             prompt = (
@@ -939,7 +966,13 @@ def execute_approved():
             # The tool already ran. A failed summary must not hide that result or make the user retry it.
             logger.exception("[TOOL_APPROVAL] Summary failed after the tool succeeded")
 
-        add_message(conv_id, "assistant", reply, cost=cost)
+        add_message(
+            conv_id,
+            "assistant",
+            reply,
+            cost=cost,
+            trace={"approved_tool_result": sanitize_trace_value(exec_res)},
+        )
         return jsonify({"reply": reply, "cost": cost, "execution_result": exec_res})
     except Exception:
         logger.exception("[TOOL_APPROVAL] Tool execution failed")

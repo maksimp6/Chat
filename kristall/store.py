@@ -178,6 +178,14 @@ class Commit:
     digest: str
 
 
+def _fsync_directory(path: Path) -> None:
+    directory = os.open(str(path), os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+
+
 class _JournalStore:
     """In-process committed RAM state backed by an fsynced append-only log."""
 
@@ -362,11 +370,7 @@ class _JournalStore:
                 # Do not acknowledge a commit before its journal bytes are synced.
                 os.fsync(stream.fileno())
             if first_write:
-                directory = os.open(str(self.path.parent), os.O_RDONLY)
-                try:
-                    os.fsync(directory)
-                finally:
-                    os.close(directory)
+                _fsync_directory(self.path.parent)
         except OSError as exc:
             # A failed fsync may still have written bytes: the disk outcome is
             # uncertain, so block future writes instead of claiming rollback.
@@ -477,11 +481,7 @@ class _JournalStore:
                     os.replace(temporary, destination)
             except FileExistsError as exc:
                 raise KristallError("backup destination was created concurrently") from exc
-            directory = os.open(str(destination.parent), os.O_RDONLY)
-            try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
+            _fsync_directory(destination.parent)
         finally:
             temporary.unlink(missing_ok=True)
 
@@ -556,11 +556,7 @@ class _JournalStore:
                 publication_started = True
                 os.replace(temporary, self.path)
                 replaced = True
-                directory = os.open(str(self.path.parent), os.O_RDONLY)
-                try:
-                    os.fsync(directory)
-                finally:
-                    os.close(directory)
+                _fsync_directory(self.path.parent)
                 self._digest = digest
                 return self._sequence
             except OSError as exc:
@@ -672,11 +668,7 @@ class Kristall:
             try:
                 with self._engine.path.open("rb") as stream:
                     os.fsync(stream.fileno())
-                directory = os.open(str(self._engine.path.parent), os.O_RDONLY)
-                try:
-                    os.fsync(directory)
-                finally:
-                    os.close(directory)
+                _fsync_directory(self._engine.path.parent)
             except OSError as exc:
                 self._engine._failed = True
                 raise KristallError("durability confirmation failed; recovery required") from exc

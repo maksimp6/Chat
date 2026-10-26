@@ -15,6 +15,7 @@
   var isRecording = false;
   var isConnecting = false;
   var isFinishing = false;
+  var isProcessing = false;
   var voiceConvId = null;
   var eventSource = null;
   var currentTranscript = "";
@@ -236,6 +237,7 @@
     };
     eventSource.onerror = function () {
       log("SSE error");
+      if (isProcessing) setStatus("Связь прервалась. Восстанавливаю голосовую сессию...");
     };
   }
 
@@ -271,6 +273,7 @@
     } else if (type === "error") {
       setStatus("Ошибка сервера голосовой сессии. Попробуйте ещё раз.");
     } else if (type === "response.done") {
+      isProcessing = false;
       setStatus("");
       if (eventSource) {
         eventSource.close();
@@ -285,10 +288,11 @@
   }
 
   async function toggleVoice() {
-    if (isFinishing) return;
+    if (isFinishing || isProcessing) return;
     if (isRecording) {
       isRecording = false;
       isFinishing = true;
+      isProcessing = true;
       if (micBtn) micBtn.classList.remove("recording");
       setStatus("Обрабатываю...");
       try {
@@ -308,6 +312,7 @@
         }
         await finishRecording();
       } catch (err) {
+        isProcessing = false;
         setStatus("Не удалось завершить запись. Попробуйте ещё раз.");
         if (eventSource) {
           eventSource.close();
@@ -337,21 +342,31 @@
       "speech-realtime-deepseek-v4-flash";
     isConnecting = true;
     voiceConvId = typeof currentConvId !== "undefined" ? currentConvId : null;
+    var selectedAtStart = voiceConvId;
     setStatus("Подключение...");
     try {
+      if (!voiceConvId && typeof createConversation === "function") {
+        voiceConvId = await createConversation(modelKey, { select: false });
+        if (!voiceConvId) throw new Error("Не удалось создать диалог для голоса");
+        // Keep a different chat the user selected while creation was pending.
+        if (typeof currentConvId !== "undefined" && currentConvId === selectedAtStart && typeof selectConv === "function") {
+          await selectConv(voiceConvId);
+        }
+      }
       var res = await request("/api/voice/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: modelKey,
           voice: "filipp",
-          conversation_id: typeof currentConvId !== "undefined" ? currentConvId : null,
+          conversation_id: voiceConvId,
           response_mode: (document.getElementById("response-mode-select") || {}).value || "audio",
         }),
       });
       var data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || "HTTP " + res.status);
       sessionId = data.session_id;
+      voiceConvId = data.conversation_id || voiceConvId;
       currentTranscript = "";
       currentReply = "";
       userMsgSent = false;

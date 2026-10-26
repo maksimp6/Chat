@@ -2,7 +2,8 @@
 
 The `Redmi 9 application server` workflow runs on every push to `develop`, without
 path filters, and supports manual dispatch from that branch. One native Bash step,
-`logos`, tests the controller and runs `redmi_app_server.sh deploy`. The workflow's
+`logos`, retires the old independent updater and runs `redmi_app_server.sh deploy`.
+It does not run code tests. The workflow's
 concurrency group serializes deployments without cancelling a running update.
 
 Deployment fetches the current `develop` tip from the existing application's
@@ -31,9 +32,15 @@ only a process with the expected command and working directory and refuses an
 occupied untracked port. The reviewed launcher reads the private bind-address settings and port. The launch receipt is `runner-start.json`; application and
 launcher logs stay in the private state directory.
 
-Readiness does not invoke a model or prove a model response. Automatic updates do
-not change RDC processes, boot schedules, dependency installations settings. Dependency installations and data-format migrations require their own
-reviewed changes; the updater does not manage them.
+The runner is the only automatic updater. Its one-time retirement step removes
+the old `60-logos-app-autoupdate` boot entry and the two active updater scripts,
+preserving their contents and status receipts privately. It waits for the old
+controller to finish before stopping its supervisor. Runner and RDC processes
+and their boot entries are preserved; removal does not stop the backend.
+
+Readiness does not invoke a model or prove a model response. Dependency
+installations and data-format migrations require their own reviewed changes;
+the deployment controller does not manage them.
 
 ## Wi-Fi readiness
 

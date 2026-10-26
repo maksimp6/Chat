@@ -113,6 +113,8 @@ class ModelDiscovery:
         capabilities = item.get("capabilities")
         if not isinstance(capabilities, dict):
             capabilities = dict(existing.get("capabilities") or {})
+        # Photos are accepted only for registry models (chat/mcp_routes.py), so the catalog takes that flag from the registry.
+        capabilities = {**capabilities, "multimodal": (existing.get("capabilities") or {}).get("multimodal")}
 
         result: dict[str, Any] = {
             "name": name,

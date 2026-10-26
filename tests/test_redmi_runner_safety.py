@@ -21,6 +21,19 @@ def test_workflow_input_is_resolved_from_the_job_context():
     assert runner.decode_env({"expr": "inputs.mode"}, {}, {}, {"mode": "read"}) == "read"
 
 
+@pytest.mark.parametrize("value,expected", [(True, "true"), (False, "false"), (0, "0"), (None, "")])
+def test_workflow_input_preserves_expression_scalar_representation(value, expected):
+    assert runner.decode_env({"expr": "inputs.value"}, {}, {}, {"value": value}) == expected
+
+
+def test_workflow_inputs_decode_the_wire_context():
+    job = {"contextData": {"inputs": {"t": 2, "d": [
+        {"k": "mode", "v": {"t": 0, "s": "read"}},
+        {"k": "enabled", "v": {"t": 4, "b": False}},
+    ]}}}
+    assert runner.workflow_inputs(job) == {"mode": "read", "enabled": False}
+
+
 def test_other_expressions_are_still_refused():
     with pytest.raises(ValueError):
         runner.decode_env({"expr": "env.anything"}, {}, {}, {"mode": "read"})

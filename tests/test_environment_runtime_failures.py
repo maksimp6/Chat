@@ -381,3 +381,104 @@ def test_runtime_worker_encodes_text_and_stops_when_chunk_delivery_is_cancelled(
     finally:
         _restore_http_handler()
         runtime.stop()
+
+
+def test_timed_out_stop_blocks_new_calls_preserves_data_and_allows_resume(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGOS_ENV_RUNTIME_ROOT", str(tmp_path / "runtimes"))
+    runtime = _runtime(tmp_path, "runtime-stop-admission")
+    entered = threading.Event()
+    release = threading.Event()
+    caller_errors = []
+
+    def http_handler(context, payload):
+        entered.set()
+        release.wait()
+        return {"status_code": 200, "headers": [], "body": (), "close": lambda: None}
+
+    def call_http():
+        try:
+            runtime.submit_http({}, timeout=2)
+        except RuntimeError as exc:
+            caller_errors.append(exc)
+
+    register_runtime_operation("http.request", http_handler)
+    register_runtime_operation("test.resume", lambda context, payload: context.runtime_id)
+    runtime.start()
+    runtime.data_dir.mkdir(parents=True, exist_ok=True)
+    marker = runtime.data_dir / "session.txt"
+    marker.write_text("retain session")
+    caller = threading.Thread(target=call_http)
+    caller.start()
+    resumed = None
+    try:
+        assert entered.wait(2)
+        http_thread = runtime._running_http_requests()[0]
+        original_join = http_thread.join
+        # Exercise the timeout path without making this regression test wait five seconds.
+        monkeypatch.setattr(http_thread, "join", lambda timeout: None)
+        with pytest.raises(RuntimeError, match="HTTP request is still running"):
+            runtime.stop()
+        monkeypatch.setattr(http_thread, "join", original_join)
+
+        with pytest.raises(RuntimeError, match="runtime is stopping"):
+            runtime.submit("test.resume")
+        with pytest.raises(RuntimeError, match="runtime is stopping"):
+            runtime.submit_http({})
+        with pytest.raises(RuntimeError, match="must stop before removal"):
+            EnvironmentRuntime(runtime.environment).remove()
+        assert marker.read_text() == "retain session"
+        assert _RUNTIME_WORKERS[runtime.runtime_id] is runtime
+
+        release.set()
+        original_join(timeout=2)
+        caller.join(timeout=2)
+        runtime.stop()
+        resumed = _runtime(tmp_path, runtime.runtime_id)
+        resumed.start()
+        assert resumed.submit("test.resume") == runtime.runtime_id
+        assert marker.read_text() == "retain session"
+        assert caller_errors
+    finally:
+        release.set()
+        caller.join(timeout=2)
+        _restore_http_handler()
+        if resumed is not None:
+            resumed.stop()
+        elif runtime._thread.is_alive():
+            runtime.stop()
+
+
+def test_delete_failed_environment_retries_live_worker_before_removing_record(tmp_path, monkeypatch):
+    runtime = _runtime(tmp_path, "runtime-failed-delete")
+    item = {**runtime.environment, "status": "FAILED"}
+    persisted = []
+    record_reads = []
+
+    def require(environment_id, owner_id):
+        record_reads.append(environment_id)
+        return dict(item)
+
+    def hung_stop():
+        raise RuntimeError("environment HTTP request is still running")
+
+    monkeypatch.setattr(environment_manager, "_require", require)
+    monkeypatch.setattr(
+        environment_manager, "_persist_environment", lambda *args: persisted.append(args)
+    )
+    monkeypatch.setattr(runtime, "stop", hung_stop)
+    with _RUNTIME_WORKERS_LOCK:
+        _RUNTIME_WORKERS[runtime.runtime_id] = runtime
+    try:
+        with pytest.raises(RuntimeError, match="HTTP request is still running"):
+            environment_manager.delete_environment(runtime.runtime_id)
+        assert record_reads == [runtime.runtime_id, runtime.runtime_id]
+        assert persisted == [
+            (
+                runtime.runtime_id,
+                {"status": "FAILED", "error": "environment HTTP request is still running"},
+            )
+        ]
+        assert _RUNTIME_WORKERS[runtime.runtime_id] is runtime
+    finally:
+        with _RUNTIME_WORKERS_LOCK:
+            _RUNTIME_WORKERS.pop(runtime.runtime_id, None)

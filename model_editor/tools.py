@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from storage.contracts import storage_provider_from_env
+from tool_providers.schema import object_schema
 
 from .engine import add_primitive, edit_primitive, number, vector3
 from .store import ModelStore
@@ -154,16 +155,7 @@ def model_export(arguments: dict[str, Any], cfg: dict[str, Any] | None = None) -
     }
 
 
-def _schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
-    return {
-        "type": "object",
-        "properties": properties,
-        "required": required,
-        "additionalProperties": False,
-    }
-
-
-_ID = {"type": "string", "description": "UUID of an existing model."}
+_ID ={"type": "string", "description": "UUID of an existing model."}
 _REV = {
     "type": "string",
     "minLength": 64,
@@ -187,7 +179,7 @@ MODEL_EDITOR_TOOLS: dict[str, dict[str, Any]] = {
     "model.create": {
         "title": "Create 3D model",
         "description": "Создать пустую 3D-сцену Logos. Возвращает model_id и revision; ничего не печатает.",
-        "parameters": _schema({"name": {"type": "string", "minLength": 1, "maxLength": 120}}, []),
+        "parameters": object_schema({"name": {"type": "string", "minLength": 1, "maxLength": 120}}, []),
         "func": model_create,
     },
     "model.addcube": {
@@ -196,7 +188,7 @@ MODEL_EDITOR_TOOLS: dict[str, dict[str, Any]] = {
             "Создать куб (по умолчанию 20 мм) в новой или существующей сцене. "
             "Для существующей передай model_id и revision вместе. Сохранить STL, без принтера."
         ),
-        "parameters": _schema(
+        "parameters": object_schema(
             {
                 **_ADD,
                 "size_mm": {"type": "number", "minimum": 0.4, "maximum": 500},
@@ -208,7 +200,7 @@ MODEL_EDITOR_TOOLS: dict[str, dict[str, Any]] = {
     "model.addcylinder": {
         "title": "Add cylinder to 3D model",
         "description": "Создать цилиндр с диаметром и высотой в мм, в новой или существующей 3D-сцене.",
-        "parameters": _schema(
+        "parameters": object_schema(
             {
                 **_ADD,
                 "diameter_mm": {"type": "number", "minimum": 0.4, "maximum": 500},
@@ -225,7 +217,7 @@ MODEL_EDITOR_TOOLS: dict[str, dict[str, Any]] = {
             "Изменить объект без потери истории: move (сдвиг XYZ мм), rotate (XYZ градусы), "
             "scale (коэффициенты XYZ), delete (без values). Создаёт новую revision и STL."
         ),
-        "parameters": _schema(
+        "parameters": object_schema(
             {
                 **_EXISTING,
                 "object_id": _ID,
@@ -252,7 +244,7 @@ MODEL_EDITOR_TOOLS: dict[str, dict[str, Any]] = {
             "Прочитать модель, объекты, размер, треугольники и ориентировочную пригодность "
             "для стола A1 mini. Объём суммарный до boolean-операций; посадка не подтверждена."
         ),
-        "parameters": _schema(_EXISTING, ["model_id", "revision"]),
+        "parameters": object_schema(_EXISTING, ["model_id", "revision"]),
         "func": model_inspect,
         "read_only": True,
     },
@@ -262,7 +254,7 @@ MODEL_EDITOR_TOOLS: dict[str, dict[str, Any]] = {
             "Экспортировать точную immutable revision модели в бинарный STL через хранилище "
             "Logos (storage_ref и SHA256). Никакого слайсера и загрузки на принтер."
         ),
-        "parameters": _schema(_EXISTING, ["model_id", "revision"]),
+        "parameters": object_schema(_EXISTING, ["model_id", "revision"]),
         "func": model_export,
     },
 }

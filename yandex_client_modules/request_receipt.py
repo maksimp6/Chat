@@ -13,7 +13,8 @@ import re
 from typing import Any
 
 CANONICALIZATION = "python-json-sorted-utf8-compact-v1"
-_MODEL_URI = re.compile(r"gpt://[A-Za-z0-9_.-]{1,128}/[A-Za-z0-9_.:-]{1,128}/[A-Za-z0-9_.-]{1,64}")
+# The version segment is optional: the photo request uses the documented gpt://<folder>/<model> form.
+_MODEL_URI = re.compile(r"gpt://[A-Za-z0-9_.-]{1,128}/[A-Za-z0-9_.:-]{1,128}(?:/[A-Za-z0-9_.-]{1,64})?")
 _CREDENTIAL_MARKER = re.compile(r"gh[pousr]_|github_pat_|sk-|AQVN|-----BEGIN", re.IGNORECASE)
 _BOOLEANS = ("background", "store", "stream", "parallel_tool_calls")
 _NUMBERS = ("temperature", "top_p", "max_output_tokens", "max_tool_calls")
