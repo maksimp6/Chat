@@ -44,7 +44,8 @@ def fingerprint(paths):
     h = hashlib.sha256()
     h.update(("ram-tests-v1|" + sys.version + "|" + sys.platform).encode())
     for name in paths:
-        if not (name.endswith((".py", ".toml", ".ini", ".cfg", ".sh", ".yml", ".yaml", ".json")) or name in ("AGENTS.md", "requirements.txt")):
+        if not (name.endswith((".py", ".toml", ".ini", ".cfg", ".sh", ".yml", ".yaml", ".json", ".kicad_sch", ".kicad_pro", ".xml"))
+                or name in ("AGENTS.md", "requirements.txt")):
             continue
         path = ROOT / name
         if not path.is_file():

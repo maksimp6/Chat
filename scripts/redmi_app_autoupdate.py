@@ -172,36 +172,44 @@ def run_controller(app: Path, env: dict[str, str], action: str, timeout: int) ->
     script = app / "scripts/redmi_app_server.sh"
     if not script.is_file():
         raise UpdateFailure("deploy_script_missing")
-    try:
-        process = subprocess.Popen(
-            ["bash", str(script), action], env=env,
-            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, start_new_session=True, close_fds=True,
-        )
-    except OSError as exc:
-        raise UpdateFailure("deploy_unavailable") from exc
-    try:
-        output, error = process.communicate(timeout=timeout)
-        state = env.get("LOGOS_STATE_DIR")
-        if state:
-            atomic_bytes(Path(state) / "autoupdate-controller.log", (output + error)[-8192:].encode(), 0o600)
-        return process.returncode
-    except subprocess.TimeoutExpired as exc:
-        # Only this controller's new process group is signalled. The backend launcher
-        # deliberately detaches the actual application into its own session.
+    # Output goes to a file, not a pipe: a detached child that inherited a pipe keeps it open, and
+    # reading the pipe would wait for that child rather than for the controller.
+    with tempfile.TemporaryFile("w+") as log:
         try:
-            os.killpg(process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
+            process = subprocess.Popen(
+                ["bash", str(script), action], env=env,
+                stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                text=True, start_new_session=True, close_fds=True,
+            )
+        except OSError as exc:
+            raise UpdateFailure("deploy_unavailable") from exc
         try:
-            process.communicate(timeout=5)
-        except subprocess.TimeoutExpired:
+            returncode = process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            # Only this controller's new process group is signalled. The backend launcher
+            # deliberately detaches the actual application into its own session.
             try:
-                os.killpg(process.pid, signal.SIGKILL)
+                os.killpg(process.pid, signal.SIGTERM)
             except ProcessLookupError:
                 pass
-            process.communicate(timeout=5)
-        raise UpdateFailure("deploy_timeout") from exc
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
+            raise UpdateFailure("deploy_timeout") from exc
+        log.seek(0)
+        output = log.read()
+    state = env.get("LOGOS_STATE_DIR")
+    if state:
+        atomic_bytes(Path(state) / "autoupdate-controller.log", output[-8192:].encode(), 0o600)
+    return returncode
 
 
 @contextmanager

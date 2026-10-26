@@ -320,6 +320,7 @@ class EnvironmentRuntime:
         )
         self._stream_lock = threading.RLock()
         self._active_streams: dict[threading.Event, queue.Queue] = {}
+        self._http_threads: set[threading.Thread] = set()
 
     @property
     def thread_id(self) -> Optional[int]:
@@ -419,12 +420,16 @@ class EnvironmentRuntime:
             self._active_streams[cancel] = events
         # Each HTTP request gets its own thread, so one slow response cannot block the environment's
         # other calls.
-        threading.Thread(
+        http_thread = threading.Thread(
             target=self._run_http,
             args=(dict(payload), events, cancel),
             name=f"logos-runtime-http-{self.runtime_id[:8]}",
             daemon=True,
-        ).start()
+        )
+        with self._stream_lock:
+            self._http_threads = {thread for thread in self._http_threads if thread.is_alive()}
+            self._http_threads.add(http_thread)
+        http_thread.start()
         try:
             first = events.get(timeout=timeout)
         except queue.Empty as exc:
@@ -437,6 +442,10 @@ class EnvironmentRuntime:
             cancel.set()
             raise RuntimeError("invalid environment runtime HTTP response")
         return RuntimeHTTPStream(first[1], first[2], events, cancel)
+
+    def _running_http_requests(self) -> list[threading.Thread]:
+        with self._stream_lock:
+            return [thread for thread in self._http_threads if thread.is_alive()]
 
     def stop(self) -> None:
         with self._stream_lock:
@@ -452,6 +461,11 @@ class EnvironmentRuntime:
                 events.put_nowait(("end",))
             except queue.Full:
                 pass
+        # A request still inside the runtime would write into data that stop is about to close.
+        for thread in self._running_http_requests():
+            thread.join(timeout=5)
+        if self._running_http_requests():
+            raise RuntimeError("environment HTTP request is still running")
         if self._thread.is_alive():
             self._jobs.put(_RUNTIME_STOP)
             self._thread.join(timeout=5)
@@ -466,6 +480,8 @@ class EnvironmentRuntime:
         close_memory_clients(self.data_dir / "logos.memory")
 
     def remove(self) -> None:
+        if self._running_http_requests():
+            raise RuntimeError("environment HTTP request is still running")
         if self.worktree.exists():
             subprocess.run(
                 ["git", "worktree", "remove", "--force", str(self.worktree)],
