@@ -4,7 +4,7 @@ This module contains pure request-shaping logic extracted from yandex_client_mod
 It deliberately has no HTTP, database, tracing, or MCP side effects.
 """
 
-from core.config import upstream_model_id
+from core.config import get_model_uri, upstream_model_id
 from yandex_client_modules.errors import YandexClientError
 from core.model_profiles import ultra_profiles, ultra_reasoning_controllable, ultra_request_defaults
 from yandex_client_modules.metadata_validator import validate_metadata
@@ -232,7 +232,8 @@ def build_response_payload(
         params["store"] = True
 
     payload = {
-        "model": "gpt://" + project_id + "/" + upstream_model_id(model_key) + "/latest",
+        # A channel named by the upstream id (yandexgpt/rc, yandexgpt/latest) is not repeated with /latest.
+        "model": get_model_uri(project_id, model_key),
         "input": _response_input(params, message),
         "background": is_background,
         "store": params.get("store", True),
