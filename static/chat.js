@@ -961,6 +961,71 @@ document.addEventListener("DOMContentLoaded", function () {
   window.addEventListener("logos:conversation-selected", syncSendButton);
 
   // retryRequest is { text, conversationId } when «Повторить» re-sends a failed message.
+  // A lost connection does not lose a turn: the server keeps it and stores the answer. The number of
+  // stored messages before the send tells a turn the server kept from one it never received.
+  const TURN_RECOVERY_MS = 600000;
+  const TURN_RECOVERY_POLL_MS = 3000;
+  const TURN_MISSING_POLLS = 3;
+
+  async function fetchMessageCount(convId) {
+    try {
+      const response = await window.LogosDispatcher.request("/api/conversations/" + convId + "/messages", undefined, { timeoutMs: 15000 });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data.messages) ? data.messages.length : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // "missing": nothing was stored after the send. "pending": the user message is stored, the answer is not.
+  // "answered": the answer (or an error answer) is stored.
+  function turnStatus(messages, baseline) {
+    if (messages.length <= baseline) return "missing";
+    return messages[messages.length - 1].role === "assistant" ? "answered" : "pending";
+  }
+
+  function releaseTurn(turn, needsConversation) {
+    if (turn.conversationId) pendingConversations.delete(turn.conversationId);
+    if (turn.conversationId) activeChatRequests.delete(turn.conversationId);
+    syncSendButton();
+    if (needsConversation) creatingConversation = false;
+  }
+
+  async function recoverTurn(turn, onMissing) {
+    const started = Date.now();
+    let missing = 0;
+    while (Date.now() - started < TURN_RECOVERY_MS) {
+      await new Promise(function (resolve) { setTimeout(resolve, TURN_RECOVERY_POLL_MS); });
+      let status = null;
+      try {
+        const response = await window.LogosDispatcher.request("/api/conversations/" + turn.conversationId + "/messages", undefined, { timeoutMs: 15000 });
+        if (!response.ok) continue;
+        const data = await response.json();
+        status = turnStatus(Array.isArray(data.messages) ? data.messages : [], turn.baselineCount);
+      } catch (error) {
+        // Still offline: keep waiting until the window closes.
+        continue;
+      }
+      if (status === "answered") {
+        if (currentConvId === turn.conversationId) loadHistory(turn.conversationId);
+        return;
+      }
+      if (status === "missing") {
+        missing += 1;
+        if (missing >= TURN_MISSING_POLLS) {
+          onMissing();
+          return;
+        }
+      } else {
+        missing = 0;
+      }
+    }
+    if (currentConvId === turn.conversationId) {
+      addMessage("Ответ ещё не пришёл. Сервер сохранит его: откройте диалог позже.", "error", false, 0);
+    }
+  }
+
   async function sendTurn(retryRequest) {
     if (!input) return;
     const rawText = retryRequest ? "" : input.value;
@@ -978,6 +1043,8 @@ document.addEventListener("DOMContentLoaded", function () {
     if (needsConversation) creatingConversation = true;
     else pendingConversations.add(turn.conversationId);
     let typingEl = null;
+    // True while a lost connection is being recovered: the turn stays pending until its answer is found.
+    let recovering = false;
     // Photos belong to this message only; they return to the tray if the send fails.
     const sentImages = retryRequest ? retryRequest.images || [] : pendingImages.slice();
     // Sent photos leave the tray. A retry finds them there again after a failed send, so they are removed here too.
@@ -1030,6 +1097,8 @@ document.addEventListener("DOMContentLoaded", function () {
         data = await runImageTurn({ ...turn, retry: Boolean(retryRequest), attachmentCount: sentImages.length });
         response = { status: data.error ? 502 : 200, ok: !data.error };
       } else {
+        // Counted before the send, so a lost connection can tell whether the server stored this turn.
+        turn.baselineCount = await fetchMessageCount(turn.conversationId);
         const chatController = new AbortController();
         activeChatRequests.set(turn.conversationId, chatController);
         syncSendButton();
@@ -1095,17 +1164,28 @@ document.addEventListener("DOMContentLoaded", function () {
           data.reasoning, data.usage, data.trace);
       }
     } catch (error) {
-      if (currentConvId === turn.conversationId) {
+      const stopped = Boolean(error) && error.name === "AbortError";
+      const canRecover = !stopped && !isImageModel(turn.model) && typeof turn.baselineCount === "number";
+      if (canRecover && currentConvId === turn.conversationId) {
+        // The server may still answer: wait for the stored answer before offering the text again.
+        recovering = true;
+        addMessage("Соединение прервалось. Ждём ответ, он сохраняется на сервере.", "error", false, 0);
+        recoverTurn(turn, function () {
+          if (currentConvId !== turn.conversationId) return;
+          restoreImages();
+          if (!input.value) input.value = turn.text;
+          addMessage(chatErrorText(error), "error", false, 0);
+        }).finally(function () {
+          releaseTurn(turn, needsConversation);
+        });
+      } else if (currentConvId === turn.conversationId) {
         restoreImages();
         if (!input.value) input.value = turn.text;
         addMessage(chatErrorText(error), "error", false, 0);
       }
     } finally {
       if (typingEl) typingEl.remove();
-      if (turn.conversationId) pendingConversations.delete(turn.conversationId);
-      if (turn.conversationId) activeChatRequests.delete(turn.conversationId);
-      syncSendButton();
-      if (needsConversation) creatingConversation = false;
+      if (!recovering) releaseTurn(turn, needsConversation);
     }
   }
 
