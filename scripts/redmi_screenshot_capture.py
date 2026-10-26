@@ -636,73 +636,14 @@ def finish_screenrecord(recorder, video_path, uid, gid, max_bytes):
     return video, artifact, failures
 
 
-SELF_ASSESSMENT_QUESTION = (
-    "Пользователь пишет: «Сделай отчёт по продажам». Прежде чем что-то делать, "
-    "задай мне вопросы, без которых ты не сможешь выполнить задачу. Перечисли их списком."
+POETS_DIALOGUE_PROMPT = (
+    "Сочини воображаемую беседу Александра Пушкина и Сергея Есенина о том, "
+    "зачем людям поэзия в век искусственного интеллекта. Пусть они отвечают друг другу: "
+    "Пушкин — ясно, остроумно и с лёгкой иронией; Есенин — образно, тепло, с мотивами "
+    "природы и деревни. Напиши шесть коротких реплик по очереди, по три каждому, "
+    "начни с Пушкина. Каждую реплику начни с «Пушкин:» или «Есенин:» на отдельной строке. "
+    "Придумай новые реплики, не выдавай их за настоящие цитаты поэтов."
 )
-
-
-def ask_model(rdp, actor, conversation_id, prompt):
-    """Send one message and return the model's reply, or the reason it was not answered."""
-    counts_before = rdp.message_counts(actor)
-    rdp.send_chat_message(actor, prompt)
-    status = "timeout"
-    deadline = time.monotonic() + 120
-    while time.monotonic() < deadline:
-        device_guard()
-        counts = rdp.message_counts(actor)
-        if counts["error"] > counts_before["error"]:
-            status = "error"
-            break
-        if counts["bot"] > counts_before["bot"]:
-            status = "answered"
-            break
-        time.sleep(1)
-    text = None
-    if status == "answered":
-        persisted = rdp.persisted_messages(actor, conversation_id)
-        replies = [m["text"] for m in persisted["messages"] if m["role"] == "assistant"]
-        text = replies[-1] if replies else None
-    return status, text
-
-
-def self_assessment(rdp, actor, conversation_id):
-    """Give the model an incomplete task and record the questions it asks. Never a failure."""
-    status, text = ask_model(rdp, actor, conversation_id, SELF_ASSESSMENT_QUESTION)
-    questions = [line.strip() for line in (text or "").splitlines() if "?" in line]
-    return {"status": status, "questions": questions, "reply_text": text}
-
-
-REAL_TASK_QUESTION = "Сколько будет 17% от 2340 рублей? Ответь числом и коротко объясни расчёт."
-REAL_TASK_EXPECTED = ("397,8", "397.8")
-REAL_TASK_VALUE = 397.8
-
-
-def first_number(text):
-    """The number the reply states first: the task asks for the answer before the working."""
-    match = re.search(r"-?\d+(?:[.,]\d+)?", text or "")
-    return float(match.group(0).replace(",", ".")) if match else None
-
-
-def real_task(rdp, actor, conversation_id):
-    """Give the model a checkable task and record its answer. Never a failure."""
-    status, text = ask_model(rdp, actor, conversation_id, REAL_TASK_QUESTION)
-    answer = first_number(text)
-    correct = None if text is None else answer is not None and abs(answer - REAL_TASK_VALUE) < 0.05
-    return {"status": status, "expected": REAL_TASK_EXPECTED[0], "correct": correct, "reply_text": text}
-
-
-STUDENT_TASKS_QUESTION = (
-    "Подбери три задачи по математике для школьников (уровень 7 класса) и реши каждую: "
-    "напиши условие, ход решения и отдельной строкой «Ответ: …»."
-)
-
-
-def student_tasks(rdp, actor, conversation_id):
-    """Ask the model for student problems with worked answers. Recorded for review, never a failure."""
-    status, text = ask_model(rdp, actor, conversation_id, STUDENT_TASKS_QUESTION)
-    answers = [line for line in (text or "").splitlines() if line.strip().lstrip("*_#> ").startswith("Ответ")]
-    return {"status": status, "answers_found": len(answers), "reply_text": text}
 
 
 def tools_self_check(rdp, actor, conversation_id):
@@ -750,7 +691,8 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
     events, failures, artifacts = [], [], []
     recorder = None
     video_path = out / "15-conversation-create.mp4"
-    video_seconds = 180 if tools_check else 90
+    video_seconds = 180
+    video_deadline = None
     video = {"path": video_path.name, "available": False, "time_limit_seconds": video_seconds,
              "clock_note": "Process timestamps bound recording; they do not identify the exact first video frame."}
     observer = {"available": False, "requests": []}
@@ -760,6 +702,8 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                    "message_send": {"status": "NOT_RUN", "reason": "creation_not_confirmed"}}
     if tools_check:
         checkpoints["tools_self_check"] = {"status": "NOT_RUN", "reason": "new_chat_not_ready"}
+    else:
+        checkpoints["poets_dialogue"] = {"status": "NOT_RUN", "reason": "message_not_answered"}
     before = after = reloaded = None
 
     def mark(name, browser=None):
@@ -771,7 +715,9 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
             event["recorder_running"] = recorder.poll() is None
         if name in ("new_chat_button_clicked", "current_model_choice_started", "current_model_choice_clicked",
                     "creation_result_observed", "reload_result_observed", "native_screencap_finished:14-conversation-after-reload.png",
-                    "message_send_clicked", "message_reply_observed"):
+                    "message_send_clicked", "message_reply_observed",
+                    "screenshot_finished:22-poets-dialogue-top.png",
+                    "screenshot_finished:23-poets-dialogue-bottom.png"):
             if not event.get("recorder_running"):
                 failures.append("native_video_ended_before_scenario_complete")
         events.append(event)
@@ -820,9 +766,10 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
         else:
             mark("recorder_launch_requested")
             recorder = subprocess.Popen([ROOT + "screenrecord", "--bugreport", "--size", "720x1560",
-                                         "--bit-rate", "800000" if tools_check else "2000000",
+                                         "--bit-rate", "800000",
                                          "--time-limit", str(video_seconds), str(video_path)],
                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            video_deadline = time.monotonic() + video_seconds
             time.sleep(0.5)
             mark("recorder_start_observed")
             if recorder.poll() is not None:
@@ -1026,11 +973,16 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                 frame("22-tools-self-check.png")
             elif checkpoints["reload_persistence"]["status"] == "PASS":
                 send_validation_start = len(failures)
+                if recorder is None or recorder.poll() is not None:
+                    raise RuntimeError("The poets dialogue requires an active native recording")
+                reply_budget = min(120, remaining(135) - 15, video_deadline - time.monotonic() - 15)
+                if reply_budget <= 0:
+                    raise RuntimeError("No recording time remains for the poets dialogue")
                 counts_before = rdp.message_counts(actor)
-                rdp.send_chat_message(actor, "привет")
+                rdp.send_chat_message(actor, POETS_DIALOGUE_PROMPT)
                 mark("message_send_clicked", rdp.conversation_state(actor))
                 reply_status = "timeout"
-                deadline = time.monotonic() + 120
+                deadline = time.monotonic() + reply_budget
                 while time.monotonic() < deadline:
                     device_guard()
                     counts = rdp.message_counts(actor)
@@ -1056,7 +1008,9 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                     if trace["status"] != 200:
                         failures.append("reply_trace_unavailable")
                     reply_errors.extend(trace["errors"])
-                if persisted["status"] != 200 or "user" not in roles:
+                prompt_persisted = any(m["role"] == "user" and m["text"] == POETS_DIALOGUE_PROMPT
+                                       for m in persisted["messages"])
+                if persisted["status"] != 200 or not prompt_persisted:
                     failures.append("user_message_not_persisted")
                 if "assistant" not in roles:
                     failures.append("reply_not_persisted")
@@ -1066,14 +1020,27 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                                                "reply_status": reply_status,
                                                "reply_text": replies[-1] if replies else None,
                                                "reply_trace_errors": reply_errors,
-                                               "user_message_persisted": "user" in roles,
+                                               "question": POETS_DIALOGUE_PROMPT,
+                                               "user_message_persisted": prompt_persisted,
                                                "reply_persisted": "assistant" in roles}
                 if checkpoints["message_send"]["status"] == "PASS":
-                    for name, check in (("self_assessment", self_assessment), ("real_task", real_task),
-                                        ("student_tasks", student_tasks)):
-                        mark("model_checkpoint_requested", name)
-                        checkpoints[name] = check(rdp, actor, new_id)
-                        mark("model_checkpoint_observed", {"name": name, "status": checkpoints[name]["status"]})
+                    reply_text = replies[-1] if replies else ""
+                    speakers = re.findall(r"(?m)^\s*[*_#> -]*(Пушкин|Есенин)[*_]*\s*[:—–-]", reply_text)
+                    counts = {name: speakers.count(name) for name in ("Пушкин", "Есенин")}
+                    alternating = all(left != right for left, right in zip(speakers, speakers[1:]))
+                    dialogue_ok = all(count >= 2 for count in counts.values()) and alternating
+                    checkpoints["poets_dialogue"] = {
+                        "status": "PASS" if dialogue_ok else "FAIL", "speakers": speakers,
+                        "turn_counts": counts, "alternating": alternating,
+                        "scope": "speaker labels and alternation, not literary quality or independent agents"}
+                    if not dialogue_ok:
+                        failures.append("poets_dialogue_missing_or_not_alternating")
+                    mark("poets_dialogue_observed", checkpoints["poets_dialogue"])
+                    for where, filename in (("top", "22-poets-dialogue-top.png"),
+                                            ("bottom", "23-poets-dialogue-bottom.png")):
+                        app_state()
+                        mark("poets_dialogue_scrolled", {"where": where, **rdp.scroll(actor, "#chatbox", where)})
+                        frame(filename)
             else:
                 checkpoints["message_send"] = {"status": "NOT_RUN", "reason": "creation_not_confirmed"}
     except CaptureSafetyError:
