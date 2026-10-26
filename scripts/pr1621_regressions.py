@@ -273,7 +273,13 @@ def main() -> int:
         counts = junit_counts(negative_junit)
     except (OSError, ValueError, ET.ParseError):
         counts = {}
-    expected_failure = negative_junit.exists() and "EXPECTED_NEGATIVE_CONTROL" in negative_junit.read_text(encoding="utf-8")
+    try:
+        expected_failure = any(
+            "EXPECTED_NEGATIVE_CONTROL" in failure.get("message", "")
+            for failure in ET.parse(negative_junit).iter("failure")
+        )
+    except (OSError, ValueError, ET.ParseError):
+        expected_failure = False
     result.update(counts=counts, verdict="PASS" if result["exit_code"] == 1 and expected_failure and counts == {
         "tests": 1, "failures": 1, "errors": 0, "skipped": 0,
     } else "FAIL")
