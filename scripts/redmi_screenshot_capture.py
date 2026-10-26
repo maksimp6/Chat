@@ -22,6 +22,9 @@ SOCKET = "\0io.github.forkmaintainers.iceraven/firefox-debugger-socket"
 PACKAGE = "io.github.forkmaintainers.iceraven"
 ROOT = "/system/bin/"
 LOGOS_URL = "http://127.0.0.1:8080/"
+# The text model the tools check runs on: the Responses function-calling example in the Yandex docs uses
+# yandexgpt, which is YandexGPT Pro 5 in the model picker.
+TOOLS_CHECK_MODEL = "yandexgpt-5-pro"
 CAPTURE_DEADLINE = None
 
 
@@ -715,6 +718,18 @@ def tools_self_check(rdp, actor, conversation_id):
         return {"status": "ERROR", "reason": "baseline_messages_unavailable"}
     if rdp.conversation_state(actor)["current_id"] != conversation_id:
         return {"status": "ERROR", "reason": "requested_chat_not_selected"}
+    # The question is a text request with tool calls. An image model refuses it (its prompt limit is
+    # 1000 characters), so the chat is moved to the text model whose documented example calls functions.
+    if rdp.conversation_state(actor)["current_model"] != TOOLS_CHECK_MODEL:
+        rdp.evaluate(actor, "JSON.stringify((()=>{window.changeModel(" + json.dumps(TOOLS_CHECK_MODEL) +
+                     ", false);return {changed:true};})())")
+        for _ in range(30):
+            device_guard()
+            if rdp.conversation_state(actor)["current_model"] == TOOLS_CHECK_MODEL:
+                break
+            time.sleep(0.2)
+        if rdp.conversation_state(actor)["current_model"] != TOOLS_CHECK_MODEL:
+            return {"status": "ERROR", "reason": "tools_check_model_not_selected"}
     # #msg-input is input[type=text]; it removes line breaks before sending.
     question = SELF_CHECK_QUESTION + " Каталог приложения: " + json.dumps(inventory, ensure_ascii=False)
     rdp.send_chat_message(actor, question)
