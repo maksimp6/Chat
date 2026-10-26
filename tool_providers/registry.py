@@ -122,7 +122,9 @@ class ToolRegistry:
     def _load_all(self):
         for category, module_name, attribute, label, failure in _TOOL_SOURCES:
             try:
-                tools = getattr(import_module(module_name), attribute)
+                tools = getattr(import_module(module_name), attribute, None)
+                if tools is None:
+                    raise ImportError(f"{module_name} does not export {attribute}")
                 for name, cfg in tools.items():
                     if category == "git":
                         cfg = _git_policy(name, cfg)
