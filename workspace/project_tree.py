@@ -5,7 +5,9 @@ import os
 from flask import Blueprint, jsonify, request
 
 project_tree_bp = Blueprint("project_tree", __name__)
-PROJECT_ROOT = os.path.realpath(env_get("LOGOS_PROJECT_ROOT", os.path.dirname(__file__)))
+PROJECT_ROOT = os.path.realpath(
+    env_get("LOGOS_PROJECT_ROOT", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 MAX_NODES = 2000
 SKIP_NAMES = {".git", "node_modules", "__pycache__", ".venv", "venv", ".pytest_cache"}
 
