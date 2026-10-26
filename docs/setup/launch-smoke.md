@@ -12,7 +12,7 @@ The script `scripts/local_launch_smoke.py` starts the documented
 `python app.py` entrypoint with an isolated native Kristall journal and verifies:
 
 1. the tracked checkout is clean;
-2. Flask starts and `GET /healthz` returns `{"status":"ok"}`;
+2. Flask starts and `GET /healthz` returns JSON with `"status":"ok"` plus the process fields `scope` and `chat_verified`;
 3. the root UI returns non-empty HTML;
 4. a local runtime session can be bootstrapped;
 5. the native Kristall journal exists after shutdown;

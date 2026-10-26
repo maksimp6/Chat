@@ -50,3 +50,8 @@ browser tab has loaded its scripts.
 
 The deployment target is `develop`. Changes left only in a feature branch do not
 reach the phone until they are reviewed and delivered to `develop`.
+
+The health contract is `"status": "ok"`. The updater checks only that field, so the
+process fields `scope` and `chat_verified` do not fail it. The state copy of the updater
+refreshes only after a successful check. The first deployment of a fixed updater therefore
+needs one manual run from the checkout: `.venv/bin/python scripts/redmi_app_autoupdate.py --once`.

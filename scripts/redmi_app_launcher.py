@@ -11,7 +11,10 @@ def main():
     app = Path(os.environ.get("LOGOS_APP_DIR", str(Path.home() / "logos-local"))).resolve()
     state = Path(os.environ.get("LOGOS_STATE_DIR", str(Path.home() / "logos-local-state"))).resolve()
     settings = state / "server-network.json"
-    network = json.loads(settings.read_text()) if settings.exists() else {}
+    try:
+        network = json.loads(settings.read_text()) if settings.exists() else {}
+    except (OSError, ValueError) as exc:
+        raise SystemExit("Invalid server network settings") from exc
     host = os.environ.get("LOGOS_BIND_HOST") or network.get("bind_host", "127.0.0.1")
     if host not in ("127.0.0.1", "0.0.0.0"):
         raise SystemExit("Unsupported server bind address")
@@ -25,17 +28,26 @@ def main():
             raise SystemExit("Application port is already occupied")
     env = {k: v for k, v in os.environ.items() if not k.startswith(("GITHUB_", "ACTIONS_", "RUNNER_", "GH_"))}
     env.update(HOST=host, PORT=str(port), FLASK_DEBUG="0", PYTHONPATH=str(native[0].parent))
-    secret = (state / "provider-encryption.key").read_text().strip()
+    try:
+        secret = (state / "provider-encryption.key").read_text().strip()
+    except OSError as exc:
+        raise SystemExit("Provider encryption key is missing") from exc
     for prefix in ("LOGOS", "ALICE"):
         env[prefix + "_MEMORY_PATH"] = str(state / "logos.memory")
         env[prefix + "_PROVIDER_CREDENTIAL_KEY"] = secret
-    with (state / "backend.log").open("ab", buffering=0) as log:
+    log_path = state / "backend.log"
+    if log_path.exists() and log_path.stat().st_size > 10 * 1024 * 1024:
+        log_path.replace(state / "backend.log.1")
+    with log_path.open("ab", buffering=0) as log:
         process = subprocess.Popen(
             [str(app / ".venv/bin/python"), "app.py"], cwd=app, env=env,
             stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True,
         )
     temporary = state / "backend.pid.next"
-    temporary.write_text(str(process.pid))
+    with temporary.open("w") as stream:
+        stream.write(str(process.pid))
+        stream.flush()
+        os.fsync(stream.fileno())
     temporary.replace(state / "backend.pid")
     print(json.dumps({"pid": process.pid, "bind_host": host, "port": port}))
 

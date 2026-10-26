@@ -15,7 +15,9 @@ The runner requires these Actions secrets:
   administrative token.
 
 No GitHub token can replace Yandex IAM authorization. The job does not create
-service accounts or assign roles. Its API-key scope is
+service accounts or assign roles. Image generation also needs the image role granted by hand
+on the folder that `project_id` names, because the model URI is `art://<folder>/yandex-art/latest`.
+Its API-key scope is
 `yc.ai.foundationModels.execute`; lifetime is 12 hours, matching the app's
 existing credential lifetime. This one-shot job does not configure scheduled
 rotation. An existing app credential is never silently replaced.

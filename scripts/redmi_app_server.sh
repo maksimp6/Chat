@@ -34,7 +34,7 @@ if [[ $wifi_required == 1 && $action != stop ]]; then
   wifi_address=$("$python" "$script_dir/redmi_wifi_probe.py" --discover)
 fi
 exec 9>"$state/runner-control.lock"
-flock -w 30 9
+flock -w 30 9 || { echo 'Another Logos control operation holds the lock' >&2; exit 1; }
 base=http://127.0.0.1:$port
 probe=$(mktemp -d "$state/runner-probe.XXXXXX")
 trap 'rm -rf "$probe"' EXIT
@@ -161,6 +161,7 @@ process_revision_matches() {
 target=
 receipt() {
   local status=${1:-ready} revision run wifi_check=
+  [[ $pid =~ ^[0-9]+$ ]] || return 2
   revision=$(git -C "$app" rev-parse HEAD 2>/dev/null || printf unknown)
   run=${GITHUB_RUN_ID:-manual}
   [[ $run =~ ^[0-9]+$ || $run == manual ]] || return 2
@@ -203,6 +204,9 @@ if [[ $action == deploy ]]; then
   timeout 90 git -C "$app" fetch --quiet --no-tags origin '+refs/heads/develop:refs/remotes/origin/develop'
   target=$(git -C "$app" rev-parse --verify 'refs/remotes/origin/develop^{commit}')
   [[ $target =~ ^[0-9a-f]{40}$ ]] || exit 2
+  git -C "$app" merge-base --is-ancestor "$previous" "$target" || {
+    echo 'Target does not descend from the installed revision; refusing deployment' >&2; exit 1;
+  }
   git -C "$app" lfs install --local --skip-repo >/dev/null
   timeout 180 git -C "$app" lfs fetch origin "$target" >&2
   git -C "$app" lfs fsck --objects "$target" >&2
@@ -212,6 +216,8 @@ if [[ $action == deploy ]]; then
     exit 0
   fi
   git -C "$app" update-ref "refs/logos/deployments/$previous" "$previous"
+  git -C "$app" for-each-ref --sort=-creatordate --format='%(refname)' refs/logos/deployments/ \
+    | tail -n +21 | while read -r ref; do git -C "$app" update-ref -d "$ref"; done || true
   mkdir -p "$state/deploy-backups"
   stop_app
   if backup_memory && checkout_revision "$target" && start_app && wait_ready && process_revision_matches "$target"; then

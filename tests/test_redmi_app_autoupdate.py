@@ -1,6 +1,7 @@
 """Queue-independent phone updates, using isolated state and no network or credentials."""
 
 import fcntl
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import importlib.util
 import json
 import os
@@ -8,6 +9,7 @@ from pathlib import Path
 import signal
 import subprocess
 import sys
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -193,6 +195,47 @@ def test_ready_uses_actual_receipt_process_and_http(tmp_path, monkeypatch):
     assert not updater.ready(app, state, NEW, 8080)
     (state / "backend.pid").write_text("124")
     assert not updater.ready(app, state, OLD, 8080)
+
+
+@pytest.fixture
+def health_server():
+    servers = []
+
+    def serve(status, body):
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        servers.append(server)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        return server.server_address[1]
+
+    yield serve
+    for server in servers:
+        server.shutdown()
+        server.server_close()
+
+
+# The real /healthz body from app.py must pass; only the status field is the contract.
+@pytest.mark.parametrize("status,body,expected", [
+    (200, b'{"status":"ok","scope":"process","chat_verified":false}', True),
+    (200, b'{"status":"ok"}', True),
+    (200, b'{"status":"failed"}', False),
+    (503, b'{"status":"ok"}', False),
+    (200, b'[]', False),
+    (200, b'not JSON', False),
+    (200, b'{"status":"ok","pad":"' + b"x" * 4096 + b'"}', False),
+])
+def test_http_healthy_checks_the_status_field_of_the_real_health_contract(health_server, status, body, expected):
+    assert updater.http_healthy(health_server(status, body)) is expected
 
 
 def test_process_identity_uses_cwd_command_and_non_zombie_state(tmp_path, monkeypatch):

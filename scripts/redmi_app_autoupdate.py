@@ -14,7 +14,9 @@ from pathlib import Path
 import re
 import signal
 import subprocess
+import sys
 import tempfile
+import traceback
 from typing import Iterator
 
 REMOTE = "https://github.com/maksimp6/Chat.git"
@@ -38,6 +40,11 @@ def atomic_bytes(path: Path, content: bytes, mode: int = 0o600) -> None:
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
+        directory = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
     finally:
         Path(temporary).unlink(missing_ok=True)
 
@@ -126,7 +133,8 @@ def http_healthy(port: int) -> bool:
         connection.request("GET", "/healthz")
         response = connection.getresponse()
         body = response.read(4097)
-        return response.status == 200 and len(body) <= 4096 and json.loads(body) == {"status": "ok"}
+        data = json.loads(body)
+        return response.status == 200 and len(body) <= 4096 and isinstance(data, dict) and data.get("status") == "ok"
     except (OSError, ValueError, http.client.HTTPException):
         return False
     finally:
@@ -151,10 +159,13 @@ def refresh_worker(app: Path, state: Path) -> None:
     source = app / "scripts/redmi_app_autoupdate.py"
     target = state / "app-autoupdate.py"
     if source.is_file():
-        content = source.read_bytes()
-        compile(content, str(source), "exec")
-        if not target.exists() or target.read_bytes() != content:
-            atomic_bytes(target, content, 0o700)
+        try:
+            content = source.read_bytes()
+            compile(content, str(source), "exec")
+            if not target.exists() or target.read_bytes() != content:
+                atomic_bytes(target, content, 0o700)
+        except (OSError, SyntaxError) as exc:
+            raise UpdateFailure("worker_refresh_failed") from exc
 
 
 def run_controller(app: Path, env: dict[str, str], action: str, timeout: int) -> int:
@@ -170,7 +181,10 @@ def run_controller(app: Path, env: dict[str, str], action: str, timeout: int) ->
     except OSError as exc:
         raise UpdateFailure("deploy_unavailable") from exc
     try:
-        process.communicate(timeout=timeout)
+        output, error = process.communicate(timeout=timeout)
+        state = env.get("LOGOS_STATE_DIR")
+        if state:
+            atomic_bytes(Path(state) / "autoupdate-controller.log", (output + error)[-8192:].encode(), 0o600)
         return process.returncode
     except subprocess.TimeoutExpired as exc:
         # Only this controller's new process group is signalled. The backend launcher
@@ -222,8 +236,9 @@ def check_once(app: Path, state: Path, port: int = 8080, deploy_timeout: int = 6
                     observed = remote_revision(env)
                 except UpdateFailure as exc:
                     # Offline GitHub must not prevent recovery of the installed application.
-                    if not (process_owned(app, record["pid_before"]) and http_healthy(port)):
-                        action = "restart" if process_owned(app, record["pid_before"]) else "start"
+                    owned_before = process_owned(app, record["pid_before"])
+                    if not (owned_before and http_healthy(port)):
+                        action = "restart" if owned_before else "start"
                         attempted = True
                         record["action"] = action
                         code = run_controller(app, env, action, deploy_timeout)
@@ -260,6 +275,7 @@ def check_once(app: Path, state: Path, port: int = 8080, deploy_timeout: int = 6
             record.update(result="error", error=str(exc), pid_after=backend_pid(state))
         except Exception:
             # Private subprocess output and exception details never enter the public receipt.
+            traceback.print_exc(file=sys.stderr)
             record.update(result="error", error="updater_error", pid_after=backend_pid(state))
         record["completed_at"] = now()
         save_json(state / "autoupdate-status.json", record)
@@ -273,7 +289,7 @@ def main() -> int:
     parser.add_argument("--once", action="store_true", help="Perform one check; the boot supervisor schedules retries.")
     parser.add_argument("--app", type=Path, default=Path(os.environ.get("LOGOS_APP_DIR", Path.home() / "logos-local")))
     parser.add_argument("--state", type=Path, default=Path(os.environ.get("LOGOS_STATE_DIR", Path.home() / "logos-local-state")))
-    parser.add_argument("--port", type=int, default=int(os.environ.get("LOGOS_PORT", "8080")))
+    parser.add_argument("--port", type=int, default=os.environ.get("LOGOS_PORT", "8080"))
     parser.add_argument("--deploy-timeout", type=int, default=600)
     args = parser.parse_args()
     if not 1024 <= args.port <= 65535 or not 1 <= args.deploy_timeout <= 900:
@@ -281,6 +297,7 @@ def main() -> int:
     try:
         result = check_once(args.app, args.state, args.port, args.deploy_timeout)
     except Exception:
+        traceback.print_exc(file=sys.stderr)
         result = {"result": "error", "error": "updater_state_unavailable", "checked_at": now()}
     print(json.dumps(result, ensure_ascii=False), flush=True)
     return int(result["result"] == "error")
