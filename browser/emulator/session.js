@@ -1,10 +1,13 @@
 "use strict";
 
+const dns = require("node:dns/promises");
 const { DocumentShim } = require("./browser_dom");
 
 const DEFAULT_MAX_BYTES = 2 * 1024 * 1024;
 const DEFAULT_TEXT_LIMIT = 8000;
 const DEFAULT_TIMEOUT_MS = 15000;
+const MAX_REDIRECTS = 5;
+const SECRET_INPUT_NAME = /token|secret|passw|api[_-]?key|session|auth|cookie|credential|csrf/i;
 
 class EmulatorError extends Error {}
 
@@ -16,6 +19,10 @@ function collapse(text) {
 
 // Literal private, loopback, link-local and metadata hosts. Pages are fetched
 // on behalf of the agent, so these must never be reachable through the emulator.
+function isSecretInput(type, name) {
+  return (type || "").toLowerCase() === "password" || SECRET_INPUT_NAME.test(name || "");
+}
+
 function isNonPublicHost(hostname) {
   const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
   if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return true;
@@ -91,23 +98,36 @@ class EmulatorSession {
     }
   }
 
+  // Every hop is checked before it is requested: the host name, the address it resolves to, and
+  // the redirect it may answer with. Following redirects inside fetch would check only the end.
+  async _assertPublicUrl(url) {
+    if (this.allowNonPublicHosts) return;
+    if (isNonPublicHost(url.hostname)) throw new EmulatorError("address is not public: " + url.hostname);
+    const { address } = await dns.lookup(url.hostname.replace(/^\[|\]$/g, ""));
+    if (isNonPublicHost(address)) throw new EmulatorError("address is not public: " + address);
+  }
+
   async navigate(target, init = {}) {
-    const url = this._resolve(target);
-    if (!this.allowNonPublicHosts && isNonPublicHost(url.hostname)) {
-      throw new EmulatorError("address is not public: " + url.hostname);
-    }
-    const response = await this.fetch(url.href, {
-      redirect: "follow",
-      signal: AbortSignal.timeout(this.timeoutMs),
-      ...init,
-    });
-    // Redirects were followed by fetch, so the host that actually answered is checked too.
-    if (!this.allowNonPublicHosts && response.url && isNonPublicHost(new URL(response.url).hostname)) {
-      throw new EmulatorError("redirected to a non-public address");
+    let url = this._resolve(target);
+    let requestInit = init;
+    let response;
+    for (let hop = 0; ; hop += 1) {
+      await this._assertPublicUrl(url);
+      response = await this.fetch(url.href, {
+        ...requestInit,
+        redirect: "manual",
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+      const location =
+        response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
+      if (!location) break;
+      if (hop >= MAX_REDIRECTS) throw new EmulatorError("too many redirects");
+      url = new URL(location, url);
+      requestInit = {};
     }
     const html = await readCapped(response, this.maxBytes);
     this.document = new DocumentShim(html);
-    this.url = response.url || url.href;
+    this.url = url.href;
     this.status = response.status;
     return { url: this.url, status: this.status, title: this._title() };
   }
@@ -127,7 +147,7 @@ class EmulatorSession {
         (el) => ({
           name: el.getAttribute("name"),
           type: el.getAttribute("type") || el.tagName.toLowerCase(),
-          value: (el.getAttribute("type") || "") === "password" ? null : el.value,
+          value: isSecretInput(el.getAttribute("type"), el.getAttribute("name")) ? null : el.value,
         }),
       ),
       buttons: root.querySelectorAll("button").map((b) => collapse(b.textContent)),

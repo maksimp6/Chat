@@ -168,6 +168,9 @@ class BrowserSynthesisResult:
 def _extract_snapshot(data: Any) -> SemanticSnapshot | None:
     if not isinstance(data, Mapping):
         return None
+    if data.get("truncated") is True and "original_chars" in data:
+        # The observation was cut to fit the budget and is lost; the run must escalate, not succeed.
+        return SemanticSnapshot(url=None, title=None, version=None, nodes=(), facts={}, truncated=True)
     if data.get("semantic_type") != "snapshot":
         return None
     raw_snapshot = data.get("snapshot")

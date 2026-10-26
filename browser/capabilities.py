@@ -165,9 +165,16 @@ def _sensitive_key(key: str) -> bool:
     return any(part in lowered for part in _SENSITIVE_KEY_PARTS)
 
 
+def _secret_input(value: Mapping) -> bool:
+    kind = str(value.get("type") or "").lower()
+    return kind == "password" or (_sensitive_key(str(value.get("name") or "")) and "value" in value)
+
+
 def sanitize_browser_value(value: Any) -> Any:
     """Redact credentials and cookies before traces, logs or issue comments."""
     if isinstance(value, Mapping):
+        if _secret_input(value):
+            value = {**value, "value": "<redacted>"}
         return {
             str(key): "<redacted>" if _sensitive_key(str(key)) else sanitize_browser_value(item)
             for key, item in value.items()

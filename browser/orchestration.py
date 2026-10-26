@@ -17,7 +17,7 @@ from browser.capabilities import BROWSER_ACTIONS
 
 
 READ_ACTIONS = frozenset({"navigate", "inspect", "screenshot", "assert_state"})
-WRITE_ACTIONS = frozenset({"click", "fill"})
+WRITE_ACTIONS = frozenset({"click", "fill", "navigate"})
 ROLE_ACTIONS = {
     "observer": READ_ACTIONS,
     "extractor": frozenset({"inspect", "screenshot", "assert_state"}),
@@ -305,6 +305,8 @@ class BrowserRoleDag:
         results: dict[str, BrowserTaskResult] = {}
         pending = set(self._task_map)
         running: dict[Future[BrowserTaskResult], BrowserRoleTask] = {}
+        # Tasks past their budget whose worker is still running. Their session stays busy until it ends.
+        quarantined: dict[Future[BrowserTaskResult], BrowserRoleTask] = {}
         deadlines: dict[Future[BrowserTaskResult], float] = {}
         total_tokens = 0
 
@@ -334,7 +336,10 @@ class BrowserRoleDag:
 
                 available_slots = self.budget.max_parallel_workers - len(running)
                 if available_slots > 0:
-                    running_tasks = {task.task_id: task for task in running.values()}
+                    running_tasks = {
+                        task.task_id: task
+                        for task in [*running.values(), *(t for f, t in quarantined.items() if not f.done())]
+                    }
                     for task_id in sorted(tuple(pending)):
                         if available_slots <= 0:
                             break
@@ -397,6 +402,8 @@ class BrowserRoleDag:
                     task = running.pop(future)
                     deadlines.pop(future)
                     future.cancel()
+                    if not future.done():
+                        quarantined[future] = task
                     suffix = "; writes may already have happened" if task.is_write else ""
                     results[task.task_id] = BrowserTaskResult(
                         task.task_id,
