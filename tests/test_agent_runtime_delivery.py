@@ -10,7 +10,7 @@ def test_result_is_resent_with_its_claim_token_and_never_run_again(monkeypatch):
 
     def flaky_request(method, url, payload=None, timeout=None):
         sent.append(payload)
-        if len(sent) == 1:
+        if len(sent) <= local_tool_agent._RESULT_ATTEMPTS:
             raise ConnectionError("response lost")
         return {"status": "ok"}
 
@@ -23,7 +23,7 @@ def test_result_is_resent_with_its_claim_token_and_never_run_again(monkeypatch):
     agent._redeliver_pending()
 
     assert agent._undelivered == {}
-    assert [payload["claim_token"] for payload in sent[:2]] == ["claim-1", "claim-1"]
+    assert {payload["claim_token"] for payload in sent} == {"claim-1"}
 
 
 def test_stale_claim_result_is_dropped_not_retried(monkeypatch):
