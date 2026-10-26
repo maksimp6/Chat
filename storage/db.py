@@ -145,6 +145,7 @@ def get_messages(conv_id: str) -> list[dict[str, Any]]:
             "timings": item["timings"],
             "trace": item["trace"],
             "source": item.get("source"),
+            "attachments": item.get("attachments") or {},
         }
         for item in sorted(records, key=lambda item: item["id"])
     ]
@@ -160,6 +161,7 @@ def add_message(
     model: Any = None,
     source: Any = None,
     trace: Any = None,
+    attachments: Any = None,
 ) -> None:
     if not isinstance(content, str):
         content = json.dumps(content, ensure_ascii=False) if content is not None else ""
@@ -185,6 +187,7 @@ def add_message(
                 "timings": timings or [],
                 "trace": trace or {},
                 "source": source,
+                "attachments": attachments or {},
             },
         )
         tx.set(key, {**record, "updated_at": now})

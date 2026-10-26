@@ -80,11 +80,11 @@
   function chk(id, checked, text, extra, hint) {
     var t = hint ? ' title="' + escapeHtml(hint) + '"' : "";
     return (
-      '<label style="font-size:13px;display:flex;align-items:center;gap:4px;color:var(--m-text,#222);"' +
+      '<label style="font-size:13px;display:flex;align-items:flex-start;gap:4px;color:var(--m-text,#222);"' +
       t +
       '><input id="' +
       id +
-      '" type="checkbox"' +
+      '" type="checkbox" style="margin:2px 0 0;flex:0 0 auto;"' +
       (checked ? " checked" : "") +
       (extra || "") +
       "> " +
@@ -94,7 +94,7 @@
   }
   function gap2(c1, c2) {
     return (
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;align-items:end;">' +
       c1 +
       c2 +
       "</div>"
@@ -102,7 +102,7 @@
   }
   function gap3(c1, c2, c3) {
     return (
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;align-items:end;">' +
       c1 +
       c2 +
       c3 +

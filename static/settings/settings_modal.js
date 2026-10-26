@@ -80,7 +80,7 @@
         "</div>",
       '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">Эти инструменты выполняются на стороне Yandex AI Studio. Они независимы от MCP и локального Tool Registry.</div>',
       '<div id="tools-status" role="status" style="color:var(--m-danger,#c33);font-size:12px;min-height:16px;"></div>',
-      '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;border-top:1px solid var(--m-border,#ddd);padding-top:12px;">',
+      '<div class="settings-modal-footer" style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;border-top:1px solid var(--m-border,#ddd);padding-top:12px;">',
       ' <button class="logos-btn settings-contract-btn" id="tools-save-btn">Сохранить инструменты</button>',
       "</div>",
     ].join("");
@@ -278,7 +278,7 @@
       '    <h2 style="margin:0;font-size:18px;color:var(--m-text,#222);">⚙️ Конфигурация LLM & Responses API</h2>',
       '    <button class="logos-btn settings-contract-btn" id="set-close-btn">&times;</button>',
       "</div>",
-      '<div class="llm-tabs" style="display:flex;gap:6px;border-bottom:1px solid var(--m-border,#ddd);overflow-x:auto;">',
+      '<div class="llm-tabs" style="display:flex;gap:6px;border-bottom:1px solid var(--m-border,#ddd);flex-wrap:wrap;">',
       '    <button class="logos-btn llm-tab-btn active settings-contract-btn" data-tab="tab-gen">Сэмплинг</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-output">Формат вывода</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-routing">Маршрутизация вызовов</button>',
@@ -545,8 +545,8 @@
     ].join("");
 
     var footer = [
-      '<div id="set-status" role="status" style="color:var(--m-danger,#c33);font-size:12px;min-height:16px;margin-top:12px;"></div>',
-      '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;border-top:1px solid var(--m-border,#ddd);padding-top:14px;">',
+      '<div id="set-status" role="status" style="color:var(--m-danger,#c33);font-size:12px;min-height:16px;margin-top:auto;"></div>',
+      '<div class="settings-modal-footer" style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;border-top:1px solid var(--m-border,#ddd);padding-top:14px;">',
       '    <button class="logos-btn settings-contract-btn" id="set-reset-btn">Сброс</button>',
       '    <button class="logos-btn settings-btn-accent" id="set-save-btn">Сохранить параметры</button>',
       "</div>",

@@ -149,7 +149,7 @@ test("Ultra line reports status, context window and blocker count", () => {
   const [withProfile, withoutProfile] = runtime.document.querySelectorAll(".model-option");
   const line = withProfile.querySelector(".model-option-ultra");
 
-  assert.equal(line.textContent, "Ultra · не активирован · контекст 32768 ток. · блокеров: 3");
+  assert.equal(line.textContent, "Ultra · не активирован · контекст 32768\u00a0ток. · блокеров: 3");
   assert.equal(line.title, PREPARED.blockers.join(", "));
   assert.equal(withoutProfile.querySelector(".model-option-ultra"), null);
   assert.equal(withoutProfile.disabled, false);

@@ -128,7 +128,10 @@
       }
     });
 
-    var unsubscribe = window.LogosCoreAPI.status.subscribe(render);
+    // A subscriber is told about one module at a time; the panel always lists every module.
+    var unsubscribe = window.LogosCoreAPI.status.subscribe(function () {
+      render(window.LogosCoreAPI.status.snapshot());
+    });
     window.LogosCoreAPI.status.set("ui", "ready", "Приборная панель активна", { revocable: false });
 
     window.addEventListener("logos:revocation", function (event) {
