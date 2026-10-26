@@ -125,7 +125,7 @@ start_app() {
     LD_PRELOAD="${LD_PRELOAD:-}" LANG="${LANG:-C.UTF-8}" \
     ANDROID_ROOT="${ANDROID_ROOT:-}" ANDROID_DATA="${ANDROID_DATA:-}" \
     LOGOS_APP_DIR="$app" LOGOS_STATE_DIR="$state" LOGOS_PORT="$port" \
-    LOGOS_APP_REVISION="$revision" \
+    LOGOS_APP_REVISION="$revision" LOGOS_LOCAL_REPO_DIR="$app" LOGOS_PROJECT_ROOT="$app" \
     "$python" - "$state/start-logos.py" "$state" >"$state/runner-launch.log" 2>&1 9>&- <<'PY'
 import os, pathlib, runpy, sys
 state = pathlib.Path(sys.argv[2])
