@@ -26,7 +26,7 @@ def test_chat_params_keep_supported_settings_and_explicit_local_defaults():
         **raw,
         "max_rounds": None,
         "request_timeout": 90,
-        "poll_timeout": 180,
+        "poll_timeout": 240,
     }
     assert raw == {"temperature": 0.2, "instructions": "Be brief."}
 

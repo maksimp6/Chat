@@ -59,6 +59,10 @@ mcp_bp = Blueprint("mcp", __name__)
 skill_registry = SkillRegistry()
 
 
+# Per-response polling budget; it is not a deadline for the whole tool loop.
+CHAT_POLL_TIMEOUT_SECONDS = 240
+
+
 def _tool_rounds(value: Any) -> int | None:
     """Only an explicit round limit bounds the local tool loop."""
     if value is None:
@@ -140,7 +144,7 @@ def _client_params(raw: dict[str, Any]) -> dict[str, Any]:
     params["max_rounds"] = _tool_rounds(params.get("max_rounds"))
     # Validate transport settings before storing a message or starting provider work.
     params["request_timeout"] = _transport_timeout(params, "request_timeout", 90, 900)
-    params["poll_timeout"] = _transport_timeout(params, "poll_timeout", 180, 7200)
+    params["poll_timeout"] = _transport_timeout(params, "poll_timeout", CHAT_POLL_TIMEOUT_SECONDS, 7200)
     return params
 
 
@@ -507,6 +511,11 @@ def chat():
         client = LogosClient(Config)
         provider_conversation_id = _provider_conversation_id(client, invocation.conversation_id, trace)
 
+        if isinstance(trace, ExecutionTrace):
+            trace.add_event(
+                "turn_limits",
+                {"poll_timeout": params["poll_timeout"], "max_rounds": params["max_rounds"]},
+            )
         response = client.ask_with_mcp(
             message=message,
             model_key=model_key,
