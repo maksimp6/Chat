@@ -9,8 +9,11 @@
 python -m pip install -r requirements-dev.txt
 ```
 
-Node.js нужен для запуска JavaScript-тестов (`node tests/*.js`). Android-приложение
-и сборка APK удалены; JDK и Android SDK для разработки Logos не требуются.
+JavaScript-тесты используют Node.js; их запуск, как и другие тесты кода,
+разрешён только по отдельной команде владельца внутри GitHub Actions runner
+согласно [AGENTS.md](../../AGENTS.md). Без запуска укажите `NOT_RUN`.
+Android-приложение и сборка APK удалены; JDK и Android SDK для разработки Logos
+не требуются.
 
 ## Backend
 
@@ -42,7 +45,8 @@ LOGOS_BASE_URL=http://127.0.0.1:8080 python cli_agent.py
 CLI по умолчанию обращается к `http://127.0.0.1:5000`; для приведённого выше
 запуска нужно явное `LOGOS_BASE_URL`.
 Он создаёт диалог через `/api/conversations`, отправляет сообщения в
-`/api/chat` и использует стандартный endpoint подтверждения инструментов.
+`/api/chat`. Текущий режим доступа описан в
+[shared local access](../security/github-login.md).
 Собственного model/tool loop и локального shell-исполнения в CLI больше нет.
 Ключ модели настраивается на backend через «Провайдеры».
 

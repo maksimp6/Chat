@@ -31,11 +31,11 @@ labels: "process"
 ## Definition of Done check
 
 - [ ] Implementation complete.
-- [ ] Regression tests added or coverage is explicitly sufficient.
 - [ ] Documentation updated where needed.
-- [ ] CI passes.
-- [ ] Review completed according to repository policy.
-- [ ] Post-merge verification completed when applicable.
+- [ ] Actual validation and NOT_RUN items recorded.
+- [ ] Code tests, if separately requested, run only inside GitHub Actions runner.
+- [ ] Diff review and authorized delivery completed.
+- [ ] Requested visible result checked where authorized.
 - [ ] Security/secrets/migrations/tracing/billing impact checked where relevant.
 
 ## Blockers
@@ -46,7 +46,8 @@ None.
 
 ## Demo / verification
 
-<!-- Record the concrete behavior that was verified. -->
+<!-- Record exact SHA, evidence scope, NOT_RUN items and blockers.
+AGENTS.md governs delivery and test execution. Owner acceptance is not merge permission. -->
 
 ## Retrospective
 

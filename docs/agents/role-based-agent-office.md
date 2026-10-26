@@ -29,6 +29,11 @@ This keeps prompts, permissions and expertise stable even when model vendors or 
 
 ## Dispatch rules
 
+Delivery and code-test execution follow the owner's current instruction and
+[AGENTS.md](../../AGENTS.md). This role guide does not add a separate publication
+route or mandatory test/CI gate. Code tests require a separate owner request and
+run only inside GitHub Actions runner; otherwise record `NOT_RUN`.
+
 Prefer a repository role from the GitHub Agents UI for normal development. Team Lead
 can delegate to other custom agents with the custom-agent tool.
 

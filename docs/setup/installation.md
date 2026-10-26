@@ -2,7 +2,7 @@
 
 ## Системные требования
 
-- Python: текущий backend CI использует 3.14; конфигурация Ruff ориентируется на 3.12.
+- Python 3 и зависимости из `requirements.txt`.
 - Git и доступ к зависимостям из `requirements.txt`.
 - Для ответов модели — доступ к Yandex AI Studio и настроенная запись провайдера.
 - Хранилище: нативный Kristall journal (`LOGOS_MEMORY_PATH`); SQLite и PostgreSQL выведены из эксплуатации, см. [docs/database.md](../database.md).
@@ -87,5 +87,5 @@ curl --fail --silent --show-error http://127.0.0.1:8080/healthz
 Отдельно проверьте загрузку интерфейса, подключение провайдера и ответ в чате.
 
 - [Режим разработки и CLI](development.md)
-- [MCP и его отдельная аутентификация](../mcp/chatgpt_apps.md)
+- [MCP и подключение ChatGPT](../mcp/chatgpt_apps.md)
 - [Production deployment](../production-deployment.md)

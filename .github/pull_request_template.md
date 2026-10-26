@@ -1,27 +1,30 @@
 ## Change
 
-Describe the user-visible or architectural change.
+Describe the concrete problem and resulting behavior.
 
-## Related issue
+## Related work
 
-Closes #
+Link the owning issue, exact source material and any overlapping PR.
 
-## Validation
+## Validation actually performed
 
-- [ ] Relevant unit/regression tests added or existing coverage is sufficient.
-- [ ] Backend checks pass.
-- [ ] Android checks pass when Android code is affected.
-- [ ] Frontend checks pass when frontend code is affected.
-- [ ] Documentation updated when behavior or operations changed.
+- Source/head SHA:
+- Diff review and document/data checks:
+- Separately authorized runner checks and run/job links:
+- NOT_RUN items and remaining limitations:
 
-## Safety and operations
+Code tests require a separate owner request and run only inside GitHub Actions
+runner (AGENTS.md). Do not mark an unrun check as passing.
 
-- [ ] No secrets or credentials were added.
-- [ ] ExecutionTrace and logging remain free of secret material.
-- [ ] Database changes use committed migrations.
-- [ ] Policy/approval boundaries remain intact.
-- [ ] Billing/treasury behavior was checked when affected.
+## Data and operations
 
-## Review notes
+Describe applicable effects on journal compatibility, backups, credentials,
+ExecutionTrace and billing. Keep secrets out of the PR and evidence.
 
-Call out migrations, compatibility changes, known limitations, or follow-up work.
+For deployment work, link process revision/PID and the requested visible outcome.
+HTTP 200 or a successful job alone does not establish user acceptance.
+
+## Delivery boundary
+
+Follow the owner's route and AGENTS.md. Stage acceptance ("OK") does not authorize
+merge or promotion to master.

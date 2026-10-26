@@ -10,7 +10,7 @@ Each sprint follows:
 
 1. Planning: choose a Sprint Goal and a small set of issues that directly contribute to it.
 2. Development: implement vertical slices, keeping work independently testable and mergeable.
-3. Demo / verification: verify acceptance criteria, CI, user-visible behavior, and operational impact.
+3. Demo / verification: record acceptance evidence, separately authorized check results, user-visible behavior and operational impact.
 4. Retrospective: record one or two process changes for the next sprint.
 
 Urgent production bugs use a separate interrupt lane and do not silently change the Sprint Goal.
@@ -42,14 +42,17 @@ Missing product details should be surfaced as questions or explicit defaults. Do
 A change is done when:
 
 - implementation is complete for the agreed slice;
-- regression tests are added or existing tests are sufficient and documented;
-- relevant documentation is updated;
-- CI passes;
-- the PR is reviewed according to repository policy;
-- the merged result is checked on master when the change affects runtime, deployment, migrations, or user-visible behavior;
+- relevant documentation and acceptance evidence are updated;
+- validation follows the owner's request and [AGENTS.md](../../AGENTS.md);
+- code tests run only when separately requested inside GitHub Actions runner;
+  unrun checks are recorded as `NOT_RUN`;
+- the actual diff is reviewed and delivered by the authorized route;
+- the delivered revision and requested visible result are checked where authorized;
 - security, secrets, tracing, billing, and migration impacts have been checked where relevant.
 
-Closing an issue before these checks is not considered Done.
+Record evidence and remaining blockers before closing work. Owner acceptance and
+merge permission are separate decisions; a sprint does not authorize promotion
+to master or create an automatic test requirement.
 
 ## WIP and prioritization
 
@@ -83,7 +86,7 @@ Use lightweight team signals, not individual scorecards:
 - Lead time: issue start to merged change.
 - Cycle time: first implementation commit to merge.
 - PR size: changed lines/files and review complexity.
-- CI return rate: PRs requiring corrective changes after failed CI.
+- Validation return rate: changes requiring correction after an authorized check.
 - WIP: active branches/PRs not yet done.
 
 Metrics are used to improve the process, not rank people.
@@ -103,7 +106,7 @@ If the Sprint Goal must change, record the change explicitly in the sprint issue
 
 Use GitHub as the source of workflow state:
 
-Issue → branch → PR → CI → merge → post-merge verification
+Issue → authorized delivery route → review → recorded evidence → owner acceptance
 
 Use GitHub Projects for the sprint-level view, Issues for acceptance criteria and dependencies, PRs for implementation/review, and Actions for deterministic validation.
 
