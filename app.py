@@ -12,6 +12,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from core.config import TEXT_MODELS, VOICE_MODELS, get_donation_url
 from core.model_profiles import annotate_catalog
+from yandex_client_modules.tool_config import normalize_tools_config
 from provider_accounts.model_discovery import (
     ModelDiscoveryError,
     get_model_discovery,
@@ -342,7 +343,15 @@ def save_dialog_settings(conv_id):
     owner_id = get_current_owner_id(required=False)
     if not owner_id or not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
-    save_conv_settings(conv_id, request.get_json(silent=True) or {})
+    settings = request.get_json(silent=True)
+    if not isinstance(settings, dict):
+        return jsonify({"error": "JSON object is required"}), 400
+    if "tools_config" in settings:
+        try:
+            settings["tools_config"] = normalize_tools_config(settings["tools_config"])
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+    save_conv_settings(conv_id, settings)
     return jsonify({"status": "ok"})
 
 
@@ -449,3 +458,4 @@ if __name__ == "__main__":
     port = int(env_get("PORT", "5000"))
     debug = env_get("FLASK_DEBUG", "0") == "1"
     app.run(host=host, port=port, debug=debug, use_reloader=False)
+

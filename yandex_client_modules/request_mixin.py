@@ -21,10 +21,9 @@ except ImportError:  # pragma: no cover
     encrypt_secret = None
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_client_modules.request_builder import (
-    build_chat_image_payload,
     build_response_payload,
-    chat_completion_to_response,
     ultra_applied_event,
+    validate_generation_params,
 )
 from yandex_client_modules.request_receipt import build_request_manifest
 from yandex_client_modules.errors import YandexClientError
@@ -42,8 +41,8 @@ def _transport_timeout(params: dict[str, Any], key: str, default: float, maximum
     if (
         isinstance(value, bool)
         or not isinstance(value, (int, float))
-        or not math.isfinite(value)
         or not 0 < value <= maximum
+        or not math.isfinite(value)
     ):
         raise ValueError(f"{key} must be a finite number in (0, {maximum}]")
     return value
@@ -211,7 +210,7 @@ class YandexRequestMixin:
         execution_trace=None,
         trace_step=None,
     ):
-        params = params or {}
+        params = validate_generation_params(params)
         request_timeout = _transport_timeout(params, "request_timeout", 90, 900)
         poll_timeout = _transport_timeout(params, "poll_timeout", 180, 7200)
         on_provider_response = params.get("on_provider_response")
@@ -245,25 +244,7 @@ class YandexRequestMixin:
             yandex_conv_id=yandex_conv_id,
         )
         url = self.responses_url
-        images = params.get("input_images") or []
-        if images:
-            # Photos go through Chat Completions, the shape the Yandex docs show for image input.
-            # That path has no tool loop, so this message is answered without tools; the trace records it.
-            if params.get("tools") and isinstance(execution_trace, ExecutionTrace):
-                execution_trace.add_event("tools_skipped_for_images", {"reason": "photo message"})
-            payload = build_chat_image_payload(
-                project_id=credential.project_id,
-                model_key=model_key,
-                message=message,
-                images=images,
-                instructions=params.get("instructions"),
-                temperature=params.get("temperature"),
-                top_p=params.get("top_p"),
-                max_tokens=params.get("max_output_tokens"),
-                history=params.get("chat_history"),
-            )
-            url = self.chat_completions_url
-        # Recorded for the payload that is actually sent, after the photo branch has chosen it.
+        # Photos share Responses input and the existing conversation/tool loop.
         if isinstance(execution_trace, ExecutionTrace):
             execution_trace.add_event("ultra_profile_applied", ultra_applied_event(model_key, params, payload))
 
@@ -390,14 +371,6 @@ class YandexRequestMixin:
                 "Provider returned a response that is not valid JSON",
                 status_code=resp.status_code,
             ) from e
-        if images:
-            try:
-                data = chat_completion_to_response(data)
-            except YandexClientError:
-                # The provider answered without a usable reply, so the reserved request is not charged.
-                release_request(quota_reservation)
-                raise
-
         if execution_trace and isinstance(execution_trace, ExecutionTrace):
             execution_trace.add_response(
                 data,
@@ -449,3 +422,4 @@ class YandexRequestMixin:
             on_provider_response(result)
         _record_quota_usage(execution_trace, quota_reservation, result)
         return result
+

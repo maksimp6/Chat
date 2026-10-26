@@ -13,18 +13,19 @@ import re
 from typing import Any
 
 CANONICALIZATION = "python-json-sorted-utf8-compact-v1"
-# The version segment is optional: the photo request uses the documented gpt://<folder>/<model> form.
+# Provider model URIs may include an explicit version segment.
 _MODEL_URI = re.compile(r"gpt://[A-Za-z0-9_.-]{1,128}/[A-Za-z0-9_.:-]{1,128}(?:/[A-Za-z0-9_.-]{1,64})?")
 _CREDENTIAL_MARKER = re.compile(r"gh[pousr]_|github_pat_|sk-|AQVN|-----BEGIN", re.IGNORECASE)
 _BOOLEANS = ("background", "store", "stream", "parallel_tool_calls")
-_NUMBERS = ("temperature", "top_p", "max_output_tokens", "max_tool_calls")
+_NUMBERS = ("temperature", "top_p", "top_logprobs", "max_output_tokens", "max_tool_calls")
 _ENUMS = {
     "truncation": {"auto", "disabled"},
-    "service_tier": {"auto", "default", "flex", "priority"},
+    "service_tier": {"auto", "default", "flex", "scale", "priority"},
     "tool_choice": {"auto", "none", "required"},
 }
-_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh", "max"}
+_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh"}
 _INPUT_TYPES = {"message", "function_call", "function_call_output", "reasoning"}
+_CONTENT_TYPES = {"input_text", "input_image", "input_audio", "input_file", "output_text"}
 _TOOL_TYPES = {"function", "mcp", "file_search", "web_search", "code_interpreter"}
 
 
@@ -73,6 +74,7 @@ def _input_manifest(payload: dict[str, Any]) -> dict[str, Any]:
         return result
     result["item_count"] = len(items)
     counts = dict.fromkeys(sorted(_INPUT_TYPES | {"other"}), 0)
+    content_counts = dict.fromkeys(sorted(_CONTENT_TYPES | {"other"}), 0)
     call_links = []
     for item in items:
         kind = (
@@ -82,9 +84,20 @@ def _input_manifest(payload: dict[str, Any]) -> dict[str, Any]:
         )
         kind = kind if isinstance(kind, str) and kind in _INPUT_TYPES else "other"
         counts[kind] += 1
+        if kind == "message":
+            content = item.get("content")
+            if isinstance(content, str):
+                content_counts["output_text" if item.get("role") == "assistant" else "input_text"] += 1
+            elif isinstance(content, list):
+                for part in content:
+                    content_type = part.get("type") if isinstance(part, dict) else None
+                    content_type = content_type if isinstance(content_type, str) and content_type in _CONTENT_TYPES else "other"
+                    content_counts[content_type] += 1
         if kind in {"function_call", "function_call_output"} and "call_id" in item:
             call_links.append({"type": kind, "call_id": item["call_id"]})
     result["item_types"] = counts
+    # Counts identify photos/audio without recording their URLs or binary data.
+    result["content_types"] = content_counts
     result["call_linkage"] = {"count": len(call_links), **_fingerprint(call_links)}
     return result
 
@@ -133,3 +146,4 @@ def build_request_manifest(payload: dict[str, Any]) -> dict[str, Any]:
             for name in ("conversation", "previous_response_id", "prompt_cache_key")
         },
     }
+

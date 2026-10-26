@@ -4,7 +4,7 @@
   var DEFAULTS = {
     temperature: 0.7,
     top_p: 1.0,
-    // 0 means the provider's maximum supported output: no cap is sent (Ultra profile).
+    // 0 omits the application output cap; the provider's own limit still applies.
     max_output_tokens: 0,
     max_tool_calls: null,
     truncation: "disabled",
@@ -78,21 +78,17 @@
       }
       return settings;
     }
-    var userCap = parseInt(settings.max_output_tokens, 10) || 0;
+    var userCap = settings.max_output_tokens;
     Object.keys(defaults).forEach(function (key) {
       settings[key] = defaults[key];
     });
-    // An output cap the user set is kept; 0 means no cap.
-    if (userCap > 0) settings.max_output_tokens = userCap;
+    // Keep an explicit value intact so serialization and the server can reject invalid caps.
+    if (userCap !== undefined && userCap !== null && userCap !== "") {
+      settings.max_output_tokens = userCap;
+    }
     settings.model_profile = "ultra";
     settings.model_profile_id = profile.profile_id;
     return settings;
-  }
-
-  // Settings saved before the Ultra default still hold the old 2000-token cap; drop it so they match the new default.
-  function withoutLegacyTokenCap(settings) {
-    if (settings && settings.max_output_tokens === 2000) settings.max_output_tokens = 0;
-    return applyUltraSettings(settings || {});
   }
 
   // Синхронная загрузка (из кэша или localStorage для обратной совместимости)
@@ -100,7 +96,7 @@
     convId =
       convId || (typeof currentConvId !== "undefined" && currentConvId ? currentConvId : null);
     if (convId && serverSettingsCache[convId]) {
-      return withoutLegacyTokenCap(JSON.parse(JSON.stringify(serverSettingsCache[convId])));
+      return applyUltraSettings(JSON.parse(JSON.stringify(serverSettingsCache[convId])));
     }
     var base = JSON.parse(JSON.stringify(DEFAULTS));
     try {
@@ -117,7 +113,7 @@
         if (conv) base = window.SettingsUI.deepMerge(base, JSON.parse(conv));
       } catch (e) {}
     }
-    return withoutLegacyTokenCap(base);
+    return applyUltraSettings(base);
   }
 
   // Сохранение локально сразу; для диалога — и на сервер (нативное хранилище Kristall).
@@ -169,7 +165,7 @@
         if (data && Object.keys(data).length > 0) {
           base = window.SettingsUI.deepMerge(base, data);
         }
-        serverSettingsCache[convId] = withoutLegacyTokenCap(base);
+        serverSettingsCache[convId] = applyUltraSettings(base);
         return serverSettingsCache[convId];
       })
       .catch(function () {
@@ -206,3 +202,4 @@
     save: save,
   };
 })();
+

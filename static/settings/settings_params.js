@@ -14,39 +14,60 @@
     return null;
   }
 
+  function numericSetting(value, fallback, name) {
+    if (value === undefined || value === null || value === "") return fallback;
+    if (typeof value !== "number" && typeof value !== "string") {
+      throw new Error(name + ": требуется число");
+    }
+    var number = Number(value);
+    if (!Number.isFinite(number)) throw new Error(name + ": требуется конечное число");
+    return number;
+  }
+
+  function booleanSetting(value, fallback, name) {
+    if (value === undefined || value === null) return fallback;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string" && /^(true|false)$/i.test(value.trim())) {
+      return value.trim().toLowerCase() === "true";
+    }
+    throw new Error(name + ": требуется true или false");
+  }
+
   window.getResponsesParams = function () {
     var Storage = window.SettingsStorage;
     var s = Storage.load(currentConvId) || {};
 
     var params = {
-      temperature: typeof s.temperature === "number" ? s.temperature : 0.7,
-      top_p: typeof s.top_p === "number" ? s.top_p : 1.0,
-      max_output_tokens: parseInt(s.max_output_tokens, 10) || 0,
+      temperature: numericSetting(s.temperature, 0.7, "temperature"),
+      top_p: numericSetting(s.top_p, 1.0, "top_p"),
+      max_output_tokens: numericSetting(s.max_output_tokens, 0, "max_output_tokens"),
       truncation: s.truncation || "disabled",
-      store: s.store !== false,
-      background: s.background !== false,
-      stream: s.stream === true,
+      store: booleanSetting(s.store, true, "store"),
+      background: booleanSetting(s.background, true, "background"),
+      stream: booleanSetting(s.stream, false, "stream"),
       instructions: s.instructions || "",
       tool_choice: s.tool_choice || "auto",
-      parallel_tool_calls: s.parallel_tool_calls !== false,
-      max_tool_calls: parseInt(s.max_tool_calls, 10) || null,
+      parallel_tool_calls: booleanSetting(s.parallel_tool_calls, true, "parallel_tool_calls"),
+      max_tool_calls: numericSetting(s.max_tool_calls, null, "max_tool_calls"),
     };
 
     if (s.reasoning_effort && s.reasoning_effort !== "disabled") {
       params.reasoning_effort = s.reasoning_effort;
     }
 
+    if (s.text_verbosity) {
+      params.text = { verbosity: s.text_verbosity };
+    }
     if (s.text_format === "json") {
       var schema = parseJsonSchema(s.json_schema);
-      if (schema) {
-        params.text = {
-          format: {
-            type: "json_schema",
-            name: s.json_schema_name || "response",
-            schema: schema,
-          },
-        };
-      }
+      if (!schema) throw new Error("json_schema: требуется корректный JSON-объект");
+      params.text = Object.assign({}, params.text, {
+        format: {
+          type: "json_schema",
+          name: s.json_schema_name || "response",
+          schema: schema,
+        },
+      });
     }
 
     if (s.service_tier && s.service_tier !== "auto") {
@@ -61,10 +82,11 @@
       params.prompt_cache_key = String(s.prompt_cache_key).trim();
     }
 
-    if (s.top_logprobs > 0) {
-      params.top_logprobs = parseInt(s.top_logprobs, 10);
+    if (s.top_logprobs !== undefined && s.top_logprobs !== null && s.top_logprobs !== "") {
+      params.top_logprobs = numericSetting(s.top_logprobs, 0, "top_logprobs");
     }
 
     return params;
   };
 })();
+

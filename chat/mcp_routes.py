@@ -10,6 +10,9 @@ import base64
 from yandex_client_modules.client import YandexResponsesClient
 from core.config import TEXT_MODELS, Config
 from core.model_profiles import completion_model_keys
+from yandex_client_modules.request_builder import validate_generation_params
+from yandex_client_modules.request_mixin import _transport_timeout
+from yandex_client_modules.tool_config import normalize_tools_config
 from observability.trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
 from invocation.manager import (
     create_invocation,
@@ -56,16 +59,13 @@ mcp_bp = Blueprint("mcp", __name__)
 skill_registry = SkillRegistry()
 
 
-_MAX_TOOL_ROUNDS = 32
-
-
-def _tool_rounds(value: Any) -> int:
-    """Tool-loop rounds the client asked for, clamped so one request cannot loop without bound."""
-    try:
-        rounds = int(16 if value is None else value)
-    except (TypeError, ValueError):
-        rounds = 16
-    return max(1, min(rounds, _MAX_TOOL_ROUNDS))
+def _tool_rounds(value: Any) -> int | None:
+    """Only an explicit round limit bounds the local tool loop."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError("max_rounds must be a positive integer or null")
+    return value
 
 
 def _tool_call_parts(tool_call: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
@@ -76,15 +76,14 @@ def _tool_call_parts(tool_call: dict[str, Any]) -> tuple[str | None, dict[str, A
     if name and "<|" in name:
         name = name.split("<|", 1)[0].strip()
 
-    arguments = tool_call.get("arguments") or function.get("arguments", {})
+    arguments = tool_call["arguments"] if "arguments" in tool_call else function.get("arguments", {})
     if isinstance(arguments, str):
         try:
             arguments = _json.loads(arguments)
         except ValueError:
-            logger.warning("[CHAT] Tool call arguments are not valid JSON; using empty arguments")
-            arguments = {}
+            raise ValueError("Invalid tool arguments: expected a valid JSON object") from None
     if not isinstance(arguments, dict):
-        arguments = {}
+        raise ValueError("Invalid tool arguments: expected a JSON object")
     return name, arguments
 
 
@@ -113,6 +112,7 @@ _CLIENT_PARAM_KEYS = frozenset(
         "max_tool_calls",
         "parallel_tool_calls",
         "poll_timeout",
+        "previous_response_id",
         "prompt_cache_key",
         "reasoning",
         "reasoning_effort",
@@ -124,13 +124,24 @@ _CLIENT_PARAM_KEYS = frozenset(
         "text",
         "tool_choice",
         "top_p",
+        "top_logprobs",
         "truncation",
     }
 )
 
 
 def _client_params(raw: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in raw.items() if key in _CLIENT_PARAM_KEYS}
+    unsupported = set(raw) - _CLIENT_PARAM_KEYS
+    if unsupported:
+        raise ValueError("unsupported params: " + ", ".join(sorted(unsupported)))
+    params = validate_generation_params(raw)
+    if params.get("previous_response_id"):
+        raise ValueError("previous_response_id cannot be combined with this endpoint's conversation; clear it to use /api/chat")
+    params["max_rounds"] = _tool_rounds(params.get("max_rounds"))
+    # Validate transport settings before storing a message or starting provider work.
+    params["request_timeout"] = _transport_timeout(params, "request_timeout", 90, 900)
+    params["poll_timeout"] = _transport_timeout(params, "poll_timeout", 180, 7200)
+    return params
 
 
 def _record_provider_output(trace, response):
@@ -282,7 +293,7 @@ class LogosClient(YandexResponsesClient):
 
             def continue_request(input_items, previous_response):
                 continuation_params = dict(base_params)
-                # A provider conversation stores the answered calls itself, so only the new outputs are sent.
+                # The provider conversation already contains the answered calls.
                 if conversation_id:
                     continuation_params["input"] = [
                         item for item in input_items
@@ -366,21 +377,35 @@ def chat():
     selected_skill_metadata = []
 
     try:
-        data = request.get_json(silent=True) or {}
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "json_body_required"}), 400
         conv_id = data.get("conversation_id")
         session_id = data.get("session_id") or conv_id
         message = data.get("message")
         # A retry re-runs the last message already stored, so it must not store that message twice.
-        retry = bool(data.get("retry"))
+        retry = data.get("retry", False)
+        if not isinstance(retry, bool):
+            return jsonify({"error": "invalid_params", "message": "retry must be a boolean"}), 400
         raw_params = data.get("params")
-        params = dict(raw_params) if isinstance(raw_params, dict) else {}
-        role = data.get("role") or params.pop("role", None)
-        requested_skills = _normalize_requested_skills(data, params)
-        model_key = data.get("model") or params.get("model", "yandexgpt-5-pro")
-        params = _client_params(params)
+        if raw_params is not None and not isinstance(raw_params, dict):
+            return jsonify({"error": "invalid_params", "message": "params must be an object"}), 400
+        params = dict(raw_params or {})
+        params_role = params.pop("role", None)
+        role = data.get("role") or params_role
+        params_model = params.pop("model", "yandexgpt-5-pro")
+        model_key = data.get("model") or params_model
+        try:
+            requested_skills = _normalize_requested_skills(data, params)
+            params.pop("skills", None)
+            params = _client_params(params)
+        except (ValueError, SkillRegistryError) as exc:
+            return jsonify({"error": "invalid_params", "message": str(exc)}), 400
 
-        if not conv_id or not message:
-            return jsonify({"error": "conversation_id и message обязательны"}), 400
+        if not isinstance(conv_id, str) or not conv_id.strip():
+            return jsonify({"error": "conversation_id is required"}), 400
+        if not isinstance(model_key, str):
+            return jsonify({"error": "model must be a string"}), 400
         if isinstance(model_key, str) and model_key in completion_model_keys():
             # These models speak the completion API; sending them through Responses is wrong.
             return jsonify({"error": "model_uses_completion_api", "endpoint": "/api/completion"}), 400
@@ -388,12 +413,23 @@ def chat():
             images = _validated_images(data.get("attachments"))
         except ValueError as exc:
             return jsonify({"error": "invalid_attachments", "message": str(exc)}), 400
+        if message is None and images:
+            message = ""
+        if not isinstance(message, str) or (not message.strip() and not images):
+            return jsonify({"error": "message or attachments are required"}), 400
         if images and model_key not in IMAGE_INPUT_MODEL_KEYS:
             return jsonify({"error": "model_does_not_accept_images"}), 400
 
         owner_id = get_current_owner_id(required=False)
         if not check_access(conv_id, owner_id):
             return jsonify({"error": "conversation_not_found"}), 404
+        conv_settings = get_conv_settings(conv_id) or {}
+        if not isinstance(conv_settings, dict):
+            return jsonify({"error": "invalid_settings", "message": "conversation settings must be an object"}), 400
+        try:
+            normalize_tools_config(conv_settings.get("tools_config", {}))
+        except ValueError as exc:
+            return jsonify({"error": "invalid_settings", "message": str(exc)}), 400
         invocation = create_invocation(
             session_id,
             conv_id,
@@ -452,7 +488,6 @@ def chat():
                 base_instructions=params.get("instructions"),
             )
 
-        conv_settings = get_conv_settings(invocation.conversation_id) or {}
         active_tools = conv_settings.get("active_tool_categories")
         if active_tools is not None:
             params["active_tool_categories"] = active_tools
@@ -462,11 +497,9 @@ def chat():
             add_message(
                 invocation.conversation_id,
                 "user",
-                message,
+                message or "[Фото]",
                 attachments={"images": len(images)} if images else None,
             )
-        if images:
-            params["chat_history"] = _image_turn_history(invocation.conversation_id)
         conversation_title = maybe_update_conversation_title(
             invocation.conversation_id,
             message,
@@ -951,3 +984,4 @@ def execute_approved():
     except Exception:
         logger.exception("[TOOL_APPROVAL] Tool execution failed")
         return jsonify({"error": "tool_execution_failed"}), 500
+
