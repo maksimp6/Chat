@@ -62,7 +62,7 @@ test("a working catalog restores the conversation's saved model", async () => {
   assert.equal(window.localStorage.getItem("current_model"), MODEL);
 });
 
-test("a missing model in a loaded catalog falls back to the default model", async () => {
+test("a missing model falls back to a model present in the loaded catalog", async () => {
   const { window, context } = boot({
     storage: { current_conv_id: "c1" },
     routes: {
@@ -74,7 +74,65 @@ test("a missing model in a loaded catalog falls back to the default model", asyn
   });
   await settle();
 
-  assert.equal(coreValue(context, "currentModel"), "yandexgpt-5-lite");
+  const selected = coreValue(context, "currentModel");
+  assert.equal(selected, MODEL);
+  assert.equal(Object.hasOwn(CATALOG.text, selected), true);
+  assert.equal(coreValue(context, "currentModelType"), "text");
+  assert.equal(window.localStorage.getItem("current_model"), selected);
+});
+
+test("a missing model prefers Pro when Pro is present in the catalog", async () => {
+  const catalog = {
+    text: { [MODEL]: {}, "yandexgpt-5-pro": {} },
+    voice: {},
+  };
+  const { window, context } = boot({
+    storage: { current_conv_id: "c1" },
+    routes: {
+      "/api/conversations": { body: { conversations: [{ id: "c1", model: "retired-model" }] } },
+      "/api/models": { body: catalog },
+    },
+  });
+  await settle();
+
+  assert.equal(coreValue(context, "currentModel"), "yandexgpt-5-pro");
+  assert.equal(coreValue(context, "currentModelType"), "text");
+  assert.equal(window.localStorage.getItem("current_model"), "yandexgpt-5-pro");
+});
+
+for (const type of ["voice", "image"]) {
+  test("a " + type + "-only catalog supplies the fallback and its model type", async () => {
+    const model = type + "-model";
+    const catalog = { text: {}, voice: {}, image: {}, [type]: { [model]: {} } };
+    const { window, context } = boot({
+      storage: { current_conv_id: "c1" },
+      routes: {
+        "/api/conversations": { body: { conversations: [{ id: "c1", model: "retired-model" }] } },
+        "/api/models": { body: catalog },
+      },
+    });
+    await settle();
+
+    const selected = coreValue(context, "currentModel");
+    assert.equal(Object.hasOwn(catalog[type], selected), true);
+    assert.equal(selected, model);
+    assert.equal(coreValue(context, "currentModelType"), type);
+    assert.equal(window.localStorage.getItem("current_model"), model);
+  });
+}
+
+test("an empty catalog keeps the saved model without inventing a fallback", async () => {
+  const { window, context } = boot({
+    storage: { current_conv_id: "c1" },
+    routes: {
+      "/api/conversations": { body: CONVERSATIONS },
+      "/api/models": { body: { text: {}, voice: {}, image: {} } },
+    },
+  });
+  await settle();
+
+  assert.equal(coreValue(context, "currentModel"), MODEL);
+  assert.equal(window.localStorage.getItem("current_model"), MODEL);
 });
 
 test("a degraded catalog keeps the conversation's saved model instead of overwriting it", async () => {
