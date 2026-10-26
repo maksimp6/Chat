@@ -439,56 +439,6 @@ class RDP:
             time.sleep(0.1)
         raise RuntimeError("The requested application surface did not become visible: " + str(surface))
 
-    def redact(self, actor, selectors):
-        expiry_ms = int((remaining(270) + 10) * 1000)
-        return self.evaluate(actor, "JSON.stringify((()=>{const selectors=" + json.dumps(selectors) +
-                             ",covered=[],expiry=" + str(expiry_ms) + ";"
-                             "const settings=document.getElementById('settings-modal-custom');"
-                             "if(settings){const fields=settings.querySelectorAll('textarea,input:not([type]),"
-                             "input[type=text],input[type=search],input[type=email],input[type=url],input[type=tel]');"
-                             "if([...fields].some(e=>!selectors.some(s=>e.matches(s)))||"
-                             "selectors.some(s=>!document.querySelector(s)))throw Error('Unprotected settings field');}"
-                             "if(selectors.some(s=>s.includes('logos-system-status'))){"
-                             "const messages=[...document.querySelectorAll('#logos-system-status .logos-system-status-text')];"
-                             "if(!messages.length||messages.some(e=>e.children.length!==2||"
-                             "e.children[0].tagName!=='STRONG'||e.children[1].tagName!=='SPAN'))"
-                             "throw Error('Unexpected system status message layout');}"
-                             "const style=document.createElement('style');style.dataset.logosCaptureRedaction='true';"
-                             "style.textContent=selectors.flatMap(s=>[s,s+'::placeholder']).join(',')+"
-                             "'{color:transparent!important;text-shadow:none!important;"
-                             "-webkit-text-fill-color:transparent!important;caret-color:transparent!important;}';"
-                             "document.head.append(style);setTimeout(()=>style.remove(),expiry);"
-                             "for(const selector of selectors){for(const e of document.querySelectorAll(selector)){"
-                             "const r=e.getBoundingClientRect();if(r.width<=0||r.height<=0||"
-                             "r.bottom<=0||r.right<=0||r.top>=innerHeight||r.left>=innerWidth)continue;"
-                             "const cover=document.createElement('div');"
-                             "cover.dataset.logosCaptureRedaction='true';cover.textContent='Скрыто';"
-                             "Object.assign(cover.style,{position:'fixed',left:r.left+'px',top:r.top+'px',"
-                             "width:r.width+'px',height:r.height+'px',boxSizing:'border-box',"
-                             "background:'#4b5563',color:'#fff',zIndex:'2147483647',display:'flex',"
-                             "alignItems:'center',justifyContent:'center',font:'12px sans-serif',"
-                             "border:'1px solid #fff',overflow:'hidden',opacity:'1',visibility:'visible',"
-                             "filter:'none',transform:'none',mixBlendMode:'normal'});document.body.append(cover);"
-                             "setTimeout(()=>cover.remove(),expiry);"
-                             "const c=cover.getBoundingClientRect();if(c.left>Math.max(0,r.left)+0.5||"
-                             "c.top>Math.max(0,r.top)+0.5||c.right<Math.min(innerWidth,r.right)-0.5||"
-                             "c.bottom<Math.min(innerHeight,r.bottom)-0.5)throw Error('Privacy cover does not cover field');"
-                             "covered.push(selector);}}"
-                             "return {selectors:[...new Set(covered)],overlays:covered.length};})())")
-
-    def verify_redactions(self, actor, selectors):
-        present = self.evaluate(actor, "JSON.stringify((()=>{const selectors=" + json.dumps(selectors) + ";"
-                                "const fields=selectors.flatMap(s=>[...document.querySelectorAll(s)]);"
-                                "return {present:!!document.querySelector('style[data-logos-capture-redaction]')&&"
-                                "fields.every(e=>{const s=getComputedStyle(e);return s.color==='rgba(0, 0, 0, 0)'&&"
-                                "s.textShadow==='none';})};})())")
-        if not present["present"]:
-            raise RuntimeError("The screenshot privacy mask disappeared before capture")
-
-    def clear_redactions(self, actor):
-        self.evaluate(actor, "JSON.stringify((()=>{document.querySelectorAll('[data-logos-capture-redaction]')"
-                      ".forEach(e=>e.remove());return {cleared:true};})())")
-
     def conversation_state(self, actor):
         return self.evaluate(actor, r"""JSON.stringify((()=>{
           const ids=typeof conversations!=='undefined'&&Array.isArray(conversations)?
@@ -1213,11 +1163,8 @@ def capture(out, uid, gid, metadata):
     if initial["title"] != "Logos" or initial["unsafeModal"] or initial["modalOpen"]:
         raise RuntimeError("A clean Logos application view is required")
     files = []
-    settings_private_fields = ["#set-instructions", "#set-js-name", "#set-js-schema", "#set-prev-id",
-                               "#set-cache-key", "#set-prompt-id", "#set-prompt-ver",
-                               "#set-prompt-vars", "#set-conv-meta"]
 
-    def snapshot(filename, surface=None, sidebar=None, tab=None, redact_selectors=(), capture_actor=None, event_sink=None):
+    def snapshot(filename, surface=None, sidebar=None, tab=None, capture_actor=None, event_sink=None):
         target = capture_actor if capture_actor is not None else actor
         device_guard()
         state = rdp.state(target)
@@ -1234,22 +1181,12 @@ def capture(out, uid, gid, metadata):
                 raise RuntimeError("Sidebar accessibility state differs from its visible state")
         if tab is not None and (state["settingsTab"] != tab or state["settingsPanels"] != [tab]):
             raise RuntimeError("The requested settings tab is not visible")
-        redaction = {"selectors": [], "overlays": 0}
-        try:
-            if redact_selectors:
-                redaction = rdp.redact(target, redact_selectors)
-                time.sleep(0.15)
-            device_guard()
-            if redact_selectors:
-                rdp.verify_redactions(target, redact_selectors)
-            if event_sink is not None:
-                event_sink("native_screencap_started:" + filename)
-            png = command(ROOT + "screencap", "-p")
-            if event_sink is not None:
-                event_sink("native_screencap_finished:" + filename)
-        finally:
-            if redact_selectors:
-                rdp.clear_redactions(target)
+        device_guard()
+        if event_sink is not None:
+            event_sink("native_screencap_started:" + filename)
+        png = command(ROOT + "screencap", "-p")
+        if event_sink is not None:
+            event_sink("native_screencap_finished:" + filename)
         if png[:8] != b"\x89PNG\r\n\x1a\n":
             raise RuntimeError("Native screenshot is not a PNG")
         width, height = struct.unpack(">II", png[16:24])
@@ -1261,11 +1198,7 @@ def capture(out, uid, gid, metadata):
         os.chown(path, uid, gid)
         files.append({"path": filename, "sha256": hashlib.sha256(png).hexdigest(),
                       "size": len(png), "width": width, "height": height,
-                      "captured_at": datetime.now(timezone.utc).isoformat(), "browser": state,
-                      "screenshot_redacted": bool(redact_selectors),
-                      "redaction": {"method": "temporary browser text masks and opaque overlays; native screenshot",
-                                    "protected_selectors": list(redact_selectors),
-                                    "selectors": redaction["selectors"], "overlays": redaction["overlays"]}})
+                      "captured_at": datetime.now(timezone.utc).isoformat(), "browser": state})
 
     matrix_failures = []
     if initial["boot_global_missing"]:
@@ -1323,11 +1256,9 @@ def capture(out, uid, gid, metadata):
         state = rdp.state(actor)
         surfaces = state["surfaces"]
         if surfaces not in ([], ["model"], ["status"], ["settings"]):
-            raise CaptureSafetyError("The observed application surfaces cannot be masked safely")
+            raise CaptureSafetyError("The observed application surfaces cannot be captured safely")
         surface = surfaces[0] if surfaces else None
-        selectors = settings_private_fields if surface == "settings" else (
-            ["#logos-system-status .logos-system-status-text > span"] if surface == "status" else [])
-        snapshot(filename, surface=surface, redact_selectors=selectors)
+        snapshot(filename, surface=surface)
         return files[-1]["browser"]
 
     def matrix_step(name, filename, action, surface=None, sidebar=None, tab=None, opener=None):
