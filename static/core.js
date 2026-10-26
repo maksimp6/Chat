@@ -309,7 +309,7 @@ function saveMessages(id, msgs) {
 // A model reads photos when its catalog entry says so; the server accepts photos only for those models.
 window.modelAcceptsPhotos = function (modelKey) {
   var entry = (modelsData.text || {})[modelKey];
-  return !!(entry && ((entry.capabilities && entry.capabilities.multimodal === true) || entry.multimodal));
+  return !!(entry && entry.capabilities && entry.capabilities.multimodal === true);
 };
 
 window.updateUIForModel = function () {

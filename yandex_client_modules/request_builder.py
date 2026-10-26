@@ -31,14 +31,7 @@ def validate_generation_params(params):
 
 
 def _response_input(params, message):
-    """Text-only input, or one user turn with the attached photos after the text.
-    Attached photos are part of the message, so they take precedence over a raw input."""
-    images = params.get("input_images") or []
-    if images:
-        # Part shapes follow the Responses image input; confirm against the provider before enabling.
-        content = [{"type": "input_text", "text": message}]
-        content += [{"type": "input_image", "image_url": url} for url in images]
-        return [{"role": "user", "content": content}]
+    """Text-only input. Photos never reach this path: request_mixin sends them through Chat Completions."""
     if params.get("input"):
         return params["input"]
     return [{"role": "user", "content": message}]

@@ -154,6 +154,8 @@ def _image_turn_history(conv_id):
         if text.strip():
             history.append({"role": turn["role"], "text": text})
     return history
+
+
 MAX_IMAGES_PER_MESSAGE = 4
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
