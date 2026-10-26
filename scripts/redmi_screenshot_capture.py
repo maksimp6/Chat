@@ -1025,14 +1025,21 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                                                "reply_persisted": "assistant" in roles}
                 if checkpoints["message_send"]["status"] == "PASS":
                     reply_text = replies[-1] if replies else ""
-                    speakers = re.findall(r"(?m)^\s*[*_#> -]*(Пушкин|Есенин)[*_]*\s*[:—–-]", reply_text)
-                    counts = {name: speakers.count(name) for name in ("Пушкин", "Есенин")}
+                    labels = list(re.finditer(r"(?m)^\s*[*_#> -]*(Пушкин|Есенин)[*_]*\s*[:—–-]", reply_text))
+                    speakers = [label.group(1) for label in labels]
+                    # A turn is the text from its label to the next label; a label with nothing said is not a turn.
+                    spoken = [bool(re.search(r"\w", reply_text[label.end():(labels[i + 1].start() if i + 1 < len(labels)
+                                                                           else len(reply_text))]))
+                              for i, label in enumerate(labels)]
+                    counts = {name: sum(1 for who, said in zip(speakers, spoken) if who == name and said)
+                              for name in ("Пушкин", "Есенин")}
+                    empty_turns = spoken.count(False)
                     alternating = all(left != right for left, right in zip(speakers, speakers[1:]))
-                    dialogue_ok = all(count >= 2 for count in counts.values()) and alternating
+                    dialogue_ok = all(count >= 2 for count in counts.values()) and alternating and not empty_turns
                     checkpoints["poets_dialogue"] = {
                         "status": "PASS" if dialogue_ok else "FAIL", "speakers": speakers,
-                        "turn_counts": counts, "alternating": alternating,
-                        "scope": "speaker labels and alternation, not literary quality or independent agents"}
+                        "turn_counts": counts, "empty_turns": empty_turns, "alternating": alternating,
+                        "scope": "spoken turns, speaker labels and alternation, not literary quality or independent agents"}
                     if not dialogue_ok:
                         failures.append("poets_dialogue_missing_or_not_alternating")
                     mark("poets_dialogue_observed", checkpoints["poets_dialogue"])
@@ -1370,10 +1377,16 @@ def capture(out, uid, gid, metadata):
     if by_name["01-sidebar-open.png"]["sha256"] == by_name["02-sidebar-closed.png"]["sha256"]:
         matrix_failures.append("sidebar_open_closed_native_screenshots_identical")
     matrix_failures = list(dict.fromkeys(matrix_failures))
+    # The verdicts describe the installed app. They prove the workflow revision only when that is what runs.
+    deployment_acceptance = {
+        "status": "CURRENT" if runtime["runtime_revision"] == metadata.get("workflow_revision") else "STALE_RUNTIME",
+        "runtime_revision": runtime["runtime_revision"], "workflow_revision": metadata.get("workflow_revision"),
+        "scope": "matrix and creation verdicts describe the installed runtime; they prove the workflow revision only when CURRENT"}
     manifest = {"schema_version": 2, "device": "Redmi 9", "browser": "Iceraven",
                 "capture_method": "Android screencap", "interaction_method": "Firefox DevTools button click",
                 "runtime_revision": runtime["runtime_revision"], "browser_revision": initial["revision"],
                 "revision_match": initial["revision"] == runtime["runtime_revision"],
+                "deployment_acceptance": deployment_acceptance,
                 "ui_version": runtime.get("ui_version"),
                 "application_process_id": runtime.get("process_id"),
                 "preparation": preparation,
@@ -1387,7 +1400,8 @@ def capture(out, uid, gid, metadata):
     path.chmod(0o600)
     os.chown(path, uid, gid)
     os.chown(out, uid, gid)
-    print(json.dumps({"captured": len(files), "runtime_revision": runtime["runtime_revision"]}))
+    print(json.dumps({"captured": len(files), "runtime_revision": runtime["runtime_revision"],
+                      "deployment_acceptance": deployment_acceptance["status"]}))
 
 
 def restore_clean_page():

@@ -88,7 +88,9 @@ jobs:
           matrix = manifest.get("matrix_scenario", {})
           artifacts = {entry.get("path") for entry in manifest.get("artifacts", [])}
           required_artifacts = {"15-conversation-create.mp4", "events.json"}
-          print(json.dumps({"creation_scenario": scenario.get("verdict", "NOT_RUN"),
+          # STALE_RUNTIME keeps the verdicts valid for the installed app; it only says they do not prove this commit.
+          print(json.dumps({"deployment_acceptance": manifest.get("deployment_acceptance"),
+                            "creation_scenario": scenario.get("verdict", "NOT_RUN"),
                             "failures": scenario.get("failures", []),
                             "matrix_scenario": matrix.get("verdict", "NOT_RUN"),
                             "matrix_failures": matrix.get("failures", []),
@@ -135,7 +137,8 @@ jobs:
               manifest = json.load(stream)
           scenario = manifest.get("creation_scenario", {})
           check = scenario.get("checkpoints", {}).get("tools_self_check", {})
-          print(json.dumps({"tools_self_check": check, "scenario_failures": scenario.get("failures", [])}, ensure_ascii=False))
+          print(json.dumps({"deployment_acceptance": manifest.get("deployment_acceptance"), "tools_self_check": check,
+                            "scenario_failures": scenario.get("failures", [])}, ensure_ascii=False))
           if check.get("status") != "PASS" or scenario.get("verdict") != "PASS":
               raise SystemExit("Tools or parameter availability not fully proven; evidence published first")
           PY
