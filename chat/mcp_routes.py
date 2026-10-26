@@ -495,10 +495,12 @@ def chat():
             )
         except Exception as settlement_error:
             logger.exception("[BILLING] Treasury settlement failed")
+            # The full exception stays in the server log above; the trace gets only fixed text and a known code.
+            failure_code = "insufficient_balance" if str(settlement_error) == "insufficient balance" else None
             _append_post_final_error(
                 trace_data,
                 "treasury_settlement",
-                f"treasury settlement failed: {str(settlement_error)[:200]}",
+                "treasury settlement failed" + (f": {failure_code}" if failure_code else ""),
                 type(settlement_error).__name__,
             )
             settlement = {"status": "failed", "reason": "treasury_settlement_failed"}
