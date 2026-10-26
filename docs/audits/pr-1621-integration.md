@@ -6,10 +6,14 @@ This is a source review and conflict-resolution record, not a device execution r
 
 - Original PR head: `e02750299d3292371a7f38bcb0750614117008ce`.
 - Original merge base: `90a030292a8c6d2e83754bc2fd9cc5167dc32c9b`.
-- Develop incorporated into this PR: `ff645a31aa82a400bcce16fc3f7c3e881c7907bb`.
+- Develop incorporated into this PR: `c1da112080a09c14a8dead4ea5920eccdedd5009`.
   The first integration snapshot was `64aef856ac46293d77199fd40bd681cd74a30206`;
   the subsequent `ff645a3` message usage/duration persistence and model-picker UI
   changes were also incorporated without conflicts.
+- The next runner-validation stage also incorporates develop's local settings-id
+  fix and provider parameter/output traces (`7ed926d`, `fd01846`, `c1da112`).
+  Git's automatic merge duplicated keyword arguments in the client and mixin;
+  these duplicates were removed by source review before any validation job.
 - The architectural removal of the independent updater is commit
   `60f5bd7db3284575f5265206840d8746bec0bc67`, already an ancestor of that develop.
 - [Issue #1620](https://github.com/maksimp6/Chat/issues/1620#issuecomment-6414683638)

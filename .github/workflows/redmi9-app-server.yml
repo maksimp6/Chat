@@ -10,7 +10,7 @@ on:
         required: true
         default: deploy
         type: choice
-        options: [deploy, screenshots, tools_self_check, tools_self_check_tests, verify_screenshots, rootagent_native_check, art_generate]
+        options: [deploy, screenshots, tools_self_check, tools_self_check_tests, pr1621_regressions, verify_screenshots, rootagent_native_check, art_generate]
 
 permissions: {}
 
@@ -19,6 +19,67 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  pr1621_regressions:
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && github.ref != 'refs/heads/master' && inputs.action == 'pr1621_regressions'
+    runs-on: redmi9
+    timeout-minutes: 10
+    steps:
+      - name: PR 1621 isolated regressions
+        shell: bash
+        timeout-minutes: 10
+        env:
+          CI: "true"
+        run: |
+          set -euo pipefail
+          umask 077
+          test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
+          test "$GITHUB_ACTIONS" = true
+          test -n "$GITHUB_RUN_ID"
+          test -n "$RUNNER_NAME"
+          check_root=$(mktemp -d "$PWD/.logos-pr1621.XXXXXX")
+          export RUNNER_TEMP="$check_root"
+          export TMPDIR="$check_root"
+          export GIT_TERMINAL_PROMPT=0
+          export GIT_LFS_SKIP_SMUDGE=1
+          python - "$check_root" <<'PY'
+          import json, shutil, sys
+          free = shutil.disk_usage(sys.argv[1]).free
+          print(json.dumps({"scope": "pr1621_setup", "free_bytes": free}))
+          if free < 128 * 1024 * 1024:
+              raise SystemExit("Insufficient free space for an isolated source checkout; no old data removed")
+          PY
+          git init --quiet "$check_root/source"
+          git -C "$check_root/source" fetch --quiet --depth=1 https://github.com/maksimp6/Chat.git "$GITHUB_SHA"
+          git -C "$check_root/source" -c advice.detachedHead=false checkout --quiet --detach FETCH_HEAD
+          test "$(git -C "$check_root/source" rev-parse HEAD)" = "$GITHUB_SHA"
+          native_site=$(python - <<'PY'
+          from pathlib import Path
+          matches = list((Path.home() / "logos-local-state/native-deps").glob("**/site-packages/cryptography"))
+          if len(matches) != 1:
+              raise SystemExit("Existing native Python dependencies could not be identified")
+          print(matches[0].parent)
+          PY
+          )
+          export PYTHONPATH="$check_root/source:$native_site"
+          cd "$check_root/source"
+          regression_exit=0
+          "$HOME/logos-local/.venv/bin/python" scripts/pr1621_regressions.py --out "$check_root/results" || regression_exit=$?
+          python - "$check_root/results/report.json" <<'PY'
+          import json, pathlib, sys
+          report_path = pathlib.Path(sys.argv[1])
+          if not report_path.is_file():
+              raise SystemExit("Regression report missing; setup or harness failed")
+          report = json.loads(report_path.read_text())
+          print("PR1621_REPORT_BEGIN")
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          print("PR1621_REPORT_END")
+          for log in sorted(report_path.parent.glob("**/*.log")):
+              print("PR1621_LOG", log.relative_to(report_path.parent))
+              lines = log.read_text(errors="replace").splitlines()
+              print("\n".join(lines[-90:]))
+          PY
+          exit "$regression_exit"
+
   server:
     if: github.event_name == 'push' || inputs.action == 'deploy'
     runs-on: redmi9

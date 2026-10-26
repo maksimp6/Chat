@@ -135,6 +135,21 @@ def _client_params(raw: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in raw.items() if key in _CLIENT_PARAM_KEYS}
 
 
+def _record_provider_output(trace, response):
+    """What the provider returned for one request: the status, the output kinds and the calls it asked for."""
+    if not isinstance(trace, ExecutionTrace) or not isinstance(response, dict):
+        return
+    output = response.get("output") or []
+    trace.add_event(
+        "provider_output_observed",
+        {
+            "status": response.get("status"),
+            "output_types": [str(item.get("type"))[:64] for item in output if isinstance(item, dict)][:50],
+            "function_calls": [str(call.get("name") or "")[:128] for call in extract_function_calls(response)][:50],
+        },
+    )
+
+
 # Models whose registry entry says they read images. A message with photos to any other
 # model is refused instead of being sent without them.
 IMAGE_INPUT_MODEL_KEYS: frozenset[str] = frozenset(
@@ -267,11 +282,12 @@ class LogosClient(YandexResponsesClient):
             message=message,
             model_key=model_key,
             conversation_id=conversation_id,
+            settings_conversation_id=settings_conversation_id,
             params=params,
             trace=trace,
-            settings_conversation_id=settings_conversation_id,
             **policy_kwargs,
         )
+        _record_provider_output(trace, response)
 
         if extract_function_calls(response):
             tool_servers = mcp_storage.list_servers(owner_id=get_current_owner_id())
@@ -289,15 +305,17 @@ class LogosClient(YandexResponsesClient):
                 continuation_params = dict(base_params)
                 continuation_params["input"] = input_items
                 continuation_params["background"] = base_params.get("background", True)
-                return self._ask_provider(
+                response = self._ask_provider(
                     message="",
                     model_key=model_key,
                     conversation_id=conversation_id,
+                    settings_conversation_id=settings_conversation_id,
                     params=continuation_params,
                     trace=trace,
-                    settings_conversation_id=settings_conversation_id,
                     **policy_kwargs,
                 )
+                _record_provider_output(trace, response)
+                return response
 
             response = run_tool_loop(
                 response,
@@ -494,9 +512,9 @@ def chat():
             message=message,
             model_key=model_key,
             conversation_id=provider_conversation_id,
+            settings_conversation_id=invocation.conversation_id,
             params=params,
             trace=trace,
-            settings_conversation_id=invocation.conversation_id,
         )
 
         api_requests = trace.trace.get("api_requests", [])

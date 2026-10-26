@@ -141,11 +141,12 @@ class YandexMcpMixin:
         import time as _t
 
         mcp_tools = []
+        # The chat's own id keys its settings and enabled servers. The provider conversation is
+        # only the thread id, and it differs from the chat's id for every new chat.
+        settings_id = settings_conversation_id or conversation_id
         # Shared conversations use the installation's MCP configuration, including
         # conversations created before ownership metadata existed.
         owner_id = get_current_owner_id()
-        # Settings are stored under the local chat id; conversation_id may be the provider's id.
-        settings_id = settings_conversation_id or conversation_id
         enabled_servers = []
         if settings_id:
             try:
