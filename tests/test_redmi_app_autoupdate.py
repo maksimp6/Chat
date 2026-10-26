@@ -105,7 +105,7 @@ def test_exit_zero_is_not_proof_of_deployment(installation, monkeypatch):
     monkeypatch.setattr(updater, "run_controller", lambda *_: 0)
     result = updater.check_once(app, state)
     assert result["result"] == "error"
-    assert result["error"] == "deploy_verification_failed"
+    assert result["error"] == "deploy_revision_mismatch"
     assert result["latest_revision_verified"] is False
 
 
@@ -123,6 +123,63 @@ def test_remote_advancing_during_deploy_verifies_newest_head(installation, monke
     assert result["observed_revision"] == NEW
     assert result["app_revision"] == result["verified_remote_revision"] == NEWER
     assert result["result"] == "deployed"
+
+
+def test_remote_advancing_after_the_controller_fetch_is_not_a_failure(installation, monkeypatch):
+    app, state, current, calls = installation
+    current["remote"] = NEW
+    controller = updater.run_controller
+
+    def advanced_after_fetch(*args):
+        code = controller(*args)
+        (state / "runner-start.json").write_text(
+            json.dumps({"status": "ready", "app_revision": NEW, "target_revision": NEW, "pid": 222})
+        )
+        current["remote"] = NEWER
+        return code
+
+    monkeypatch.setattr(updater, "run_controller", advanced_after_fetch)
+    result = updater.check_once(app, state)
+    assert result["result"] == "deployed"
+    assert result["app_revision"] == result["deploy_target_revision"] == NEW
+    assert result["verified_remote_revision"] == NEWER
+    assert result["latest_revision_verified"] is False
+    assert "error" not in result
+
+
+def test_deploy_that_misses_its_own_target_is_a_revision_mismatch(installation, monkeypatch):
+    app, state, current, calls = installation
+    current["remote"] = NEW
+    controller = updater.run_controller
+
+    def wrong_revision(*args):
+        code = controller(*args)
+        current["revision"] = OLD
+        (state / "runner-start.json").write_text(
+            json.dumps({"status": "ready", "app_revision": OLD, "target_revision": NEW, "pid": 222})
+        )
+        return code
+
+    monkeypatch.setattr(updater, "run_controller", wrong_revision)
+    result = updater.check_once(app, state)
+    assert result["result"] == "error" and result["error"] == "deploy_revision_mismatch"
+    assert result["deploy_target_revision"] == NEW
+
+
+def test_deploy_of_the_right_revision_that_is_not_ready_has_its_own_error(installation, monkeypatch):
+    app, state, current, calls = installation
+    current["remote"] = NEW
+    controller = updater.run_controller
+
+    def not_ready(*args):
+        code = controller(*args)
+        current["ready"] = False
+        return code
+
+    monkeypatch.setattr(updater, "run_controller", not_ready)
+    result = updater.check_once(app, state)
+    assert result["result"] == "error" and result["error"] == "deploy_not_ready"
+    assert result["latest_revision_verified"] is False
 
 
 def test_disabled_marker_prevents_every_external_operation(installation, monkeypatch):
@@ -195,6 +252,41 @@ def test_ready_uses_actual_receipt_process_and_http(tmp_path, monkeypatch):
     assert not updater.ready(app, state, NEW, 8080)
     (state / "backend.pid").write_text("124")
     assert not updater.ready(app, state, OLD, 8080)
+
+
+def test_rolled_back_receipt_still_proves_a_running_application(tmp_path, monkeypatch):
+    app, state = tmp_path / "app", tmp_path / "state"
+    app.mkdir(); state.mkdir()
+    (state / "backend.pid").write_text("123")
+    receipt = {"status": "rolled_back", "app_revision": OLD, "target_revision": NEW, "pid": 123}
+    (state / "runner-start.json").write_text(json.dumps(receipt))
+    monkeypatch.setattr(updater, "process_owned", lambda actual_app, pid: True)
+    monkeypatch.setattr(updater, "http_healthy", lambda port: True)
+    assert updater.ready(app, state, OLD, 8080)
+    (state / "runner-start.json").write_text(json.dumps({**receipt, "status": "failed"}))
+    assert not updater.ready(app, state, OLD, 8080)
+
+
+def test_controller_timeout_keeps_its_output_for_diagnosis(monkeypatch, tmp_path):
+    app, state = tmp_path / "app", tmp_path / "state"
+    (app / "scripts").mkdir(parents=True); state.mkdir()
+    (app / "scripts/redmi_app_server.sh").touch()
+
+    class Process:
+        pid = 456790
+        calls = 0
+
+        def communicate(self, timeout):
+            self.calls += 1
+            if self.calls == 1:
+                raise subprocess.TimeoutExpired("synthetic controller", timeout)
+            return "partial deploy output", "stalled in lfs fetch"
+
+    monkeypatch.setattr(updater.subprocess, "Popen", lambda *args, **kwargs: Process())
+    monkeypatch.setattr(updater.os, "killpg", lambda pid, sig: None)
+    with pytest.raises(updater.UpdateFailure, match="deploy_timeout"):
+        updater.run_controller(app, {"LOGOS_STATE_DIR": str(state)}, "deploy", 600)
+    assert "stalled in lfs fetch" in (state / "autoupdate-controller.log").read_text()
 
 
 @pytest.fixture

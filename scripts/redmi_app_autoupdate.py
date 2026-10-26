@@ -145,14 +145,29 @@ def ready(app: Path, state: Path, revision: str, port: int) -> bool:
     pid = backend_pid(state)
     try:
         receipt = json.loads((state / "runner-start.json").read_text())
+        # A rolled-back receipt is written only after the previous revision passed the same
+        # readiness checks, so it proves a running application just like "ready" does.
         matches = (
-            receipt.get("status") == "ready"
+            receipt.get("status") in ("ready", "rolled_back")
             and receipt.get("app_revision") == revision
             and receipt.get("pid") == pid
         )
     except (OSError, ValueError, AttributeError):
         return False
     return matches and process_owned(app, pid) and http_healthy(port)
+
+
+def deployed_target(state: Path) -> str | None:
+    """The revision the controller deployed, read from its own receipt.
+
+    develop keeps moving while a deploy runs, so the tip read afterwards is not the target.
+    """
+    try:
+        receipt = json.loads((state / "runner-start.json").read_text())
+    except (OSError, ValueError):
+        return None
+    value = receipt.get("target_revision") if isinstance(receipt, dict) else None
+    return value if isinstance(value, str) and REVISION.fullmatch(value) else None
 
 
 def refresh_worker(app: Path, state: Path) -> None:
@@ -182,9 +197,7 @@ def run_controller(app: Path, env: dict[str, str], action: str, timeout: int) ->
         raise UpdateFailure("deploy_unavailable") from exc
     try:
         output, error = process.communicate(timeout=timeout)
-        state = env.get("LOGOS_STATE_DIR")
-        if state:
-            atomic_bytes(Path(state) / "autoupdate-controller.log", (output + error)[-8192:].encode(), 0o600)
+        save_controller_log(env, output, error)
         return process.returncode
     except subprocess.TimeoutExpired as exc:
         # Only this controller's new process group is signalled. The backend launcher
@@ -194,14 +207,22 @@ def run_controller(app: Path, env: dict[str, str], action: str, timeout: int) ->
         except ProcessLookupError:
             pass
         try:
-            process.communicate(timeout=5)
+            output, error = process.communicate(timeout=5)
         except subprocess.TimeoutExpired:
             try:
                 os.killpg(process.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-            process.communicate(timeout=5)
+            output, error = process.communicate(timeout=5)
+        # The output of a timed-out deploy is the only evidence of where it stalled.
+        save_controller_log(env, output, error)
         raise UpdateFailure("deploy_timeout") from exc
+
+
+def save_controller_log(env: dict[str, str], output: str | None, error: str | None) -> None:
+    state = env.get("LOGOS_STATE_DIR")
+    if state:
+        atomic_bytes(Path(state) / "autoupdate-controller.log", ((output or "") + (error or ""))[-8192:].encode(), 0o600)
 
 
 @contextmanager
@@ -264,12 +285,28 @@ def check_once(app: Path, state: Path, port: int = 8080, deploy_timeout: int = 6
                         if code:
                             raise UpdateFailure("deploy_failed")
                         final_revision = app_revision(app, env)
-                        final_remote = remote_revision(env)
-                        record.update(app_revision=final_revision, verified_remote_revision=final_remote, pid_after=backend_pid(state))
-                        if final_revision != final_remote or not ready(app, state, final_revision, port):
+                        try:
+                            final_remote = remote_revision(env)
+                        except UpdateFailure:
+                            # GitHub going offline after a finished deploy must not turn it into an error.
+                            final_remote = None
+                        # Verify against what this deploy aimed at: develop is pushed to all the time
+                        # and the tip read now may already be newer than the deployed revision.
+                        target = deployed_target(state)
+                        expected = target or final_remote
+                        record.update(
+                            app_revision=final_revision, verified_remote_revision=final_remote,
+                            deploy_target_revision=target, pid_after=backend_pid(state),
+                        )
+                        if expected is None:
                             raise UpdateFailure("deploy_verification_failed")
+                        if final_revision != expected:
+                            raise UpdateFailure("deploy_revision_mismatch")
+                        if not ready(app, state, final_revision, port):
+                            raise UpdateFailure("deploy_not_ready")
                         record["result"] = "deployed" if installed != final_revision else "recovered"
-                        record.update(healthy_after=True, latest_revision_verified=True)
+                        # A newer develop tip is picked up by the next check, it is not a failure.
+                        record.update(healthy_after=True, latest_revision_verified=final_remote == final_revision)
                         refresh_worker(app, state)
         except UpdateFailure as exc:
             record.update(result="error", error=str(exc), pid_after=backend_pid(state))
