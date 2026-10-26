@@ -8,7 +8,7 @@ trigger=${LOGOS_DEPLOY_TRIGGER:-}
 if [[ -z $trigger ]]; then
   if [[ ${GITHUB_ACTIONS:-} == true ]]; then trigger=github_actions; else trigger=manual; fi
 fi
-case "$trigger" in manual|github_actions|local_autoupdate) ;; *) echo 'Invalid deployment trigger' >&2; exit 2 ;; esac
+case "$trigger" in manual|github_actions) ;; *) echo 'Invalid deployment trigger' >&2; exit 2 ;; esac
 case "$action" in start|restart|status|stop|deploy) ;; *) echo 'Use start, restart, status, stop or deploy' >&2; exit 2 ;; esac
 app=${LOGOS_APP_DIR:-$HOME/logos-local}
 state=${LOGOS_STATE_DIR:-$HOME/logos-local-state}
