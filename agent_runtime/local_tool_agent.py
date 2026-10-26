@@ -17,6 +17,15 @@ logger = logging.getLogger("local_tool_agent")
 
 # Renew well inside the gateway's 30 s job lease so a slow tool is not requeued and run twice.
 _LEASE_RENEW_SECONDS = 10.0
+_RESULT_ATTEMPTS = 4
+
+
+class GatewayHTTPError(RuntimeError):
+    """The gateway answered with an error status; callers can tell a refusal from an outage."""
+
+    def __init__(self, code: int, reason: str) -> None:
+        super().__init__(f"agent gateway HTTP error {code}: {reason}")
+        self.code = code
 
 
 def _request(
@@ -38,7 +47,7 @@ def _request(
         with urlopen(request, timeout=timeout) as response:
             raw = response.read().decode("utf-8")
     except HTTPError as exc:
-        raise RuntimeError(f"agent gateway HTTP error {exc.code}: {exc.reason}") from exc
+        raise GatewayHTTPError(exc.code, str(exc.reason)) from exc
     except (URLError, TimeoutError) as exc:
         raise ConnectionError(f"agent gateway unavailable: {exc}") from exc
 
@@ -99,11 +108,18 @@ class LocalToolAgent:
         self.agent_id = agent_id
         self.poll_interval = max(0.5, float(poll_interval))
         self.stop_event = stop_event or threading.Event()
+        # Results the gateway did not confirm. They are re-sent before any new job is taken, so a lost
+        # response never leads to running the same tool again.
+        self._undelivered: dict[str, tuple[str, str, Mapping[str, Any]]] = {}
 
     def run_forever(self) -> None:
         poll_url = f"{self.gateway_url}/api/local-agents/{self.agent_id}/poll"
         while not self.stop_event.is_set():
             try:
+                self._redeliver_pending()
+                if self._undelivered:
+                    self.stop_event.wait(self.poll_interval)
+                    continue
                 response = _request("GET", poll_url, timeout=20)
                 job = response.get("job") if isinstance(response, Mapping) else None
                 if not job:
@@ -140,9 +156,10 @@ class LocalToolAgent:
         job_id = str(job.get("id") or "")
         tool_name = str(job.get("tool_name") or "")
         arguments = job.get("arguments")
+        claim_token = str(job.get("claim_token") or "")
 
         if not job_id or not tool_name or not isinstance(arguments, Mapping):
-            self._submit(job_id, "failed", {"error": "invalid_job"})
+            self._submit(job_id, "failed", {"error": "invalid_job"}, claim_token)
             return
 
         started = time.monotonic()
@@ -176,22 +193,45 @@ class LocalToolAgent:
             "agent_id": self.agent_id,
             "duration_ms": round((time.monotonic() - started) * 1000, 2),
         }
-        self._submit(job_id, status, result)
+        self._submit(job_id, status, result, claim_token)
 
     def _submit(
         self,
         job_id: str,
         status: str,
         result: Mapping[str, Any],
+        claim_token: str = "",
     ) -> None:
         if not job_id:
             return
-        _request(
-            "POST",
-            (f"{self.gateway_url}/api/local-agents/{self.agent_id}/jobs/{job_id}/result"),
-            payload={"status": status, "result": dict(result)},
-            timeout=20,
-        )
+        if not self._send(job_id, status, result, claim_token):
+            self._undelivered[job_id] = (status, claim_token, dict(result))
+            logger.error("Local agent result for job %s is kept until the gateway confirms it", job_id)
+
+    def _send(self, job_id: str, status: str, result: Mapping[str, Any], claim_token: str) -> bool:
+        for attempt in range(_RESULT_ATTEMPTS):
+            try:
+                _request(
+                    "POST",
+                    f"{self.gateway_url}/api/local-agents/{self.agent_id}/jobs/{job_id}/result",
+                    payload={"status": status, "result": dict(result), "claim_token": claim_token},
+                    timeout=20,
+                )
+                return True
+            except GatewayHTTPError as exc:
+                # The gateway answered: a stale claim (409) or unknown job (404) will never be accepted.
+                logger.warning("Local agent result for job %s refused: HTTP %s", job_id, exc.code)
+                return exc.code in (404, 409)
+            except (ConnectionError, RuntimeError, URLError, TimeoutError) as exc:
+                logger.warning("Local agent result for job %s not sent: %s", job_id, exc)
+                if attempt + 1 < _RESULT_ATTEMPTS:
+                    time.sleep(min(2.0**attempt, 8.0))
+        return False
+
+    def _redeliver_pending(self) -> None:
+        for job_id, (status, claim_token, result) in list(self._undelivered.items()):
+            if self._send(job_id, status, result, claim_token):
+                self._undelivered.pop(job_id, None)
 
 
 def start_agent(

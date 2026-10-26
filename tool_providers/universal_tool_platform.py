@@ -494,7 +494,8 @@ class UniversalToolExecutor:
             definition.name,
             dict(call.arguments),
             metadata={
-                **dict(call.metadata),
+                # The live trace object cannot be serialized into a durable job; it stays local.
+                **{key: value for key, value in dict(call.metadata).items() if key != "execution_trace"},
                 "transport": call.transport,
                 "risk_level": definition.risk_level,
                 "user_id": call.user_id,

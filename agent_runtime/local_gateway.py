@@ -235,9 +235,17 @@ def local_agent_poll(agent_id: str):
             if row is None:
                 return jsonify({"job": None, "poll_after_seconds": 2})
             lease_until = now + _DEFAULT_LEASE_SECONDS
+            # Each claim gets its own token; only the holder of the latest token may report a result.
+            claim_token = uuid4().hex
             tx.set(
                 "local-job/" + row["id"],
-                {**row, "status": "running", "claimed_at": now, "lease_until": lease_until},
+                {
+                    **row,
+                    "status": "running",
+                    "claimed_at": now,
+                    "lease_until": lease_until,
+                    "claim_token": claim_token,
+                },
             )
     except LookupError:
         return jsonify({"error": "agent_not_found"}), 404
@@ -251,6 +259,7 @@ def local_agent_poll(agent_id: str):
                 "trace_id": row["trace_id"],
                 "invocation_id": row["invocation_id"],
                 "lease_until": lease_until,
+                "claim_token": claim_token,
             },
             "poll_after_seconds": 1,
         }
@@ -279,6 +288,9 @@ def local_agent_result(agent_id: str, job_id: str):
             # run, so a result for it would be invented.
             if row["status"] != "running":
                 return jsonify({"error": "job_not_running"}), 409
+            # A result from an earlier claim (its lease expired and the job was given to someone else) is stale.
+            if row.get("claim_token") != data.get("claim_token"):
+                return jsonify({"error": "claim_mismatch"}), 409
             tx.set(
                 key,
                 {
