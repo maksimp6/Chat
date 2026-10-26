@@ -361,7 +361,10 @@ function parseMarkdown(text) {
 
   var result = out.join("\n");
   for (var j = 0; j < codeBlocks.length; j++)
-    result = result.replace("\x00CB" + j + "\x00", codeBlocks[j]);
+    // A function keeps "$$", "$&" and "$'" in the code literal; a string would read them as patterns.
+    result = result.replace("\x00CB" + j + "\x00", function () {
+      return codeBlocks[j];
+    });
   for (var k = 0; k < maths.length; k++)
     result = result.replace("\x00MT" + k + "\x00", function () {
       return maths[k];
