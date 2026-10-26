@@ -130,13 +130,16 @@ def _call_evidence(call):
     result = call.get("result")
     result = result if isinstance(result, dict) else {}
     metadata = result.get("metadata")
-    phase = metadata.get("phase") if isinstance(metadata, dict) else None
-    phase = phase if isinstance(phase, str) and phase in _PHASES else "UNKNOWN"
+    raw_phase = metadata.get("phase") if isinstance(metadata, dict) else None
+    phase = raw_phase if isinstance(raw_phase, str) and raw_phase in _PHASES else "UNKNOWN"
     if phase in _BLOCKED:
         status = "BLOCKED"
     elif call.get("error") or result.get("error") or result.get("success") is False:
         status = "FAIL"
-    elif result.get("success") is True and phase == "execution":
+    # The real executor supplies executor/duration metadata on success, but
+    # does not add a phase. Its explicit success flag still proves the call
+    # envelope completed; it does not prove the effect or unrestricted inputs.
+    elif result.get("success") is True and (phase == "execution" or raw_phase is None):
         status = "CALL_SUCCEEDED"
     else:
         status = "UNKNOWN"

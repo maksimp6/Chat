@@ -86,6 +86,22 @@ class ToolsSelfCheckTests(unittest.TestCase):
         self.assertEqual(report["limits"]["parameter_domains"], "UNKNOWN")
         self.assertEqual(report["hosted_and_mcp"]["status"], "UNKNOWN")
 
+    def test_real_executor_success_without_phase_counts_as_completed_call(self):
+        self.trace["tool_calls"] = [{
+            "name": "read_file", "call_id": "real-call", "error": False,
+            "result": {"success": True, "metadata": {
+                "tool": "read_file", "transport": "responses_api",
+                "executor": "local", "duration_ms": 1.2,
+            }},
+        }]
+        report = self.evaluate()
+        row = next(row for row in report["tools"] if row["name"] == "read_file")
+        self.assertEqual(row["status"], "CALL_SUCCEEDED")
+        self.assertEqual(row["calls"][0]["phase"], "UNKNOWN")
+        self.assertEqual(report["coverage"]["succeeded"], 1)
+        self.assertEqual(report["status"], "PARTIAL")
+        self.assertEqual(report["limits"]["parameter_domains"], "UNKNOWN")
+
     def test_failure_and_approval_controls_override_success_claims(self):
         for call in [self.call(success=False), self.call(phase="approval_required"),
                      self.call(error=True)]:
