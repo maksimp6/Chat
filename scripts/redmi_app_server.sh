@@ -68,6 +68,8 @@ ready() {
   [[ -n $pid ]] && owned "$pid" || return 1
   curl --noproxy '*' --fail --silent --max-time 3 "$base/healthz" -o "$probe/health" || return 1
   grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"' "$probe/health" || return 1
+  curl --noproxy '*' --fail --silent --max-time 3 "$base/readyz" -o "$probe/storage" || return 1
+  grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"' "$probe/storage" || return 1
   curl --noproxy '*' --fail --silent --max-time 3 "$base/" -o "$probe/index" || return 1
   grep -q '<title>Logos</title>' "$probe/index" || return 1
   local asset

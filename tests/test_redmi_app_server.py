@@ -35,7 +35,7 @@ assert Path(os.environ["LOGOS_MEMORY_PATH"]).read_bytes() == b"existing-persiste
 assert os.environ["LOGOS_PROVIDER_CREDENTIAL_KEY"] == (state / "provider-encryption.key").read_text().strip()
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path == "/healthz": body = b'{"status":"ok"}'
+        if self.path in ("/healthz", "/readyz"): body = b'{"status":"ok"}'
         elif self.path == "/": body = b"<html><title>Logos</title></html>"
         elif self.path.startswith("/static/"): body = Path(self.path.lstrip("/")).read_bytes()
         else: self.send_error(404); return
