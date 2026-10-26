@@ -40,6 +40,8 @@ def _response_input(params, message):
 # Every request parameter is named the way an Ultra profile names each setting: the value that
 # was sent, or the reason it was left to the provider. Nothing is silently absent.
 _RESPONSES_PARAMETERS = (
+    "input",
+    "instructions",
     "background",
     "store",
     "stream",
@@ -49,12 +51,34 @@ _RESPONSES_PARAMETERS = (
     "truncation",
     "reasoning",
     "service_tier",
+    "text",
+    "prompt_cache_key",
+    "previous_response_id",
+    "conversation",
+    "tools",
     "tool_choice",
     "max_tool_calls",
     "parallel_tool_calls",
 )
 _CHAT_PARAMETERS = ("stream", "temperature", "top_p", "max_tokens", "tools")
 _TOOL_PARAMETERS = {"tool_choice", "max_tool_calls", "parallel_tool_calls"}
+
+
+def _sent_value(name, value):
+    """The value a trace shows: tools and input by count and kind, since their full bodies are in the request manifest."""
+    if name == "tools" and isinstance(value, list):
+        listed = [tool for tool in value if isinstance(tool, dict)]
+        return {
+            "count": len(listed),
+            "names": [str(tool.get("name") or tool.get("type") or "")[:128] for tool in listed],
+            "strict": sum(1 for tool in listed if tool.get("strict") is True),
+        }
+    if name == "input" and isinstance(value, list):
+        return {
+            "count": len(value),
+            "types": [str(item.get("type") or item.get("role") or "")[:32] if isinstance(item, dict) else "" for item in value][:50],
+        }
+    return value
 
 
 def explicit_parameters(model_key, payload):
@@ -65,16 +89,18 @@ def explicit_parameters(model_key, payload):
     result = {}
     for name in _CHAT_PARAMETERS if "messages" in payload else _RESPONSES_PARAMETERS:
         if name in payload:
-            result[name] = {"sent": True, "value": payload[name]}
+            result[name] = {"sent": True, "value": _sent_value(name, payload[name])}
             continue
         if name in ("max_output_tokens", "max_tokens"):
             reason = output.get("basis") or "no_application_output_cap"
         elif name == "reasoning":
             reason = reasoning.get("basis") if reasoning.get("depth_control") is False else "reasoning_effort_disabled"
         elif name == "tools":
-            reason = "photo_request_has_no_tool_loop"
+            reason = "photo_request_has_no_tool_loop" if "messages" in payload else "no_tools_in_request"
         elif name in _TOOL_PARAMETERS:
             reason = "no_tools_in_request"
+        elif name == "conversation":
+            reason = "no_provider_conversation"
         elif name == "service_tier":
             reason = "provider_default"
         else:
@@ -253,10 +279,9 @@ def build_response_payload(
         cleaned_tools = _clean_tools(raw_tools)
         if cleaned_tools:
             payload["tools"] = cleaned_tools
-            if params.get("tool_choice"):
-                payload["tool_choice"] = params["tool_choice"]
-            if params.get("max_tool_calls"):
-                payload["max_tool_calls"] = int(params["max_tool_calls"])
+            # Every tool parameter is named in the request; the application default fills an omitted one.
+            payload["tool_choice"] = params.get("tool_choice") or "auto"
+            payload["max_tool_calls"] = int(params.get("max_tool_calls") or 10)
 
             ptc = params.get("parallel_tool_calls")
             if ptc is not None:
