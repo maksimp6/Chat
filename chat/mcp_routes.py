@@ -498,7 +498,7 @@ def chat():
             _append_post_final_error(
                 trace_data,
                 "treasury_settlement",
-                "treasury settlement failed",
+                f"treasury settlement failed: {str(settlement_error)[:200]}",
                 type(settlement_error).__name__,
             )
             settlement = {"status": "failed", "reason": "treasury_settlement_failed"}
