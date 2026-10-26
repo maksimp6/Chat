@@ -10,14 +10,15 @@ from __future__ import annotations
 
 import hashlib
 import json
-import time
 from typing import Any, Mapping, Optional
 from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
 
+from core.clock import unix_seconds
 from storage.db import get_store
 from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
+from tool_providers.schema import object_schema
 
 
 partner_relations_bp = Blueprint(
@@ -39,10 +40,6 @@ MESSAGE_DIRECTIONS = ("incoming", "outgoing")
 MESSAGE_STATUSES = ("prepared", "queued", "recorded")
 FOLLOWUP_STATUSES = ("open", "completed", "cancelled")
 _MAX_METADATA_CHARS = 8000
-
-
-def _now() -> int:
-    return int(time.time())
 
 
 def _json(value: Any) -> str:
@@ -117,7 +114,7 @@ def create_partner(
     metadata = dict(arguments.get("metadata") or {})
     if len(_json(metadata)) > _MAX_METADATA_CHARS:
         raise ValueError("metadata is too large")
-    now = _now()
+    now = unix_seconds()
 
     init_partner_relations_tables()
     _insert_owned(
@@ -202,7 +199,7 @@ def delete_partner(
         raise ValueError("partner_id is required")
     if not _get_partner(owner_id, partner_id):
         raise ValueError("partner not found")
-    now = _now()
+    now = unix_seconds()
     _update_owned("partner", partner_id, owner_id, {"status": "archived", "updated_at": now})
     _trace_event(
         cfg,
@@ -243,7 +240,7 @@ def update_partner(
             arguments["status"], PARTNER_STATUSES, "partner status"
         )
     status = changes.get("status", existing["status"])
-    now = _now()
+    now = unix_seconds()
     _update_owned("partner", partner_id, owner_id, {**changes, "updated_at": now})
     _trace_event(
         cfg,
@@ -269,7 +266,7 @@ def add_contact(
     if not _get_partner(owner_id, partner_id):
         raise ValueError("partner not found")
     contact_id = str(arguments.get("id") or uuid4())
-    now = _now()
+    now = unix_seconds()
     _insert_owned(
         "contact",
         contact_id,
@@ -329,7 +326,7 @@ def update_contact(
     existing = _contact_for_owner(owner_id, contact_id)
     if not existing:
         raise ValueError("contact not found")
-    now = _now()
+    now = unix_seconds()
     # A partial update changes only the fields it names; an empty value clears that field.
     changes = {
         field: str(arguments[field] or "").strip()
@@ -399,7 +396,7 @@ def prepare_message(
     )
     message_id = str(arguments.get("message_id") or uuid4())
     status = "prepared" if direction == "outgoing" else "recorded"
-    now = _now()
+    now = unix_seconds()
     _insert_owned(
         "message",
         message_id,
@@ -449,7 +446,7 @@ def queue_message(
         raise ValueError("message not found")
     if message["direction"] != "outgoing":
         raise ValueError("only outgoing messages can be queued")
-    now = _now()
+    now = unix_seconds()
     changed = _update_owned(
         "message",
         message_id,
@@ -500,7 +497,7 @@ def update_status(
     status = _validate_status(arguments.get("status"), PARTNER_STATUSES, "partner status")
     if not partner_id or not _get_partner(owner_id, partner_id):
         raise ValueError("partner not found")
-    _update_owned("partner", partner_id, owner_id, {"status": status, "updated_at": _now()})
+    _update_owned("partner", partner_id, owner_id, {"status": status, "updated_at": unix_seconds()})
     _trace_event(
         cfg,
         "partner_status_updated",
@@ -527,7 +524,7 @@ def create_followup(
     followup_id = str(arguments.get("id") or uuid4())
     due_at = arguments.get("due_at")
     due_value = int(due_at) if due_at not in (None, "") else None
-    now = _now()
+    now = unix_seconds()
     _insert_owned(
         "followup",
         followup_id,
@@ -575,7 +572,7 @@ def complete_followup(
     status = _validate_status(
         arguments.get("status") or "completed", FOLLOWUP_STATUSES, "follow-up status"
     )
-    now = _now()
+    now = unix_seconds()
     _update_owned("followup", followup_id, owner_id, {"status": status, "updated_at": now})
     _trace_event(
         cfg,
@@ -591,20 +588,11 @@ def complete_followup(
     return get_followup(owner_id, followup_id) or {}
 
 
-def _tool_schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
-    return {
-        "type": "object",
-        "properties": properties,
-        "required": required,
-        "additionalProperties": False,
-    }
-
-
 PARTNER_TOOLS = {
     "partner.create": {
         "title": "Partner Create",
         "description": "Создать партнёра в личном реестре текущего пользователя.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "name": {"type": "string", "minLength": 1, "maxLength": 200},
                 "organization": {"type": "string", "maxLength": 200},
@@ -628,7 +616,7 @@ PARTNER_TOOLS = {
     "partner.list": {
         "title": "Partner List",
         "description": "Список партнёров текущего пользователя.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "status": {
                     "anyOf": [{"type": "string", "enum": list(PARTNER_STATUSES)}, {"type": "null"}]
@@ -647,7 +635,7 @@ PARTNER_TOOLS = {
     "partner.get": {
         "title": "Partner Get",
         "description": "Получить партнёра, контакты, переписку и follow-up только в собственной области доступа.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "partner_id": {"type": "string", "minLength": 1, "maxLength": 128},
             },
@@ -664,7 +652,7 @@ PARTNER_TOOLS = {
     "partner.update": {
         "title": "Partner Update",
         "description": "Изменить партнёра в личном реестре текущего пользователя.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "partner_id": {"type": "string", "minLength": 1, "maxLength": 128},
                 "name": {"type": "string", "minLength": 1, "maxLength": 200},
@@ -687,7 +675,7 @@ PARTNER_TOOLS = {
     "partner.contact.create": {
         "title": "Partner Contact Create",
         "description": "Добавить контакт партнёра.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "partner_id": {"type": "string", "minLength": 1, "maxLength": 128},
                 "name": {"type": "string", "minLength": 1, "maxLength": 200},
@@ -710,7 +698,7 @@ PARTNER_TOOLS = {
     "partner.delete": {
         "title": "Partner Archive",
         "description": "Архивировать партнёра, сохранив историю коммуникаций.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "partner_id": {"type": "string", "minLength": 1, "maxLength": 128},
             },
@@ -727,7 +715,7 @@ PARTNER_TOOLS = {
     "partner.contact.list": {
         "title": "Partner Contact List",
         "description": "Получить контакты выбранного партнёра.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "partner_id": {"type": "string", "minLength": 1, "maxLength": 128},
             },
@@ -744,7 +732,7 @@ PARTNER_TOOLS = {
     "partner.contact.update": {
         "title": "Partner Contact Update",
         "description": "Изменить контакт партнёра.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "contact_id": {"type": "string", "minLength": 1, "maxLength": 128},
                 "name": {"type": "string", "minLength": 1, "maxLength": 200},
@@ -766,7 +754,7 @@ PARTNER_TOOLS = {
     "partner.contact.delete": {
         "title": "Partner Contact Delete",
         "description": "Удалить контакт партнёра из личного реестра.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "contact_id": {"type": "string", "minLength": 1, "maxLength": 128},
             },
@@ -783,7 +771,7 @@ PARTNER_TOOLS = {
     "partner.message.prepare": {
         "title": "Partner Message Prepare",
         "description": "Подготовить исходящее сообщение партнёру и сохранить его в истории без внешней отправки.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "partner_id": {"type": "string", "minLength": 1, "maxLength": 128},
                 "subject": {"type": "string", "maxLength": 300},
@@ -814,7 +802,7 @@ PARTNER_TOOLS = {
     "partner.message.send": {
         "title": "Partner Message Send",
         "description": "Поставить ранее подготовленное исходящее сообщение в очередь после обязательного подтверждения; внешний transport adapter должен быть настроен отдельно.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "message_id": {"type": "string", "minLength": 1, "maxLength": 128},
             },
@@ -831,7 +819,7 @@ PARTNER_TOOLS = {
     "partner.thread.get": {
         "title": "Partner Thread Get",
         "description": "Получить историю переписки с партнёром.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "partner_id": {"type": "string", "minLength": 1, "maxLength": 128},
             },
@@ -848,7 +836,7 @@ PARTNER_TOOLS = {
     "partner.status.update": {
         "title": "Partner Status Update",
         "description": "Обновить статус отношений с партнёром.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "partner_id": {"type": "string", "minLength": 1, "maxLength": 128},
                 "status": {"type": "string", "enum": list(PARTNER_STATUSES)},
@@ -866,7 +854,7 @@ PARTNER_TOOLS = {
     "partner.followup.create": {
         "title": "Partner Follow-up Create",
         "description": "Создать follow-up для партнёра.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "partner_id": {"type": "string", "minLength": 1, "maxLength": 128},
                 "title": {"type": "string", "minLength": 1, "maxLength": 300},
@@ -889,7 +877,7 @@ PARTNER_TOOLS = {
     "partner.followup.complete": {
         "title": "Partner Follow-up Complete",
         "description": "Завершить или отменить follow-up партнёра.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "followup_id": {"type": "string", "minLength": 1, "maxLength": 128},
                 "status": {"type": "string", "enum": list(FOLLOWUP_STATUSES)},

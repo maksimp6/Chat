@@ -2,19 +2,15 @@
 
 from __future__ import annotations
 import json
-import time
 from typing import Any, Mapping, Optional
 from uuid import uuid4
 from flask import Blueprint, jsonify, request
+from core.clock import unix_seconds
 from storage.db import get_store
 from sessions.manager import create_session, get_session
 
 departments_bp = Blueprint("departments", __name__, url_prefix="/api/departments")
 _DEPT_ID_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789-_"
-
-
-def _now() -> int:
-    return int(time.time())
 
 
 def _json(value: Any) -> str:
@@ -81,7 +77,7 @@ def upsert_department(
             "agent_id": str(given("agent_id") or "").strip() or None,
             "system_prompt": str(given("system_prompt") or ""),
             "status": str(given("status") or "active"),
-            "updated_at": _now(),
+            "updated_at": unix_seconds(),
         }
         for field in ("model_config", "policies", "knowledge_scope", "session_config", "metadata"):
             value = given(field) or {}
@@ -145,7 +141,7 @@ def departments_delete(department_id: str):
     with get_store().transaction() as tx:
         record = tx.get(key)
         if record is not None:
-            tx.set(key, {**record, "status": "archived", "updated_at": _now()})
+            tx.set(key, {**record, "status": "archived", "updated_at": unix_seconds()})
     return jsonify({"status": "archived", "department_id": department_id})
 
 

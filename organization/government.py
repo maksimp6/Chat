@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import json
-import time
 from typing import Any, Mapping, Optional
 from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
+from core.clock import unix_seconds
 from storage.db import get_store
 from economy.treasury_identity import get_current_owner_id, TreasuryIdentityError
+from tool_providers.schema import object_schema
 
 government_bp = Blueprint("government", __name__, url_prefix="/api/government")
 
@@ -27,10 +28,6 @@ CASE_STATUSES = (
 )
 EDITABLE_STATUSES = ("DRAFT", "PENDING_USER_DATA", "READY_FOR_APPROVAL")
 IP_REQUIRED_FIELDS = ("full_name", "birth_date", "citizenship", "passport")
-
-
-def _now() -> int:
-    return int(time.time())
 
 
 def _json(value: Any) -> str:
@@ -82,7 +79,7 @@ def _save(case: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("government case not found")
         if int(current.get("revision") or 0) != read_revision:
             raise ValueError("government case was changed concurrently; retry")
-        tx.set(key, {**case, "revision": read_revision + 1, "updated_at": _now()})
+        tx.set(key, {**case, "revision": read_revision + 1, "updated_at": unix_seconds()})
     return _require_case(case["case_id"])
 
 
@@ -93,7 +90,7 @@ def create_case(
     if case_type not in CASE_TYPES:
         raise ValueError("unsupported government case type")
     case_id = "gov-" + uuid4().hex[:16]
-    now = _now()
+    now = unix_seconds()
     with get_store().transaction() as tx:
         tx.set(
             "government/case/" + case_id,
@@ -230,7 +227,7 @@ def approve_case(case_id: str) -> dict[str, Any]:
     if case["status"] != "READY_FOR_APPROVAL" or not case["documents"]:
         raise ValueError("case is not ready for approval")
     case["user_approved"] = True
-    case["approval_at"] = _now()
+    case["approval_at"] = unix_seconds()
     return _save(case)
 
 
@@ -241,7 +238,7 @@ def submit_case(case_id: str) -> dict[str, Any]:
     if not case.get("user_approved"):
         raise PermissionError("explicit user approval is required before submission")
     case["status"] = "SUBMITTED"
-    case["submitted_at"] = _now()
+    case["submitted_at"] = unix_seconds()
     return _save(case)
 
 
@@ -266,7 +263,7 @@ def process_response(case_id: str, response: Mapping[str, Any]) -> dict[str, Any
     case["responses"].append(
         {
             "response_id": "response-" + uuid4().hex[:12],
-            "received_at": _now(),
+            "received_at": unix_seconds(),
             "data": dict(response),
         }
     )
@@ -301,16 +298,7 @@ def _tool(
     }
 
 
-def _schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
-    return {
-        "type": "object",
-        "properties": properties,
-        "required": required,
-        "additionalProperties": False,
-    }
-
-
-_CASE = {"case_id": {"type": "string", "minLength": 1, "maxLength": 128}}
+_CASE ={"case_id": {"type": "string", "minLength": 1, "maxLength": 128}}
 
 
 def _tool_approved(cfg: Optional[dict[str, Any]]) -> bool:
@@ -378,7 +366,7 @@ GOVERNMENT_TOOLS = {
         _tool_create,
         read_only=False,
         requires_approval=True,
-        schema=_schema(
+        schema=object_schema(
             {
                 "case_type": {"type": "string", "enum": list(CASE_TYPES)},
                 "user_id": {"type": ["string", "null"]},
@@ -392,7 +380,7 @@ GOVERNMENT_TOOLS = {
         _tool_requirements,
         read_only=True,
         requires_approval=False,
-        schema=_schema({"case_type": {"type": "string", "enum": ["IP_REGISTRATION"]}}, []),
+        schema=object_schema({"case_type": {"type": "string", "enum": ["IP_REGISTRATION"]}}, []),
         title="Government Requirements",
         description="Получить контракт данных для открытия ИП.",
     ),
@@ -400,7 +388,7 @@ GOVERNMENT_TOOLS = {
         _tool_collect,
         read_only=False,
         requires_approval=True,
-        schema=_schema({**_CASE, "data": {"type": "object"}}, ["case_id", "data"]),
+        schema=object_schema({**_CASE, "data": {"type": "object"}}, ["case_id", "data"]),
         title="Government Collect Data",
         description="Сохранить данные пользователя в дело.",
     ),
@@ -408,7 +396,7 @@ GOVERNMENT_TOOLS = {
         _tool_validate,
         read_only=False,
         requires_approval=True,
-        schema=_schema(_CASE, ["case_id"]),
+        schema=object_schema(_CASE, ["case_id"]),
         title="Government Validate Data",
         description="Детерминированно проверить данные дела.",
     ),
@@ -416,7 +404,7 @@ GOVERNMENT_TOOLS = {
         _tool_tax_options,
         read_only=True,
         requires_approval=False,
-        schema=_schema({}, []),
+        schema=object_schema({}, []),
         title="Government Tax Options",
         description="Вернуть варианты налогового режима.",
     ),
@@ -424,7 +412,7 @@ GOVERNMENT_TOOLS = {
         _tool_prepare_application,
         read_only=False,
         requires_approval=True,
-        schema=_schema(_CASE, ["case_id"]),
+        schema=object_schema(_CASE, ["case_id"]),
         title="Government Prepare Application",
         description="Подготовить заявление Р21001.",
     ),
@@ -432,7 +420,7 @@ GOVERNMENT_TOOLS = {
         _tool_prepare_documents,
         read_only=False,
         requires_approval=True,
-        schema=_schema(_CASE, ["case_id"]),
+        schema=object_schema(_CASE, ["case_id"]),
         title="Government Prepare Documents",
         description="Подготовить документы без отправки.",
     ),
@@ -440,7 +428,7 @@ GOVERNMENT_TOOLS = {
         _tool_request_approval,
         read_only=True,
         requires_approval=False,
-        schema=_schema(_CASE, ["case_id"]),
+        schema=object_schema(_CASE, ["case_id"]),
         title="Government Request Approval",
         description="Проверить готовность дела к подтверждению.",
     ),
@@ -448,7 +436,7 @@ GOVERNMENT_TOOLS = {
         _tool_status,
         read_only=True,
         requires_approval=False,
-        schema=_schema(_CASE, ["case_id"]),
+        schema=object_schema(_CASE, ["case_id"]),
         title="Government Case Status",
         description="Получить состояние дела.",
     ),
@@ -456,7 +444,7 @@ GOVERNMENT_TOOLS = {
         _tool_process_response,
         read_only=False,
         requires_approval=True,
-        schema=_schema({**_CASE, "response": {"type": "object"}}, ["case_id", "response"]),
+        schema=object_schema({**_CASE, "response": {"type": "object"}}, ["case_id", "response"]),
         title="Government Process Response",
         description="Сохранить ответ ведомства.",
     ),
@@ -464,7 +452,7 @@ GOVERNMENT_TOOLS = {
         _tool_archive,
         read_only=False,
         requires_approval=True,
-        schema=_schema(_CASE, ["case_id"]),
+        schema=object_schema(_CASE, ["case_id"]),
         title="Government Archive Case",
         description="Архивировать дело.",
     ),
@@ -472,7 +460,7 @@ GOVERNMENT_TOOLS = {
         _tool_submit,
         read_only=False,
         requires_approval=True,
-        schema=_schema(_CASE, ["case_id"]),
+        schema=object_schema(_CASE, ["case_id"]),
         title="Government Submit",
         description="Отправить подтверждённое дело через GovGateway.",
     ),

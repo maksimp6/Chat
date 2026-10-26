@@ -29,6 +29,10 @@ def _fernet():
     return Fernet(derived), InvalidToken
 
 
+def fingerprint_key(api_key: str) -> str:
+    return hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+
+
 def encryption_configured() -> bool:
     return bool(env_get("LOGOS_PROVIDER_CREDENTIAL_KEY", "").strip())
 

@@ -9,10 +9,10 @@ from __future__ import annotations
 from core.env import env_get
 from core.restrictions import restrictions_lifted
 
-import time
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from core.clock import unix_seconds
 from storage.db import get_store
 
 
@@ -83,10 +83,6 @@ class QuotaReservation:
     rate_window_start: int = 0
 
 
-def _now() -> int:
-    return int(time.time())
-
-
 def _env_int(name: str, default: int, minimum: int = 0) -> int:
     try:
         value = int(env_get(name, str(default)))
@@ -108,7 +104,7 @@ def _default_policy_values() -> tuple[int, int, int]:
 
 def init_quota_tables() -> None:
     period, maximum, rate = _default_policy_values()
-    now = _now()
+    now = unix_seconds()
     key = "quota/policy/" + DEFAULT_POLICY
     with get_store().transaction() as tx:
         old = tx.get(key)
@@ -140,7 +136,7 @@ def upsert_policy(
         raise ValueError("invalid quota policy")
     init_quota_tables()
     key = "quota/policy/" + name
-    now = _now()
+    now = unix_seconds()
     with get_store().transaction() as tx:
         old = tx.get(key)
         tx.set(
@@ -230,7 +226,7 @@ def reserve_request(
             )
         return None
 
-    now_value = int(now if now is not None else _now())
+    now_value = int(now if now is not None else unix_seconds())
     policy = get_user_policy(trusted_user_id)
     if not policy["enabled"]:
         return None
@@ -331,7 +327,7 @@ def record_usage(
                     **row,
                     "token_count": row["token_count"] + tokens,
                     "cost": row["cost"] + numeric_cost,
-                    "updated_at": _now(),
+                    "updated_at": unix_seconds(),
                 },
             )
 
@@ -342,7 +338,7 @@ def get_usage(user_id: str, *, now: Optional[int] = None) -> dict[str, Any]:
         raise ValueError("user_id is required")
 
     policy = get_user_policy(user_id)
-    now_value = int(now if now is not None else _now())
+    now_value = int(now if now is not None else unix_seconds())
     period_start = (now_value // policy["period_seconds"]) * policy["period_seconds"]
     rate_window_start = (now_value // 60) * 60
 

@@ -131,8 +131,8 @@ def test_local_runtime_exec_uses_existing_approval_and_trace_pipeline(tmp_path):
 def test_local_output_limit_handles_none_and_truncates():
     import tool_providers.runtime_tools as runtime_tools
 
-    assert runtime_tools._limit_local_output(None, max_bytes=32) == ""
-    truncated = runtime_tools._limit_local_output("x" * 100, max_bytes=32)
+    assert runtime_tools.limit_output(None, max_bytes=32) == ""
+    truncated = runtime_tools.limit_output("x" * 100, max_bytes=32)
     assert truncated.endswith("...[output truncated]")
     assert len(truncated.encode("utf-8")) <= 32
 

@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-import hashlib
 import threading
 from typing import Any, Callable, Optional
 
 from observability.trace_manager import get_current_trace
+from secret_store.credential_crypto import fingerprint_key
 
 KEY_TTL = timedelta(hours=12)
 ROTATE_BEFORE = timedelta(hours=1)
@@ -73,25 +73,8 @@ def _as_utc(value: datetime | str) -> datetime:
     return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
 
-def fingerprint_key(api_key: str) -> str:
-    return hashlib.sha256(api_key.encode("utf-8")).hexdigest()
-
-
 def create_schema(db: Any) -> None:
     db.info()
-
-
-def _parse_expiry(value: Any) -> Optional[datetime]:
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        return _as_utc(value)
-    if isinstance(value, str) and value.strip():
-        try:
-            return _as_utc(value.strip())
-        except ValueError:
-            return None
-    return None
 
 
 def get_active_credential(

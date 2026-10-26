@@ -14,6 +14,7 @@ from economy.treasury_identity import get_current_owner_id
 from forge.binding import printing_store as _store
 from printing3d import finance, service
 from printing3d.plate import MAX_FILE_BYTES, inspect_archive
+from tool_providers.schema import object_schema
 
 QUOTE_REQUIRED_FIELDS = ("material_grams", "material_cost_per_kg", "print_hours")
 QUOTE_OPTIONAL_FIELDS = (
@@ -195,15 +196,6 @@ _QUOTE_PROPERTIES: dict[str, Any] = {
 }
 
 
-def _tool_schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
-    return {
-        "type": "object",
-        "properties": properties,
-        "required": required,
-        "additionalProperties": False,
-    }
-
-
 PRINTING3D_TOOLS = {
     "printing3d.plate.inspect": {
         "title": "3D Plate Preflight",
@@ -212,7 +204,7 @@ PRINTING3D_TOOLS = {
             "ZIP integrity, material/profile, G-code heat commands and single plate. "
             "Return readiness findings; NEVER start/upload a print or read other paths."
         ),
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {"artifact_name": {"type": "string", "minLength": 5, "maxLength": 140}},
             ["artifact_name"],
         ),
@@ -234,7 +226,7 @@ PRINTING3D_TOOLS = {
             "как null — инструмент вернёт missing_fields. Остальные параметры имеют "
             "консервативные значения по умолчанию и перечисляются в assumed_defaults."
         ),
-        "parameters": _tool_schema(_QUOTE_PROPERTIES, []),
+        "parameters": object_schema(_QUOTE_PROPERTIES, []),
         "capabilities": ["3d", "orders", "read"],
         "risk_level": "low",
         "read_only": True,
@@ -250,7 +242,7 @@ PRINTING3D_TOOLS = {
             "данные расчёта в quote — цена будет пересчитана на сервере; quoted_price "
             "указывай, только если пользователь согласовал другую цену."
         ),
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "title": {"type": "string", "minLength": 1, "maxLength": 200},
                 "customer_name": {
@@ -262,7 +254,7 @@ PRINTING3D_TOOLS = {
                         {"type": "null"},
                     ]
                 },
-                "quote": {"anyOf": [_tool_schema(_QUOTE_PROPERTIES, []), {"type": "null"}]},
+                "quote": {"anyOf": [object_schema(_QUOTE_PROPERTIES, []), {"type": "null"}]},
                 "quoted_price": _nullable_number(),
                 "currency": _QUOTE_PROPERTIES["currency"],
                 "notes": {"anyOf": [{"type": "string", "maxLength": 2000}, {"type": "null"}]},
@@ -286,7 +278,7 @@ PRINTING3D_TOOLS = {
             "как null. Инструмент объединяет найденные условия с уже сохранённым планом, "
             "учитывает фактическую прибыль 3D-направления и возвращает missing_fields."
         ),
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "purchase_mode": {
                     "anyOf": [
@@ -336,7 +328,7 @@ PRINTING3D_TOOLS = {
     "printing3d.finance.status": {
         "title": "3D Printing Finance Status",
         "description": "Получить условия финансирования, окупаемость и покрытие платежа прибылью.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "month": {
                     "anyOf": [
@@ -358,7 +350,7 @@ PRINTING3D_TOOLS = {
     "printing3d.finance.plan.set": {
         "title": "3D Printing Finance Plan Set",
         "description": "Сохранить стоимость принтера и условия кредита для расчёта окупаемости.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "printer_model": {"type": "string", "minLength": 1, "maxLength": 200},
                 "equipment_price": {"type": "number", "minimum": 0},
@@ -396,7 +388,7 @@ PRINTING3D_TOOLS = {
         "description": (
             "Получить фактическую выручку, расходы и прибыль 3D-печати для текущего пользователя."
         ),
-        "parameters": _tool_schema({}, []),
+        "parameters": object_schema({}, []),
         "capabilities": ["3d", "treasury", "read"],
         "risk_level": "low",
         "read_only": True,
@@ -408,7 +400,7 @@ PRINTING3D_TOOLS = {
     "printing3d.orders.list": {
         "title": "3D Printing Orders",
         "description": "Получить очередь заказов 3D-печати текущего пользователя.",
-        "parameters": _tool_schema(
+        "parameters": object_schema(
             {
                 "status": {
                     "anyOf": [

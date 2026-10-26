@@ -7,10 +7,10 @@ import uuid
 import base64
 import hashlib
 import json
-from datetime import datetime, timezone
 from typing import Any, Optional
 
 from agent_memory.client import get_memory_client
+from core.clock import unix_seconds
 from storage.db import memory_file_path
 from invocation.context import InvocationContext
 from sessions.manager import create_session, restore_session
@@ -37,10 +37,6 @@ _SENSITIVE_KEY_RE = re.compile(
     r"|token(?!s(?![A-Za-z])))",
     re.IGNORECASE,
 )
-
-
-def _now() -> int:
-    return int(datetime.now(timezone.utc).timestamp())
 
 
 def _sanitize_metadata(value: Any) -> Any:
@@ -120,7 +116,7 @@ def create_invocation(
 
     invocation_id = str(uuid.uuid4())
     trace_id = str(uuid.uuid4())
-    now = _now()
+    now = unix_seconds()
     persisted_metadata = _sanitize_metadata(metadata or {})
     resolved_user_id = (
         str(user_id).strip() if user_id is not None and str(user_id).strip() else None
@@ -161,7 +157,7 @@ def start_invocation(invocation_id: str) -> bool:
         if record is None or record["status"] != "created":
             return False
         record["status"] = "running"
-        record["started_at"] = _now()
+        record["started_at"] = unix_seconds()
         tx.set(key, record)
         return True
 
@@ -332,7 +328,7 @@ def _complete(invocation_id: str, status: str, result: Any = None, error: Any = 
                 record = tx.get(key)
                 if record is not None and record["status"] in {"created", "running"}:
                     record["status"] = status
-                    record["completed_at"] = _now()
+                    record["completed_at"] = unix_seconds()
                     _assign_value(record, "result", prepared_result)
                     _assign_value(record, "error", prepared_error)
                     tx.set(key, record)

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from uuid import uuid4
 
+from printing3d.money import decimal_field, money_float
 from printing3d.store import PrintStore
 
 
@@ -29,39 +30,23 @@ ORDER_STATUSES = (
 )
 
 
-def _money(value: Decimal) -> float:
-    return float(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
-
-
-def _decimal(value, name: str, *, minimum: str = "0") -> Decimal:
-    try:
-        number = Decimal(str(value))
-    except Exception as exc:
-        raise ValueError(f"{name} must be numeric") from exc
-    if not number.is_finite():
-        raise ValueError(f"{name} must be a finite number")
-    if number < Decimal(minimum):
-        raise ValueError(f"{name} must be >= {minimum}")
-    return number
-
-
 def calculate_quote(data: dict) -> dict:
     """Calculate a conservative quote from material, machine and selling costs."""
     if not isinstance(data, dict):
         raise ValueError("quote input must be an object")
 
-    grams = _decimal(data.get("material_grams", 0), "material_grams")
-    material_cost_per_kg = _decimal(data.get("material_cost_per_kg", 0), "material_cost_per_kg")
-    print_hours = _decimal(data.get("print_hours", 0), "print_hours")
-    power_watts = _decimal(data.get("printer_power_watts", 120), "printer_power_watts")
-    electricity_per_kwh = _decimal(
+    grams = decimal_field(data.get("material_grams", 0), "material_grams")
+    material_cost_per_kg = decimal_field(data.get("material_cost_per_kg", 0), "material_cost_per_kg")
+    print_hours = decimal_field(data.get("print_hours", 0), "print_hours")
+    power_watts = decimal_field(data.get("printer_power_watts", 120), "printer_power_watts")
+    electricity_per_kwh = decimal_field(
         data.get("electricity_cost_per_kwh", 0), "electricity_cost_per_kwh"
     )
-    depreciation_per_hour = _decimal(data.get("depreciation_per_hour", 0), "depreciation_per_hour")
-    packaging_cost = _decimal(data.get("packaging_cost", 0), "packaging_cost")
-    failure_rate = _decimal(data.get("failure_rate_percent", 10), "failure_rate_percent")
-    platform_fee = _decimal(data.get("platform_fee_percent", 0), "platform_fee_percent")
-    margin = _decimal(data.get("target_margin_percent", 30), "target_margin_percent")
+    depreciation_per_hour = decimal_field(data.get("depreciation_per_hour", 0), "depreciation_per_hour")
+    packaging_cost = decimal_field(data.get("packaging_cost", 0), "packaging_cost")
+    failure_rate = decimal_field(data.get("failure_rate_percent", 10), "failure_rate_percent")
+    platform_fee = decimal_field(data.get("platform_fee_percent", 0), "platform_fee_percent")
+    margin = decimal_field(data.get("target_margin_percent", 30), "target_margin_percent")
 
     if failure_rate >= 100:
         raise ValueError("failure_rate_percent must be < 100")
@@ -82,16 +67,16 @@ def calculate_quote(data: dict) -> dict:
     expected_profit = recommended_price - estimated_total_cost
 
     return {
-        "material_cost": _money(material),
-        "electricity_cost": _money(electricity),
-        "depreciation_cost": _money(depreciation),
-        "packaging_cost": _money(packaging_cost),
-        "failure_reserve": _money(failure_reserve),
-        "cost_with_risk": _money(cost_with_risk),
-        "recommended_price": _money(recommended_price),
-        "expected_platform_fee": _money(expected_platform_fee),
-        "estimated_total_cost": _money(estimated_total_cost),
-        "expected_profit": _money(expected_profit),
+        "material_cost": money_float(material),
+        "electricity_cost": money_float(electricity),
+        "depreciation_cost": money_float(depreciation),
+        "packaging_cost": money_float(packaging_cost),
+        "failure_reserve": money_float(failure_reserve),
+        "cost_with_risk": money_float(cost_with_risk),
+        "recommended_price": money_float(recommended_price),
+        "expected_platform_fee": money_float(expected_platform_fee),
+        "estimated_total_cost": money_float(estimated_total_cost),
+        "expected_profit": money_float(expected_profit),
         "currency": str(data.get("currency") or "RUB"),
     }
 
@@ -122,15 +107,15 @@ def create_order(store: PrintStore, owner_id: str, data: dict) -> dict:
     if quoted_price is None and quote:
         quoted_price = quote["recommended_price"]
     if quoted_price is not None:
-        quoted_price = float(_decimal(quoted_price, "quoted_price"))
+        quoted_price = float(decimal_field(quoted_price, "quoted_price"))
 
     actual_revenue = data.get("actual_revenue")
     if actual_revenue is not None:
-        actual_revenue = float(_decimal(actual_revenue, "actual_revenue"))
+        actual_revenue = float(decimal_field(actual_revenue, "actual_revenue"))
 
     actual_cost = data.get("actual_cost")
     if actual_cost is not None:
-        actual_cost = float(_decimal(actual_cost, "actual_cost"))
+        actual_cost = float(decimal_field(actual_cost, "actual_cost"))
 
     now = datetime.now(UTC).replace(tzinfo=None).isoformat()
     order_id = str(uuid4())
@@ -207,8 +192,8 @@ def settle_order(
     if order.get("settled_at"):
         if actual_revenue is None and actual_cost is None:
             return order
-        revenue = _money(_decimal(actual_revenue, "actual_revenue"))
-        cost = _money(_decimal(actual_cost, "actual_cost"))
+        revenue = money_float(decimal_field(actual_revenue, "actual_revenue"))
+        cost = money_float(decimal_field(actual_cost, "actual_cost"))
         if revenue == order.get("actual_revenue") and cost == order.get("actual_cost"):
             return order
         raise ValueError("order is already settled")
@@ -229,8 +214,8 @@ def settle_order(
     if cost_source is None:
         raise ValueError("actual_cost is required")
 
-    revenue = _money(_decimal(revenue_source, "actual_revenue"))
-    cost = _money(_decimal(cost_source, "actual_cost"))
+    revenue = money_float(decimal_field(revenue_source, "actual_revenue"))
+    cost = money_float(decimal_field(cost_source, "actual_cost"))
     now = datetime.now(UTC).replace(tzinfo=None).isoformat()
 
     _publish_settlement(store, owner_id, order_id, revenue, cost, now)
@@ -279,10 +264,10 @@ def get_financial_summary(store: PrintStore, owner_id: str) -> dict:
         currencies.append(
             {
                 **bucket,
-                "quoted_revenue": _money(bucket["quoted_revenue"]),
-                "settled_revenue": _money(bucket["settled_revenue"]),
-                "settled_cost": _money(bucket["settled_cost"]),
-                "settled_profit": _money(bucket["settled_profit"]),
+                "quoted_revenue": money_float(bucket["quoted_revenue"]),
+                "settled_revenue": money_float(bucket["settled_revenue"]),
+                "settled_cost": money_float(bucket["settled_cost"]),
+                "settled_profit": money_float(bucket["settled_profit"]),
             }
         )
 

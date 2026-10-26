@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
 
+from core.clock import unix_time
 from storage.db import get_store
 
 local_agent_bp = Blueprint("local_agents", __name__, url_prefix="/api/local-agents")
@@ -18,10 +19,6 @@ local_agent_bp = Blueprint("local_agents", __name__, url_prefix="/api/local-agen
 _AGENT_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _MAX_CAPABILITIES = 64
 _DEFAULT_LEASE_SECONDS = 30
-
-
-def _now() -> float:
-    return time.time()
 
 
 def _json(value: Any) -> str:
@@ -91,7 +88,7 @@ def enqueue_local_tool_job(
                 "trace_id": trace_id,
                 "invocation_id": invocation_id,
                 "status": "queued",
-                "created_at": _now(),
+                "created_at": unix_time(),
                 "claimed_at": None,
                 "lease_until": None,
                 "completed_at": None,
@@ -131,7 +128,7 @@ def wait_for_local_tool_job(
 
 
 def _recover_expired_jobs(conn, agent_id: str) -> None:
-    now = _now()
+    now = unix_time()
     for key, row in get_store().items(prefix="local-job/").items():
         if (
             row["agent_id"] == agent_id
@@ -166,7 +163,7 @@ def register_local_agent():
         return jsonify({"error": "invalid_capabilities"}), 400
     capabilities = [str(item).strip() for item in capabilities if str(item).strip()]
 
-    now = _now()
+    now = unix_time()
 
     key = "local-agent/" + agent_id
     with get_store().transaction() as tx:
@@ -201,7 +198,7 @@ def register_local_agent():
 @local_agent_bp.post("/<agent_id>/heartbeat")
 def local_agent_heartbeat(agent_id: str):
 
-    now = _now()
+    now = unix_time()
     key = "local-agent/" + agent_id
     try:
         with get_store().transaction() as tx:
@@ -223,7 +220,7 @@ def local_agent_poll(agent_id: str):
         with store.transaction() as tx:
             agent = _require_agent(agent_id)
             _recover_expired_jobs(tx, agent_id)
-            now = _now()
+            now = unix_time()
             queued = []
             for key in store.items(prefix="local-job/"):
                 item = tx.get(key)
@@ -286,7 +283,7 @@ def local_agent_result(agent_id: str, job_id: str):
                     "status": status,
                     "result_json": _json(data.get("result")),
                     "error_json": _json(data.get("error")),
-                    "completed_at": _now(),
+                    "completed_at": unix_time(),
                     "lease_until": None,
                 },
             )
@@ -298,7 +295,7 @@ def local_agent_result(agent_id: str, job_id: str):
 
 @local_agent_bp.get("/health")
 def local_agent_health():
-    cutoff = _now() - 90
+    cutoff = unix_time() - 90
     rows = sorted(get_store().items(prefix="local-agent/").values(), key=lambda row: row["id"])
 
     agents = []

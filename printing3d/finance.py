@@ -4,38 +4,13 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Any, Literal, overload
+from decimal import Decimal
+from typing import Any
 
+from printing3d.money import decimal_field, money_float
 from printing3d.store import PrintStore
 
 _MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
-
-
-def _money(value: Decimal) -> float:
-    return float(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
-
-
-@overload
-def _decimal(value: Any, name: str, *, nullable: Literal[False] = False) -> Decimal: ...
-
-
-@overload
-def _decimal(value: Any, name: str, *, nullable: Literal[True]) -> Decimal | None: ...
-
-
-def _decimal(value: Any, name: str, *, nullable: bool = False) -> Decimal | None:
-    if value is None and nullable:
-        return None
-    try:
-        number = Decimal(str(value))
-    except Exception as exc:
-        raise ValueError(f"{name} must be numeric") from exc
-    if not number.is_finite():
-        raise ValueError(f"{name} must be a finite number")
-    if number < 0:
-        raise ValueError(f"{name} must be >= 0")
-    return number
 
 
 def _optional_int(value: Any, name: str) -> int | None:
@@ -80,21 +55,21 @@ def set_financing_plan(store: PrintStore, owner_id: str, data: dict[str, Any]) -
     if not model:
         raise ValueError("printer_model is required")
 
-    equipment_price = _decimal(data.get("equipment_price"), "equipment_price")
-    setup_cost = _decimal(data.get("setup_cost", 0), "setup_cost")
-    down_payment = _decimal(data.get("down_payment", 0), "down_payment")
-    credit_principal = _decimal(data.get("credit_principal", 0), "credit_principal")
-    total_repayment = _decimal(
+    equipment_price = decimal_field(data.get("equipment_price"), "equipment_price")
+    setup_cost = decimal_field(data.get("setup_cost", 0), "setup_cost")
+    down_payment = decimal_field(data.get("down_payment", 0), "down_payment")
+    credit_principal = decimal_field(data.get("credit_principal", 0), "credit_principal")
+    total_repayment = decimal_field(
         data.get("credit_total_repayment"),
         "credit_total_repayment",
         nullable=True,
     )
-    monthly_payment = _decimal(
+    monthly_payment = decimal_field(
         data.get("monthly_payment"),
         "monthly_payment",
         nullable=True,
     )
-    psk_percent = _decimal(data.get("psk_percent"), "psk_percent", nullable=True)
+    psk_percent = decimal_field(data.get("psk_percent"), "psk_percent", nullable=True)
     term_months = _optional_int(data.get("term_months"), "term_months")
 
     if total_repayment is not None and total_repayment < credit_principal:
@@ -112,14 +87,14 @@ def set_financing_plan(store: PrintStore, owner_id: str, data: dict[str, Any]) -
     record = {
         "owner_id": owner_id,
         "printer_model": model,
-        "equipment_price": _money(equipment_price),
-        "setup_cost": _money(setup_cost),
-        "down_payment": _money(down_payment),
-        "credit_principal": _money(credit_principal),
-        "credit_total_repayment": _money(total_repayment) if total_repayment is not None else None,
-        "monthly_payment": _money(monthly_payment) if monthly_payment is not None else None,
+        "equipment_price": money_float(equipment_price),
+        "setup_cost": money_float(setup_cost),
+        "down_payment": money_float(down_payment),
+        "credit_principal": money_float(credit_principal),
+        "credit_total_repayment": money_float(total_repayment) if total_repayment is not None else None,
+        "monthly_payment": money_float(monthly_payment) if monthly_payment is not None else None,
         "term_months": term_months,
-        "psk_percent": _money(psk_percent) if psk_percent is not None else None,
+        "psk_percent": money_float(psk_percent) if psk_percent is not None else None,
         "currency": currency,
         "started_at": started_at,
         "updated_at": now,
@@ -210,14 +185,14 @@ def get_payback_status(
         "status": "configured",
         "month": selected_month,
         "cost_basis_status": "complete" if financing_cost_known else "partial",
-        "known_cost_basis": _money(known_cost_basis),
-        "credit_overpayment": _money(financing_cost) if financing_cost_known else None,
-        "cumulative_realized_profit": _money(cumulative_profit),
-        "month_realized_profit": _money(month_profit),
-        "remaining_to_known_cost_basis": _money(remaining),
-        "payback_progress_percent": _money(progress) if progress is not None else None,
+        "known_cost_basis": money_float(known_cost_basis),
+        "credit_overpayment": money_float(financing_cost) if financing_cost_known else None,
+        "cumulative_realized_profit": money_float(cumulative_profit),
+        "month_realized_profit": money_float(month_profit),
+        "remaining_to_known_cost_basis": money_float(remaining),
+        "payback_progress_percent": money_float(progress) if progress is not None else None,
         "monthly_payment_coverage_ratio": (
-            _money(payment_coverage_ratio) if payment_coverage_ratio is not None else None
+            money_float(payment_coverage_ratio) if payment_coverage_ratio is not None else None
         ),
         "monthly_payment_covered": payment_covered,
         "break_even_reached": break_even_reached,
@@ -298,7 +273,7 @@ def assess_financing(store: PrintStore, owner_id: str, data: dict[str, Any]) -> 
     profit_source = "none"
     profit_basis: Decimal | None = None
     if expected_monthly_profit is not None:
-        profit_basis = _decimal(expected_monthly_profit, "expected_monthly_profit")
+        profit_basis = decimal_field(expected_monthly_profit, "expected_monthly_profit")
         profit_source = "provided_or_agent_estimate"
     elif observed_monthly_profit > 0:
         profit_basis = observed_monthly_profit
@@ -333,30 +308,30 @@ def assess_financing(store: PrintStore, owner_id: str, data: dict[str, Any]) -> 
         "assumptions": assumptions,
         "saved_plan_used": bool(saved),
         "observed_month": observed_month,
-        "observed_monthly_profit": _money(observed_monthly_profit),
-        "cumulative_realized_profit": _money(cumulative_profit),
+        "observed_monthly_profit": money_float(observed_monthly_profit),
+        "cumulative_realized_profit": money_float(cumulative_profit),
         "profit_source": profit_source,
-        "profit_basis": _money(profit_basis) if profit_basis is not None else None,
+        "profit_basis": money_float(profit_basis) if profit_basis is not None else None,
         "analysis": None,
     }
     if missing_fields:
         return result
 
-    equipment = _decimal(equipment_price, "equipment_price")
-    setup = _decimal(setup_cost, "setup_cost")
-    principal = _decimal(credit_principal, "credit_principal")
+    equipment = decimal_field(equipment_price, "equipment_price")
+    setup = decimal_field(setup_cost, "setup_cost")
+    principal = decimal_field(credit_principal, "credit_principal")
     if purchase_mode == "cash":
         down = equipment
     elif down_payment is None:
         down = max(equipment - principal, Decimal("0"))
     else:
-        down = _decimal(down_payment, "down_payment")
-    result["resolved_terms"]["down_payment"] = _money(down)
+        down = decimal_field(down_payment, "down_payment")
+    result["resolved_terms"]["down_payment"] = money_float(down)
 
     if psk_percent is not None:
-        result["resolved_terms"]["psk_percent"] = _money(_decimal(psk_percent, "psk_percent"))
+        result["resolved_terms"]["psk_percent"] = money_float(decimal_field(psk_percent, "psk_percent"))
 
-    coverage_target = _decimal(target_coverage, "target_payment_coverage")
+    coverage_target = decimal_field(target_coverage, "target_payment_coverage")
     if coverage_target < 1:
         raise ValueError("target_payment_coverage must be >= 1")
 
@@ -365,14 +340,14 @@ def assess_financing(store: PrintStore, owner_id: str, data: dict[str, Any]) -> 
     repayment = Decimal("0")
     financing_cost = Decimal("0")
     if purchase_mode == "credit":
-        payment = _decimal(monthly_payment, "monthly_payment")
+        payment = decimal_field(monthly_payment, "monthly_payment")
         months = _optional_int(term_months, "term_months")
         if payment <= 0:
             raise ValueError("monthly_payment must be > 0")
         if principal > equipment:
             raise ValueError("credit_principal cannot exceed equipment_price")
         repayment = (
-            _decimal(credit_total_repayment, "credit_total_repayment")
+            decimal_field(credit_total_repayment, "credit_total_repayment")
             if credit_total_repayment is not None
             else payment * Decimal(months)
         )
@@ -394,15 +369,15 @@ def assess_financing(store: PrintStore, owner_id: str, data: dict[str, Any]) -> 
             coverage_ok = profit_basis >= required_monthly_profit
 
     result["analysis"] = {
-        "known_cost_basis": _money(known_cost_basis),
-        "upfront_cash_required": _money(upfront_cash),
-        "total_credit_repayment": _money(repayment),
-        "financing_cost": _money(financing_cost),
-        "target_payment_coverage": _money(coverage_target),
-        "required_monthly_profit": _money(required_monthly_profit),
-        "payment_coverage_ratio": _money(coverage_ratio) if coverage_ratio is not None else None,
+        "known_cost_basis": money_float(known_cost_basis),
+        "upfront_cash_required": money_float(upfront_cash),
+        "total_credit_repayment": money_float(repayment),
+        "financing_cost": money_float(financing_cost),
+        "target_payment_coverage": money_float(coverage_target),
+        "required_monthly_profit": money_float(required_monthly_profit),
+        "payment_coverage_ratio": money_float(coverage_ratio) if coverage_ratio is not None else None,
         "payment_coverage_ok": coverage_ok,
-        "estimated_payback_months": _money(payback_months) if payback_months is not None else None,
+        "estimated_payback_months": money_float(payback_months) if payback_months is not None else None,
         "profit_evidence_status": "available" if profit_basis is not None else "not_available",
     }
     return result

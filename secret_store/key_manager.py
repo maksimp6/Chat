@@ -10,12 +10,13 @@ from core.env import env_get
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import hashlib
 import os
 from typing import Any, Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 
+from secret_store.credential_crypto import fingerprint_key
+from core.clock import utc_now
 from storage.db import get_store
 
 DatabaseRow = dict[str, Any]
@@ -52,10 +53,6 @@ class KeyMetadata:
     fingerprint: str
 
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 def _iso(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
@@ -90,10 +87,6 @@ def secret_storage_ready() -> bool:
     return True
 
 
-def _fingerprint(secret: str) -> str:
-    return hashlib.sha256(secret.encode("utf-8")).hexdigest()
-
-
 def create_schema(db: Any) -> None:
     db.info()
 
@@ -118,7 +111,7 @@ def _check_active(row: DatabaseRow) -> None:
     expires_at = row["expires_at"]
     if expires_at:
         expires = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
-        if _utcnow() >= expires:
+        if utc_now() >= expires:
             raise KeyExpiredError(f"Key '{row['key_ref']}' is expired")
 
 
@@ -147,7 +140,7 @@ def store_secret(
 
     _ensure_schema()
     ref = key_ref or f"key_{os.urandom(16).hex()}"
-    created_at = _iso(_utcnow())
+    created_at = _iso(utc_now())
     expires_value = _iso(expires_at) if expires_at else None
     encrypted = _fernet().encrypt(secret.encode("utf-8")).decode("ascii")
 
@@ -163,7 +156,7 @@ def store_secret(
         "created_at": created_at,
         "expires_at": expires_value,
         "rotated_from": rotated_from,
-        "fingerprint": _fingerprint(secret),
+        "fingerprint": fingerprint_key(secret),
         "revoked_at": None,
     }
     with get_store().transaction() as tx:
@@ -215,7 +208,7 @@ def revoke_key(key_ref: str) -> None:
         if row is None:
             raise KeyNotFoundError("Managed key not found")
         if row["status"] != "revoked":
-            tx.set(key, {**row, "status": "revoked", "revoked_at": _iso(_utcnow())})
+            tx.set(key, {**row, "status": "revoked", "revoked_at": _iso(utc_now())})
 
 
 def delete_key(key_ref: str) -> None:

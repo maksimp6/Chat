@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import datetime, timezone
 from typing import Any, Optional
 
 from agent_memory.client import get_memory_client
+from core.clock import unix_seconds
 from storage.db import memory_file_path
 
 _SESSION_PREFIX = "runtime_session:"
@@ -15,10 +15,6 @@ _SENSITIVE_KEY_RE = re.compile(
     r"(?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)",
     re.IGNORECASE,
 )
-
-
-def _now() -> int:
-    return int(datetime.now(timezone.utc).timestamp())
 
 
 def _sanitize_metadata(value: Any) -> Any:
@@ -43,7 +39,7 @@ def create_session(
     session_id: Optional[str] = None, metadata: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     session_id = session_id or str(uuid.uuid4())
-    now = _now()
+    now = unix_seconds()
     record = {
         "id": session_id,
         "status": "active",
@@ -78,7 +74,7 @@ def restore_session(session_id: str) -> Optional[dict[str, Any]]:
         if not isinstance(record, dict) or record.get("id") != str(session_id):
             raise ValueError("invalid runtime session record")
         if record.get("status") == "active":
-            record["updated_at"] = _now()
+            record["updated_at"] = unix_seconds()
             tx.set(key, record)
         return record
 
@@ -95,7 +91,7 @@ def update_session(
             return None
         if not isinstance(record, dict) or record.get("id") != str(session_id):
             raise ValueError("invalid runtime session record")
-        record["updated_at"] = _now()
+        record["updated_at"] = unix_seconds()
         if metadata is not None:
             replaced = _sanitize_metadata(metadata)
             # Replacing metadata must not drop the owner recorded at creation.
@@ -106,6 +102,6 @@ def update_session(
         if status is not None:
             record["status"] = status
             if status in {"completed", "failed", "cancelled"}:
-                record["completed_at"] = _now()
+                record["completed_at"] = unix_seconds()
         tx.set(key, record)
         return record

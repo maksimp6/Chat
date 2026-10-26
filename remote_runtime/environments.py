@@ -19,6 +19,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Optional
 
+from core.clock import unix_seconds
 from storage.db import get_store, init_db as init_runtime_db
 from invocation.context import InvocationContext
 from invocation.trace import create_invocation_trace
@@ -53,10 +54,6 @@ def _invoke_revision_runtime(context, payload):
 
 
 _RUNTIME_DISPATCHER.register_operation("revision.invoke", _invoke_revision_runtime)
-
-
-def _now() -> int:
-    return int(time.time())
 
 
 def _repo_root() -> Path:
@@ -138,8 +135,8 @@ def init_environment_tables() -> None:
                         "status": "STOPPED",
                         "runtime_pid": None,
                         "runtime_port": None,
-                        "updated_at": _now(),
-                        "stopped_at": row["stopped_at"] or _now(),
+                        "updated_at": unix_seconds(),
+                        "stopped_at": row["stopped_at"] or unix_seconds(),
                     },
                 )
 
@@ -235,7 +232,7 @@ def _record_trace(
                 "status": status,
                 "trace_id": trace.trace_id,
                 "trace_json": trace_json,
-                "created_at": _now(),
+                "created_at": unix_seconds(),
             },
         )
     return trace_json
@@ -620,8 +617,8 @@ def create_environment(
         "runtime_port": None,
         "data_namespace": _namespace(environment_id),
         "owner_id": owner_id,
-        "created_at": _now(),
-        "updated_at": _now(),
+        "created_at": unix_seconds(),
+        "updated_at": unix_seconds(),
         "started_at": None,
         "stopped_at": None,
         "deleted_at": None,
@@ -661,7 +658,7 @@ def start_environment(
                 "status": "RUNNING",
                 "runtime_pid": None,
                 "runtime_port": None,
-                "started_at": _now(),
+                "started_at": unix_seconds(),
                 "error": None,
             },
         )
@@ -671,7 +668,7 @@ def start_environment(
                 "runtime_pid": None,
                 "runtime_port": None,
                 "runtime_thread_id": thread_id,
-                "started_at": _now(),
+                "started_at": unix_seconds(),
                 "error": None,
             }
         )
@@ -707,7 +704,7 @@ def stop_environment(
             raise
     _persist_environment(
         environment_id,
-        {"status": "STOPPED", "runtime_pid": None, "runtime_port": None, "stopped_at": _now()},
+        {"status": "STOPPED", "runtime_pid": None, "runtime_port": None, "stopped_at": unix_seconds()},
     )
     item.update(
         {
@@ -715,7 +712,7 @@ def stop_environment(
             "runtime_pid": None,
             "runtime_port": None,
             "runtime_thread_id": None,
-            "stopped_at": _now(),
+            "stopped_at": unix_seconds(),
         }
     )
     _record_trace(item, "STOP_ENVIRONMENT", "SUCCESS", context=context)
@@ -739,7 +736,7 @@ def delete_environment(
         stop_environment(environment_id, owner_id, context=context)
         item = _require(environment_id, owner_id)
     _transition(item["status"], "DELETING")
-    item.update({"status": "DELETING", "deleted_at": _now()})
+    item.update({"status": "DELETING", "deleted_at": unix_seconds()})
     _record_trace(item, "DELETE_ENVIRONMENT", "SUCCESS", context=context)
     # The record goes first: if the files were removed and the record then survived, the record
     # would claim an environment whose source and data are gone.
@@ -755,4 +752,4 @@ def _persist_environment(environment_id: str, changes: dict[str, Any]) -> None:
         old = tx.get(key)
         if old is None:
             raise KeyError("environment_not_found")
-        tx.set(key, {**old, **changes, "updated_at": _now()})
+        tx.set(key, {**old, **changes, "updated_at": unix_seconds()})
