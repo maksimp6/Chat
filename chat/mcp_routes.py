@@ -482,7 +482,7 @@ def chat():
 
         reasoning, reply = client.extract_reasoning_and_text(response)
         if not reply:
-            raise RuntimeError("Responses API завершил tool-call цепочку без текстового ответа")
+            raise RuntimeError("Модель не вернула текстовый ответ. Повторите запрос.")
         usage = client.extract_usage(response)
         timings = response.get("step_timings", []) if isinstance(response, dict) else []
         total_ms = round((_time.perf_counter() - t_start) * 1000)

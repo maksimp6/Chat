@@ -638,6 +638,7 @@ function addMessage(
         event.stopPropagation();
         if (typeof window.openTraceViewer !== "function") {
           console.error("[CHAT] Execution Trace Viewer is not loaded");
+          window.LogosToast.error("Просмотр трассы не загрузился. Обновите страницу.");
           return;
         }
         // A stored message keeps only a reference to its trace; the full trace is read from the invocation.
@@ -652,6 +653,7 @@ function addMessage(
             window.openTraceViewer(await res.json());
           } catch (err) {
             summary.textContent = "🔍 Трасса недоступна";
+            window.LogosToast.error("Не удалось загрузить трассу. Попробуйте позже.");
             console.error("[CHAT] Trace load failed: " + err.message);
           }
           return;
@@ -838,11 +840,11 @@ document.addEventListener("DOMContentLoaded", function () {
       for (const file of files) {
         // Count photos still being read, so two quick picks cannot pass the limit together.
         if (pendingImages.length + imagesInFlight >= MAX_IMAGES) {
-          addMessage("Можно прикрепить не больше " + MAX_IMAGES + " фото", "error", false, 0);
+          window.LogosToast.error("Можно прикрепить не больше " + MAX_IMAGES + " фото");
           break;
         }
         if (!IMAGE_TYPES.includes(file.type) || file.size > MAX_IMAGE_BYTES) {
-          addMessage("Фото «" + file.name + "»: нужен PNG, JPEG или WebP до 5 МБ", "error", false, 0);
+          window.LogosToast.error("Фото «" + file.name + "»: нужен PNG, JPEG или WebP до 5 МБ");
           continue;
         }
         imagesInFlight += 1;
@@ -850,7 +852,7 @@ document.addEventListener("DOMContentLoaded", function () {
           pendingImages.push({ name: file.name, dataUrl: await readAsDataUrl(file) });
           renderPendingImages();
         } catch (error) {
-          addMessage("Не удалось прочитать фото «" + file.name + "»", "error", false, 0);
+          window.LogosToast.error("Не удалось прочитать фото «" + file.name + "»");
         } finally {
           imagesInFlight -= 1;
         }
@@ -1056,6 +1058,8 @@ document.addEventListener("DOMContentLoaded", function () {
       if (currentConvId !== turn.conversationId) return;
       if (data.error) {
         restoreImages();
+        // The failed text goes back to the field, unless the user already started a new draft.
+        if (!input.value) input.value = turn.text;
         addMessage(data.reply || "⚠️ Ошибка: " + data.error, "error", false, data.cost || 0, data.timings,
           clientTotalMs, data.reasoning, data.usage, data.trace, {
             onRetry: function () {

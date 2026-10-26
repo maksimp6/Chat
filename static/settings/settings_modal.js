@@ -118,6 +118,7 @@
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json();
     }
+    function loadCategories() {
     Promise.all([
       window.LogosDispatcher.request("/api/tools/categories").then(readOk),
       currentConvId
@@ -159,8 +160,19 @@
       })
       .catch(function () {
         var listEl = document.getElementById("tools-category-list");
-        if (listEl) listEl.textContent = "Ошибка загрузки категорий";
+        if (!listEl) return;
+        listEl.replaceChildren();
+        var message = document.createElement("p");
+        message.textContent = "Не удалось загрузить список инструментов. Проверьте соединение.";
+        var retry = document.createElement("button");
+        retry.type = "button";
+        retry.className = "logos-btn";
+        retry.textContent = "Повторить";
+        retry.addEventListener("click", loadCategories);
+        listEl.append(message, retry);
       });
+    }
+    loadCategories();
 
     document.getElementById("tools-save-btn").addEventListener("click", function () {
       var selected = [];
