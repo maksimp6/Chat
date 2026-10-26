@@ -419,7 +419,7 @@
           "</div>",
         "<div>" +
           UI.lbl("Max Tool Calls") +
-          UI.inp("set-max-tools", "number", settings.max_tool_calls || 10, ' min="1" max="50"') +
+          UI.inp("set-max-tools", "number", settings.max_tool_calls || "", ' min="1"') +
           "</div>",
       ),
       UI.gap2(
@@ -632,7 +632,7 @@
       settings.json_schema = document.getElementById("set-js-schema").value.trim();
 
       settings.tool_choice = document.getElementById("set-tool-choice").value;
-      settings.max_tool_calls = parseInt(document.getElementById("set-max-tools").value, 10) || 10;
+      settings.max_tool_calls = parseInt(document.getElementById("set-max-tools").value, 10) || null;
       settings.parallel_tool_calls = document.getElementById("set-parallel-tools").checked;
       settings.top_logprobs = parseInt(document.getElementById("set-logprobs").value, 10) || 0;
 

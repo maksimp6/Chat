@@ -6,7 +6,7 @@
     top_p: 1.0,
     // 0 means the provider's maximum supported output: no cap is sent (Ultra profile).
     max_output_tokens: 0,
-    max_tool_calls: 10,
+    max_tool_calls: null,
     truncation: "disabled",
     store: true,
     background: true,

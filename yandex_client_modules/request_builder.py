@@ -279,9 +279,11 @@ def build_response_payload(
         cleaned_tools = _clean_tools(raw_tools)
         if cleaned_tools:
             payload["tools"] = cleaned_tools
-            # Every tool parameter is named in the request; the application default fills an omitted one.
+            # Every tool parameter is named in the request. The documented default for max_tool_calls is
+            # null, which means no limit, so an unset value is sent as null rather than as a cap.
             payload["tool_choice"] = params.get("tool_choice") or "auto"
-            payload["max_tool_calls"] = int(params.get("max_tool_calls") or 10)
+            max_tool_calls = params.get("max_tool_calls")
+            payload["max_tool_calls"] = int(max_tool_calls) if max_tool_calls else None
 
             ptc = params.get("parallel_tool_calls")
             if ptc is not None:

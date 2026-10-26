@@ -29,7 +29,7 @@
       instructions: s.instructions || "",
       tool_choice: s.tool_choice || "auto",
       parallel_tool_calls: s.parallel_tool_calls !== false,
-      max_tool_calls: parseInt(s.max_tool_calls, 10) || 10,
+      max_tool_calls: parseInt(s.max_tool_calls, 10) || null,
     };
 
     if (s.reasoning_effort && s.reasoning_effort !== "disabled") {

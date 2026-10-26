@@ -211,7 +211,6 @@ class ToolRegistry:
             "description": cfg.get("description", ""),
             "parameters": self._strict_schema(parameters),
             "strict": not self._has_open_object(parameters),
-            "defer_loading": False,
         }
 
     def get_definitions(self, active_categories: set = None) -> list:
