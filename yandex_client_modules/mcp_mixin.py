@@ -10,6 +10,7 @@ from storage.db import get_conv_settings
 
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_client_modules.api_logger import api_logger
+from yandex_client_modules.tool_config import file_search_max_results, normalize_tools_config
 from tool_providers.universal_tool_platform import (
     ReadOnlyToolPolicy,
     UniversalToolCall,
@@ -19,10 +20,7 @@ from tool_providers.universal_tool_platform import (
 
 def _max_results(value: Any) -> int:
     """File-search result count from settings, clamped to the provider's range."""
-    try:
-        return max(1, min(int(20 if value is None else value), 50))
-    except (TypeError, ValueError):
-        return 20
+    return file_search_max_results(value)
 
 
 class YandexMcpMixin:
@@ -36,12 +34,7 @@ class YandexMcpMixin:
         if name and "<|" in name:
             name = name.split("<|")[0].strip()
 
-        args = tc.get("arguments") or function.get("arguments", {})
-        if isinstance(args, str):
-            try:
-                args = json.loads(args)
-            except Exception:
-                args = {}
+        args = tc["arguments"] if "arguments" in tc else function.get("arguments", {})
 
         call_id = tc.get("call_id") or tc.get("id") or tc.get("tool_call_id") or name
 
@@ -55,18 +48,33 @@ class YandexMcpMixin:
             user_id = (trace.trace.get("context") or {}).get("user_id")
             invocation_id = (trace.trace.get("context") or {}).get("invocation_id")
 
-        call = UniversalToolCall(
-            tool_name=name,
-            arguments=args,
-            call_id=call_id,
-            transport="responses_api",
-            trace_id=trace_id,
-            invocation_id=invocation_id,
-            user_id=user_id,
-            metadata={"source": "yandex_responses", "server_count": len(all_servers or [])},
-        )
-
         try:
+            try:
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except ValueError:
+                        raise ValueError("Invalid tool arguments: expected a valid JSON object") from None
+                if not isinstance(args, dict):
+                    raise ValueError("Invalid tool arguments: expected a JSON object")
+            except ValueError as exc:
+                if isinstance(trace, ExecutionTrace):
+                    trace.add_event(
+                        "tool_arguments_rejected",
+                        {"tool": name, "call_id": call_id, "error": str(exc)},
+                    )
+                raise
+
+            call = UniversalToolCall(
+                tool_name=name,
+                arguments=args,
+                call_id=call_id,
+                transport="responses_api",
+                trace_id=trace_id,
+                invocation_id=invocation_id,
+                user_id=user_id,
+                metadata={"source": "yandex_responses", "server_count": len(all_servers or [])},
+            )
             executor = UniversalToolExecutor(registry)
             if isinstance(trace, ExecutionTrace):
                 universal_result = executor.execute_with_trace(call, trace, policy=execution_policy)
@@ -191,30 +199,21 @@ class YandexMcpMixin:
             conv_settings = get_conv_settings(settings_id) or {} if settings_id else {}
         except Exception:
             conv_settings = {}
-        tools_config = (conv_settings or {}).get("tools_config") or params.get("tools_config") or {}
-        if not isinstance(tools_config, dict):
-            tools_config = {}
+        if not isinstance(conv_settings, dict):
+            raise ValueError("Conversation settings must be a JSON object")
+        raw_tools_config = conv_settings.get("tools_config", params.get("tools_config", {}))
+        tools_config = normalize_tools_config(raw_tools_config)
 
         raw_web_cfg = tools_config.get("web_search")
-        web_cfg = raw_web_cfg if isinstance(raw_web_cfg, dict) else {}
-        web_flag = web_cfg.get("enabled")
-        # bool("false") is True, so a JSON string must be read as its own text; anything else stays off.
-        if isinstance(web_flag, str):
-            web_flag = web_flag.strip().lower() == "true"
-        web_enabled = True if raw_web_cfg is None else bool(web_flag)
+        web_cfg = raw_web_cfg or {}
+        web_enabled = True if raw_web_cfg is None else web_cfg.get("enabled", False)
         if web_enabled:
             web_tool = {
                 "type": "web_search",
                 "search_context_size": web_cfg.get("context_size") or "medium",
             }
-            allowed = web_cfg.get("allowed_domains") or ""
-            blocked = web_cfg.get("blocked_domains") or ""
-            allowed_domains = [
-                x.strip() for x in allowed.replace("\\n", ",").split(",") if x.strip()
-            ]
-            blocked_domains = [
-                x.strip() for x in blocked.replace("\\n", ",").split(",") if x.strip()
-            ]
+            allowed_domains = list(web_cfg.get("allowed_domains", []))
+            blocked_domains = list(web_cfg.get("blocked_domains", []))
             # A project-wide exclusion is not removable through conversation settings.
             required_blocks = tuple(getattr(self, "mandatory_blocked_web_domains", ()))
             if required_blocks:
@@ -243,10 +242,7 @@ class YandexMcpMixin:
 
         file_cfg = tools_config.get("file_search") or {}
         if file_cfg.get("enabled"):
-            vector_ids = file_cfg.get("vector_store_ids") or ""
-            vector_store_ids = [
-                x.strip() for x in vector_ids.replace("\\n", ",").split(",") if x.strip()
-            ]
+            vector_store_ids = file_cfg.get("vector_store_ids", [])
             if vector_store_ids:
                 hosted_tools.append(
                     {
@@ -293,3 +289,4 @@ class YandexMcpMixin:
             ask_params["execution_trace"] = trace
 
         return self.ask(message, model_key, conversation_id, ask_params, execution_trace=trace)
+

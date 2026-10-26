@@ -472,9 +472,13 @@ function addMessage(
     retryBtn.type = "button";
     retryBtn.className = "logos-btn msg-retry-btn";
     retryBtn.textContent = "Повторить";
-    retryBtn.addEventListener("click", function () {
+    retryBtn.addEventListener("click", async function () {
       retryBtn.disabled = true;
-      options.onRetry();
+      try {
+        await options.onRetry();
+      } finally {
+        retryBtn.disabled = false;
+      }
     });
     msg.appendChild(retryBtn);
   }
@@ -692,7 +696,7 @@ function loadHistory(convId) {
           // A user message that carried photos shows their count, as it did when it was sent.
           const photos = msg.role === "user" && msg.attachments ? msg.attachments.images : 0;
           const node = addMessage(
-            photos ? msg.text + " · фото: " + photos : msg.text,
+            photos ? (msg.text ? msg.text + " · фото: " : "Фото: ") + photos : msg.text,
             msg.source === "error" ? "error" : msg.role,
             false,
             msg.cost || 0,
@@ -704,7 +708,11 @@ function loadHistory(convId) {
             {
               id: msg.id,
               onRetry: retryText === null ? undefined : function () {
-                window.logosRetryTurn({ text: retryText, conversationId: convId });
+                return window.logosRetryTurn({
+                  text: retryText,
+                  conversationId: convId,
+                  imageCount: previous.attachments ? previous.attachments.images || 0 : 0,
+                });
               },
             },
           );
@@ -776,8 +784,12 @@ document.addEventListener("DOMContentLoaded", function () {
   function syncSendButton() {
     if (!sendBtn) return;
     const running = Boolean(currentConvId && activeChatRequests.has(currentConvId));
+    const pending = currentConvId ? pendingConversations.has(currentConvId) : creatingConversation;
     sendBtn.textContent = running ? "■" : "➤";
     sendBtn.setAttribute("aria-label", running ? "Остановить ответ" : "Отправить");
+    sendBtn.disabled = !running && (
+      pending || imagesInFlight > 0 || !input || (!input.value.trim() && !pendingImages.length)
+    );
   }
 
   const attachBtn = document.getElementById("attach-btn");
@@ -791,6 +803,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
   function renderPendingImages() {
+    syncSendButton();
     if (!previewBox) return;
     previewBox.replaceChildren();
     previewBox.hidden = pendingImages.length === 0;
@@ -859,6 +872,7 @@ document.addEventListener("DOMContentLoaded", function () {
           continue;
         }
         imagesInFlight += 1;
+        syncSendButton();
         try {
           pendingImages.push({ name: file.name, dataUrl: await readAsDataUrl(file) });
           renderPendingImages();
@@ -866,6 +880,7 @@ document.addEventListener("DOMContentLoaded", function () {
           window.LogosToast.error("Не удалось прочитать фото «" + file.name + "»");
         } finally {
           imagesInFlight -= 1;
+          syncSendButton();
         }
       }
     });
@@ -941,7 +956,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (data.error) {
       addMessage("⚠️ Ошибка: " + data.error, "error", false, 0, null, null, null, null, null, {
         onRetry: function () {
-          resumeImageTurn(turn, operationId);
+          return resumeImageTurn(turn, operationId);
         },
       });
     } else {
@@ -960,7 +975,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   window.addEventListener("logos:conversation-selected", syncSendButton);
 
-  // retryRequest is { text, conversationId } when «Повторить» re-sends a failed message.
   // A lost connection does not lose a turn: the server keeps it and stores the answer. The number of
   // stored messages before the send tells a turn the server kept from one it never received.
   const TURN_RECOVERY_MS = 600000;
@@ -988,8 +1002,8 @@ document.addEventListener("DOMContentLoaded", function () {
   function releaseTurn(turn, needsConversation) {
     if (turn.conversationId) pendingConversations.delete(turn.conversationId);
     if (turn.conversationId) activeChatRequests.delete(turn.conversationId);
-    syncSendButton();
     if (needsConversation) creatingConversation = false;
+    syncSendButton();
   }
 
   async function recoverTurn(turn, onMissing) {
@@ -1026,12 +1040,25 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  // A live retry keeps its photos; a history retry only knows their count and asks for them again.
   async function sendTurn(retryRequest) {
     if (!input) return;
     const rawText = retryRequest ? "" : input.value;
     const text = retryRequest ? retryRequest.text : rawText.trim();
-    if (!text) return;
     if (retryRequest && currentConvId !== retryRequest.conversationId) return;
+    if (imagesInFlight > 0) return;
+    const sentImages = retryRequest
+      ? retryRequest.images || (retryRequest.imageCount ? pendingImages.slice() : [])
+      : pendingImages.slice();
+    if (sentImages.length > MAX_IMAGES) {
+      window.LogosToast.error("Можно отправить не больше " + MAX_IMAGES + " фото: уберите лишние из вложений");
+      return;
+    }
+    if (retryRequest && retryRequest.imageCount && sentImages.length !== retryRequest.imageCount) {
+      window.LogosToast.error("Для повтора прикрепите фото заново: " + retryRequest.imageCount);
+      return;
+    }
+    if (!text && !sentImages.length) return;
     const selectedAtSubmit = currentConvId;
     if (selectedAtSubmit ? pendingConversations.has(selectedAtSubmit) : creatingConversation) {
       window.LogosToast.show("Ответ ещё формируется, дождитесь его окончания.");
@@ -1046,7 +1073,6 @@ document.addEventListener("DOMContentLoaded", function () {
     // True while a lost connection is being recovered: the turn stays pending until its answer is found.
     let recovering = false;
     // Photos belong to this message only; they return to the tray if the send fails.
-    const sentImages = retryRequest ? retryRequest.images || [] : pendingImages.slice();
     // Sent photos leave the tray. A retry finds them there again after a failed send, so they are removed here too.
     pendingImages = pendingImages.filter(function (image) {
       return !sentImages.includes(image);
@@ -1057,8 +1083,13 @@ document.addEventListener("DOMContentLoaded", function () {
       if (imagesRestored || !sentImages.length) return;
       imagesRestored = true;
       // Photos added while this send was pending stay in the tray, after the restored ones.
-      pendingImages = sentImages.concat(pendingImages).slice(0, MAX_IMAGES);
+      pendingImages = sentImages.concat(pendingImages.filter(function (image) {
+        return !sentImages.includes(image);
+      }));
       renderPendingImages();
+      if (pendingImages.length > MAX_IMAGES) {
+        window.LogosToast.error("Все фото сохранены. Перед отправкой оставьте не больше " + MAX_IMAGES);
+      }
     }
     try {
       // Keep the submitted settings and text even if the user edits the next draft while waiting.
@@ -1066,7 +1097,10 @@ document.addEventListener("DOMContentLoaded", function () {
       turn.params = JSON.parse(JSON.stringify(params || {}));
       if (needsConversation) {
         const createdId = await createConversation(turn.model, { select: false });
-        if (!createdId) return;
+        if (!createdId) {
+          if (currentConvId === turn.conversationId) restoreImages();
+          return;
+        }
         turn.conversationId = createdId;
         pendingConversations.add(createdId);
         // Selecting another chat while creation is pending must not pull the user back.
@@ -1078,7 +1112,9 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!retryRequest) {
           if (input.value === rawText) input.value = "";
           addMessage(
-            sentImages.length ? turn.text + " · фото: " + sentImages.length : turn.text,
+            sentImages.length
+              ? (turn.text ? turn.text + " · фото: " : "Фото: ") + sentImages.length
+              : turn.text,
             "user",
             false,
             0,
@@ -1144,8 +1180,8 @@ document.addEventListener("DOMContentLoaded", function () {
         addMessage(data.reply || "⚠️ Ошибка: " + errorReasonText(data), "error", false, data.cost || 0, data.timings,
           clientTotalMs, data.reasoning, data.usage, data.trace, {
             onRetry: function () {
-              if (data.operationId) resumeImageTurn(turn, data.operationId);
-              else sendTurn({ text: turn.text, conversationId: turn.conversationId, images: sentImages });
+              if (data.operationId) return resumeImageTurn(turn, data.operationId);
+              return sendTurn({ text: turn.text, conversationId: turn.conversationId, images: sentImages });
             },
           });
       } else if (data.reply) {
@@ -1190,6 +1226,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   if (sendBtn) sendBtn.addEventListener("click", sendMessage);
+  if (input) input.addEventListener("input", syncSendButton);
   if (input)
     input.addEventListener("keydown", function (e) {
       // Enter that confirms an IME word is not a send.
@@ -1203,3 +1240,4 @@ document.addEventListener("DOMContentLoaded", function () {
   syncSendButton();
   if (currentConvId) loadHistory(currentConvId);
 });
+

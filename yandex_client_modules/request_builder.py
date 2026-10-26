@@ -4,6 +4,8 @@ This module contains pure request-shaping logic extracted from yandex_client_mod
 It deliberately has no HTTP, database, tracing, or MCP side effects.
 """
 
+import math
+
 from core.config import get_model_uri, upstream_model_id
 from yandex_client_modules.errors import YandexClientError
 from core.model_profiles import ultra_profiles, ultra_reasoning_controllable, ultra_request_defaults
@@ -11,29 +13,142 @@ from yandex_client_modules.metadata_validator import validate_metadata
 
 
 TEMPERATURE_MIN = 0.0
-TEMPERATURE_MAX = 1.0
-LEGACY_OUTPUT_CAP_TOKENS = 2000
+TEMPERATURE_MAX = 2.0
+_REASONING_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh"}
 
 
 def validate_generation_params(params):
-    """Validate provider generation parameters before building an outbound request."""
-    params = params or {}
-    if params.get("temperature") is None:
-        return params
-    try:
-        temperature = float(params["temperature"])
-    except (TypeError, ValueError) as exc:
-        raise ValueError("temperature must be a number between 0 and 1") from exc
-    if not TEMPERATURE_MIN <= temperature <= TEMPERATURE_MAX:
-        raise ValueError(f"temperature must be between {TEMPERATURE_MIN:g} and {TEMPERATURE_MAX:g}")
-    params["temperature"] = temperature
-    return params
+    """Validate without coercing strings/bools or mutating the caller's settings.
+
+    Numeric ranges follow the Responses request schema, not a model-specific
+    capability claim. Zero output tokens is the application's explicit no-cap
+    sentinel; it is omitted from the provider request.
+    """
+    if params is None:
+        params = {}
+    if not isinstance(params, dict):
+        raise ValueError("params must be an object")
+    validated = dict(params)
+    for name, minimum, maximum in (
+        ("temperature", TEMPERATURE_MIN, TEMPERATURE_MAX),
+        ("top_p", 0.0, 1.0),
+    ):
+        value = validated.get(name)
+        if value is None:
+            continue
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not minimum <= value <= maximum
+            or not math.isfinite(value)
+        ):
+            raise ValueError(f"{name} must be a finite number between {minimum:g} and {maximum:g}")
+        validated[name] = float(value)
+    for name in ("background", "store", "stream", "parallel_tool_calls"):
+        if name in validated and not isinstance(validated[name], bool):
+            raise ValueError(f"{name} must be a boolean")
+    if validated.get("stream") is True:
+        raise ValueError("stream=true is not supported by the polling transport")
+    if validated.get("background", True) and validated.get("store") is False:
+        raise ValueError("background=true requires store=true")
+    limit = validated.get("max_output_tokens")
+    if limit is not None and (
+        isinstance(limit, bool)
+        or not isinstance(limit, int)
+        or (limit != 0 and limit < 16)
+    ):
+        raise ValueError("max_output_tokens must be 0 (no application cap) or an integer of at least 16")
+    tool_limit = validated.get("max_tool_calls")
+    if tool_limit is not None and (
+        isinstance(tool_limit, bool) or not isinstance(tool_limit, int) or tool_limit < 0
+    ):
+        raise ValueError("max_tool_calls must be null (provider default) or a non-negative integer")
+    if "top_logprobs" in validated:
+        value = validated["top_logprobs"]
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 20:
+            raise ValueError("top_logprobs must be an integer between 0 and 20")
+    if "previous_response_id" in validated:
+        value = validated["previous_response_id"]
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("previous_response_id must be a non-empty string")
+    for name in ("instructions", "prompt_cache_key"):
+        if name in validated and not isinstance(validated[name], str):
+            raise ValueError(f"{name} must be a string")
+    if "reasoning_effort" in validated:
+        effort = validated["reasoning_effort"]
+        if not isinstance(effort, str) or effort not in _REASONING_EFFORTS | {"disabled"}:
+            raise ValueError("reasoning_effort must be disabled, none, minimal, low, medium, high or xhigh")
+    if "reasoning" in validated:
+        reasoning = validated["reasoning"]
+        if not isinstance(reasoning, dict):
+            raise ValueError("reasoning must be an object")
+        if "effort" in reasoning:
+            effort = reasoning["effort"]
+            if not isinstance(effort, str) or effort not in _REASONING_EFFORTS:
+                raise ValueError("reasoning.effort must be none, minimal, low, medium, high or xhigh")
+    for name, allowed in (
+        ("truncation", {"auto", "disabled"}),
+        ("service_tier", {"auto", "default", "flex", "scale", "priority"}),
+    ):
+        if name in validated:
+            value = validated[name]
+            if not isinstance(value, str) or value not in allowed:
+                raise ValueError(f"{name} must be one of {', '.join(sorted(allowed))}")
+    if "text" in validated:
+        text = validated["text"]
+        if not isinstance(text, dict):
+            raise ValueError("text must be an object")
+        if "verbosity" in text:
+            verbosity = text["verbosity"]
+            if not isinstance(verbosity, str) or verbosity not in {"low", "medium", "high"}:
+                raise ValueError("text.verbosity must be low, medium or high")
+        if "format" in text:
+            text_format = text["format"]
+            if not isinstance(text_format, dict):
+                raise ValueError("text.format must be an object")
+            format_type = text_format.get("type")
+            if not isinstance(format_type, str) or format_type not in {"text", "json_schema", "json_object"}:
+                raise ValueError("text.format.type must be text, json_schema or json_object")
+            if format_type == "json_schema":
+                if not isinstance(text_format.get("schema"), dict):
+                    raise ValueError("text.format.schema must be an object")
+                name = text_format.get("name")
+                if not isinstance(name, str) or not name.strip():
+                    raise ValueError("text.format.name must be a non-empty string")
+                if "strict" in text_format and not isinstance(text_format["strict"], bool):
+                    raise ValueError("text.format.strict must be a boolean")
+                if "description" in text_format and not isinstance(text_format["description"], str):
+                    raise ValueError("text.format.description must be a string")
+    if "tool_choice" in validated:
+        choice = validated["tool_choice"]
+        if isinstance(choice, str):
+            if choice not in {"auto", "none", "required"}:
+                raise ValueError("tool_choice must be auto, none, required or a typed object")
+        elif isinstance(choice, dict):
+            choice_type = choice.get("type")
+            if not isinstance(choice_type, str) or not choice_type.strip():
+                raise ValueError("tool_choice.type must be a non-empty string")
+            if choice_type == "function" and (
+                not isinstance(choice.get("name"), str) or not choice["name"].strip()
+            ):
+                raise ValueError("tool_choice.name must be a non-empty string for a function")
+        else:
+            raise ValueError("tool_choice must be auto, none, required or a typed object")
+    return validated
 
 
 def _response_input(params, message):
-    """Text-only input. Photos never reach this path: request_mixin sends them through Chat Completions."""
-    if params.get("input"):
+    """Keep tool continuations intact; attach photos only to the initial user turn."""
+    if "input" in params:
         return params["input"]
+    images = params.get("input_images") or []
+    if images:
+        content = [{"type": "input_text", "text": message}] if message else []
+        content.extend(
+            {"type": "input_image", "image_url": image, "detail": "auto"}
+            for image in images
+        )
+        return [{"role": "user", "content": content}]
     return [{"role": "user", "content": message}]
 
 
@@ -47,12 +162,14 @@ _RESPONSES_PARAMETERS = (
     "stream",
     "temperature",
     "top_p",
+    "top_logprobs",
     "max_output_tokens",
     "truncation",
     "reasoning",
     "service_tier",
     "text",
     "prompt_cache_key",
+    "prompt",
     "previous_response_id",
     "conversation",
     "tools",
@@ -97,6 +214,8 @@ def explicit_parameters(model_key, payload):
             reason = reasoning.get("basis") if reasoning.get("depth_control") is False else "reasoning_effort_disabled"
         elif name == "tools":
             reason = "photo_request_has_no_tool_loop" if "messages" in payload else "no_tools_in_request"
+        elif name == "max_tool_calls" and payload.get("tools"):
+            reason = "provider_default"
         elif name in _TOOL_PARAMETERS:
             reason = "no_tools_in_request"
         elif name == "conversation":
@@ -110,7 +229,7 @@ def explicit_parameters(model_key, payload):
 
 
 def ultra_applied_event(model_key, params, payload):
-    """Describe the Ultra values that reached the provider, so a trace can confirm the chosen profile."""
+    """Describe assembled parameters; this event does not prove provider acceptance."""
     profile = ultra_profiles().get(model_key) or {}
     return {
         "model": model_key,
@@ -211,17 +330,12 @@ def build_response_payload(
 ):
     """Build a Yandex Responses API payload from client parameters."""
     # A copy, so applying the model profile never mutates saved caller settings.
-    params = dict(params or {})
+    params = validate_generation_params(params)
     defaults = ultra_request_defaults(model_key)
     if defaults:
-        # Older browsers still send medium reasoning, auto truncation and output
-        # caps. The model's Ultra policy owns these fields, except an output cap
-        # the user set explicitly (0 means no cap). The old 2000 default is not
-        # a user choice; the browser drops it too, so the sent value matches the
-        # value shown in settings.
-        user_cap = int(params.get("max_output_tokens") or 0)
-        if user_cap == LEGACY_OUTPUT_CAP_TOKENS:
-            user_cap = 0
+        # The Ultra policy owns profile defaults, but an explicit positive cap
+        # is preserved. Its value alone cannot identify an old saved default.
+        user_cap = params.get("max_output_tokens") or 0
         params.update(defaults)
         if user_cap > 0:
             params["max_output_tokens"] = user_cap
@@ -232,7 +346,6 @@ def build_response_payload(
         params["store"] = True
 
     payload = {
-        # A channel named by the upstream id (yandexgpt/rc, yandexgpt/latest) is not repeated with /latest.
         "model": get_model_uri(project_id, model_key),
         "input": _response_input(params, message),
         "background": is_background,
@@ -251,6 +364,8 @@ def build_response_payload(
         payload["temperature"] = float(params["temperature"])
     if params.get("top_p") is not None:
         payload["top_p"] = float(params["top_p"])
+    if "top_logprobs" in params:
+        payload["top_logprobs"] = params["top_logprobs"]
     if params.get("max_output_tokens"):
         payload["max_output_tokens"] = int(params["max_output_tokens"])
     if params.get("prompt"):
@@ -280,22 +395,25 @@ def build_response_payload(
         cleaned_tools = _clean_tools(raw_tools)
         if cleaned_tools:
             payload["tools"] = cleaned_tools
-            # Every tool parameter is named in the request. The documented default for max_tool_calls is
-            # null, which means no limit, so an unset value is sent as null rather than as a cap.
             payload["tool_choice"] = params.get("tool_choice") or "auto"
             max_tool_calls = params.get("max_tool_calls")
-            payload["max_tool_calls"] = int(max_tool_calls) if max_tool_calls else None
+            # The input schema documents an integer. Omit an unset limit rather
+            # than relying on nullable response fields to prove POST support.
+            if max_tool_calls is not None:
+                payload["max_tool_calls"] = max_tool_calls
 
             ptc = params.get("parallel_tool_calls")
             if ptc is not None:
-                if isinstance(ptc, str):
-                    ptc = ptc.lower() not in ("false", "0")
-                payload["parallel_tool_calls"] = bool(ptc)
+                payload["parallel_tool_calls"] = ptc
             else:
                 payload["parallel_tool_calls"] = True
 
+    previous_response_id = params.get("previous_response_id")
+    if previous_response_id and yandex_conv_id:
+        raise ValueError("previous_response_id cannot be combined with a provider conversation")
+    if previous_response_id:
+        payload["previous_response_id"] = previous_response_id
     if yandex_conv_id:
-        # The Responses reference and the examples pass the conversation id as a string.
         payload["conversation"] = yandex_conv_id
 
     return payload
@@ -338,3 +456,4 @@ def _clean_tools(tools):
         else:
             cleaned.append(tool)
     return cleaned
+
