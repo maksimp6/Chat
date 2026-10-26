@@ -135,19 +135,23 @@ class YandexMcpMixin:
         trace: Any = None,
         *,
         execution_policy: ReadOnlyToolPolicy | None = None,
+        settings_conversation_id: Any = None,
     ) -> Any:
         params = params or {}
         import time as _t
 
         mcp_tools = []
+        # The chat's own id keys its settings and enabled servers. The provider conversation is
+        # only the thread id, and it differs from the chat's id for every new chat.
+        settings_id = settings_conversation_id or conversation_id
         # Shared conversations use the installation's MCP configuration, including
         # conversations created before ownership metadata existed.
         owner_id = get_current_owner_id()
         enabled_servers = []
-        if conversation_id:
+        if settings_id:
             try:
                 enabled_servers = mcp_storage.get_enabled_servers_for_conv(
-                    conversation_id, owner_id=owner_id
+                    settings_id, owner_id=owner_id
                 )
             except Exception:
                 enabled_servers = []
@@ -166,9 +170,9 @@ class YandexMcpMixin:
                 )
 
         active_cats = None
-        if conversation_id:
+        if settings_id:
             try:
-                preferences = get_conv_settings(conversation_id) or {}
+                preferences = get_conv_settings(settings_id) or {}
                 active_cats = preferences.get("active_tool_categories")
             except Exception:
                 active_cats = None
@@ -184,7 +188,7 @@ class YandexMcpMixin:
 
         hosted_tools = []
         try:
-            conv_settings = get_conv_settings(conversation_id) or {} if conversation_id else {}
+            conv_settings = get_conv_settings(settings_id) or {} if settings_id else {}
         except Exception:
             conv_settings = {}
         tools_config = (conv_settings or {}).get("tools_config") or params.get("tools_config") or {}

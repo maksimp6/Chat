@@ -236,6 +236,7 @@ class LogosClient(YandexResponsesClient):
         trace=None,
         *,
         execution_policy=None,
+        settings_conversation_id=None,
     ):
         policy_kwargs = (
             {"execution_policy": execution_policy} if execution_policy is not None else {}
@@ -245,6 +246,7 @@ class LogosClient(YandexResponsesClient):
             message=message,
             model_key=model_key,
             conversation_id=conversation_id,
+            settings_conversation_id=settings_conversation_id,
             params=params,
             trace=trace,
             **policy_kwargs,
@@ -270,6 +272,7 @@ class LogosClient(YandexResponsesClient):
                     message="",
                     model_key=model_key,
                     conversation_id=conversation_id,
+                    settings_conversation_id=settings_conversation_id,
                     params=continuation_params,
                     trace=trace,
                     **policy_kwargs,
@@ -450,6 +453,7 @@ def chat():
             message=message,
             model_key=model_key,
             conversation_id=provider_conversation_id,
+            settings_conversation_id=invocation.conversation_id,
             params=params,
             trace=trace,
         )
