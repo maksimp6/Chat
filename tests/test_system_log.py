@@ -36,6 +36,25 @@ def test_levels_are_preserved(configured):
     assert levels == {"started": "INFO", "failed": "ERROR"}
 
 
+def test_credentials_are_redacted_from_message_and_traceback(configured):
+    log = system_log.get_logger("test")
+    log.warning("Authorization: Bearer SYNTHETIC_VALUE")
+    try:
+        raise ValueError("token Bearer SYNTHETIC_VALUE rejected")
+    except ValueError:
+        log.exception("request failed")
+    assert "SYNTHETIC_VALUE" not in configured.read_text(encoding="utf-8")
+
+
+def test_exception_text_and_traceback_are_redacted_in_trace():
+    trace = ExecutionTrace()
+    try:
+        raise ValueError("auth failed: Bearer SYNTHETIC_VALUE")
+    except ValueError as exc:
+        trace.record_error("test", "failed", exception=exc)
+    assert "SYNTHETIC_VALUE" not in json.dumps(trace.trace, ensure_ascii=False)
+
+
 def test_records_carry_trace_ids_and_warnings_mirror_into_trace(configured):
     trace = ExecutionTrace()
     token = bind_current_trace(trace)

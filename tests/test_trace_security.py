@@ -1,6 +1,6 @@
 import unittest
 
-from observability.trace_security import safe_repr, sanitize_trace_value
+from observability.trace_security import MAX_REPR, redact_text, safe_repr, sanitize_trace_value
 
 
 class TraceSecurityTests(unittest.TestCase):
@@ -75,6 +75,21 @@ class TraceSecurityTests(unittest.TestCase):
             value,
             "deploy --api-key=<redacted> --token <redacted>; authorization: <redacted>",
         )
+
+    def test_safe_repr_redacts_bearer_in_bytes_and_object_repr(self):
+        class Holder:
+            def __repr__(self):
+                return "Holder(header='Authorization: Bearer SYNTHETIC_VALUE')"
+
+        self.assertNotIn("SYNTHETIC_VALUE", safe_repr(b"Bearer SYNTHETIC_VALUE"))
+        self.assertNotIn("SYNTHETIC_VALUE", safe_repr(Holder()))
+
+    def test_redact_text_keeps_full_length_for_long_tracebacks(self):
+        tail = "ValueError: final line"
+        text = "x" * (MAX_REPR + 10) + " Bearer SYNTHETIC_VALUE\n" + tail
+        result = redact_text(text)
+        self.assertNotIn("SYNTHETIC_VALUE", result)
+        self.assertTrue(result.endswith(tail))
 
 
 if __name__ == "__main__":

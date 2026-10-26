@@ -96,6 +96,11 @@ def _sanitize_string(value: str) -> str:
     return _redact_private_key_blocks(value)
 
 
+def redact_text(value: str) -> str:
+    """Remove inline credentials from free text without truncating it."""
+    return _sanitize_string(value)
+
+
 def safe_repr(value: Any, depth: int = 0) -> Any:
     if depth > MAX_DEPTH:
         return "<max-depth>"
@@ -127,6 +132,7 @@ def safe_repr(value: Any, depth: int = 0) -> Any:
         text = repr(value)
     except Exception:
         text = f"<{type(value).__name__}: repr failed>"
+    text = _sanitize_string(text)
     if len(text) > MAX_REPR:
         text = text[:MAX_REPR] + "... <truncated>"
     return text
