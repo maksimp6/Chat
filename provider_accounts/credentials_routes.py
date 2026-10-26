@@ -98,13 +98,14 @@ def _provider_client(provider: str, project_id: str | None = None):
     raise ValueError(f"Unsupported provider: {provider}")
 
 
-def _load_credential(provider: str) -> ProviderCredential | None:
+def _load_credential(provider: str, *, allow_expired: bool = False) -> ProviderCredential | None:
     conn = get_store()
     try:
         return get_active_credential(
             conn,
             decrypt_secret,
             provider=provider,
+            allow_expired=allow_expired,
         )
     except NoActiveCredentialError:
         return None
@@ -198,7 +199,8 @@ def _perform_health_check(provider: str) -> dict:
         else:
             _provider_client(provider).validate_key(credential.api_key)
         error = None
-        status = "connected"
+        # Yandex validation checks local presence only: it proves configuration, not authorization.
+        status = "configured" if provider == YANDEX else "connected"
     except PermissionError as exc:
         # The exception text is not logged: it can echo request details, and the key must never reach a log.
         logger.error(
@@ -585,17 +587,23 @@ def update_provider_credentials():
         conn = get_store()
         # The Yandex key being replaced is revoked only after the new one is stored, so the provider
         # never holds an active key that nothing in Logos uses.
+        # Re-saving the active Yandex key keeps its provider identity: revoking it would kill the key just stored.
+        supplied_keys = dict(supplied)
         previous_yandex = (
-            _load_credential(YANDEX) if any(p == YANDEX for p, _ in supplied) else None
+            _load_credential(YANDEX, allow_expired=True) if YANDEX in supplied_keys else None
+        )
+        same_yandex_key = (
+            previous_yandex is not None and previous_yandex.api_key == supplied_keys[YANDEX]
         )
         for provider, api_key in supplied:
+            keep_identity = provider == YANDEX and same_yandex_key
             replace_active_credential(
                 conn,
                 api_key,
                 str(yandex_project_id) if provider == YANDEX else "",
                 encrypt_secret,
                 provider,
-                provider_key_id=None,
+                provider_key_id=previous_yandex.provider_key_id if keep_identity else None,
                 ttl=timedelta(hours=12),
             )
             # Only a real provider request proves authorization. Yandex validation
@@ -607,7 +615,7 @@ def update_provider_credentials():
                 error=None,
             )
             stored_providers.append(provider)
-        if previous_yandex is not None:
+        if previous_yandex is not None and not same_yandex_key:
             _revoke_replaced_yandex_key(previous_yandex)
     except Exception as exc:
         logger.error(

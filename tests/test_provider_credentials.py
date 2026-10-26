@@ -263,3 +263,61 @@ def test_provider_credentials_update_logs_storage_error_and_returns_detail(monke
     assert body["error"] == "credential_storage_failed"
     assert "не смог сохранить" in body["detail"]
     assert "sqlite exploded" in caplog.text
+
+
+def test_expired_key_is_readable_for_replacement_only_when_allowed():
+    import storage.db as db
+    from provider_accounts.credentials import get_active_credential, replace_active_credential
+
+    store = db.get_store()
+    past = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    decrypt = lambda value: value.removeprefix("cipher:")
+    replace_active_credential(
+        store,
+        "expired-secret",
+        "project",
+        lambda value: "cipher:" + value,
+        "yandex",
+        provider_key_id="expired-key",
+        now=past,
+        ttl=timedelta(hours=1),
+    )
+    later = past + timedelta(hours=2)
+    with pytest.raises(ExpiredCredentialError):
+        get_active_credential(store, decrypt, now=later, provider="yandex")
+    credential = get_active_credential(store, decrypt, now=later, provider="yandex", allow_expired=True)
+    assert credential.provider_key_id == "expired-key"
+
+
+def test_replacement_refuses_a_key_that_changed_after_the_read():
+    import storage.db as db
+    from provider_accounts.credentials import (
+        CredentialError,
+        get_active_credential,
+        replace_active_credential,
+    )
+
+    store = db.get_store()
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    encrypt = lambda value: "cipher:" + value
+    first = replace_active_credential(
+        store, "first-secret", "project", encrypt, "yandex", provider_key_id="first-key", now=now
+    )
+    replace_active_credential(
+        store, "second-secret", "project", encrypt, "yandex", provider_key_id="second-key", now=now
+    )
+    with pytest.raises(CredentialError):
+        replace_active_credential(
+            store,
+            "third-secret",
+            "project",
+            encrypt,
+            "yandex",
+            provider_key_id="third-key",
+            now=now,
+            expected_active_id=first.id,
+        )
+    credential = get_active_credential(
+        store, lambda value: value.removeprefix("cipher:"), now=now, provider="yandex"
+    )
+    assert credential.api_key == "second-secret"

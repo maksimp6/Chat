@@ -115,8 +115,8 @@ def test_update_validates_before_persisting_and_clears_frontend_contract(monkeyp
     payload = response.get_json()
     assert "good-yandex-secret" not in str(payload)
     statuses = {item["provider"]: item for item in payload["providers"]}
-    assert statuses["yandex"]["status"] == "connected"
-    assert statuses["yandex"]["authorization_ok"] is True
+    assert statuses["yandex"]["status"] == "configured"
+    assert statuses["yandex"]["authorization_ok"] is False
 
 
 def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_path):
@@ -684,3 +684,79 @@ def test_provider_validation_failure_is_sanitized(monkeypatch):
     assert payload["error"] == "provider_health_check_failed"
     assert payload["provider"] == "cloudru"
     assert internal_marker not in str(payload)
+
+
+def _yandex_app(monkeypatch, tmp_path, key):
+    monkeypatch.chdir(tmp_path)
+    import storage.db as db
+    from flask import Flask
+
+    db.DB_PATH = str(tmp_path / "yandex-keys.db")
+    db.init_db()
+    monkeypatch.setenv("LOGOS_PROVIDER_CREDENTIAL_KEY", base64.urlsafe_b64encode(key).decode("ascii"))
+    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeProvider())
+    monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
+    monkeypatch.setattr(routes.config, "CLOUDRU_API_KEY", "", raising=False)
+    revoked = []
+    monkeypatch.setattr(
+        routes, "_revoke_replaced_yandex_key", lambda previous: revoked.append(previous.provider_key_id)
+    )
+    app = Flask(__name__)
+    app.register_blueprint(routes.provider_credentials_bp)
+    return app, revoked
+
+
+def test_resaving_active_yandex_key_keeps_its_identity_and_is_not_revoked(monkeypatch, tmp_path):
+    app, revoked = _yandex_app(monkeypatch, tmp_path, b"3" * 32)
+    import storage.db as db
+    from provider_accounts.credentials import list_provider_credentials, replace_active_credential
+
+    replace_active_credential(
+        db.get_store(),
+        "same-yandex-secret",
+        "project-test",
+        routes.encrypt_secret,
+        "yandex",
+        provider_key_id="aje-key-1",
+    )
+    with app.test_client() as client:
+        response = client.put(
+            "/api/provider-credentials",
+            json={"yandex_api_key": "same-yandex-secret", "yandex_project_id": "project-test"},
+        )
+
+    assert response.status_code == 200
+    assert revoked == []
+    active = [
+        row
+        for row in list_provider_credentials(db.get_store(), provider="yandex")
+        if row["status"] == "active"
+    ]
+    assert active[0]["provider_key_id"] == "aje-key-1"
+
+
+def test_expired_active_yandex_key_can_be_replaced(monkeypatch, tmp_path):
+    app, revoked = _yandex_app(monkeypatch, tmp_path, b"4" * 32)
+    from datetime import timedelta
+
+    import storage.db as db
+    from provider_accounts.credentials import replace_active_credential
+
+    replace_active_credential(
+        db.get_store(),
+        "expired-yandex-secret",
+        "project-test",
+        routes.encrypt_secret,
+        "yandex",
+        provider_key_id="aje-expired",
+        now=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        ttl=timedelta(hours=1),
+    )
+    with app.test_client() as client:
+        response = client.put(
+            "/api/provider-credentials",
+            json={"yandex_api_key": "fresh-yandex-secret", "yandex_project_id": "project-test"},
+        )
+
+    assert response.status_code == 200
+    assert revoked == ["aje-expired"]
