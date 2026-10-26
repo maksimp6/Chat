@@ -57,6 +57,9 @@ skill_registry = SkillRegistry()
 
 
 _MAX_TOOL_ROUNDS = 32
+# The browser waits up to 300 s for a chat reply. The server stops waiting first, so a slow
+# reply ends with the server's own error rather than the browser giving up silently.
+CHAT_POLL_TIMEOUT_SECONDS = 240
 
 
 def _tool_rounds(value: Any) -> int:
@@ -377,6 +380,8 @@ def chat():
         role = data.get("role") or params.pop("role", None)
         requested_skills = _normalize_requested_skills(data, params)
         model_key = data.get("model") or params.get("model", "yandexgpt-5-pro")
+        # Keys the chat route does not accept are dropped, and the trace names them (never their values).
+        dropped_params = sorted(key for key in params if key not in _CLIENT_PARAM_KEYS and key != "model")
         params = _client_params(params)
 
         if not conv_id or not message:
@@ -474,6 +479,14 @@ def chat():
         client = LogosClient(Config)
         provider_conversation_id = _provider_conversation_id(client, invocation.conversation_id, trace)
 
+        params.setdefault("poll_timeout", CHAT_POLL_TIMEOUT_SECONDS)
+        if isinstance(trace, ExecutionTrace):
+            if dropped_params:
+                trace.add_event("params_dropped", {"names": dropped_params})
+            trace.add_event(
+                "turn_limits",
+                {"poll_timeout": params["poll_timeout"], "max_rounds": _tool_rounds(params.get("max_rounds"))},
+            )
         response = client.ask_with_mcp(
             message=message,
             model_key=model_key,
