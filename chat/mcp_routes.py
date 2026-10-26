@@ -430,7 +430,13 @@ def chat():
             params["active_tool_categories"] = active_tools
 
         if not retry:
-            add_message(invocation.conversation_id, "user", message)
+            # The photo count is kept with the message, so a reloaded chat still shows which turn had photos.
+            add_message(
+                invocation.conversation_id,
+                "user",
+                message,
+                attachments={"images": len(images)} if images else None,
+            )
         if images:
             params["chat_history"] = _image_turn_history(invocation.conversation_id)
         conversation_title = maybe_update_conversation_title(
@@ -510,6 +516,15 @@ def chat():
         trace_data.setdefault("billing", {})["settlement"] = settlement
         billing = trace_data.get("billing") or {}
         cost = _turn_cost(billing)
+        if billing.get("items"):
+            # The reply shows the tokens of the whole turn, every model call, the same total its cost is billed on.
+            usage = {
+                **(usage if isinstance(usage, dict) else {}),
+                "input_tokens": billing.get("input_tokens", 0),
+                "output_tokens": billing.get("output_tokens", 0),
+                "cached_tokens": billing.get("cached_input_tokens", 0),
+                "total_tokens": billing.get("total_tokens", 0),
+            }
 
         persist_invocation_trace(invocation.invocation_id, trace_data)
         add_message(

@@ -2272,3 +2272,45 @@ body {
   border-radius: 22px;
   background: var(--bg-input);
 }
+
+/* Settings dialog: one height for every tab, so switching tabs does not move the dialog.
+   The status line and the buttons stay at the bottom (margin-top:auto in settings_modal.js). */
+.logos-pro-app .settings-modal-panel {
+  height: calc(100% - 24px);
+}
+/* Dialog footer buttons get the same 44px touch target as the other buttons. */
+.logos-pro-app .settings-modal-footer .logos-btn {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 8px;
+}
+/* The three dialog close buttons look the same: a 44px square with the glyph and no outline. */
+.logos-pro-app #close-modal,
+.logos-pro-app #set-close-btn,
+.logos-pro-app button.logos-system-status-close {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--btn-bg);
+  color: var(--text-main);
+  font-size: 24px;
+  line-height: 1;
+}
+/* «Открыть трассу» is a text action with a full touch target. */
+.logos-pro-app .logos-trace-open-viewer {
+  min-height: 44px;
+  padding: 0 8px;
+}
+/* Rename and the trace action are identified by their glyph or label, like copy and delete. */
+[data-theme="high-contrast"] .logos-btn.rename-btn,
+[data-theme="high-contrast"] .logos-btn.logos-trace-open-viewer {
+  border-color: transparent;
+}
+/* A failed stage is marked in colour as well as by its glyph. */
+.logos-pro-app .execution-surface-stages li[data-status="error"] {
+  color: var(--danger);
+}

@@ -415,6 +415,13 @@ function buildDetails(content, usage, totalDurationMs, cost) {
   if (usage && usage.total_tokens) parts.push(`${usage.total_tokens} токенов`);
   if (cost && cost > 0) parts.push(`≈ ${cost.toFixed(2)} ₽`);
   if (totalDurationMs) parts.push(`${(totalDurationMs / 1000).toFixed(1)} с`);
+  // The cost is shown once, in this line; with nothing else to unfold it is a plain line.
+  if (!content.children.length) {
+    const line = document.createElement("div");
+    line.className = "msg-details";
+    line.textContent = parts.length ? "Детали · " + parts.join(" · ") : "Детали";
+    return line;
+  }
   const details = document.createElement("details");
   details.className = "msg-details";
   const summary = document.createElement("summary");
@@ -523,13 +530,6 @@ function addMessage(
     usageBadge.appendChild(usageSummary);
     usageBadge.appendChild(usageDetails);
     metaWrap.appendChild(usageBadge);
-  }
-
-  if (cost && cost > 0) {
-    const billing = document.createElement("div");
-    billing.className = "billing-bubble";
-    billing.textContent = `≈ ${cost.toFixed(2)} ₽`;
-    metaWrap.appendChild(billing);
   }
 
   if (timings && timings.length > 0) {
@@ -665,7 +665,7 @@ function addMessage(
     }
   }
 
-  if (metaWrap.children.length > 0) msg.appendChild(buildDetails(metaWrap, usage, totalDurationMs, cost));
+  if (metaWrap.children.length > 0 || (cost && cost > 0)) msg.appendChild(buildDetails(metaWrap, usage, totalDurationMs, cost));
   chatbox.appendChild(msg);
   chatbox.scrollTop = chatbox.scrollHeight;
   return msg;
@@ -689,8 +689,10 @@ function loadHistory(convId) {
           // A stored error answers the user message right before it; «Повторить» re-sends that message.
           const previous = index > 0 ? all[index - 1] : null;
           const retryText = msg.source === "error" && previous && previous.role === "user" ? previous.text : null;
+          // A user message that carried photos shows their count, as it did when it was sent.
+          const photos = msg.role === "user" && msg.attachments ? msg.attachments.images : 0;
           const node = addMessage(
-            msg.text,
+            photos ? msg.text + " · фото: " + photos : msg.text,
             msg.source === "error" ? "error" : msg.role,
             false,
             msg.cost || 0,
