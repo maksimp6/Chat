@@ -192,6 +192,9 @@ def write_file(args: dict) -> dict:
             except Exception as be:
                 logger.warning(f"[FS] Не удалось создать бэкап {path}: {be}")
 
+        if os.path.isfile(abs_path):
+            # The temporary file starts owner-only; keep the permissions of the file it replaces.
+            os.chmod(tmp_path, os.stat(abs_path).st_mode & 0o7777)
         try:
             os.replace(tmp_path, abs_path)
         except OSError as err:
@@ -363,6 +366,9 @@ def zip_compress(args: dict) -> dict:
     try:
         abs_src = _get_abs_path(source_path)
         abs_out = _get_abs_path(out_archive)
+        if abs_src == abs_out:
+            # Opening the archive for writing would empty the source before it is read.
+            return {"error": "Архив не может совпадать с исходным путём"}
         if not os.path.exists(abs_src):
             return {"error": f"Исходный путь '{source_path}' не существует"}
 
@@ -544,15 +550,19 @@ def delete_path(args: dict) -> dict:
         return {"error": "Параметр 'path' обязателен"}
 
     try:
-        abs_path = _get_abs_path(path)
+        # The final component is not resolved, so a symlink is removed itself, not its target.
+        name = os.path.basename(path.rstrip("/"))
+        if name in ("", ".", ".."):
+            return {"error": "Некорректный путь для удаления"}
+        abs_path = os.path.join(_get_abs_path(os.path.dirname(path) or "."), name)
         if abs_path == BASE_DIR:
             return {"error": "Запрещено удалять корневую директорию проекта"}
         if ".git" in abs_path.split(os.sep):
             return {"error": "Запрещено удалять файлы репозитория Git"}
-        if not os.path.exists(abs_path):
+        if not os.path.lexists(abs_path):
             return {"error": f"Путь '{path}' не найден"}
 
-        if os.path.isdir(abs_path):
+        if os.path.isdir(abs_path) and not os.path.islink(abs_path):
             shutil.rmtree(abs_path)
             kind = "папка"
         else:

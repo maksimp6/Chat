@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | git | tool_providers/git.py | 10 | git_status, git_log, git_diff, git_branches (read, low); git_add, git_commit, git_remote, git_push, git_pull, git_fetch (write, high, requires_approval) |
 | termux | tool_providers/termux.py | 11 | termux_battery_status, termux_camera_photo, termux_clipboard_get/set, termux_notification, termux_open_app_settings, termux_toast, termux_torch, termux_tts_speak, termux_vibrate, remove_file |
-| system | tool_providers/termux_system.py | 17 | get/set_clipboard, get_device_location, get/set_system_volume, get_wifi_status, list_contacts, list_sms, send_sms, send_notification, show_toast, set_screen_brightness, set_torch, take_camera_photo, trigger_vibration, tts_speak, get_system_battery |
+| system | tool_providers/termux_system.py | 12 | get/set_clipboard, get_device_location, get/set_system_volume, send_notification, show_toast, set_screen_brightness, set_torch, trigger_vibration, tts_speak, get_system_battery. SMS, camera, contacts and Wi-Fi details are defined but not registered |
 | filesystem | tool_providers/filesystem.py | 17 | read_file, write_file, apply_patch, list_directory, glob_search, grep_search, file_stat, calculate_hash, copy_or_move_file, delete_path, make_directory, run_command, http_fetch, get_system_info, python_ast_outline, zip_compress, zip_extract |
 | wikipedia | tool_providers/wikipedia.py | 2 | wikipedia_search, wikipedia_summary |
 | profiler | tool_providers/profiler.py | 2 | inspect_app_internals, profile_application_performance |

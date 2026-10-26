@@ -124,12 +124,12 @@ def _run_git(args: list, cfg: dict = None, repo_name: str = None, is_read: bool 
         else os.path.join(repo_path, ".git", "index.lock")
     )
     if not is_read and os.path.exists(lock_file):
-        try:
-            if time.time() - os.path.getmtime(lock_file) > 2.0:
-                os.remove(lock_file)
-                time.sleep(0.05)
-        except Exception as exc:
-            logger.debug("[GIT] lock cleanup skipped: %s", exc)
+        # A running Git process may hold this lock; removing it by age could corrupt its index update.
+        return {
+            "success": False,
+            "error": f"Индекс занят файлом {os.path.relpath(lock_file, repo_path)}. "
+            "Удалите его вручную, если Git не запущен.",
+        }
 
     cmd = ["git"]
     if is_read:
@@ -240,9 +240,12 @@ def git_commit(args: dict, cfg: dict) -> dict:
     # Автоматическая индексация перед коммитом
     if files:
         target = [files] if isinstance(files, str) else files
-        _run_git(["add", "--"] + target, cfg, repo, is_read=False)
+        staged = _run_git(["add", "--"] + target, cfg, repo, is_read=False)
     else:
-        _run_git(["add", "-A"], cfg, repo, is_read=False)
+        staged = _run_git(["add", "-A"], cfg, repo, is_read=False)
+    if not staged.get("success"):
+        # Committing after a failed add would record whatever an older index holds.
+        return staged
 
     time.sleep(0.15)
     return _run_git(["commit", "-m", msg], cfg, repo, is_read=False)
