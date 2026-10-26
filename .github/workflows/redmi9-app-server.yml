@@ -10,7 +10,7 @@ on:
         required: true
         default: deploy
         type: choice
-        options: [deploy, screenshots, verify_screenshots, rootagent_native_check, art_generate]
+        options: [deploy, screenshots, tools_self_check, verify_screenshots, rootagent_native_check, art_generate]
 
 permissions: {}
 
@@ -97,6 +97,48 @@ jobs:
                   or matrix.get("verdict") != "PASS" or matrix.get("failures") != []
                   or not required_artifacts <= artifacts):
               raise SystemExit("Application UI checks failed; evidence was published first")
+          PY
+
+  tools_self_check:
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && github.ref != 'refs/heads/master' && inputs.action == 'tools_self_check'
+    runs-on: redmi9
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: logos
+        shell: bash
+        timeout-minutes: 10
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LOGOS_TOOLS_SELF_CHECK: "1"
+          CI: "true"
+        run: |
+          set -euo pipefail
+          test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
+          check_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-tools-check-", dir=".")).resolve())')
+          export RUNNER_TEMP="$check_temp"
+          export TMPDIR="$check_temp"
+          mkdir -m 700 "$check_temp/scripts" "$check_temp/tests"
+          for file in scripts/redmi_screenshot_capture.py scripts/publish_redmi_screenshots.py scripts/logos_tools_self_check.py tests/test_logos_tools_self_check.py; do
+            curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
+              "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/$file" -o "$check_temp/$file"
+          done
+          cd "$check_temp"
+          python -m unittest discover -s tests -p test_logos_tools_self_check.py -v
+          capture_dir="$check_temp/logos-screenshots-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          python scripts/redmi_screenshot_capture.py "$capture_dir"
+          python scripts/publish_redmi_screenshots.py "$capture_dir"
+          python - "$capture_dir/manifest.json" <<'PY'
+          import json
+          import sys
+          with open(sys.argv[1], encoding="utf-8") as stream:
+              manifest = json.load(stream)
+          scenario = manifest.get("creation_scenario", {})
+          check = scenario.get("checkpoints", {}).get("tools_self_check", {})
+          print(json.dumps({"tools_self_check": check, "scenario_failures": scenario.get("failures", [])}, ensure_ascii=False))
+          if check.get("status") != "PASS" or scenario.get("verdict") != "PASS":
+              raise SystemExit("Tools or parameter availability not fully proven; evidence published first")
           PY
 
   verify_screenshots:

@@ -538,6 +538,26 @@ class RDP:
                              "return {status:x.status,errors:errors.slice(0,50).map(e=>({source:String(e.source||'').slice(0,80),"
                              "type:String(e.type||'').slice(0,80),error:String(e.error||'').slice(0,300)}))};})())")
 
+    def tools_inventory(self, actor, conversation_id):
+        return self.evaluate(actor, "JSON.stringify((()=>{const get=p=>{const x=new XMLHttpRequest();"
+                             "x.open('GET',p,false);x.send();if(x.status!==200)throw Error('Tool inventory unavailable');"
+                             "return JSON.parse(x.responseText);};return {categories:get('/api/tools/categories').categories,"
+                             "active_categories:get('/api/conversations/'+encodeURIComponent(" + json.dumps(conversation_id) +
+                             ")+'/tools').active_tool_categories};})())")
+
+    def tools_trace(self, actor, invocation_id):
+        # Publish only execution outcomes and the existing secret-free request receipt.
+        # Tool arguments and results can contain personal files or credentials.
+        return self.evaluate(actor, "JSON.stringify((()=>{const x=new XMLHttpRequest();"
+                             "x.open('GET','/api/invocations/'+encodeURIComponent(" + json.dumps(invocation_id) +
+                             ")+'/trace',false);x.send();if(x.status!==200)return {http_status:x.status};"
+                             "const t=JSON.parse(x.responseText);return {context:t.context,"
+                             "errors:(t.errors||[]).map(e=>({type:e.type||'unknown'})),"
+                             "tool_calls:(t.tool_calls||[]).map(c=>({name:c.name||c.tool_name,call_id:c.call_id,"
+                             "error:!!c.error,result:{success:c.result?.success,"
+                             "metadata:{phase:c.result?.metadata?.phase}},status:c.status})),"
+                             "events:(t.events||[]).filter(e=>e.type==='api_request_manifest'||e.event==='api_request_manifest')};})())")
+
     def start_creation_observer(self, actor):
         return self.evaluate(actor, r"""JSON.stringify((()=>{
           const key='__logosCaptureCreationObserver';if(window[key])throw Error('Capture observer already present');
@@ -735,18 +755,60 @@ def student_tasks(rdp, actor, conversation_id):
     return {"status": status, "answers_found": len(answers), "reply_text": text}
 
 
-def record_creation(rdp, actor, out, uid, gid, snapshot):
+def tools_self_check(rdp, actor, conversation_id):
+    """Ask Logos through the actual Send button; judge calls independently of its claims."""
+    from logos_tools_self_check import SELF_CHECK_QUESTION, evaluate_tool_evidence
+
+    inventory = rdp.tools_inventory(actor, conversation_id)
+    before = rdp.persisted_messages(actor, conversation_id)
+    if before["status"] != 200:
+        return {"status": "ERROR", "reason": "baseline_messages_unavailable"}
+    if rdp.conversation_state(actor)["current_id"] != conversation_id:
+        return {"status": "ERROR", "reason": "requested_chat_not_selected"}
+    question = SELF_CHECK_QUESTION + "\nКаталог приложения: " + json.dumps(inventory, ensure_ascii=False)
+    rdp.send_chat_message(actor, question)
+    # Leave time to finalize the recording and publish even when the app times out.
+    deadline = time.monotonic() + max(0, remaining(120) - 15)
+    after, traces = before, {}
+    while time.monotonic() < deadline:
+        device_guard()
+        after = rdp.persisted_messages(actor, conversation_id)
+        if after["status"] != 200:
+            break
+        fresh = after["messages"][len(before["messages"]):]
+        question_positions = [i for i, m in enumerate(fresh) if m["role"] == "user" and m["text"] == question]
+        old_invocations = {m["invocation_id"] for m in before["messages"] if m["invocation_id"]}
+        replies = fresh[question_positions[-1] + 1:] if question_positions else []
+        if any(m["role"] == "assistant" and m["text"].strip() and m["invocation_id"]
+               and m["invocation_id"] not in old_invocations for m in replies):
+            for m in replies:
+                if m["role"] == "assistant" and m["invocation_id"] and m["invocation_id"] not in old_invocations:
+                    traces[m["invocation_id"]] = rdp.tools_trace(actor, m["invocation_id"])
+            break
+        time.sleep(1)
+    report = evaluate_tool_evidence(inventory["categories"], inventory["active_categories"],
+                                    before["messages"], after["messages"], traces, question)
+    report["question"] = question
+    # The original reply remains in the app conversation. Do not publish free text from
+    # a model with filesystem tools; the evidence report contains only structured facts.
+    return report
+
+
+def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
     """Observe one real new-chat flow, preserving application failures as evidence."""
     events, failures, artifacts = [], [], []
     recorder = None
     video_path = out / "15-conversation-create.mp4"
-    video = {"path": video_path.name, "available": False, "time_limit_seconds": 90,
+    video_seconds = 180 if tools_check else 90
+    video = {"path": video_path.name, "available": False, "time_limit_seconds": video_seconds,
              "clock_note": "Process timestamps bound recording; they do not identify the exact first video frame."}
     observer = {"available": False, "requests": []}
     reload_observer = {"available": False, "requests": []}
     checkpoints = {"new_conversation_postconditions": {"status": "NOT_RUN", "reason": "creation_not_confirmed"},
                    "reload_persistence": {"status": "NOT_RUN", "reason": "creation_not_confirmed"},
                    "message_send": {"status": "NOT_RUN", "reason": "creation_not_confirmed"}}
+    if tools_check:
+        checkpoints["tools_self_check"] = {"status": "NOT_RUN", "reason": "new_chat_not_ready"}
     before = after = reloaded = None
 
     def mark(name, browser=None):
@@ -807,7 +869,8 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
         else:
             mark("recorder_launch_requested")
             recorder = subprocess.Popen([ROOT + "screenrecord", "--bugreport", "--size", "720x1560",
-                                         "--bit-rate", "2000000", "--time-limit", "90", str(video_path)],
+                                         "--bit-rate", "800000" if tools_check else "2000000",
+                                         "--time-limit", str(video_seconds), str(video_path)],
                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             time.sleep(0.5)
             mark("recorder_start_observed")
@@ -999,7 +1062,18 @@ def record_creation(rdp, actor, out, uid, gid, snapshot):
                 checkpoints["reload_persistence"] = {"status": "FAIL" if len(failures) > reload_validation_start else "PASS"}
             else:
                 checkpoints["reload_persistence"] = {"status": "NOT_RUN", "reason": not_run_reason}
-            if checkpoints["reload_persistence"]["status"] == "PASS":
+            if checkpoints["reload_persistence"]["status"] == "PASS" and tools_check:
+                # The requested self-check is the only model request in this mode.
+                mark("tools_self_check_requested")
+                checkpoints["tools_self_check"] = {"status": "ERROR", "reason": "check_interrupted"}
+                checkpoints["tools_self_check"] = tools_self_check(rdp, actor, new_id)
+                mark("tools_self_check_observed", checkpoints["tools_self_check"])
+                if checkpoints["tools_self_check"]["status"] != "PASS":
+                    failures.append("tools_self_check_incomplete_or_failed")
+                if recorder is None or recorder.poll() is not None:
+                    failures.append("native_video_ended_before_tools_check_complete")
+                frame("22-tools-self-check.png")
+            elif checkpoints["reload_persistence"]["status"] == "PASS":
                 send_validation_start = len(failures)
                 counts_before = rdp.message_counts(actor)
                 rdp.send_chat_message(actor, "привет")
@@ -1376,7 +1450,8 @@ def capture(out, uid, gid, metadata):
     if not final["open"] or final["surfaces"] or final["expanded"] != "true":
         matrix_failures.append("final_sidebar_state_not_restored")
     if final["surfaces"] in ([], ["model"]):
-        actor, creation_scenario, artifacts = record_creation(rdp, actor, out, uid, gid, snapshot)
+        actor, creation_scenario, artifacts = record_creation(
+            rdp, actor, out, uid, gid, snapshot, tools_check=metadata.get("tools_self_check", False))
     else:
         creation_scenario = {"verdict": "FAIL", "failures": ["creation_not_run_because_clean_view_unavailable"]}
         timeline = out / "events.json"
@@ -1450,6 +1525,7 @@ def main():
                 "github_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
                 "workflow_revision": os.environ["GITHUB_SHA"], "runner_name": os.environ["RUNNER_NAME"],
                 "github_run_url": "https://github.com/maksimp6/Chat/actions/runs/" + os.environ["GITHUB_RUN_ID"]}
+    metadata["tools_self_check"] = os.environ.get("LOGOS_TOOLS_SELF_CHECK") == "1"
     argv = [sys.executable, str(Path(__file__).resolve()), "_capture", str(output),
             str(os.getuid()), str(os.getgid()), json.dumps(metadata)]
     safe_env = {"PATH": os.environ.get("PATH", "/system/bin"), "TMPDIR": os.environ.get("TMPDIR", str(runner_temp))}
