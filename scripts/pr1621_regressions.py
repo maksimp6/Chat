@@ -203,6 +203,11 @@ def child_environment(harness: Path, state: Path, native: list[str]) -> dict[str
     return env
 
 
+def print_failure_tail(result: dict) -> None:
+    print("PR1621_FAILURE_LOG " + result["log"], flush=True)
+    print(Path(result["log"]).read_bytes()[-16000:].decode("utf-8", errors="replace"), flush=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, help="New evidence directory inside RUNNER_TEMP")
@@ -250,7 +255,12 @@ def main() -> int:
     # product success scenario and is never added to the product pass count.
     negative = private_directory(evidence / "negative-control")
     (negative / "test_expected_failure.py").write_text(
-        'def test_harness_detects_failure():\n    assert False, "EXPECTED_NEGATIVE_CONTROL"\n',
+        '''def test_harness_detects_failure():
+    import socket
+    assert socket.socket.connect.__module__ == "sitecustomize", "network guard not loaded"
+    assert socket.getaddrinfo.__module__ == "sitecustomize", "DNS guard not loaded"
+    assert False, "EXPECTED_NEGATIVE_CONTROL"
+''',
         encoding="utf-8",
     )
     negative_junit = negative / "junit.xml"
@@ -263,11 +273,21 @@ def main() -> int:
         counts = junit_counts(negative_junit)
     except (OSError, ValueError, ET.ParseError):
         counts = {}
-    result.update(counts=counts, verdict="PASS" if result["exit_code"] == 1 and counts == {
+    expected_failure = negative_junit.exists() and "EXPECTED_NEGATIVE_CONTROL" in negative_junit.read_text(encoding="utf-8")
+    result.update(counts=counts, verdict="PASS" if result["exit_code"] == 1 and expected_failure and counts == {
         "tests": 1, "failures": 1, "errors": 0, "skipped": 0,
     } else "FAIL")
     report["negative_control"] = result
     save()
+    if result["verdict"] != "PASS":
+        report["verdict"] = "FAIL"
+        report["groups"] = [{"name": name, "verdict": "NOT_RUN", "reason": "negative_control_failed"}
+                            for name, _ in GROUPS]
+        report["groups"].append({"name": "javascript", "verdict": "NOT_RUN", "reason": "negative_control_failed"})
+        save()
+        print_failure_tail(result)
+        print(json.dumps(report, ensure_ascii=False), flush=True)
+        return 1
     for name, tests in GROUPS:
         group = private_directory(evidence / name)
         junit = group / "junit.xml"
@@ -284,6 +304,8 @@ def main() -> int:
         report["groups"].append(result)
         save()
         print(json.dumps({"group": name, "verdict": result["verdict"], "counts": counts}), flush=True)
+        if not passed:
+            print_failure_tail(result)
     node_group = private_directory(evidence / "javascript")
     node = shutil.which("node")
     node_results = []
@@ -293,6 +315,8 @@ def main() -> int:
                 [node, "--require", str(harness / "node-guard.cjs"), str(ROOT / "tests" / name)],
                 ROOT, child_environment(harness, node_group, native), node_group / (name + ".log"), timeout=30,
             ))
+            if node_results[-1]["exit_code"] != 0:
+                print_failure_tail(node_results[-1])
     report["groups"].append({
         "name": "javascript", "commands": node_results,
         "verdict": "PASS" if len(node_results) == 2 and all(x["exit_code"] == 0 for x in node_results) else "FAIL",
@@ -302,7 +326,7 @@ def main() -> int:
         group["verdict"] == "PASS" for group in report["groups"])) else "FAIL"
     report["free_bytes_after"] = shutil.disk_usage(evidence).free
     save()
-    print(json.dumps({"verdict": report["verdict"], "report": str(report_path)}), flush=True)
+    print(json.dumps(report, ensure_ascii=False), flush=True)
     return 0 if report["verdict"] == "PASS" else 1
 
 
