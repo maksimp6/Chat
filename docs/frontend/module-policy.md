@@ -67,14 +67,8 @@ Static validation is only the first layer. The module runtime separately validat
 
 A module must not access another module's private state, DOM, styles, tools, or implementation details.
 
-## Command
+## Verification
 
-Run from the repository root:
-
-    python tests/validate_frontend_modules.py
-
-Runtime safety regression tests:
-
-    node tests/test_frontend_runtime_safety.js
-
-The CI pipeline runs both checks before the broader frontend regression suite.
+Only explicitly requested real Redmi 9 checks remain, inside GitHub Actions.
+See [Redmi 9 checks](../architecture/browser-self-testing.md). The former
+static validator and VM/BrowserShim test commands have been removed.

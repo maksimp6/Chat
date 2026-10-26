@@ -22,7 +22,6 @@ Modes:
   --mode query     : run query from --query-file or --query, publish to --publish-issue
   --mode red       : same, but treat the query as a negative control (refusal expected)
   --corpus tasks|dialogues : choose source scope explicitly
-  --selftest       : offline controls only; live-model RED remains NOT_RUN
 """
 
 from __future__ import annotations
@@ -2488,32 +2487,6 @@ def retrieval_outcome(query: str, candidates: list[dict], corpus: list[dict]) ->
     }
 
 
-def selftest() -> int:
-    """Exercise offline retrieval and citation controls, never a live model."""
-    text = "Узкий канал даёт точность пересказа, но не новизну."
-    source = {
-        "issue": 9001,
-        "text": text,
-        "sha256": hashlib.sha256(text.encode()).hexdigest(),
-        "body_sha256": hashlib.sha256(text.encode()).hexdigest(),
-        "body_offset": 0,
-        "url": f"https://github.com/{REPO}/issues/9001",
-        "updated_at": None,
-        "retrieved_at": "offline",
-    }
-    corpus = [source]
-    index = BM25Index(build_units(corpus))
-    hits = index.search("узкий канал точность")
-    assert hits and hits[0]["issue"] == 9001, "positive retrieval control"
-    assert not index.search("морозильник клубника"), "negative retrieval control"
-    obj = parse_model_json(
-        json.dumps({"answer": text, "refusal": False, "citations": [{"id": 1, "quote": text}]})
-    )
-    assert evaluate(obj, hits, corpus, "query")["status"] == "CITATIONS_ONLY"
-    print("selftest: retrieval/citation controls PASS; live model RED NOT_RUN")
-    return 0
-
-
 def _query(args: argparse.Namespace) -> str:
     """Read a bounded UTF-8 query before any external model call."""
     if args.query_file:
@@ -2643,10 +2616,9 @@ def main(argv: list[str] | None = None) -> int:
         help="search an already indexed Yandex store without creating or attaching files",
     )
     parser.add_argument("--approval-reference", default="")
-    parser.add_argument("--selftest", action="store_true")
     args = parser.parse_args(argv)
     try:
-        return selftest() if args.selftest else _run(args)
+        return _run(args)
     except NativeLogosLaunchBlocked as exc:
         print(str(exc), file=sys.stderr)
         return 1

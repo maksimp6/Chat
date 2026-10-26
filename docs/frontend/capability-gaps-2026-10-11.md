@@ -284,12 +284,9 @@ Disposable SQLite/Memory paths, пустое окружение без provider 
 | Chromium chat 429 и network abort | Ошибки видимы | Mocked response; G01 подтверждён source, не live provider |
 | Chromium 390 × 844 | Input видим | Не полный mobile/a11y аудит |
 
-Focused commands из корня репозитория:
-
-```bash
-python -m pytest -q tests/test_frontend_chat_contract.py tests/test_frontend_navigation_contract.py tests/test_memory_panel_contract.py tests/test_runtime_api.py tests/test_provider_quotas.py tests/test_memory_backup.py tests/test_agent_task_state.py
-node --test tests/test_execution_surface.js tests/test_frontend_smoke.js tests/test_frontend_boot.js tests/test_frontend_runtime_safety.js tests/test_real_header_actions.js
-```
+Исторические команды unit/BrowserShim/Chromium удалены вместе с наборами
+26 октября 2026 года. Таблица выше сохраняет прежние результаты, а не текущий
+PASS приложения. Теперь оставлены только проверки Redmi 9.
 
 Chromium reproduction: открыть локальный `/`, проверить `#msg-input`; нажать
 `#memory-btn` и получить empty state; открыть credentials dialog без save;

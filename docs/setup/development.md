@@ -9,8 +9,10 @@
 python -m pip install -r requirements-dev.txt
 ```
 
-Node.js нужен для запуска JavaScript-тестов (`node tests/*.js`). Android-приложение
-и сборка APK удалены; JDK и Android SDK для разработки Logos не требуются.
+Оставлены только реальные проверки Redmi 9 в GitHub Actions; см.
+[проверки устройства](../architecture/browser-self-testing.md). Локальные
+Node/BrowserShim/Chromium-наборы удалены. Android-приложение и сборка APK
+удалены; JDK и Android SDK для разработки Logos не требуются.
 
 ## Backend
 

@@ -82,7 +82,6 @@ unknown usage/cost remains unknown.
 Offline controls:
 
 ```sh
-python scripts/semantic_pipeline.py --selftest
 python -m pytest -q tests/test_semantic_pipeline.py tests/test_semantic_task_search.py tests/test_semantic_vector_store.py tests/test_semantic_workflow.py
 ```
 

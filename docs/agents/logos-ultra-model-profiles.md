@@ -98,9 +98,6 @@ accepted и effective/UNKNOWN; estimate не выдаётся за счёт пр
 ```bash
 python3 scripts/validate_ultra_profiles.py
 python3 scripts/validate_ultra_profiles.py --model gpt-oss-120b
-python3 -m unittest discover -s tests -p test_ultra_profiles.py -v
-python3 -m pytest -q tests/test_model_ultra_catalog.py
-node --test tests/test_model_ultra_ui.js
 ```
 
 Утилита разбирает literals из `core/config.py` через AST: не импортирует этот

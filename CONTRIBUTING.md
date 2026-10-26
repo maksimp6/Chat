@@ -4,7 +4,7 @@
 
 ## Changes and verification
 
-Describe the user-visible behavior, technical change, risks and validation actually performed. Project CI, lint, typing, naming and layout gates have been removed. Existing functional tests can be run manually when they help verify a change. Operational deployment checks still track process identity, application readiness, data preservation and rollback.
+Describe the user-visible behavior, technical change, risks and validation actually performed. Project CI, lint, typing, naming and layout gates have been removed. Only real Redmi 9 checks remain; run them inside GitHub Actions only when explicitly requested. See [Redmi 9 checks](docs/architecture/browser-self-testing.md). Operational deployment checks still track process identity, application readiness, data preservation and rollback.
 
 Do not paste credentials, provider keys, access tokens or private URLs into GitHub. Data-model changes follow the current native Kristall contract.
 

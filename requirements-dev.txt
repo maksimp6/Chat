@@ -1,15 +1,8 @@
-# Development and CI tooling.
-# Keep these versions aligned with .github/workflows/ci.yml behavior so local/Codex checks
-# use the same toolchain as GitHub Actions whenever the packages are available locally.
-pytest==9.1.1
-pytest-asyncio==1.4.0
-pytest-cov==7.1.0
-pytest-xdist==3.8.0
-coverage==7.16.2
+# Development tooling; code test suites have been removed.
 ruff==0.17.1
 mypy==2.4.0
 PyYAML==6.0.3
-# Real offline mesh/video regression fixtures (FFmpeg/ffprobe are OS tools).
+# Geometry and image tooling (FFmpeg/ffprobe are OS tools).
 numpy==2.5.4
 matplotlib==3.11.2
 trimesh==4.9.0
