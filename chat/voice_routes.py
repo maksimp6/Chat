@@ -175,6 +175,7 @@ def _chat(text: str, conversation_id: str | None, model: str) -> str:
         conversation_id=_provider_conversation_id(client, conversation_id, None),
         params={},
         trace=None,
+        settings_conversation_id=conversation_id,
     )
     reply = client.extract_text(response)
     if not reply:

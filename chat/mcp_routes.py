@@ -3,6 +3,7 @@
 from flask import Blueprint, request, jsonify
 import logging
 import re
+import threading
 import json as _json
 import uuid
 from typing import Any
@@ -154,6 +155,22 @@ def _image_turn_history(conv_id):
         if text.strip():
             history.append({"role": turn["role"], "text": text})
     return history
+
+
+def _photo_exchange_context(conv_id):
+    """Earlier photo exchanges. They were answered statelessly, so the provider conversation lacks them."""
+    turns = get_messages(conv_id)
+    blocks = []
+    for index, turn in enumerate(turns):
+        if turn.get("source") != "photo" or turn["role"] != "user":
+            continue
+        answer = next((t for t in turns[index + 1 :] if t["role"] == "assistant"), None)
+        question = str(turn.get("text") or "")[:IMAGE_HISTORY_TEXT_CHARS]
+        reply = _MARKDOWN_PICTURE.sub("[картинка]", str((answer or {}).get("text") or ""))
+        blocks.append(f"Пользователь прислал фото с вопросом: {question}\nОтвет: {reply[:IMAGE_HISTORY_TEXT_CHARS]}")
+    return "\n\n".join(blocks[-IMAGE_HISTORY_TURNS:])
+
+
 MAX_IMAGES_PER_MESSAGE = 4
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
@@ -302,20 +319,31 @@ def _append_post_final_error(trace_data, source, message, error_type):
     )
 
 
+_provider_conversation_locks: dict[str, threading.Lock] = {}
+_provider_conversation_locks_guard = threading.Lock()
+
+
+def _provider_conversation_lock(conv_id):
+    with _provider_conversation_locks_guard:
+        return _provider_conversation_locks.setdefault(conv_id, threading.Lock())
+
+
 def _provider_conversation_id(client, conv_id, trace):
     """Return the provider conversation behind a local chat, creating it on the first message."""
-    mapped = get_yandex_conversation(conv_id)
-    if mapped:
-        return mapped
-    if not is_provider_pending(conv_id):
-        # Chats created before this change already use the provider's id as their own id.
-        return conv_id
-    created = client.create_conversation(execution_trace=trace)
-    provider_id = created.get("id") if isinstance(created, dict) else None
-    if not provider_id:
-        raise RuntimeError("Yandex conversation creation returned no ID")
-    set_yandex_conversation(conv_id, provider_id)
-    return provider_id
+    # Two first messages of one chat must not each create a provider conversation.
+    with _provider_conversation_lock(conv_id):
+        mapped = get_yandex_conversation(conv_id)
+        if mapped:
+            return mapped
+        if not is_provider_pending(conv_id):
+            # Chats created before this change already use the provider's id as their own id.
+            return conv_id
+        created = client.create_conversation(execution_trace=trace)
+        provider_id = created.get("id") if isinstance(created, dict) else None
+        if not provider_id:
+            raise RuntimeError("Yandex conversation creation returned no ID")
+        set_yandex_conversation(conv_id, provider_id)
+        return provider_id
 
 
 @mcp_bp.route("/api/chat", methods=["POST"])
@@ -428,9 +456,17 @@ def chat():
             params["active_tool_categories"] = active_tools
 
         if not retry:
-            add_message(invocation.conversation_id, "user", message)
+            add_message(invocation.conversation_id, "user", message, source="photo" if images else None)
         if images:
             params["chat_history"] = _image_turn_history(invocation.conversation_id)
+        else:
+            photo_context = _photo_exchange_context(invocation.conversation_id)
+            if photo_context:
+                params["instructions"] = "\n\n".join(
+                    part
+                    for part in (params.get("instructions"), "Ранее в этом диалоге:\n" + photo_context)
+                    if part
+                )
         conversation_title = maybe_update_conversation_title(
             invocation.conversation_id,
             message,
@@ -444,6 +480,7 @@ def chat():
             conversation_id=provider_conversation_id,
             params=params,
             trace=trace,
+            settings_conversation_id=invocation.conversation_id,
         )
 
         api_requests = trace.trace.get("api_requests", [])
@@ -868,33 +905,39 @@ def execute_approved():
             } else 400
 
         execution_data = exec_res.get("data")
-        client = LogosClient(Config)
-        prompt = (
-            f"Пользователь подтвердил действие '{func_name}' с параметрами {arguments}.\n"
-            f"Результат: {execution_data}.\nДай краткий ответ о завершении."
-        )
-        synth_response = client.ask(
-            prompt,
-            model_key,
-            _provider_conversation_id(client, conv_id, ExecutionTrace()),
-            {"instructions": "Ты системный ассистент."},
-        )
-        reply = client.extract_text(synth_response) or f"Действие {func_name} успешно выполнено."
-        usage = client.extract_usage(synth_response)
-        # The follow-up answer is a model call like any chat turn, so it is billed the same way.
-        billing = aggregate_billing(
-            [build_ai_billing_item(model_key, usage, step=1)],
-            context={
-                "trace_id": "approval-" + uuid.uuid4().hex,
-                "owner_id": owner_id,
-                "conversation_id": conv_id,
-            },
-        )
+        reply = f"Действие {func_name} успешно выполнено."
+        cost = 0.0
         try:
-            settle_billing_to_treasury(billing, owner_id)
+            client = LogosClient(Config)
+            prompt = (
+                f"Пользователь подтвердил действие '{func_name}' с параметрами {arguments}.\n"
+                f"Результат: {execution_data}.\nДай краткий ответ о завершении."
+            )
+            synth_response = client.ask(
+                prompt,
+                model_key,
+                _provider_conversation_id(client, conv_id, ExecutionTrace()),
+                {"instructions": "Ты системный ассистент."},
+            )
+            reply = client.extract_text(synth_response) or reply
+            usage = client.extract_usage(synth_response)
+            # The follow-up answer is a model call like any chat turn, so it is billed the same way.
+            billing = aggregate_billing(
+                [build_ai_billing_item(model_key, usage, step=1)],
+                context={
+                    "trace_id": "approval-" + uuid.uuid4().hex,
+                    "owner_id": owner_id,
+                    "conversation_id": conv_id,
+                },
+            )
+            try:
+                settle_billing_to_treasury(billing, owner_id)
+            except Exception:
+                logger.exception("[BILLING] Approval follow-up settlement failed")
+            cost = _turn_cost(billing)
         except Exception:
-            logger.exception("[BILLING] Approval follow-up settlement failed")
-        cost = _turn_cost(billing)
+            # The tool already ran. A failed summary must not hide that result or make the user retry it.
+            logger.exception("[TOOL_APPROVAL] Summary failed after the tool succeeded")
 
         add_message(conv_id, "assistant", reply, cost=cost)
         return jsonify({"reply": reply, "cost": cost, "execution_result": exec_res})
