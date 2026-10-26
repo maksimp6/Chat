@@ -765,7 +765,8 @@ def tools_self_check(rdp, actor, conversation_id):
         return {"status": "ERROR", "reason": "baseline_messages_unavailable"}
     if rdp.conversation_state(actor)["current_id"] != conversation_id:
         return {"status": "ERROR", "reason": "requested_chat_not_selected"}
-    question = SELF_CHECK_QUESTION + "\nКаталог приложения: " + json.dumps(inventory, ensure_ascii=False)
+    # #msg-input is input[type=text]; it removes line breaks before sending.
+    question = SELF_CHECK_QUESTION + " Каталог приложения: " + json.dumps(inventory, ensure_ascii=False)
     rdp.send_chat_message(actor, question)
     # Leave time to finalize the recording and publish even when the app times out.
     deadline = time.monotonic() + max(0, remaining(120) - 15)

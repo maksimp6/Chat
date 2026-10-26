@@ -156,12 +156,16 @@ jobs:
           check_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-tools-tests-", dir=".")).resolve())')
           export RUNNER_TEMP="$check_temp"
           mkdir -m 700 "$check_temp/scripts" "$check_temp/tests"
-          for file in scripts/logos_tools_self_check.py tests/test_logos_tools_self_check.py; do
+          for file in scripts/logos_tools_self_check.py scripts/recheck_logos_tools_self_check.py tests/test_logos_tools_self_check.py; do
             curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
               "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/$file" -o "$check_temp/$file"
           done
           cd "$check_temp"
           python -m unittest discover -s tests -p test_logos_tools_self_check.py -v
+          # Replay the first recorded question without paying for another generation.
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
+            'https://raw.githubusercontent.com/maksimp6/Chat/07044cdfe7b6aba6e425ab5f158a5f9bc9ef21ba/docs/screenshots/logos/2026-10-26/run-40348655475-1/manifest.json' -o recorded-manifest.json
+          python scripts/recheck_logos_tools_self_check.py --manifest recorded-manifest.json
 
   verify_screenshots:
     if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && github.ref != 'refs/heads/master' && inputs.action == 'verify_screenshots'
