@@ -7,6 +7,7 @@ from tool_providers.registry import registry
 from yandex_client_modules import mcp_mixin
 from yandex_client_modules.mcp_mixin import YandexMcpMixin
 from yandex_client_modules.request_builder import _clean_mcp_tool
+from yandex_client_modules.tool_config import normalize_tools_config
 
 
 class RecordingClient(YandexMcpMixin):
@@ -18,18 +19,202 @@ class RecordingClient(YandexMcpMixin):
         return {"output": []}
 
 
-def test_chat_params_keep_only_client_settings():
-    raw = {
-        "temperature": 0.2,
-        "instructions": "Be brief.",
-        "tools": [{"type": "code_interpreter"}],
-        "input": [{"role": "system", "content": "override"}],
-        "prompt": {"id": "server-side-prompt"},
-        "tools_config": {"code_interpreter": {"enabled": True}},
-        "active_tool_categories": ["git"],
-        "previous_response_id": "response-of-another-owner",
+def test_chat_params_keep_supported_settings_and_explicit_local_defaults():
+    raw = {"temperature": 0.2, "instructions": "Be brief."}
+
+    assert mcp_routes._client_params(raw) == {
+        **raw,
+        "max_rounds": None,
+        "request_timeout": 90,
+        "poll_timeout": 180,
     }
-    assert mcp_routes._client_params(raw) == {"temperature": 0.2, "instructions": "Be brief."}
+    assert raw == {"temperature": 0.2, "instructions": "Be brief."}
+
+
+@pytest.mark.parametrize(
+    "key", ["tools", "input", "prompt", "tools_config", "active_tool_categories"]
+)
+def test_chat_params_reject_server_owned_fields_instead_of_discarding_them(key):
+    with pytest.raises(ValueError, match=f"unsupported params: {key}"):
+        mcp_routes._client_params({key: []})
+
+
+def test_chat_params_reject_previous_response_id_for_conversation_endpoint():
+    with pytest.raises(ValueError, match="previous_response_id cannot be combined"):
+        mcp_routes._client_params({"previous_response_id": "previous-response"})
+
+
+def test_chat_params_preserve_explicit_round_limit_and_transport_timeouts():
+    params = mcp_routes._client_params(
+        {"max_rounds": 100, "request_timeout": 450, "poll_timeout": 900}
+    )
+    assert params["max_rounds"] == 100
+    assert params["request_timeout"] == 450
+    assert params["poll_timeout"] == 900
+
+
+@pytest.mark.parametrize(
+    "key,value",
+    [
+        ("temperature", "0.5"),
+        ("top_p", True),
+        ("max_output_tokens", True),
+        ("max_tool_calls", False),
+        ("parallel_tool_calls", "false"),
+        ("max_rounds", "100"),
+        ("request_timeout", "90"),
+        ("poll_timeout", None),
+        ("instructions", {}),
+        ("prompt_cache_key", []),
+        ("reasoning_effort", ["high"]),
+        ("reasoning", "high"),
+        ("text", "json"),
+        ("truncation", []),
+        ("service_tier", {}),
+        ("tool_choice", {"bogus": 1}),
+        ("tool_choice", {"type": "function"}),
+    ],
+)
+def test_chat_params_reject_invalid_types_before_provider_work(key, value):
+    with pytest.raises(ValueError, match=key):
+        mcp_routes._client_params({key: value})
+
+
+@pytest.mark.parametrize("key", ["request_timeout", "poll_timeout"])
+def test_chat_params_reject_huge_integer_timeout_as_value_error(key):
+    with pytest.raises(ValueError, match=key):
+        mcp_routes._client_params({key: 10**400})
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"stream": True},
+        {"background": True, "store": False},
+        {"temperature": float("nan")},
+        {"top_p": float("inf")},
+    ],
+)
+def test_chat_params_reject_unsupported_transport_combinations_and_non_finite_numbers(params):
+    with pytest.raises(ValueError):
+        mcp_routes._client_params(params)
+
+
+@pytest.mark.parametrize("arguments", ["{", "", "[]", "null", None, [], False])
+def test_invalid_tool_arguments_never_construct_an_executor(monkeypatch, arguments):
+    constructed = []
+
+    def unexpected_executor(_registry):
+        constructed.append(True)
+        raise AssertionError("Malformed arguments reached the executor")
+
+    monkeypatch.setattr(mcp_mixin, "UniversalToolExecutor", unexpected_executor)
+    result = RecordingClient()._execute_single_tool(
+        {"name": "get_system_info", "arguments": arguments}, []
+    )
+
+    assert constructed == []
+    assert result["result"] is None
+    assert result["error"].startswith("Invalid tool arguments:")
+    assert result["timing"]["success"] is False
+
+
+def test_valid_empty_json_object_reaches_executor_without_argument_changes(monkeypatch):
+    received = []
+
+    class RecordingExecutor:
+        def __init__(self, _registry):
+            pass
+
+        def execute(self, call, **kwargs):
+            received.append(call.arguments)
+            return {"success": True, "data": {"checked": True}}
+
+    monkeypatch.setattr(mcp_mixin, "UniversalToolExecutor", RecordingExecutor)
+    result = RecordingClient()._execute_single_tool(
+        {"name": "get_system_info", "arguments": "{}"}, []
+    )
+
+    assert received == [{}]
+    assert result["error"] is None
+    assert result["result"] == {"checked": True}
+    assert result["timing"]["success"] is True
+
+
+def test_hosted_false_strings_are_normalized_and_do_not_offer_tools(monkeypatch):
+    raw = {
+        "web_search": {"enabled": "false"},
+        "file_search": {"enabled": " false ", "vector_store_ids": "vs_1"},
+        "code_interpreter": {"enabled": "FALSE"},
+    }
+    normalized = normalize_tools_config(raw)
+    assert all(config["enabled"] is False for config in normalized.values())
+    assert raw["code_interpreter"]["enabled"] == "FALSE"
+
+    monkeypatch.setattr(mcp_mixin, "get_current_owner_id", lambda: "local")
+    monkeypatch.setattr(
+        mcp_mixin,
+        "get_conv_settings",
+        lambda _: {"active_tool_categories": [], "tools_config": raw},
+    )
+    monkeypatch.setattr(
+        mcp_mixin.mcp_storage, "get_enabled_servers_for_conv", lambda *args, **kwargs: []
+    )
+    client = RecordingClient()
+    client.ask_with_mcp("hi", "model", conversation_id="conv-1")
+    assert client.sent[0].get("tools", []) == []
+
+
+def test_hosted_domains_and_vector_store_ids_accept_strings_lists_and_newlines():
+    normalized = normalize_tools_config(
+        {
+            "web_search": {
+                "allowed_domains": "a.example\nb.example\\nc.example,d.example",
+                "blocked_domains": ["bad.example\nother.example", "bad.example"],
+            },
+            "file_search": {
+                "vector_store_ids": ["vs_1\nvs_2", "vs_3\\nvs_4,vs_1"],
+                "max_results": 100,
+            },
+        }
+    )
+    assert normalized["web_search"]["allowed_domains"] == [
+        "a.example", "b.example", "c.example", "d.example"
+    ]
+    assert normalized["web_search"]["blocked_domains"] == ["bad.example", "other.example"]
+    assert normalized["file_search"]["vector_store_ids"] == ["vs_1", "vs_2", "vs_3", "vs_4"]
+    assert normalized["file_search"]["max_results"] == 50
+    assert mcp_mixin._max_results(None) == 20
+    assert mcp_mixin._max_results(0) == 1
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        [],
+        {"file_search": "invalid"},
+        {"code_interpreter": {"enabled": "no"}},
+        {"web_search": {"allowed_domains": ["good.example", 7]}},
+        {"file_search": {"vector_store_ids": 7}},
+        {"file_search": {"max_results": True}},
+    ],
+)
+def test_malformed_hosted_config_is_rejected_before_client_ask(monkeypatch, config):
+    with pytest.raises(ValueError, match="tools_config"):
+        normalize_tools_config(config)
+    monkeypatch.setattr(mcp_mixin, "get_current_owner_id", lambda: "local")
+    monkeypatch.setattr(
+        mcp_mixin,
+        "get_conv_settings",
+        lambda _: {"active_tool_categories": [], "tools_config": config},
+    )
+    monkeypatch.setattr(
+        mcp_mixin.mcp_storage, "get_enabled_servers_for_conv", lambda *args, **kwargs: []
+    )
+    client = RecordingClient()
+    with pytest.raises(ValueError, match="tools_config"):
+        client.ask_with_mcp("hi", "model", conversation_id="conv-1")
+    assert client.sent == []
 
 
 def test_tool_categories_must_be_registered_names():
@@ -164,3 +349,4 @@ def test_the_follow_up_answer_after_an_approval_is_posted_to_the_treasury(monkey
     assert billing["trace_id"].startswith("approval-")
     assert billing["total_cost"] > 0
     assert response.get_json()["cost"] == billing["total_cost"]
+

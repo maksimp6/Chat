@@ -19,12 +19,14 @@ RESPONSES_PARAMETERS = {
     "stream",
     "temperature",
     "top_p",
+    "top_logprobs",
     "max_output_tokens",
     "truncation",
     "reasoning",
     "service_tier",
     "text",
     "prompt_cache_key",
+    "prompt",
     "previous_response_id",
     "conversation",
     "tools",
@@ -53,7 +55,7 @@ def test_responses_request_names_every_parameter_with_a_value_or_a_reason():
     assert parameters["service_tier"]["reason"] == "provider_default"
 
 
-def test_photo_request_sends_stream_and_top_p_and_names_the_rest():
+def test_legacy_chat_image_builder_retains_compatibility_shape():
     payload = build_chat_image_payload(
         "folder", QWEN, "what is on the photo", ["data:image/png;base64,AAAA"], temperature=0.7, top_p=0.9
     )
@@ -69,6 +71,37 @@ def test_photo_request_sends_stream_and_top_p_and_names_the_rest():
     assert parameters["tools"]["reason"] == "photo_request_has_no_tool_loop"
 
 
+def test_photo_responses_parameters_keep_tools_and_show_provider_default_limit():
+    payload = build_response_payload(
+        "folder", QWEN, "what is on the photo", params={
+            "input_images": ["data:image/png;base64,AAAA"],
+            "tools": [{"type": "function", "name": "inspect"}],
+            "top_logprobs": 0,
+        },
+    )
+
+    parameters = explicit_parameters(QWEN, payload)
+
+    assert set(parameters) == RESPONSES_PARAMETERS
+    assert parameters["tools"]["sent"] is True
+    assert parameters["tools"]["value"]["names"] == ["inspect"]
+    assert parameters["max_tool_calls"] == {"sent": False, "value": None, "reason": "provider_default"}
+    assert parameters["top_logprobs"] == {"sent": True, "value": 0}
+    assert parameters["prompt"]["sent"] is False
+    assert "messages" not in payload
+
+
+def test_explicit_zero_tool_limit_is_distinct_from_provider_default():
+    payload = build_response_payload(
+        "folder", QWEN, "hi", params={
+            "tools": [{"type": "function", "name": "inspect"}],
+            "max_tool_calls": 0,
+        },
+    )
+
+    assert explicit_parameters(QWEN, payload)["max_tool_calls"] == {"sent": True, "value": 0}
+
+
 def test_profile_event_in_the_trace_carries_the_explicit_parameters():
     payload = build_response_payload("folder", QWEN, "hi", params={})
 
@@ -76,3 +109,4 @@ def test_profile_event_in_the_trace_carries_the_explicit_parameters():
 
     assert event["parameters"] == explicit_parameters(QWEN, payload)
     assert event["parameters"]["temperature"] == {"sent": False, "value": None, "reason": "not_set_by_request"}
+
