@@ -72,35 +72,86 @@ function renderSidebar() {
     titleSpan.className = "conv-title";
     titleSpan.textContent = conv.title;
 
-    // Двойной клик для переименования
+    // Сохраняет новое имя; при неудаче диалог остаётся с прежним именем.
+    function saveTitle(name) {
+      window.LogosDispatcher.request("/api/conversations/" + conv.id, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: name }),
+      })
+        .then((r) => {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })
+        .then((data) => {
+          if (data.status === "ok") {
+            conv.title = name;
+            localStorage.setItem("conversations", JSON.stringify(conversations));
+            renderSidebar();
+          } else {
+            LogosToast.error("Не удалось переименовать диалог.");
+          }
+        })
+        .catch((err) => {
+          console.error("[SIDEBAR] Rename error:", err);
+          LogosToast.error("Нет связи с сервером. Диалог не переименован.");
+        });
+    }
+
+    // Поле редактирования на месте названия: Enter сохраняет, Escape отменяет, уход с поля сохраняет.
+    function startRename() {
+      var input = document.createElement("input");
+      input.type = "text";
+      input.className = "conv-rename-input";
+      input.maxLength = 80;
+      input.value = conv.title;
+      input.setAttribute("aria-label", "Новое имя диалога");
+      titleSpan.replaceWith(input);
+      input.focus();
+      input.select();
+      var finished = false;
+      function finish(save) {
+        if (finished) return;
+        finished = true;
+        var name = input.value.trim();
+        input.replaceWith(titleSpan);
+        if (save && name && name !== conv.title) saveTitle(name);
+      }
+      input.addEventListener("keydown", function (e) {
+        if (e.isComposing) return;
+        if (e.key === "Enter") {
+          e.preventDefault();
+          finish(true);
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          finish(false);
+        }
+      });
+      input.addEventListener("blur", function () {
+        finish(true);
+      });
+      // The editor sits inside the chat link: its clicks must neither select the chat nor follow the link.
+      input.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    }
+
+    // Двойной клик (мышь) и кнопка «✎» (сенсорный экран) открывают одно и то же поле.
     titleSpan.addEventListener("dblclick", function (e) {
       e.preventDefault();
       e.stopPropagation();
-      var newName = prompt("Новое имя диалога:", conv.title);
-      if (newName && newName.trim() !== "") {
-        window.LogosDispatcher.request("/api/conversations/" + conv.id, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: newName.trim() }),
-        })
-          .then((r) => {
-            if (!r.ok) throw new Error("Network response was not ok");
-            return r.json();
-          })
-          .then((data) => {
-            if (data.status === "ok") {
-              conv.title = newName.trim();
-              localStorage.setItem("conversations", JSON.stringify(conversations));
-              renderSidebar();
-            } else {
-              LogosToast.error("Ошибка переименования: " + (data.error || "Неизвестная ошибка"));
-            }
-          })
-          .catch((err) => {
-            console.error("[SIDEBAR] Rename error:", err);
-            LogosToast.error("Ошибка сети при переименовании");
-          });
-      }
+      startRename();
+    });
+
+    var renameBtn = document.createElement("button");
+    renameBtn.type = "button";
+    renameBtn.className = "logos-btn rename-btn";
+    renameBtn.textContent = "✎";
+    renameBtn.setAttribute("aria-label", "Переименовать диалог");
+    renameBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      startRename();
     });
 
     var delBtn = document.createElement("button");
@@ -112,12 +163,12 @@ function renderSidebar() {
       if (confirm("Удалить этот диалог?")) {
         window.LogosDispatcher.request("/api/conversations/" + conv.id, { method: "DELETE" })
           .then((r) => {
-            if (!r.ok) throw new Error("Network response was not ok");
+            if (!r.ok) throw new Error("HTTP " + r.status);
             deleteConv(conv.id);
           })
           .catch((err) => {
             console.error("[SIDEBAR] Delete error:", err);
-            LogosToast.error("Ошибка сети при удалении");
+            LogosToast.error("Не удалось удалить диалог. Попробуйте ещё раз.");
           });
       }
     });
@@ -128,9 +179,10 @@ function renderSidebar() {
     link.setAttribute("aria-current", conv.id === currentConvId ? "page" : "false");
     link.appendChild(titleSpan);
     div.appendChild(link);
+    div.appendChild(renameBtn);
     div.appendChild(delBtn);
     div.addEventListener("click", function (e) {
-      if (e.target === delBtn || e.target.closest(".conv-link")) return;
+      if (e.target === delBtn || e.target === renameBtn || e.target.closest(".conv-link")) return;
       selectConv(conv.id);
     });
     link.addEventListener("click", function (e) {

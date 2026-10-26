@@ -254,6 +254,28 @@ body {
   min-height: 44px;
 }
 
+/* Rename on touch screens: the same 44px target as the delete button. */
+.logos-pro-app .rename-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 4px;
+  min-width: 44px;
+  min-height: 44px;
+}
+.logos-pro-app .conv-rename-input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--text-secondary);
+  background: transparent;
+  color: inherit;
+}
+
 /* Overlay */
 .logos-pro-app #overlay {
   position: fixed;

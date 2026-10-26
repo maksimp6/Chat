@@ -726,7 +726,16 @@ function loadHistory(convId) {
       console.error("[CHAT] Fetch history error:", err);
       const error = document.createElement("div");
       error.className = "empty-state error-state";
-      error.textContent = "Ошибка сети: " + err.message;
+      const text = document.createElement("p");
+      text.textContent = "Не удалось загрузить диалог. Проверьте соединение.";
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "logos-btn";
+      retry.textContent = "Повторить";
+      retry.addEventListener("click", function () {
+        loadHistory(convId);
+      });
+      error.append(text, retry);
       chatbox.replaceChildren(error);
     });
 }
@@ -735,7 +744,28 @@ document.addEventListener("DOMContentLoaded", function () {
   const sendBtn = document.getElementById("send-btn");
   const input = document.getElementById("msg-input");
   const pendingConversations = new Set();
+  // The chat request in flight for each conversation; «Стоп» aborts it from the UI.
+  const activeChatRequests = new Map();
   let creatingConversation = false;
+
+  // Shows the reason in Russian. The browser's own message (for example «The operation was aborted») stays out of the chat.
+  function chatErrorText(error) {
+    if (error && error.name === "AbortError") {
+      return "Ответ остановлен. Сервер мог продолжить работу, проверьте диалог позже.";
+    }
+    if (error && error.name === "TimeoutError") {
+      return "Ответ не пришёл за 5 минут. Повторите запрос.";
+    }
+    return "Не удалось получить ответ. Проверьте соединение и повторите.";
+  }
+
+  // The send button becomes «Stop» while the chat in the open conversation is still answering.
+  function syncSendButton() {
+    if (!sendBtn) return;
+    const running = Boolean(currentConvId && activeChatRequests.has(currentConvId));
+    sendBtn.textContent = running ? "■" : "➤";
+    sendBtn.setAttribute("aria-label", running ? "Остановить ответ" : "Отправить");
+  }
 
   const attachBtn = document.getElementById("attach-btn");
   const imageInput = document.getElementById("image-input");
@@ -907,8 +937,15 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function sendMessage() {
+    const running = currentConvId ? activeChatRequests.get(currentConvId) : null;
+    if (running) {
+      running.abort();
+      return;
+    }
     return sendTurn(null);
   }
+
+  window.addEventListener("logos:conversation-selected", syncSendButton);
 
   // retryRequest is { text, conversationId } when «Повторить» re-sends a failed message.
   async function sendTurn(retryRequest) {
@@ -918,7 +955,10 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!text) return;
     if (retryRequest && currentConvId !== retryRequest.conversationId) return;
     const selectedAtSubmit = currentConvId;
-    if (selectedAtSubmit ? pendingConversations.has(selectedAtSubmit) : creatingConversation) return;
+    if (selectedAtSubmit ? pendingConversations.has(selectedAtSubmit) : creatingConversation) {
+      window.LogosToast.show("Ответ ещё формируется, дождитесь его окончания.");
+      return;
+    }
 
     const turn = { conversationId: selectedAtSubmit, model: currentModel, text: text };
     const needsConversation = !selectedAtSubmit;
@@ -976,8 +1016,12 @@ document.addEventListener("DOMContentLoaded", function () {
         data = await runImageTurn({ ...turn, retry: Boolean(retryRequest), attachmentCount: sentImages.length });
         response = { status: data.error ? 502 : 200, ok: !data.error };
       } else {
+        const chatController = new AbortController();
+        activeChatRequests.set(turn.conversationId, chatController);
+        syncSendButton();
         response = await window.LogosDispatcher.request("/api/chat", {
           method: "POST",
+          signal: chatController.signal,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             message: turn.text,
@@ -1032,11 +1076,13 @@ document.addEventListener("DOMContentLoaded", function () {
       if (currentConvId === turn.conversationId) {
         restoreImages();
         if (!input.value) input.value = rawText;
-        addMessage("⚠️ Ошибка: " + (error.message || "Сетевой сбой"), "error", false, 0);
+        addMessage(chatErrorText(error), "error", false, 0);
       }
     } finally {
       if (typingEl) typingEl.remove();
       if (turn.conversationId) pendingConversations.delete(turn.conversationId);
+      if (turn.conversationId) activeChatRequests.delete(turn.conversationId);
+      syncSendButton();
       if (needsConversation) creatingConversation = false;
     }
   }
@@ -1044,12 +1090,14 @@ document.addEventListener("DOMContentLoaded", function () {
   if (sendBtn) sendBtn.addEventListener("click", sendMessage);
   if (input)
     input.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" && !e.shiftKey) {
+      // Enter that confirms an IME word is not a send.
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
         e.preventDefault();
         sendMessage();
       }
     });
 
   // Single history trigger: it does not depend on the conversation list or model catalog.
+  syncSendButton();
   if (currentConvId) loadHistory(currentConvId);
 });
