@@ -1,0 +1,2597 @@
+{
+  "schema_version": 1,
+  "scenario": "create_conversation",
+  "events": [
+    {
+      "event": "scenario_started",
+      "wall_utc": "2026-10-26T19:18:12.789310+00:00",
+      "monotonic_ns": 97909573049142,
+      "browser": {
+        "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "current_model": "alice-ai-art",
+        "conversation_ids": [
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+        ],
+        "active_rows": 1,
+        "url_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "stored_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 14,
+        "empty_state": false,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793042292785,
+        "performance_ms": 39700,
+        "time_origin_ms": 1793042253085
+      }
+    },
+    {
+      "event": "recorder_launch_requested",
+      "wall_utc": "2026-10-26T19:18:12.790032+00:00",
+      "monotonic_ns": 97909573715604
+    },
+    {
+      "event": "recorder_start_observed",
+      "wall_utc": "2026-10-26T19:18:13.292983+00:00",
+      "monotonic_ns": 97910076713835,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:11-conversation-before.png",
+      "wall_utc": "2026-10-26T19:18:13.670319+00:00",
+      "monotonic_ns": 97910454023296,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:11-conversation-before.png",
+      "wall_utc": "2026-10-26T19:18:14.477385+00:00",
+      "monotonic_ns": 97911261068527,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:11-conversation-before.png",
+      "wall_utc": "2026-10-26T19:18:15.189626+00:00",
+      "monotonic_ns": 97911973358450,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:11-conversation-before.png",
+      "wall_utc": "2026-10-26T19:18:15.194226+00:00",
+      "monotonic_ns": 97911977891912,
+      "recorder_running": true
+    },
+    {
+      "event": "network_observer_installed",
+      "wall_utc": "2026-10-26T19:18:15.217135+00:00",
+      "monotonic_ns": 97912000857527,
+      "browser": {
+        "installed": true,
+        "date_ms": 1793042295212,
+        "performance_ms": 42126,
+        "time_origin_ms": 1793042253085
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "new_chat_button_attempted",
+      "wall_utc": "2026-10-26T19:18:15.243255+00:00",
+      "monotonic_ns": 97912026969527,
+      "browser": {
+        "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "current_model": "alice-ai-art",
+        "conversation_ids": [
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+        ],
+        "active_rows": 1,
+        "url_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "stored_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 14,
+        "empty_state": false,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793042295238,
+        "performance_ms": 42153,
+        "time_origin_ms": 1793042253085
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "new_chat_button_clicked",
+      "wall_utc": "2026-10-26T19:18:15.388918+00:00",
+      "monotonic_ns": 97912172595912,
+      "browser": {
+        "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "current_model": "alice-ai-art",
+        "conversation_ids": [
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+        ],
+        "active_rows": 1,
+        "url_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "stored_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 14,
+        "empty_state": false,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793042295385,
+        "performance_ms": 42300,
+        "time_origin_ms": 1793042253085
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:12-conversation-model-picker.png",
+      "wall_utc": "2026-10-26T19:18:15.930367+00:00",
+      "monotonic_ns": 97912714050142,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:12-conversation-model-picker.png",
+      "wall_utc": "2026-10-26T19:18:16.703315+00:00",
+      "monotonic_ns": 97913487021527,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:12-conversation-model-picker.png",
+      "wall_utc": "2026-10-26T19:18:17.363558+00:00",
+      "monotonic_ns": 97914147292835,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:12-conversation-model-picker.png",
+      "wall_utc": "2026-10-26T19:18:17.369112+00:00",
+      "monotonic_ns": 97914152779373,
+      "recorder_running": true
+    },
+    {
+      "event": "model_picker_phase_observed",
+      "wall_utc": "2026-10-26T19:18:17.739106+00:00",
+      "monotonic_ns": 97914522830758,
+      "browser": {
+        "conversation": {
+          "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "current_model": "alice-ai-art",
+          "conversation_ids": [
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "active_ids": [
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+          ],
+          "active_rows": 1,
+          "url_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "stored_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "storage_available": true,
+          "model_choices": 1,
+          "message_count": 14,
+          "empty_state": false,
+          "error_state": false,
+          "ready_state": "complete",
+          "date_ms": 1793042297723,
+          "performance_ms": 44637,
+          "time_origin_ms": 1793042253085
+        },
+        "network": {
+          "available": true,
+          "intact": true,
+          "expired": false,
+          "requests": [],
+          "samples": [
+            {
+              "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+              "conversation_ids": [
+                "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+                "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+                "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+                "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+                "a37a8de8-acc0-4016-9250-5dc03c55df47",
+                "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+                "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+                "68814db3-13c2-45ee-b776-e770f7f6065a",
+                "f371a78e-b2f3-4ace-8597-39edc00723da",
+                "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+                "38f7195d-4813-4264-8d63-5ef31aeb2734",
+                "c1181aef-2e76-451d-a15e-204bb9e81306",
+                "8915994e-1f98-49b3-b4c2-8b49badda50e",
+                "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+                "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+                "df373696-3bbd-4929-87d1-520135362bb0",
+                "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+                "93f9dce8-6517-4b42-bd46-1620207457c9",
+                "06913773-9e3e-4c4d-a510-792975a1e1c9",
+                "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+                "a20c8238-2484-46be-8120-1e8ebcb7970d",
+                "00c2d210-ccba-47d7-8d95-7e08dd487126",
+                "66b73a50-c7b4-432e-8114-00abfcdb8201",
+                "f9d785f7-60ab-47da-a554-18d11747f17a",
+                "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+                "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+                "93e2e852-0bcc-4658-be14-78f561135342",
+                "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+              ],
+              "active_ids": [
+                "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+              ],
+              "message_count": 14,
+              "empty_state": false,
+              "error_state": false,
+              "sidebar_open": true,
+              "expanded": "true",
+              "date_ms": 1793042295211,
+              "performance_ms": 42126,
+              "reason": "initial"
+            }
+          ],
+          "sample_overflow": false
+        }
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "current_model_choice_started",
+      "wall_utc": "2026-10-26T19:18:17.739369+00:00",
+      "monotonic_ns": 97914523028604,
+      "browser": {
+        "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "current_model": "alice-ai-art",
+        "conversation_ids": [
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+        ],
+        "active_rows": 1,
+        "url_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "stored_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 14,
+        "empty_state": false,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793042297723,
+        "performance_ms": 44637,
+        "time_origin_ms": 1793042253085
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "current_model_choice_clicked",
+      "wall_utc": "2026-10-26T19:18:17.792030+00:00",
+      "monotonic_ns": 97914575700220,
+      "recorder_running": true
+    },
+    {
+      "event": "creation_result_observed",
+      "wall_utc": "2026-10-26T19:18:19.351185+00:00",
+      "monotonic_ns": 97916134878066,
+      "browser": {
+        "current_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+        "current_model": "alice-ai-art",
+        "conversation_ids": [
+          "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+        ],
+        "active_rows": 1,
+        "url_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+        "stored_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 0,
+        "empty_state": true,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793042299346,
+        "performance_ms": 46261,
+        "time_origin_ms": 1793042253085
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "sidebar_after_creation",
+      "wall_utc": "2026-10-26T19:18:19.777058+00:00",
+      "monotonic_ns": 97916560714758,
+      "browser": {
+        "open": false,
+        "expanded": "false"
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:13-conversation-created.png",
+      "wall_utc": "2026-10-26T19:18:20.113033+00:00",
+      "monotonic_ns": 97916896742143,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:13-conversation-created.png",
+      "wall_utc": "2026-10-26T19:18:20.910860+00:00",
+      "monotonic_ns": 97917694526681,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:13-conversation-created.png",
+      "wall_utc": "2026-10-26T19:18:21.469744+00:00",
+      "monotonic_ns": 97918253448912,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:13-conversation-created.png",
+      "wall_utc": "2026-10-26T19:18:21.473555+00:00",
+      "monotonic_ns": 97918257219374,
+      "recorder_running": true
+    },
+    {
+      "event": "reload_requested",
+      "wall_utc": "2026-10-26T19:18:21.491287+00:00",
+      "monotonic_ns": 97918274987374,
+      "browser": {
+        "current_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+        "current_model": "alice-ai-art",
+        "conversation_ids": [
+          "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+        ],
+        "active_rows": 1,
+        "url_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+        "stored_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 0,
+        "empty_state": true,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793042301487,
+        "performance_ms": 48401,
+        "time_origin_ms": 1793042253085
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "reload_result_observed",
+      "wall_utc": "2026-10-26T19:18:23.325572+00:00",
+      "monotonic_ns": 97920109258374,
+      "browser": {
+        "current_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+        "current_model": "alice-ai-art",
+        "conversation_ids": [
+          "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+        ],
+        "active_rows": 1,
+        "url_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+        "stored_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 0,
+        "empty_state": true,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793042303321,
+        "performance_ms": 1714,
+        "time_origin_ms": 1793042301608
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "reload_server_reads_requested",
+      "wall_utc": "2026-10-26T19:18:23.725425+00:00",
+      "monotonic_ns": 97920509111604,
+      "browser": {
+        "current_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+        "current_model": "alice-ai-art",
+        "conversation_ids": [
+          "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+        ],
+        "active_rows": 1,
+        "url_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+        "stored_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 0,
+        "empty_state": true,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793042303321,
+        "performance_ms": 1714,
+        "time_origin_ms": 1793042301608
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "reload_server_reads_observed",
+      "wall_utc": "2026-10-26T19:18:24.748996+00:00",
+      "monotonic_ns": 97921532661758,
+      "browser": {
+        "available": true,
+        "intact": true,
+        "expired": false,
+        "requests": [
+          {
+            "id": 1,
+            "path": "/api/conversations",
+            "method": "GET",
+            "started": {
+              "date_ms": 1793042303732,
+              "performance_ms": 2124
+            },
+            "finished": {
+              "date_ms": 1793042303780,
+              "performance_ms": 2173
+            },
+            "status": 200,
+            "error": null,
+            "body_done": true,
+            "response_id": null,
+            "response_ids": [
+              "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+              "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+              "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+              "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+              "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+              "a37a8de8-acc0-4016-9250-5dc03c55df47",
+              "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+              "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+              "68814db3-13c2-45ee-b776-e770f7f6065a",
+              "f371a78e-b2f3-4ace-8597-39edc00723da",
+              "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+              "38f7195d-4813-4264-8d63-5ef31aeb2734",
+              "c1181aef-2e76-451d-a15e-204bb9e81306",
+              "8915994e-1f98-49b3-b4c2-8b49badda50e",
+              "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+              "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+              "df373696-3bbd-4929-87d1-520135362bb0",
+              "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+              "93f9dce8-6517-4b42-bd46-1620207457c9",
+              "06913773-9e3e-4c4d-a510-792975a1e1c9",
+              "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+              "a20c8238-2484-46be-8120-1e8ebcb7970d",
+              "00c2d210-ccba-47d7-8d95-7e08dd487126",
+              "66b73a50-c7b4-432e-8114-00abfcdb8201",
+              "f9d785f7-60ab-47da-a554-18d11747f17a",
+              "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+              "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+              "93e2e852-0bcc-4658-be14-78f561135342",
+              "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+            ],
+            "response_message_count": null,
+            "blocked": false
+          },
+          {
+            "id": 2,
+            "path": "/api/conversations/0b3d6ede-8597-4552-a6cf-79584296a8e0/messages",
+            "method": "GET",
+            "started": {
+              "date_ms": 1793042303734,
+              "performance_ms": 2126
+            },
+            "finished": {
+              "date_ms": 1793042304202,
+              "performance_ms": 2594
+            },
+            "status": 200,
+            "error": null,
+            "body_done": true,
+            "response_id": null,
+            "response_ids": null,
+            "response_message_count": 0,
+            "blocked": false
+          }
+        ],
+        "samples": [
+          {
+            "current_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+            "conversation_ids": [
+              "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+              "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+              "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+              "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+              "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+              "a37a8de8-acc0-4016-9250-5dc03c55df47",
+              "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+              "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+              "68814db3-13c2-45ee-b776-e770f7f6065a",
+              "f371a78e-b2f3-4ace-8597-39edc00723da",
+              "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+              "38f7195d-4813-4264-8d63-5ef31aeb2734",
+              "c1181aef-2e76-451d-a15e-204bb9e81306",
+              "8915994e-1f98-49b3-b4c2-8b49badda50e",
+              "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+              "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+              "df373696-3bbd-4929-87d1-520135362bb0",
+              "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+              "93f9dce8-6517-4b42-bd46-1620207457c9",
+              "06913773-9e3e-4c4d-a510-792975a1e1c9",
+              "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+              "a20c8238-2484-46be-8120-1e8ebcb7970d",
+              "00c2d210-ccba-47d7-8d95-7e08dd487126",
+              "66b73a50-c7b4-432e-8114-00abfcdb8201",
+              "f9d785f7-60ab-47da-a554-18d11747f17a",
+              "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+              "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+              "93e2e852-0bcc-4658-be14-78f561135342",
+              "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+            ],
+            "active_ids": [
+              "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+            ],
+            "message_count": 0,
+            "empty_state": true,
+            "error_state": false,
+            "sidebar_open": false,
+            "expanded": "false",
+            "date_ms": 1793042303721,
+            "performance_ms": 2112,
+            "reason": "initial"
+          }
+        ],
+        "sample_overflow": false
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:14-conversation-after-reload.png",
+      "wall_utc": "2026-10-26T19:18:25.554327+00:00",
+      "monotonic_ns": 97922338048835,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:14-conversation-after-reload.png",
+      "wall_utc": "2026-10-26T19:18:26.394684+00:00",
+      "monotonic_ns": 97923178387297,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:14-conversation-after-reload.png",
+      "wall_utc": "2026-10-26T19:18:27.003595+00:00",
+      "monotonic_ns": 97923787257528,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:14-conversation-after-reload.png",
+      "wall_utc": "2026-10-26T19:18:27.006546+00:00",
+      "monotonic_ns": 97923790211066,
+      "recorder_running": true
+    },
+    {
+      "event": "tools_self_check_requested",
+      "wall_utc": "2026-10-26T19:18:27.006802+00:00",
+      "monotonic_ns": 97923790460912,
+      "recorder_running": true
+    },
+    {
+      "event": "tools_self_check_observed",
+      "wall_utc": "2026-10-26T19:20:13.012831+00:00",
+      "monotonic_ns": 98029796565765,
+      "browser": {
+        "status": "NOT_RUN",
+        "tools": [
+          {
+            "name": "apply_patch",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "calculate_hash",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.backup.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.budget.status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.capabilities",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.compute.list",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.compute.reboot",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.compute.start",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.compute.status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.compute.stop",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.costs.summary",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.logs.query",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.metrics.query",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.resources.get",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.resources.list",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.ssh.exec",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "copy_or_move_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "delete_path",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "file_stat",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "get_system_info",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_add",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_branches",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_commit",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_diff",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_fetch",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_log",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_pull",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_push",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_remote",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "glob_search",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.archive_case",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.case.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.collect_data",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.prepare_application",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.prepare_documents",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.process_response",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.request_approval",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.requirements",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.submit",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.tax_options",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.validate_data",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "grep_search",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "http_fetch",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "inspect_app_internals",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "list_directory",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "local_runtime_exec",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_conversation",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_conversation_messages",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_execution",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_execution_trace",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_invocation",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_invocation_trace",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_session",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_system_status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_list_agents",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_list_conversations",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_list_project_files",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_read_project_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_search_project",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "make_directory",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.addcube",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.addcylinder",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.edit",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.export",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.inspect",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.contact.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.contact.delete",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.contact.list",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.contact.update",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.delete",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.followup.complete",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.followup.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.get",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.list",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.message.prepare",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.message.send",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.status.update",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.thread.get",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.update",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.finance.assess",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.finance.plan.set",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.finance.status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.order.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.orders.list",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.plate.inspect",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.quote",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.treasury.summary",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "profile_application_performance",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "python_ast_outline",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "read_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "remove_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "run_command",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "set_ui_theme",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "ssh_runtime_exec",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "ssh_runtime_read_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "ssh_runtime_write_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_battery_status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_camera_photo",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_clipboard_get",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_clipboard_set",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_notification",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_open_app_settings",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_toast",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_torch",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_tts_speak",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_vibrate",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "wikipedia_search",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "wikipedia_summary",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "write_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "zip_compress",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "zip_extract",
+            "status": "NOT_RUN",
+            "calls": []
+          }
+        ],
+        "inactive_tools": [],
+        "coverage": {
+          "status": "NOT_RUN",
+          "expected": 115,
+          "called": 0,
+          "succeeded": 0,
+          "scope": "fresh_invocation_call_envelopes_only; effects_not_independently_verified"
+        },
+        "limits": {
+          "status": "UNKNOWN",
+          "unbounded": "UNKNOWN",
+          "parameter_domains": "UNKNOWN",
+          "provider_effective": "UNKNOWN",
+          "requests": [],
+          "reason": "finite_calls_do_not_prove_unbounded_parameters"
+        },
+        "hosted_and_mcp": {
+          "status": "UNKNOWN",
+          "reason": "registry_categories_do_not_prove_hosted_or_remote_inventory"
+        },
+        "reason": "message_history_not_append_only",
+        "question": "Логос, проведи проверку всех инструментов, реально переданных тебе в этом запросе: локальных, hosted и MCP. Сопоставь их с приложенным каталогом приложения: укажи отключённые категории, отсутствующие инструменты и причины недоступности. Для каждого инструмента перечисли параметры из фактической схемы, обязательность, значения по умолчанию, допустимые значения и пределы; отличай схему от реально принятых параметров. Выполни безопасные пробные вызовы чтения и проверь результат. Проверки записи допустимы только на собственных временных обратимых данных. Не читай секреты, ключи, переписку, контакты и другие личные данные; не выводи их. Опасные действия, внешние публикации, платные дополнительные сервисы и операции с устройствами не выполняй: обозначь NOT_RUN и причину. Не меняй доступ, настройки, защиту и ограничения. Не удаляй ограничения ради прохождения теста. Проверь также фактические настройки запроса: контекст, вывод, рассуждение, усечение, число вызовов и раундов, таймауты. Для каждого предела укажи источник: схема, приложение или провайдер. Неизвестное обозначь UNKNOWN: успешный вызов не доказывает, что параметры не ограничены. Итог: таблица инструмент → параметры → выполненный вызов → результат → ограничение → доказательство. Не утверждай «всё доступно» по одному каталогу или по собственному ответу без фактических вызовов. Каталог приложения: {\"categories\": {\"3d\": [\"printing3d.plate.inspect\", \"printing3d.quote\", \"printing3d.order.create\", \"printing3d.finance.assess\", \"printing3d.finance.status\", \"printing3d.finance.plan.set\", \"printing3d.treasury.summary\", \"printing3d.orders.list\", \"model.create\", \"model.addcube\", \"model.addcylinder\", \"model.edit\", \"model.inspect\", \"model.export\"], \"chatgpt_bridge\": [\"logos_get_system_status\", \"logos_list_agents\", \"logos_get_session\", \"logos_get_invocation\", \"logos_get_invocation_trace\"], \"chatgpt_conversation\": [\"logos_list_conversations\", \"logos_get_conversation\", \"logos_get_conversation_messages\", \"logos_get_execution\", \"logos_get_execution_trace\"], \"chatgpt_project\": [\"logos_list_project_files\", \"logos_read_project_file\", \"logos_search_project\"], \"cloud\": [\"cloud.capabilities\", \"cloud.resources.list\", \"cloud.resources.get\", \"cloud.compute.list\", \"cloud.compute.status\", \"cloud.compute.start\", \"cloud.compute.stop\", \"cloud.compute.reboot\", \"cloud.logs.query\", \"cloud.metrics.query\", \"cloud.backup.create\", \"cloud.costs.summary\", \"cloud.budget.status\", \"cloud.ssh.exec\"], \"filesystem\": [\"apply_patch\", \"read_file\", \"write_file\", \"python_ast_outline\", \"calculate_hash\", \"zip_compress\", \"zip_extract\", \"http_fetch\", \"make_directory\", \"copy_or_move_file\", \"delete_path\", \"list_directory\", \"glob_search\", \"grep_search\", \"file_stat\", \"run_command\", \"get_system_info\"], \"git\": [\"git_status\", \"git_log\", \"git_diff\", \"git_branches\", \"git_add\", \"git_commit\", \"git_remote\", \"git_push\", \"git_pull\", \"git_fetch\"], \"government\": [\"gov.case.create\", \"gov.requirements\", \"gov.collect_data\", \"gov.validate_data\", \"gov.tax_options\", \"gov.prepare_application\", \"gov.prepare_documents\", \"gov.request_approval\", \"gov.status\", \"gov.process_response\", \"gov.archive_case\", \"gov.submit\"], \"partner\": [\"partner.create\", \"partner.list\", \"partner.get\", \"partner.update\", \"partner.contact.create\", \"partner.delete\", \"partner.contact.list\", \"partner.contact.update\", \"partner.contact.delete\", \"partner.message.prepare\", \"partner.message.send\", \"partner.thread.get\", \"partner.status.update\", \"partner.followup.create\", \"partner.followup.complete\"], \"profiler\": [\"profile_application_performance\", \"inspect_app_internals\"], \"runtime\": [\"local_runtime_exec\", \"ssh_runtime_exec\", \"ssh_runtime_read_file\", \"ssh_runtime_write_file\"], \"termux\": [\"remove_file\", \"termux_open_app_settings\", \"termux_camera_photo\", \"termux_battery_status\", \"termux_toast\", \"termux_vibrate\", \"termux_torch\", \"termux_clipboard_get\", \"termux_clipboard_set\", \"termux_tts_speak\", \"termux_notification\"], \"theme\": [\"set_ui_theme\"], \"wikipedia\": [\"wikipedia_search\", \"wikipedia_summary\"]}, \"active_categories\": [\"git\", \"termux\", \"filesystem\", \"wikipedia\", \"profiler\", \"theme\", \"runtime\", \"government\", \"partner\", \"3d\", \"cloud\", \"chatgpt_project\", \"chatgpt_conversation\", \"chatgpt_bridge\"]}"
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:22-tools-self-check.png",
+      "wall_utc": "2026-10-26T19:20:13.383870+00:00",
+      "monotonic_ns": 98030167562380,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:22-tools-self-check.png",
+      "wall_utc": "2026-10-26T19:20:14.192281+00:00",
+      "monotonic_ns": 98030975990688,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:22-tools-self-check.png",
+      "wall_utc": "2026-10-26T19:20:14.866680+00:00",
+      "monotonic_ns": 98031650348919,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:22-tools-self-check.png",
+      "wall_utc": "2026-10-26T19:20:14.870278+00:00",
+      "monotonic_ns": 98031653942996,
+      "recorder_running": true
+    },
+    {
+      "event": "recorder_stop_requested",
+      "wall_utc": "2026-10-26T19:20:15.211884+00:00",
+      "monotonic_ns": 98031995543919,
+      "recorder_running": true
+    },
+    {
+      "event": "recorder_stop_observed",
+      "wall_utc": "2026-10-26T19:20:15.680282+00:00",
+      "monotonic_ns": 98032464151919,
+      "recorder_running": false
+    },
+    {
+      "event": "scenario_finished",
+      "wall_utc": "2026-10-26T19:20:15.695209+00:00",
+      "monotonic_ns": 98032478952611,
+      "browser": {
+        "verdict": "FAIL",
+        "failures": [
+          "tools_self_check_incomplete_or_failed"
+        ]
+      },
+      "recorder_running": false
+    }
+  ],
+  "result": {
+    "verdict": "FAIL",
+    "failures": [
+      "tools_self_check_incomplete_or_failed"
+    ],
+    "checkpoints": {
+      "new_conversation_postconditions": {
+        "status": "PASS"
+      },
+      "reload_persistence": {
+        "status": "PASS"
+      },
+      "message_send": {
+        "status": "NOT_RUN",
+        "reason": "creation_not_confirmed"
+      },
+      "tools_self_check": {
+        "status": "NOT_RUN",
+        "tools": [
+          {
+            "name": "apply_patch",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "calculate_hash",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.backup.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.budget.status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.capabilities",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.compute.list",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.compute.reboot",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.compute.start",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.compute.status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.compute.stop",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.costs.summary",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.logs.query",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.metrics.query",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.resources.get",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.resources.list",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.ssh.exec",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "copy_or_move_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "delete_path",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "file_stat",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "get_system_info",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_add",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_branches",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_commit",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_diff",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_fetch",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_log",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_pull",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_push",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_remote",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "glob_search",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.archive_case",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.case.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.collect_data",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.prepare_application",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.prepare_documents",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.process_response",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.request_approval",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.requirements",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.submit",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.tax_options",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.validate_data",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "grep_search",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "http_fetch",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "inspect_app_internals",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "list_directory",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "local_runtime_exec",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_conversation",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_conversation_messages",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_execution",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_execution_trace",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_invocation",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_invocation_trace",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_session",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_system_status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_list_agents",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_list_conversations",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_list_project_files",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_read_project_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_search_project",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "make_directory",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.addcube",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.addcylinder",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.edit",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.export",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.inspect",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.contact.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.contact.delete",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.contact.list",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.contact.update",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.delete",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.followup.complete",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.followup.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.get",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.list",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.message.prepare",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.message.send",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.status.update",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.thread.get",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.update",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.finance.assess",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.finance.plan.set",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.finance.status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.order.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.orders.list",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.plate.inspect",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.quote",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.treasury.summary",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "profile_application_performance",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "python_ast_outline",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "read_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "remove_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "run_command",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "set_ui_theme",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "ssh_runtime_exec",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "ssh_runtime_read_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "ssh_runtime_write_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_battery_status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_camera_photo",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_clipboard_get",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_clipboard_set",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_notification",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_open_app_settings",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_toast",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_torch",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_tts_speak",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_vibrate",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "wikipedia_search",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "wikipedia_summary",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "write_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "zip_compress",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "zip_extract",
+            "status": "NOT_RUN",
+            "calls": []
+          }
+        ],
+        "inactive_tools": [],
+        "coverage": {
+          "status": "NOT_RUN",
+          "expected": 115,
+          "called": 0,
+          "succeeded": 0,
+          "scope": "fresh_invocation_call_envelopes_only; effects_not_independently_verified"
+        },
+        "limits": {
+          "status": "UNKNOWN",
+          "unbounded": "UNKNOWN",
+          "parameter_domains": "UNKNOWN",
+          "provider_effective": "UNKNOWN",
+          "requests": [],
+          "reason": "finite_calls_do_not_prove_unbounded_parameters"
+        },
+        "hosted_and_mcp": {
+          "status": "UNKNOWN",
+          "reason": "registry_categories_do_not_prove_hosted_or_remote_inventory"
+        },
+        "reason": "message_history_not_append_only",
+        "question": "Логос, проведи проверку всех инструментов, реально переданных тебе в этом запросе: локальных, hosted и MCP. Сопоставь их с приложенным каталогом приложения: укажи отключённые категории, отсутствующие инструменты и причины недоступности. Для каждого инструмента перечисли параметры из фактической схемы, обязательность, значения по умолчанию, допустимые значения и пределы; отличай схему от реально принятых параметров. Выполни безопасные пробные вызовы чтения и проверь результат. Проверки записи допустимы только на собственных временных обратимых данных. Не читай секреты, ключи, переписку, контакты и другие личные данные; не выводи их. Опасные действия, внешние публикации, платные дополнительные сервисы и операции с устройствами не выполняй: обозначь NOT_RUN и причину. Не меняй доступ, настройки, защиту и ограничения. Не удаляй ограничения ради прохождения теста. Проверь также фактические настройки запроса: контекст, вывод, рассуждение, усечение, число вызовов и раундов, таймауты. Для каждого предела укажи источник: схема, приложение или провайдер. Неизвестное обозначь UNKNOWN: успешный вызов не доказывает, что параметры не ограничены. Итог: таблица инструмент → параметры → выполненный вызов → результат → ограничение → доказательство. Не утверждай «всё доступно» по одному каталогу или по собственному ответу без фактических вызовов. Каталог приложения: {\"categories\": {\"3d\": [\"printing3d.plate.inspect\", \"printing3d.quote\", \"printing3d.order.create\", \"printing3d.finance.assess\", \"printing3d.finance.status\", \"printing3d.finance.plan.set\", \"printing3d.treasury.summary\", \"printing3d.orders.list\", \"model.create\", \"model.addcube\", \"model.addcylinder\", \"model.edit\", \"model.inspect\", \"model.export\"], \"chatgpt_bridge\": [\"logos_get_system_status\", \"logos_list_agents\", \"logos_get_session\", \"logos_get_invocation\", \"logos_get_invocation_trace\"], \"chatgpt_conversation\": [\"logos_list_conversations\", \"logos_get_conversation\", \"logos_get_conversation_messages\", \"logos_get_execution\", \"logos_get_execution_trace\"], \"chatgpt_project\": [\"logos_list_project_files\", \"logos_read_project_file\", \"logos_search_project\"], \"cloud\": [\"cloud.capabilities\", \"cloud.resources.list\", \"cloud.resources.get\", \"cloud.compute.list\", \"cloud.compute.status\", \"cloud.compute.start\", \"cloud.compute.stop\", \"cloud.compute.reboot\", \"cloud.logs.query\", \"cloud.metrics.query\", \"cloud.backup.create\", \"cloud.costs.summary\", \"cloud.budget.status\", \"cloud.ssh.exec\"], \"filesystem\": [\"apply_patch\", \"read_file\", \"write_file\", \"python_ast_outline\", \"calculate_hash\", \"zip_compress\", \"zip_extract\", \"http_fetch\", \"make_directory\", \"copy_or_move_file\", \"delete_path\", \"list_directory\", \"glob_search\", \"grep_search\", \"file_stat\", \"run_command\", \"get_system_info\"], \"git\": [\"git_status\", \"git_log\", \"git_diff\", \"git_branches\", \"git_add\", \"git_commit\", \"git_remote\", \"git_push\", \"git_pull\", \"git_fetch\"], \"government\": [\"gov.case.create\", \"gov.requirements\", \"gov.collect_data\", \"gov.validate_data\", \"gov.tax_options\", \"gov.prepare_application\", \"gov.prepare_documents\", \"gov.request_approval\", \"gov.status\", \"gov.process_response\", \"gov.archive_case\", \"gov.submit\"], \"partner\": [\"partner.create\", \"partner.list\", \"partner.get\", \"partner.update\", \"partner.contact.create\", \"partner.delete\", \"partner.contact.list\", \"partner.contact.update\", \"partner.contact.delete\", \"partner.message.prepare\", \"partner.message.send\", \"partner.thread.get\", \"partner.status.update\", \"partner.followup.create\", \"partner.followup.complete\"], \"profiler\": [\"profile_application_performance\", \"inspect_app_internals\"], \"runtime\": [\"local_runtime_exec\", \"ssh_runtime_exec\", \"ssh_runtime_read_file\", \"ssh_runtime_write_file\"], \"termux\": [\"remove_file\", \"termux_open_app_settings\", \"termux_camera_photo\", \"termux_battery_status\", \"termux_toast\", \"termux_vibrate\", \"termux_torch\", \"termux_clipboard_get\", \"termux_clipboard_set\", \"termux_tts_speak\", \"termux_notification\"], \"theme\": [\"set_ui_theme\"], \"wikipedia\": [\"wikipedia_search\", \"wikipedia_summary\"]}, \"active_categories\": [\"git\", \"termux\", \"filesystem\", \"wikipedia\", \"profiler\", \"theme\", \"runtime\", \"government\", \"partner\", \"3d\", \"cloud\", \"chatgpt_project\", \"chatgpt_conversation\", \"chatgpt_bridge\"]}"
+      },
+      "creation_response": {
+        "status": "PASS",
+        "http_status": 201,
+        "confirmed_new_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+      }
+    },
+    "before": {
+      "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+      "current_model": "alice-ai-art",
+      "conversation_ids": [
+        "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+        "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+        "a37a8de8-acc0-4016-9250-5dc03c55df47",
+        "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+        "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+        "68814db3-13c2-45ee-b776-e770f7f6065a",
+        "f371a78e-b2f3-4ace-8597-39edc00723da",
+        "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+        "38f7195d-4813-4264-8d63-5ef31aeb2734",
+        "c1181aef-2e76-451d-a15e-204bb9e81306",
+        "8915994e-1f98-49b3-b4c2-8b49badda50e",
+        "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+        "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+        "df373696-3bbd-4929-87d1-520135362bb0",
+        "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+        "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "06913773-9e3e-4c4d-a510-792975a1e1c9",
+        "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+        "a20c8238-2484-46be-8120-1e8ebcb7970d",
+        "00c2d210-ccba-47d7-8d95-7e08dd487126",
+        "66b73a50-c7b4-432e-8114-00abfcdb8201",
+        "f9d785f7-60ab-47da-a554-18d11747f17a",
+        "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+        "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+        "93e2e852-0bcc-4658-be14-78f561135342",
+        "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+      ],
+      "active_ids": [
+        "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+      ],
+      "active_rows": 1,
+      "url_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+      "stored_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+      "storage_available": true,
+      "model_choices": 1,
+      "message_count": 14,
+      "empty_state": false,
+      "error_state": false,
+      "ready_state": "complete",
+      "date_ms": 1793042292785,
+      "performance_ms": 39700,
+      "time_origin_ms": 1793042253085
+    },
+    "after_create": {
+      "current_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+      "current_model": "alice-ai-art",
+      "conversation_ids": [
+        "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+        "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+        "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+        "a37a8de8-acc0-4016-9250-5dc03c55df47",
+        "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+        "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+        "68814db3-13c2-45ee-b776-e770f7f6065a",
+        "f371a78e-b2f3-4ace-8597-39edc00723da",
+        "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+        "38f7195d-4813-4264-8d63-5ef31aeb2734",
+        "c1181aef-2e76-451d-a15e-204bb9e81306",
+        "8915994e-1f98-49b3-b4c2-8b49badda50e",
+        "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+        "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+        "df373696-3bbd-4929-87d1-520135362bb0",
+        "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+        "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "06913773-9e3e-4c4d-a510-792975a1e1c9",
+        "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+        "a20c8238-2484-46be-8120-1e8ebcb7970d",
+        "00c2d210-ccba-47d7-8d95-7e08dd487126",
+        "66b73a50-c7b4-432e-8114-00abfcdb8201",
+        "f9d785f7-60ab-47da-a554-18d11747f17a",
+        "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+        "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+        "93e2e852-0bcc-4658-be14-78f561135342",
+        "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+      ],
+      "active_ids": [
+        "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+      ],
+      "active_rows": 1,
+      "url_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+      "stored_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+      "storage_available": true,
+      "model_choices": 1,
+      "message_count": 0,
+      "empty_state": true,
+      "error_state": false,
+      "ready_state": "complete",
+      "date_ms": 1793042299346,
+      "performance_ms": 46261,
+      "time_origin_ms": 1793042253085
+    },
+    "after_reload": {
+      "current_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+      "current_model": "alice-ai-art",
+      "conversation_ids": [
+        "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+        "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+        "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+        "a37a8de8-acc0-4016-9250-5dc03c55df47",
+        "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+        "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+        "68814db3-13c2-45ee-b776-e770f7f6065a",
+        "f371a78e-b2f3-4ace-8597-39edc00723da",
+        "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+        "38f7195d-4813-4264-8d63-5ef31aeb2734",
+        "c1181aef-2e76-451d-a15e-204bb9e81306",
+        "8915994e-1f98-49b3-b4c2-8b49badda50e",
+        "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+        "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+        "df373696-3bbd-4929-87d1-520135362bb0",
+        "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+        "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "06913773-9e3e-4c4d-a510-792975a1e1c9",
+        "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+        "a20c8238-2484-46be-8120-1e8ebcb7970d",
+        "00c2d210-ccba-47d7-8d95-7e08dd487126",
+        "66b73a50-c7b4-432e-8114-00abfcdb8201",
+        "f9d785f7-60ab-47da-a554-18d11747f17a",
+        "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+        "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+        "93e2e852-0bcc-4658-be14-78f561135342",
+        "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+      ],
+      "active_ids": [
+        "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+      ],
+      "active_rows": 1,
+      "url_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+      "stored_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+      "storage_available": true,
+      "model_choices": 1,
+      "message_count": 0,
+      "empty_state": true,
+      "error_state": false,
+      "ready_state": "complete",
+      "date_ms": 1793042304759,
+      "performance_ms": 3151,
+      "time_origin_ms": 1793042301608
+    },
+    "network": {
+      "available": true,
+      "intact": true,
+      "expired": false,
+      "requests": [
+        {
+          "id": 1,
+          "path": "/api/conversations",
+          "method": "POST",
+          "started": {
+            "date_ms": 1793042297757,
+            "performance_ms": 44673
+          },
+          "finished": {
+            "date_ms": 1793042297836,
+            "performance_ms": 44751
+          },
+          "status": 201,
+          "error": null,
+          "body_done": true,
+          "response_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+          "response_ids": null,
+          "response_message_count": null,
+          "blocked": false
+        },
+        {
+          "id": 2,
+          "path": "/api/conversations/0b3d6ede-8597-4552-a6cf-79584296a8e0/settings",
+          "method": "GET",
+          "started": {
+            "date_ms": 1793042297871,
+            "performance_ms": 44786
+          },
+          "finished": {
+            "date_ms": 1793042297956,
+            "performance_ms": 44871
+          },
+          "status": 200,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": null,
+          "response_message_count": null,
+          "blocked": false
+        },
+        {
+          "id": 3,
+          "path": "/api/conversations/0b3d6ede-8597-4552-a6cf-79584296a8e0/messages",
+          "method": "GET",
+          "started": {
+            "date_ms": 1793042297883,
+            "performance_ms": 44798
+          },
+          "finished": {
+            "date_ms": 1793042298295,
+            "performance_ms": 45210
+          },
+          "status": 200,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": null,
+          "response_message_count": 0,
+          "blocked": false
+        }
+      ],
+      "samples": [
+        {
+          "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "conversation_ids": [
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "active_ids": [
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+          ],
+          "message_count": 14,
+          "empty_state": false,
+          "error_state": false,
+          "sidebar_open": true,
+          "expanded": "true",
+          "date_ms": 1793042295211,
+          "performance_ms": 42126,
+          "reason": "initial"
+        },
+        {
+          "current_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+          "conversation_ids": [
+            "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "active_ids": [
+            "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+          ],
+          "message_count": 0,
+          "empty_state": false,
+          "error_state": false,
+          "sidebar_open": false,
+          "expanded": "false",
+          "date_ms": 1793042297900,
+          "performance_ms": 44815,
+          "reason": "mutation"
+        },
+        {
+          "current_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+          "conversation_ids": [
+            "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "active_ids": [
+            "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+          ],
+          "message_count": 0,
+          "empty_state": true,
+          "error_state": false,
+          "sidebar_open": false,
+          "expanded": "false",
+          "date_ms": 1793042298312,
+          "performance_ms": 45227,
+          "reason": "mutation"
+        }
+      ],
+      "sample_overflow": false
+    },
+    "reload_network": {
+      "available": true,
+      "intact": true,
+      "expired": false,
+      "requests": [
+        {
+          "id": 1,
+          "path": "/api/conversations",
+          "method": "GET",
+          "started": {
+            "date_ms": 1793042303732,
+            "performance_ms": 2124
+          },
+          "finished": {
+            "date_ms": 1793042303780,
+            "performance_ms": 2173
+          },
+          "status": 200,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": [
+            "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "response_message_count": null,
+          "blocked": false
+        },
+        {
+          "id": 2,
+          "path": "/api/conversations/0b3d6ede-8597-4552-a6cf-79584296a8e0/messages",
+          "method": "GET",
+          "started": {
+            "date_ms": 1793042303734,
+            "performance_ms": 2126
+          },
+          "finished": {
+            "date_ms": 1793042304202,
+            "performance_ms": 2594
+          },
+          "status": 200,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": null,
+          "response_message_count": 0,
+          "blocked": false
+        }
+      ],
+      "samples": [
+        {
+          "current_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+          "conversation_ids": [
+            "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "active_ids": [
+            "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+          ],
+          "message_count": 0,
+          "empty_state": true,
+          "error_state": false,
+          "sidebar_open": false,
+          "expanded": "false",
+          "date_ms": 1793042303721,
+          "performance_ms": 2112,
+          "reason": "initial"
+        }
+      ],
+      "sample_overflow": false
+    },
+    "video": {
+      "path": "15-conversation-create.mp4",
+      "available": true,
+      "time_limit_seconds": 180,
+      "clock_note": "Process timestamps bound recording; they do not identify the exact first video frame.",
+      "exit_code": 0
+    }
+  }
+}

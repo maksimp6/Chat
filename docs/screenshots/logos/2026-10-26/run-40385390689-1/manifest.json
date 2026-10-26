@@ -1,0 +1,2762 @@
+{
+  "schema_version": 2,
+  "device": "Redmi 9",
+  "browser": "Iceraven",
+  "capture_method": "Android screencap",
+  "interaction_method": "Firefox DevTools button click",
+  "runtime_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+  "browser_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+  "revision_match": true,
+  "ui_version": "d857300a21385e9bc8d2c8f3b391b2822e135c13d162099ef2725e1105b49214",
+  "application_process_id": 29455,
+  "preparation": {
+    "method": "Android/kernel wakeup, insecure keyguard dismissal, browser VIEW intent",
+    "before": {
+      "screen_on": true,
+      "interactive": true,
+      "power_wakefulness": "Awake",
+      "power_display_state": "ON",
+      "global_display_state": "ON",
+      "window_policy_screen_on": true,
+      "window_policy_interactive": true,
+      "keyguard_showing": false,
+      "input_restricted": false,
+      "keyguard_secure": false,
+      "browser_foreground": true
+    },
+    "wake_attempts": [
+      {
+        "method": "Android KEYCODE_WAKEUP",
+        "awake": true
+      }
+    ],
+    "ready": {
+      "screen_on": true,
+      "interactive": true,
+      "power_wakefulness": "Awake",
+      "power_display_state": "ON",
+      "global_display_state": "ON",
+      "window_policy_screen_on": true,
+      "window_policy_interactive": true,
+      "keyguard_showing": false,
+      "input_restricted": false,
+      "keyguard_secure": false,
+      "browser_foreground": true
+    },
+    "navigation": {
+      "tag": "40385390689-1-1793042252331008832",
+      "requested_at_ms": 1793042252332.2856,
+      "document_time_origin_ms": 1793042253085,
+      "rdp_location_replace_used": false
+    }
+  },
+  "captured_at": "2026-10-26T19:17:37.822990+00:00",
+  "initial_sidebar_open": false,
+  "final_sidebar_open": false,
+  "files": [
+    {
+      "path": "00-application-initial.png",
+      "sha256": "d9776023e8cf3e1193c7460488513fb9c4c22d9d03d183a44ff57832d4ca1656",
+      "size": 233182,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:17:37.822990+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": true,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": null,
+        "settingsPanels": [],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": false
+      }
+    },
+    {
+      "path": "01-sidebar-open.png",
+      "sha256": "96ae72bec3436654fefb6d5191a5e7e865abfb10abaf15554c0834160c421ab1",
+      "size": 162867,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:17:39.733567+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": true,
+        "sidebar": {
+          "x": 0,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 280
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": 221.26666259765625,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": 265.26666259765625
+        },
+        "reachable": {
+          "menu": false,
+          "newChat": true,
+          "close": true
+        },
+        "expanded": "true",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": null,
+        "settingsPanels": [],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": false
+      },
+      "matrix_expectation": {
+        "state": "01-sidebar-open",
+        "surface": null,
+        "sidebar": true,
+        "tab": null,
+        "verdict": "PASS",
+        "failures": [],
+        "retried_after_reload": false
+      }
+    },
+    {
+      "path": "02-sidebar-closed.png",
+      "sha256": "12f6adc0bfb6b572f41014a9417989e9ea38ec00f01ab43d2ec13f2c81a85056",
+      "size": 233492,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:17:41.797344+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": true,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": null,
+        "settingsPanels": [],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": false
+      },
+      "matrix_expectation": {
+        "state": "02-sidebar-closed",
+        "surface": null,
+        "sidebar": false,
+        "tab": null,
+        "verdict": "PASS",
+        "failures": [],
+        "retried_after_reload": false
+      }
+    },
+    {
+      "path": "03-sidebar-reopened.png",
+      "sha256": "e16e955454bae1ea35941e250f3e8e2d1b8513a67763576400dc432268482e26",
+      "size": 163132,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:17:43.753573+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": true,
+        "sidebar": {
+          "x": 0,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 280
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": 221.26666259765625,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": 265.26666259765625
+        },
+        "reachable": {
+          "menu": false,
+          "newChat": true,
+          "close": true
+        },
+        "expanded": "true",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": null,
+        "settingsPanels": [],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": false
+      },
+      "matrix_expectation": {
+        "state": "03-sidebar-reopened",
+        "surface": null,
+        "sidebar": true,
+        "tab": null,
+        "verdict": "PASS",
+        "failures": [],
+        "retried_after_reload": false
+      }
+    },
+    {
+      "path": "04-model-picker.png",
+      "sha256": "6a5254525bc03fc1f3483029850c40d2109eba5eb02ca88d9a73cb2c22c6bb6d",
+      "size": 245683,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:17:45.917190+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": false,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [
+          "model"
+        ],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": null,
+        "settingsPanels": [],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": true
+      },
+      "matrix_expectation": {
+        "state": "model_picker",
+        "surface": "model",
+        "sidebar": null,
+        "tab": null,
+        "verdict": "PASS",
+        "failures": [],
+        "retried_after_reload": false
+      }
+    },
+    {
+      "path": "19-model-picker-bottom.png",
+      "sha256": "9a16fde48807c03a4a0d031f836892d94c2ad80f7766bf1e4cf04acedd92cb94",
+      "size": 238579,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:17:47.326419+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": false,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [
+          "model"
+        ],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": null,
+        "settingsPanels": [],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": true
+      },
+      "matrix_expectation": {
+        "state": "model_picker_bottom",
+        "surface": "model",
+        "sidebar": null,
+        "tab": null,
+        "verdict": "PASS",
+        "failures": [],
+        "retried_after_reload": false
+      },
+      "scroll": {
+        "where": "bottom",
+        "selector": "#model-modal .modal-content",
+        "scrollTop": 426.4333190917969,
+        "scrollHeight": 1120,
+        "clientHeight": 693,
+        "scrollable": true
+      }
+    },
+    {
+      "path": "05-system-status.png",
+      "sha256": "4a07169d0338899f630e46a34c8e5fd977a56bb975c97b7ab97c5d4d8e7f11fa",
+      "size": 211082,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:17:49.291652+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": true,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [
+          "status"
+        ],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": null,
+        "settingsPanels": [],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": true
+      },
+      "matrix_expectation": {
+        "state": "system_status",
+        "surface": "status",
+        "sidebar": null,
+        "tab": null,
+        "verdict": "PASS",
+        "failures": [],
+        "retried_after_reload": false
+      }
+    },
+    {
+      "path": "20-system-status-bottom.png",
+      "sha256": "4a07169d0338899f630e46a34c8e5fd977a56bb975c97b7ab97c5d4d8e7f11fa",
+      "size": 211082,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:17:50.787429+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": true,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [
+          "status"
+        ],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": null,
+        "settingsPanels": [],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": true
+      },
+      "matrix_expectation": {
+        "state": "system_status_bottom",
+        "surface": "status",
+        "sidebar": null,
+        "tab": null,
+        "verdict": "PASS",
+        "failures": [],
+        "retried_after_reload": false
+      },
+      "scroll": {
+        "where": "bottom",
+        "selector": ".logos-system-status-content",
+        "scrollTop": 0,
+        "scrollHeight": 286,
+        "clientHeight": 286,
+        "scrollable": false
+      }
+    },
+    {
+      "path": "06-settings-gen.png",
+      "sha256": "65ddbb837e7dc7c2ef7428dbbb19defd0fe4ef59999e8ee39feca0440f171993",
+      "size": 184884,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:17:53.004872+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": false,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [
+          "settings"
+        ],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": "tab-gen",
+        "settingsPanels": [
+          "tab-gen"
+        ],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": true
+      },
+      "matrix_expectation": {
+        "state": "settings_gen",
+        "surface": "settings",
+        "sidebar": null,
+        "tab": "tab-gen",
+        "verdict": "PASS",
+        "failures": [],
+        "retried_after_reload": false
+      }
+    },
+    {
+      "path": "07-settings-output.png",
+      "sha256": "6fe91bb8a5c8c2e9dfafd863eed15e776a7ddfd04328dbe79949d3cdb01b00e6",
+      "size": 154330,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:17:54.680367+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": false,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [
+          "settings"
+        ],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": "tab-output",
+        "settingsPanels": [
+          "tab-output"
+        ],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": true
+      },
+      "matrix_expectation": {
+        "state": "settings_output",
+        "surface": "settings",
+        "sidebar": null,
+        "tab": "tab-output",
+        "verdict": "PASS",
+        "failures": [],
+        "retried_after_reload": false
+      }
+    },
+    {
+      "path": "08-settings-routing.png",
+      "sha256": "71aa7b73788c84ab906f92c1cc509729699d4fd14d1736b639cb9c297255ae78",
+      "size": 177352,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:17:56.338334+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": false,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [
+          "settings"
+        ],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": "tab-routing",
+        "settingsPanels": [
+          "tab-routing"
+        ],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": true
+      },
+      "matrix_expectation": {
+        "state": "settings_routing",
+        "surface": "settings",
+        "sidebar": null,
+        "tab": "tab-routing",
+        "verdict": "PASS",
+        "failures": [],
+        "retried_after_reload": false
+      }
+    },
+    {
+      "path": "09-settings-adv.png",
+      "sha256": "ea0fdadc204e60081f6c0e6fefca3d9b043e77c9db41b4b5b1c2579935bfd4df",
+      "size": 183954,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:17:57.982487+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": false,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [
+          "settings"
+        ],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": "tab-adv",
+        "settingsPanels": [
+          "tab-adv"
+        ],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": true
+      },
+      "matrix_expectation": {
+        "state": "settings_adv",
+        "surface": "settings",
+        "sidebar": null,
+        "tab": "tab-adv",
+        "verdict": "PASS",
+        "failures": [],
+        "retried_after_reload": false
+      }
+    },
+    {
+      "path": "10-settings-theme.png",
+      "sha256": "37e58fd4837189cf742d6bcda5ae5c2bc6bdffc33f2a94e1208de589a46c9974",
+      "size": 164392,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:17:59.705672+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": false,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [
+          "settings"
+        ],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": "tab-theme",
+        "settingsPanels": [
+          "tab-theme"
+        ],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": true
+      },
+      "matrix_expectation": {
+        "state": "settings_theme",
+        "surface": "settings",
+        "sidebar": null,
+        "tab": "tab-theme",
+        "verdict": "PASS",
+        "failures": [],
+        "retried_after_reload": false
+      }
+    },
+    {
+      "path": "21-settings-gen-bottom.png",
+      "sha256": "2e9ec3c44b547ec5ce1eaf9a96f0051797696d27aaebcb957d383beae6377ca0",
+      "size": 191581,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:18:01.160626+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": false,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [
+          "settings"
+        ],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": "tab-gen",
+        "settingsPanels": [
+          "tab-gen"
+        ],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": true
+      },
+      "matrix_expectation": {
+        "state": "settings_gen_bottom",
+        "surface": "settings",
+        "sidebar": null,
+        "tab": "tab-gen",
+        "verdict": "PASS",
+        "failures": [],
+        "retried_after_reload": false
+      },
+      "scroll": {
+        "where": "bottom",
+        "selector": "#settings-modal-custom .settings-modal-panel",
+        "scrollTop": 46.93333435058594,
+        "scrollHeight": 740,
+        "clientHeight": 693,
+        "scrollable": true
+      }
+    },
+    {
+      "path": "17-chat-top.png",
+      "sha256": "d2cbee14b22da2f68761f61995945e2972edbc8a54a455773597ae5239880a9e",
+      "size": 313866,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:18:09.381511+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": true,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": null,
+        "settingsPanels": [],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": false
+      },
+      "matrix_expectation": {
+        "state": "chat_top",
+        "surface": null,
+        "sidebar": null,
+        "tab": null,
+        "verdict": "PASS",
+        "failures": [],
+        "retried_after_reload": false
+      },
+      "scroll": {
+        "where": "top",
+        "selector": "#chatbox",
+        "scrollTop": 0,
+        "scrollHeight": 13342,
+        "clientHeight": 525,
+        "scrollable": true,
+        "index": 0,
+        "id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "title": "Логос, проведи проверку всех инструментов, реально переданных тебе в этом запро…",
+        "message_count": 14
+      }
+    },
+    {
+      "path": "18-chat-bottom.png",
+      "sha256": "75798e6925225ec86d1eef2b0025f4907b3f8a6bfb4fa0efd2e3da3d6f974279",
+      "size": 233896,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:18:10.828678+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": true,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": null,
+        "settingsPanels": [],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": false
+      },
+      "matrix_expectation": {
+        "state": "chat_bottom",
+        "surface": null,
+        "sidebar": null,
+        "tab": null,
+        "verdict": "PASS",
+        "failures": [],
+        "retried_after_reload": false
+      },
+      "scroll": {
+        "where": "bottom",
+        "selector": "#chatbox",
+        "scrollTop": 12817.56640625,
+        "scrollHeight": 13342,
+        "clientHeight": 525,
+        "scrollable": true,
+        "index": 0,
+        "id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "title": "Логос, проведи проверку всех инструментов, реально переданных тебе в этом запро…",
+        "message_count": 14
+      }
+    },
+    {
+      "path": "11-conversation-before.png",
+      "sha256": "9ab47358c2af3c57a3a77191f8b06a1f18d041c06ca2055957c5c2f436e5e994",
+      "size": 163568,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:18:15.193919+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": true,
+        "sidebar": {
+          "x": 0,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 280
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": 221.26666259765625,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": 265.26666259765625
+        },
+        "reachable": {
+          "menu": false,
+          "newChat": true,
+          "close": true
+        },
+        "expanded": "true",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": null,
+        "settingsPanels": [],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": false
+      }
+    },
+    {
+      "path": "12-conversation-model-picker.png",
+      "sha256": "774f85204cae56a15f7f16f68b10a4b223bae59d76f70795bed8a74db499ed01",
+      "size": 245809,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:18:17.368780+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": true,
+        "sidebar": {
+          "x": 0,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 280
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": 221.26666259765625,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": 265.26666259765625
+        },
+        "reachable": {
+          "menu": false,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "true",
+        "conversations": 28,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [
+          "model"
+        ],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": null,
+        "settingsPanels": [],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": true
+      }
+    },
+    {
+      "path": "13-conversation-created.png",
+      "sha256": "687e37b74e4f3b186fea3c8a59472dafe7a57a061ca01793ee0ad4e0e9bd6ab1",
+      "size": 103294,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:18:21.473308+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042253085,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": true,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 29,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": null,
+        "settingsPanels": [],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": false
+      }
+    },
+    {
+      "path": "14-conversation-after-reload.png",
+      "sha256": "492ef5b8c4b2a2222e345f4266348a4cf958072d97ef9bf67cfcd06a81cdd572",
+      "size": 103282,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:18:27.006295+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042301608,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": true,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 29,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [],
+        "statusCounts": {
+          "ready": 3
+        },
+        "settingsTab": null,
+        "settingsPanels": [],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": false
+      }
+    },
+    {
+      "path": "22-tools-self-check.png",
+      "sha256": "095a32b130b9169255b21cd0d38f3de3b07f5d874fdfe7e2e44744480fec9d5a",
+      "size": 256314,
+      "width": 1080,
+      "height": 2340,
+      "captured_at": "2026-10-26T19:20:14.869969+00:00",
+      "browser": {
+        "url": "http://127.0.0.1:8080/",
+        "title": "Logos",
+        "document_ready_state": "complete",
+        "visibility": "visible",
+        "revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "template_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+        "time_origin_ms": 1793042301608,
+        "navigation_tag": "40385390689-1-1793042252331008832",
+        "revision_source": "runtime_global",
+        "boot_global_missing": false,
+        "core_api_missing": false,
+        "open": false,
+        "sidebar": {
+          "x": -280,
+          "y": 0,
+          "width": 280,
+          "height": 717.2000122070312,
+          "right": 0
+        },
+        "menu": {
+          "x": 15,
+          "y": 12,
+          "width": 44,
+          "height": 44,
+          "right": 59
+        },
+        "close": {
+          "x": -58.73333740234375,
+          "y": 14,
+          "width": 44,
+          "height": 44,
+          "right": -14.73333740234375
+        },
+        "reachable": {
+          "menu": true,
+          "newChat": false,
+          "close": false
+        },
+        "expanded": "false",
+        "conversations": 29,
+        "viewport": {
+          "width": 396,
+          "height": 717,
+          "dpr": 2.727272727272727
+        },
+        "surfaces": [],
+        "statusCounts": {
+          "ready": 2,
+          "degraded": 1
+        },
+        "settingsTab": null,
+        "settingsPanels": [],
+        "unsafeModal": false,
+        "unexpectedModal": false,
+        "modalOpen": false
+      }
+    }
+  ],
+  "matrix_scenario": {
+    "verdict": "PASS",
+    "failures": []
+  },
+  "creation_scenario": {
+    "verdict": "FAIL",
+    "failures": [
+      "tools_self_check_incomplete_or_failed"
+    ],
+    "checkpoints": {
+      "new_conversation_postconditions": {
+        "status": "PASS"
+      },
+      "reload_persistence": {
+        "status": "PASS"
+      },
+      "message_send": {
+        "status": "NOT_RUN",
+        "reason": "creation_not_confirmed"
+      },
+      "tools_self_check": {
+        "status": "NOT_RUN",
+        "tools": [
+          {
+            "name": "apply_patch",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "calculate_hash",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.backup.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.budget.status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.capabilities",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.compute.list",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.compute.reboot",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.compute.start",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.compute.status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.compute.stop",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.costs.summary",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.logs.query",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.metrics.query",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.resources.get",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.resources.list",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "cloud.ssh.exec",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "copy_or_move_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "delete_path",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "file_stat",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "get_system_info",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_add",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_branches",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_commit",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_diff",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_fetch",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_log",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_pull",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_push",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_remote",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "git_status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "glob_search",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.archive_case",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.case.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.collect_data",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.prepare_application",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.prepare_documents",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.process_response",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.request_approval",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.requirements",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.submit",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.tax_options",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "gov.validate_data",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "grep_search",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "http_fetch",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "inspect_app_internals",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "list_directory",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "local_runtime_exec",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_conversation",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_conversation_messages",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_execution",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_execution_trace",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_invocation",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_invocation_trace",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_session",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_get_system_status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_list_agents",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_list_conversations",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_list_project_files",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_read_project_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "logos_search_project",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "make_directory",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.addcube",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.addcylinder",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.edit",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.export",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "model.inspect",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.contact.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.contact.delete",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.contact.list",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.contact.update",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.delete",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.followup.complete",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.followup.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.get",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.list",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.message.prepare",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.message.send",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.status.update",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.thread.get",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "partner.update",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.finance.assess",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.finance.plan.set",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.finance.status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.order.create",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.orders.list",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.plate.inspect",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.quote",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "printing3d.treasury.summary",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "profile_application_performance",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "python_ast_outline",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "read_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "remove_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "run_command",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "set_ui_theme",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "ssh_runtime_exec",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "ssh_runtime_read_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "ssh_runtime_write_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_battery_status",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_camera_photo",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_clipboard_get",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_clipboard_set",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_notification",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_open_app_settings",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_toast",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_torch",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_tts_speak",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "termux_vibrate",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "wikipedia_search",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "wikipedia_summary",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "write_file",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "zip_compress",
+            "status": "NOT_RUN",
+            "calls": []
+          },
+          {
+            "name": "zip_extract",
+            "status": "NOT_RUN",
+            "calls": []
+          }
+        ],
+        "inactive_tools": [],
+        "coverage": {
+          "status": "NOT_RUN",
+          "expected": 115,
+          "called": 0,
+          "succeeded": 0,
+          "scope": "fresh_invocation_call_envelopes_only; effects_not_independently_verified"
+        },
+        "limits": {
+          "status": "UNKNOWN",
+          "unbounded": "UNKNOWN",
+          "parameter_domains": "UNKNOWN",
+          "provider_effective": "UNKNOWN",
+          "requests": [],
+          "reason": "finite_calls_do_not_prove_unbounded_parameters"
+        },
+        "hosted_and_mcp": {
+          "status": "UNKNOWN",
+          "reason": "registry_categories_do_not_prove_hosted_or_remote_inventory"
+        },
+        "reason": "message_history_not_append_only",
+        "question": "Логос, проведи проверку всех инструментов, реально переданных тебе в этом запросе: локальных, hosted и MCP. Сопоставь их с приложенным каталогом приложения: укажи отключённые категории, отсутствующие инструменты и причины недоступности. Для каждого инструмента перечисли параметры из фактической схемы, обязательность, значения по умолчанию, допустимые значения и пределы; отличай схему от реально принятых параметров. Выполни безопасные пробные вызовы чтения и проверь результат. Проверки записи допустимы только на собственных временных обратимых данных. Не читай секреты, ключи, переписку, контакты и другие личные данные; не выводи их. Опасные действия, внешние публикации, платные дополнительные сервисы и операции с устройствами не выполняй: обозначь NOT_RUN и причину. Не меняй доступ, настройки, защиту и ограничения. Не удаляй ограничения ради прохождения теста. Проверь также фактические настройки запроса: контекст, вывод, рассуждение, усечение, число вызовов и раундов, таймауты. Для каждого предела укажи источник: схема, приложение или провайдер. Неизвестное обозначь UNKNOWN: успешный вызов не доказывает, что параметры не ограничены. Итог: таблица инструмент → параметры → выполненный вызов → результат → ограничение → доказательство. Не утверждай «всё доступно» по одному каталогу или по собственному ответу без фактических вызовов. Каталог приложения: {\"categories\": {\"3d\": [\"printing3d.plate.inspect\", \"printing3d.quote\", \"printing3d.order.create\", \"printing3d.finance.assess\", \"printing3d.finance.status\", \"printing3d.finance.plan.set\", \"printing3d.treasury.summary\", \"printing3d.orders.list\", \"model.create\", \"model.addcube\", \"model.addcylinder\", \"model.edit\", \"model.inspect\", \"model.export\"], \"chatgpt_bridge\": [\"logos_get_system_status\", \"logos_list_agents\", \"logos_get_session\", \"logos_get_invocation\", \"logos_get_invocation_trace\"], \"chatgpt_conversation\": [\"logos_list_conversations\", \"logos_get_conversation\", \"logos_get_conversation_messages\", \"logos_get_execution\", \"logos_get_execution_trace\"], \"chatgpt_project\": [\"logos_list_project_files\", \"logos_read_project_file\", \"logos_search_project\"], \"cloud\": [\"cloud.capabilities\", \"cloud.resources.list\", \"cloud.resources.get\", \"cloud.compute.list\", \"cloud.compute.status\", \"cloud.compute.start\", \"cloud.compute.stop\", \"cloud.compute.reboot\", \"cloud.logs.query\", \"cloud.metrics.query\", \"cloud.backup.create\", \"cloud.costs.summary\", \"cloud.budget.status\", \"cloud.ssh.exec\"], \"filesystem\": [\"apply_patch\", \"read_file\", \"write_file\", \"python_ast_outline\", \"calculate_hash\", \"zip_compress\", \"zip_extract\", \"http_fetch\", \"make_directory\", \"copy_or_move_file\", \"delete_path\", \"list_directory\", \"glob_search\", \"grep_search\", \"file_stat\", \"run_command\", \"get_system_info\"], \"git\": [\"git_status\", \"git_log\", \"git_diff\", \"git_branches\", \"git_add\", \"git_commit\", \"git_remote\", \"git_push\", \"git_pull\", \"git_fetch\"], \"government\": [\"gov.case.create\", \"gov.requirements\", \"gov.collect_data\", \"gov.validate_data\", \"gov.tax_options\", \"gov.prepare_application\", \"gov.prepare_documents\", \"gov.request_approval\", \"gov.status\", \"gov.process_response\", \"gov.archive_case\", \"gov.submit\"], \"partner\": [\"partner.create\", \"partner.list\", \"partner.get\", \"partner.update\", \"partner.contact.create\", \"partner.delete\", \"partner.contact.list\", \"partner.contact.update\", \"partner.contact.delete\", \"partner.message.prepare\", \"partner.message.send\", \"partner.thread.get\", \"partner.status.update\", \"partner.followup.create\", \"partner.followup.complete\"], \"profiler\": [\"profile_application_performance\", \"inspect_app_internals\"], \"runtime\": [\"local_runtime_exec\", \"ssh_runtime_exec\", \"ssh_runtime_read_file\", \"ssh_runtime_write_file\"], \"termux\": [\"remove_file\", \"termux_open_app_settings\", \"termux_camera_photo\", \"termux_battery_status\", \"termux_toast\", \"termux_vibrate\", \"termux_torch\", \"termux_clipboard_get\", \"termux_clipboard_set\", \"termux_tts_speak\", \"termux_notification\"], \"theme\": [\"set_ui_theme\"], \"wikipedia\": [\"wikipedia_search\", \"wikipedia_summary\"]}, \"active_categories\": [\"git\", \"termux\", \"filesystem\", \"wikipedia\", \"profiler\", \"theme\", \"runtime\", \"government\", \"partner\", \"3d\", \"cloud\", \"chatgpt_project\", \"chatgpt_conversation\", \"chatgpt_bridge\"]}"
+      },
+      "creation_response": {
+        "status": "PASS",
+        "http_status": 201,
+        "confirmed_new_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+      }
+    },
+    "before": {
+      "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+      "current_model": "alice-ai-art",
+      "conversation_ids": [
+        "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+        "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+        "a37a8de8-acc0-4016-9250-5dc03c55df47",
+        "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+        "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+        "68814db3-13c2-45ee-b776-e770f7f6065a",
+        "f371a78e-b2f3-4ace-8597-39edc00723da",
+        "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+        "38f7195d-4813-4264-8d63-5ef31aeb2734",
+        "c1181aef-2e76-451d-a15e-204bb9e81306",
+        "8915994e-1f98-49b3-b4c2-8b49badda50e",
+        "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+        "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+        "df373696-3bbd-4929-87d1-520135362bb0",
+        "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+        "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "06913773-9e3e-4c4d-a510-792975a1e1c9",
+        "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+        "a20c8238-2484-46be-8120-1e8ebcb7970d",
+        "00c2d210-ccba-47d7-8d95-7e08dd487126",
+        "66b73a50-c7b4-432e-8114-00abfcdb8201",
+        "f9d785f7-60ab-47da-a554-18d11747f17a",
+        "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+        "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+        "93e2e852-0bcc-4658-be14-78f561135342",
+        "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+      ],
+      "active_ids": [
+        "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+      ],
+      "active_rows": 1,
+      "url_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+      "stored_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+      "storage_available": true,
+      "model_choices": 1,
+      "message_count": 14,
+      "empty_state": false,
+      "error_state": false,
+      "ready_state": "complete",
+      "date_ms": 1793042292785,
+      "performance_ms": 39700,
+      "time_origin_ms": 1793042253085
+    },
+    "after_create": {
+      "current_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+      "current_model": "alice-ai-art",
+      "conversation_ids": [
+        "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+        "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+        "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+        "a37a8de8-acc0-4016-9250-5dc03c55df47",
+        "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+        "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+        "68814db3-13c2-45ee-b776-e770f7f6065a",
+        "f371a78e-b2f3-4ace-8597-39edc00723da",
+        "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+        "38f7195d-4813-4264-8d63-5ef31aeb2734",
+        "c1181aef-2e76-451d-a15e-204bb9e81306",
+        "8915994e-1f98-49b3-b4c2-8b49badda50e",
+        "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+        "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+        "df373696-3bbd-4929-87d1-520135362bb0",
+        "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+        "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "06913773-9e3e-4c4d-a510-792975a1e1c9",
+        "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+        "a20c8238-2484-46be-8120-1e8ebcb7970d",
+        "00c2d210-ccba-47d7-8d95-7e08dd487126",
+        "66b73a50-c7b4-432e-8114-00abfcdb8201",
+        "f9d785f7-60ab-47da-a554-18d11747f17a",
+        "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+        "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+        "93e2e852-0bcc-4658-be14-78f561135342",
+        "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+      ],
+      "active_ids": [
+        "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+      ],
+      "active_rows": 1,
+      "url_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+      "stored_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+      "storage_available": true,
+      "model_choices": 1,
+      "message_count": 0,
+      "empty_state": true,
+      "error_state": false,
+      "ready_state": "complete",
+      "date_ms": 1793042299346,
+      "performance_ms": 46261,
+      "time_origin_ms": 1793042253085
+    },
+    "after_reload": {
+      "current_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+      "current_model": "alice-ai-art",
+      "conversation_ids": [
+        "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+        "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+        "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+        "a37a8de8-acc0-4016-9250-5dc03c55df47",
+        "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+        "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+        "68814db3-13c2-45ee-b776-e770f7f6065a",
+        "f371a78e-b2f3-4ace-8597-39edc00723da",
+        "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+        "38f7195d-4813-4264-8d63-5ef31aeb2734",
+        "c1181aef-2e76-451d-a15e-204bb9e81306",
+        "8915994e-1f98-49b3-b4c2-8b49badda50e",
+        "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+        "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+        "df373696-3bbd-4929-87d1-520135362bb0",
+        "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+        "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "06913773-9e3e-4c4d-a510-792975a1e1c9",
+        "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+        "a20c8238-2484-46be-8120-1e8ebcb7970d",
+        "00c2d210-ccba-47d7-8d95-7e08dd487126",
+        "66b73a50-c7b4-432e-8114-00abfcdb8201",
+        "f9d785f7-60ab-47da-a554-18d11747f17a",
+        "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+        "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+        "93e2e852-0bcc-4658-be14-78f561135342",
+        "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+      ],
+      "active_ids": [
+        "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+      ],
+      "active_rows": 1,
+      "url_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+      "stored_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+      "storage_available": true,
+      "model_choices": 1,
+      "message_count": 0,
+      "empty_state": true,
+      "error_state": false,
+      "ready_state": "complete",
+      "date_ms": 1793042304759,
+      "performance_ms": 3151,
+      "time_origin_ms": 1793042301608
+    },
+    "network": {
+      "available": true,
+      "intact": true,
+      "expired": false,
+      "requests": [
+        {
+          "id": 1,
+          "path": "/api/conversations",
+          "method": "POST",
+          "started": {
+            "date_ms": 1793042297757,
+            "performance_ms": 44673
+          },
+          "finished": {
+            "date_ms": 1793042297836,
+            "performance_ms": 44751
+          },
+          "status": 201,
+          "error": null,
+          "body_done": true,
+          "response_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+          "response_ids": null,
+          "response_message_count": null,
+          "blocked": false
+        },
+        {
+          "id": 2,
+          "path": "/api/conversations/0b3d6ede-8597-4552-a6cf-79584296a8e0/settings",
+          "method": "GET",
+          "started": {
+            "date_ms": 1793042297871,
+            "performance_ms": 44786
+          },
+          "finished": {
+            "date_ms": 1793042297956,
+            "performance_ms": 44871
+          },
+          "status": 200,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": null,
+          "response_message_count": null,
+          "blocked": false
+        },
+        {
+          "id": 3,
+          "path": "/api/conversations/0b3d6ede-8597-4552-a6cf-79584296a8e0/messages",
+          "method": "GET",
+          "started": {
+            "date_ms": 1793042297883,
+            "performance_ms": 44798
+          },
+          "finished": {
+            "date_ms": 1793042298295,
+            "performance_ms": 45210
+          },
+          "status": 200,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": null,
+          "response_message_count": 0,
+          "blocked": false
+        }
+      ],
+      "samples": [
+        {
+          "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "conversation_ids": [
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "active_ids": [
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+          ],
+          "message_count": 14,
+          "empty_state": false,
+          "error_state": false,
+          "sidebar_open": true,
+          "expanded": "true",
+          "date_ms": 1793042295211,
+          "performance_ms": 42126,
+          "reason": "initial"
+        },
+        {
+          "current_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+          "conversation_ids": [
+            "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "active_ids": [
+            "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+          ],
+          "message_count": 0,
+          "empty_state": false,
+          "error_state": false,
+          "sidebar_open": false,
+          "expanded": "false",
+          "date_ms": 1793042297900,
+          "performance_ms": 44815,
+          "reason": "mutation"
+        },
+        {
+          "current_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+          "conversation_ids": [
+            "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "active_ids": [
+            "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+          ],
+          "message_count": 0,
+          "empty_state": true,
+          "error_state": false,
+          "sidebar_open": false,
+          "expanded": "false",
+          "date_ms": 1793042298312,
+          "performance_ms": 45227,
+          "reason": "mutation"
+        }
+      ],
+      "sample_overflow": false
+    },
+    "reload_network": {
+      "available": true,
+      "intact": true,
+      "expired": false,
+      "requests": [
+        {
+          "id": 1,
+          "path": "/api/conversations",
+          "method": "GET",
+          "started": {
+            "date_ms": 1793042303732,
+            "performance_ms": 2124
+          },
+          "finished": {
+            "date_ms": 1793042303780,
+            "performance_ms": 2173
+          },
+          "status": 200,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": [
+            "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "response_message_count": null,
+          "blocked": false
+        },
+        {
+          "id": 2,
+          "path": "/api/conversations/0b3d6ede-8597-4552-a6cf-79584296a8e0/messages",
+          "method": "GET",
+          "started": {
+            "date_ms": 1793042303734,
+            "performance_ms": 2126
+          },
+          "finished": {
+            "date_ms": 1793042304202,
+            "performance_ms": 2594
+          },
+          "status": 200,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": null,
+          "response_message_count": 0,
+          "blocked": false
+        }
+      ],
+      "samples": [
+        {
+          "current_id": "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+          "conversation_ids": [
+            "0b3d6ede-8597-4552-a6cf-79584296a8e0",
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "502e3a09-f359-41ef-9f4c-e2b5868fa497",
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "active_ids": [
+            "0b3d6ede-8597-4552-a6cf-79584296a8e0"
+          ],
+          "message_count": 0,
+          "empty_state": true,
+          "error_state": false,
+          "sidebar_open": false,
+          "expanded": "false",
+          "date_ms": 1793042303721,
+          "performance_ms": 2112,
+          "reason": "initial"
+        }
+      ],
+      "sample_overflow": false
+    },
+    "video": {
+      "path": "15-conversation-create.mp4",
+      "available": true,
+      "time_limit_seconds": 180,
+      "clock_note": "Process timestamps bound recording; they do not identify the exact first video frame.",
+      "exit_code": 0
+    }
+  },
+  "dialogs_video": {
+    "path": "16-dialogs-walk.mp4",
+    "available": true,
+    "exit_code": 0
+  },
+  "artifacts": [
+    {
+      "path": "16-dialogs-walk.mp4",
+      "sha256": "92262ef86ca5d0ee632494a963b95c0dd19eca8215862638fb3f1358cad9be16",
+      "size": 6075247
+    },
+    {
+      "path": "15-conversation-create.mp4",
+      "sha256": "07757bbee8f0940c5f602b9bf650268c70381124c641418532aaf9f97999ae64",
+      "size": 2033458
+    },
+    {
+      "path": "events.json",
+      "sha256": "4ec369c8aec9e5754cd76a81952b2a3ee0d90dba52f7393946793e8ca32d8656",
+      "size": 95394
+    }
+  ],
+  "github_run_id": "40385390689",
+  "github_run_attempt": "1",
+  "workflow_revision": "5129128436edbc6ab8bea41b5acb87e29ce472dc",
+  "runner_name": "redmi9-python",
+  "github_run_url": "https://github.com/maksimp6/Chat/actions/runs/40385390689",
+  "tools_self_check": true
+}
