@@ -150,28 +150,41 @@ def test_runtime_rejects_submission_before_start(tmp_path):
         runtime.submit_http({})
 
 
-def test_runtime_http_submission_timeout_and_invalid_start(tmp_path):
-    runtime = _runtime(tmp_path, "runtime-http-fake")
+def test_runtime_http_submission_timeout_and_invalid_start(tmp_path, monkeypatch):
+    runtime = _runtime(tmp_path, "runtime-http-submission")
+    entered = threading.Event()
+    release = threading.Event()
+    closed = threading.Event()
 
-    class AliveThread:
-        ident = 1
+    def blocked_http(context, payload):
+        entered.set()
+        release.wait()
+        return {"status_code": 200, "headers": [], "body": (), "close": closed.set}
 
-        def is_alive(self):
-            return True
+    register_runtime_operation("http.request", blocked_http)
+    runtime.start()
+    try:
+        with pytest.raises(TimeoutError, match="HTTP request timed out"):
+            runtime.submit_http({}, timeout=0.05)
+        assert entered.wait(1), "the registered HTTP handler must actually receive the call"
+        release.set()
+        assert closed.wait(1), "a timed-out request must still close its handler result"
 
-    runtime._thread = AliveThread()
+        def invalid_http_start(payload, events, cancel):
+            # Corrupt the current HTTP worker protocol, rather than the unrelated call queue.
+            try:
+                events.put(("invalid",))
+            finally:
+                with runtime._stream_lock:
+                    runtime._active_streams.pop(cancel, None)
 
-    with pytest.raises(TimeoutError, match="HTTP request timed out"):
-        runtime.submit_http({}, timeout=0.001)
-
-    class InvalidJobQueue:
-        def put(self, job):
-            events = job[3]
-            events.put(("invalid",))
-
-    runtime._jobs = InvalidJobQueue()
-    with pytest.raises(RuntimeError, match="invalid environment runtime HTTP response"):
-        runtime.submit_http({}, timeout=0.1)
+        monkeypatch.setattr(runtime, "_run_http", invalid_http_start)
+        with pytest.raises(RuntimeError, match="invalid environment runtime HTTP response"):
+            runtime.submit_http({}, timeout=1)
+    finally:
+        release.set()
+        _restore_http_handler()
+        runtime.stop()
 
 
 def test_runtime_http_worker_propagates_handler_error(tmp_path):

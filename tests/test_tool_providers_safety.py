@@ -1,4 +1,9 @@
+import errno
+import io
+import os
+import shutil
 import stat
+import subprocess
 import zipfile
 from types import SimpleNamespace
 
@@ -10,6 +15,40 @@ def _unrestricted(monkeypatch, tmp_path):
     monkeypatch.setattr(filesystem, "BASE_DIR", str(tmp_path))
     monkeypatch.setattr(filesystem, "BACKUP_DIR", str(tmp_path / "backups"))
     monkeypatch.setattr(filesystem, "restrictions_lifted", lambda: True)
+
+
+def _real_hardlink(link, target):
+    """Use an existing native ln when Android's Python omits os.link.
+
+    The fixture must create a real shared inode. A filesystem refusal remains
+    a failing test; neither a copy, a symlink nor a mocked inode is substituted.
+    """
+    native_required = False
+    try:
+        link.hardlink_to(target)
+    except (AttributeError, NotImplementedError, io.UnsupportedOperation):
+        native_required = True
+    except OSError as exc:
+        if exc.errno not in (errno.ENOSYS, errno.ENOTSUP):
+            raise
+        native_required = True
+    if native_required:
+        executable = shutil.which("ln")
+        if executable is None and os.access("/system/bin/ln", os.X_OK):
+            executable = "/system/bin/ln"
+        assert executable is not None, "Python hard links are unavailable and no existing native ln was found"
+        result = subprocess.run(
+            [executable, "--", str(target), str(link)],
+            capture_output=True, text=True, timeout=5, check=False,
+        )
+        assert result.returncode == 0, (
+            "Native hard-link creation failed (no skip or substitute): "
+            + (result.stderr or result.stdout)[:500]
+        )
+    source_stat, link_stat = target.stat(), link.stat()
+    assert not link.is_symlink(), "The fixture must create a hard link, not a symlink"
+    assert (source_stat.st_dev, source_stat.st_ino) == (link_stat.st_dev, link_stat.st_ino)
+    assert source_stat.st_nlink >= 2 and link_stat.st_nlink >= 2
 
 
 def test_write_file_keeps_the_mode_of_the_replaced_file(monkeypatch, tmp_path):
@@ -73,7 +112,7 @@ def test_zip_compress_refuses_a_hard_link_to_its_source(monkeypatch, tmp_path):
     source = tmp_path / "data.txt"
     source.write_text("precious")
     archive = tmp_path / "archive.zip"
-    archive.hardlink_to(source)
+    _real_hardlink(archive, source)
 
     result = filesystem.zip_compress({"source_path": str(source), "archive_path": str(archive)})
 
@@ -90,19 +129,19 @@ def test_zip_inside_its_source_excludes_output_and_temp_aliases(monkeypatch, tmp
     archive.write_bytes(b"previous archive")
     archive.chmod(0o640)
     alias = source / "old-archive-alias.zip"
-    alias.hardlink_to(archive)
+    _real_hardlink(alias, archive)
     original_walk = filesystem.os.walk
 
     def walk_with_temp_alias(path):
         temporary = next(source.glob(".zip_*.tmp"))
-        (source / "temp-alias.zip").hardlink_to(temporary)
+        _real_hardlink(source / "temp-alias.zip", temporary)
         yield from original_walk(path)
 
     monkeypatch.setattr(filesystem.os, "walk", walk_with_temp_alias)
 
     result = filesystem.zip_compress({"source_path": str(source), "archive_path": str(archive)})
 
-    assert result["success"] is True
+    assert result.get("success") is True, result
     assert result["files_archived"] == 1
     with zipfile.ZipFile(archive) as created:
         assert created.namelist() == ["precious.txt"]

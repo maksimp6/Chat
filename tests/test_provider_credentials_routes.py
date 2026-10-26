@@ -157,7 +157,7 @@ def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_pat
     assert rows == []
 
 
-def test_provider_credentials_rejects_remote_without_admin_token(monkeypatch, tmp_path):
+def test_provider_credentials_accepts_remote_without_legacy_admin_token(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     import storage.db as db
 
@@ -165,6 +165,7 @@ def test_provider_credentials_rejects_remote_without_admin_token(monkeypatch, tm
     db.init_db()
     monkeypatch.delenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", raising=False)
     monkeypatch.setenv("LOGOS_REQUIRE_SHORT_TOKEN", "false")
+    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeProvider())
 
     from flask import Flask
 
@@ -174,11 +175,18 @@ def test_provider_credentials_rejects_remote_without_admin_token(monkeypatch, tm
     with app.test_client() as client:
         response = client.put(
             "/api/provider-credentials",
-            json={"yandex_api_key": "secret", "yandex_project_id": "project-test"},
+            json={"yandex_api_key": "remote-fixture-key", "yandex_project_id": "project-test"},
             environ_base={"REMOTE_ADDR": "203.0.113.10"},
         )
 
-    assert response.status_code == 401
+    assert response.status_code == 200
+    statuses = {item["provider"]: item for item in response.get_json()["providers"]}
+    assert statuses["yandex"]["status"] == "configured"
+    assert statuses["yandex"]["authorization_ok"] is False
+    from provider_accounts.credentials import get_active_credential
+
+    stored = get_active_credential(db.get_store(), routes.decrypt_secret, provider="yandex")
+    assert stored.api_key == "remote-fixture-key"
 
 
 def test_provider_credentials_accepts_explicit_admin_token(monkeypatch, tmp_path):
@@ -217,7 +225,7 @@ def test_provider_credentials_accepts_explicit_admin_token(monkeypatch, tmp_path
     assert response.status_code == 200
 
 
-def test_provider_credentials_status_check_requires_auth(monkeypatch, tmp_path):
+def test_provider_credentials_status_check_without_legacy_token_reports_missing_key(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     import storage.db as db
 
@@ -238,7 +246,10 @@ def test_provider_credentials_status_check_requires_auth(monkeypatch, tmp_path):
             environ_base={"REMOTE_ADDR": "203.0.113.11"},
         )
 
-    assert response.status_code == 401
+    assert response.status_code == 200
+    statuses = {item["provider"]: item for item in response.get_json()["providers"]}
+    assert statuses["cloudru"]["status"] == "not_configured"
+    assert statuses["cloudru"]["authorization_ok"] is False
 
 
 def test_cloudru_bootstrap_rejects_expired_master_key(monkeypatch, tmp_path):
@@ -466,8 +477,6 @@ def test_provider_status_check_hides_internal_exception(monkeypatch):
 
     internal_marker = "provider-internal-marker-should-not-leak"
 
-    monkeypatch.setattr(routes, "_guard", lambda: None)
-
     def fail_health_check(_provider):
         raise RuntimeError(internal_marker)
 
@@ -566,7 +575,6 @@ def test_cloudru_service_accounts_failure_is_sanitized(monkeypatch):
     from flask import Flask
 
     internal_marker = "cloudru-service-account-internal-marker"
-    monkeypatch.setattr(routes, "_guard", lambda: None)
 
     class FailingIam:
         def __init__(self, **_kwargs):
@@ -597,7 +605,6 @@ def test_cloudru_bootstrap_failure_is_sanitized(monkeypatch):
     from flask import Flask
 
     internal_marker = "cloudru-bootstrap-internal-marker"
-    monkeypatch.setattr(routes, "_guard", lambda: None)
 
     class FailingIam:
         def __init__(self, **_kwargs):
@@ -632,8 +639,6 @@ def test_cloudru_bootstrap_failure_is_sanitized(monkeypatch):
 def test_provider_update_rejects_invalid_json_without_parser_details(monkeypatch):
     from flask import Flask
 
-    monkeypatch.setattr(routes, "_guard", lambda: None)
-
     app = Flask(__name__)
     app.config["TESTING"] = True
     app.register_blueprint(routes.provider_credentials_bp)
@@ -657,7 +662,6 @@ def test_provider_validation_failure_is_sanitized(monkeypatch):
     from flask import Flask
 
     internal_marker = "provider-validation-internal-marker"
-    monkeypatch.setattr(routes, "_guard", lambda: None)
 
     class FailingProvider:
         def validate_key(self, _api_key):

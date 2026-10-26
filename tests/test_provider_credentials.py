@@ -173,10 +173,18 @@ def test_provider_credentials_update_returns_provider_auth_error(monkeypatch):
     assert body["status"] == "invalid"
 
 
-def test_provider_credentials_update_rejects_admin_auth_before_provider_validation(monkeypatch):
+def test_provider_credentials_update_validates_provider_despite_legacy_admin_token(monkeypatch):
     import provider_accounts.credentials_routes as routes
 
+    validated = []
+
+    class RefusedProvider:
+        def validate_key(self, api_key):
+            validated.append(api_key)
+            raise PermissionError("fixture provider refused the key")
+
     monkeypatch.setenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", "expected-token")
+    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: RefusedProvider())
     app = __import__("flask").Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
     app.testing = True
@@ -189,8 +197,8 @@ def test_provider_credentials_update_rejects_admin_auth_before_provider_validati
 
     assert response.status_code == 401
     body = response.get_json()
-    assert body["error"] == "provider_credential_admin_authentication_required"
-    assert "provider API-key validation" in body["detail"]
+    assert validated == ["invalid-key"]
+    assert body == {"error": "authorization_failed", "provider": "yandex", "status": "invalid"}
 
 
 def test_provider_credentials_update_accepts_yandex_static_key_without_remote_probe(monkeypatch):
@@ -207,6 +215,10 @@ def test_provider_credentials_update_accepts_yandex_static_key_without_remote_pr
     monkeypatch.delenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", raising=False)
 
     class FakeConn:
+        def get(self, key):
+            # The current route reads the previous active credential before replacement.
+            return None
+
         def close(self):
             pass
 
@@ -233,7 +245,7 @@ def test_provider_credentials_update_accepts_yandex_static_key_without_remote_pr
     assert calls == ["static-yandex-key"]
 
 
-def test_provider_credentials_update_logs_storage_error_and_returns_detail(monkeypatch, caplog):
+def test_provider_credentials_update_logs_storage_error_type_without_internal_detail(monkeypatch, caplog):
     from flask import Flask
     import provider_accounts.credentials_routes as routes
 
@@ -243,8 +255,9 @@ def test_provider_credentials_update_logs_storage_error_and_returns_detail(monke
 
     monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeClient())
     monkeypatch.delenv("LOGOS_PROVIDER_CREDENTIALS_TOKEN", raising=False)
+    internal_marker = "storage-internal-marker-should-not-leak"
     monkeypatch.setattr(
-        routes, "get_store", lambda: (_ for _ in ()).throw(RuntimeError("sqlite exploded"))
+        routes, "get_store", lambda: (_ for _ in ()).throw(RuntimeError(internal_marker))
     )
 
     app = Flask(__name__)
@@ -262,7 +275,10 @@ def test_provider_credentials_update_logs_storage_error_and_returns_detail(monke
     body = response.get_json()
     assert body["error"] == "credential_storage_failed"
     assert "не смог сохранить" in body["detail"]
-    assert "sqlite exploded" in caplog.text
+    assert "Provider credential storage failed" in caplog.text
+    assert "error=RuntimeError" in caplog.text
+    assert internal_marker not in caplog.text
+    assert internal_marker not in str(body)
 
 
 def test_expired_key_is_readable_for_replacement_only_when_allowed():

@@ -49,9 +49,13 @@ jobs:
               raise SystemExit("Insufficient free space for an isolated source checkout; no old data removed")
           PY
           git init --quiet "$check_root/source"
-          git -C "$check_root/source" fetch --quiet --depth=1 https://github.com/maksimp6/Chat.git "$GITHUB_SHA"
+          git -C "$check_root/source" remote add origin https://github.com/maksimp6/Chat.git
+          git -C "$check_root/source" fetch --quiet --depth=1 origin "$GITHUB_SHA"
           git -C "$check_root/source" -c advice.detachedHead=false checkout --quiet --detach FETCH_HEAD
           test "$(git -C "$check_root/source" rev-parse HEAD)" = "$GITHUB_SHA"
+          # Hydrate only the small STL fixtures needed by the inventory regressions.
+          # Other repository LFS objects (including recordings) remain untouched.
+          git -C "$check_root/source" lfs pull origin --include='printing3d/assets/**/*.stl' --exclude=''
           native_site=$(python - <<'PY'
           from pathlib import Path
           matches = list((Path.home() / "logos-local-state/native-deps").glob("**/site-packages/cryptography"))
