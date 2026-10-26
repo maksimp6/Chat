@@ -305,3 +305,27 @@ def test_readiness_operator_gate_requires_every_other_check(monkeypatch):
     assert report["checks"]["operator_approval"] == "PASS"
     assert report["status"] == "READY"
     assert report["print_start_authorized"] is False
+
+
+def test_plain_toolpath_still_passes_the_audit():
+    assert gcode_audit._verify_toolpaths(gcode_body(), [256, 256, 256]) == (12, 12)
+
+
+def test_compact_motion_word_is_bounds_checked():
+    with pytest.raises(ValueError, match="motion outside bed"):
+        gcode_audit._verify_toolpaths(gcode_body("G1X999Y5"), [256, 256, 256])
+
+
+def test_compact_dangerous_firmware_command_is_rejected():
+    with pytest.raises(ValueError, match="dangerous"):
+        gcode_audit._verify_toolpaths(gcode_body("M112S0"), [256, 256, 256])
+
+
+def test_relative_positioning_arcs_and_position_reset_are_not_accepted():
+    bed = [256, 256, 256]
+    with pytest.raises(ValueError, match="relative"):
+        gcode_audit._verify_toolpaths(gcode_body("G91"), bed)
+    with pytest.raises(ValueError, match="arc"):
+        gcode_audit._verify_toolpaths(gcode_body("G2 X10 Y10 I5 J0"), bed)
+    with pytest.raises(ValueError, match="position reset"):
+        gcode_audit._verify_toolpaths(gcode_body("G92 X1000"), bed)
