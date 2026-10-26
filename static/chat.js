@@ -697,7 +697,7 @@ function loadHistory(convId) {
             false,
             msg.cost || 0,
             msg.timings,
-            0,
+            msg.total_duration_ms || 0,
             msg.reasoning,
             msg.usage,
             msg.trace,
@@ -1080,8 +1080,14 @@ document.addEventListener("DOMContentLoaded", function () {
             },
           });
       } else if (data.reply) {
-        addMessage(data.reply, "bot", false, data.cost || 0, data.timings,
-          clientTotalMs, data.reasoning, data.usage, data.trace, { id: data.message_id });
+        // The server's duration is the one stored with the reply, so the details read the same after a reload.
+        const replyNode = addMessage(data.reply, "bot", false, data.cost || 0, data.timings,
+          data.total_duration_ms || clientTotalMs, data.reasoning, data.usage, data.trace, { id: data.message_id });
+        // A reply taller than the chat opens at its first line, not its last.
+        const replyBox = document.getElementById("chatbox");
+        if (replyNode && replyBox && replyNode.offsetHeight > replyBox.clientHeight) {
+          replyBox.scrollTop += replyNode.getBoundingClientRect().top - replyBox.getBoundingClientRect().top;
+        }
       } else {
         restoreImages();
         addMessage("⚠️ Ошибка: " + (data.detail || data.title || "HTTP " + response.status),

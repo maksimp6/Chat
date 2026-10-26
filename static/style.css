@@ -2300,6 +2300,15 @@ body {
   font-size: 24px;
   line-height: 1;
 }
+/* The model picker scrolls as a whole; its close button stays at the top like .modal-close. */
+.logos-pro-app #close-modal {
+  position: sticky;
+  top: 0;
+  right: auto;
+  float: right;
+  margin: -12px -12px 0 8px;
+  z-index: 1;
+}
 /* «Открыть трассу» is a text action with a full touch target. */
 .logos-pro-app .logos-trace-open-viewer {
   min-height: 44px;
