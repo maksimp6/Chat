@@ -28,6 +28,15 @@ except ImportError:  # pragma: no cover
 _COMMAND_ENV_NAMES = ("PATH", "HOME", "LANG", "LC_ALL", "TERM", "TMPDIR", "USER", "LOGNAME", "SHELL")
 
 
+def _output_text(value: Any) -> str:
+    """TimeoutExpired carries raw bytes even when the command ran with text=True."""
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
 @dataclass
 class VirtualServerConfig:
     runtime: str = "python"
@@ -122,8 +131,8 @@ class VirtualLowConsumptionServer:
                     "runtime_id": self.runtime_id,
                     "state": self.state,
                     "exit_code": None,
-                    "stdout": (exc.stdout or "")[: self.config.max_output_bytes],
-                    "stderr": (exc.stderr or "")[: self.config.max_output_bytes],
+                    "stdout": _output_text(exc.stdout)[: self.config.max_output_bytes],
+                    "stderr": _output_text(exc.stderr)[: self.config.max_output_bytes],
                     "timed_out": True,
                     "duration_ms": round((time.perf_counter() - started) * 1000, 2),
                 }

@@ -18,7 +18,8 @@ def import_secret_file(
     purpose: str,
     admin: SecretAdminBackend,
 ) -> SecretAdminResult:
-    value = Path(path).read_text(encoding="utf-8")
+    # The newline that echo or an editor appends is not part of the secret.
+    value = Path(path).read_text(encoding="utf-8").rstrip("\r\n")
     if not value:
         raise ValueError("secret file must be non-empty")
     return admin.create(purpose=purpose, value=SecretValue(value))

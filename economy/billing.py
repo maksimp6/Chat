@@ -106,7 +106,12 @@ def aggregate_billing(items, context: Optional[dict[str, Any]] = None) -> dict[s
     unknown = sum(1 for item in items if item.get("cost_status") == "unknown")
     compute = [item for item in items if item.get("type") == "compute"]
     compute_cost = round(
-        sum(float(item.get("total_cost") or 0) for item in compute if item in known), 6
+        sum(
+            float(item.get("total_cost") or 0)
+            for item in compute
+            if item.get("cost_status") == "calculated"
+        ),
+        6,
     )
     result = {
         "currency": PRICING_CURRENCY,
