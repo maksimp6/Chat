@@ -1,6 +1,6 @@
 # Dynamic model discovery
 
-Logos reads the available models from the configured Yandex AI Studio OpenAI-compatible `/models` endpoint. The response keeps text, voice, image, embedding, and classifier models in separate sections; an embedding or image URI is never offered as a text model.
+Logos reads the available models from the configured Yandex AI Studio OpenAI-compatible `/models` endpoint. The response keeps the existing text, voice, image, and embedding types in separate sections; an embedding or image URI is never offered as a text model. Classifiers are not supported and their entries are skipped, including `cls://` URIs and explicit classifier metadata.
 
 ## Runtime behavior
 
@@ -11,7 +11,7 @@ Logos reads the available models from the configured Yandex AI Studio OpenAI-com
 - `provider_model_id` records the exact identifier returned by the provider. It is not reconstructed by discarding path segments or appending `/latest`.
 - Known pricing metadata is preserved when a discovered model matches the static catalog.
 - Unknown tariffs remain unknown. A discovered non-text deployment without a registered adapter is listed with `available: false` and `availability_reason: runtime_adapter_not_registered`.
-- Registered voice, image, embedding, and classifier entries also remain in their corresponding sections when not returned by Models API. Their presence is a local capability declaration, not proof that the active key can invoke them.
+- Registered voice, image, and embedding entries also remain in their corresponding sections when not returned by Models API. Their presence is a local capability declaration, not proof that the active key can invoke them.
 - If discovery fails or the provider credential is missing, `/api/models` returns the static catalog with `degraded: true` and the stable error code `model_discovery_unavailable`.
 - Provider credentials are never included in the response or diagnostic message.
 

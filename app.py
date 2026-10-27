@@ -70,7 +70,6 @@ from workspace.project_tree import project_tree_bp
 from chat.voice_routes import voice_bp
 from chat.image_routes import image_bp
 from chat.embedding_routes import embedding_bp
-from chat.classification_routes import classification_bp
 from chat.completion_routes import completion_bp
 from forge import init_printing_tables
 from forge.routes import printing3d_bp
@@ -150,7 +149,6 @@ app.register_blueprint(plugin_bp)
 app.register_blueprint(project_tree_bp)
 app.register_blueprint(voice_bp)
 app.register_blueprint(image_bp)
-app.register_blueprint(classification_bp)
 app.register_blueprint(embedding_bp)
 app.register_blueprint(completion_bp)
 app.register_blueprint(printing3d_bp)

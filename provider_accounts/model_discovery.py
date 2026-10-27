@@ -15,7 +15,6 @@ from urllib.parse import urlsplit
 import requests
 
 from core.config import (
-    CLASSIFIER_MODELS,
     EMBEDDING_MODELS,
     IMAGE_MODELS,
     TEXT_MODELS,
@@ -160,7 +159,6 @@ class ModelDiscovery:
             kind = {
                 "gpt": "text",
                 "emb": "embedding",
-                "cls": "classifier",
                 "art": "image",
             }.get(parsed.scheme)
             if kind is None or not parsed.netloc or "@" in parsed.netloc or ":" in parsed.netloc:
@@ -181,20 +179,25 @@ class ModelDiscovery:
         elif model_id.startswith(("text-search-", "text-embeddings")):
             kind = "embedding"
         elif model_id.startswith("classifier-"):
-            kind = "classifier"
+            return None
         elif model_id.startswith(("aliceai-image-", "yandex-art")):
             kind = "image"
         if not segments[-1] and kind != "embedding":
             # The published v2 embeddings URI ends with '/'; preserve it.
+            return None
+        if any(
+            isinstance(value, str) and value in {"classifier", "classification"}
+            for value in (item.get("type"), item.get("model_type"))
+        ):
             return None
         declared_type = item.get("type") or item.get("model_type")
         if isinstance(declared_type, str):
             if declared_type in {"audio", "voice", "realtime", "stt", "tts"}:
                 kind = "voice"
             elif declared_type in {
-                "image", "embedding", "classifier", "classification", "embeddings"
+                "image", "embedding", "embeddings"
             }:
-                kind = {"classification": "classifier", "embeddings": "embedding"}.get(
+                kind = {"embeddings": "embedding"}.get(
                     declared_type, declared_type
                 )
 
@@ -203,7 +206,6 @@ class ModelDiscovery:
             "voice": VOICE_MODELS,
             "image": IMAGE_MODELS,
             "embedding": EMBEDDING_MODELS,
-            "classifier": CLASSIFIER_MODELS,
         }
         registry = registries[kind]
         registry_key = registry_key_for_upstream(model_id) if kind == "text" else None
@@ -295,5 +297,4 @@ def static_model_catalog() -> dict[str, Any]:
         "voice": {key: dict(value) for key, value in VOICE_MODELS.items()},
         "image": {key: dict(value) for key, value in IMAGE_MODELS.items()},
         "embedding": {key: dict(value) for key, value in EMBEDDING_MODELS.items()},
-        "classifier": {key: dict(value) for key, value in CLASSIFIER_MODELS.items()},
     }

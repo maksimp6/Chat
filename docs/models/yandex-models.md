@@ -2,6 +2,8 @@
 
 Каталог сверяется с официальной документацией Яндекса. Наличие записи в исходниках
 не подтверждает доступ конкретного ключа или успешный живой вызов.
+Поддерживаются только существовавшие до ремонта типы: текст, голос, изображения
+и отдельный API эмбеддингов. Новые типы моделей не подключаются.
 
 | Назначение | Модели | Транспорт Logos |
 | --- | --- | --- |
@@ -10,14 +12,13 @@
 | Голосовой диалог | Speech Realtime DeepSeek V4 Flash, Speech Realtime Max TTS Live | `/api/voice/session`, Realtime WebSocket |
 | Синтез текста | Speech TTS Live | `/api/voice/text`, Realtime WebSocket, без аудиовхода |
 | Эмбеддинги | `text-search-doc`, `text-search-query`, `text-embeddings-v2-doc`, `text-embeddings-v2-query` | `/api/embeddings`, Embeddings API |
-| Классификаторы | `classifier-yandexgpt-lite`, `classifier-yandexgpt` | `/api/classify`, Text Classification API |
 
 Pro 5.1 также сохраняет отдельный совместимый `/api/completion`. Профиль этого
 эндпоинта не исключает модель из обычного чата. URI содержат точные версии;
 неизвестные дообученные URI из Models API не сокращаются до базовой модели.
 
-`/api/models` возвращает отдельные секции `text`, `voice`, `image`, `embedding`
-и `classifier`. Классификаторы и эмбеддинги не являются моделями чата. Discovery
+`/api/models` возвращает отдельные секции `text`, `voice`, `image`, `embedding`.
+Эмбеддинги не являются моделями чата. Классификаторы не подключены. Discovery
 разрешает действующий ключ перед чтением кеша, передаёт его папку и не использует
 каталог от другого ключа после ротации. При сбое возвращается статический каталог
 с `degraded: true`; это не подтверждение прав аккаунта.
@@ -42,4 +43,3 @@ SpeechKit-версии имеют собственный протокол и н�
 - [Images API](https://aistudio.yandex.ru/ru/docs/ai-studio/api/Images/createImage)
 - [Realtime API](https://aistudio.yandex.ru/ru/docs/ai-studio/realtime/)
 - [Эмбеддинги](https://aistudio.yandex.ru/ru/docs/ai-studio/concepts/embeddings)
-- [Классификаторы](https://aistudio.yandex.ru/ru/docs/ai-studio/concepts/classifier/models)

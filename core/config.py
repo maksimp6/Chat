@@ -241,18 +241,6 @@ EMBEDDING_MODELS = {
         "dimensions": [128, 256, 512, 768],
     },
 }
-CLASSIFIER_MODELS = {
-    "classifier-yandexgpt-lite": {
-        "name": "YandexGPT Lite Classifier",
-        "upstream": "yandexgpt-lite/latest",
-        "type": "classifier",
-    },
-    "classifier-yandexgpt": {
-        "name": "YandexGPT Classifier",
-        "upstream": "yandexgpt/latest",
-        "type": "classifier",
-    },
-}
 
 ALL_MODELS = {**TEXT_MODELS, **VOICE_MODELS, **IMAGE_MODELS}
 AUDIO_STT_PRICE_PER_SEC = 0.0264
