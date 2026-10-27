@@ -333,6 +333,4 @@ class CloudRuIamClient:
             raise ValueError("api_key_id is required")
         return self._request("DELETE", f"{API_KEYS_PATH}/{quote(api_key_id, safe='')}")
 
-
-
 __all__ = ["CloudRuIamError", "CloudRuIamClient"]

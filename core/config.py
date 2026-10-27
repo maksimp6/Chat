@@ -34,7 +34,7 @@ def get_donation_url():
     Only absolute http/https URLs without embedded credentials are accepted so
     the header button can never be turned into a script or credential carrier.
     """
-    raw = trim_string((env_get("LOGOS_DONATION_URL") or ""))
+    raw = trim_string(env_get("LOGOS_DONATION_URL") or "")
     if not raw:
         return None
     if any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in raw):
