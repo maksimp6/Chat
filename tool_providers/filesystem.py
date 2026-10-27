@@ -72,6 +72,14 @@ def _get_abs_path(path: str) -> str:
     return target
 
 
+def _get_entry_path(path: str) -> str:
+    """Like _get_abs_path, but a symlink in the final component is kept, not resolved to its target."""
+    head, tail = os.path.split(os.path.normpath(path))
+    if tail in ("", ".", ".."):
+        return _get_abs_path(path)
+    return os.path.join(_get_abs_path(head), tail)
+
+
 def read_file(args: dict) -> dict:
     """Низкоуровневое позиционированное чтение файлов (аналог C fopen + fseek + fread)."""
     path = args.get("path") or args.get("file_path") or args.get("filename")
@@ -560,9 +568,10 @@ def copy_or_move_file(args: dict) -> dict:
         return {"error": "Параметры 'src' и 'dst' обязательны"}
 
     try:
-        abs_src = _get_abs_path(src)
+        # A move relocates the entry itself: a symlink is relinked, not its target moved.
+        abs_src = _get_entry_path(src) if action == "move" else _get_abs_path(src)
         abs_dst = _get_abs_path(dst)
-        if not os.path.exists(abs_src):
+        if not os.path.lexists(abs_src):
             return {"error": f"Исходный файл '{src}' не существует"}
 
         os.makedirs(os.path.dirname(abs_dst), exist_ok=True)
@@ -589,14 +598,19 @@ def delete_path(args: dict) -> dict:
 
     try:
         abs_path = _get_abs_path(path)
-        if abs_path == BASE_DIR:
+        entry = _get_entry_path(path)
+        if entry == BASE_DIR:
             return {"error": "Запрещено удалять корневую директорию проекта"}
-        if ".git" in abs_path.split(os.sep):
+        if ".git" in entry.split(os.sep) or ".git" in abs_path.split(os.sep):
             return {"error": "Запрещено удалять файлы репозитория Git"}
-        if not os.path.exists(abs_path):
+        if not os.path.lexists(entry):
             return {"error": f"Путь '{path}' не найден"}
 
-        if os.path.isdir(abs_path):
+        if os.path.islink(entry):
+            # Remove the link itself; the target it points to must survive.
+            os.remove(entry)
+            kind = "ссылка"
+        elif os.path.isdir(abs_path):
             shutil.rmtree(abs_path)
             kind = "папка"
         else:

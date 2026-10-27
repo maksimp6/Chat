@@ -39,7 +39,7 @@ _SENSITIVE_KEY_RE = re.compile(
 _INLINE_SECRET = re.compile(
     r"(?i)([A-Za-z0-9_.-]*?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|"
     r"secret|token|authorization|private[_-]?key|ssh[_-]?private[_-]?key|secret[_-]?key|"
-    r"client[_-]?secret)\s*[=:]\s*)((?:bearer\s+)?[^\s;&|]+)"
+    r"client[_-]?secret)[\"']?\s*[=:]\s*)((?:bearer\s+)?[^\s;&|]+)"
 )
 _INLINE_CLI_SECRET = re.compile(
     r"(?i)((?:--(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|token|authorization|private[_-]?key|ssh[_-]?private[_-]?key|secret[_-]?key|client[_-]?secret))\s+)([^\s;&|]+)"
