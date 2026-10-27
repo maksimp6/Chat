@@ -151,7 +151,9 @@ def generate_image():
     if existing is not None:
         if existing.get("fingerprint") != fingerprint:
             return jsonify({"error": "request_id_conflict"}), 409
-        return _request_response(conv_id, request_id, existing)
+        # Only pending and unknown attempts block a new paid call; a failed one may start again.
+        if existing.get("status") != "failed":
+            return _request_response(conv_id, request_id, existing)
 
     try:
         project_id, headers = _headers()
@@ -162,17 +164,18 @@ def generate_image():
     # Reserve before the non-idempotent provider POST, atomically across concurrent clients.
     with get_store().transaction() as tx:
         existing = tx.get(key)
-        if existing is None:
+        if existing is None or (existing.get("status") == "failed" and existing.get("fingerprint") == fingerprint):
             if tx.get("chat/conversation/" + conv_id) is None:
                 return jsonify({"error": "conversation_not_found"}), 404
             tx.set(key, {"status": "pending", "created_at": time.time(), "fingerprint": fingerprint, "model": model_key})
+            existing = None
     if existing is not None:
         if existing.get("fingerprint") != fingerprint:
             return jsonify({"error": "request_id_conflict"}), 409
         return _request_response(conv_id, request_id, existing)
 
     try:
-        add_message(conv_id, "user", prompt, cost=None, source="image-request:" + request_id)
+        add_message(conv_id, "user", prompt, cost=None, source="image-request:" + request_id, deduplicate_source=True)
         image, mime_type = request_image(headers, payload)
     except requests.RequestException as exc:
         response = getattr(exc, "response", None)
