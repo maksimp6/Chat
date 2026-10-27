@@ -5,6 +5,7 @@
 """Pinned local Wikifunctions implementations used by Logos."""
 
 
+# WIKIFUNCTIONS Z21951 / Z21953@162115 — НЕ РЕДАКТИРОВАТЬ.
 def clamp_integer(minimum: int, value: int, maximum: int) -> int:
     """Clamp an already-converted integer between the caller's ordered bounds."""
     if value < minimum:
