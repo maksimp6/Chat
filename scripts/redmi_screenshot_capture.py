@@ -42,10 +42,17 @@ def capture_storage_guard():
     if shutil.disk_usage(root).free < MIN_CAPTURE_FREE_BYTES:
         raise CaptureSafetyError("Capture stopped: less than 512 MiB free")
     total = 0
-    for folder in root.iterdir():
+    # A native runner uses work/<job UUID> for each job. Include every job's
+    # capture directories when enforcing the shared temporary-media budget.
+    if root.name == "work" and root.parent.name == "github-python-runner":
+        workspaces = [path for path in root.iterdir()
+                      if path.is_dir() and not path.is_symlink()]
+    else:
+        workspaces = [root]
+    for folder in (path for workspace in workspaces for path in workspace.iterdir()):
         if folder.is_symlink() or not folder.is_dir() or not folder.name.startswith((
             ".logos-screenshots-", ".logos-tools-check-", ".logos-candidate-tools-",
-            ".logos-screenshot-verification-",
+            ".logos-screenshot-verification-", ".logos-tools-tests-",
         )):
             continue
         for directory, dirs, names in os.walk(folder, followlinks=False):
@@ -1560,7 +1567,9 @@ def main():
         workspace = next((path.parent for path in capture_output.parents
                           if path.name.startswith((".logos-screenshots-", ".logos-tools-check-",
                                                    ".logos-candidate-tools-"))), None)
-        CAPTURE_STORAGE_ROOT = workspace or capture_output.parent
+        runner_work = next((path for path in capture_output.parents
+                            if path.name == "work" and path.parent.name == "github-python-runner"), None)
+        CAPTURE_STORAGE_ROOT = runner_work or workspace or capture_output.parent
         capture_storage_guard()
     if len(sys.argv) == 6 and sys.argv[1] == "_capture":
         metadata = json.loads(sys.argv[5])
