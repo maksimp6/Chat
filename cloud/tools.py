@@ -88,31 +88,41 @@ def cloud_resources_get(args: dict[str, Any], cfg: dict | None = None) -> dict[s
     )
 
 
-@_result
-def _budget_refusal(provider, operation: str) -> dict[str, Any] | None:
+def _budget_gate(provider, operation: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """Return (refusal, budget): a refusal when blocked, else the budget status worth reporting."""
     try:
-        _budget_guard(provider).enforce(operation)
+        status = _budget_guard(provider).enforce(operation)
     except BudgetLimitExceeded as exc:
         return {
             "success": False,
             "error": str(exc),
             "metadata": {"phase": "policy", "provider_code": "budget_exceeded"},
-        }
-    return None
+        }, None
+    if status.get("status") in {"ok", "unconfigured"}:
+        return None, None
+    return None, status
+
+
+def _with_budget(result: dict[str, Any], budget: dict[str, Any] | None) -> dict[str, Any]:
+    if budget is None:
+        return result
+    return {**result, "budget": budget}
 
 
 def cloud_compute(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
     provider = _provider(args)
     operation = str(args.get("operation") or "").strip().lower()
+    budget = None
     if operation in BUDGET_GUARDED_COMPUTE_OPERATIONS:
-        refusal = _budget_refusal(provider, f"cloud.compute.{operation}")
+        refusal, budget = _budget_gate(provider, f"cloud.compute.{operation}")
         if refusal is not None:
             return refusal
-    return provider.compute(
+    result = provider.compute(
         operation=str(args.get("operation") or ""),
         instance_id=(str(args.get("instance_id")) if args.get("instance_id") is not None else None),
         extra=dict(args.get("extra") or {}),
     )
+    return _with_budget(result, budget)
 
 
 @_result
@@ -140,15 +150,17 @@ def cloud_metrics_query(args: dict[str, Any], cfg: dict | None = None) -> dict[s
 def cloud_backup(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
     provider = _provider(args)
     operation = str(args.get("operation") or "").strip().lower()
+    budget = None
     if operation in BUDGET_GUARDED_BACKUP_OPERATIONS:
-        refusal = _budget_refusal(provider, f"cloud.backup.{operation}")
+        refusal, budget = _budget_gate(provider, f"cloud.backup.{operation}")
         if refusal is not None:
             return refusal
-    return provider.backup(
+    result = provider.backup(
         operation=str(args.get("operation") or ""),
         resource_id=(str(args.get("resource_id")) if args.get("resource_id") is not None else None),
         options=dict(args.get("options") or {}),
     )
+    return _with_budget(result, budget)
 
 
 @_result

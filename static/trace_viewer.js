@@ -48,11 +48,6 @@
     }
     return t && typeof t === "object" ? t : null;
   }
-  function objectsOf(list) {
-    return (list || []).filter(function (x) {
-      return x !== null && typeof x === "object";
-    });
-  }
   function getTimestamp(obj) {
     if (!obj || typeof obj !== "object") return null;
     var c = [obj.timestamp, obj.end_timestamp, obj.created_at];
@@ -113,7 +108,7 @@
 .logos-trace-modal{padding:0;touch-action:auto}.logos-trace-window{border-radius:0}.logos-trace-nav{display:none}
 .logos-trace-mobile-tabs{display:flex;gap:5px;width:100%;box-sizing:border-box;padding:7px 8px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.08));overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-x;flex:0 0 auto}.logos-trace-mobile-tabs.detail-active{display:none}
 .logos-trace-mobile-tab{flex:0 0 auto;border:1px solid var(--border-color,rgba(255,255,255,.12));background:transparent;color:inherit;border-radius:7px;padding:6px 9px;font-size:11px;cursor:pointer}.logos-trace-mobile-tab.active{background:rgba(127,127,127,.12);font-weight:700}
-.logos-trace-main{display:block;min-height:0;flex:1 1 0%;overflow:hidden;position:relative}.logos-trace-main .logos-trace-inspector{display:none}.logos-trace-mobile-list{display:block;width:100%;height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain}.logos-trace-mobile-list .logos-trace-item{padding:10px 12px;border-radius:0;grid-template-columns:22px minmax(0,1fr) auto}.logos-trace-mobile-detail{position:absolute;inset:0;display:none;flex-direction:column;background:var(--bg-app);z-index:10;min-height:0}.logos-trace-mobile-detail.active{display:flex}.logos-trace-mobile-detail-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.1));flex:0 0 auto}.logos-trace-mobile-back{border:1px solid var(--border-color,rgba(255,255,255,.12));background:transparent;color:inherit;border-radius:7px;padding:6px 9px;cursor:pointer}.logos-trace-mobile-detail-title{min-width:0;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.logos-trace-mobile-detail-content{flex:1 1 0%;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:0}.logos-trace-mobile-detail-content .logos-trace-inspector{display:block;overflow:visible;max-height:none}.logos-trace-mobile-detail-content .logos-trace-inspector-inner{padding:12px}.logos-trace-mobile-detail-content .logos-trace-pre{max-height:none;overflow:auto;white-space:pre;word-break:normal}.logos-trace-mobile-detail-content .logos-trace-json-wrap{overflow:visible}.logos-trace-mobile-detail-content .logos-trace-json-toolbar{position:sticky;top:0;background:var(--bg-app);padding:4px 0;z-index:2}.logos-trace-header{padding:9px;flex-wrap:wrap}.logos-trace-waterfall{padding-left:8px;padding-right:8px}.logos-trace-timeline{min-width:460px}
+.logos-trace-main{display:block;min-height:0;flex:1 1 0%;overflow:hidden;position:relative}.logos-trace-main .logos-trace-inspector{display:none}.logos-trace-mobile-list{display:block;width:100%;height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain}.logos-trace-mobile-list .logos-trace-item{padding:10px 12px;border-radius:0;grid-template-columns:22px minmax(0,1fr) auto}.logos-trace-mobile-detail{position:absolute;inset:0;display:none;flex-direction:column;background:var(--bg-app);z-index:10;min-height:0}.logos-trace-mobile-detail.active{display:flex}.logos-trace-mobile-detail-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.1));flex:0 0 auto}.logos-trace-mobile-back{border:1px solid var(--border-color,rgba(255,255,255,.12));background:transparent;color:inherit;border-radius:7px;padding:6px 9px;cursor:pointer}.logos-trace-mobile-detail-title{min-width:0;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.logos-trace-mobile-detail-content{flex:1 1 0%;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:0}.logos-trace-mobile-detail-content .logos-trace-inspector{display:block;overflow:visible;max-height:none}.logos-trace-mobile-detail-content .logos-trace-inspector-inner{padding:12px}.logos-trace-mobile-detail-content .logos-trace-pre{max-height:none;overflow:auto;white-space:pre;word-break:normal}.logos-trace-mobile-detail-content .logos-trace-json-wrap{overflow:visible}.logos-trace-mobile-detail-content .logos-trace-json-toolbar{position:sticky;top:0;background:var(--bg-app);padding:4px 0;z-index:2}.logos-trace-header{padding:9px}.logos-trace-waterfall{padding-left:8px;padding-right:8px}.logos-trace-timeline{min-width:460px}
 }
 @media(max-width:600px){.logos-trace-title{font-size:13px}.logos-trace-sub{max-width:120px}.logos-trace-btn{padding:6px 8px}.logos-trace-metrics{gap:5px;padding:7px}.logos-trace-metric{font-size:10px;padding:4px 6px}.logos-trace-waterfall-head{align-items:flex-start;flex-direction:column;gap:3px}.logos-trace-timeline{min-width:430px}.logos-trace-axis-labels{grid-template-columns:88px 1fr}.logos-trace-timeline-row{grid-template-columns:88px 1fr}.logos-trace-row-label{font-size:9px}.logos-trace-pre{font-size:10px;line-height:1.45}.logos-trace-inspector-title{font-size:16px}}
 `;
@@ -122,7 +117,7 @@
 
   function buildItems(trace) {
     var items = [];
-    objectsOf(trace.events).forEach(function (ev, i) {
+    (trace.events || []).forEach(function (ev, i) {
       var payload = ev.payload || {};
       items.push({
         kind: "event",
@@ -134,7 +129,7 @@
         data: ev,
       });
     });
-    objectsOf(trace.tool_calls).forEach(function (t, i) {
+    (trace.tool_calls || []).forEach(function (t, i) {
       var st = Number(t.start_timestamp),
         en = Number(t.end_timestamp),
         span = Number.isFinite(st) && Number.isFinite(en) && en >= st;
@@ -149,7 +144,7 @@
         data: t,
       });
     });
-    objectsOf(trace.responses).forEach(function (r, i) {
+    (trace.responses || []).forEach(function (r, i) {
       var st = Number(r.start_timestamp),
         en = Number(r.end_timestamp),
         ts = getTimestamp(r);
@@ -232,9 +227,9 @@
       u = collectUsage(trace),
       m = [
         ["Duration", fmtMs(duration(trace))],
-        ["Events", objectsOf(trace.events).length],
-        ["Responses", objectsOf(trace.responses).length],
-        ["Tools", objectsOf(trace.tool_calls).length],
+        ["Events", (trace.events || []).length],
+        ["Responses", (trace.responses || []).length],
+        ["Tools", (trace.tool_calls || []).length],
         ["Tokens", fmtNumber(u.total)],
         ["Cost", trace.billing && trace.billing.total_cost != null ? "≈ " + trace.billing.total_cost + " ₽" : "—"],
         ["Status", (trace.errors || []).length ? "⚠ " + trace.errors.length : "● completed"],
@@ -703,25 +698,7 @@
     } else if (selected === "Usage") {
       pre((item.data.raw && item.data.raw.usage) || {});
     } else if (selected === "Tools") {
-      var declaredTools = item.data.raw && item.data.raw.tools;
-      if (declaredTools) {
-        content.appendChild(
-          el(
-            "div",
-            { className: "logos-trace-notice" },
-            "Объявленные инструменты запроса (определения, не вызовы)",
-          ),
-        );
-        pre(declaredTools);
-      }
-      var stepCalls = objectsOf(trace.tool_calls).filter(function (call) {
-        return item.data.step != null && call.step === item.data.step;
-      });
-      if (stepCalls.length) pre(stepCalls);
-      else
-        content.appendChild(
-          el("div", { className: "logos-trace-notice" }, "Вызовы этого шага в трассе не найдены."),
-        );
+      pre((item.data.raw && item.data.raw.tools) || trace.tool_calls || []);
     } else if (selected === "Reasoning") {
       pre((item.data.raw && item.data.raw.reasoning) || null);
     }

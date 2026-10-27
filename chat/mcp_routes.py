@@ -386,6 +386,14 @@ def _turn_cost(billing: dict[str, Any]) -> float | None:
     return float(billing.get("total_cost") or 0)
 
 
+def _settled_turn_cost(billing: dict[str, Any], settlement: dict[str, Any]) -> float | None:
+    """Show a cost only when the treasury charged it; a failed or skipped posting charged nothing."""
+    cost = _turn_cost(billing)
+    if cost and settlement.get("status") not in {"posted", "already_posted"}:
+        return None
+    return cost
+
+
 def _append_post_final_error(trace_data, source, message, error_type):
     """Record an error raised after ExecutionTrace.finalize() in the returned copy only."""
     import time
@@ -624,7 +632,7 @@ def _finalize_chat_turn(
 
     trace_data.setdefault("billing", {})["settlement"] = settlement
     billing = trace_data.get("billing") or {}
-    cost = _turn_cost(billing)
+    cost = _settled_turn_cost(billing, settlement)
     if billing.get("items"):
         # The reply shows the tokens of the whole turn, every model call, the same total its cost is billed on.
         usage = {
@@ -1259,11 +1267,12 @@ def execute_approved():
                 "conversation_id": conv_id,
             },
         )
+        settlement = {"status": "failed", "reason": "treasury_settlement_failed"}
         try:
-            settle_billing_to_treasury(billing, owner_id)
+            settlement = settle_billing_to_treasury(billing, owner_id)
         except Exception:
             logger.exception("[BILLING] Approval follow-up settlement failed")
-        cost = _turn_cost(billing)
+        cost = _settled_turn_cost(billing, settlement)
 
         add_message(conv_id, "assistant", reply, cost=cost, source="error" if followup_failed else None)
         return jsonify(
