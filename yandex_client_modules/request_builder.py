@@ -137,6 +137,9 @@ def validate_generation_params(params):
     return validated
 
 
+# WIKIFUNCTIONS-CANDIDATE WF-06: https://www.wikifunctions.org/wiki/Z873 + Z18755.
+# Заменить сборку content композицией map(images) + concat(text, images); адаптер
+# сохраняет готовый params.input как есть, порядок, detail="auto" и фото только в первом ходе.
 def _response_input(params, message):
     """Keep tool continuations intact; attach photos only to the initial user turn."""
     if "input" in params:
@@ -181,6 +184,9 @@ _CHAT_PARAMETERS = ("stream", "temperature", "top_p", "max_tokens", "tools")
 _TOOL_PARAMETERS = {"tool_choice", "max_tool_calls", "parallel_tool_calls"}
 
 
+# WIKIFUNCTIONS-CANDIDATE WF-20: https://www.wikifunctions.org/wiki/Z872 + Z873.
+# Заменить ядро сводки tools/input на filter/map; адаптер сохраняет ветки name,
+# strict is True, пределы 128/32/50, count и возврат остальных значений без копирования.
 def _sent_value(name, value):
     """The value a trace shows: tools and input by count and kind, since their full bodies are in the request manifest."""
     if name == "tools" and isinstance(value, list):
@@ -452,6 +458,9 @@ def _clean_mcp_tool(tool):
     return cleaned
 
 
+# WIKIFUNCTIONS-CANDIDATE WF-07: https://www.wikifunctions.org/wiki/Z873 + Z872.
+# Заменить обход на map(validate/clean) + filter(result is not None); адаптер сохраняет
+# ValueError для malformed tools, HTTPS-политику _clean_mcp_tool и исходные non-MCP объекты.
 def _clean_tools(tools):
     if not isinstance(tools, list):
         raise ValueError("tools must be a list of typed objects")

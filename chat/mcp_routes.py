@@ -102,6 +102,9 @@ def _tool_call_parts(tool_call: dict[str, Any]) -> tuple[str | None, dict[str, A
     return name, arguments
 
 
+# WIKIFUNCTIONS-CANDIDATE WF-05: https://www.wikifunctions.org/wiki/Z873 + Z872 + Z10079.
+# Заменить ядро очистки списка на map(trim) + filter(nonempty); адаптер сохраняет
+# приоритет data.skills, params.pop только при fallback, проверку list[str] и дубли.
 def _normalize_requested_skills(data, params):
     raw = data.get("skills")
     if raw is None:

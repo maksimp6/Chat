@@ -3,6 +3,9 @@
 from typing import Any, Optional
 
 
+# WIKIFUNCTIONS-CANDIDATE WF-10: https://www.wikifunctions.org/wiki/Z872 + Z873 + Z12899.
+# Заменить ядро сбора reasoning/output_text на filter/map/join; адаптер сохраняет
+# top-level output_text, только dict content parts, финальный strip и fallback при пустом тексте.
 def extract_response_text(data: dict[str, Any]) -> tuple[str, str]:
     """Return (reasoning, user-visible text) from one Responses API response."""
     if not isinstance(data, dict):
@@ -33,6 +36,10 @@ def extract_response_text(data: dict[str, Any]) -> tuple[str, str]:
     return "\n\n".join(reasoning_parts), text
 
 
+# WIKIFUNCTIONS-CANDIDATE WF-14: https://www.wikifunctions.org/wiki/Z18479 + Z872 + Z873.
+# Заменить поиск последнего текста на reverse + адаптер ленивого filter/map/first-match;
+# обычные W filter/map не обещают lazy/early-stop и без такой адаптации неэквивалентны.
+# адаптер не вычисляет ранние ответы после совпадения и возвращает исходную trace entry рядом с текстом.
 def extract_last_response_text(responses: list) -> tuple[str, Optional[dict[str, Any]]]:
     """Return the last non-empty user-visible response text and its trace entry."""
     if not isinstance(responses, list):

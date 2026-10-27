@@ -6,6 +6,9 @@ import json
 from typing import Any, Callable, Iterable
 
 
+# WIKIFUNCTIONS-CANDIDATE WF-12: https://www.wikifunctions.org/wiki/Z872 + Z873 + Z18755.
+# Заменить ядро сбора calls на filter/map/concat; адаптер обходит только output и message.content,
+# сохраняет порядок и исходные dict, не удаляет повторные call_id и не исполняет вызовы.
 def extract_function_calls(response: Any) -> list[dict[str, Any]]:
     """Return function calls from a Responses API output payload."""
     calls: list[dict[str, Any]] = []
@@ -43,6 +46,9 @@ def make_function_call_output(call: dict[str, Any], result: Any) -> dict[str, An
     return {"type": "function_call_output", "call_id": call_id, "output": output}
 
 
+# WIKIFUNCTIONS-CANDIDATE WF-13: https://www.wikifunctions.org/wiki/Z14779.
+# Заменить попарную сборку на map двух списков одинаковой длины; адаптер материализует
+# results один раз, сохраняет прежнюю ошибку размера до сборки и callback make_function_call_output.
 def build_continuation_input(
     response: dict[str, Any], results: Iterable[Any]
 ) -> list[dict[str, Any]]:

@@ -15,6 +15,9 @@ def file_search_max_results(value: Any) -> int:
         return 20
 
 
+# WIKIFUNCTIONS-CANDIDATE WF-03: https://www.wikifunctions.org/wiki/Z10079 + Z10047.
+# Заменить строковую ветку преобразования boolean композицией trim/lowercase;
+# адаптер сохраняет bool без преобразования, только true/false и прежний ValueError/path.
 def _enabled(value: Any, path: str) -> bool:
     if isinstance(value, bool):
         return value
@@ -25,6 +28,10 @@ def _enabled(value: Any, path: str) -> bool:
     raise ValueError(f"{path} must be a boolean or the string true/false")
 
 
+# WIKIFUNCTIONS-CANDIDATE WF-04: https://www.wikifunctions.org/wiki/Z10075 + Z25614 + Z19202.
+# Перенести разбор списка в replace/split -> map(trim Z10079) -> stable dedup;
+# адаптер сохраняет string/list[str], literal \\r\\n/\\n, запятые и ВСЕ разделители splitlines,
+# пропуск пустых элементов, порядок и ошибки; простой split("\n") сам по себе неэквивалентен.
 def _entries(value: Any, path: str) -> list[str]:
     if isinstance(value, str):
         values = [value]

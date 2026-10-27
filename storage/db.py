@@ -75,6 +75,10 @@ def create_conversation(conv_id: str, title: str, model: str, provider_pending: 
         )
 
 
+# WIKIFUNCTIONS-CANDIDATE WF-01: https://www.wikifunctions.org/wiki/Z10193 + Z14592.
+# Заменить ядро нормализации пробелов и усечения; адаптер: Python Unicode whitespace,
+# str(title or ""), fallback «Новый чат», max_length - 1, rstrip и прежнее многоточие.
+# Z14592 принимает Natural N: отрицательный stop при max_length <= 0 оставить Python-срезу.
 def normalize_conversation_title(title: Any, max_length: int = 80) -> str:
     value = " ".join(str(title or "").strip().split())
     if not value:

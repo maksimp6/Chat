@@ -24,6 +24,9 @@
     return number;
   }
 
+  // WIKIFUNCTIONS-CANDIDATE WF-19: https://www.wikifunctions.org/wiki/Z10079 + Z10047.
+  // Заменить строковую ветку boolean композицией trim/lowercase; адаптер сохраняет
+  // bool без преобразования, null/undefined fallback, только true/false и прежнюю ошибку с name.
   function booleanSetting(value, fallback, name) {
     if (value === undefined || value === null) return fallback;
     if (typeof value === "boolean") return value;

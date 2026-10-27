@@ -77,6 +77,9 @@ def capture_provider_diagnostics(result: dict[str, Any], response: dict[str, Any
             result["capability_receipt"]["provider_echo"] = echo
 
 
+# WIKIFUNCTIONS-CANDIDATE WF-11: https://www.wikifunctions.org/wiki/Z872 + Z873 + Z12899.
+# Заменить ядро сбора assistant parts на filter/map/join; адаптер сохраняет role/type guards,
+# исключение user/tool/reasoning, порядок, fallback и различие available/empty/unknown.
 def assistant_text(response: dict[str, Any]) -> tuple[str, str]:
     """Preserve explicit assistant text; exclude tool/user/reasoning diagnostics."""
     parts: list[str] = []

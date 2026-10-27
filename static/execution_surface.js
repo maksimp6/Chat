@@ -174,6 +174,9 @@
     return null;
   }
 
+  // WIKIFUNCTIONS-CANDIDATE WF-17: https://www.wikifunctions.org/wiki/Z19202.
+  // Заменить ядро stable dedup строк; адаптер сохраняет извлечение raw.model, text(..., 80),
+  // пропуск пустых значений и порядок первого появления; не менять UTF-16 усечение text().
   function models(responses) {
     var seen = new Set();
     responses.forEach(function (response) {

@@ -4,6 +4,9 @@ This module intentionally has no HTTP, database, tracing, or MCP side effects.
 """
 
 
+# WIKIFUNCTIONS-CANDIDATE WF-09: https://www.wikifunctions.org/wiki/Z872 + Z873 + Z12899.
+# Заменить чистое ядро отбора/сборки частей на filter/map/join; адаптер сохраняет
+# str(part_text), строковые content parts, разделитель reasoning "\n\n" и прежние fallback/type guards.
 def extract_reasoning_and_text(data):
     """Return a tuple of (reasoning_text, response_text) from a response."""
     if not isinstance(data, dict):

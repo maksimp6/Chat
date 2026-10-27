@@ -34,6 +34,9 @@
     document.head.appendChild(s);
   }
 
+  // WIKIFUNCTIONS-CANDIDATE WF-16: https://www.wikifunctions.org/wiki/Z12316.
+  // Собрать escape через четыре regex replacements в порядке & < > "; сохранить
+  // null/undefined -> "", String(str), g и НЕ экранировать апостроф (generic HTML escape не подходит).
   function escapeHtml(str) {
     // 0 and false are real values; only a missing value renders empty.
     if (str === null || str === undefined) return "";
@@ -158,6 +161,9 @@
     }
     return target;
   }
+  // WIKIFUNCTIONS-CANDIDATE WF-18: https://www.wikifunctions.org/wiki/Z25614 + Z873 + Z872 + Z10079.
+  // Заменить нормализатор списка композицией split(",") -> map(trim) -> filter(nonempty);
+  // адаптер сохраняет falsy -> [], порядок и повторные значения, не добавляет dedup.
   function strToArr(str) {
     if (!str) return [];
     return str

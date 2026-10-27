@@ -64,6 +64,9 @@
     }
   }
 
+  // WIKIFUNCTIONS-CANDIDATE WF-15: https://www.wikifunctions.org/wiki/Z12316.
+  // Заменить ядро маскирования двумя regex replacements; сохранить String(value || ""),
+  // предварительный slice, порядок шаблонов, gi и $1. Секреты обрабатывать только локально.
   function redactString(value) {
     var text = String(value || "").slice(0, MAX_STRING_LENGTH);
     text = text.replace(/(bearer\s+)[a-z0-9._~+/=-]+/gi, "$1[REDACTED]");

@@ -128,6 +128,9 @@ class Skill:
         }
 
 
+# WIKIFUNCTIONS-CANDIDATE WF-02: https://www.wikifunctions.org/wiki/Z10193 + Z10079 + Z10047.
+# Собрать нормализатор роли из Python regex/trim/lowercase; сохранить None и str(role),
+# шаблон [^a-z0-9]+, отдельную обрезку дефисов по краям и None для пустого результата.
 def _normalize_role(role: Optional[str]) -> Optional[str]:
     if role is None:
         return None

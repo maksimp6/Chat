@@ -1,6 +1,9 @@
 import math
 
 
+# WIKIFUNCTIONS-CANDIDATE WF-08: https://www.wikifunctions.org/wiki/Z872 + Z873 + Z12899.
+# Заменить чистое ядро отбора/сборки частей на filter/map/join; адаптер сохраняет
+# отдельные reasoning/text, строковые content parts, текущие преобразования и fallback output_text/text.
 def extract_reasoning_and_text(data):
     if not isinstance(data, dict):
         return "", str(data or "")
