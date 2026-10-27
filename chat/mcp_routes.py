@@ -1051,14 +1051,51 @@ def execute_approved():
             f"Пользователь подтвердил действие '{func_name}' с параметрами {arguments}.\n"
             f"Результат: {execution_data}.\nДай краткий ответ о завершении."
         )
-        synth_response = client.ask(
-            prompt,
-            model_key,
-            _provider_conversation_id(client, conv_id, ExecutionTrace()),
-            {"instructions": "Ты системный ассистент."},
+        try:
+            synth_response = client.ask(
+                prompt,
+                model_key,
+                _provider_conversation_id(client, conv_id, ExecutionTrace()),
+                {"instructions": "Ты системный ассистент."},
+            )
+        except Exception:
+            # The action already completed. Preserve its result even if the
+            # optional model follow-up fails; never invite re-execution.
+            logger.exception("[TOOL_APPROVAL] Follow-up model request failed")
+            synth_response = {
+                "status": "failed",
+                "error": {"code": "approval_followup_failed"},
+                "output": [],
+            }
+        try:
+            provider_diagnostics = {}
+            capture_provider_diagnostics(
+                provider_diagnostics,
+                synth_response if isinstance(synth_response, dict) else {},
+            )
+            followup_reply = client.extract_text(synth_response) if isinstance(synth_response, dict) else ""
+            followup_failed = (
+                provider_diagnostics["provider_status"] != "completed"
+                or provider_diagnostics["provider_error_present"]
+                or bool(extract_function_calls(synth_response))
+                or not followup_reply.strip()
+            )
+            usage = client.extract_usage(synth_response)
+        except Exception:
+            logger.exception("[TOOL_APPROVAL] Invalid follow-up model response")
+            provider_diagnostics = {
+                "provider_status": "failed",
+                "provider_error_present": True,
+                "provider_error_code": "approval_followup_invalid_response",
+            }
+            followup_reply = ""
+            followup_failed = True
+            usage = None
+        reply = (
+            f"Действие {func_name} выполнено. Итоговый ответ модели не завершён. "
+            "Повторять действие не нужно."
+            if followup_failed else followup_reply
         )
-        reply = client.extract_text(synth_response) or f"Действие {func_name} успешно выполнено."
-        usage = client.extract_usage(synth_response)
         # The follow-up answer is a model call like any chat turn, so it is billed the same way.
         billing = aggregate_billing(
             [build_ai_billing_item(model_key, usage, step=1)],
@@ -1074,8 +1111,17 @@ def execute_approved():
             logger.exception("[BILLING] Approval follow-up settlement failed")
         cost = _turn_cost(billing)
 
-        add_message(conv_id, "assistant", reply, cost=cost)
-        return jsonify({"reply": reply, "cost": cost, "execution_result": exec_res})
+        add_message(conv_id, "assistant", reply, cost=cost, source="error" if followup_failed else None)
+        return jsonify(
+            {
+                "reply": reply,
+                "cost": cost,
+                "execution_result": exec_res,
+                "status": "failed" if followup_failed else "completed",
+                **provider_diagnostics,
+                **({"error": "approval_followup_failed"} if followup_failed else {}),
+            }
+        ), 502 if followup_failed else 200
     except Exception:
         logger.exception("[TOOL_APPROVAL] Tool execution failed")
         return jsonify({"error": "tool_execution_failed"}), 500

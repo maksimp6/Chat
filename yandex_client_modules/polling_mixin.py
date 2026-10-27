@@ -43,8 +43,13 @@ class YandexPollingMixin:
                     delay = min(delay * 1.5, poll_delay_cap(time.time() - start))
                     continue
                 resp.raise_for_status()
-                data = resp.json()
             except requests.RequestException as e:
+                status_code = getattr(getattr(e, "response", None), "status_code", None)
+                error_message = (
+                    f"Provider polling HTTP {status_code}"
+                    if status_code is not None
+                    else f"Provider polling transport error ({type(e).__name__})"
+                )
                 if execution_trace and isinstance(execution_trace, ExecutionTrace):
                     execution_trace.add_event(
                         "api_poll_error",
@@ -54,21 +59,47 @@ class YandexPollingMixin:
                                 trace_step or 1
                             ),
                             "response_id": task_id,
-                            "error": str(e),
+                            "status_code": status_code,
+                            "error": error_message,
                         },
                     )
                     execution_trace.record_error(
                         "yandex_poll",
-                        str(e),
+                        error_message,
                         step=trace_step,
                         error_type=type(e).__name__,
                     )
+                if (
+                    isinstance(status_code, int)
+                    and 400 <= status_code < 500
+                    and status_code not in {404, 408, 429}
+                ):
+                    raise YandexClientError(error_message, status_code=status_code) from e
                 time.sleep(delay)
                 delay = min(delay * 1.5, poll_delay_cap(time.time() - start))
                 continue
 
+            invalid_json = False
+            try:
+                data = resp.json()
+            except ValueError:
+                # JSONDecodeError also inherits RequestException in requests.
+                # Keep the body as trace evidence instead of retrying it as a
+                # transport failure; only the fixed envelope reaches callers.
+                data = resp.text
+                invalid_json = True
+
             poll_end = time.time()
             snapshot_key = json.dumps(data, sort_keys=True, ensure_ascii=False, default=str)
+            response = data if isinstance(data, dict) else {
+                "id": task_id,
+                "status": "failed",
+                "error": {
+                    "code": "provider_invalid_json" if invalid_json else "provider_invalid_response",
+                    "type": "invalid_response",
+                },
+                "output": [],
+            }
             if (
                 execution_trace
                 and isinstance(execution_trace, ExecutionTrace)
@@ -89,16 +120,16 @@ class YandexPollingMixin:
                         "step": trace_step,
                         "correlation_id": execution_trace.get_step_correlation_id(trace_step or 1),
                         "response_id": task_id,
-                        "status": data.get("status"),
+                        "status": response.get("status"),
                         "timing_ms": poll_timing_ms,
-                        "has_output": bool(data.get("output")),
+                        "has_output": bool(response.get("output")),
                         "snapshot_changed": True,
                     },
                 )
                 last_snapshot = snapshot_key
 
-            status = data.get("status")
-            if status in ("completed", "incomplete", "failed", "cancelled"):
+            status = response.get("status")
+            if status in ("completed", "incomplete", "failed", "cancelled") or response.get("error") is not None:
                 if execution_trace and isinstance(execution_trace, ExecutionTrace):
                     execution_trace.add_event(
                         "api_poll_completed",
@@ -112,15 +143,12 @@ class YandexPollingMixin:
                         },
                     )
                 if status == "failed":
-                    err = data.get("error")
-                    err_msg = err.get("message", "unknown") if isinstance(err, dict) else str(err)
                     execution_trace.record_error(
                         "yandex_poll",
-                        err_msg,
+                        "Provider task failed",
                         step=trace_step,
                         error_type="ProviderTaskFailed",
                     ) if execution_trace and isinstance(execution_trace, ExecutionTrace) else None
-                    raise YandexClientError(f"Task failed: {err_msg}")
                 if status == "cancelled":
                     execution_trace.record_error(
                         "yandex_poll",
@@ -128,8 +156,9 @@ class YandexPollingMixin:
                         step=trace_step,
                         error_type="ProviderTaskCancelled",
                     ) if execution_trace and isinstance(execution_trace, ExecutionTrace) else None
-                    raise YandexClientError("Task cancelled")
-                return data
+                # ask() delivers every terminal state to its checkpoint callback
+                # and caller; provider failures use the normal diagnostics path.
+                return response
             time.sleep(delay)
             delay = min(delay * 1.5, poll_delay_cap(time.time() - start))
 

@@ -395,19 +395,25 @@ class YandexRequestMixin:
                     "start_timestamp": request_start_timestamp,
                     "end_timestamp": request_end_timestamp,
                     "timing_ms": request_duration_ms,
-                    "response_id": data.get("id"),
-                    "status": data.get("status"),
+                    "response_id": data.get("id") if isinstance(data, dict) else None,
+                    "status": data.get("status") if isinstance(data, dict) else None,
                 },
             )
+        if not isinstance(data, dict):
+            # add_response above retains the original JSON as evidence. Callers
+            # and checkpoints receive a safe failure object, never a scalar.
+            data = {
+                "status": "failed",
+                "error": {"code": "provider_invalid_response", "type": "invalid_response"},
+                "output": [],
+            }
         if on_provider_response is not None:
             on_provider_response(data)
         task_id = data.get("id")
         status = data.get("status")
-        if status in ("completed", "incomplete"):
+        if status in ("completed", "incomplete", "failed", "cancelled") or data.get("error") is not None:
             _record_quota_usage(execution_trace, quota_reservation, data)
             return data
-        if status in ("failed", "cancelled"):
-            raise YandexClientError(f"Task status: {status}")
         if not task_id:
             raise YandexClientError("Provider response has no task id to poll")
         wait_params = {"timeout": poll_timeout} if "poll_timeout" in params else {}

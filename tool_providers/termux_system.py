@@ -410,6 +410,33 @@ TOOL_REGISTRY = {
     },
 }
 
+# The model is offered only tools whose Termux:API helper exists on this host.
+# Keep the canonical system names separate from the legacy aliases below, so
+# loading this category does not replace tools already loaded from termux.py.
+_REQUIRED_EXECUTABLES = {
+    "get_system_battery": "termux-battery-status",
+    "get_wifi_status": "termux-wifi-connectioninfo",
+    "get_device_location": "termux-location",
+    "get_clipboard": "termux-clipboard-get",
+    "set_clipboard": "termux-clipboard-set",
+    "send_notification": "termux-notification",
+    "show_toast": "termux-toast",
+    "tts_speak": "termux-tts-speak",
+    "trigger_vibration": "termux-vibrate",
+    "set_torch": "termux-torch",
+    "get_system_volume": "termux-volume",
+    "set_system_volume": "termux-volume",
+    "set_screen_brightness": "termux-brightness",
+    "list_contacts": "termux-contact-list",
+    "list_sms": "termux-sms-list",
+    "send_sms": "termux-sms-send",
+    "take_camera_photo": "termux-camera-photo",
+}
+for _name, _executable in _REQUIRED_EXECUTABLES.items():
+    TOOL_REGISTRY[_name]["metadata"] = {"requires_executables": [_executable]}
+
+SYSTEM_TOOLS = {name: TOOL_REGISTRY[name] for name in _REQUIRED_EXECUTABLES}
+
 # Алиасы для обратной совместимости
 # Reads and captures of private data (location, contacts, SMS, camera) need the owner's approval.
 for _private_tool in ("get_device_location", "list_contacts", "list_sms", "take_camera_photo"):
@@ -425,6 +452,3 @@ def execute_termux_tool(tool_name: str, arguments: dict, cfg: dict = None) -> di
     if tool_name not in TOOL_REGISTRY:
         return {"error": f"Неизвестный инструмент Termux: {tool_name}"}
     return TOOL_REGISTRY[tool_name]["func"](arguments, cfg or {})
-
-
-SYSTEM_TOOLS = {}

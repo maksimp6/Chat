@@ -19,6 +19,7 @@ import ast
 import sys
 import glob
 import shutil
+import stat
 import difflib
 import hashlib
 import zipfile
@@ -155,6 +156,7 @@ def write_file(args: dict) -> dict:
         abs_path = _get_abs_path(path)
         target_dir = os.path.dirname(abs_path)
         os.makedirs(target_dir, exist_ok=True)
+        existing_mode = stat.S_IMODE(os.stat(abs_path).st_mode) if os.path.exists(abs_path) else None
 
         with tempfile.NamedTemporaryFile(
             "w", encoding="utf-8", dir=target_dir, delete=False, prefix=".tmp_", suffix=".tmp"
@@ -191,6 +193,9 @@ def write_file(args: dict) -> dict:
                 shutil.copy2(abs_path, backup_file)
             except Exception as be:
                 logger.warning(f"[FS] Не удалось создать бэкап {path}: {be}")
+
+        if existing_mode is not None and stat.S_IMODE(os.stat(tmp_path).st_mode) != existing_mode:
+            os.chmod(tmp_path, existing_mode)
 
         try:
             os.replace(tmp_path, abs_path)
@@ -360,15 +365,33 @@ def zip_compress(args: dict) -> dict:
     if not source_path or not out_archive:
         return {"error": "Параметры 'source_path' и 'archive_path' обязательны"}
 
+    tmp_path = None
     try:
         abs_src = _get_abs_path(source_path)
         abs_out = _get_abs_path(out_archive)
         if not os.path.exists(abs_src):
             return {"error": f"Исходный путь '{source_path}' не существует"}
+        if abs_src == abs_out or (
+            os.path.exists(abs_out) and os.path.samefile(abs_src, abs_out)
+        ):
+            return {"error": "Исходный путь и путь архива должны различаться"}
 
         os.makedirs(os.path.dirname(abs_out), exist_ok=True)
+        output_mode = stat.S_IMODE(os.stat(abs_out).st_mode) if os.path.exists(abs_out) else None
+        with tempfile.NamedTemporaryFile(
+            dir=os.path.dirname(abs_out), prefix=".tmp_archive_", suffix=".zip", delete=False
+        ) as tmp:
+            tmp_path = tmp.name
+        # Build beside the destination so failures leave an existing archive
+        # intact. Neither the temporary file nor the old archive is an input.
+        excluded_paths = {os.path.realpath(abs_out), os.path.realpath(tmp_path)}
+        excluded_ids = set()
+        for excluded_path in (abs_out, tmp_path):
+            if os.path.exists(excluded_path):
+                info = os.stat(excluded_path)
+                excluded_ids.add((info.st_dev, info.st_ino))
         count = 0
-        with zipfile.ZipFile(abs_out, "w", zipfile.ZIP_DEFLATED) as zf:
+        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
             if os.path.isfile(abs_src):
                 zf.write(abs_src, arcname=os.path.basename(abs_src))
                 count = 1
@@ -376,10 +399,19 @@ def zip_compress(args: dict) -> dict:
                 for root, _, files in os.walk(abs_src):
                     for file in files:
                         full_f = os.path.join(root, file)
+                        if os.path.realpath(full_f) in excluded_paths:
+                            continue
+                        info = os.stat(full_f)
+                        if (info.st_dev, info.st_ino) in excluded_ids:
+                            continue
                         rel_f = os.path.relpath(full_f, abs_src)
                         zf.write(full_f, arcname=rel_f)
                         count += 1
 
+        if output_mode is not None and stat.S_IMODE(os.stat(tmp_path).st_mode) != output_mode:
+            os.chmod(tmp_path, output_mode)
+        os.replace(tmp_path, abs_out)
+        tmp_path = None
         return {
             "success": True,
             "archive_path": out_archive,
@@ -388,6 +420,12 @@ def zip_compress(args: dict) -> dict:
         }
     except Exception as e:
         return {"error": f"Ошибка создания архива: {str(e)}"}
+    finally:
+        if tmp_path is not None:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
 
 
 def zip_extract(args: dict) -> dict:
@@ -790,7 +828,7 @@ TOOL_REGISTRY = {
                     "description": "Размер буфера чтения в байтах (по умолчанию 64KB)",
                 },
                 "whence": {
-                    "type": "string",
+                    "type": ["string", "integer"],
                     "description": "Точка отсчета: 0/'start' (SEEK_SET), 1/'cur' (SEEK_CUR), 2/'end' (SEEK_END для tail)",
                 },
             },

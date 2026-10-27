@@ -253,7 +253,7 @@ class ToolRegistry:
             definition = self.get_universal_definition(name)
             if definition is None:
                 continue
-            if transport and transport not in definition.supported_transports:
+            if transport and not self.is_offered(self._tools[name], transport):
                 continue
             definitions.append(definition.to_mapping())
         return definitions

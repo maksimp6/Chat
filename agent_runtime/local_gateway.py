@@ -19,6 +19,68 @@ local_agent_bp = Blueprint("local_agents", __name__, url_prefix="/api/local-agen
 _AGENT_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _MAX_CAPABILITIES = 64
 _DEFAULT_LEASE_SECONDS = 30
+_PROTOCOL_VERSION = 2
+
+
+def _protocol_error():
+    if request.headers.get("X-Logos-Agent-Protocol") != str(_PROTOCOL_VERSION):
+        return jsonify({"error": "agent_protocol_upgrade_required", "protocol_version": _PROTOCOL_VERSION}), 409
+    return None
+
+
+def _uncertain_result(row, reason: str) -> dict[str, Any]:
+    return {
+        "success": False,
+        "data": None,
+        "error": (
+            "Исход выполнения локального инструмента неизвестен (in_doubt). "
+            "Действие могло уже выполниться. Автоматически повторять его нельзя; "
+            "сначала проверьте фактический результат."
+        ),
+        "metadata": {
+            "job_id": row["id"], "agent_id": row["agent_id"],
+            "claim_attempt": row.get("attempt", 0), "phase": "execution",
+            "outcome": "in_doubt", "uncertain": True, "retry_safe": False,
+            "reason": reason,
+        },
+    }
+
+
+def _expire_job(tx, key: str, row, now: float):
+    if row["status"] not in {"claimed", "running"}:
+        return row
+    if row.get("claim_token") and row.get("lease_until") is not None and row["lease_until"] > now:
+        return row
+    if row["status"] == "running":
+        result = _uncertain_result(row, "execution_lease_expired")
+        row = {**row, "status": "in_doubt", "lease_until": None,
+               "result_json": _json(result), "error_json": _json(result["error"])}
+    else:
+        # No /start acknowledgement was issued, so this claim cannot have executed.
+        row = {**row, "status": "queued", "claimed_at": None,
+               "lease_until": None, "claim_token": None}
+    tx.set(key, row)
+    return row
+
+
+def _timeout_job(tx, key: str, row):
+    if row["status"] == "running":
+        result = _uncertain_result(row, "wait_timeout")
+        row = {**row, "status": "in_doubt", "lease_until": None,
+               "result_json": _json(result), "error_json": _json(result["error"])}
+        tx.set(key, row)
+    elif row["status"] in {"queued", "claimed"}:
+        result = {
+            "success": False, "data": None,
+            "error": "Ожидание локального инструмента истекло до запуска; задание отменено.",
+            "metadata": {"job_id": row["id"], "phase": "waiting", "outcome": "cancelled",
+                         "uncertain": False, "execution_started": False, "retry_safe": True},
+        }
+        row = {**row, "status": "cancelled", "claim_token": None, "lease_until": None,
+               "completed_at": unix_time(), "result_json": _json(result),
+               "error_json": _json(result["error"])}
+        tx.set(key, row)
+    return row
 
 
 def _json(value: Any) -> str:
@@ -90,6 +152,8 @@ def enqueue_local_tool_job(
                 "status": "queued",
                 "created_at": unix_time(),
                 "claimed_at": None,
+                "claim_token": None,
+                "attempt": 0,
                 "lease_until": None,
                 "completed_at": None,
                 "result_json": None,
@@ -108,10 +172,15 @@ def wait_for_local_tool_job(
         raise ValueError("timeout_seconds must be between 0 and 3600")
     deadline = time.monotonic() + timeout
     while True:
-        row = get_store().get("local-job/" + str(job_id))
-        if row is None:
-            raise LookupError("local_tool_job_not_found")
-        if row["status"] in {"completed", "failed"}:
+        key = "local-job/" + str(job_id)
+        with get_store().transaction() as tx:
+            row = tx.get(key)
+            if row is None:
+                raise LookupError("local_tool_job_not_found")
+            row = _expire_job(tx, key, row, unix_time())
+            if time.monotonic() >= deadline:
+                row = _timeout_job(tx, key, row)
+        if row["status"] in {"completed", "failed", "cancelled", "in_doubt"}:
             result = _parse_json(row.get("result_json"), None)
             if row["status"] == "completed":
                 return result if result is not None else {"success": True, "data": None}
@@ -123,28 +192,16 @@ def wait_for_local_tool_job(
             return {"success": False, "data": None, "error": error or "local_agent_job_failed"}
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            return None
+            continue
         time.sleep(min(0.05, remaining))
 
 
 def _recover_expired_jobs(conn, agent_id: str) -> None:
     now = unix_time()
-    for key, row in get_store().items(prefix="local-job/").items():
-        if (
-            row["agent_id"] == agent_id
-            and row["status"] == "running"
-            and row["lease_until"] is not None
-            and row["lease_until"] < now
-        ):
-            conn.set(key, {**row, "status": "queued", "claimed_at": None, "lease_until": None})
-
-
-def _renew_running_leases(conn, agent_id: str, now: float) -> None:
-    # A job that is still executing must keep its lease, or the next poll requeues it and a
-    # second agent run repeats any side effect the first one already produced.
-    for key, row in get_store().items(prefix="local-job/").items():
-        if row["agent_id"] == agent_id and row["status"] == "running":
-            conn.set(key, {**row, "lease_until": now + _DEFAULT_LEASE_SECONDS})
+    for key in get_store().items(prefix="local-job/"):
+        row = conn.get(key)
+        if row is not None and row["agent_id"] == agent_id:
+            _expire_job(conn, key, row, now)
 
 
 @local_agent_bp.post("/register")
@@ -184,6 +241,7 @@ def register_local_agent():
 
     return jsonify(
         {
+            "protocol_version": _PROTOCOL_VERSION,
             "agent": {
                 "id": agent_id,
                 "name": name,
@@ -197,24 +255,39 @@ def register_local_agent():
 
 @local_agent_bp.post("/<agent_id>/heartbeat")
 def local_agent_heartbeat(agent_id: str):
-
+    protocol_error = _protocol_error()
+    if protocol_error is not None:
+        return protocol_error
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not data.get("job_id") or not data.get("claim_token"):
+        return jsonify({"error": "job_id_and_claim_token_required"}), 400
     now = unix_time()
     key = "local-agent/" + agent_id
     try:
         with get_store().transaction() as tx:
             agent = _require_agent(agent_id)
-            row = agent
-            tx.set(key, {**row, "status": "online", "last_seen": now, "updated_at": now})
-            _renew_running_leases(tx, agent_id, now)
+            job_key = "local-job/" + str(data["job_id"])
+            row = tx.get(job_key)
+            if row is None or row["agent_id"] != agent_id:
+                return jsonify({"error": "job_not_found"}), 404
+            row = _expire_job(tx, job_key, row, now)
+            if row.get("claim_token") != data["claim_token"] or row["status"] not in {"claimed", "running"}:
+                return jsonify({"error": "claim_not_active"}), 409
+            tx.set(job_key, {**row, "lease_until": now + _DEFAULT_LEASE_SECONDS})
+            tx.set(key, {**agent, "status": "online", "last_seen": now, "updated_at": now})
     except LookupError:
         return jsonify({"error": "agent_not_found"}), 404
 
-    return jsonify({"status": "ok", "agent_id": agent_id, "last_seen": now})
+    return jsonify({"status": "ok", "protocol_version": _PROTOCOL_VERSION,
+                    "agent_id": agent_id, "job_id": data["job_id"],
+                    "claim_token": data["claim_token"], "last_seen": now})
 
 
 @local_agent_bp.get("/<agent_id>/poll")
 def local_agent_poll(agent_id: str):
-
+    protocol_error = _protocol_error()
+    if protocol_error is not None:
+        return protocol_error
     store = get_store()
     try:
         with store.transaction() as tx:
@@ -230,16 +303,20 @@ def local_agent_poll(agent_id: str):
             agent_key = "local-agent/" + agent_id
             tx.set(agent_key, {**agent, "status": "online", "last_seen": now, "updated_at": now})
             if row is None:
-                return jsonify({"job": None, "poll_after_seconds": 2})
+                return jsonify({"job": None, "protocol_version": _PROTOCOL_VERSION, "poll_after_seconds": 2})
             lease_until = now + _DEFAULT_LEASE_SECONDS
+            claim_token = uuid4().hex
+            attempt = int(row.get("attempt") or 0) + 1
             tx.set(
                 "local-job/" + row["id"],
-                {**row, "status": "running", "claimed_at": now, "lease_until": lease_until},
+                {**row, "status": "claimed", "claimed_at": now, "lease_until": lease_until,
+                 "claim_token": claim_token, "attempt": attempt},
             )
     except LookupError:
         return jsonify({"error": "agent_not_found"}), 404
     return jsonify(
         {
+            "protocol_version": _PROTOCOL_VERSION,
             "job": {
                 "id": row["id"],
                 "tool_name": row["tool_name"],
@@ -248,19 +325,56 @@ def local_agent_poll(agent_id: str):
                 "trace_id": row["trace_id"],
                 "invocation_id": row["invocation_id"],
                 "lease_until": lease_until,
+                "claim_token": claim_token,
+                "attempt": attempt,
             },
             "poll_after_seconds": 1,
         }
     )
 
 
+@local_agent_bp.post("/<agent_id>/jobs/<job_id>/start")
+def local_agent_start(agent_id: str, job_id: str):
+    protocol_error = _protocol_error()
+    if protocol_error is not None:
+        return protocol_error
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not data.get("claim_token"):
+        return jsonify({"error": "claim_token_required"}), 400
+    key = "local-job/" + job_id
+    try:
+        with get_store().transaction() as tx:
+            _require_agent(agent_id)
+            row = tx.get(key)
+            if row is None or row["agent_id"] != agent_id:
+                return jsonify({"error": "job_not_found"}), 404
+            row = _expire_job(tx, key, row, unix_time())
+            if row.get("claim_token") != data["claim_token"] or row["status"] not in {"claimed", "running"}:
+                return jsonify({"error": "claim_not_active"}), 409
+            if row["status"] == "claimed":
+                row = {**row, "status": "running", "started_at": unix_time()}
+                tx.set(key, row)
+    except LookupError:
+        return jsonify({"error": "agent_not_found"}), 404
+    return jsonify({"status": "running", "protocol_version": _PROTOCOL_VERSION,
+                    "job_id": job_id, "claim_token": row["claim_token"], "attempt": row["attempt"]})
+
+
 @local_agent_bp.post("/<agent_id>/jobs/<job_id>/result")
 def local_agent_result(agent_id: str, job_id: str):
 
-    data = request.get_json(silent=True) or {}
+    protocol_error = _protocol_error()
+    if protocol_error is not None:
+        return protocol_error
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not data.get("claim_token"):
+        return jsonify({"error": "claim_token_required"}), 400
     status = str(data.get("status") or "").strip().lower()
     if status not in {"completed", "failed"}:
         return jsonify({"error": "status_must_be_completed_or_failed"}), 400
+    result = data.get("result")
+    if not isinstance(result, dict) or result.get("success") is not (status == "completed"):
+        return jsonify({"error": "result_success_must_match_status"}), 400
 
     key = "local-job/" + job_id
     try:
@@ -270,19 +384,24 @@ def local_agent_result(agent_id: str, job_id: str):
             row = tx.get(key)
             if row is None or row["agent_id"] != agent_id:
                 return jsonify({"error": "job_not_found"}), 404
+            if row.get("claim_token") != data["claim_token"]:
+                return jsonify({"error": "claim_mismatch"}), 409
             if row["status"] in {"completed", "failed"}:
-                return jsonify({"status": "ok", "idempotent": True})
-            # Only the job this agent claimed through poll may be completed. A queued job was never
-            # run, so a result for it would be invented.
-            if row["status"] != "running":
+                if row["status"] != status or _parse_json(row.get("result_json"), None) != result:
+                    return jsonify({"error": "result_conflict"}), 409
+                return jsonify({"status": "ok", "protocol_version": _PROTOCOL_VERSION,
+                                "job_id": job_id, "claim_token": row["claim_token"], "idempotent": True})
+            # A late result may resolve uncertainty for the SAME started claim.
+            # An expired running job is never offered to another worker.
+            if row["status"] not in {"running", "in_doubt"}:
                 return jsonify({"error": "job_not_running"}), 409
             tx.set(
                 key,
                 {
                     **row,
                     "status": status,
-                    "result_json": _json(data.get("result")),
-                    "error_json": _json(data.get("error")),
+                    "result_json": _json(result),
+                    "error_json": _json(result.get("error")),
                     "completed_at": unix_time(),
                     "lease_until": None,
                 },
@@ -290,7 +409,8 @@ def local_agent_result(agent_id: str, job_id: str):
     except LookupError:
         return jsonify({"error": "agent_not_found"}), 404
 
-    return jsonify({"status": "ok", "job_id": job_id})
+    return jsonify({"status": "ok", "protocol_version": _PROTOCOL_VERSION,
+                    "job_id": job_id, "claim_token": data["claim_token"]})
 
 
 @local_agent_bp.get("/health")
@@ -312,7 +432,7 @@ def local_agent_health():
                 "updated_at": row["updated_at"],
             }
         )
-    return jsonify({"agents": agents})
+    return jsonify({"protocol_version": _PROTOCOL_VERSION, "agents": agents})
 
 
 __all__ = ["enqueue_local_tool_job", "wait_for_local_tool_job", "init_local_agent_tables", "local_agent_bp"]
