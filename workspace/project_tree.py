@@ -1,4 +1,6 @@
 """Functional project tree API with safe, bounded filesystem traversal."""
+from core.wikifunctions import lowercase_string
+
 from core.env import env_get
 
 import os
@@ -22,7 +24,7 @@ def _tree(path, depth=0, budget=None):
     try:
         names = sorted(
             os.listdir(path),
-            key=lambda value: (not os.path.isdir(os.path.join(path, value)), value.lower()),
+            key=lambda value: (not os.path.isdir(os.path.join(path, value)), lowercase_string(value)),
         )
     except OSError as exc:
         raise RuntimeError(f"Cannot read project tree: {exc}") from exc

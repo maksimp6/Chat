@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 import json
 from typing import Any, Mapping, Optional
 from uuid import uuid4
@@ -86,7 +88,7 @@ def _save(case: dict[str, Any]) -> dict[str, Any]:
 def create_case(
     case_type: str = "IP_REGISTRATION", user_id: Optional[str] = None
 ) -> dict[str, Any]:
-    case_type = str(case_type or "").strip().upper()
+    case_type = trim_string(str(case_type or "")).upper()
     if case_type not in CASE_TYPES:
         raise ValueError("unsupported government case type")
     case_id = "gov-" + uuid4().hex[:16]
@@ -114,7 +116,7 @@ def create_case(
 
 
 def requirements(case_type: str = "IP_REGISTRATION") -> dict[str, Any]:
-    if str(case_type or "").strip().upper() != "IP_REGISTRATION":
+    if trim_string(str(case_type or "")).upper() != "IP_REGISTRATION":
         raise ValueError("requirements are not implemented for this case type")
     return {
         "case_type": "IP_REGISTRATION",
@@ -152,11 +154,11 @@ def validate_data(case_id: str) -> dict[str, Any]:
     errors = [
         {"field": field, "code": "required"}
         for field in IP_REQUIRED_FIELDS
-        if not isinstance(payload.get(field), str) or not payload.get(field).strip()
+        if not isinstance(payload.get(field), str) or not trim_string(payload.get(field))
     ]
     okved = payload.get("okved")
     if okved is not None and (
-        not isinstance(okved, list) or not all(isinstance(v, str) and v.strip() for v in okved)
+        not isinstance(okved, list) or not all(isinstance(v, str) and trim_string(v) for v in okved)
     ):
         errors.append({"field": "okved", "code": "invalid_format"})
     case["status"] = "PENDING_USER_DATA" if errors else "READY_FOR_APPROVAL"

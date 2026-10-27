@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 from copy import deepcopy
 from typing import Any
 
@@ -48,7 +50,7 @@ def _validated_config_update(new_config: dict) -> dict:
                 )
         elif key == "categories_allowed":
             if not isinstance(value, list) or not all(
-                isinstance(item, str) and item.strip() for item in value
+                isinstance(item, str) and trim_string(item) for item in value
             ):
                 raise ValueError("categories_allowed must be a list of non-empty strings")
         elif type(value) is not _CONFIG_TYPES[key]:

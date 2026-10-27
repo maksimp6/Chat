@@ -1,6 +1,8 @@
 """Native shared MCP server records and per-conversation selection."""
 
 from __future__ import annotations
+from core.wikifunctions import trim_string
+
 import uuid
 import time
 from typing import Any
@@ -76,7 +78,7 @@ def _validate_server_url(value: Any) -> None:
         return
     if not isinstance(value, str):
         raise ValueError("server_url must be a string")
-    parts = urlsplit(value.strip())
+    parts = urlsplit(trim_string(value))
     if parts.scheme != "https" or not parts.hostname:
         raise ValueError("server_url must be an https URL with a host")
     if parts.username is not None or parts.password is not None:

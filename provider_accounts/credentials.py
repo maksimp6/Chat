@@ -7,6 +7,8 @@ non-secret provider metadata/fingerprints.
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import threading
@@ -337,7 +339,7 @@ def set_secret_management_ref(
     *,
     now: Optional[datetime] = None,
 ) -> SecretManagementRef:
-    purpose, secret_id, version_id = purpose.strip(), secret_id.strip(), version_id.strip()
+    purpose, secret_id, version_id = trim_string(purpose), trim_string(secret_id), trim_string(version_id)
     if not purpose or not secret_id or not version_id:
         raise ValueError("purpose, secret_id and version_id are required")
     key = "secret/ref/" + purpose
@@ -492,7 +494,9 @@ def save_cloudru_iam_credentials(
     encrypt: Callable[[str], str],
     expires_at: Optional[datetime] = None,
 ) -> None:
-    if not key_id.strip() or not key_secret:
+    key_id = trim_string(key_id)
+    project_id = trim_string(project_id)
+    if not key_id or not key_secret:
         raise ValueError("IAM key id and secret are required")
     if expires_at is not None and _as_utc(expires_at) <= utcnow():
         raise ValueError("IAM master key is expired")
@@ -501,9 +505,9 @@ def save_cloudru_iam_credentials(
         tx.set(
             "provider/cloudru-iam",
             {
-                "key_id": key_id.strip(),
+                "key_id": key_id,
                 "key_secret_encrypted": encrypted,
-                "project_id": project_id.strip(),
+                "project_id": project_id,
                 "service_account_id": service_account_id,
                 "expires_at": _as_utc(expires_at).isoformat() if expires_at else None,
             },

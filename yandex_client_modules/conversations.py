@@ -1,3 +1,5 @@
+from core.wikifunctions import trim_string
+
 from observability.system_log import get_logger
 import uuid
 import requests
@@ -24,7 +26,7 @@ class YandexConversationMixin:
             resp.raise_for_status()
             data = resp.json()
             provider_id = data.get("id") if isinstance(data, dict) else None
-            if not isinstance(provider_id, str) or not provider_id.strip():
+            if not isinstance(provider_id, str) or not trim_string(provider_id):
                 raise YandexClientError("Yandex conversation creation returned no provider ID")
             try:
                 provider_id = str(uuid.UUID(provider_id))

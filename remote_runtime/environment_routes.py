@@ -1,5 +1,7 @@
 """REST API for branch-aware application environments."""
 
+from core.wikifunctions import lowercase_string, trim_string
+
 from flask import Blueprint, Response, current_app, jsonify, request
 
 from remote_runtime.environments import (
@@ -28,7 +30,7 @@ def environments_list():
 @environment_bp.post("")
 def environments_create():
     data = request.get_json(silent=True) or {}
-    branch = str(data.get("branch") or "").strip()
+    branch = trim_string(str(data.get("branch") or ""))
     commit_sha = data.get("commit_sha")
     if not branch:
         return jsonify({"error": "branch is required"}), 400
@@ -115,7 +117,7 @@ def _runtime_http_request(context, payload):
     return {
         "status_code": response.status_code,
         "headers": [
-            (key, value) for key, value in response.headers.items() if key.lower() not in excluded
+            (key, value) for key, value in response.headers.items() if lowercase_string(key) not in excluded
         ],
         "body": response.iter_encoded(),
         "close": response.close,
@@ -135,7 +137,7 @@ def _proxy(environment_id, subpath=""):
     headers = [
         (key, value)
         for key, value in request.headers.items()
-        if key.lower() not in {"host", "content-length", "connection"}
+        if lowercase_string(key) not in {"host", "content-length", "connection"}
     ]
     try:
         upstream = dispatch_environment_http(

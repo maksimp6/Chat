@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import lowercase_string
+
 from typing import Any
 
 from cloud.base import CloudProviderError
@@ -100,7 +102,10 @@ class AliceCloudProvider:
             raise CloudProviderError("Service must resolve to one container", code="ambiguous_service")
         text = self.runtime.logs(name=resources[0]["name"], limit=limit)
         if query:
-            lines = [line for line in text.splitlines() if query.lower() in line.lower()]
+            normalized_query = lowercase_string(query)
+            lines = [
+                line for line in text.splitlines() if normalized_query in lowercase_string(line)
+            ]
         else:
             lines = text.splitlines()
         return {"provider": self.name, "service": service, "lines": lines[-limit:]}

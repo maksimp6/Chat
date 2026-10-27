@@ -6,6 +6,8 @@ arguments.  Caller decides the path; this module never creates a password.
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 from dataclasses import dataclass
 from ipaddress import IPv4Address
 import os
@@ -33,7 +35,7 @@ def _read_private_file(dirfd: int, name: str, max_bytes: int) -> str:
         data = os.read(fd, max_bytes + 1)
         if len(data) > max_bytes:
             raise ValueError("printer profile value is too large")
-        return data.decode("utf-8").strip()
+        return trim_string(data.decode("utf-8"))
     finally:
         os.close(fd)
 

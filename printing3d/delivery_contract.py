@@ -6,6 +6,8 @@ upload files, or start a physical print. The transport is a separate capability.
 
 from __future__ import annotations
 
+from core.wikifunctions import lowercase_string
+
 from dataclasses import dataclass
 from hashlib import file_digest, sha256
 from pathlib import Path
@@ -40,7 +42,7 @@ class UploadTransport(Protocol):
 def validate_job(path: Path, *, printer_model: str, approved_profile: str) -> ApprovedJob:
     if printer_model != "A1 mini" or not approved_profile:
         raise InvalidPrintJob("printer model or approved profile missing")
-    if path.suffix.lower() != ".3mf" or not path.name.endswith(".gcode.3mf"):
+    if lowercase_string(path.suffix) != ".3mf" or not path.name.endswith(".gcode.3mf"):
         raise InvalidPrintJob("expected sliced .gcode.3mf")
     if path.is_symlink() or not path.is_file():
         raise InvalidPrintJob("artifact must be a regular non-symlink file")
@@ -65,7 +67,7 @@ def validate_job(path: Path, *, printer_model: str, approved_profile: str) -> Ap
                 raise InvalidPrintJob("unsafe archive path")
             if "[Content_Types].xml" not in names:
                 raise InvalidPrintJob("missing 3MF manifest")
-            if not any(name.lower().endswith(".gcode") for name in names):
+            if not any(lowercase_string(name).endswith(".gcode") for name in names):
                 raise InvalidPrintJob("missing sliced G-code")
     except BadZipFile as exc:
         raise InvalidPrintJob("invalid 3MF archive") from exc

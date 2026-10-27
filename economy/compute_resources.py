@@ -7,6 +7,8 @@ and is already paid for through provider token pricing.
     energy_wh = cpu_seconds * watts_per_core / 3600
     cost      = energy_wh / 1000 * price_per_kwh
 """
+from core.wikifunctions import trim_string
+
 from core.env import env_get
 
 import logging
@@ -22,7 +24,7 @@ DEFAULT_CPU_WATTS_PER_CORE = 15.0
 
 
 def _positive_env_float(name: str) -> Optional[float]:
-    raw = (env_get(name) or "").strip()
+    raw = trim_string((env_get(name) or ""))
     if not raw:
         return None
     try:

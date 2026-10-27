@@ -1,6 +1,8 @@
 """Concrete Yandex Cloud API-key provider used by the rotation worker."""
 
 from __future__ import annotations
+from core.wikifunctions import trim_string
+
 from core.env import env_get
 
 from datetime import datetime
@@ -32,20 +34,19 @@ class YandexApiKeyProvider:
     ) -> None:
         self.iam_token = iam_token or env_get("YANDEX_IAM_TOKEN")
         self.service_account_id = service_account_id or env_get("YANDEX_SERVICE_ACCOUNT_ID")
-        raw_scopes = (
-            list(scopes)
-            if scopes is not None
-            else [
-                item.strip()
-                for item in env_get(
-                    "YANDEX_API_KEY_SCOPES",
-                    "yc.ai.languageModels.execute,"
-                    "yc.ai.speechkitStt.execute,"
-                    "yc.ai.speechkitTts.execute",
-                ).split(",")
-                if item.strip()
-            ]
-        )
+        if scopes is not None:
+            raw_scopes = list(scopes)
+        else:
+            raw_scopes = []
+            for item in env_get(
+                "YANDEX_API_KEY_SCOPES",
+                "yc.ai.languageModels.execute,"
+                "yc.ai.speechkitStt.execute,"
+                "yc.ai.speechkitTts.execute",
+            ).split(","):
+                item = trim_string(item)
+                if item:
+                    raw_scopes.append(item)
         self.scopes = raw_scopes
         self.endpoint = (
             endpoint
@@ -61,7 +62,7 @@ class YandexApiKeyProvider:
                 "https://ai.api.cloud.yandex.net/v1",
             )
         ).rstrip("/")
-        self.project_id = project_id.strip() if isinstance(project_id, str) else ""
+        self.project_id = trim_string(project_id) if isinstance(project_id, str) else ""
         if not self.project_id:
             raise ValueError("Yandex project_id is required")
         self.timeout = timeout
@@ -105,7 +106,7 @@ class YandexApiKeyProvider:
 
     def validate_key(self, api_key: str) -> None:
         """Validate only local presence; never make a billable/probing request."""
-        if not isinstance(api_key, str) or not api_key.strip():
+        if not isinstance(api_key, str) or not trim_string(api_key):
             raise ValueError("Yandex API key is empty")
 
     def revoke_key(self, provider_key_id: str) -> None:

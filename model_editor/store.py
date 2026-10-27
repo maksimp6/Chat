@@ -5,6 +5,8 @@ Uses Logos's configured StorageProvider. No caller-provided paths or owners.
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 import hashlib
 import json
 import re
@@ -28,13 +30,19 @@ class ModelStore:
     """Content-addressed, immutable scene snapshots in an owner namespace."""
 
     def __init__(self, provider: StorageProvider, owner_id: str, runtime_id: str = "host") -> None:
-        if not isinstance(owner_id, str) or not owner_id.strip():
+        if not isinstance(owner_id, str):
             raise ValueError("trusted owner identity is required")
-        if not isinstance(runtime_id, str) or not runtime_id.strip():
+        owner_id = trim_string(owner_id)
+        if not owner_id:
+            raise ValueError("trusted owner identity is required")
+        if not isinstance(runtime_id, str):
+            raise ValueError("runtime scope is required")
+        runtime_id = trim_string(runtime_id)
+        if not runtime_id:
             raise ValueError("runtime scope is required")
         self.provider = provider
         scoped = hashlib.sha256(
-            (owner_id.strip() + "\x00" + runtime_id.strip()).encode("utf-8")
+            (owner_id + "\x00" + runtime_id).encode("utf-8")
         ).hexdigest()
         self.prefix = f"model_editor/{scoped}"
 

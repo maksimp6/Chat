@@ -6,6 +6,8 @@ It does not expose or persist a model private chain-of-thought.
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
@@ -83,7 +85,7 @@ class PlanValidator:
         errors: list[str] = []
         warnings: list[str] = []
 
-        if not plan.goal.strip():
+        if not trim_string(plan.goal):
             errors.append("goal is required")
         if not plan.success_criteria:
             errors.append("at least one success criterion is required")
@@ -91,7 +93,7 @@ class PlanValidator:
             errors.append("at least one plan step is required")
 
         step_ids = [step.id for step in plan.steps]
-        if any(not step_id.strip() for step_id in step_ids):
+        if any(not trim_string(step_id) for step_id in step_ids):
             errors.append("step ids must not be empty")
         duplicates = sorted(step_id for step_id, count in Counter(step_ids).items() if count > 1)
         if duplicates:

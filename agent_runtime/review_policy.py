@@ -1,4 +1,6 @@
 """Trusted source-file scope for the headless read-only Issue worker."""
+from core.wikifunctions import lowercase_string, trim_string
+
 from core.env import env_get
 
 from dataclasses import dataclass, field
@@ -21,11 +23,13 @@ SENSITIVE_NAMES = frozenset({"credentials.json", "service_account.json", "id_rsa
 
 
 def _is_source_path(path: Path) -> bool:
+    name = lowercase_string(path.name)
+    suffix = lowercase_string(path.suffix)
     return (
         ".git" not in path.parts
-        and not path.name.lower().startswith(".env")
-        and path.name.lower() not in SENSITIVE_NAMES
-        and path.suffix.lower() not in SENSITIVE_SUFFIXES
+        and not name.startswith(".env")
+        and name not in SENSITIVE_NAMES
+        and suffix not in SENSITIVE_SUFFIXES
     )
 
 
@@ -67,7 +71,7 @@ def require_external_review_store(repo_root: Path) -> None:
     # standalone worker must not inherit another runtime's storage authority.
     if current_runtime_id() is not None or current_runtime_data_root() is not None:
         raise PermissionError("Issue review cannot inherit an active runtime context")
-    configured = env_get("LOGOS_MEMORY_PATH", "").strip()
+    configured = trim_string(env_get("LOGOS_MEMORY_PATH", ""))
     if not configured:
         raise PermissionError("Issue review requires an explicit external LOGOS_MEMORY_PATH")
     root = repo_root.resolve()

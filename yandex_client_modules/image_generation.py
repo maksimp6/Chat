@@ -1,5 +1,7 @@
 """Alice AI ART through the synchronous OpenAI-compatible Yandex Images API."""
 
+from core.wikifunctions import trim_string
+
 import base64
 import binascii
 from typing import Any
@@ -23,18 +25,21 @@ class ImageGenerationError(RuntimeError):
 def build_generation_payload(
     project_id: str, model_key: str, prompt: str, size: str | None = None
 ) -> dict[str, Any]:
-    if not isinstance(project_id, str) or not project_id.strip():
+    if not isinstance(project_id, str):
+        raise ValueError("Yandex project_id is required")
+    project_id = trim_string(project_id)
+    if not project_id:
         raise ValueError("Yandex project_id is required")
     if not isinstance(model_key, str) or model_key not in IMAGE_MODELS:
         raise ValueError("not_an_image_model")
-    if not isinstance(prompt, str) or not prompt.strip():
+    if not isinstance(prompt, str) or not trim_string(prompt):
         raise ValueError("message is required")
     if len(prompt) > MAX_PROMPT_CHARS:
         raise ValueError("prompt_too_long")
     if size is not None and (not isinstance(size, str) or size not in IMAGE_SIZES):
         raise ValueError("invalid_image_size")
     payload = {
-        "model": "art://" + project_id.strip() + "/" + upstream_model_id(model_key),
+        "model": "art://" + project_id + "/" + upstream_model_id(model_key),
         "prompt": prompt,
     }
     if size is not None:

@@ -1,5 +1,7 @@
 """Small API helpers for session/invocation lifecycle endpoints."""
 
+from core.wikifunctions import trim_string
+
 from flask import Blueprint, jsonify, request
 
 from api.contracts import ContractViolation, validate_api_contract
@@ -59,7 +61,7 @@ def api_clone_session_profile(profile_id):
 
     name = data.get("name")
     try:
-        payload = clone_profile(profile_id, name.strip() if name else None)
+        payload = clone_profile(profile_id, trim_string(name) if name else None)
     except KeyError:
         return _contract_response("runtime.error.basic", {"error": "profile_not_found"}, 404)
     return _contract_response("runtime.profile.clone.response", payload, 201)

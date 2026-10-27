@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Never, Protocol
@@ -24,7 +26,7 @@ class SecretRef:
     purpose: str = ""
 
     def __post_init__(self) -> None:
-        if not self.provider.strip() or not self.secret_id.strip() or not self.version_id.strip():
+        if not trim_string(self.provider) or not trim_string(self.secret_id) or not trim_string(self.version_id):
             raise ValueError("provider, secret_id and version_id are required")
 
     def metadata(self) -> dict[str, str]:

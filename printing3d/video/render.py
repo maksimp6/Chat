@@ -5,6 +5,8 @@ Requires trimesh, matplotlib (Agg), numpy. Frames are then encoded with ffmpeg.
 
 from __future__ import annotations
 
+from core.wikifunctions import lowercase_string
+
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -13,7 +15,7 @@ if TYPE_CHECKING:
 
 
 def _load_mesh(stl_path: Path) -> Trimesh:
-    if stl_path.suffix.lower() != ".stl" or not stl_path.is_file():
+    if lowercase_string(stl_path.suffix) != ".stl" or not stl_path.is_file():
         raise ValueError("Expected existing STL file")
     if stl_path.stat().st_size > 20_000_000:
         raise ValueError("STL exceeds 20 MB")

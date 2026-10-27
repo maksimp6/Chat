@@ -6,6 +6,8 @@ profile. It never treats the context window as an output-token ceiling.
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 import math
 from types import SimpleNamespace
 
@@ -55,7 +57,7 @@ def _messages_from_body(body: dict) -> list[dict]:
         ):
             raise _BadInput("each message needs role system, user or assistant")
         text = item.get("text")
-        if not isinstance(text, str) or not text.strip():
+        if not isinstance(text, str) or not trim_string(text):
             raise _BadInput("every message text must be a non-empty string")
         if len(text) > MAX_TEXT_CHARS:
             raise _BadInput(f"every message text must be at most {MAX_TEXT_CHARS} characters")
@@ -112,7 +114,7 @@ def create_completion():
         headers["x-folder-id"] = credential.project_id
     except Exception:
         return jsonify({"error": "completion_not_configured"}), 503
-    if not credential.api_key or not str(credential.project_id or "").strip():
+    if not credential.api_key or not trim_string(str(credential.project_id or "")):
         return jsonify({"error": "completion_not_configured"}), 503
 
     payload = {"modelUri": model_uri, "completionOptions": options, "messages": messages}

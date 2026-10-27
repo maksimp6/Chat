@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 import re
 import uuid
 import base64
@@ -94,7 +96,8 @@ def create_invocation(
     if session is None:
         if not create_missing_session:
             raise ValueError(f"Session not found: {session_id}")
-        legacy_owner = str(user_id).strip() if user_id and str(user_id).strip() else None
+        legacy_owner = trim_string(str(user_id)) if user_id else ""
+        legacy_owner = legacy_owner or None
         try:
             create_session(
                 session_id,
@@ -113,9 +116,8 @@ def create_invocation(
     trace_id = str(uuid.uuid4())
     now = unix_seconds()
     persisted_metadata = _sanitize_metadata(metadata or {})
-    resolved_user_id = (
-        str(user_id).strip() if user_id is not None and str(user_id).strip() else None
-    )
+    resolved_user_id = trim_string(str(user_id)) if user_id is not None else ""
+    resolved_user_id = resolved_user_id or None
     if resolved_user_id is not None:
         persisted_metadata["user_id"] = resolved_user_id
     record = {
