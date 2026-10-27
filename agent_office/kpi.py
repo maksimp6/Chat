@@ -13,9 +13,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from statistics import mean, median
-
 from agent_office.observer import AGENT_LABELS, AGENTS, Finding, Thread, checks_state
+from core.wikifunctions import mean_float64_list, median_float64_list
 
 
 @dataclass
@@ -32,11 +31,11 @@ class AgentKpi:
 
     @property
     def median_lead_hours(self) -> float | None:
-        return median(self.lead_hours) if self.lead_hours else None
+        return median_float64_list(self.lead_hours) if self.lead_hours else None
 
     @property
     def mean_reviews(self) -> float | None:
-        return mean(self.reviews_per_merge) if self.reviews_per_merge else None
+        return mean_float64_list(self.reviews_per_merge) if self.reviews_per_merge else None
 
 
 def _merged_at(thread: Thread) -> datetime | None:
