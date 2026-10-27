@@ -10,6 +10,8 @@ from typing import Any, Iterable, Optional
 
 import yaml
 
+from core.wikifunctions import unique_strings
+
 
 DEFAULT_SKILL_ROOT = Path(__file__).resolve().parents[1] / ".agents" / "skills"
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -259,13 +261,9 @@ class SkillRegistry:
 
     def load_many(self, names: Iterable[str], role: Optional[str] = None) -> list[Skill]:
         unique: list[str] = []
-        seen: set[str] = set()
-        for name in names:
-            if name in seen:
-                continue
-            if len(seen) >= MAX_SELECTED_SKILLS:
+        for name in unique_strings(names):
+            if len(unique) >= MAX_SELECTED_SKILLS:
                 raise SkillPolicyError(f"at most {MAX_SELECTED_SKILLS} skills may be selected")
-            seen.add(name)
             unique.append(name)
         return [self.load(name, role=role) for name in unique]
 

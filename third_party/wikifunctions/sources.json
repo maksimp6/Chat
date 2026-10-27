@@ -28,5 +28,18 @@
     "license": "Apache-2.0",
     "original_code_sha256": "67168a661d376d88f564cb23db4e533b97a21710db440c0686404eca0adb7c12",
     "original_code": "function Z12316( Z12316K1, Z12316K2, Z12316K3, Z12316K4 ) {\n\treturn Z12316K3.replace(RegExp(Z12316K1, Z12316K4), Z12316K2);\n}"
+  },
+  {
+    "function": "Z13078",
+    "implementation": "Z19201",
+    "function_revision": 326886,
+    "revision": 283594,
+    "source_url": "https://www.wikifunctions.org/w/index.php?title=Z19201&oldid=283594",
+    "function_source_url": "https://www.wikifunctions.org/w/index.php?title=Z13078&oldid=326886",
+    "license": "Apache-2.0",
+    "original_code_sha256": "94e9820c472b28fdef54d05c910218943586f5d1238d2926257539da648f7c39",
+    "original_code": "def Z13078(Z13078K1):\n\tres = []\n\tfor i in Z13078K1:\n\t\tif i not in res:\n\t\t\tres.append(i)\n\treturn res",
+    "local_api": "core.wikifunctions.unique_strings",
+    "adaptation": "Descriptive names, string types and a generator yielding each newly appended item; preserves lazy input consumption in chat skill selection."
   }
 ]

@@ -10,6 +10,36 @@ files identify their changes. No Wikifunctions service is called at runtime.
 | Z21951 Clamp | Z21953, 162115 | `core.wikifunctions.clamp_integer` | File-search result count; HTTP/shell/session timeouts; two Cloud.ru list limits |
 | Z12316 regex replacement | Z12317, 285821 | `LogosWikifunctions.replaceRegex` | Browser text whitespace normalization; trace export filenames |
 | Z10079 trim | Z10081, 143512 | `LogosWikifunctions.trim` | Browser text whitespace normalization |
+| Z13078 deduplicate list | Python Z19201, 283594; function definition 326886 | `core.wikifunctions.unique_strings` | `SkillRegistry.load_many`, invoked by `/api/chat` before composing selected skill instructions |
+
+## Chat skill selection
+
+`SkillRegistry.load_many` previously owned a separate seen-set and ordered
+list loop. Its duplicate-removal algorithm now comes from the pinned Python
+implementation Z19201 of Z13078. The adapter is restricted to the existing
+`Iterable[str]` contract and yields each newly appended value instead of
+returning the entire list. This explicit streaming adaptation preserves the
+caller's early stop: the fifth distinct name raises the same policy error,
+without reading the rest of a potentially lazy input. Skill files are still
+loaded only after the entire accepted selection has been collected.
+
+First occurrences and their order are preserved. The original catalog
+implementation uses list equality instead of hashing. For the chat's string
+skill names this gives the same selection; the existing four-skill limit
+bounds the number of retained names and comparisons at this caller. This is
+a transfer of an application algorithm, not a rewrite of standard-library
+`strip`, `lower`, `dict.fromkeys` or JSON functions.
+
+The source record includes the original Python code, its SHA-256 and the
+revision of both the implementation and function definition. The chat uses
+the local implementation without requests to Wikifunctions at runtime.
+The catalog evaluator and its type converters are not dependencies.
+
+No whole-chat migration is claimed. Provider response parsing, `tool_calls`
+correlation, tool-result continuation, duplicate-call rejection, request
+validation and logging masks remain application-specific contracts without
+a confirmed matching Wikifunctions implementation. Removing duplicate tool
+call IDs instead of rejecting them would change execution behavior.
 
 ## Preserved behavior
 
