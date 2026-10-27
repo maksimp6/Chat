@@ -15,16 +15,38 @@
     );
   }
 
-  // Only web addresses become links; any other scheme in server data would run as script.
+  // Web addresses and same-origin paths such as "/environments/<id>/" become links; other schemes in
+  // server data would run as script. "//host" and backslashes would leave the origin, so they are refused.
+  const SAME_ORIGIN_PATH_RE = /^\/(?![\/\\])[^\\\x00-\x20\x7f]*$/;
   function safeHref(value) {
-    return /^https?:\/\//i.test(String(value ?? "")) ? String(value) : "#";
+    const text = String(value ?? "");
+    return /^https?:\/\//i.test(text) || SAME_ORIGIN_PATH_RE.test(text) ? text : "#";
   }
 
-  async function request(path, options = {}) {
-    const response = await window.LogosDispatcher.request(path, {
-      headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-      ...options,
-    });
+  // Environment operations run git and runtime start-up on the server, so they outlast the 10 s default.
+  const OPERATION_OPTIONS = { timeoutMs: 120000 };
+
+  const ERROR_TEXT = {
+    environment_operation_failed: "Не удалось выполнить операцию.",
+  };
+
+  // A timed-out request may still finish on the server, so the message says that instead of the browser text.
+  function errorText(error) {
+    if (error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      return "Сервер не ответил вовремя: операция могла продолжиться. Проверьте статус окружения.";
+    }
+    return ERROR_TEXT[error.message] || error.message;
+  }
+
+  async function request(path, options = {}, dispatchOptions) {
+    const response = await window.LogosDispatcher.request(
+      path,
+      {
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+        ...options,
+      },
+      dispatchOptions,
+    );
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || "HTTP " + response.status);
     return data;
@@ -54,18 +76,31 @@
     });
     (document.querySelector(".logos-pro-app") || document.body).appendChild(node);
     node.querySelector(".environments-refresh").onclick = load;
+    let creating = false;
     node.querySelector(".environments-create").onsubmit = async (event) => {
       event.preventDefault();
-      const input = event.currentTarget.branch;
+      // A repeated submit while the first request runs would create a second identical environment.
+      if (creating) return;
+      creating = true;
+      const form = event.currentTarget;
+      const input = form.branch;
+      const submit = form.querySelector('button[type="submit"]');
+      submit.disabled = true;
       try {
-        await request("/api/environments", {
-          method: "POST",
-          body: JSON.stringify({ branch: input.value.trim() }),
-        });
+        await request(
+          "/api/environments",
+          { method: "POST", body: JSON.stringify({ branch: input.value.trim() }) },
+          OPERATION_OPTIONS,
+        );
         input.value = "";
         await load();
       } catch (error) {
-        setStatus(error.message);
+        // The server may have created the environment before the error, so the list is re-read first.
+        await load();
+        setStatus(errorText(error));
+      } finally {
+        creating = false;
+        submit.disabled = false;
       }
     };
     return node;
@@ -82,8 +117,10 @@
     list.innerHTML = state.environments.length
       ? state.environments
           .map((env) => {
-            const action = env.status === "RUNNING" ? "stop" : "start";
-            const label = env.status === "RUNNING" ? "Стоп" : "Старт";
+            // A FAILED environment cannot start or restart. Stop moves it to STOPPED, from where Start works.
+            const stoppable = env.status === "RUNNING" || env.status === "FAILED";
+            const action = stoppable ? "stop" : "start";
+            const label = stoppable ? "Стоп" : "Старт";
             return [
               '<article class="environment-card">',
               '<div class="environment-card-main"><strong>',
@@ -102,6 +139,9 @@
               " · ",
               esc(env.data_namespace),
               "</div>",
+              env.status === "FAILED" && env.error
+                ? '<div class="environment-card-meta">Ошибка: ' + esc(env.error) + "</div>"
+                : "",
               '<div class="environment-card-actions">',
               '<a href="',
               esc(safeHref(env.url)),
@@ -113,9 +153,11 @@
               '">',
               label,
               "</button>",
-              '<button class="logos-btn" data-op="restart" data-id="',
-              esc(env.environment_id),
-              '">Перезапуск</button>',
+              env.status === "FAILED"
+                ? ""
+                : '<button class="logos-btn" data-op="restart" data-id="' +
+                  esc(env.environment_id) +
+                  '">Перезапуск</button>',
               '<button class="logos-btn" data-op="delete" data-id="',
               esc(env.environment_id),
               '">Удалить</button>',
@@ -135,11 +177,17 @@
         try {
           const method = op === "delete" ? "DELETE" : "POST";
           const suffix = op === "delete" ? "" : "/" + op;
-          await request("/api/environments/" + encodeURIComponent(id) + suffix, { method });
+          await request(
+            "/api/environments/" + encodeURIComponent(id) + suffix,
+            { method },
+            OPERATION_OPTIONS,
+          );
           await load();
         } catch (error) {
           button.disabled = false;
-          setStatus(error.message);
+          // The server may have finished the operation anyway, so the list is re-read before the message shows.
+          await load();
+          setStatus(errorText(error));
         }
       };
     });
@@ -152,7 +200,7 @@
       setStatus("");
       render();
     } catch (error) {
-      setStatus(error.message);
+      setStatus(errorText(error));
     }
   }
 

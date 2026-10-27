@@ -60,7 +60,7 @@
       "</div>",
       '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">',
       "Приватный ключ и его содержимое никогда не передаются через этот интерфейс. В targets указывается только серверный путь к существующему ключу и known_hosts. ",
-      "Проверка подключения выполняет только фиксированную команду true.",
+      "Проверка подключения выполняет только фиксированную команду true и проверяет сохранённую конфигурацию.",
       "</div>",
       '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">',
       '<button class="logos-btn settings-contract-btn" id="set-ssh-save-btn" type="button">Сохранить SSH</button>',
@@ -102,6 +102,33 @@
       sshStatusEl.style.color = error ? "var(--m-danger,#c33)" : "var(--m-muted,#666)";
     }
 
+    // Form values as they were last loaded or saved; a connection test is allowed only while they match.
+    var savedFormState = null;
+    function formState() {
+      return JSON.stringify(
+        Array.prototype.map.call(
+          content.querySelectorAll("input:not(#set-ssh-test-target), textarea"),
+          function (el) {
+            return el.type === "checkbox" ? el.checked : el.value;
+          },
+        ),
+      );
+    }
+
+    function showLastTest(last) {
+      if (last) {
+        setSshStatus(
+          "Последняя проверка: " +
+            (last.success ? "успешна" : "ошибка") +
+            (last.target ? " · " + last.target : "") +
+            (last.duration_ms != null ? " · " + last.duration_ms + " мс" : ""),
+          !last.success,
+        );
+      } else {
+        setSshStatus("Конфигурация загружена.");
+      }
+    }
+
     function populateSshSettings(data) {
       var ssh = data || {};
       document.getElementById("set-ssh-enabled").checked = ssh.enabled === true;
@@ -125,18 +152,8 @@
       var targetNames = Object.keys(ssh.targets || {});
       if (sshTestTargetEl && targetNames.length && !sshTestTargetEl.value)
         sshTestTargetEl.value = targetNames[0];
-      var last = ssh.last_test;
-      if (last) {
-        setSshStatus(
-          "Последняя проверка: " +
-            (last.success ? "успешна" : "ошибка") +
-            (last.target ? " · " + last.target : "") +
-            (last.duration_ms != null ? " · " + last.duration_ms + " мс" : ""),
-          !last.success,
-        );
-      } else {
-        setSshStatus("Конфигурация загружена.");
-      }
+      showLastTest(ssh.last_test);
+      savedFormState = formState();
     }
 
     window.LogosDispatcher.request("/api/ssh-runtime/settings")
@@ -227,12 +244,25 @@
         setSshStatus("Укажите target для проверки.", true);
         return;
       }
+      // The server tests the saved configuration, so unsaved edits must be saved before a test.
+      if (savedFormState !== null && formState() !== savedFormState) {
+        setSshStatus(
+          "Есть несохранённые изменения. Сначала сохраните SSH Runtime, затем проверьте подключение.",
+          true,
+        );
+        return;
+      }
       setSshStatus("Проверка подключения...");
-      window.LogosDispatcher.request("/api/ssh-runtime/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target: target }),
-      })
+      // The server waits up to the connect timeout plus ssh's own limit, which is longer than the 10 s default.
+      window.LogosDispatcher.request(
+        "/api/ssh-runtime/test",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target: target }),
+        },
+        { timeoutMs: 60000 },
+      )
         .then(function (r) {
           return r.json().then(function (data) {
             if (!r.ok) throw new Error(data.error || "Не удалось подключиться по SSH");
@@ -249,14 +279,26 @@
               data.duration_ms +
               " мс",
           );
+          // Only the status line is refreshed: re-populating the form would discard edits made during the test.
           window.LogosDispatcher.request("/api/ssh-runtime/settings")
             .then(function (r) {
+              if (!r.ok) throw new Error("settings refresh failed");
               return r.json();
             })
-            .then(populateSshSettings)
+            .then(function (settings) {
+              showLastTest(settings.last_test);
+            })
             .catch(function () {});
         })
         .catch(function (err) {
+          if (err && (err.name === "TimeoutError" || err.name === "AbortError")) {
+            // The server keeps going and records its result in last_test; the form is left untouched.
+            setSshStatus(
+              "Сервер ещё проверяет подключение. Откройте окно позже: итог появится в строке «Последняя проверка».",
+              true,
+            );
+            return;
+          }
           setSshStatus(err.message, true);
         });
     });
