@@ -6,6 +6,6 @@ Pillow>=13.0.0
 
 cryptography==50.0.2
 
-# Keel Platform config management (reads YAML at deployment time)
-PyYAML>=6.0
+# YAML, JSON Schema, Russian sentence segmentation and unified-diff parsing.
+-r requirements-parsers.txt
 -r contracts/yandex/requirements.txt

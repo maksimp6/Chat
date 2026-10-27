@@ -1,9 +1,13 @@
 """Yandex AI Studio File & Vector Store Manager Mixin"""
 
+import copy
 import json
-import time
-import requests
 import logging
+
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.exceptions import MaxRetryError
+from urllib3.util import Retry
 
 api_logger = logging.getLogger("yandex_api_debug")
 
@@ -29,29 +33,53 @@ class YandexFileManagerMixin:
             headers["Content-Type"] = None
         kwargs["headers"] = headers
 
-        self._log_request(method, url, **kwargs)
-
-        delays = [0.0, 0.5, 1.5, 4.5]
         # Only a read is repeated. A timed-out upload may already have been stored, so repeating it
         # stores a second copy, and a repeated delete reports the file as not found.
-        if method.upper() not in {"GET", "HEAD", "OPTIONS"}:
-            delays = delays[:1]
-        last_exc = None
-        for attempt, delay in enumerate(delays):
-            if delay > 0:
-                time.sleep(delay)
-            try:
-                resp = self.session.request(method, url, timeout=30, **kwargs)
-                self._log_response(resp)
-                return resp
-            except requests.exceptions.Timeout:
-                last_exc = YandexClientError("Network timeout")
-                api_logger.warning(f"[FILES/VS] Timeout attempt {attempt + 1}/4 on {method} {url}")
-            except requests.exceptions.RequestException as e:
-                last_exc = YandexClientError(f"Network error: {e}")
-                api_logger.warning(f"[FILES/VS] Network error attempt {attempt + 1}/4: {e}")
-
-        raise last_exc or YandexClientError("Unknown network error")
+        retries = 3 if method.upper() in {"GET", "HEAD", "OPTIONS"} else 0
+        retry = Retry(
+            total=retries,
+            connect=retries,
+            read=retries,
+            other=retries,
+            redirect=0,
+            status=0,
+            allowed_methods=frozenset({"GET", "HEAD", "OPTIONS"}),
+            backoff_factor=0.25,
+            respect_retry_after_header=False,
+        )
+        # Do not mount an adapter on the shared Responses session: that could retry
+        # a concurrent model request. Keep its configuration, but own these pools.
+        session = copy.copy(self.session)
+        session.headers = self.session.headers.copy()
+        session.cookies = self.session.cookies.copy()
+        adapter = HTTPAdapter(max_retries=0)
+        session.adapters = {"https://": adapter, "http://": adapter}
+        try:
+            while True:
+                self._log_request(method, url, **kwargs)
+                try:
+                    resp = session.request(method, url, timeout=30, **kwargs)
+                    self._log_response(resp)
+                    return resp
+                except requests.exceptions.RequestException as exc:
+                    message = (
+                        "Network timeout"
+                        if isinstance(exc, requests.exceptions.Timeout)
+                        else "Network error"
+                    )
+                    api_logger.warning(
+                        "[FILES/VS] %s attempt %s/%s on %s %s",
+                        message, len(retry.history) + 1, retries + 1, method, url,
+                    )
+                    try:
+                        # The adapter never retries internally: each attempt,
+                        # including failures while consuming a body, stays logged.
+                        retry = retry.increment(method=method, url=url, error=exc)
+                    except MaxRetryError:
+                        raise YandexClientError(message) from exc
+                    retry.sleep()
+        finally:
+            session.close()
 
     def _fm_handle_error(self, resp, context):
         """Обработка HTTP-ошибок с логированием."""

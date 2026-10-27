@@ -7,6 +7,7 @@ Adapters create a UniversalToolCall and hand it to UniversalToolExecutor.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from functools import lru_cache
 from typing import Any, Callable, Mapping, Optional
 import math
 import time
@@ -34,8 +35,8 @@ def _warn_deprecated_execution_hooks(hooks: Mapping[str, Any]) -> None:
 class UniversalToolDefinition:
     name: str
     description: str
-    input_schema: dict[str, Any]
-    output_schema: dict[str, Any]
+    input_schema: Mapping[str, Any] | bool
+    output_schema: Mapping[str, Any] | bool
     capabilities: tuple[str, ...] = ()
     risk_level: str = "medium"
     read_only: bool = False
@@ -51,15 +52,12 @@ class UniversalToolDefinition:
             name=name,
             title=str(cfg.get("title") or name),
             description=str(cfg.get("description") or ""),
-            input_schema=dict(
-                cfg.get("inputSchema")
-                or cfg.get("input_schema")
-                or cfg.get("parameters")
-                or {"type": "object", "properties": {}, "required": [], "additionalProperties": False}
+            input_schema=_contract_schema(
+                cfg,
+                ("inputSchema", "input_schema", "parameters"),
+                {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
             ),
-            output_schema=dict(
-                cfg.get("outputSchema") or cfg.get("output_schema") or {"type": "object"}
-            ),
+            output_schema=_contract_schema(cfg, ("outputSchema", "output_schema"), {"type": "object"}),
             capabilities=tuple(str(x) for x in (cfg.get("capabilities") or ())),
             risk_level=str(cfg.get("risk_level") or "medium"),
             read_only=bool(cfg.get("read_only", False)),
@@ -139,116 +137,113 @@ class ReadOnlyToolPolicy:
         return self.allows_tool(definition)
 
 
-def _type_matches(value: Any, expected: str) -> bool:
-    if expected == "object":
-        return isinstance(value, Mapping)
-    if expected == "array":
-        return isinstance(value, list)
-    if expected == "string":
-        return isinstance(value, str)
-    if expected == "integer":
-        return isinstance(value, int) and not isinstance(value, bool)
-    if expected == "number":
-        return isinstance(value, (int, float)) and not isinstance(value, bool)
-    if expected == "boolean":
-        return isinstance(value, bool)
-    if expected == "null":
-        return value is None
-    return True
+def _contract_schema(
+    cfg: Mapping[str, Any], names: tuple[str, ...], default: dict[str, Any]
+) -> Mapping[str, Any] | bool:
+    # Empty objects and False are real schemas, rather than missing settings.
+    for name in names:
+        if name in cfg and cfg[name] is not None:
+            schema = cfg[name]
+            return dict(schema) if isinstance(schema, Mapping) else schema
+    return default
 
 
-def validate_json_schema(value: Any, schema: Mapping[str, Any], path: str = "$") -> list[str]:
-    """Validate the JSON-schema features used by the tool contracts.
+def _value_path(path: str, parts) -> str:
+    for part in parts:
+        path += f"[{part}]" if isinstance(part, int) else f".{part}"
+    return path
 
-    This is deliberately dependency-free so the same contract layer can be
-    imported by the Android/Chaquopy agent. Unsupported schema keywords are
-    ignored rather than treated as implicit validation failures.
-    """
-    if not isinstance(schema, Mapping):
-        return []
 
-    errors: list[str] = []
-
-    if isinstance(value, float) and not math.isfinite(value):
-        return [f"{path}: number must be finite"]
-
-    enum = schema.get("enum")
-    if isinstance(enum, list) and value not in enum:
-        errors.append(f"{path}: value is not one of enum choices")
-        return errors
-
-    if "const" in schema and value != schema["const"]:
-        errors.append(f"{path}: value does not match const")
-        return errors
-
-    any_of = schema.get("anyOf")
-    if isinstance(any_of, list):
-        if not any(
-            not validate_json_schema(value, option, path)
-            for option in any_of
-            if isinstance(option, Mapping)
-        ):
-            errors.append(f"{path}: value does not match anyOf")
-            return errors
-
-    expected_type = schema.get("type")
-    if isinstance(expected_type, list):
-        if not any(_type_matches(value, str(t)) for t in expected_type):
-            errors.append(f"{path}: expected one of types {expected_type}")
-            return errors
-    elif isinstance(expected_type, str) and not _type_matches(value, expected_type):
-        errors.append(f"{path}: expected type {expected_type}")
-        return errors
-
-    if isinstance(value, str):
-        min_length = schema.get("minLength")
-        max_length = schema.get("maxLength")
-        if isinstance(min_length, int) and len(value) < min_length:
-            errors.append(f"{path}: length must be >= {min_length}")
-        if isinstance(max_length, int) and len(value) > max_length:
-            errors.append(f"{path}: length must be <= {max_length}")
-
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        minimum = schema.get("minimum")
-        maximum = schema.get("maximum")
-        if isinstance(minimum, (int, float)) and value < minimum:
-            errors.append(f"{path}: value must be >= {minimum}")
-        if isinstance(maximum, (int, float)) and value > maximum:
-            errors.append(f"{path}: value must be <= {maximum}")
-
-    if isinstance(value, list):
-        min_items = schema.get("minItems")
-        max_items = schema.get("maxItems")
-        if isinstance(min_items, int) and len(value) < min_items:
-            errors.append(f"{path}: item count must be >= {min_items}")
-        if isinstance(max_items, int) and len(value) > max_items:
-            errors.append(f"{path}: item count must be <= {max_items}")
-        item_schema = schema.get("items")
-        if isinstance(item_schema, Mapping):
-            for index, item in enumerate(value):
-                errors.extend(validate_json_schema(item, item_schema, f"{path}[{index}]"))
-
-    if isinstance(value, Mapping):
-        properties = schema.get("properties") or {}
-        if not isinstance(properties, Mapping):
-            properties = {}
-        for name in schema.get("required") or []:
-            if name not in value:
-                errors.append(f"{path}.{name}: required property is missing")
-
-        additional = schema.get("additionalProperties", True)
-        for name, item in value.items():
-            if name in properties:
-                item_schema = properties[name]
-            elif additional is False:
-                errors.append(f"{path}.{name}: additional property is not allowed")
+def _json_data_errors(value: Any, path: str) -> list[str]:
+    """Reject non-JSON numbers and cyclic containers before schema evaluation."""
+    stack = [(path, value, False)]
+    active: set[int] = set()
+    errors = []
+    while stack:
+        current_path, item, leaving = stack.pop()
+        if leaving:
+            active.remove(id(item))
+        elif isinstance(item, float) and not math.isfinite(item):
+            errors.append(f"{current_path}: number must be finite")
+        elif isinstance(item, (Mapping, list)):
+            if id(item) in active:
+                errors.append(f"{current_path}: cyclic data is not JSON")
                 continue
+            active.add(id(item))
+            stack.append((current_path, item, True))
+            if isinstance(item, Mapping):
+                for key, child in reversed(list(item.items())):
+                    if not isinstance(key, str):
+                        errors.append(f"{current_path}: object keys must be strings")
+                    else:
+                        stack.append((_value_path(current_path, (key,)), child, False))
             else:
-                item_schema = additional
-            if isinstance(item_schema, Mapping):
-                errors.extend(validate_json_schema(item, item_schema, f"{path}.{name}"))
-
+                for index in range(len(item) - 1, -1, -1):
+                    stack.append((_value_path(current_path, (index,)), item[index], False))
+        elif item is not None and not isinstance(item, (str, bool, int, float)):
+            errors.append(f"{current_path}: value is not JSON data")
     return errors
+
+
+@lru_cache(maxsize=1)
+def _schema_runtime():
+    # Keep the contract module importable by lightweight agents. Validation still
+    # fails closed when their deployment omitted the declared jsonschema dependency.
+    from jsonschema import Draft202012Validator
+    from jsonschema.exceptions import SchemaError
+    from jsonschema.validators import extend, validator_for
+    from referencing import Registry
+    from referencing.exceptions import Unresolvable
+
+    return Draft202012Validator, SchemaError, extend, validator_for, Registry, Unresolvable
+
+
+def validate_json_schema(
+    value: Any, schema: Mapping[str, Any] | bool, path: str = "$"
+) -> list[str]:
+    """Validate tool contracts with jsonschema; default to JSON Schema 2020-12.
+
+    Explicit, known draft declarations use their corresponding library validator.
+    References resolve only within the supplied schema, never via network or files.
+    Error strings retain the existing path prefix without exposing argument values.
+    """
+    if not isinstance(schema, (Mapping, bool)):
+        return [f"{path}: schema must be an object or boolean"]
+    data_errors = _json_data_errors(value, path)
+    if data_errors:
+        return data_errors
+    schema_errors = _json_data_errors(schema, path)
+    if schema_errors:
+        return [f"{path}: schema is not JSON data"]
+    try:
+        default, SchemaError, extend, validator_for, Registry, Unresolvable = _schema_runtime()
+    except ImportError:
+        return [f"{path}: jsonschema validation dependency is unavailable"]
+    try:
+        validator_type = validator_for(schema, default=default)
+        if isinstance(schema, Mapping) and "$schema" in schema:
+            validator_type = validator_for(schema, default=None)
+            if validator_type is None:
+                return [f"{path}: unsupported JSON Schema draft"]
+        validator_type.check_schema(schema)
+        # UniversalToolCall permits Mapping implementations in addition to dict.
+        type_checker = validator_type.TYPE_CHECKER.redefine(
+            "object", lambda _checker, instance: isinstance(instance, Mapping)
+        )
+        validator = extend(validator_type, type_checker=type_checker)(schema, registry=Registry())
+        errors = []
+        for error in validator.iter_errors(value):
+            error_path = _value_path(path, error.absolute_path)
+            keyword = error.validator or "schema"
+            # jsonschema's full messages can include repr(instance), including secrets.
+            errors.append(f"{error_path}: does not satisfy {keyword}")
+        return errors
+    except SchemaError as exc:
+        return [f"{_value_path(path, exc.absolute_path)}: invalid JSON Schema"]
+    except Unresolvable:
+        return [f"{path}: schema reference cannot be resolved locally"]
+    except (TypeError, ValueError, RecursionError):
+        return [f"{path}: invalid or recursive JSON Schema"]
 
 
 def tool_call_requires_approval(
@@ -276,16 +271,18 @@ def tool_call_requires_approval(
     return requires_approval
 
 
-def _normalize_responses_arguments(value: Any, schema: Mapping[str, Any]) -> Any:
+def _normalize_responses_arguments(value: Any, schema: Mapping[str, Any] | bool) -> Any:
     """Restore omitted optional fields encoded as null by strict Responses schemas.
 
     Null remains a value when the original contract accepts it. Required values,
     unknown fields and invalid types are left for ordinary schema validation.
     """
+    if not isinstance(schema, Mapping):
+        return value
     any_of = schema.get("anyOf")
     if isinstance(any_of, list):
         for option in any_of:
-            if isinstance(option, Mapping):
+            if isinstance(option, (Mapping, bool)):
                 candidate = _normalize_responses_arguments(value, option)
                 if not validate_json_schema(candidate, option):
                     return candidate
@@ -295,7 +292,7 @@ def _normalize_responses_arguments(value: Any, schema: Mapping[str, Any]) -> Any
         required = set(schema.get("required") or [])
         normalized = dict(value)
         for name, item_schema in properties.items():
-            if name not in value or not isinstance(item_schema, Mapping):
+            if name not in value or not isinstance(item_schema, (Mapping, bool)):
                 continue
             if (
                 value[name] is None
@@ -307,7 +304,7 @@ def _normalize_responses_arguments(value: Any, schema: Mapping[str, Any]) -> Any
                 normalized[name] = _normalize_responses_arguments(value[name], item_schema)
         return normalized
     item_schema = schema.get("items")
-    if isinstance(value, list) and isinstance(item_schema, Mapping):
+    if isinstance(value, list) and isinstance(item_schema, (Mapping, bool)):
         return [_normalize_responses_arguments(item, item_schema) for item in value]
     return value
 

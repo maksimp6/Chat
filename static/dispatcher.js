@@ -32,10 +32,23 @@
 
   // Aborts when either signal aborts; keeps the reason of the one that did.
   function combineSignals(first, second) {
+    if (typeof AbortSignal.any === "function") return AbortSignal.any([first, second]);
+    // Compatibility for browsers with timeout() but without any(). Remove both
+    // subscriptions when either signal ends, including the bounded timeout.
+    const signals = [first, second];
+    const aborted = signals.find(function (signal) { return signal.aborted; });
+    if (aborted) return aborted;
     const controller = new AbortController();
-    [first, second].forEach(function (signal) {
-      if (signal.aborted) controller.abort(signal.reason);
-      else signal.addEventListener("abort", function () { controller.abort(signal.reason); }, { once: true });
+    const listeners = signals.map(function (signal) {
+      return function () {
+        listeners.forEach(function (listener, index) {
+          signals[index].removeEventListener("abort", listener);
+        });
+        controller.abort(signal.reason);
+      };
+    });
+    signals.forEach(function (signal, index) {
+      signal.addEventListener("abort", listeners[index], { once: true });
     });
     return controller.signal;
   }

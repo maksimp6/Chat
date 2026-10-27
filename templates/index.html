@@ -82,6 +82,9 @@
     <script src="{{ static_root }}/models.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/trace_summary.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/execution_surface.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/vendor/markdown-it-15.0.3/markdown-it.min.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/vendor/katex-0.19.1/katex.min.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/vendor/markdown-it-texmath-1.0.0/texmath.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/chat.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/trace_viewer.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/trace_viewer_timing.js?v={{ static_version }}" defer></script>
@@ -339,7 +342,7 @@
           <div class="logos-system-status-list" aria-live="polite"></div>
         </div>
       </div>
-      <div
+      <dialog
         id="model-modal"
         class="modal"
         hidden
@@ -360,8 +363,8 @@
           <h3 id="model-modal-title">Выбор модели</h3>
           <div id="model-list"></div>
         </div>
-      </div>
-      <div
+      </dialog>
+      <dialog
         id="memoryModal"
         class="modal memory-modal"
         hidden
@@ -397,7 +400,7 @@
           <h3 class="memory-facts-title">Факты (<span id="memCount">0</span>)</h3>
           <div id="memoryFactsList" class="memory-facts-list"></div>
         </div>
-      </div>
+      </dialog>
     </div>
     <script
       src="{{ static_root }}/settings/ssh_runtime_modal.js?v={{ static_version }}"

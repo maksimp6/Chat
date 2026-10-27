@@ -179,7 +179,7 @@
         "</h3>" +
         '<div style="margin-bottom:8px;">' +
         UI.lbl("Название") +
-        UI.inp("mcp-ed-name", "text", srv.name || "", ' style="width:100%;"') +
+        UI.inp("mcp-ed-name", "text", srv.name || "", {"style": "width:100%;"}) +
         "</div>" +
         '<div style="margin-bottom:8px;">' +
         UI.lbl("Connector ID") +
@@ -191,13 +191,13 @@
           "mcp-ed-url",
           "text",
           srv.server_url || "",
-          ' style="width:100%;" placeholder="https://mcp.example.com/sse"',
+          {"style": "width:100%;", "placeholder": "https://mcp.example.com/sse"},
         ) +
         "</div>" +
         UI.gap2(
           "<div>" +
             UI.lbl("Server Label") +
-            UI.inp("mcp-ed-label", "text", srv.server_label || "", ' style="width:100%;"') +
+            UI.inp("mcp-ed-label", "text", srv.server_label || "", {"style": "width:100%;"}) +
             "</div>",
           "<div>" +
             UI.lbl("Authorization") +
@@ -205,15 +205,13 @@
               "mcp-ed-auth",
               "password",
               "",
-              ' style="width:100%;" placeholder="' +
-                UI.escapeHtml(srv.has_authorization ? SAVED_HINT : "") +
-                '"',
+              { style: "width:100%;", placeholder: srv.has_authorization ? SAVED_HINT : "" },
             ) +
             "</div>",
         ) +
         '<div style="margin-bottom:8px;">' +
         UI.lbl("Description") +
-        UI.inp("mcp-ed-desc", "text", srv.server_description || "", ' style="width:100%;"') +
+        UI.inp("mcp-ed-desc", "text", srv.server_description || "", {"style": "width:100%;"}) +
         "</div>" +
         '<div style="margin-bottom:8px;">' +
         UI.lbl("Headers (JSON)") +
@@ -222,7 +220,7 @@
         '"></textarea></div>' +
         '<div style="margin-bottom:8px;">' +
         UI.lbl("Allowed Tools") +
-        UI.inp("mcp-ed-allowed", "text", srv.allowed_tools || "", ' style="width:100%;"') +
+        UI.inp("mcp-ed-allowed", "text", srv.allowed_tools || "", {"style": "width:100%;"}) +
         "</div>" +
         '<div style="margin-bottom:4px;">' +
         UI.chk("mcp-ed-allowed-ro", srv.allowed_tools_read_only || false, "Read-only filter") +

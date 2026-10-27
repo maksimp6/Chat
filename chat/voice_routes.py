@@ -117,34 +117,43 @@ def _require_session(session_id: str) -> VoiceSession:
     return session
 
 
+class _PCM16WaveReader(wave.Wave_read):
+    """Retain the exact wire codec before wave rounds bit depth to whole bytes."""
+
+    def _read_fmt_chunk(self, chunk) -> None:
+        start = chunk.tell()
+        header = chunk.read(16)
+        if len(header) != 16:
+            raise wave.Error("incomplete WAV format header")
+        if int.from_bytes(header[:2], "little") != 1 or int.from_bytes(header[14:16], "little") != 16:
+            raise wave.Error("WAV format must be integer PCM with exactly 16 bits per sample")
+        chunk.seek(start)
+        super()._read_fmt_chunk(chunk)
+
+
 def _wav_pcm(audio: bytes) -> tuple[int, bytes]:
-    """Read RIFF chunks; accept only mono PCM16 that Realtime can receive."""
-    if len(audio) < 12 or audio[:4] != b"RIFF" or audio[8:12] != b"WAVE":
-        raise ValueError("audio must be a PCM16 WAV file")
-    offset = 12
-    fmt = None
-    while offset + 8 <= len(audio):
-        chunk_id = audio[offset:offset + 4]
-        size = int.from_bytes(audio[offset + 4:offset + 8], "little")
-        if offset + 8 + size > len(audio):
-            raise ValueError("truncated WAV audio")
-        body = audio[offset + 8:offset + 8 + size]
-        if chunk_id == b"fmt ":
-            fmt = body
-        elif chunk_id == b"data":
-            if fmt is None or len(fmt) < 16:
-                raise ValueError("invalid WAV audio format")
-            encoding = int.from_bytes(fmt[0:2], "little")
-            channels = int.from_bytes(fmt[2:4], "little")
-            sample_rate = int.from_bytes(fmt[4:8], "little")
-            bits = int.from_bytes(fmt[14:16], "little")
-            if encoding != 1 or channels != 1 or bits != 16 or sample_rate not in {8000, 16000, 24000, 44100, 48000}:
+    """Decode the WAV container with wave, retaining the Realtime PCM contract."""
+    # wave.readframes may return the available prefix of a truncated RIFF file.
+    if len(audio) < 12 or int.from_bytes(audio[4:8], "little") + 8 > len(audio):
+        raise ValueError("audio must be a complete PCM16 WAV file")
+    try:
+        with _PCM16WaveReader(io.BytesIO(audio)) as wav:
+            sample_rate = wav.getframerate()
+            if (
+                wav.getnchannels() != 1
+                or wav.getsampwidth() != 2
+                or wav.getcomptype() != "NONE"
+                or sample_rate not in {8000, 16000, 24000, 44100, 48000}
+            ):
                 raise ValueError("WAV must be mono PCM16 at 8, 16, 24, 44.1 or 48 kHz")
-            if not body or len(body) % 2:
+            frames = wav.getnframes()
+            # One extra frame exposes an odd final byte, which getnframes() rounds down.
+            pcm = wav.readframes(frames + 1)
+            if not frames or len(pcm) != frames * 2:
                 raise ValueError("WAV audio samples are empty or truncated")
-            return sample_rate, body
-        offset += 8 + size + (size & 1)
-    raise ValueError("WAV audio has no data chunk")
+            return sample_rate, pcm
+    except (wave.Error, EOFError, OSError) as exc:
+        raise ValueError("audio must be a complete PCM16 WAV file") from exc
 
 
 def _output_wav(pcm: bytes, sample_rate: int = OUTPUT_RATE) -> bytes:

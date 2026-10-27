@@ -50,12 +50,12 @@
           "tools-ws-allow",
           "text",
           ws.allowed_domains || "",
-          ' placeholder="example.com, wikipedia.org"',
+          {"placeholder": "example.com, wikipedia.org"},
         ) +
         "</div>",
       '<div style="margin-top:8px;">' +
         UI.lbl("Заблокированные домены") +
-        UI.inp("tools-ws-block", "text", ws.blocked_domains || "", ' placeholder="example.org"') +
+        UI.inp("tools-ws-block", "text", ws.blocked_domains || "", {"placeholder": "example.org"}) +
         "</div>",
       '<hr style="margin:14px 0;border:none;border-top:1px solid var(--m-border,#ddd);">',
       UI.chk("tools-ci-en", ci.enabled || false, "<strong>🧮 Code Interpreter</strong> (Python)"),
@@ -71,12 +71,12 @@
           "tools-fs-vids",
           "text",
           fs.vector_store_ids || "",
-          ' placeholder="vs_xxx, vs_yyy"',
+          {"placeholder": "vs_xxx, vs_yyy"},
         ) +
         "</div>",
       '<div style="margin-top:8px;">' +
         UI.lbl("Максимум результатов") +
-        UI.inp("tools-fs-max", "number", fs.max_results || 20, ' min="1"') +
+        UI.inp("tools-fs-max", "number", fs.max_results || 20, {"min": "1"}) +
         "</div>",
       '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">Эти инструменты выполняются на стороне Yandex AI Studio. Они независимы от MCP и локального Tool Registry.</div>',
       '<div id="tools-status" role="status" style="color:var(--m-danger,#c33);font-size:12px;min-height:16px;"></div>',
@@ -256,15 +256,15 @@
   var SETTINGS_FIELDS = {
     temperature: {
       id: "set-temp", label: "Temperature", type: "number", read: "float", fallback: 0.7,
-      extra: ' step="0.1" min="0" max="2"',
+      extra: {"step": "0.1", "min": "0", "max": "2"},
     },
     top_p: {
       id: "set-topp", label: "Top P", type: "number", read: "float", fallback: 1.0,
-      extra: ' step="0.05" min="0" max="1"',
+      extra: {"step": "0.05", "min": "0", "max": "1"},
     },
     max_output_tokens: {
       id: "set-tokens", label: "Токены ответа (0 — максимум провайдера)",
-      type: "number", read: "integer", fallback: 0, extra: ' step="100" min="0"',
+      type: "number", read: "integer", fallback: 0, extra: {"step": "100", "min": "0"},
     },
     truncation: {
       id: "set-trunc", label: "Truncation", type: "select", ultraFixed: true,
@@ -292,7 +292,7 @@
     },
     json_schema_name: {
       id: "set-js-name", label: "Название схемы", type: "text", read: "trim",
-      displayFallback: "response", extra: ' style="margin-bottom:8px;"',
+      displayFallback: "response", extra: {"style": "margin-bottom:8px;"},
     },
     json_schema: {
       id: "set-js-schema", label: "JSON Schema definition", type: "textarea", read: "trim",
@@ -304,7 +304,7 @@
     },
     max_tool_calls: {
       id: "set-max-tools", label: "Max Tool Calls", type: "number", read: "integer",
-      fallback: null, displayFallback: "", extra: ' min="1"',
+      fallback: null, displayFallback: "", extra: {"min": "1"},
     },
     parallel_tool_calls: {
       id: "set-parallel-tools", label: "Параллельные вызовы (Parallel Tool Calls)",
@@ -312,7 +312,7 @@
     },
     top_logprobs: {
       id: "set-logprobs", label: "Top Logprobs", type: "number", read: "integer",
-      fallback: 0, displayFallback: 0, extra: ' min="0" max="5"',
+      fallback: 0, displayFallback: 0, extra: {"min": "0", "max": "5"},
     },
     service_tier: {
       id: "set-tier", label: "Service Tier", type: "select",
@@ -320,23 +320,23 @@
     },
     previous_response_id: {
       id: "set-prev-id", label: "Previous Response ID", type: "text", read: "trim",
-      displayFallback: "", extra: ' placeholder="UUID"',
+      displayFallback: "", extra: {"placeholder": "UUID"},
     },
     prompt_cache_key: {
       id: "set-cache-key", label: "Prompt Cache Key", type: "text", read: "trim",
-      displayFallback: "", extra: ' placeholder="cache-id"',
+      displayFallback: "", extra: {"placeholder": "cache-id"},
     },
     prompt_id: {
       id: "set-prompt-id", label: "Prompt ID (Шаблон)", type: "text", read: "trim",
-      displayFallback: "", extra: ' placeholder="Шаблон Yandex Studio"',
+      displayFallback: "", extra: {"placeholder": "Шаблон Yandex Studio"},
     },
     prompt_version: {
       id: "set-prompt-ver", label: "Prompt Version", type: "text", read: "trim",
-      displayFallback: "", extra: ' placeholder="latest"',
+      displayFallback: "", extra: {"placeholder": "latest"},
     },
     prompt_variables: {
       id: "set-prompt-vars", label: "Prompt Variables (JSON)", type: "text", read: "trim",
-      displayFallback: "", extra: ' placeholder=\'{"key":"val"}\'',
+      displayFallback: "", extra: {"placeholder": "{\"key\":\"val\"}"},
     },
     conv_metadata: {
       id: "set-conv-meta", label: "Диалоговые метаданные (Metadata JSON)", type: "textarea",

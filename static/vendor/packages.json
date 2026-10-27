@@ -1,0 +1,32 @@
+[
+  {
+    "package": "markdown-it",
+    "version": "15.0.3",
+    "source": "https://registry.npmjs.org/markdown-it/-/markdown-it-15.0.3.tgz",
+    "files": {
+      "LICENSES": "4f2560ec963d65b18163d509d3fa08e5d890a355b47ee39176dafdd524ec2893",
+      "markdown-it.min.js": "810a91cd7d21435ef8a904725fffd56337fd592a38f683c71a1cc904307c82cc",
+      "package-lock.json": "ebdf35cdad5ce2be71daac9fb0a6677c5011708fc99064aff333133005ae3566",
+      "package.json": "0d845ae676c0092e7904294b96bcb1965410fb325bb41d5050b07c62758f4685",
+      "renderer-entry.mjs": "7a1e66fcbdd2d2dda3fd1c27ef2593d8bbadd9bc572a9eb0b99f93d77fd82078"
+    }
+  },
+  {
+    "package": "katex",
+    "version": "0.19.1",
+    "source": "https://registry.npmjs.org/katex/-/katex-0.19.1.tgz",
+    "files": {
+      "LICENSE": "766ccc1f306c885aa45542a9846bbd0a505b27a0374f146778171c2254ce18e3",
+      "katex.min.js": "fa140498b8cfc8302cbe5e7cb1bdbc1f952bc38b3fa258ede09e73edbf9a74bc"
+    }
+  },
+  {
+    "package": "markdown-it-texmath",
+    "version": "1.0.0",
+    "source": "https://registry.npmjs.org/markdown-it-texmath/-/markdown-it-texmath-1.0.0.tgz",
+    "files": {
+      "LICENSE": "655a4d5721dabe668d3ef640d5587d44534d370e7dc256d4f33740278dc710d5",
+      "texmath.js": "926e075a1745e1019813b8418b90183feea0c7b3782c85dceb4f246da999edc6"
+    }
+  }
+]

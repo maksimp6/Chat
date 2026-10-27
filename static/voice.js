@@ -27,6 +27,7 @@
   var micModel = null;
   var micTransport = "realtime";
   var micTimeout = null;
+  var micGeneration = 0;
   var audioPlayer = null;
   var textSessions = new Map();
 
@@ -72,7 +73,7 @@
     waveCtx.stroke();
   }
 
-  function wavFromPcm(chunks, inputRate) {
+  async function wavFromPcm(chunks, inputRate) {
     var length = chunks.reduce(function (n, chunk) { return n + chunk.length; }, 0);
     var input = new Float32Array(length);
     var position = 0;
@@ -81,6 +82,24 @@
     // Resample explicitly because mobile AudioContext may ignore the requested rate.
     var outputRate = 16000;
     var outputLength = Math.floor(length * outputRate / inputRate);
+    var samples = input;
+    if (outputLength && inputRate !== outputRate) {
+      var OfflineContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      if (!OfflineContext) throw new Error("Браузер не поддерживает преобразование частоты записи");
+      var renderContext = new OfflineContext(1, outputLength, outputRate);
+      var inputBuffer = renderContext.createBuffer(1, length, inputRate);
+      inputBuffer.getChannelData(0).set(input);
+      var renderSource = renderContext.createBufferSource();
+      renderSource.buffer = inputBuffer;
+      renderSource.connect(renderContext.destination);
+      try {
+        renderSource.start(0);
+        samples = (await renderContext.startRendering()).getChannelData(0);
+      } finally {
+        renderSource.disconnect();
+        renderSource.buffer = null;
+      }
+    }
     var buffer = new ArrayBuffer(44 + outputLength * 2);
     var view = new DataView(buffer);
     function str(offset, value) {
@@ -100,12 +119,7 @@
     str(36, "data");
     view.setUint32(40, outputLength * 2, true);
     for (var n = 0; n < outputLength; n++) {
-      var start = Math.floor(n * inputRate / outputRate);
-      var end = Math.max(start + 1, Math.floor((n + 1) * inputRate / outputRate));
-      var sum = 0;
-      var count = 0;
-      for (var j = start; j < end && j < length; j++) { sum += input[j]; count++; }
-      var sample = Math.max(-1, Math.min(1, count ? sum / count : 0));
+      var sample = Math.max(-1, Math.min(1, samples[n]));
       view.setInt16(44 + n * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
     }
     return new Blob([buffer], { type: "audio/wav" });
@@ -190,13 +204,46 @@
     }
   }
 
-  async function startRecording() {
-    mediaStream = await navigator.mediaDevices.getUserMedia({
+  function micContextMatches() {
+    return typeof currentConvId !== "undefined" && currentConvId === micConversationId &&
+      typeof currentModel !== "undefined" && currentModel === micModel;
+  }
+
+  function micUploadActive(id) {
+    if (sessionId !== id || !isProcessing) return false;
+    if (micContextMatches()) return true;
+    cancelMic();
+    setStatus("Голосовая сессия отменена: выбран другой диалог или модель");
+    return false;
+  }
+
+  async function startRecording(generation) {
+    var stream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
     });
+    if (generation !== micGeneration || !micContextMatches()) {
+      stream.getTracks().forEach(function (track) { track.stop(); });
+      if (generation === micGeneration) cancelMic();
+      return;
+    }
     var AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    audioContext = new AudioContextClass({ sampleRate: 16000 });
-    if (audioContext.state === "suspended") await audioContext.resume();
+    var context;
+    try {
+      context = new AudioContextClass({ sampleRate: 16000 });
+      if (context.state === "suspended") await context.resume();
+    } catch (error) {
+      stream.getTracks().forEach(function (track) { track.stop(); });
+      if (context) context.close().catch(function () {});
+      throw error;
+    }
+    if (generation !== micGeneration || !micContextMatches()) {
+      stream.getTracks().forEach(function (track) { track.stop(); });
+      context.close().catch(function () {});
+      if (generation === micGeneration) cancelMic();
+      return;
+    }
+    mediaStream = stream;
+    audioContext = context;
     recordingRate = audioContext.sampleRate;
     source = audioContext.createMediaStreamSource(mediaStream);
     processor = audioContext.createScriptProcessor(4096, 1, 1);
@@ -205,7 +252,7 @@
     processor.onaudioprocess = function (event) {
       if (!isRecording) return;
       if (typeof currentConvId !== "undefined" && (currentConvId !== micConversationId || currentModel !== micModel)) {
-        cancel();
+        cancelMic();
         return;
       }
       var input = event.inputBuffer.getChannelData(0);
@@ -234,7 +281,7 @@
       // EventSource resumes from Last-Event-ID; the backend retains its event log.
       if (sessionId && isProcessing) setStatus("Восстанавливаю события голосового ответа...");
       if (eventSource && eventSource.readyState === EventSource.CLOSED) {
-        cancel();
+        cancelMic();
         setStatus("События голосовой сессии недоступны");
       }
     };
@@ -247,25 +294,35 @@
       if (micBtn) micBtn.classList.remove("recording");
       setStatus("Передаю запись в Realtime...");
       var id = sessionId;
-      var blob = wavFromPcm(pcmChunks, recordingRate);
+      var chunks = pcmChunks;
+      var inputRate = recordingRate;
       releaseRecording();
       pcmChunks = [];
       try {
+        var blob = await wavFromPcm(chunks, inputRate);
+        if (!micUploadActive(id)) return;
         if (!blob.size || blob.size <= 44) throw new Error("Запись голоса пуста");
+        var audioBytes = await blob.arrayBuffer();
+        if (!micUploadActive(id)) return;
         var res = await request("/api/voice/audio?session_id=" + encodeURIComponent(id), {
-          method: "POST", headers: { "Content-Type": "audio/wav" }, body: await blob.arrayBuffer(),
+          method: "POST", headers: { "Content-Type": "audio/wav" }, body: audioBytes,
         });
+        if (!micUploadActive(id)) return;
         if (!res.ok) {
           var error = await res.json();
           throw new Error(error.error || "Не удалось передать запись");
         }
         await jsonRequest("/api/voice/close", { session_id: id });
       } catch (err) {
+        if (sessionId !== id) return;
         closeMicEvents();
-        await cancelServer(id);
+        if (micTimeout) { window.clearTimeout(micTimeout); micTimeout = null; }
         sessionId = null;
+        micConversationId = null;
+        micModel = null;
         isProcessing = false;
         setStatus(err.message || "Не удалось передать запись");
+        await cancelServer(id);
       }
       return;
     }
@@ -285,11 +342,15 @@
       return;
     }
     isConnecting = true;
+    var generation = ++micGeneration;
+    micConversationId = typeof currentConvId !== "undefined" && currentConvId ? currentConvId : null;
+    micModel = model;
     setStatus("Подключение...");
     try {
       if (typeof currentConvId === "undefined" || !currentConvId) {
         if (typeof createConversation !== "function") throw new Error("Создайте диалог для голосового запроса");
         var created = await createConversation(model);
+        if (generation !== micGeneration) return;
         if (!created) throw new Error("Не удалось создать диалог");
         if (currentConvId !== created) throw new Error("Выбран другой диалог; начните запись в нём");
       }
@@ -305,11 +366,16 @@
         instructions: params.instructions,
         response_mode: (document.getElementById("response-mode-select") || {}).value || "audio",
       });
+      if (generation !== micGeneration || !micContextMatches()) {
+        if (generation === micGeneration) cancelMic();
+        await cancelServer(data.session_id);
+        return;
+      }
       sessionId = data.session_id;
       var startedSession = sessionId;
       micTimeout = window.setTimeout(function () {
         if (sessionId !== startedSession) return;
-        cancel();
+        cancelMic();
         setStatus("Истекло время голосовой сессии");
       }, data.ttl_seconds * 1000);
       maxAudioBytes = data.max_audio_bytes;
@@ -318,15 +384,10 @@
       userMsgSent = false;
       botMsgSent = false;
       sessionError = "";
-      await startRecording();
+      await startRecording(generation);
     } catch (err) {
-      releaseRecording();
-      closeMicEvents();
-      await cancelServer(sessionId);
-      sessionId = null;
-      if (micTimeout) { window.clearTimeout(micTimeout); micTimeout = null; }
-      isRecording = false;
-      isConnecting = false;
+      if (generation !== micGeneration) return;
+      cancelMic();
       setStatus(err.message || "Не удалось начать голосовую сессию");
     }
   }
@@ -392,7 +453,8 @@
     });
   }
 
-  function cancel() {
+  function cancelMic() {
+    micGeneration += 1;
     isRecording = false;
     isConnecting = false;
     isProcessing = false;
@@ -402,11 +464,29 @@
     closeMicEvents();
     var id = sessionId;
     sessionId = null;
+    micConversationId = null;
+    micModel = null;
     cancelServer(id);
+  }
+
+  function cancel() {
+    cancelMic();
     textSessions.forEach(function (abort) { abort(); });
     if (audioPlayer) audioPlayer.pause();
     setStatus("Голосовая сессия отменена");
   }
+
+  function cancelMicOnSelectionChange() {
+    if (!(sessionId || isRecording || isConnecting || isProcessing)) return;
+    // Creating the microphone's first conversation selects it before createConversation resolves.
+    if (isConnecting && !sessionId && micConversationId === null && currentModel === micModel) return;
+    if (micContextMatches()) return;
+    cancelMic();
+    setStatus("Голосовая сессия отменена: выбран другой диалог или модель");
+  }
+
+  window.addEventListener("logos:conversation-selected", cancelMicOnSelectionChange);
+  window.addEventListener("logos:model-changed", cancelMicOnSelectionChange);
 
   window.LogosVoice = { sendText: sendText, synthesizeText: sendText, cancel: cancel };
   document.addEventListener("DOMContentLoaded", function () {

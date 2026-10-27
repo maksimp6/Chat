@@ -569,6 +569,22 @@ body {
   display: flex;
 }
 
+/* Keep the existing full-screen modal layout inside the native dialog top layer. */
+.logos-pro-app dialog.modal {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  box-sizing: border-box;
+  color: inherit;
+}
+.logos-pro-app dialog.modal::backdrop {
+  background: transparent;
+}
+
 .logos-pro-app .modal-content {
   background: var(--bg-sidebar);
   border-radius: 16px;
@@ -1560,18 +1576,42 @@ body {
 .logos-pro-app .md-code-block {
   margin: 8px 0;
 }
-.logos-pro-app .md-code {
+.logos-pro-app .md-code-block > pre {
   margin: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
-.logos-pro-app .md-math {
-  font-family: "Cambria Math", "Times New Roman", serif;
+.logos-pro-app .bubble .md-render-fallback {
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
+  font: inherit;
 }
-.logos-pro-app .md-math-block {
+/* texmath supplies eq/eqn wrappers; KaTeX emits native MathML inside them. */
+.logos-pro-app .bubble eq {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: middle;
+  overflow-x: auto;
+}
+.logos-pro-app .bubble eqn {
   display: block;
+  max-width: 100%;
+  min-width: 0;
   margin: 8px 0;
+  overflow-x: auto;
   text-align: center;
-  white-space: normal;
+}
+.logos-pro-app .bubble .eqno {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+.logos-pro-app .bubble .eqno > eqn {
+  flex: 1;
+}
+.logos-pro-app .bubble .eqno > span {
+  flex: none;
 }
 .logos-pro-app .md-image {
   display: block;
@@ -1579,17 +1619,6 @@ body {
   height: auto;
   margin: 8px 0;
   border-radius: 8px;
-}
-.logos-pro-app .md-frac {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  vertical-align: middle;
-  padding: 0 2px;
-}
-.logos-pro-app .md-frac > span:first-child {
-  border-bottom: 1px solid currentColor;
-  padding: 0 2px;
 }
 .logos-pro-app .msg sup,
 .logos-pro-app .msg sub {

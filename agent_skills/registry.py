@@ -6,7 +6,9 @@ from dataclasses import dataclass
 import hashlib
 from pathlib import Path
 import re
-from typing import Iterable, Optional
+from typing import Any, Iterable, Optional
+
+import yaml
 
 
 DEFAULT_SKILL_ROOT = Path(__file__).resolve().parents[1] / ".agents" / "skills"
@@ -131,26 +133,24 @@ def _normalize_role(role: Optional[str]) -> Optional[str]:
     return normalized or None
 
 
-def _parse_frontmatter_lines(lines: list[str], source: str) -> dict[str, str]:
+def _parse_frontmatter_lines(lines: list[str], source: str) -> dict[str, Any]:
     if not lines or lines[0].strip() != "---":
         raise SkillFormatError(f"{source}: SKILL.md must start with YAML frontmatter")
-    metadata: dict[str, str] = {}
-    closed = False
-    for line in lines[1:]:
-        if line.strip() == "---":
-            closed = True
-            break
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        if ":" not in line:
-            raise SkillFormatError(f"{source}: invalid frontmatter line")
-        key, value = line.split(":", 1)
-        metadata[key.strip()] = value.strip().strip('"').strip("'")
-    if not closed:
+    closing_index = next(
+        (i for i, line in enumerate(lines[1:], start=1) if line.strip() == "---"), None
+    )
+    if closing_index is None:
         raise SkillFormatError(f"{source}: frontmatter is not closed")
+    document = "\n".join(line.rstrip("\r\n") for line in lines[1:closing_index])
+    try:
+        metadata = yaml.safe_load(document)
+    except yaml.YAMLError as exc:
+        raise SkillFormatError(f"{source}: invalid YAML frontmatter") from exc
+    if not isinstance(metadata, dict) or not all(isinstance(key, str) for key in metadata):
+        raise SkillFormatError(f"{source}: frontmatter must be a mapping with string keys")
     for key in ("name", "description"):
-        if not metadata.get(key):
-            raise SkillFormatError(f"{source}: missing frontmatter field {key}")
+        if not isinstance(metadata.get(key), str) or not metadata[key].strip():
+            raise SkillFormatError(f"{source}: frontmatter field {key} must be a non-empty string")
     return metadata
 
 
@@ -166,16 +166,20 @@ class SkillRegistry:
             raise SkillFormatError(f"{name}: symlinked skills are not allowed")
         return path
 
-    def _read_metadata(self, name: str) -> dict[str, str]:
+    def _read_metadata(self, name: str) -> dict[str, Any]:
         path = self._skill_path(name)
         if not path.is_file():
             raise SkillNotFoundError(f"skill not found: {name}")
         lines: list[str] = []
+        size = 0
         with path.open("r", encoding="utf-8") as handle:
             for _ in range(MAX_FRONTMATTER_LINES):
-                line = handle.readline()
+                line = handle.readline(MAX_SKILL_BYTES - size + 1)
                 if line == "":
                     break
+                size += len(line.encode("utf-8"))
+                if size > MAX_SKILL_BYTES:
+                    raise SkillFormatError(f"{name}: frontmatter exceeds {MAX_SKILL_BYTES} bytes")
                 lines.append(line)
                 if len(lines) > 1 and line.strip() == "---":
                     break

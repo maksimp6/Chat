@@ -7,14 +7,18 @@ import re
 from collections import Counter
 from collections.abc import Container
 
+from razdel import sentenize
+
 
 def split_sentences(text: str, *, min_chars: int) -> list[str]:
-    sentences = []
-    for match in re.finditer(r"[^.!?\u2026\n]+[.!?…]*", text):
-        sentence = match.group().strip()
-        if len(sentence) >= min_chars:
-            sentences.append(sentence)
-    return sentences
+    # Newlines remain hard boundaries; punctuation inside numbers and Russian
+    # abbreviations is interpreted by the sentence segmenter.
+    return [
+        sentence.text.strip()
+        for paragraph in text.split("\n")
+        for sentence in sentenize(paragraph)
+        if len(sentence.text.strip()) >= min_chars
+    ]
 
 
 def tokenize(text: str, *, stop_words: Container[str], min_chars: int) -> list[str]:

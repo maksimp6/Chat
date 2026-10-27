@@ -261,6 +261,12 @@ for path, required in budgets.values():
     if available <= required:
         raise SystemExit("Insufficient space for backup and checkout; backend was not stopped")
 PY
+  # Prepare parser dependencies while the old backend still serves requests.
+  # Never compile native packages on the phone. Missing compatible wheels or a
+  # download failure abort deployment before stop_app, retaining the running code.
+  git -C "$app" show "$target:requirements-parsers.txt" >"$probe/requirements-parsers.txt"
+  timeout 120 "$python" -m pip install --disable-pip-version-check --no-input \
+    --only-binary=:all: -r "$probe/requirements-parsers.txt"
   git -C "$app" update-ref "refs/logos/deployments/$previous" "$previous"
   git -C "$app" for-each-ref --sort=-creatordate --format='%(refname)' refs/logos/deployments/ \
     | tail -n +21 | while read -r ref; do git -C "$app" update-ref -d "$ref"; done || true

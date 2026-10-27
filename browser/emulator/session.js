@@ -1,6 +1,9 @@
 "use strict";
 
 const { DocumentShim } = require("./browser_dom");
+const { isIP } = require("node:net");
+// Vendored ipaddr.js 2.2.0; see vendor/ipaddr.LICENSE.
+const ipaddr = require("./vendor/ipaddr");
 
 const DEFAULT_MAX_BYTES = 2 * 1024 * 1024;
 const DEFAULT_TEXT_LIMIT = 8000;
@@ -17,23 +20,20 @@ function collapse(text) {
 // Literal private, loopback, link-local and metadata hosts. Pages are fetched
 // on behalf of the agent, so these must never be reachable through the emulator.
 function isNonPublicHost(hostname) {
-  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  const host = hostname.replace(/^\[|\]$/g, "").replace(/\.$/, "").toLowerCase();
   if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return true;
-  if (host === "::1" || host === "::" || host.startsWith("fc") || host.startsWith("fd")) return true;
-  if (host.startsWith("fe80:") || host.startsWith("::ffff:")) return true;
-  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (!ipv4) return false;
-  const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
-  return (
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    (a === 100 && b >= 64 && b <= 127)
-  );
+  // DNS labels such as fc-example.com are not IPv6 literals. URL parsing
+  // canonicalizes IP notation before this boundary; net.isIP checks its type.
+  if (isIP(host) === 0) return false;
+  const range = ipaddr.parse(host).range();
+  return NON_PUBLIC_IP_RANGES.has(range);
 }
+
+const NON_PUBLIC_IP_RANGES = new Set([
+  "unspecified", "broadcast", "multicast", "linkLocal", "loopback",
+  "carrierGradeNat", "private", "reserved", "uniqueLocal", "ipv4Mapped",
+  "discard", "benchmarking", "deprecated", "orchid2", "droneRemoteIdProtocolEntityTags",
+]);
 
 // Read a response body without buffering more than maxBytes of it.
 async function readCapped(response, maxBytes) {

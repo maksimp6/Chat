@@ -129,254 +129,71 @@ function flushApprovalOutputs(convId) {
   });
 }
 
-// Only the outer pipes are dropped: an empty inner cell keeps its column.
-function splitTableRow(line) {
-  var cells = line.trim().split("|");
-  if (cells.length && cells[0].trim() === "") cells.shift();
-  if (cells.length && cells[cells.length - 1].trim() === "") cells.pop();
-  return cells;
-}
+// The vendored parsers own Markdown/TeX syntax. Keep Logos-specific presentation
+// and the existing image-source policy at the renderer boundary.
+var chatMarkdownRenderer = null;
 
-var MATH_SYMBOLS = {
-  times: "×",
-  cdot: "·",
-  div: "÷",
-  pm: "±",
-  le: "≤",
-  leq: "≤",
-  ge: "≥",
-  geq: "≥",
-  neq: "≠",
-  approx: "≈",
-  infty: "∞",
-  ldots: "…",
-  cdots: "⋯",
-  sin: "sin",
-  cos: "cos",
-  tan: "tan",
-  cot: "cot",
-  log: "log",
-  ln: "ln",
-  exp: "exp",
-  lim: "lim",
-  min: "min",
-  max: "max",
-};
-
-// Plain-HTML approximation of common LaTeX. The input is already HTML-escaped, so the only tags here are the ones made below.
-function mathToHtml(tex) {
-  return tex
-    .replace(/\\text\{([^{}]*)\}/g, "$1")
-    .replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, '<span class="md-frac"><span>$1</span><span>$2</span></span>')
-    .replace(/\\sqrt\{([^{}]*)\}/g, "√($1)")
-    .replace(/\^\{([^{}]*)\}/g, "<sup>$1</sup>")
-    .replace(/\^(&[a-z]+;|[^{\s\\])/g, "<sup>$1</sup>")
-    .replace(/_\{([^{}]*)\}/g, "<sub>$1</sub>")
-    .replace(/_(&[a-z]+;|[^{\s\\])/g, "<sub>$1</sub>")
-    .replace(/\\%/g, "%")
-    .replace(/\\[,;]/g, " ")
-    .replace(/\\([a-zA-Z]+)/g, function (m, name) {
-      return Object.prototype.hasOwnProperty.call(MATH_SYMBOLS, name) ? MATH_SYMBOLS[name] : m;
-    })
-    .replace(/[{}]/g, "");
+function getChatMarkdownRenderer() {
+  if (chatMarkdownRenderer) return chatMarkdownRenderer;
+  if (typeof window.markdownit !== "function" || typeof texmath !== "function" || !window.katex) {
+    throw new Error("Markdown renderer is unavailable");
+  }
+  var md = window.markdownit({ html: false, breaks: true, linkify: false });
+  md.use(texmath, {
+    engine: {
+      renderToString: function (source, options) {
+        return window.katex.renderToString(source, Object.assign({}, options, {
+          output: "mathml",
+          trust: false,
+          throwOnError: false,
+          // A formula cannot redefine macros for another message.
+          macros: {},
+        }));
+      },
+    },
+    delimiters: ["dollars", "brackets"],
+  });
+  md.renderer.rules.table_open = function (tokens, index, options, env, renderer) {
+    tokens[index].attrJoin("class", "md-table");
+    return renderer.renderToken(tokens, index, options);
+  };
+  var image = md.renderer.rules.image;
+  md.renderer.rules.image = function (tokens, index, options, env, renderer) {
+    var token = tokens[index];
+    var src = token.attrGet("src") || "";
+    var allowed = /^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(src) ||
+      /^\/api\/images\/files\/[A-Za-z0-9_-]{1,128}\/[A-Za-z0-9_-]{16,128}$/.test(src);
+    if (!allowed) {
+      return md.utils.escapeHtml(renderer.renderInlineAsText(token.children || [], options, env));
+    }
+    token.attrJoin("class", "md-image");
+    token.attrSet("loading", "lazy");
+    token.attrSet("decoding", "async");
+    return image(tokens, index, options, env, renderer);
+  };
+  ["fence", "code_block"].forEach(function (rule) {
+    var renderCode = md.renderer.rules[rule];
+    md.renderer.rules[rule] = function (tokens, index, options, env, renderer) {
+      return '<div class="md-code-block">' + renderCode(tokens, index, options, env, renderer) + "</div>";
+    };
+  });
+  chatMarkdownRenderer = md;
+  return md;
 }
 
 function parseMarkdown(text) {
-  if (!text) return "";
-  var strText = typeof text === "string" ? text : JSON.stringify(text);
-  // Drop blank lines at both ends; the indentation of the first real line is content and stays.
-  strText = strText.replace(/^(?:[ \t]*\r?\n)+/, "").replace(/\s+$/, "");
-
-  strText = strText.replace(/^\s*```(?:markdown|md|html)?\s*\n([\s\S]*)\n?```\s*$/i, "$1");
-
-  var safe = strText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-  var codeBlocks = [];
-  safe = safe.replace(/```([\w\-\+\#]*)\n?([\s\S]*?)```/g, function (m, lang, code) {
-    var ph = "\x00CB" + codeBlocks.length + "\x00";
-    code = code.replace(/^\n/, "").replace(/\n$/, "");
-    codeBlocks.push(
-      '<div class="md-code-block"><pre class="md-code"><code' +
-        (lang ? ' class="language-' + lang + '"' : "") +
-        ">" +
-        code +
-        "</code></pre></div>",
-    );
-    return ph;
-  });
-
-  // Inline code is taken out first, so a $ inside backticks is never read as a formula.
-  var codeSpans = [];
-  safe = safe.replace(/`([^`\n]+)`/g, function (m, code) {
-    var ph = "\x00IC" + codeSpans.length + "\x00";
-    codeSpans.push("<code>" + code + "</code>");
-    return ph;
-  });
-
-  // Render stored inline PNG/JPEG and only the authenticated generated-image route.
-  var images = [];
-  safe = safe.replace(/!\[([^\]\n]{0,200})\]\((data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+|\/api\/images\/files\/[A-Za-z0-9_-]{1,128}\/[A-Za-z0-9_-]{16,128})\)/g, function (m, alt, src) {
-    var ph = "\x00IM" + images.length + "\x00";
-    images.push('<img class="md-image" src="' + src + '" alt="' + alt.replace(/"/g, "") + '">');
-    return ph;
-  });
-
-  // Formulas are taken out before the lines are split, so a $$ block may span several lines.
-  var maths = [];
-  safe = safe.replace(/\$\$([\s\S]+?)\$\$|\$(?!\s)([^$\n]+?)(?<!\s)\$(?!\d)/g, function (m, block, inline) {
-    var ph = "\x00MT" + maths.length + "\x00";
-    if (block !== undefined) {
-      maths.push('<div class="md-math md-math-block">' + mathToHtml(block.trim()) + "</div>");
-    } else {
-      maths.push('<span class="md-math">' + mathToHtml(inline) + "</span>");
-    }
-    return ph;
-  });
-
-  var lines = safe.split("\n");
-  var out = [];
-  var listType = null;
-  var inTable = false;
-  var tableHtml = "";
-
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i];
-    var nextLine = lines[i + 1] || "";
-    var isTableStart =
-      /^\s*\|.*\|\s*$/.test(line) && /^\s*\|?[\s:]*-+[\s:|-]*\|?\s*$/.test(nextLine);
-
-    if (isTableStart && !inTable) {
-      if (listType) {
-        out.push("</" + listType + ">");
-        listType = null;
-      }
-      inTable = true;
-      tableHtml = '<table class="md-table"><thead><tr>';
-      var hdr = splitTableRow(line);
-      hdr.forEach((c) => {
-        tableHtml += "<th>" + formatInline(c.trim()) + "</th>";
-      });
-      tableHtml += "</tr></thead><tbody>";
-      i++;
-      continue;
-    }
-
-    if (inTable) {
-      if (/^\s*\|.*\|\s*$/.test(line)) {
-        var cells = splitTableRow(line);
-        tableHtml += "<tr>";
-        cells.forEach((c) => {
-          var cellContent = c
-            .trim()
-            .replace(/&lt;ul&gt;/g, "<ul>")
-            .replace(/&lt;\/ul&gt;/g, "</ul>")
-            .replace(/&lt;li&gt;/g, "<li>")
-            .replace(/&lt;\/li&gt;/g, "</li>");
-          tableHtml += "<td>" + formatInline(cellContent) + "</td>";
-        });
-        tableHtml += "</tr>";
-        continue;
-      } else {
-        tableHtml += "</tbody></table>";
-        out.push(tableHtml);
-        tableHtml = "";
-        inTable = false;
-      }
-    }
-
-    if (/^(-{3,}|_{3,}|\*{3,})$/.test(line.trim())) {
-      if (listType) {
-        out.push("</" + listType + ">");
-        listType = null;
-      }
-      out.push("<hr>");
-      continue;
-    }
-
-    var hdrMatch = line.match(/^(#{1,6})\s+(.*)$/);
-    if (hdrMatch) {
-      if (listType) {
-        out.push("</" + listType + ">");
-        listType = null;
-      }
-      out.push(
-        "<h" +
-          hdrMatch[1].length +
-          ">" +
-          formatInline(hdrMatch[2]) +
-          "</h" +
-          hdrMatch[1].length +
-          ">",
-      );
-      continue;
-    }
-
-    var liMatch = line.match(/^\s*([-*+]|\d+\.)\s+(.*)$/);
-    if (liMatch) {
-      var currentListType = /^\d+\.$/.test(liMatch[1]) ? "ol" : "ul";
-      if (!listType) {
-        out.push("<" + currentListType + ">");
-        listType = currentListType;
-      } else if (listType !== currentListType) {
-        out.push("</" + listType + ">");
-        out.push("<" + currentListType + ">");
-        listType = currentListType;
-      }
-      out.push("<li>" + formatInline(liMatch[2]) + "</li>");
-      continue;
-    }
-
-    if (line.trim() === "") {
-      var nextLiMatch = nextLine.match(/^\s*([-*+]|\d+\.)\s+(.*)$/);
-      if (listType && nextLiMatch) continue;
-      if (listType) {
-        out.push("</" + listType + ">");
-        listType = null;
-      }
-      out.push("<br>");
-      continue;
-    }
-
-    if (listType) {
-      out.push("</" + listType + ">");
-      listType = null;
-    }
-    if (line.trim().indexOf("\x00CB") === 0) out.push(line);
-    else out.push("<p>" + formatInline(line) + "</p>");
+  if (text === null || text === undefined || text === "") return "";
+  var source = typeof text === "string" ? text : JSON.stringify(text);
+  try {
+    return getChatMarkdownRenderer().render(source);
+  } catch (error) {
+    // A missing optional renderer must still leave the model's answer readable.
+    var plain = document.createElement("pre");
+    plain.className = "md-render-fallback";
+    plain.textContent = source;
+    console.error("[CHAT] Markdown rendering failed", error && error.name);
+    return plain.outerHTML;
   }
-
-  if (listType) out.push("</" + listType + ">");
-  if (inTable) {
-    tableHtml += "</tbody></table>";
-    out.push(tableHtml);
-  }
-
-  var result = out.join("\n");
-  for (var j = 0; j < codeBlocks.length; j++)
-    // A function keeps "$$", "$&" and "$'" in the code literal; a string would read them as patterns.
-    result = result.replace("\x00CB" + j + "\x00", function () {
-      return codeBlocks[j];
-    });
-  for (var k = 0; k < maths.length; k++)
-    result = result.replace("\x00MT" + k + "\x00", function () {
-      return maths[k];
-    });
-  for (var n = 0; n < images.length; n++)
-    result = result.replace("\x00IM" + n + "\x00", function () {
-      return images[n];
-    });
-  for (var c = 0; c < codeSpans.length; c++)
-    result = result.replace("\x00IC" + c + "\x00", function () {
-      return codeSpans[c];
-    });
-  return result;
-}
-
-function formatInline(text) {
-  return text
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/(?<!\s)\*(?!\s)(.+?)(?<!\s)\*(?!\s)/g, "<em>$1</em>")
-    .replace(/`(.+?)`/g, "<code>$1</code>");
 }
 
 var CHAT_UI_ROLES = {

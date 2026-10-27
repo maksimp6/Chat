@@ -18,7 +18,7 @@
             "set-ssh-max-output",
             "number",
             1048576,
-            ' min="4096" max="10485760" step="4096"',
+            {"min": "4096", "max": "10485760", "step": "4096"},
           ) +
           "</div>",
       ),
@@ -28,7 +28,7 @@
       ),
       '<div style="margin-top:10px;">' +
         UI.lbl("Общий known_hosts (серверный путь)") +
-        UI.inp("set-ssh-known-hosts", "text", "", ' placeholder="/srv/logos/ssh/known_hosts"') +
+        UI.inp("set-ssh-known-hosts", "text", "", {"placeholder": "/srv/logos/ssh/known_hosts"}) +
         "</div>",
       '<fieldset id="ssh-inactive-restrictions" disabled style="margin-top:10px;border:1px solid var(--m-border,#ddd);border-radius:6px;padding:10px;">',
       '<legend>Ограничения отключены</legend>',
@@ -54,7 +54,7 @@
       '<div style="display:flex;gap:8px;align-items:end;margin-top:10px;">',
       '<div style="flex:1;">' +
         UI.lbl("Проверить target") +
-        UI.inp("set-ssh-test-target", "text", "", ' placeholder="preview"') +
+        UI.inp("set-ssh-test-target", "text", "", {"placeholder": "preview"}) +
         "</div>",
       '<button class="logos-btn settings-contract-btn" id="set-ssh-test-btn" type="button">Проверить</button>',
       "</div>",

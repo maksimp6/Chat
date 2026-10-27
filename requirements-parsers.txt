@@ -1,0 +1,5 @@
+# Parser dependencies are synchronized before the Redmi backend is stopped.
+PyYAML>=6.0
+jsonschema>=4.26.0
+razdel==0.5.0
+unidiff==0.7.5

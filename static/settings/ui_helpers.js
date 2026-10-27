@@ -43,116 +43,100 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
   }
+  // Keep the public HTML-string contract while letting the DOM serialize values and attributes.
+  // Markup arguments are composed by settings code; user/provider text goes through textContent
+  // or setAttribute before serialization.
+  function element(tag, css, attrs) {
+    var node = document.createElement(tag);
+    if (css) node.style.cssText = css;
+    Object.keys(attrs || {}).forEach(function (name) {
+      var value = attrs[name];
+      if (name === "style") {
+        node.style.cssText += ";" + String(value || "");
+      } else if (value !== false && value !== null && value !== undefined) {
+        node.setAttribute(name, value === true ? "" : String(value));
+      }
+    });
+    return node;
+  }
+
+  function markup(node, html) {
+    if (html !== null && html !== undefined) node.innerHTML = String(html);
+    return node;
+  }
+
+  var INPUT_STYLE = "width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--m-border,#ddd);border-radius:6px;font-size:13px;background:var(--m-input-bg,#f5f5f5);color:var(--m-input-text,#222);";
+
   function inp(id, type, val, extra) {
-    return (
-      '<input id="' +
-      id +
-      '" type="' +
-      type +
-      '" value="' +
-      escapeHtml(val) +
-      '" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--m-border,#ddd);border-radius:6px;font-size:13px;background:var(--m-input-bg,#f5f5f5);color:var(--m-input-text,#222);"' +
-      (extra || "") +
-      ">"
-    );
+    var node = element("input", INPUT_STYLE, extra);
+    node.id = String(id);
+    node.type = String(type);
+    node.setAttribute("value", val === null || val === undefined ? "" : String(val));
+    return node.outerHTML;
   }
+
   function sel(id, options, extra) {
-    return (
-      '<select id="' +
-      id +
-      '" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--m-border,#ddd);border-radius:6px;font-size:13px;background:var(--m-input-bg,#f5f5f5);color:var(--m-input-text,#222);"' +
-      (extra || "") +
-      ">" +
-      options +
-      "</select>"
-    );
+    var node = element("select", INPUT_STYLE, extra);
+    node.id = String(id);
+    markup(node, options);
+    return node.outerHTML;
   }
+
   function lbl(text, hint) {
-    var t = hint ? ' title="' + escapeHtml(hint) + '"' : "";
-    return (
-      '<label style="font-size:13px;display:block;margin-bottom:4px;color:var(--m-text,#222);"' +
-      t +
-      ">" +
-      text +
-      "</label>"
-    );
+    var node = element("label", "font-size:13px;display:block;margin-bottom:4px;color:var(--m-text,#222);");
+    if (hint) node.title = String(hint);
+    return markup(node, text).outerHTML;
   }
+
   function chk(id, checked, text, extra, hint) {
-    var t = hint ? ' title="' + escapeHtml(hint) + '"' : "";
-    return (
-      '<label style="font-size:13px;display:flex;align-items:flex-start;gap:4px;color:var(--m-text,#222);"' +
-      t +
-      '><input id="' +
-      id +
-      '" type="checkbox" style="margin:2px 0 0;flex:0 0 auto;"' +
-      (checked ? " checked" : "") +
-      (extra || "") +
-      "> " +
-      text +
-      "</label>"
-    );
+    var label = element("label", "font-size:13px;display:flex;align-items:flex-start;gap:4px;color:var(--m-text,#222);");
+    if (hint) label.title = String(hint);
+    var input = element("input", "margin:2px 0 0;flex:0 0 auto;", extra);
+    input.id = String(id);
+    input.type = "checkbox";
+    if (checked) input.setAttribute("checked", "");
+    label.appendChild(input);
+    label.appendChild(document.createTextNode(" "));
+    var caption = markup(document.createElement("span"), text);
+    label.appendChild(caption);
+    return label.outerHTML;
   }
+
   function gap2(c1, c2) {
-    return (
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;align-items:end;">' +
-      c1 +
-      c2 +
-      "</div>"
-    );
+    return markup(element("div", "display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;align-items:end;"), String(c1 || "") + String(c2 || "")).outerHTML;
   }
+
   function gap3(c1, c2, c3) {
-    return (
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;align-items:end;">' +
-      c1 +
-      c2 +
-      c3 +
-      "</div>"
-    );
+    return markup(element("div", "display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;align-items:end;"), String(c1 || "") + String(c2 || "") + String(c3 || "")).outerHTML;
   }
+
   function section(title) {
-    return (
-      '<h3 style="font-size:14px;margin:16px 0 8px;color:var(--m-section,#666);border-bottom:1px solid var(--m-section-border,#eee);padding-bottom:4px;">' +
-      title +
-      "</h3>"
-    );
+    return markup(element("h3", "font-size:14px;margin:16px 0 8px;color:var(--m-section,#666);border-bottom:1px solid var(--m-section-border,#eee);padding-bottom:4px;"), title).outerHTML;
   }
+
   function toolSection(title, id, content) {
-    return (
-      '<details style="margin-bottom:10px;border:1px solid var(--m-border,#ddd);border-radius:6px;padding:10px;background:var(--m-card,#fff);">' +
-      '<summary style="cursor:pointer;font-weight:bold;color:var(--m-text,#222);">' +
-      title +
-      "</summary>" +
-      '<div style="margin-top:10px;" id="' +
-      id +
-      '">' +
-      content +
-      "</div></details>"
-    );
+    var node = element("details", "margin-bottom:10px;border:1px solid var(--m-border,#ddd);border-radius:6px;padding:10px;background:var(--m-card,#fff);");
+    node.appendChild(markup(element("summary", "cursor:pointer;font-weight:bold;color:var(--m-text,#222);"), title));
+    var body = markup(element("div", "margin-top:10px;"), content);
+    body.id = String(id);
+    node.appendChild(body);
+    return node.outerHTML;
   }
+
   function ta(id, val, extra) {
-    return (
-      '<textarea id="' +
-      id +
-      '" style="width:100%;' +
-      (extra || "") +
-      'padding:8px;border:1px solid var(--m-border,#ddd);border-radius:6px;background:var(--m-input-bg,#f5f5f5);color:var(--m-input-text,#222);box-sizing:border-box;">' +
-      escapeHtml(val) +
-      "</textarea>"
-    );
+    var node = element("textarea", "width:100%;padding:8px;border:1px solid var(--m-border,#ddd);border-radius:6px;background:var(--m-input-bg,#f5f5f5);color:var(--m-input-text,#222);box-sizing:border-box;" + String(extra || ""));
+    node.id = String(id);
+    node.textContent = val === null || val === undefined ? "" : String(val);
+    return node.outerHTML;
   }
+
   function btn(id, text, bg, extra) {
     var variant = bg === "accent" || bg === "success" || bg === "danger" ? bg : "default";
-    var extraClass = extra ? " settings-btn-extra" : "";
-    return (
-      '<button class="logos-btn settings-btn settings-btn-' +
-      variant +
-      extraClass +
-      '" id="' +
-      id +
-      '">' +
-      text +
-      "</button>"
-    );
+    var node = element("button");
+    node.id = String(id);
+    node.type = "button";
+    node.className = "logos-btn settings-btn settings-btn-" + variant + (extra ? " settings-btn-extra" : "");
+    return markup(node, text).outerHTML;
   }
   function deepMerge(target, source) {
     for (var key in source) {

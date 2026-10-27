@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import re
 from pathlib import Path
 
-HUNK = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+from unidiff import PatchSet
+from unidiff.errors import UnidiffParseError
+
 REQUIRED = {"claim", "rule_quote", "path", "line", "source_quote", "reason", "reproduction"}
 OPTIONAL = {"side", "severity", "consequence"}
 SEVERITY_CRITERIA = {
@@ -18,24 +21,42 @@ SEVERITY_CRITERIA = {
 
 
 def changed_lines(patch: str) -> dict[str, dict[int, str]]:
-    """Map changed lines on each side; context advances both line counters."""
+    """Map one GitHub file's complete hunks; reject malformed citation evidence."""
     result: dict[str, dict[int, str]] = {"LEFT": {}, "RIGHT": {}}
-    old_line = new_line = None
-    # Unified diffs use LF delimiters; Unicode separators and CR can be source data.
-    for text in patch.split("\n"):
-        hunk = HUNK.match(text)
-        if hunk:
-            old_line, new_line = int(hunk[1]), int(hunk[2])
-        elif old_line is not None and new_line is not None:
-            if text.startswith("+"):
-                result["RIGHT"][new_line] = text[1:]
-                new_line += 1
-            elif text.startswith("-"):
-                result["LEFT"][old_line] = text[1:]
-                old_line += 1
-            elif text.startswith(" "):
-                old_line += 1
-                new_line += 1
+    if not patch:
+        return result
+    if not isinstance(patch, str) or not patch.startswith("@@ "):
+        raise ValueError("Expected a per-file GitHub hunk fragment")
+    # GitHub omits file headers. StringIO splits only at LF, retaining literal
+    # CR and Unicode line separators in the source being quoted.
+    wrapped = "--- a/source\n+++ b/source\n" + patch
+    try:
+        parsed = PatchSet(io.StringIO(wrapped, newline="\n"))
+    except UnidiffParseError as exc:
+        raise ValueError("Incomplete or malformed diff evidence") from exc
+    if len(parsed) != 1 or not parsed[0]:
+        raise ValueError("Expected hunks for exactly one source file")
+    covered = set()
+    for hunk in parsed[0]:
+        for line in hunk:
+            if line.diff_line_no is not None:
+                covered.add(line.diff_line_no - 2)
+            if line.is_added or line.is_removed:
+                side = "RIGHT" if line.is_added else "LEFT"
+                number = line.target_line_no if line.is_added else line.source_line_no
+                if number in result[side]:
+                    raise ValueError("Overlapping changed lines in diff evidence")
+                result[side][number] = line.value.removesuffix("\n")
+    header_count = 0
+    for number, line in enumerate(io.StringIO(patch, newline="\n"), start=1):
+        if line.startswith("@@ "):
+            header_count += 1
+        elif number not in covered and line.removesuffix("\n") != "\\ No newline at end of file":
+            # unidiff permits extra patch metadata outside hunks. A GitHub
+            # fragment has none, so never accept ignored trailing source data.
+            raise ValueError("Unexpected data outside diff hunks")
+    if header_count != len(parsed[0]):
+        raise ValueError("Malformed hunk header in diff evidence")
     return result
 
 

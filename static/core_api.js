@@ -480,7 +480,7 @@
     if (!options.id) throw new Error("UI modal requires id");
     if (!options.title) throw new Error("UI modal requires title");
 
-    var modal = document.createElement("div");
+    var modal = document.createElement("dialog");
     modal.id = String(options.id);
     modal.className = "modal" + (options.className ? " " + String(options.className).trim() : "");
     modal.hidden = true;
@@ -516,20 +516,54 @@
     return modal;
   }
 
-  function openModal(modal) {
-    if (!modal || !modal.classList || !modal.classList.contains("modal")) {
-      throw new Error("Canonical modal root is required");
+  var preparedModals = new WeakSet();
+
+  function prepareModal(modal) {
+    if (!modal || modal.tagName !== "DIALOG" || !modal.classList.contains("modal") ||
+        typeof modal.showModal !== "function" || typeof modal.close !== "function") {
+      throw new Error("A supported native dialog is required");
     }
+    if (preparedModals.has(modal)) return;
+    preparedModals.add(modal);
+    // Escape follows the same action as the close button, including module cleanup.
+    modal.addEventListener("cancel", function (event) {
+      event.preventDefault();
+      var button = modal.querySelector(".modal-close") ||
+        modal.querySelector('button[data-action="modal.close"]');
+      if (button && button.dataset.action) {
+        dispatchAction(button.dataset.action, actionPayload(button, event), event);
+      } else {
+        closeModal(modal);
+      }
+    });
+    modal.addEventListener("close", function () {
+      // A close event can be queued immediately before a dialog is reopened.
+      if (modal.open) return;
+      modal.classList.remove("visible");
+      modal.hidden = true;
+      modal.setAttribute("aria-hidden", "true");
+    });
+  }
+
+  function openModal(modal) {
+    prepareModal(modal);
     modal.hidden = false;
     modal.classList.add("visible");
     modal.setAttribute("aria-hidden", "false");
+    try {
+      if (!modal.open) modal.showModal();
+    } catch (error) {
+      modal.classList.remove("visible");
+      modal.hidden = true;
+      modal.setAttribute("aria-hidden", "true");
+      throw error;
+    }
     return modal;
   }
 
   function closeModal(modal) {
-    if (!modal || !modal.classList || !modal.classList.contains("modal")) {
-      throw new Error("Canonical modal root is required");
-    }
+    prepareModal(modal);
+    if (modal.open) modal.close();
     modal.classList.remove("visible");
     modal.hidden = true;
     modal.setAttribute("aria-hidden", "true");

@@ -1,6 +1,7 @@
 """Config loading and validation for Keel Platform."""
 
 import re
+from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 from typing import Any
 
@@ -55,24 +56,6 @@ def _validate_no_plaintext_secrets(
                 raise ConfigError(f"Plaintext secret detected at {path}.{key}")
 
 
-def _has_cycle(
-    graph: dict[str, set[str]], node: str, visited: set[str], rec_stack: set[str]
-) -> bool:
-    """Check if there's a cycle in the dependency graph."""
-    visited.add(node)
-    rec_stack.add(node)
-
-    for neighbor in graph.get(node, set()):
-        if neighbor not in visited:
-            if _has_cycle(graph, neighbor, visited, rec_stack):
-                return True
-        elif neighbor in rec_stack:
-            return True
-
-    rec_stack.remove(node)
-    return False
-
-
 def _validate_no_cycles(services: dict[str, dict[str, Any]]) -> None:
     """Check for cycles in service dependencies."""
     # Build dependency graph
@@ -84,6 +67,8 @@ def _validate_no_cycles(services: dict[str, dict[str, Any]]) -> None:
 
         # Check all dependencies exist
         for dep in deps:
+            if not isinstance(dep, str):
+                raise ConfigError(f"Service '{service_name}': depends_on entries must be strings")
             if dep not in services:
                 raise ConfigError(
                     f"Service '{service_name}' depends on nonexistent service '{dep}'"
@@ -91,12 +76,11 @@ def _validate_no_cycles(services: dict[str, dict[str, Any]]) -> None:
 
         graph[service_name] = set(deps)
 
-    # Check for cycles
-    visited: set[str] = set()
-    for node in graph:
-        if node not in visited:
-            if _has_cycle(graph, node, visited, set()):
-                raise ConfigError(f"Circular dependency detected involving service '{node}'")
+    try:
+        TopologicalSorter(graph).prepare()
+    except CycleError as exc:
+        cycle = " -> ".join(exc.args[1])
+        raise ConfigError(f"Circular dependency detected: {cycle}") from exc
 
 
 def _validate_scaling(service_name: str, service_config: dict[str, Any]) -> None:

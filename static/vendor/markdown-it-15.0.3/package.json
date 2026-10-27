@@ -1,0 +1,12 @@
+{
+  "name": "logos-markdown-vendor",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "esbuild renderer-entry.mjs --bundle --minify --format=iife --platform=browser --legal-comments=eof --outfile=markdown-it.min.js"
+  },
+  "dependencies": {
+    "esbuild": "0.25.11",
+    "markdown-it": "15.0.3"
+  }
+}

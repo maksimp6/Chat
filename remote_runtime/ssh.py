@@ -9,7 +9,7 @@ from core.env import env_get
 from core.output import limit_output
 
 import json
-import os
+import posixpath
 import math
 import shlex
 import subprocess
@@ -171,11 +171,11 @@ class SSHRuntime:
 
     @staticmethod
     def _path_within_workspace(path: str, workspace_root: Optional[str]) -> str:
-        normalized = os.path.normpath(path)
+        normalized = posixpath.normpath(path)
         if not workspace_root:
             return normalized
-        root = os.path.normpath(workspace_root)
-        if root != "/" and not normalized.startswith(root.rstrip("/") + "/") and normalized != root:
+        root = posixpath.normpath(workspace_root)
+        if root != "/" and not PurePosixPath(normalized).is_relative_to(PurePosixPath(root)):
             raise SSHRuntimeError("Remote file path is outside the configured workspace")
         return normalized
 
@@ -283,8 +283,8 @@ class SSHRuntime:
         target_config = self._targets.get(str(target))
         workspace_root = target_config.workspace_root if target_config else None
         remote_path = self._path_within_workspace(remote_path, workspace_root)
-        if workspace_root and os.path.normpath(workspace_root) != "/":
-            root = shlex.quote(os.path.normpath(workspace_root))
+        if workspace_root and posixpath.normpath(workspace_root) != "/":
+            root = shlex.quote(posixpath.normpath(workspace_root))
             path_arg = shlex.quote(remote_path)
             read_command = (
                 f"root=$(realpath -e -- {root}) && "
@@ -322,8 +322,8 @@ class SSHRuntime:
         quoted_parent = shlex.quote(parent)
         quoted_path = shlex.quote(remote_path)
         template = shlex.quote(parent + "/.logos-runtime-XXXXXX")
-        if workspace_root and os.path.normpath(workspace_root) != "/":
-            root = shlex.quote(os.path.normpath(workspace_root))
+        if workspace_root and posixpath.normpath(workspace_root) != "/":
+            root = shlex.quote(posixpath.normpath(workspace_root))
             workspace_guard = (
                 f"root=$(realpath -e -- {root}); "
                 f"mkdir -p -- {quoted_parent}; "
