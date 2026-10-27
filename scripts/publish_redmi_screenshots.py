@@ -402,6 +402,23 @@ def main():
         commit = publish(repo, env, files, relative, run_id, attempt)
         print(json.dumps({"published_commit": commit, "verification": "pending"}), flush=True)
         verify(repo, env, files, relative, root / "remote-lfs-verification")
+        # Remote bytes and Git pointers were checked above. Keep the small
+        # manifest for the caller's verdict, but release capture media now.
+        removed_bytes = 0
+        removed_files = 0
+        for name, metadata in files.items():
+            if not is_lfs_file(name):
+                continue
+            path = metadata["path"]
+            require(not path.is_symlink() and path.is_file()
+                    and path.stat().st_size == metadata["size"]
+                    and digest(path) == metadata["sha256"],
+                    "capture changed before local cleanup")
+            path.unlink()
+            removed_bytes += metadata["size"]
+            removed_files += 1
+        print(json.dumps({"local_media_cleanup": "completed",
+                          "removed_files": removed_files, "removed_bytes": removed_bytes}), flush=True)
         result = {"commit": commit, "ref": publication_ref(env), "run_id": run_id, "run_attempt": attempt,
                   "files": [{"path": relative + "/" + name, "sha256": metadata["sha256"],
                              "size": metadata["size"]} for name, metadata in files.items()]}
