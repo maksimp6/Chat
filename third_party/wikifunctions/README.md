@@ -10,6 +10,8 @@ files identify their changes. No Wikifunctions service is called at runtime.
 | Z21951 Clamp | Z21953, 162115 | `core.wikifunctions.clamp_integer` | File-search result count; HTTP/shell/session timeouts; two Cloud.ru list limits |
 | Z12316 regex replacement | Z12317, 285821 | `LogosWikifunctions.replaceRegex` | Browser text whitespace normalization; trace export filenames |
 | Z10079 trim | Z10081, 143512 | `LogosWikifunctions.trim` | Browser text whitespace normalization |
+| Z10079 trim (Python) | Z10082, 143513 | `core.wikifunctions.trim_string` | Conversation titles; browser semantic/retrieval text |
+| Z10047 lowercase (Python) | Z10050, 207180 | `core.wikifunctions.lowercase_string` | Agent memory key normalization |
 | Z10047 lowercase string | Z10048, 207179 | `LogosWikifunctions.lowercase` | UI status/role normalization; browser emulator |
 | Z10018 uppercase string | Z10019, 216191 | `LogosWikifunctions.uppercase` | Trace labels; browser emulator |
 | Z22583 mean of float64 list | Z22587, 168295 | `core.wikifunctions.mean_float64_list` | Agent office reviews per merge |
@@ -17,7 +19,7 @@ files identify their changes. No Wikifunctions service is called at runtime.
 
 ## Static function inventory
 
-At baseline `develop` commit `e3f7bfa08267d004b23c5d024aafc38c6e05f1c2`, a source-only scan counted **4,385 function definitions**: 3,367 Python and 1,018 JavaScript. This change adds four adapters (two Python and two JavaScript), bringing the branch count to **4,389** (3,369 Python and 1,020 JavaScript). **Seven are pinned Wikifunctions implementations (0.16%)**: `clamp_integer` (Z21951), `trim` (Z10079), `replaceRegex` (Z12316), `mean_float64_list` (Z22583), `median_float64_list` (Z22588), `lowercase` (Z10047) and `uppercase` (Z10018). The separate 100-candidate inventory is not a count of adopted implementations.
+At baseline `develop` commit `e3f7bfa08267d004b23c5d024aafc38c6e05f1c2`, a source-only scan counted **4,385 function definitions**: 3,367 Python and 1,018 JavaScript. This change adds six local adapters (four Python and two JavaScript), bringing the branch count to **4,391** (3,371 Python and 1,020 JavaScript). They represent **7 distinct Wikifunctions IDs** and **9 pinned local implementations** (0.16% and 0.20% of definitions, respectively). The separate 100-candidate inventory is not a count of adopted implementations.
 
 The scan covered 401 tracked `.py` files (400 non-empty) and 48 `.js`, `.cjs`, `.mjs`, `.jsx`, `.ts` or `.tsx` files. It counted Python `def`/`async def` declarations, JavaScript `function` declarations/expressions, arrow functions and method-shorthand definitions. It excluded `vendor`, `node_modules`, `third_party`, tests/ `__tests__`, `.agents`, and all other languages. This is a syntactic source count, not a runtime or semantic count. See [the audit details](../../docs/audits/2026-10-27-wikifunctions-static-function-inventory.md).
 
@@ -40,8 +42,9 @@ same ECMAScript string operations as their pinned source implementations.
 
 The Wikifunctions mean and median implementations delegate to Python's
 `statistics.mean` and `statistics.median`; the agent KPI properties retain their
-existing empty-list `None` behavior. Callers retain their original string
-conversions.
+existing empty-list `None` behavior. Python and JavaScript trim/lowercase/uppercase
+adapters call the same native string methods as their pinned sources, preserving
+the existing conversions at callers.
 
 HTML escaping was excluded: Z31475 changes the quote policy, while the
 Z31709 composition can normalize newlines. Neither is a drop-in replacement
