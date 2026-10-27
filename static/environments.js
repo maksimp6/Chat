@@ -93,7 +93,7 @@
               esc(String(env.commit_sha).slice(0, 12)),
               "</code>",
               '<span class="environment-status environment-status-',
-              esc(String(env.status).toLowerCase()),
+              esc(window.LogosWikifunctions.lowercase(String(env.status))),
               '">',
               esc(env.status),
               "</span></div>",
