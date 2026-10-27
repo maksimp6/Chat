@@ -175,8 +175,9 @@ receipt() {
 }
 
 checkout_revision() {
-  GIT_LFS_SKIP_SMUDGE=1 git -C "$app" -c core.hooksPath=/dev/null checkout --quiet --detach "$1" || return 1
-  git -C "$app" lfs checkout >&2
+  # Server startup needs source code, not archive videos, mirrors or 3D assets.
+  # Feature-specific LFS files must be fetched explicitly when that feature needs them.
+  GIT_LFS_SKIP_SMUDGE=1 git -C "$app" -c core.hooksPath=/dev/null checkout --quiet --detach "$1"
 }
 
 backup_memory() {
@@ -201,7 +202,7 @@ if [[ $action == deploy ]]; then
   previous=$(git -C "$app" rev-parse HEAD)
   [[ $previous =~ ^[0-9a-f]{40}$ ]] || exit 2
   # Read the current branch tip even for a delayed/retried job, never downgrade
-  # to an older event SHA. Fetch all target LFS bytes before stopping the app.
+  # to an older event SHA. Archive LFS objects are not part of server deployment.
   export GIT_TERMINAL_PROMPT=0
   timeout 90 git -C "$app" fetch --quiet --no-tags origin '+refs/heads/develop:refs/remotes/origin/develop'
   target=$(git -C "$app" rev-parse --verify 'refs/remotes/origin/develop^{commit}')
@@ -209,14 +210,39 @@ if [[ $action == deploy ]]; then
   git -C "$app" merge-base --is-ancestor "$previous" "$target" || {
     echo 'Target does not descend from the installed revision; refusing deployment' >&2; exit 1;
   }
-  git -C "$app" lfs install --local --skip-repo >/dev/null
-  timeout 180 git -C "$app" lfs fetch origin "$target" >&2
-  git -C "$app" lfs fsck --objects "$target" >&2
   if [[ $previous == "$target" ]] && ready && process_revision_matches "$target"; then
     outcome=already_current
     receipt
     exit 0
   fi
+  # Fail while the old backend is still serving if backup/checkout cannot fit.
+  # Copying the live memory journal is unsafe: backup_memory stays after stop_app.
+  "$python" - "$app" "$state" "$target" <<'PY'
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+app, state = Path(sys.argv[1]), Path(sys.argv[2])
+tree = subprocess.run(["git", "-C", str(app), "ls-tree", "-r", "-l", sys.argv[3]],
+                      capture_output=True, text=True, check=True).stdout
+checkout_bytes = sum(int(fields[3]) for line in tree.splitlines()
+                     if len(fields := line.split(None, 4)) >= 4 and fields[3].isdigit())
+memory = state / "logos.memory"
+backup_bytes = memory.stat().st_size if memory.is_file() else 0
+budgets = {os.stat(app).st_dev: [app, checkout_bytes]}
+state_device = os.stat(state).st_dev
+if state_device in budgets:
+    budgets[state_device][1] += backup_bytes
+else:
+    budgets[state_device] = [state, backup_bytes]
+for path, required in budgets.values():
+    usage = os.statvfs(path)
+    available = usage.f_bavail * usage.f_frsize
+    print("DEPLOY_DISK_PREFLIGHT available_bytes=%d required_bytes=%d" % (available, required))
+    if available <= required:
+        raise SystemExit("Insufficient space for backup and checkout; backend was not stopped")
+PY
   git -C "$app" update-ref "refs/logos/deployments/$previous" "$previous"
   git -C "$app" for-each-ref --sort=-creatordate --format='%(refname)' refs/logos/deployments/ \
     | tail -n +21 | while read -r ref; do git -C "$app" update-ref -d "$ref"; done || true
