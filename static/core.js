@@ -8,6 +8,8 @@ const modelSelectionSaves = new Map();
 let coreInitialized = false;
 let coreEnhancementStarted = false;
 let modelLoadState = { status: "idle", message: "" };
+// Conversation list load: "idle" | "loading" | "ready" | "failed".
+let conversationsLoadState = "idle";
 
 // URL is authoritative for the selected conversation when present.
 const urlParams = new URLSearchParams(window.location.search);
@@ -250,6 +252,7 @@ async function enhanceCore() {
   coreEnhancementStarted = true;
 
   try {
+    conversationsLoadState = "loading";
     var conversationsRes = await fetchWithTimeout(
       "/api/conversations",
       { credentials: "same-origin", cache: "no-store" },
@@ -264,6 +267,7 @@ async function enhanceCore() {
       ? conversationsData.conversations
       : [];
     localStorage.setItem("conversations", JSON.stringify(conversations));
+    conversationsLoadState = "ready";
     if (typeof renderSidebar === "function") renderSidebar();
 
     try {
@@ -295,6 +299,7 @@ async function enhanceCore() {
       window.LogosCoreAPI.status.set("core", "ready", "Ядро готово", { revocable: false });
     }
   } catch (error) {
+    if (conversationsLoadState === "loading") conversationsLoadState = "failed";
     console.error("[CORE] Enhancement initialization error:", error);
     if (window.LogosCoreAPI && window.LogosCoreAPI.status) {
       window.LogosCoreAPI.status.set(
@@ -310,6 +315,13 @@ async function enhanceCore() {
   }
 }
 
+// Retry button of the sidebar after a failed conversation list load.
+window.retryConversationsLoad = function () {
+  if (conversationsLoadState !== "failed") return;
+  coreEnhancementStarted = false;
+  void enhanceCore();
+};
+
 function initCore() {
   if (coreInitialized) return;
   coreInitialized = true;
@@ -321,6 +333,11 @@ function initCore() {
   }
   initializeShell();
   applyConversationCache();
+  // Restore the open conversation's model from the local cache, so replies do not go to the default model while the server list loads.
+  var cachedCurrentConv = conversations.find(function (c) {
+    return c.id === currentConvId;
+  });
+  if (cachedCurrentConv && cachedCurrentConv.model) window.changeModel(cachedCurrentConv.model, true);
   if (typeof updateUIForModel === "function") updateUIForModel();
   if (typeof updateModelButton === "function") updateModelButton();
   if (window.LogosBoot && typeof window.LogosBoot.markShellReady === "function") {

@@ -110,9 +110,9 @@ function renderModelModal() {
     div.addEventListener("click", function () {
       if (unavailable) return;
       var creatingNewChat = window.isCreatingNewChat === true;
-      if (typeof window.changeModel === "function") {
-        // A new chat must not rewrite the model of the conversation that is still current.
-        if (window.changeModel(key, creatingNewChat) === false) return;
+      // A new chat sets its model only once the conversation exists (selectConv applies it), so a failed creation changes nothing.
+      if (!creatingNewChat && typeof window.changeModel === "function") {
+        if (window.changeModel(key, false) === false) return;
       }
       if (modelModal) window.LogosCoreAPI.ui.modal.close(modelModal);
       if (creatingNewChat) {
@@ -139,7 +139,9 @@ function createConversation(modelKey, options) {
     .then(async function (r) {
       var data = await r.json().catch(function () { return {}; });
       if (!r.ok || data.error) {
-        throw new Error(data.error || data.detail || data.title || "HTTP " + r.status);
+        var failure = new Error(data.error || data.detail || data.title || "HTTP " + r.status);
+        failure.serverResponse = true;
+        throw failure;
       }
       if (typeof data.id !== "string" || !data.id.trim()) {
         throw new Error("Сервер не вернул идентификатор диалога");
@@ -162,7 +164,16 @@ function createConversation(modelKey, options) {
     })
     .catch(function (e) {
       console.error("[MODELS] network error", e);
-      LogosToast.error("Ошибка сети. Проверьте соединение.");
+      if (e && e.serverResponse) {
+        // A server refusal names its reason; the network text is only for transport failures.
+        var reasons = {
+          model_not_available_for_dialog: "Эта модель недоступна для диалога. Выберите другую модель.",
+          model_catalog_unavailable: "Каталог моделей временно недоступен. Повторите попытку позже.",
+        };
+        LogosToast.error(Object.prototype.hasOwnProperty.call(reasons, e.message) ? reasons[e.message] : e.message);
+      } else {
+        LogosToast.error("Ошибка сети. Проверьте соединение.");
+      }
       return null;
     });
 }

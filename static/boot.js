@@ -227,6 +227,8 @@
       if (!modal.hidden && modal.getAttribute("aria-hidden") !== "true" &&
           (modal.classList.contains("visible") || modal.classList.contains("open") || modal.getAttribute("aria-modal") === "true")) return false;
     }
+    // Photos chosen for the next message stay in the page tray; the file input is already cleared by then.
+    if (document.querySelector("#image-previews:not([hidden]) .image-preview")) return false;
     var fields = Array.from(document.querySelectorAll("textarea"))
       .concat(Array.from(document.querySelectorAll("input")))
       .concat(Array.from(document.querySelectorAll('[contenteditable="true"]')));

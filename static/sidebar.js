@@ -60,7 +60,19 @@ function renderSidebar() {
   if (!items.length) {
     var empty = document.createElement("div");
     empty.className = "conv-empty";
-    empty.textContent = "Нет диалогов";
+    if (conversationsLoadState === "failed") {
+      empty.textContent = "Не удалось загрузить диалоги";
+      var retryBtn = document.createElement("button");
+      retryBtn.type = "button";
+      retryBtn.className = "logos-btn";
+      retryBtn.textContent = "Повторить";
+      retryBtn.addEventListener("click", function () {
+        if (typeof window.retryConversationsLoad === "function") window.retryConversationsLoad();
+      });
+      empty.appendChild(retryBtn);
+    } else {
+      empty.textContent = "Нет диалогов";
+    }
     list.appendChild(empty);
     return;
   }
