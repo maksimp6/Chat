@@ -12,7 +12,7 @@ from core.config import (
     AUDIO_TTS_PRICE_PER_SEC,
     canonical_model_key,
 )
-from core.wikifunctions import trim_string
+from core.wikifunctions import clamp_integer, trim_string
 
 PRICING_CURRENCY = "RUB"
 PRICING_VERSION = "config-v1"
@@ -41,7 +41,7 @@ def build_ai_billing_item(
     input_tokens = int(usage.get("input_tokens", 0) or 0)
     output_tokens = int(usage.get("output_tokens", 0) or 0)
     total_tokens = int(usage.get("total_tokens", input_tokens + output_tokens) or 0)
-    cached_tokens = min(max(extract_cached_tokens(usage), 0), max(input_tokens, 0))
+    cached_tokens = clamp_integer(0, extract_cached_tokens(usage), max(input_tokens, 0))
     audio_stt = float(usage.get("audio_seconds_stt", 0) or 0)
     audio_tts = float(usage.get("audio_seconds_tts", 0) or 0)
 

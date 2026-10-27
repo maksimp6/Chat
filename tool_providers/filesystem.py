@@ -118,7 +118,7 @@ def read_file(args: dict) -> dict:
                 seek_delta = -abs(offset) if offset != 0 else -read_bytes
                 f.seek(max(-file_size, seek_delta), os.SEEK_END)
             elif whence == os.SEEK_SET:
-                f.seek(max(0, min(offset, file_size)), os.SEEK_SET)
+                f.seek(clamp_integer(0, offset, file_size), os.SEEK_SET)
             else:
                 f.seek(offset, os.SEEK_CUR)
 
