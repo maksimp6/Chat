@@ -107,14 +107,18 @@ class BoardHandler(BaseHTTPRequestHandler):
                 200 if healthy else 503,
                 {"ok": healthy, "storage": "file-native Memory DB"},
             )
-        asset_names = {
-            "/": ("index.html", "text/html; charset=utf-8"),
-            "/static/app.js": ("app.js", "text/javascript; charset=utf-8"),
-            "/static/app.css": ("app.css", "text/css; charset=utf-8"),
+        asset_files = {
+            "/": (ASSETS / "index.html", "text/html; charset=utf-8"),
+            "/static/app.js": (ASSETS / "app.js", "text/javascript; charset=utf-8"),
+            "/static/app.css": (ASSETS / "app.css", "text/css; charset=utf-8"),
+            "/static/wikifunctions.js": (
+                Path(__file__).resolve().parents[1] / "static" / "wikifunctions.js",
+                "text/javascript; charset=utf-8",
+            ),
         }
-        if path in asset_names:
-            name, mime = asset_names[path]
-            return self._handle(lambda: self._send(200, (ASSETS / name).read_bytes(), mime))
+        if path in asset_files:
+            asset, mime = asset_files[path]
+            return self._handle(lambda: self._send(200, asset.read_bytes(), mime))
 
         def handle() -> None:
             if path == "/api/threads":

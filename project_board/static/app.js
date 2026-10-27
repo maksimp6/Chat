@@ -248,7 +248,7 @@ $("create-task").addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = new FormData(e.target);
   const dependencies = String(form.get("dependencies") || "")
-    .split(",").map((x) => x.trim()).filter(Boolean);
+    .split(",").map((x) => window.LogosWikifunctions.trim(x)).filter(Boolean);
   try {
     const item = await api("POST", "/api/tasks", {
       title: form.get("title"), depends_on: dependencies, request_id: requestId(),
