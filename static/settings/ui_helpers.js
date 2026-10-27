@@ -37,11 +37,11 @@
   function escapeHtml(str) {
     // 0 and false are real values; only a missing value renders empty.
     if (str === null || str === undefined) return "";
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+    var escaped = String(str);
+    escaped = window.LogosWikifunctions.replaceRegex("&", "&amp;", escaped, "g");
+    escaped = window.LogosWikifunctions.replaceRegex("<", "&lt;", escaped, "g");
+    escaped = window.LogosWikifunctions.replaceRegex(">", "&gt;", escaped, "g");
+    return window.LogosWikifunctions.replaceRegex('"', "&quot;", escaped, "g");
   }
   // Keep the public HTML-string contract while letting the DOM serialize values and attributes.
   // Markup arguments are composed by settings code; user/provider text goes through textContent

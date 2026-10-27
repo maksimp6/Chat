@@ -66,11 +66,13 @@
 
   function redactString(value) {
     var text = String(value || "").slice(0, MAX_STRING_LENGTH);
-    text = text.replace(/(bearer\s+)[a-z0-9._~+/=-]+/gi, "$1[REDACTED]");
+    text = window.LogosWikifunctions.replaceRegex("(bearer\\s+)[a-z0-9._~+/=-]+", "$1[REDACTED]", text, "gi");
     // Also matches JSON-style pairs such as "api_key": "value".
-    text = text.replace(
-      /((?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)["']?\s*[:=]\s*["']?)[^\s,;"']+/gi,
+    text = window.LogosWikifunctions.replaceRegex(
+      "((?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)[\"']?\\s*[:=]\\s*[\"']?)[^\\s,;\"']+",
       "$1[REDACTED]",
+      text,
+      "gi",
     );
     return text;
   }
