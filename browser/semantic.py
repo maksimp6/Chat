@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import json
 from typing import Any, Iterable, Mapping, Sequence
 
-from core.wikifunctions import trim_string
+from core.wikifunctions import lowercase_string, trim_string
 
 
 INTERACTIVE_ROLES = frozenset(
@@ -50,7 +50,12 @@ def _normalize_states(value: Any) -> tuple[str, ...]:
         values = list(value)
     else:
         values = []
-    return tuple(sorted({trim_string(str(item)) for item in values if trim_string(str(item))}))
+    normalized = set()
+    for item in values:
+        state = trim_string(str(item))
+        if state:
+            normalized.add(state)
+    return tuple(sorted(normalized))
 
 
 def _node_value(raw: Mapping[str, Any]) -> Any:
@@ -69,8 +74,8 @@ class SemanticNode:
 
     @classmethod
     def from_mapping(cls, raw: Mapping[str, Any], *, index: int) -> "SemanticNode":
-        node_id = str(raw.get("id") or raw.get("node_id") or f"n{index}").strip()
-        role = str(raw.get("role") or "generic").strip().lower()
+        node_id = trim_string(str(raw.get("id") or raw.get("node_id") or f"n{index}"))
+        role = lowercase_string(trim_string(str(raw.get("role") or "generic")))
         return cls(
             node_id=node_id,
             role=role,
@@ -271,9 +276,9 @@ class Evidence:
     confidence: float = 1.0
 
     def __post_init__(self) -> None:
-        if not self.field.strip():
+        if not trim_string(self.field):
             raise ValueError("evidence field is required")
-        if not self.source.strip():
+        if not trim_string(self.source):
             raise ValueError("evidence source is required")
         if not 0 <= self.confidence <= 1:
             raise ValueError("evidence confidence must be between 0 and 1")
@@ -308,7 +313,7 @@ def merge_evidence(
 
     grouped: dict[str, dict[str, dict[str, Any]]] = {}
     for item in evidence:
-        field = item.field.strip()
+        field = trim_string(item.field)
         key = _stable_json(item.value)
         bucket = grouped.setdefault(field, {})
         candidate = bucket.setdefault(
@@ -320,7 +325,7 @@ def merge_evidence(
             },
         )
         candidate["confidence"] = max(float(candidate["confidence"]), item.confidence)
-        candidate["sources"].add(item.source.strip())
+        candidate["sources"].add(trim_string(item.source))
 
     facts: dict[str, Any] = {}
     conflicts: dict[str, tuple[dict[str, Any], ...]] = {}

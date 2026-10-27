@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from core.env import env_get
+from core.wikifunctions import lowercase_string, trim_string
 
 from typing import Any
 
@@ -48,6 +49,8 @@ def ensure_default_providers() -> CloudProviderRegistry:
 
 def resolve_provider_name(args: dict[str, Any]) -> str:
     value = args.get("provider")
-    if isinstance(value, str) and value.strip():
-        return value.strip().lower()
-    return env_get("LOGOS_CLOUD_PROVIDER", "cloudru").strip().lower() or "cloudru"
+    if isinstance(value, str):
+        normalized = lowercase_string(trim_string(value))
+        if normalized:
+            return normalized
+    return lowercase_string(trim_string(env_get("LOGOS_CLOUD_PROVIDER", "cloudru"))) or "cloudru"

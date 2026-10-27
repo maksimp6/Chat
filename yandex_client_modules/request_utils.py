@@ -2,6 +2,8 @@
 
 import re
 
+from core.wikifunctions import lowercase_string
+
 _BINARY_THRESHOLD = 100_000
 _BASE64_RE = re.compile(r"^[A-Za-z0-9+/]{200,}={0,2}$", re.DOTALL)
 _BINARY_KEYS = frozenset(
@@ -25,7 +27,7 @@ def sanitize_for_log(obj):
     if isinstance(obj, dict):
         result = {}
         for k, v in obj.items():
-            key_lower = k.lower() if isinstance(k, str) else str(k).lower()
+            key_lower = lowercase_string(k if isinstance(k, str) else str(k))
             if key_lower in _BINARY_KEYS and isinstance(v, str) and len(v) > 1000:
                 result[k] = f"<AUDIO/BINARY MASKED: {len(v)} chars>"
             else:

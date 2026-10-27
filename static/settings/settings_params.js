@@ -4,7 +4,7 @@
   // The schema is typed as JSON text in settings; the provider expects an object.
   function parseJsonSchema(raw) {
     if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw;
-    if (typeof raw !== "string" || !raw.trim()) return null;
+    if (typeof raw !== "string" || !window.LogosWikifunctions.trim(raw)) return null;
     try {
       var parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
@@ -27,8 +27,9 @@
   function booleanSetting(value, fallback, name) {
     if (value === undefined || value === null) return fallback;
     if (typeof value === "boolean") return value;
-    if (typeof value === "string" && /^(true|false)$/i.test(value.trim())) {
-      return window.LogosWikifunctions.lowercase(value.trim()) === "true";
+    if (typeof value === "string") {
+      var normalized = window.LogosWikifunctions.lowercase(window.LogosWikifunctions.trim(value));
+      if (/^(true|false)$/.test(normalized)) return normalized === "true";
     }
     throw new Error(name + ": требуется true или false");
   }
@@ -75,11 +76,11 @@
     }
 
     if (s.previous_response_id) {
-      params.previous_response_id = String(s.previous_response_id).trim();
+      params.previous_response_id = window.LogosWikifunctions.trim(String(s.previous_response_id));
     }
 
     if (s.prompt_cache_key) {
-      params.prompt_cache_key = String(s.prompt_cache_key).trim();
+      params.prompt_cache_key = window.LogosWikifunctions.trim(String(s.prompt_cache_key));
     }
 
     if (s.top_logprobs !== undefined && s.top_logprobs !== null && s.top_logprobs !== "") {

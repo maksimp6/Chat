@@ -3,6 +3,8 @@
 from __future__ import annotations
 from flask import Blueprint, jsonify, request
 
+from core.wikifunctions import lowercase_string, trim_string
+
 from provider_accounts.quotas import assign_user_policy, get_usage, get_user_policy, upsert_policy
 from economy.treasury_identity import get_current_owner_id
 
@@ -19,8 +21,10 @@ def _flag(value) -> bool:
     # policy on or off. Only real booleans and their JSON-string spellings are accepted.
     if isinstance(value, bool):
         return value
-    if isinstance(value, str) and value.strip().lower() in {"true", "false"}:
-        return value.strip().lower() == "true"
+    if isinstance(value, str):
+        normalized = lowercase_string(trim_string(value))
+        if normalized in {"true", "false"}:
+            return normalized == "true"
     raise ValueError("enabled must be a boolean")
 
 
@@ -45,7 +49,7 @@ def quota_policy_update(policy_name: str):
     data = request.get_json(silent=True) or {}
     try:
         values = {
-            "name": str(policy_name).strip().lower(),
+            "name": lowercase_string(trim_string(str(policy_name))),
             "period_seconds": int(data.get("period_seconds", 86400)),
             "max_requests": int(data.get("max_requests", 100)),
             "max_requests_per_minute": int(data.get("max_requests_per_minute", 20)),

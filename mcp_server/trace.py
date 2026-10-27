@@ -2,16 +2,18 @@
 
 from typing import Any, Iterable
 
+from core.wikifunctions import lowercase_string
+
 
 _MCP_TYPE_MARKERS = ("mcp",)
 _MCP_KEY_MARKERS = ("mcp_call", "mcp_server", "mcp_tool", "mcp_list", "mcp_approval")
 
 
 def _looks_like_mcp_item(value: dict[str, Any]) -> bool:
-    item_type = str(value.get("type", "")).lower()
+    item_type = lowercase_string(str(value.get("type", "")))
     if item_type.startswith(_MCP_TYPE_MARKERS) or "_mcp_" in item_type:
         return True
-    keys = {str(key).lower() for key in value}
+    keys = {lowercase_string(str(key)) for key in value}
     return any(marker in key for key in keys for marker in _MCP_KEY_MARKERS)
 
 

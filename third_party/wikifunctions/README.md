@@ -10,12 +10,16 @@ files identify their changes. No Wikifunctions service is called at runtime.
 | Z21951 Clamp | Z21953, 162115 | `core.wikifunctions.clamp_integer` | File-search result count; HTTP/shell/session timeouts; two Cloud.ru list limits |
 | Z12316 regex replacement | Z12317, 285821 | `LogosWikifunctions.replaceRegex` | Browser text whitespace normalization; trace export filenames |
 | Z10079 trim | Z10081, 143512 | `LogosWikifunctions.trim` | Browser text whitespace normalization |
-| Z10079 trim (Python) | Z10082, 143513 | `core.wikifunctions.trim_string` | Conversation titles; browser semantic/retrieval text |
-| Z10047 lowercase (Python) | Z10050, 207180 | `core.wikifunctions.lowercase_string` | Agent memory key normalization |
+| Z10079 trim (Python) | Z10082, 143513 | `core.wikifunctions.trim_string` | Conversation titles; browser semantic/pipeline and retrieval data; provider, quota and theme normalization |
+| Z10047 lowercase (Python) | Z10050, 207180 | `core.wikifunctions.lowercase_string` | Agent memory keys; browser mode/role and provider, quota, theme normalization; MCP/log keys |
 | Z10047 lowercase string | Z10048, 207179 | `LogosWikifunctions.lowercase` | UI status/role normalization; browser emulator |
 | Z10018 uppercase string | Z10019, 216191 | `LogosWikifunctions.uppercase` | Trace labels; browser emulator |
 | Z22583 mean of float64 list | Z22587, 168295 | `core.wikifunctions.mean_float64_list` | Agent office reviews per merge |
 | Z22588 median of float64 list | Z22589, 168298 | `core.wikifunctions.median_float64_list` | Agent office lead time |
+
+## Shared operations
+
+Fifty-two existing string operation call sites use the pinned adapters: 17 JavaScript calls (13 case conversions and four trims) and 35 Python calls (23 trims and 12 lowercases). The two KPI properties also use the pinned mean and median. Repeated state and boolean normalization now computes the trimmed/lowercase value once.
 
 ## Static function inventory
 

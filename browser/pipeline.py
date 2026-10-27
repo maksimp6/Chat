@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping
 
+from core.wikifunctions import lowercase_string, trim_string
+
 from browser.orchestration import BrowserDagResult, BrowserRoleDag, BrowserRoleTask
 from browser.semantic import (
     Evidence,
@@ -54,7 +56,7 @@ class SemanticBrowserWorker:
         if isinstance(raw_result, Mapping) and raw_result.get("success") is False:
             return raw_result
 
-        mode = str(task.metadata.get("semantic_mode") or "").strip().lower()
+        mode = lowercase_string(trim_string(str(task.metadata.get("semantic_mode") or "")))
         if not mode:
             mode = (
                 "snapshot" if task.role in {"observer", "extractor", "verifier"} else "passthrough"
@@ -99,9 +101,9 @@ def _snapshot_from_mapping(raw: Mapping[str, Any]) -> SemanticSnapshot:
     if not isinstance(facts, Mapping):
         facts = {}
     return SemanticSnapshot(
-        url=str(raw.get("url")).strip() if raw.get("url") is not None else None,
-        title=str(raw.get("title")).strip() if raw.get("title") is not None else None,
-        version=str(raw.get("version")).strip() if raw.get("version") is not None else None,
+        url=trim_string(str(raw.get("url"))) if raw.get("url") is not None else None,
+        title=trim_string(str(raw.get("title"))) if raw.get("title") is not None else None,
+        version=trim_string(str(raw.get("version"))) if raw.get("version") is not None else None,
         nodes=nodes,
         facts={str(key): value for key, value in facts.items()},
         truncated=bool(raw.get("truncated", False)),
@@ -255,7 +257,7 @@ def synthesize_browser_dag(
         confidence = min(1.0, max(0.0, confidence))
         for field_name, value in snapshot.facts.items():
             # A fact with no name cannot be merged. It is skipped, so it does not fail the synthesis.
-            if not str(field_name).strip():
+            if not trim_string(str(field_name)):
                 continue
             evidence_items.append(Evidence(field_name, value, source, confidence))
 
@@ -273,7 +275,7 @@ def synthesize_browser_dag(
         task = task_map.get(task_id)
         if task is None:
             continue
-        diff_from = str(task.metadata.get("diff_from") or "").strip()
+        diff_from = trim_string(str(task.metadata.get("diff_from") or ""))
         if not diff_from:
             continue
         previous = snapshots.get(diff_from)

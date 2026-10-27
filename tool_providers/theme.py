@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from core.wikifunctions import lowercase_string, trim_string
+
 
 THEME_LABELS = {
     "light": "Светлая",
@@ -15,7 +17,7 @@ THEME_LABELS = {
 
 def set_ui_theme(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
     """Return a client-side theme action after the existing approval gate allows it."""
-    theme = str((arguments or {}).get("theme") or "").strip().lower()
+    theme = lowercase_string(trim_string(str((arguments or {}).get("theme") or "")))
     if theme not in THEME_LABELS:
         return {
             "success": False,
@@ -23,7 +25,7 @@ def set_ui_theme(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str
             "allowed_themes": sorted(THEME_LABELS),
         }
 
-    previous_theme = str((arguments or {}).get("current_theme") or "").strip().lower()
+    previous_theme = lowercase_string(trim_string(str((arguments or {}).get("current_theme") or "")))
     if previous_theme not in THEME_LABELS:
         previous_theme = None
 
@@ -31,7 +33,7 @@ def set_ui_theme(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str
         "success": True,
         "theme": theme,
         "label": THEME_LABELS[theme],
-        "reason": str((arguments or {}).get("reason") or "").strip(),
+        "reason": trim_string(str((arguments or {}).get("reason") or "")),
         "frontend_action": {
             "type": "set_theme",
             "theme": theme,
