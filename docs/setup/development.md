@@ -44,7 +44,8 @@ LOGOS_BASE_URL=http://127.0.0.1:8080 python cli_agent.py
 CLI по умолчанию обращается к `http://127.0.0.1:5000`; для приведённого выше
 запуска нужно явное `LOGOS_BASE_URL`.
 Он создаёт диалог через `/api/conversations`, отправляет сообщения в
-`/api/chat` и использует стандартный endpoint подтверждения инструментов.
+`/api/chat`. Текущий режим доступа описан в
+[shared local access](../security/github-login.md).
 Собственного model/tool loop и локального shell-исполнения в CLI больше нет.
 Ключ модели настраивается на backend через «Провайдеры».
 

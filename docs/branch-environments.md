@@ -37,10 +37,10 @@ are never updated when a branch advances.
 Each environment receives its own worktree, process, runtime data directory,
 native Kristall journal, environment id, namespace, branch and commit metadata.
 
-master remains a separate production deployment. The existing GitHub Preview
-Deployment workflow continues to provide public tokenized PR/branch previews.
-The Environment Manager is the persistent application control plane and does not
-replace that deployment mechanism.
+`master` is the owner's personal branch. The current phone delivery route uses
+the [develop runner](setup/redmi9-auto-update.md); this page does not establish a
+public preview deployment. Access follows [shared local access](security/github-login.md).
+The Environment Manager remains a separate application control-plane concept.
 
 ## Lifecycle and traces
 

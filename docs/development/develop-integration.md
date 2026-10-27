@@ -1,69 +1,20 @@
-# Develop integration and protected promotion
+# Интеграция в develop
 
-Issues [#1072](https://github.com/maksimp6/Chat/issues/1072) and
-[#1084](https://github.com/maksimp6/Chat/issues/1084) own this workflow.
-Feature PRs target `develop` by default; stacked slices record their parent and
-direct master hotfixes require an explicit task exception. Promotion is a separate PR from `develop` to
-protected `master`. Open a promotion PR only when the branches have an actual diff.
+`develop` — интеграционная ветка; `master` — личная ветка владельца.
+Маршрут публикации выбирается по прямому поручению и
+[AGENTS.md](../../AGENTS.md). Этот документ не задаёт второй порядок по умолчанию.
 
-## Workflow inventory
+Если работа ведётся через PR, сверяйте его текущие HEAD/base, состав изменений,
+конфликты и фактически существующие результаты проверок. При изменении HEAD
+прежние результаты относятся к прежнему SHA.
 
-| Workflow | PR bases | Push | Merge group | Path filtering |
-| --- | --- | --- | --- | --- |
-| CI | All, including develop and stack parents | master | None | No event filter; jobs use the platform classifier |
-| Format | All; same-repository heads only | None | None | None |
-| Security checks | All, including develop and stack parents | master | None | None |
-| Local launch smoke | All | None | None | None |
-| Remote Desktop Commander validation | All | None | None | RDC sources and its workflow |
-| Merge readiness snapshot | Non-draft PRs into master | None | None | None |
-| Host-managed preview validation | All; job requires LOGOS_HOST_PREVIEW_ENABLED | All branches | None | None |
+Тесты кода запускаются только по отдельной команде владельца внутри GitHub
+Actions runner. При отсутствии запуска укажите `NOT_RUN`. Перечня обязательных
+CI/Format/Security jobs и pre-push скрипта в текущем процессе нет.
 
-Security previously filtered PRs to `master`. Removing that PR filter
-lets develop and stacked PRs receive the same scans without changing the jobs,
-permissions, schedules or master push triggers. No merge-group checks are provided;
-do not enable a merge queue on the assumption that these workflows support it.
+Интеграцию и продвижение в `master` выполняют только в разрешённых владельцем
+границах. «ОК» означает приёмку этапа и не разрешает merge. Настройки защиты
+веток нельзя выводить из текста документа или менять ради прохождения задачи.
 
-`CI required` runs with `always()` after the classifier and platform
-jobs. `scripts/ci_platform_changes.py --verify` requires selected suites to succeed,
-rejects failure/cancellation/missing results, and permits a skipped suite only when
-the classifier did not select it. Documentation-only changes skip platform suites
-but still run the classifier and the aggregate; workflow changes select infrastructure
-tests. Unknown or shared dependency paths conservatively select broader suites.
-The separate Security workflow still runs for documentation-only PRs.
-
-Format produces a correction artifact when formatting changes are necessary; its
-success alone is not proof of a clean tree. Run `bash scripts/pre_push.sh` in the
-real checkout before publication, apply and commit corrections, and validate the
-new head.
-
-## Integration and promotion
-
-1. Create an isolated feature branch from the intended current base and open a PR
-   into develop. Keep it draft while implementation and checks change.
-2. Verify the exact head's `CI required`, formatting result and security checks.
-   Record run links, expected skipped jobs and unresolved findings.
-3. Resolve review conversations and follow the maintainer policy in `AGENTS.md`.
-   A green aggregate is evidence of selected tests, not permission to bypass reviews.
-4. Open the actual develop-to-master diff as a promotion PR. Synchronize with current
-   master and require fresh exact-head checks, resolved reviews and readiness evidence.
-5. Merge only through GitHub's protected API with the current head SHA after the
-   owner's authorization. Never force-push master or weaken protection to unblock it.
-
-## Enforcement and acceptance boundary
-
-The owner's #1084 contract records ruleset `develop integration` (#24841115) as
-Disabled: PR required, conversations resolved, no bypass, no deletion/force push,
-and `CI required`; strict base freshness is disabled for stacked PRs. This change
-does not modify or enable any ruleset. Master protection remains unchanged.
-Live settings must be inspected before proposing enforcement changes. The current
-owner request to reconcile branch rules authorizes preparing the settings proposal
-in [branch-policy-alignment.md](branch-policy-alignment.md); applying it still needs
-an authorized administration capability and live verification. This documentation
-change is not evidence that develop enforcement has been enabled.
-
-The regression tests in `tests/test_ci_develop_workflows.py` prove workflow
-eligibility for master, develop and stack parents and the always-run aggregate.
-`tests/test_ci_platform_changes.py` exercises documentation skips, changed dependencies
-and failed/cancelled/missing selected suites. These tests do not prove live GitHub
-delivery, branch protection or independent review. Record those results on the
-implementation PR; keep #1084 open until its live acceptance criteria are met.
+Для проверки результата используйте [рабочий процесс](../development_workflow.md).
+Доставка на телефон описана в [server runbook](../redmi-app-server.md).

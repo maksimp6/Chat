@@ -25,7 +25,7 @@ The repository is actively evolving. This README separates shipped behavior from
 - **Agent Gateway and RuntimeDispatcher** for runtime-scoped invocations. The target architecture is one Python process with managed threads/contexts; threads are not a hostile-code security boundary.
 - **Logos agent tooling**: headless runner, tools and draft PR output. See [Logos GitHub agent](docs/agents/github-agent.md).
 - **Compute energy accounting** based on measured CPU time and configured watts/price; if no electricity price is configured, the trace remains unpriced. See [compute energy billing](docs/compute-energy-billing.md).
-- **Treasury and billing controls**, internal usage accounting and demo balances.
+- **Treasury and billing records**, internal usage accounting and demo balances.
 - **3D Printing Business**: quote calculation, owner-scoped orders and settlement, realized P&L, finance/payback tracking and AI-first purchase assessment. See [3D Printing Business](docs/printing3d.md).
 - **Files, knowledge and Departments** integrations with local Execution Trace persistence.
 - **Native Kristall** for local/Termux and shared deployments, with one writer per durable journal.
@@ -63,14 +63,22 @@ can use its available APIs and tools. Provider API keys and SSH credentials are 
 needed by the external services themselves.
 
 Repository CI acceptance, code-policy and pre-push gates have been removed.
-Functional tests remain available for explicit verification. Only the phone application
-server workflow remains. Deployment still verifies the running process and HTTP
+Code tests require a separate owner request and run only inside GitHub Actions
+runner; see [AGENTS.md](AGENTS.md). The
+[phone server workflow](.github/workflows/redmi9-app-server.yml) is the only
+remaining workflow. Deployment verifies the process and HTTP
 readiness and preserves its backup/rollback behavior.
 `develop` is the integration branch; `master` remains the owner's personal branch.
 Repository code changes do not by themselves prove the installed phone version or
 access from a second device.
 
-The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440). Logos Dev worker is implemented as a separate coding worker; legacy cloudru-rdc.yml and production-deploy.yml remain unchanged. Resource-scoped ownership, replacement decision, and accepted cutover criteria are tracked in [#869](https://github.com/maksimp6/Chat/issues/869). Kristall Wave 1 is shipped; further migration of shared state (sessions, runtime events, conversation metadata) remains roadmap. Object Storage migration, durable background workers, and full production cutover remain separate work.
+The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440).
+Resource ownership and cutover acceptance remain separate work in
+[#869](https://github.com/maksimp6/Chat/issues/869). Runtime repositories use native
+Kristall for conversations, configuration, sessions, invocations, traces and the
+other prefixes listed in [the storage contract](docs/database.md). Activation of
+historical data, Object Storage backups, durable background workers and production
+cutover require their own evidence.
 
 Still experimental or roadmap unless the corresponding issue is complete:
 
@@ -86,7 +94,7 @@ Still experimental or roadmap unless the corresponding issue is complete:
 
 ### Prerequisites
 
-- Python: backend CI uses 3.14; Ruff targets 3.12.
+- Python 3 with the dependencies from `requirements.txt`.
 - Git.
 
 ### Backend
@@ -126,11 +134,11 @@ For security-sensitive reports, follow [SECURITY.md](SECURITY.md). Never use rea
 
 ## Development workflow
 
-The owner can request a direct push to `develop`; routine contributions can still
-use branches and pull requests. See [CONTRIBUTING.md](CONTRIBUTING.md).
-Functional checks are run explicitly when needed; there are no mandatory CI gates.
+Follow the owner's current delivery instruction and [AGENTS.md](AGENTS.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for change descriptions and evidence.
+There are no mandatory repository CI gates.
 
-## Testing
+## Verification
 
 Only real Redmi 9 checks remain. The offline unit/fixture suites, Chromium
 component test and their generic runners have been removed. Run device checks
@@ -167,7 +175,6 @@ Cloud.ru migration is coordinated in [#440](https://github.com/maksimp6/Chat/iss
 - [#326](https://github.com/maksimp6/Chat/issues/326) and [#238](https://github.com/maksimp6/Chat/issues/238) — MCP/ChatGPT compatibility;
 - [#254](https://github.com/maksimp6/Chat/issues/254) and [#256](https://github.com/maksimp6/Chat/issues/256) — plugin platform and autonomous development;
 - [#116](https://github.com/maksimp6/Chat/issues/116) — conversation agents;
-- [#195](https://github.com/maksimp6/Chat/issues/195) — Android/release safety;
 - [#104](https://github.com/maksimp6/Chat/issues/104) — public release;
 - [#409](https://github.com/maksimp6/Chat/issues/409) — cloud/local browsing and self-testing.
 

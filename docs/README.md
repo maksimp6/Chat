@@ -8,14 +8,16 @@
 - [Канонический AI pipeline](architecture/ai-execution-pipeline.md) — единый путь model/tool execution и правила адаптеров
 - [Координация архитектурной интеграции](architecture/integration-coordination.md) — порядок и границы активных потоков работ
 - [Async/concurrency runtime contract](runtime/async-concurrency-contract.md) — cancellation, timeout, task/thread boundaries и atomic reservations
-- [Текущий интеграционный реестр](integration/current-scope.md) — статус и правила допуска сфокусированных PR
+- [Текущий интеграционный реестр](integration/current-scope.md) — действующие контракты и ссылки на задачи без исторической очереди PR
 - [Настройка](setup/installation.md) — установка и конфигурация
-- [Рабочий процесс разработки](development_workflow.md) — прямой push в develop, отдельный допуск к тестам и архив прежних процедур
-- [Правила надёжного кода](development/reliability.md) — идемпотентность операций и правила Power of Ten для Python/JS; «храповик» `tests/test_reliability_rules.py`
-- [Правила именования](development/naming.md) — тексты UI, код фронтенда, файлы, Python-модули, ветки и PR; проверка `tests/test_naming_conventions.py`
+- [Рабочий процесс разработки](development_workflow.md) — публикация по поручению, проверки только по отдельной команде в runner и доказательства результата
+- [Правила надёжного кода](development/reliability.md) — инженерные рекомендации по идемпотентности и структуре Python/JS
+- [Правила именования](development/naming.md) — рекомендации для UI, модулей, веток и PR
 - [Продакшен-конфиги и секреты деплоя](development/production-deploy-secrets.md) — решение: отдельное защищённое место и хранение секретов в Cloud.ru (не реализовано)
 - [Agent shell: стартовый каркас](agents/agent-shell.md) — хранилище задач, исполнитель и первая read-only задача для запуска агентов в своём контейнере
-- [Production deployment](production-deployment.md) — VPS production runbook; наличие runbook не заменяет post-deploy verification
+- [Эксплуатация и восстановление](production-deployment.md) — действующий маршрут Redmi 9, сохранность данных и границы восстановления
+- [Сервер Redmi 9](redmi-app-server.md) — процесс, launcher, readiness и Wi-Fi
+- [Выпуск веб-приложения](release.md) — доставка и критерии результата
 - [Cloud.ru Container Apps](cloudru-container-apps.md) — v2 baseline serverless deployment runbook; client contract синхронизирован с `master`, live Cloud.ru rollout пока не подтверждён
 - [Keel Platform](platform/architecture.md) — deployment system с config-driven reconciliation
   - [Архитектура](platform/architecture.md) — сервисы, lanes, валидация
@@ -41,7 +43,7 @@
 - [Пробелы пользовательских сценариев](frontend/capability-gaps-2026-10-11.md) — код и локальный UI на 2026-10-11, приоритеты и критерии приёмки
 - [Повторно применимые уроки и навыки](lessons/README.md) — источники, границы истории и каталог процедур
 - [Бэкенд](backend/overview.md) — архитектура серверной части
-- [База данных](database/overview.md) — модели данных и схема БД
+- [База данных](database/overview.md) — нативный журнал Kristall и работа с данными
 - [Безопасность](security/overview.md) — меры защиты и безопасность системы
 - [Cloud.ru Secret Management](security/cloudru-secret-management.md) — адаптер и границы прав для секретов Logos
 - [Аудит кода 2026-10-26](audits/2026-10-26-code-defects/README.md) — дефекты по чтению кода, метод поиска и критерии исправления (часть по безопасности не публикуется)

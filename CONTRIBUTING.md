@@ -1,17 +1,34 @@
 # Contributing to Logos
 
-`develop` is the default integration branch; `master` is the owner's personal branch. Follow the delivery route explicitly requested by the owner. Promotion to `master` requires separate authorization. Stage acceptance (`OK`) does not authorize merge.
+Start with the owner's current instruction and [AGENTS.md](AGENTS.md).
+They define delivery and test execution; this guide does not add another default
+publication route.
 
-## Changes and verification
+`develop` is the integration branch; `master` is the owner's personal branch.
+Promotion to `master` requires separate authorization. Stage acceptance (`OK`)
+does not authorize merge.
 
-Describe the user-visible behavior, technical change, risks and validation actually performed. Project CI, lint, typing, naming and layout gates have been removed. Only real Redmi 9 checks remain; run them inside GitHub Actions only when explicitly requested. See [Redmi 9 checks](docs/architecture/browser-self-testing.md). Operational deployment checks still track process identity, application readiness, data preservation and rollback.
+## Change and evidence
 
-Do not paste credentials, provider keys, access tokens or private URLs into GitHub. Data-model changes follow the current native Kristall contract.
+Describe the user-visible result, change, risks and verification actually performed.
+Read the final diff and reconcile the current source head before publication.
 
-## Local web assets
+Only real [Redmi 9 checks](docs/architecture/browser-self-testing.md) remain.
+Code tests run only on the owner's separate request, inside a GitHub Actions
+runner. Without a run, report `NOT_RUN`; never imitate a runner environment.
+Removed CI, lint, typing, naming and layout gates are not required checks.
 
-Required UI resources such as JavaScript, CSS, icons and debugging UI bundles are repository-local. External network access belongs to API/service calls, not static application assets.
+Deployment evidence records process identity, application readiness, data
+preservation and the actual outcome. It does not replace a user-visible check.
+See the [development workflow](docs/development_workflow.md).
 
-## Tracing
+Do not publish credentials, provider keys, access tokens or private URLs.
+Data changes follow the [native Kristall contract](docs/database.md).
 
-Tool execution, provider requests, polling and agent calls should preserve `trace_id`/invocation correlation and must not expose secrets in ExecutionTrace.
+## Local web assets and tracing
+
+Required JavaScript, CSS and icons are repository-local. External network access
+belongs to API/service calls rather than static UI dependencies.
+
+Tool execution, provider requests, polling and agent calls preserve
+`trace_id`/invocation correlation and keep secrets out of ExecutionTrace.

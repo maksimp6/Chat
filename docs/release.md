@@ -1,54 +1,23 @@
-# Release process
+# Выпуск Logos
 
-Logos uses semantic version tags in the form `vMAJOR.MINOR.PATCH`.
+Текущий пользовательский интерфейс — веб-приложение в браузере.
+Android-приложение и средства сборки APK удалены 24 октября 2026 года.
+Прежняя инструкция подписания APK и автоматической публикации по тегу снята.
 
-## Release checklist
+## Подготовка и доставка
 
-1. Merge and verify the intended changes on `master`.
-2. Update the changelog/release notes as appropriate.
-3. Create and push a version tag:
+1. Зафиксируйте согласованный объём изменений и точный исходный SHA.
+2. Следуйте маршруту публикации из поручения владельца и
+   [AGENTS.md](../AGENTS.md).
+3. Обновление Redmi 9 выполняет существующий runner:
+   [server runbook](redmi-app-server.md).
+4. Сопоставьте фактически запущенный `runtime_revision`, PID и версию UI
+   с доставленным изменением. Старый открытый клиент проверяется отдельно.
+5. Запишите доказательства пользовательского сценария и оставшиеся ограничения.
 
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
+Создание Git-тега само по себе не обещает сборку или доставку артефакта.
+Проверки кода запускаются только по отдельной команде внутри runner;
+без запуска укажите `NOT_RUN`.
 
-4. GitHub Actions validates the tag, builds the signed Android release APK, verifies the signature, creates a SHA-256 checksum and publishes the GitHub Release.
-
-## Required repository secrets
-
-- `LOGOS_RELEASE_KEYSTORE_BASE64`
-- `LOGOS_RELEASE_STORE_PASSWORD`
-- `LOGOS_RELEASE_KEY_ALIAS`
-- `LOGOS_RELEASE_KEY_PASSWORD`
-
-The keystore is decoded only in the runner's temporary directory, removed by an unconditional cleanup step, and never uploaded as an artifact.
-
-## Build metadata
-
-The Android release receives:
-
-- `versionName` from the Git tag without the leading `v`;
-- `versionCode` from the GitHub Actions run number;
-- the source commit SHA as build metadata.
-
-## Broken releases
-
-Do not delete or rewrite release tags casually. Mark a broken release clearly, publish a corrective patch release, and document the issue in the release notes. Database rollback remains a separate operational process.
-
-## Verification
-
-Every release should have:
-
-- a signed APK attached to the GitHub Release;
-- a SHA-256 checksum;
-- release metadata containing tag, commit and build number.
-
-Before publishing, CI also verifies that the APK signer matches the configured
-release keystore, the application ID remains `com.logospro.mobile`, and the APK's
-version name and code match the tag and workflow run number. Before changing the
-release keystore, compare its certificate SHA-256 fingerprint with a previously
-published production APK (or the registered upload certificate when using Play
-App Signing); a different certificate breaks direct-update compatibility.
-
-The workflow intentionally fails when signing secrets are absent instead of silently publishing a debug or unsigned APK as a production release.
+Восстановление приложения описано в [эксплуатационном руководстве](production-deployment.md).
+Пользовательская приёмка и разрешение на merge фиксируются отдельно.
