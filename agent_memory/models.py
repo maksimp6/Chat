@@ -9,6 +9,7 @@ import re
 import time
 import uuid
 
+from core.wikifunctions import lowercase_string
 from observability.trace_security import sanitize_trace_value
 
 
@@ -37,7 +38,7 @@ def _sanitize_memory_value(value: Any) -> Any:
     if isinstance(sanitized, dict):
         result = {}
         for key, item in sanitized.items():
-            normalized = str(key).lower().replace("-", "_")
+            normalized = lowercase_string(str(key)).replace("-", "_)
             result[str(key)] = (
                 "<redacted>" if normalized in _MEMORY_SECRET_KEYS else _sanitize_memory_value(item)
             )
