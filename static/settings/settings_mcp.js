@@ -8,10 +8,7 @@
     if (mcpFetchPromise) return mcpFetchPromise;
     mcpFetchPromise = window.LogosDispatcher.request("/api/mcp-servers")
       .then(function (r) {
-        if (!r.ok) {
-          console.warn("[MCP] Server returned " + r.status);
-          return { data: [] };
-        }
+        if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
       })
       .then(function (data) {
@@ -20,10 +17,11 @@
         return mcpServersCache;
       })
       .catch(function (e) {
-        console.warn("[MCP] Fetch failed:", e.message || e);
+        // A failed load is not an empty list: the caller has to show the error instead.
+        console.warn("[MCP] Fetch failed:", (e && e.message) || e);
         mcpServersCache = [];
         mcpFetchPromise = null;
-        return [];
+        throw e;
       });
     return mcpFetchPromise;
   };
@@ -131,8 +129,22 @@
       });
     }
 
+    function renderLoadError() {
+      var list = document.getElementById("mcp-mgr-list");
+      if (!list) return;
+      list.replaceChildren();
+      var message = document.createElement("p");
+      message.textContent = "Не удалось загрузить MCP серверы. Проверьте соединение.";
+      var retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "logos-btn";
+      retry.textContent = "Повторить";
+      retry.addEventListener("click", refreshList);
+      list.append(message, retry);
+    }
+
     function refreshList() {
-      window.fetchMcpServers().then(renderList);
+      window.fetchMcpServers().then(renderList, renderLoadError);
     }
 
     var editorEl = null;

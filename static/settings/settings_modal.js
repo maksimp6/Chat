@@ -1,12 +1,21 @@
 (function () {
   "use strict";
 
+  // A refusal that carries the server's reason is shown with it; any other failure says nothing was saved.
+  function saveFailureText(error, subject) {
+    if (error && error.serverMessage) return "Не сохранено: " + error.message;
+    return "Не удалось сохранить " + subject + " на сервер. Изменения не сохранены, повторите попытку.";
+  }
+
   // === 1. Модальное окно локальных инструментов (Tools) с немедленным сохранением в БД ===
   window.openToolsModal = function () {
     var UI = window.SettingsUI;
     var CoreUI = window.LogosCoreAPI.ui;
     var Storage = window.SettingsStorage;
-    var settings = Storage.load(currentConvId);
+    // The dialog this window was opened for; a save must not follow a later switch.
+    var convId = currentConvId;
+    var settings = Storage.load(convId);
+    var unknownAtOpen = Boolean(convId) && Storage.isUnknown(convId);
     var cfg = settings.tools_config || {};
     var ws = cfg.web_search || {};
     var fs = cfg.file_search || {};
@@ -157,8 +166,10 @@
             );
           })
           .join("");
+        toolsSaveBtn.disabled = false;
       })
       .catch(function () {
+        toolsSaveBtn.disabled = true;
         var listEl = document.getElementById("tools-category-list");
         if (!listEl) return;
         listEl.replaceChildren();
@@ -172,14 +183,33 @@
         listEl.append(message, retry);
       });
     }
+    var toolsSaveBtn = document.getElementById("tools-save-btn");
+    // Saving before the list has loaded would send an empty selection, so the button waits for it.
+    toolsSaveBtn.disabled = true;
+    if (unknownAtOpen) {
+      document.getElementById("tools-status").textContent =
+        "Настройки инструментов этого диалога не загружены с сервера. Сохранение недоступно: выберите диалог заново.";
+    }
     loadCategories();
 
-    document.getElementById("tools-save-btn").addEventListener("click", function () {
+    toolsSaveBtn.addEventListener("click", function () {
+      var status = document.getElementById("tools-status");
+      status.textContent = "";
+      if (currentConvId !== convId) {
+        status.textContent =
+          "Диалог сменился, пока открыто окно: инструменты не сохранены. Откройте инструменты заново.";
+        return;
+      }
+      if (unknownAtOpen) {
+        status.textContent =
+          "Настройки инструментов этого диалога не загружены с сервера. Выберите диалог заново.";
+        return;
+      }
       var selected = [];
       document.querySelectorAll(".tool-cat-chk:checked").forEach(function (chk) {
         selected.push(chk.value);
       });
-      settings.tools_config = {
+      var toolsConfig = {
         web_search: {
           enabled: document.getElementById("tools-ws-en").checked,
           context_size: document.getElementById("tools-ws-context").value,
@@ -196,22 +226,30 @@
           ),
         },
       };
-      // Tool selection is saved by PUT /tools; this loaded copy would overwrite it.
-      delete settings.active_tool_categories;
-      var status = document.getElementById("tools-status");
-      status.textContent = "";
-      var localSave = currentConvId
-        ? window.LogosDispatcher.request("/api/conversations/" + currentConvId + "/tools", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ active_tool_categories: selected }),
-          }).then(function (r) {
-            if (!r.ok) throw new Error("HTTP " + r.status);
-          })
-        : Promise.resolve();
-      Promise.all([localSave, Storage.save(settings, currentConvId)]).then(closeModal, function () {
+      if (!convId) {
+        // Categories are stored per dialog: keep the config locally and say so, rather than closing silently.
+        Storage.saveChanges({ tools_config: toolsConfig }, null);
         status.textContent =
-          "Не удалось сохранить инструменты на сервер. Настройки сохранены только в этом браузере.";
+          "Категории инструментов сохраняются в беседе. Откройте или создайте беседу и повторите.";
+        return;
+      }
+      var localSave = window.LogosDispatcher.request("/api/conversations/" + convId + "/tools", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active_tool_categories: selected }),
+      }).then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+      });
+      // Only a changed config is written, and only over the stored record, so other settings stay as saved.
+      var changes = {};
+      if (JSON.stringify(toolsConfig) !== JSON.stringify(settings.tools_config)) {
+        changes.tools_config = toolsConfig;
+      }
+      var settingsSave = Object.keys(changes).length
+        ? Storage.saveChanges(changes, convId)
+        : Promise.resolve();
+      Promise.all([localSave, settingsSave]).then(closeModal, function (error) {
+        status.textContent = saveFailureText(error, "инструменты");
       });
     });
   };
@@ -360,7 +398,10 @@
     var UI = window.SettingsUI;
     var CoreUI = window.LogosCoreAPI.ui;
     var Storage = window.SettingsStorage;
-    var settings = Storage.load(currentConvId);
+    // The dialog this window was opened for; a save must not follow a later switch.
+    var convId = currentConvId;
+    var settings = Storage.load(convId);
+    var unknownAtOpen = Boolean(convId) && Storage.isUnknown(convId);
     var ultra = ultraProfileFor(typeof currentModel !== "undefined" ? currentModel : "");
     if (ultra) settings = applyUltraProfile(settings, ultra);
 
@@ -525,9 +566,16 @@
     function closeModal() {
       CoreUI.modal.close(ov);
     }
-    function showSaveError() {
+    function showSaveError(error) {
+      md.querySelector("#set-status").textContent = saveFailureText(error, "параметры");
+    }
+    function leftConversation() {
       md.querySelector("#set-status").textContent =
-        "Не удалось сохранить на сервер. Настройки сохранены только в этом браузере.";
+        "Диалог сменился, пока открыто окно: параметры не сохранены. Откройте настройки заново.";
+    }
+    if (unknownAtOpen) {
+      md.querySelector("#set-status").textContent =
+        "Сохранённые параметры этого диалога не загружены: показаны локальные значения или значения по умолчанию. При сохранении записываются только изменённые поля.";
     }
     ov.addEventListener("click", function (e) {
       if (e.target === ov) closeModal();
@@ -564,17 +612,31 @@
 
     md.querySelector("#set-reset-btn").addEventListener("click", function () {
       if (!confirm("Сбросить параметры генерации к значениям по умолчанию?")) return;
-      var defs = window.resetSettings(currentConvId);
-      Storage.save(defs, currentConvId).then(closeModal, showSaveError);
+      if (currentConvId !== convId) return leftConversation();
+      var defs = window.resetSettings();
+      // Only the generation fields are reset; tools and the other saved settings stay as stored.
+      var resetChanges = {};
+      Object.keys(SETTINGS_FIELDS).forEach(function (key) {
+        resetChanges[key] = defs[key];
+      });
+      Storage.saveChanges(resetChanges, convId).then(closeModal, showSaveError);
     });
 
     md.querySelector("#set-save-btn").addEventListener("click", function () {
+      if (currentConvId !== convId) return leftConversation();
+      var edited = {};
       Object.keys(SETTINGS_FIELDS).forEach(function (key) {
-        settings[key] = readSettingsField(SETTINGS_FIELDS[key], fieldElement(key));
+        edited[key] = readSettingsField(SETTINGS_FIELDS[key], fieldElement(key));
       });
-      if (ultra) applyUltraProfile(settings, ultra);
-      delete settings.active_tool_categories;
-      Storage.save(settings, currentConvId).then(closeModal, showSaveError);
+      if (ultra) applyUltraProfile(edited, ultra);
+      // Only the fields the user changed are written; the rest keep the values stored now.
+      var changes = {};
+      Object.keys(edited).forEach(function (key) {
+        if (JSON.stringify(edited[key]) !== JSON.stringify(settings[key])) {
+          changes[key] = edited[key];
+        }
+      });
+      Storage.saveChanges(changes, convId).then(closeModal, showSaveError);
     });
   };
 })();

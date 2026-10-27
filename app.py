@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from core.config import TEXT_MODELS, VOICE_MODELS, get_donation_url
 from core.model_profiles import annotate_catalog
 from yandex_client_modules.tool_config import normalize_tools_config
+from yandex_client_modules.request_builder import validate_generation_params
 from provider_accounts.model_discovery import (
     ModelDiscoveryError,
     get_model_discovery,
@@ -65,6 +66,7 @@ from conversations.ownership import (
     delete_owner,
     get_owned_conversation,
 )
+from remote_runtime.ssh import SSHRuntimeError
 from remote_runtime.ssh_settings import public_settings, save_settings, test_connection
 from plugin_system.routes import plugin_bp
 from workspace.project_tree import project_tree_bp
@@ -364,6 +366,16 @@ def save_dialog_settings(conv_id):
     settings = request.get_json(silent=True)
     if not isinstance(settings, dict):
         return jsonify({"error": "JSON object is required"}), 400
+    # Refuse here what every later message would be refused for, while the window can still show why.
+    if str(settings.get("previous_response_id") or "").strip():
+        message = "previous_response_id cannot be used in a dialog; clear it"
+        return jsonify({"error": "invalid_params", "message": message}), 400
+    try:
+        validate_generation_params(
+            {key: value for key, value in settings.items() if key != "previous_response_id"}
+        )
+    except ValueError as exc:
+        return jsonify({"error": "invalid_params", "message": str(exc)}), 400
     if "tools_config" in settings:
         try:
             settings["tools_config"] = normalize_tools_config(settings["tools_config"])
@@ -471,6 +483,9 @@ def test_ssh_runtime_connection():
         return jsonify(result)
     except TreasuryIdentityError as exc:
         return jsonify({"error": str(exc)}), 401
+    except SSHRuntimeError as exc:
+        # The SSH error text (for example Permission denied) is what the window shows the user.
+        return jsonify({"success": False, "error": str(exc)}), 400
     except Exception:
         logger.exception("SSH Runtime connection test failed")
         return jsonify({"success": False, "error": "ssh_connection_test_failed"}), 400

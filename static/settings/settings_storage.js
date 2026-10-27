@@ -54,6 +54,8 @@
   var serverSettingsCache = {};
   // Bumped on every save, so a load that started before it cannot overwrite it.
   var settingsSaveVersion = {};
+  // Set when the stored settings of a dialog could not be read, so the cache holds local values or defaults.
+  var serverSettingsUnknown = {};
   var globalSettingsCache = null; // cache
 
   function convKey(convId) {
@@ -127,6 +129,8 @@
       localStorage.setItem(STORAGE_KEY, globalSettingsCache);
       return Promise.resolve();
     }
+    var previousCache = serverSettingsCache[convId];
+    var previousLocal = localStorage.getItem(convKey(convId));
     settingsSaveVersion[convId] = (settingsSaveVersion[convId] || 0) + 1;
     serverSettingsCache[convId] = settings;
     localStorage.setItem(convKey(convId), JSON.stringify(settings));
@@ -134,15 +138,49 @@
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(settings),
-    }).then(function (r) {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-    });
+    })
+      .then(function (r) {
+        if (r.ok) return null;
+        return r.json().catch(function () { return {}; }).then(function (body) {
+          var error = new Error(body && body.message ? body.message : "HTTP " + r.status);
+          error.serverMessage = Boolean(body && body.message);
+          throw error;
+        });
+      })
+      .then(
+        function () {
+          serverSettingsUnknown[convId] = false;
+        },
+        function (error) {
+          // A refused copy must not stay in the cache or localStorage, or a reload would show it as saved.
+          if (previousCache === undefined) delete serverSettingsCache[convId];
+          else serverSettingsCache[convId] = previousCache;
+          if (previousLocal === null) localStorage.removeItem(convKey(convId));
+          else localStorage.setItem(convKey(convId), previousLocal);
+          throw error;
+        },
+      );
   }
 
-  // Загрузка настроек с сервера при смене диалога
-  window.loadServerConvSettings = function (convId) {
-    if (!convId) return Promise.resolve(load(convId));
-    var versionAtRequest = settingsSaveVersion[convId] || 0;
+  // The stored record merged over the defaults and the global copy, as the window shows it.
+  function recordFrom(data) {
+    var base = JSON.parse(JSON.stringify(DEFAULTS));
+    try {
+      var global = globalSettingsCache;
+      if (global === null) {
+        global = localStorage.getItem(STORAGE_KEY);
+        globalSettingsCache = global || "";
+      }
+      if (global) base = window.SettingsUI.deepMerge(base, JSON.parse(global));
+    } catch (e) {}
+    if (data && Object.keys(data).length > 0) {
+      base = window.SettingsUI.deepMerge(base, data);
+    }
+    return applyUltraSettings(base);
+  }
+
+  // Reads the stored record of a dialog; rejects when the server cannot be read.
+  function fetchRecord(convId) {
     return window.LogosDispatcher.request("/api/conversations/" + convId + "/settings", null, {
       timeoutMs: 5000,
     })
@@ -150,46 +188,41 @@
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
       })
-      .then(function (data) {
+      .then(recordFrom);
+  }
+
+  // Загрузка настроек с сервера при смене диалога
+  window.loadServerConvSettings = function (convId) {
+    if (!convId) return Promise.resolve(load(convId));
+    var versionAtRequest = settingsSaveVersion[convId] || 0;
+    return fetchRecord(convId)
+      .then(function (record) {
         // A save made while this GET was in flight is newer than the server snapshot it returned.
         if ((settingsSaveVersion[convId] || 0) !== versionAtRequest) return load(convId);
-        var base = JSON.parse(JSON.stringify(DEFAULTS));
-        try {
-          var global = globalSettingsCache;
-          if (global === null) {
-            global = localStorage.getItem(STORAGE_KEY);
-            globalSettingsCache = global || "";
-          }
-          if (global) base = window.SettingsUI.deepMerge(base, JSON.parse(global));
-        } catch (e) {}
-        if (data && Object.keys(data).length > 0) {
-          base = window.SettingsUI.deepMerge(base, data);
-        }
-        serverSettingsCache[convId] = applyUltraSettings(base);
-        return serverSettingsCache[convId];
+        serverSettingsCache[convId] = record;
+        serverSettingsUnknown[convId] = false;
+        return record;
       })
       .catch(function () {
+        serverSettingsUnknown[convId] = true;
         return load(convId);
       });
   };
 
-  window.resetSettings = function (convId) {
-    var defaults = applyUltraSettings(JSON.parse(JSON.stringify(DEFAULTS)));
-    convId =
-      convId || (typeof currentConvId !== "undefined" && currentConvId ? currentConvId : null);
-    if (convId) {
-      localStorage.removeItem(convKey(convId));
-      delete serverSettingsCache[convId];
-      window.LogosDispatcher.request("/api/conversations/" + convId + "/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(defaults),
-      }).catch(function () {});
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-      globalSettingsCache = "";
-    }
-    return defaults;
+  // Writes only `changes` onto the stored record. The record is read again first, so values saved
+  // from another tab or device are kept, and nothing is written when that read fails.
+  function saveChanges(changes, convId) {
+    if (!convId) return save(Object.assign(load(null), changes), null);
+    return fetchRecord(convId).then(function (record) {
+      // Tool selection is saved by PUT /tools; a settings save must not write back a copy of it.
+      delete record.active_tool_categories;
+      return save(Object.assign(record, changes), convId);
+    });
+  }
+
+  // «Сброс» only supplies the generation defaults; the caller saves the keys it resets.
+  window.resetSettings = function () {
+    return applyUltraSettings(JSON.parse(JSON.stringify(DEFAULTS)));
   };
 
   window.SettingsStorage = {
@@ -200,6 +233,10 @@
     applyUltraSettings: applyUltraSettings,
     load: load,
     save: save,
+    saveChanges: saveChanges,
+    isUnknown: function (convId) {
+      return Boolean(serverSettingsUnknown[convId]);
+    },
   };
 })();
 
