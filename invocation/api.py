@@ -12,7 +12,8 @@ def _sanitize_trace(value: Any) -> Any:
 
         return ExecutionTrace._sanitize_trace_value(value)
     except Exception:
-        return value
+        # Never expose unsanitized trace data when the sanitizer fails.
+        return "[trace unavailable: sanitization failed]"
 
 
 def _visible_invocation(invocation: dict[str, Any]) -> dict[str, Any]:
