@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from core.env import env_get
+from core.wikifunctions import trim_string
 import hashlib
 import json
 from pathlib import Path
@@ -76,7 +77,7 @@ def create_conversation(conv_id: str, title: str, model: str, provider_pending: 
 
 
 def normalize_conversation_title(title: Any, max_length: int = 80) -> str:
-    value = " ".join(str(title or "").strip().split())
+    value = " ".join(trim_string(str(title or "")).split())
     if not value:
         return "Новый чат"
     return value if len(value) <= max_length else value[: max_length - 1].rstrip() + "…"
