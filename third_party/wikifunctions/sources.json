@@ -28,5 +28,25 @@
     "license": "Apache-2.0",
     "original_code_sha256": "67168a661d376d88f564cb23db4e533b97a21710db440c0686404eca0adb7c12",
     "original_code": "function Z12316( Z12316K1, Z12316K2, Z12316K3, Z12316K4 ) {\n\treturn Z12316K3.replace(RegExp(Z12316K1, Z12316K4), Z12316K2);\n}"
+  },
+  {
+    "function": "Z22583",
+    "implementation": "Z22587",
+    "revision": 168295,
+    "timestamp": "2025-02-18T22:53:50Z",
+    "source_url": "https://www.wikifunctions.org/w/index.php?title=Z22587&oldid=168295",
+    "license": "Apache-2.0",
+    "original_code_sha256": "335bdc296449ecebac299bc3a2de378499f122203b821fc04e056e425fd5d123",
+    "original_code": "def Z22583(Z22583K1):\n\timport statistics\n\treturn statistics.mean(Z22583K1)"
+  },
+  {
+    "function": "Z22588",
+    "implementation": "Z22589",
+    "revision": 168298,
+    "timestamp": "2025-02-18T22:56:18Z",
+    "source_url": "https://www.wikifunctions.org/w/index.php?title=Z22589&oldid=168298",
+    "license": "Apache-2.0",
+    "original_code_sha256": "889acfc8201a106ad91f93b50be000699b4f841491d4b6db42694738a5fa346f",
+    "original_code": "def Z22588(Z22588K1):\n\timport statistics\n\treturn statistics.median(Z22588K1)"
   }
 ]
