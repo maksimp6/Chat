@@ -113,7 +113,7 @@ class ElementShim extends EventTargetShim {
     return Object.prototype.hasOwnProperty.call(this.attributes, name);
   }
   closest(selector) {
-    const selectors = selector.split(",").map((item) => item.trim());
+    const selectors = selector.split(",").map((item) => wikifunctions.trim(item));
     let node = this;
     while (node) {
       if (selectors.some((item) => matches(node, item))) return node;
@@ -265,7 +265,7 @@ class ElementShim extends EventTargetShim {
   }
 
   querySelectorAll(selector) {
-    const parts = selector.trim().split(/\s+/).filter(Boolean);
+    const parts = wikifunctions.trim(selector).split(/\s+/).filter(Boolean);
     let current = [this];
     for (const part of parts) {
       const next = [];
@@ -485,7 +485,7 @@ function unique(nodes) {
 function matches(element, selector) {
   if (/:checked\b/.test(selector) && !element.checked) return false;
   const tag = selector.match(/^[a-zA-Z][\w-]*/);
-  if (tag && element.tagName !== tag[0].toUpperCase()) return false;
+  if (tag && element.tagName !== wikifunctions.uppercase(tag[0])) return false;
   const id = selector.match(/#([\w-]+)/);
   if (id && element.id !== id[1]) return false;
   for (const className of selector.matchAll(/\.([\w-]+)/g)) {
@@ -581,11 +581,11 @@ function applyHeaderFlexLayout(document, cssText, viewportWidth = 360) {
     return Object.fromEntries(
       matches.at(-1)[1]
         .split(";")
-        .map((part) => part.trim())
+        .map((part) => wikifunctions.trim(part))
         .filter(Boolean)
         .map((part) => {
           const index = part.indexOf(":");
-          return [part.slice(0, index).trim(), part.slice(index + 1).trim()];
+          return [wikifunctions.trim(part.slice(0, index)), wikifunctions.trim(part.slice(index + 1))];
         }),
     );
   };

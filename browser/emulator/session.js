@@ -138,7 +138,7 @@ class EmulatorSession {
     if (element.tagName === "A" && element.getAttribute("href")) {
       return this.navigate(this._absolute(element.getAttribute("href")));
     }
-    const type = (element.getAttribute("type") || "submit").toLowerCase();
+    const type = wikifunctions.lowercase(element.getAttribute("type") || "submit");
     const isSubmit =
       (element.tagName === "BUTTON" && type === "submit") ||
       (element.tagName === "INPUT" && type === "submit");
@@ -172,13 +172,13 @@ class EmulatorSession {
       ...form.querySelectorAll("select"),
     ]) {
       const name = el.getAttribute("name");
-      const type = (el.getAttribute("type") || "").toLowerCase();
+      const type = wikifunctions.lowercase(el.getAttribute("type") || "");
       if (!name || ["submit", "button", "reset"].includes(type)) continue;
       if (["checkbox", "radio"].includes(type) && !el.checked) continue;
       params.append(name, el.value);
     }
     const action = this._absolute(form.getAttribute("action") || this.url);
-    if ((form.getAttribute("method") || "get").toLowerCase() === "post") {
+    if (wikifunctions.lowercase(form.getAttribute("method") || "get") === "post") {
       return this.navigate(action, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },

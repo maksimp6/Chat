@@ -33,7 +33,7 @@ The branch adds six local function definitions: four Python adapters and two Jav
 
 All nine local adapters have an adjacent `НЕ РЕДАКТИРОВАТЬ` comment with source and implementation IDs. The mean/median KPI properties delegate to the same standard-library functions they used before and keep their empty-list `None` result. The string helpers call the same native `strip`, `lower`, `upper`, `toLowerCase`, and `toUpperCase` methods as their pinned source implementations.
 
-Fifty-two existing string operation call sites now use shared adapters: 17 JavaScript calls (13 case conversions and four trims) plus 35 Python calls (23 trims and 12 lowercases). Two KPI properties also use the pinned statistics adapters. Repeated normalization in browser states, boolean settings and quota flags now computes the trimmed/lowercase value once.
+Sixty-one existing string operation call sites now use shared adapters: 26 JavaScript calls (17 case conversions and nine trims) plus 35 Python calls (23 trims and 12 lowercases). Two KPI properties also use the pinned statistics adapters. Repeated normalization in browser states, boolean settings and quota flags now computes the trimmed/lowercase value once.
 
 The separate 100-candidate inventory remains a list of possible unifications, not a claim that all 100 candidates are from Wikifunctions or can be replaced. This change applies only where the pinned source operation matches the current behavior.
 

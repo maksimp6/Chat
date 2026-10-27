@@ -19,7 +19,7 @@ files identify their changes. No Wikifunctions service is called at runtime.
 
 ## Shared operations
 
-Fifty-two existing string operation call sites use the pinned adapters: 17 JavaScript calls (13 case conversions and four trims) and 35 Python calls (23 trims and 12 lowercases). The two KPI properties also use the pinned mean and median. Repeated state and boolean normalization now computes the trimmed/lowercase value once.
+Sixty-one existing string operation call sites use the pinned adapters: 26 JavaScript calls (17 case conversions and nine trims) and 35 Python calls (23 trims and 12 lowercases). The two KPI properties also use the pinned mean and median. Repeated state and boolean normalization now computes the trimmed/lowercase value once.
 
 ## Static function inventory
 
