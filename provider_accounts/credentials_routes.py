@@ -29,6 +29,7 @@ from provider_accounts.credentials import (
     get_active_credential,
     replace_active_credential,
     rotation_needed,
+    should_revoke,
     fingerprint_key,
     record_health_check,
     get_cloudru_iam_credentials,
@@ -144,11 +145,15 @@ def _status_for(provider: str) -> dict:
             "expires_at": str(row["expires_at"]) if row["expires_at"] else None,
         }
         health_status = row["last_check_status"] or "unknown"
-        authorization_ok = health_status == "connected"
+        # Same boundary as get_active_credential, which refuses a key from expires_at on.
+        expired = bool(row["expires_at"]) and should_revoke(row["expires_at"])
+        authorization_ok = health_status == "connected" and not expired
         return {
             "provider": provider,
             "status": (
-                "connected"
+                "expired"
+                if expired
+                else "connected"
                 if authorization_ok
                 else "invalid"
                 if health_status == "invalid"
@@ -594,9 +599,21 @@ def update_provider_credentials():
         # never holds an active key that nothing in Logos uses.
         # Re-saving the active Yandex key keeps its provider identity: revoking it would kill the key just stored.
         supplied_keys = dict(supplied)
-        previous_yandex = (
-            _load_credential(YANDEX, allow_expired=True) if YANDEX in supplied_keys else None
-        )
+        try:
+            previous_yandex = (
+                _load_credential(YANDEX, allow_expired=True) if YANDEX in supplied_keys else None
+            )
+        except CredentialCryptoError:
+            # Without decrypting the stored key its identity and revocation are unknown, so replacement is refused.
+            logger.warning("Stored Yandex provider credential is unreadable with the configured encryption key")
+            return jsonify(
+                {
+                    "error": "credential_unreadable",
+                    "provider": YANDEX,
+                    "detail": "Сохранённый ключ Yandex нельзя расшифровать, поэтому его нельзя заменить. "
+                    "Проверьте LOGOS_PROVIDER_CREDENTIAL_KEY на сервере.",
+                }
+            ), 503
         same_yandex_key = (
             previous_yandex is not None and previous_yandex.api_key == supplied_keys[YANDEX]
         )

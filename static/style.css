@@ -1200,6 +1200,12 @@ body {
   display: none;
 }
 
+/* Voice models whose catalog entry accepts text keep the text field (voice.js sets this class). */
+.logos-pro-app.logos-model-voice.logos-voice-text-input #text-ui,
+.logos-pro-app.logos-model-voice.logos-voice-text-input #text-ui[aria-hidden="true"] {
+  display: flex;
+}
+
 
 .logos-pro-app #voice-ui[aria-hidden="true"],
 .logos-pro-app #text-ui[aria-hidden="true"],

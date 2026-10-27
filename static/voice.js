@@ -485,8 +485,22 @@
     setStatus("Голосовая сессия отменена: выбран другой диалог или модель");
   }
 
+  // Voice models whose catalog entry accepts text keep the chat text field visible.
+  function syncVoiceTextInput() {
+    var root = document.querySelector(".logos-pro-app");
+    if (!root) return;
+    var isVoice = root.classList.contains("logos-model-voice");
+    var model = typeof currentModel !== "undefined" ? currentModel : "";
+    var entry = typeof modelsData !== "undefined" && modelsData.voice ? modelsData.voice[model] : null;
+    var acceptsText = isVoice && !!(entry && entry.capabilities && entry.capabilities.text_input === true);
+    root.classList.toggle("logos-voice-text-input", acceptsText);
+    var textUi = document.getElementById("text-ui");
+    if (isVoice && textUi) textUi.setAttribute("aria-hidden", acceptsText ? "false" : "true");
+  }
+
   window.addEventListener("logos:conversation-selected", cancelMicOnSelectionChange);
   window.addEventListener("logos:model-changed", cancelMicOnSelectionChange);
+  window.addEventListener("logos:model-changed", syncVoiceTextInput);
 
   window.LogosVoice = { sendText: sendText, synthesizeText: sendText, cancel: cancel };
   document.addEventListener("DOMContentLoaded", function () {
@@ -496,5 +510,6 @@
     waveCtx = waveformCanvas ? waveformCanvas.getContext("2d") : null;
     if (micBtn) micBtn.addEventListener("click", toggleVoice);
     clearWaveform();
+    syncVoiceTextInput();
   });
 })();
