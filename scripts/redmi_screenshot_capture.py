@@ -14,6 +14,7 @@ import struct
 import subprocess
 import sys
 import time
+import uuid
 from datetime import datetime, timezone
 from urllib.request import urlopen
 
@@ -26,6 +27,13 @@ LOGOS_URL = "http://127.0.0.1:8080/"
 # yandexgpt, which is YandexGPT Pro 5 in the model picker.
 TOOLS_CHECK_MODEL = "yandexgpt-5-pro"
 CAPTURE_DEADLINE = None
+
+
+def capture_url(value):
+    """Allow only the installed server or the isolated runner candidate server."""
+    if value not in {"http://127.0.0.1:8080/", "http://127.0.0.1:8081/"}:
+        raise ValueError("Unsupported local capture URL")
+    return value
 
 
 class CaptureSafetyError(RuntimeError):
@@ -332,7 +340,7 @@ class RDP:
     def find_logos(self):
         candidates = []
         for tab in self.request("root", "listTabs")["tabs"]:
-            if not re.match(r"^http://(?:127\.0\.0\.1|localhost):8080/(?:[?#]|$)", tab.get("url", "")):
+            if tab.get("url", "").split("?", 1)[0].split("#", 1)[0] != LOGOS_URL:
                 continue
             frame = self.request(tab["actor"], "getTarget")["frame"]
             actor = frame["consoleActor"]
@@ -504,10 +512,18 @@ class RDP:
         return self.evaluate(actor, "JSON.stringify((()=>{const x=new XMLHttpRequest();"
                              "x.open('GET','/api/invocations/'+encodeURIComponent(" + json.dumps(invocation_id) +
                              ")+'/trace',false);x.send();if(x.status!==200)return {http_status:x.status};"
-                             "const t=JSON.parse(x.responseText);return {context:t.context,"
+                             "const t=JSON.parse(x.responseText);const out=r=>(r.output||[]).flatMap(i=>"
+                             "i.type==='function_call'?[i]:i.type==='message'?(i.content||[]).filter(c=>c.type==='function_call'):[])"
+                             ".map(i=>({type:'function_call',name:i.name,call_id:i.call_id,status:i.status}));"
+                             "return {context:{invocation_id:t.context?.invocation_id},"
                              "errors:(t.errors||[]).map(e=>({type:e.type||'unknown'})),"
+                             "responses:(t.responses||[]).map(r=>({step:r.step,response_id:r.response_id,raw:{"
+                             "id:r.raw?.id,status:r.raw?.status,incomplete_details:{reason:r.raw?.incomplete_details?.reason},"
+                             "error:r.raw?.error!=null?{code:r.raw.error.code||'provider_error'}:null,output:out(r.raw||{})}})),"
+                             "api_requests:(t.api_requests||[]).map(r=>({step:r.step,payload:{tools:(r.payload?.tools||[])"
+                             ".map(i=>({type:i.type,name:i.name||i.function?.name}))}})),"
                              "tool_calls:(t.tool_calls||[]).map(c=>({name:c.name||c.tool_name,call_id:c.call_id,"
-                             "error:!!c.error,result:{success:c.result?.success,"
+                             "step:c.step,error:!!c.error,result:{success:c.result?.success,"
                              "metadata:{phase:c.result?.metadata?.phase}},status:c.status})),"
                              "events:(t.events||[]).filter(e=>e.type==='api_request_manifest'||e.event==='api_request_manifest')};})())")
 
@@ -584,8 +600,8 @@ class RDP:
 
 
 def version():
-    with urlopen("http://127.0.0.1:8080/api/version", timeout=5) as response:
-        if response.geturl() != "http://127.0.0.1:8080/api/version":
+    with urlopen(LOGOS_URL + "api/version", timeout=5) as response:
+        if response.geturl() != LOGOS_URL + "api/version":
             raise RuntimeError("Unexpected version redirect")
         return json.loads(response.read(65536))
 
@@ -710,7 +726,7 @@ def student_tasks(rdp, actor, conversation_id):
 
 def tools_self_check(rdp, actor, conversation_id):
     """Ask Logos through the actual Send button; judge calls independently of its claims."""
-    from logos_tools_self_check import SELF_CHECK_QUESTION, evaluate_tool_evidence
+    from logos_tools_self_check import build_self_check_question, evaluate_tool_evidence
 
     inventory = rdp.tools_inventory(actor, conversation_id)
     before = rdp.persisted_messages(actor, conversation_id)
@@ -731,7 +747,9 @@ def tools_self_check(rdp, actor, conversation_id):
         if rdp.conversation_state(actor)["current_model"] != TOOLS_CHECK_MODEL:
             return {"status": "ERROR", "reason": "tools_check_model_not_selected"}
     # #msg-input is input[type=text]; it removes line breaks before sending.
-    question = SELF_CHECK_QUESTION + " Каталог приложения: " + json.dumps(inventory, ensure_ascii=False)
+    nonce = uuid.uuid4().hex
+    folder = "tmp/logos-tools-check-" + nonce
+    question = build_self_check_question(inventory, nonce, folder)
     rdp.send_chat_message(actor, question)
     # Leave time to finalize the recording and publish even when the app times out.
     deadline = time.monotonic() + max(0, remaining(120) - 15)
@@ -755,6 +773,13 @@ def tools_self_check(rdp, actor, conversation_id):
     report = evaluate_tool_evidence(inventory["categories"], inventory["active_categories"],
                                     before["messages"], after["messages"], traces, question)
     report["question"] = question
+    report["file_fixture"] = {"nonce": nonce, "folder": folder}
+    report["execution_traces"] = traces
+    report["browser_observation"] = rdp.evaluate(actor, "JSON.stringify({"
+        "tool_summaries:[...document.querySelectorAll('.msg-technical-summary')]"
+        ".map(e=>e.textContent),zero_calls_visible:[...document.querySelectorAll('.msg-technical-label')]"
+        ".some(e=>e.textContent.includes('Вызовы инструментов: 0')),"
+        "error_messages:document.querySelectorAll('#chatbox .msg.error').length})")
     # The original reply remains in the app conversation. Do not publish free text from
     # a model with filesystem tools; the evidence report contains only structured facts.
     return report
@@ -1438,14 +1463,14 @@ def capture(out, uid, gid, metadata):
     print(json.dumps({"captured": len(files), "runtime_revision": runtime["runtime_revision"]}))
 
 
-def restore_clean_page():
+def restore_clean_page(target_url=None):
     """Leave the phone on the plain app page: no open picker and no capture query in the address bar."""
     try:
         rdp = RDP()
         try:
             actor = rdp.find_logos()
             rdp.evaluate(actor, "JSON.stringify((()=>{setTimeout(()=>location.replace(" +
-                         json.dumps(LOGOS_URL) + "),100);return {scheduled:true};})())")
+                         json.dumps(target_url or LOGOS_URL) + "),100);return {scheduled:true};})())")
         finally:
             rdp.s.close()
     except Exception:
@@ -1453,11 +1478,14 @@ def restore_clean_page():
 
 
 def main():
+    global LOGOS_URL
     if len(sys.argv) == 6 and sys.argv[1] == "_capture":
+        metadata = json.loads(sys.argv[5])
+        LOGOS_URL = capture_url(metadata.get("capture_url", LOGOS_URL))
         try:
-            capture(Path(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), json.loads(sys.argv[5]))
+            capture(Path(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), metadata)
         finally:
-            restore_clean_page()
+            restore_clean_page("http://127.0.0.1:8080/" if LOGOS_URL.endswith(":8081/") else LOGOS_URL)
         return
     required = ("GITHUB_ACTIONS", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "RUNNER_NAME", "RUNNER_TEMP", "GITHUB_SHA")
     if os.environ.get("GITHUB_ACTIONS") != "true" or any(not os.environ.get(k) for k in required):
@@ -1473,6 +1501,7 @@ def main():
                 "workflow_revision": os.environ["GITHUB_SHA"], "runner_name": os.environ["RUNNER_NAME"],
                 "github_run_url": "https://github.com/maksimp6/Chat/actions/runs/" + os.environ["GITHUB_RUN_ID"]}
     metadata["tools_self_check"] = os.environ.get("LOGOS_TOOLS_SELF_CHECK") == "1"
+    metadata["capture_url"] = capture_url(os.environ.get("LOGOS_CAPTURE_URL", LOGOS_URL))
     argv = [sys.executable, str(Path(__file__).resolve()), "_capture", str(output),
             str(os.getuid()), str(os.getgid()), json.dumps(metadata)]
     safe_env = {"PATH": os.environ.get("PATH", "/system/bin"), "TMPDIR": os.environ.get("TMPDIR", str(runner_temp))}

@@ -5,7 +5,9 @@ import json
 import os
 from pathlib import Path
 import sys
+import tempfile
 import unittest
+import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -13,7 +15,9 @@ if not (os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("CI") == "
         and all(os.environ.get(key) for key in ("GITHUB_RUN_ID", "RUNNER_NAME", "RUNNER_TEMP"))):
     raise RuntimeError("LOCAL_TESTS_FORBIDDEN: run this check in a GitHub Actions runner job")
 
-from scripts.logos_tools_self_check import SELF_CHECK_QUESTION, evaluate_tool_evidence
+from scripts.logos_tools_self_check import (
+    SELF_CHECK_QUESTION, build_self_check_question, evaluate_tool_evidence, verify_file_effects,
+)
 
 
 class ToolsSelfCheckTests(unittest.TestCase):
@@ -26,7 +30,18 @@ class ToolsSelfCheckTests(unittest.TestCase):
             {"role": "user", "text": self.question, "invocation_id": None},
             {"role": "assistant", "text": "Всё доступно, ограничений нет", "invocation_id": "fresh"},
         ]
-        self.trace = {"context": {"invocation_id": "fresh"}, "errors": [], "tool_calls": [], "events": []}
+        self.trace = {
+            "context": {"invocation_id": "fresh"}, "errors": [], "tool_calls": [], "events": [],
+            "api_requests": [{"step": 1, "payload": {"tools": [
+                {"type": "function", "name": name} for name in self.categories["filesystem"]
+            ]}}],
+            "responses": [{"step": 1, "response_id": "response-fresh", "raw": {
+                "id": "response-fresh", "status": "completed", "output": [
+                    {"type": "function_call", "name": name, "call_id": "call-" + name}
+                    for name in self.categories["filesystem"]
+                ],
+            }}],
+        }
 
     def call(self, name="read_file", success=True, phase="execution", **extra):
         return {"name": name, "call_id": "call-" + name, "error": False,
@@ -94,6 +109,7 @@ class ToolsSelfCheckTests(unittest.TestCase):
                 "executor": "local", "duration_ms": 1.2,
             }},
         }]
+        self.trace["responses"][0]["raw"]["output"][0]["call_id"] = "real-call"
         report = self.evaluate()
         row = next(row for row in report["tools"] if row["name"] == "read_file")
         self.assertEqual(row["status"], "CALL_SUCCEEDED")
@@ -118,6 +134,82 @@ class ToolsSelfCheckTests(unittest.TestCase):
         self.assertEqual(report["coverage"]["succeeded"], 0)
         self.assertEqual(report["unexpected_call_count"], 1)
         self.assertEqual(next(row for row in report["tools"] if row["name"] == "read_file")["status"], "UNKNOWN")
+
+    def test_dispatcher_success_without_provider_call_is_not_model_coverage(self):
+        self.trace["tool_calls"] = [self.call(), self.call("file_stat")]
+        self.trace["responses"][0]["raw"]["output"] = []
+        report = self.evaluate()
+        self.assertEqual(report["status"], "NOT_RUN")
+        self.assertEqual(report["coverage"]["called"], 0)
+        self.assertEqual(report["unlinked_executor_call_count"], 2)
+
+    def test_provider_call_without_executor_result_is_not_success(self):
+        report = self.evaluate()
+        self.assertEqual(report["coverage"]["succeeded"], 0)
+        self.assertEqual(report["status"], "NOT_RUN")
+
+    def test_provider_identity_requires_matching_name_and_round(self):
+        for name, step in [("file_stat", 1), ("read_file", 2)]:
+            with self.subTest(name=name, step=step):
+                self.trace["tool_calls"] = [self.call(name=name, step=step, call_id="call-read_file")]
+                report = self.evaluate()
+                self.assertEqual(report["coverage"]["called"], 0)
+                self.assertEqual(report["coverage"]["succeeded"], 0)
+
+    def test_conflicting_provider_call_identity_is_not_coverage(self):
+        self.trace["responses"][0]["raw"]["output"].append(
+            {"type": "function_call", "name": "file_stat", "call_id": "call-read_file"})
+        self.trace["tool_calls"] = [self.call()]
+        self.assertEqual(self.evaluate()["coverage"]["called"], 0)
+
+    def test_unfinished_function_item_is_not_successful_model_call_evidence(self):
+        self.trace["tool_calls"] = [self.call()]
+        self.trace["responses"][0]["raw"]["output"][0]["status"] = "in_progress"
+        self.assertEqual(self.evaluate()["coverage"]["called"], 0)
+
+    def test_native_nested_function_call_links_to_real_executor(self):
+        output = self.trace["responses"][0]["raw"]["output"]
+        self.trace["responses"][0]["raw"]["output"] = [
+            {"type": "message", "status": "completed", "content": output}]
+        self.trace["tool_calls"] = [self.call(), self.call("file_stat")]
+        report = self.evaluate()
+        self.assertEqual(report["coverage"]["succeeded"], 2)
+        self.assertEqual(report["coverage"]["status"], "PASS")
+
+    def test_non_null_empty_provider_error_is_a_failure(self):
+        self.trace["responses"][0]["raw"]["error"] = {}
+        self.assertEqual(self.evaluate()["status"], "FAIL")
+
+    def test_incomplete_provider_overrides_local_completed_and_success_claims(self):
+        self.trace["status"] = "completed"
+        self.trace["tool_calls"] = [self.call(), self.call("file_stat")]
+        self.trace["responses"][0]["raw"].update(
+            status="incomplete", incomplete_details={"reason": "max_output_tokens"})
+        report = self.evaluate()
+        self.assertEqual(report["status"], "FAIL")
+        self.assertEqual(report["provider"]["status"], "FAIL")
+        self.assertEqual(report["provider"]["responses"][0]["incomplete_reason"], "max_output_tokens")
+
+    def test_missing_terminal_state_or_outgoing_inventory_cannot_pass(self):
+        self.trace["tool_calls"] = [self.call(), self.call("file_stat")]
+        for field in ["status", "api_requests"]:
+            with self.subTest(field=field):
+                trace = copy.deepcopy(self.trace)
+                if field == "status":
+                    del trace["responses"][0]["raw"]["status"]
+                else:
+                    del trace[field]
+                self.assertEqual(self.evaluate(traces={"fresh": trace})["status"], "PARTIAL")
+
+    def test_catalogue_is_distinct_from_payload_inventory(self):
+        self.trace["api_requests"][0]["payload"]["tools"] = [{"type": "function", "name": "read_file"}]
+        self.trace["tool_calls"] = [self.call()]
+        report = self.evaluate()
+        self.assertEqual(report["inventory"]["not_offered"], ["file_stat"])
+        self.assertEqual(report["inventory"]["offered"], ["read_file"])
+        self.assertEqual(report["coverage"]["expected"], 2)
+        self.assertEqual(report["status"], "PARTIAL")
+        self.assertEqual(next(row for row in report["tools"] if row["name"] == "file_stat")["status"], "NOT_OFFERED")
 
     def test_empty_or_disabled_inventory_never_passes(self):
         self.assertEqual(self.evaluate(categories={})["status"], "ERROR")
@@ -151,6 +243,38 @@ class ToolsSelfCheckTests(unittest.TestCase):
         report = self.evaluate()
         self.assertNotIn("SECRET_CANARY", json.dumps(report))
         self.assertIn("call_id_sha256", next(row for row in report["tools"] if row["name"] == "read_file")["calls"][0])
+
+    def test_compact_question_binds_real_file_calls_to_nonce_and_folder(self):
+        nonce = "a" * 32
+        folder = "tmp/logos-tools-check-" + nonce
+        question = build_self_check_question(
+            {"categories": self.categories, "active_categories": self.active}, nonce, folder)
+        self.assertIn('"name":"write_file"', question)
+        self.assertIn('"source_path":"' + folder + '/payload.txt"', question)
+        self.assertIn('"archive_path":"' + folder + '/payload.zip"', question)
+        self.assertIn("LOGOS_TOOLS_SELF_CHECK:" + nonce, question)
+        self.assertNotIn("device_action", question)
+        self.assertLess(len(question), 2200)
+        for invalid in ["/tmp/absolute", "tmp/../escape", "tmp/logos-tools-check-" + "b" * 32]:
+            with self.subTest(folder=invalid), self.assertRaises(ValueError):
+                build_self_check_question({"categories": self.categories, "active_categories": self.active}, nonce, invalid)
+
+    def test_file_effects_require_exact_nonce_bytes_and_zip_contents(self):
+        nonce = "c" * 32
+        folder = "tmp/logos-tools-check-" + nonce
+        content = ("LOGOS_TOOLS_SELF_CHECK:" + nonce).encode()
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / folder
+            target.mkdir(parents=True)
+            self.assertEqual(verify_file_effects(directory, nonce, folder)["status"], "FAIL")
+            (target / "payload.txt").write_bytes(content)
+            with zipfile.ZipFile(target / "payload.zip", "w") as archive:
+                archive.writestr("payload.txt", content)
+            report = verify_file_effects(directory, nonce, folder)
+            self.assertEqual(report["status"], "PASS")
+            self.assertEqual(report["actual_sha256"], report["expected_sha256"])
+            (target / "payload.txt").write_bytes(b"wrong nonce")
+            self.assertEqual(verify_file_effects(directory, nonce, folder)["status"], "FAIL")
 
 
 if __name__ == "__main__":

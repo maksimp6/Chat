@@ -40,6 +40,7 @@ from storage.db import (
     normalize_conversation_title,
 )
 from agent_runtime.partial_output import extract_last_response_text, format_partial_output_message
+from agent_runtime.provider_receipt import capture_provider_diagnostics
 from agent_runtime.responses_tool_loop import run_tool_loop, extract_function_calls
 from economy.billing import aggregate_billing, build_ai_billing_item, settle_billing_to_treasury
 from provider_accounts.quotas import ProviderQuotaExceeded
@@ -559,8 +560,57 @@ def chat():
                     }
                 )
 
-        reasoning, reply = client.extract_reasoning_and_text(response)
-        if not reply:
+        invalid_provider_response = not isinstance(response, dict)
+        provider_diagnostics = {}
+        capture_provider_diagnostics(provider_diagnostics, {} if invalid_provider_response else response)
+        provider_status = provider_diagnostics["provider_status"]
+        pending_calls = [] if invalid_provider_response else extract_function_calls(response)
+        if invalid_provider_response:
+            # Keep the invalid JSON value as evidence too; never convert arbitrary
+            # provider data into an assistant reply or replace the last valid raw.
+            trace.add_event(
+                "provider_invalid_response",
+                {"response_type": type(response).__name__, "raw": response},
+            )
+        provider_failed = (
+            provider_status != "completed"
+            or provider_diagnostics["provider_error_present"]
+            or bool(pending_calls)
+        )
+        provider_error = None
+        if provider_failed:
+            provider_error = (
+                "provider_invalid_response" if invalid_provider_response
+                else "provider_tool_calls_unresolved" if pending_calls
+                else "provider_error" if provider_diagnostics["provider_error_present"]
+                else "provider_" + provider_status
+            )
+            if invalid_provider_response:
+                provider_message = "Провайдер вернул ответ неверного формата"
+            elif pending_calls:
+                provider_message = "Вызовы инструментов из ответа провайдера не завершены"
+            elif provider_diagnostics["provider_error_present"]:
+                provider_message = "Провайдер вернул ошибку"
+            else:
+                provider_message = "Ответ провайдера не завершён: " + provider_status
+            if provider_diagnostics.get("provider_reason"):
+                provider_message += " (" + provider_diagnostics["provider_reason"] + ")"
+            trace.record_error("provider_response", provider_message, error_type=provider_error)
+        trace.add_event(
+            "provider_terminal_state",
+            {**provider_diagnostics, "invocation_status": "failed" if provider_failed else "completed"},
+        )
+
+        reasoning, reply = ("", "") if invalid_provider_response else client.extract_reasoning_and_text(response)
+        partial_output = reply if provider_failed else None
+        if provider_failed:
+            if not partial_output:
+                # Only this request's trace is consulted. The final raw response
+                # and its status remain untouched even when an earlier tool round
+                # supplied the last available assistant text.
+                partial_output, _ = extract_last_response_text(trace.trace.get("responses", []))
+            reply = format_partial_output_message(partial_output, provider_message)
+        elif not reply:
             raise RuntimeError("Модель не вернула текстовый ответ. Повторите запрос.")
         usage = client.extract_usage(response)
         timings = response.get("step_timings", []) if isinstance(response, dict) else []
@@ -607,16 +657,27 @@ def chat():
             usage=usage,
             trace={"trace_id": invocation.trace_id, "invocation_id": invocation.invocation_id, "storage": "invocation"},
             total_duration_ms=total_ms,
+            source="error" if provider_failed else None,
         )
-        finish_invocation(
-            invocation.invocation_id,
-            result={
-                "reply": reply,
-                "usage": usage,
-                "cost": cost,
-                "settlement": settlement,
-            },
-        )
+        outcome = {
+            "reply": reply,
+            "usage": usage,
+            "cost": cost,
+            "settlement": settlement,
+            **provider_diagnostics,
+        }
+        if provider_failed:
+            fail_invocation(
+                invocation.invocation_id,
+                error={
+                    **outcome,
+                    "code": provider_error,
+                    "message": provider_message,
+                    "partial_output": partial_output or None,
+                },
+            )
+        else:
+            finish_invocation(invocation.invocation_id, result=outcome)
 
         return jsonify(
             {
@@ -633,8 +694,11 @@ def chat():
                 "trace": trace_data,
                 "skills": selected_skill_metadata,
                 "title": conversation_title or get_conversation_title(invocation.conversation_id),
+                "status": "failed" if provider_failed else "completed",
+                **provider_diagnostics,
+                **({"error": provider_error, "partial_output": partial_output or None} if provider_failed else {}),
             }
-        )
+        ), 502 if provider_failed else 200
     except Exception as e:
         logger.exception("[CHAT] Ошибка")
         internal_error_message = str(e)

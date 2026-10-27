@@ -1,28 +1,23 @@
 """Judge a fresh Logos tools reply from its invocation evidence, without a model call."""
 
 import hashlib
+import json
 import math
+from pathlib import Path
 import re
+import stat
+import zipfile
 
 
 SELF_CHECK_QUESTION = (
-    "Логос, проведи проверку всех инструментов, реально переданных тебе в этом запросе: "
-    "локальных, hosted и MCP. Сопоставь их с приложенным каталогом приложения: укажи "
-    "отключённые категории, отсутствующие инструменты и причины недоступности. Для "
-    "каждого инструмента перечисли параметры из фактической схемы, обязательность, "
-    "значения по умолчанию, допустимые значения и пределы; отличай схему от реально "
-    "принятых параметров. Выполни безопасные пробные вызовы чтения и проверь результат. "
-    "Проверки записи допустимы только на собственных временных обратимых данных. "
-    "Не читай секреты, ключи, переписку, контакты и другие личные данные; не выводи их. "
-    "Опасные действия, внешние публикации, платные дополнительные сервисы и операции "
-    "с устройствами не выполняй: обозначь NOT_RUN и причину. Не меняй доступ, настройки, "
-    "защиту и ограничения. Не удаляй ограничения ради прохождения теста. Проверь также "
-    "фактические настройки запроса: контекст, вывод, рассуждение, усечение, число "
-    "вызовов и раундов, таймауты. Для каждого предела укажи источник: схема, приложение "
-    "или провайдер. Неизвестное обозначь UNKNOWN: успешный вызов не доказывает, что "
-    "параметры не ограничены. Итог: таблица инструмент → параметры → выполненный вызов "
-    "→ результат → ограничение → доказательство. Не утверждай «всё доступно» по одному "
-    "каталогу или по собственному ответу без фактических вызовов."
+    "Логос, сначала выполни настоящие вызовы инструментов, затем дай краткий итог. "
+    "Не заменяй function_call текстом о выполнении. Читай только собственные тестовые данные; "
+    "записывай только в указанную новую временную папку. Секреты, личные данные, устройства, "
+    "платные дополнительные сервисы и внешние публикации не затрагивай. Не меняй доступ, "
+    "настройки или ограничения; требуемое разрешение обозначь BLOCKED. Остальные инструменты "
+    "проверяй только безопасными реальными вызовами в этой области; неприменимые обозначь "
+    "NOT_RUN с короткой причиной. Каталог и твои слова не доказывают вызов или отсутствие "
+    "лимитов. Итог до 12 строк: фактические вызовы, SHA256, ошибки и NOT_RUN; неизвестное UNKNOWN."
 )
 
 _NAME = re.compile(r"[A-Za-z0-9_.:-]{1,128}\Z")
@@ -38,6 +33,8 @@ _ENUM_SETTINGS = {
 }
 _EFFORT = {"none", "minimal", "low", "medium", "high", "xhigh", "max"}
 _TOOL_TYPES = {"function", "mcp", "file_search", "web_search", "code_interpreter", "other"}
+_RESPONSE_STATUSES = {"completed", "incomplete", "failed", "cancelled", "queued", "in_progress"}
+_INCOMPLETE_REASONS = {"max_output_tokens", "content_filter"}
 
 
 def _name(value):
@@ -46,6 +43,71 @@ def _name(value):
 
 def _digest(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _fixture_paths(nonce, folder):
+    if not isinstance(nonce, str) or not re.fullmatch(r"[0-9a-f]{32}", nonce):
+        raise ValueError("Use a fresh UUID hex nonce")
+    if folder != "tmp/logos-tools-check-" + nonce:
+        raise ValueError("Use the nonce-bound relative temporary folder")
+    return folder + "/payload.txt", folder + "/payload.zip", "LOGOS_TOOLS_SELF_CHECK:" + nonce
+
+
+def build_self_check_question(inventory, nonce, folder):
+    """Keep the task small enough to call tools before generating a long catalogue review."""
+    text_path, archive_path, content = _fixture_paths(nonce, folder)
+    calls = [
+        {"name": "write_file", "arguments": {"path": text_path, "content": content}},
+        {"name": "read_file", "arguments": {"path": text_path, "offset": 0,
+                                              "length": len(content), "whence": "start"}},
+        {"name": "calculate_hash", "arguments": {"path": text_path, "algorithm": "sha256"}},
+        {"name": "zip_compress", "arguments": {"source_path": text_path, "archive_path": archive_path}},
+    ]
+    categories = inventory.get("categories") if isinstance(inventory, dict) else None
+    active = inventory.get("active_categories") if isinstance(inventory, dict) else None
+    if (not isinstance(categories, dict) or not isinstance(active, list)
+            or any(not _name(category) or not isinstance(names, list)
+                   or any(not _name(name) for name in names) for category, names in categories.items())
+            or any(not isinstance(category, str) or category not in categories for category in active)):
+        raise ValueError("Tool inventory is unavailable or invalid")
+    names = sorted({name for category in active for name in categories[category]})
+    return (SELF_CHECK_QUESTION + " Выполни последовательно: "
+            + json.dumps(calls, ensure_ascii=False, separators=(",", ":"))
+            + " Не удаляй созданные файлы: раннер независимо проверит их. Активный каталог: "
+            + ",".join(names))
+
+
+def verify_file_effects(project_root, nonce, folder):
+    """Independently inspect only the nonce-bound test files, never execute a tool."""
+    text_path, archive_path, content = _fixture_paths(nonce, folder)
+    root = Path(project_root).resolve()
+    expected = content.encode("utf-8")
+    report = {"status": "FAIL", "scope": "nonce_bound_text_and_zip_effects_only",
+              "expected_sha256": hashlib.sha256(expected).hexdigest(), "checks": {}}
+    try:
+        paths = [root / text_path, root / archive_path]
+        for path in paths:
+            for part in [path, *path.parents]:
+                if part == root:
+                    break
+                if part.is_symlink():
+                    raise ValueError("Test path is a symlink")
+            size = path.stat()
+            if not stat.S_ISREG(size.st_mode) or size.st_size > 1024 * 1024:
+                raise ValueError("Test artifact is not a bounded regular file")
+        payload = paths[0].read_bytes()
+        report["checks"]["text_matches_nonce"] = payload == expected
+        report["actual_sha256"] = hashlib.sha256(payload).hexdigest()
+        with zipfile.ZipFile(paths[1]) as archive:
+            entries = archive.infolist()
+            valid = (len(entries) == 1 and entries[0].filename == "payload.txt"
+                     and entries[0].file_size == len(expected))
+            report["checks"]["zip_contains_exact_nonce_file"] = valid and archive.read(entries[0]) == expected
+        if all(report["checks"].values()):
+            report["status"] = "PASS"
+    except (OSError, ValueError, RuntimeError, zipfile.BadZipFile):
+        report["reason"] = "test_files_missing_invalid_or_unreadable"
+    return report
 
 
 def _signature(message):
@@ -126,7 +188,73 @@ def _request_evidence(trace):
     return result
 
 
-def _call_evidence(call):
+def _provider_evidence(trace):
+    """Read provider-authored call identities; executor records alone are insufficient."""
+    calls, responses = {}, []
+    for entry in trace.get("responses", []) if isinstance(trace.get("responses"), list) else []:
+        raw = entry.get("raw") if isinstance(entry, dict) else None
+        if not isinstance(raw, dict):
+            continue
+        status = raw.get("status")
+        response = {"status": status if isinstance(status, str) and status in _RESPONSE_STATUSES else "UNKNOWN",
+                    "error_present": raw.get("error") is not None}
+        response_id = raw.get("id") or entry.get("response_id")
+        if isinstance(response_id, str) and response_id:
+            response["response_id_sha256"] = _digest(response_id)
+        details = raw.get("incomplete_details")
+        reason = details.get("reason") if isinstance(details, dict) else None
+        if status == "incomplete":
+            response["incomplete_reason"] = reason if isinstance(reason, str) and reason in _INCOMPLETE_REASONS else "UNKNOWN"
+        responses.append(response)
+        output = raw.get("output", []) if isinstance(raw.get("output"), list) else []
+        candidates = []
+        for item in output:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") == "message" and item.get("status") in (None, "completed"):
+                candidates.extend(item.get("content", []) if isinstance(item.get("content"), list) else [])
+            else:
+                candidates.append(item)
+        for item in candidates:
+            if not isinstance(item, dict) or item.get("type") != "function_call":
+                continue
+            if item.get("status") not in (None, "completed"):
+                continue
+            name, call_id = item.get("name"), item.get("call_id")
+            if _name(name) and isinstance(call_id, str) and call_id:
+                step = entry.get("step")
+                if step is None or type(step) is int:
+                    calls.setdefault(call_id, set()).add((name, step))
+    return calls, responses
+
+
+def _offered_evidence(trace):
+    """Inspect the captured outgoing payload, rather than treating a catalogue as sent."""
+    inventories = []
+    for entry in trace.get("api_requests", []) if isinstance(trace.get("api_requests"), list) else []:
+        payload = entry.get("payload") if isinstance(entry, dict) else None
+        tools = payload.get("tools") if isinstance(payload, dict) else None
+        if not isinstance(tools, list):
+            continue
+        names = set()
+        malformed = False
+        for tool in tools:
+            if not isinstance(tool, dict):
+                malformed = True
+                continue
+            if tool.get("type") != "function":
+                continue
+            function = tool.get("function")
+            name = tool.get("name") or (function.get("name") if isinstance(function, dict) else None)
+            if _name(name):
+                names.add(name)
+            else:
+                malformed = True
+        inventories.append({"names": names, "complete": not malformed})
+    return inventories
+
+
+def _call_evidence(call, provider_calls):
     result = call.get("result")
     result = result if isinstance(result, dict) else {}
     metadata = result.get("metadata")
@@ -143,10 +271,22 @@ def _call_evidence(call):
         status = "CALL_SUCCEEDED"
     else:
         status = "UNKNOWN"
-    evidence = {"status": status, "phase": phase}
+    evidence = {"status": status, "phase": phase, "model_linked": False}
     call_id = call.get("call_id")
     if isinstance(call_id, str) and call_id:
         evidence["call_id_sha256"] = _digest(call_id)
+        matches = provider_calls.get(call_id, set())
+        name = call.get("name", call.get("tool_name"))
+        step = call.get("step")
+        # A reused identity, a different tool name, or a different request round
+        # cannot establish that this executor entry came from this model call.
+        if len(matches) == 1:
+            provider_name, provider_step = next(iter(matches))
+            evidence["model_linked"] = provider_name == name and (
+                step is None or provider_step is None or step == provider_step
+            )
+        if not evidence["model_linked"]:
+            evidence.update(status="UNKNOWN", reason="provider_function_call_link_missing_or_ambiguous")
     else:
         evidence["status"] = "UNKNOWN"
         evidence["reason"] = "model_call_link_missing"
@@ -157,17 +297,20 @@ def evaluate_tool_evidence(categories, active_categories, before_messages, after
     """Return conservative coverage; prose never establishes execution or unbounded limits.
 
     ``traces`` maps fresh assistant invocation IDs to the corresponding trace JSON.
-    A successful envelope establishes one completed call only, not its real effect,
-    every argument combination, or unlimited provider/adapter capabilities.
+    A provider function_call must match the executor name and call_id. A successful
+    envelope establishes one completed call only, not its real effect, every
+    argument combination, or unlimited provider/adapter capabilities.
     """
     report = {
         "status": "NOT_RUN", "tools": [], "inactive_tools": [],
         "coverage": {"status": "NOT_RUN", "expected": 0, "called": 0, "succeeded": 0,
-                     "scope": "fresh_invocation_call_envelopes_only; effects_not_independently_verified"},
+                     "scope": "active_catalogue_model_linked_call_envelopes_only; effects_not_independently_verified"},
         "limits": {"status": "UNKNOWN", "unbounded": "UNKNOWN", "parameter_domains": "UNKNOWN",
                    "provider_effective": "UNKNOWN", "requests": [],
                    "reason": "finite_calls_do_not_prove_unbounded_parameters"},
         "hosted_and_mcp": {"status": "UNKNOWN", "reason": "registry_categories_do_not_prove_hosted_or_remote_inventory"},
+        "inventory": {"status": "UNKNOWN", "offered": [], "not_offered": [], "offered_outside_catalogue": []},
+        "provider": {"status": "UNKNOWN", "responses": []},
     }
     if (not isinstance(categories, dict) or not categories or not isinstance(active_categories, list)
             or any(not _name(category) or not isinstance(names, list) or any(not _name(name) for name in names)
@@ -194,6 +337,8 @@ def evaluate_tool_evidence(categories, active_categories, before_messages, after
     trace_failures = 0
     missing_traces = 0
     unexpected_calls = 0
+    unlinked_calls = 0
+    inventories = []
     for invocation_id in ids:
         trace = traces.get(invocation_id) if isinstance(traces, dict) else None
         context = trace.get("context") if isinstance(trace, dict) else None
@@ -203,6 +348,9 @@ def evaluate_tool_evidence(categories, active_categories, before_messages, after
         errors = trace.get("errors")
         trace_failures += len(errors) if isinstance(errors, list) else 0
         report["limits"]["requests"].extend(_request_evidence(trace))
+        provider_calls, provider_responses = _provider_evidence(trace)
+        report["provider"]["responses"].extend(provider_responses)
+        inventories.extend(_offered_evidence(trace))
         entries = trace.get("tool_calls")
         for call in entries if isinstance(entries, list) else []:
             if not isinstance(call, dict):
@@ -211,7 +359,16 @@ def evaluate_tool_evidence(categories, active_categories, before_messages, after
             if not isinstance(name, str) or name not in expected:
                 unexpected_calls += 1
                 continue
-            calls[name].append(_call_evidence(call))
+            evidence = _call_evidence(call, provider_calls)
+            unlinked_calls += not evidence["model_linked"]
+            calls[name].append(evidence)
+    offered = set().union(*(item["names"] for item in inventories)) if inventories else set()
+    if inventories:
+        report["inventory"].update(
+            status="CAPTURED" if all(item["complete"] for item in inventories) else "PARTIAL",
+            offered=sorted(offered), not_offered=sorted(expected - offered),
+            offered_outside_catalogue=sorted(offered - expected),
+        )
     for row in report["tools"]:
         row["calls"] = calls[row["name"]]
         statuses = {call["status"] for call in row["calls"]}
@@ -221,18 +378,35 @@ def evaluate_tool_evidence(categories, active_categories, before_messages, after
             row["status"] = "CALL_SUCCEEDED"
         elif statuses:
             row["status"] = "UNKNOWN"
+        elif report["inventory"]["status"] == "CAPTURED" and row["name"] not in offered:
+            row["status"] = "NOT_OFFERED"
     coverage = report["coverage"]
-    coverage.update(called=sum(bool(row["calls"]) for row in report["tools"]),
+    coverage.update(called=sum(any(call["model_linked"] for call in row["calls"]) for row in report["tools"]),
                     succeeded=sum(row["status"] == "CALL_SUCCEEDED" for row in report["tools"]))
     report.update(missing_traces=missing_traces, trace_error_count=trace_failures,
-                  unexpected_call_count=unexpected_calls)
-    failed = trace_failures or any(row["status"] in {"FAIL", "BLOCKED"} for row in report["tools"])
+                  unexpected_call_count=unexpected_calls, unlinked_executor_call_count=unlinked_calls)
+    responses = report["provider"]["responses"]
+    provider_failed = any(response["status"] in {"incomplete", "failed", "cancelled"}
+                          or response["error_present"] for response in responses)
+    if provider_failed:
+        report["provider"]["status"] = "FAIL"
+    elif responses and all(response["status"] == "completed" for response in responses):
+        report["provider"]["status"] = "COMPLETED"
+    failed = provider_failed or trace_failures or any(row["status"] in {"FAIL", "BLOCKED"} for row in report["tools"])
     if failed:
         report["status"] = coverage["status"] = "FAIL"
+        report["reason"] = "provider_response_not_completed" if provider_failed else "tool_or_trace_failed"
     elif not coverage["called"]:
         report["reason"] = "no_verified_tool_calls"
     else:
         report["status"] = "PARTIAL"
-        coverage["status"] = "PASS" if coverage["succeeded"] == len(expected) and not missing_traces else "PARTIAL"
-        report["reason"] = "tool_calls_do_not_prove_full_inventory_or_unbounded_parameters"
+        complete = (coverage["succeeded"] == len(expected) and not missing_traces
+                    and not unexpected_calls and not unlinked_calls
+                    and report["inventory"]["status"] == "CAPTURED"
+                    and offered == expected and report["provider"]["status"] == "COMPLETED")
+        coverage["status"] = "PASS" if complete else "PARTIAL"
+        if complete:
+            report["reason"] = "local_function_coverage_complete; hosted_mcp_and_effects_not_fully_proven"
+        else:
+            report["reason"] = "active_catalogue_model_call_coverage_incomplete"
     return report

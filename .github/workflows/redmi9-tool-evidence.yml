@@ -1,0 +1,38 @@
+name: Redmi 9 candidate tool evidence
+
+on:
+  push:
+    branches: [fix/tools-execution-evidence]
+    paths-ignore:
+      - 'docs/screenshots/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: redmi9-app-server
+  cancel-in-progress: false
+
+jobs:
+  candidate_tools:
+    if: github.ref == 'refs/heads/fix/tools-execution-evidence'
+    runs-on: redmi9
+    timeout-minutes: 15
+    steps:
+      - name: Candidate status regression and real browser tool evidence
+        shell: bash
+        timeout-minutes: 15
+        env:
+          CI: 'true'
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
+          candidate_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-candidate-tools-", dir=".")).resolve())')
+          export RUNNER_TEMP="$candidate_temp"
+          export TMPDIR="$candidate_temp"
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
+            "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/redmi_candidate_tools_check.py" \
+            -o "$candidate_temp/redmi_candidate_tools_check.py"
+          python "$candidate_temp/redmi_candidate_tools_check.py"

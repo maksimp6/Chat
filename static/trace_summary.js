@@ -247,6 +247,15 @@
     var items = timeline.map(function (entry) {
       return entry.item;
     });
+    if (Array.isArray(trace.tool_calls) && !tools.length) {
+      items.push({
+        kind: "tool_evidence",
+        icon: "🔧",
+        label: "Вызовы инструментов: 0",
+        detail: "В трассе нет выполненных вызовов; текст ответа не подтверждает файловые операции.",
+        status: "",
+      });
+    }
 
     var usage = usageTotals(trace);
     var totalMs = durationMs(trace);
@@ -260,7 +269,7 @@
     var errorCount = failedToolCount + standaloneErrors.length;
     var parts = [];
     if (apiCount) parts.push(apiCount + " API");
-    if (tools.length) parts.push(tools.length + " инстр.");
+    if (Array.isArray(trace.tool_calls)) parts.push(tools.length + " инстр.");
     if (errorCount) parts.push(errorCount + " ош.");
     if (totalMs !== null) parts.push(formatDuration(totalMs));
 
