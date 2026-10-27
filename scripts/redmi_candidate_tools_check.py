@@ -21,11 +21,20 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
 REPOSITORY = "maksimp6/Chat"
 PORT = 8081
+REPLAY_SOURCES = {
+    "40446025539": Path("/data/data/com.termux/files/home/github-python-runner/work/"
+                        "fc911a6a-e4ef-59cc-9398-f692975d603f/"
+                        ".logos-candidate-tools-nbps7h0e/logos-candidate-tools-sc1uebyg"),
+}
 
 
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, *args):
         raise RuntimeError("local evidence endpoint redirected")
+
+
+class ReplayFinished(Exception):
+    """Leave the live-generation branch after an evidence-only replay."""
 
 
 LOCAL_HTTP = build_opener(ProxyHandler({}), NoRedirect())
@@ -234,6 +243,146 @@ def independent_file_effects(repo, fixture, executable, env, private):
     return result
 
 
+def replay_previous_run(run_id, repo, private, executable, env):
+    """Inspect the already-paid turn from a detached snapshot; no server/model starts."""
+    require(run_id in REPLAY_SOURCES, "replay run is not explicitly allowlisted")
+    previous = REPLAY_SOURCES[run_id].resolve(strict=True)
+    previous_repo = (previous / "repository").resolve(strict=True)
+    previous_report = json.loads((previous / "candidate-check.json").read_text(encoding="utf-8"))
+    require(previous_report.get("candidate_process_stopped") is True,
+            "prior run did not confirm its candidate stopped")
+    for process in Path("/proc").iterdir():
+        if not process.name.isdecimal():
+            continue
+        try:
+            cwd = (process / "cwd").resolve(strict=True)
+        except (OSError, RuntimeError):
+            continue
+        require(cwd != previous_repo, "a prior candidate process is still alive")
+    snapshot = private / "replay-source.memory"
+    make_snapshot(previous / "private/logos.memory", snapshot)
+    snapshot_bytes = snapshot.stat().st_size
+    snapshot_hash = hashlib.sha256()
+    with snapshot.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            snapshot_hash.update(block)
+    replay_env = dict(env, LOGOS_MEMORY_PATH=str(snapshot), ALICE_MEMORY_PATH=str(snapshot))
+    program = r'''
+import hashlib, json, pathlib, re, sys
+from agent_memory.client import close_memory_clients
+from storage.db import get_store, get_messages
+from invocation.manager import get_invocation
+from scripts.logos_tools_self_check import evaluate_tool_evidence, verify_file_effects
+
+old_repo, private = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+name_pattern = re.compile(r"[A-Za-z0-9_.:-]{1,128}\Z")
+nonce_pattern = re.compile(r"tmp/logos-tools-check-([0-9a-f]{32})")
+store = get_store()
+# The prior isolated candidate has no copied personal chat history. Search only
+# its own test-question records and retrieve only the selected conversation.
+questions = [row for row in store.items(prefix="chat/message/").values()
+             if isinstance(row, dict) and row.get("role") == "user"
+             and nonce_pattern.search(str(row.get("content") or ""))]
+if not questions:
+    raise RuntimeError("prior paid self-check question unavailable")
+selected = max(questions, key=lambda row: int(row["id"]))
+question, conversation_id = selected["content"], selected["conversation_id"]
+matches = set(nonce_pattern.findall(question))
+if len(matches) != 1:
+    raise RuntimeError("prior question has ambiguous nonce")
+nonce = matches.pop()
+folder = "tmp/logos-tools-check-" + nonce
+history = get_messages(conversation_id)
+position = next(index for index, row in enumerate(history) if row["id"] == selected["id"])
+turn = []
+for row in history[position:]:
+    if turn and row.get("role") == "user":
+        break
+    trace_ref = row.get("trace") if isinstance(row.get("trace"), dict) else {}
+    turn.append({"role": row.get("role"), "text": row.get("text"),
+                 "invocation_id": trace_ref.get("invocation_id")})
+invocation_ids = sorted({row["invocation_id"] for row in turn
+                         if row["role"] == "assistant" and isinstance(row["invocation_id"], str)})
+if not invocation_ids:
+    raise RuntimeError("prior paid assistant invocation unavailable")
+traces, lifecycles, provider_counts, executor_counts = {}, [], [], []
+statuses = {"completed", "incomplete", "failed", "cancelled", "queued", "in_progress", "created", "running"}
+reasons = {"max_output_tokens", "content_filter"}
+for identity in invocation_ids:
+    invocation = get_invocation(identity)
+    if not isinstance(invocation, dict) or invocation.get("conversation_id") != conversation_id:
+        raise RuntimeError("prior invocation does not bind to conversation")
+    trace = invocation.get("trace")
+    request = trace.get("request") if isinstance(trace, dict) else None
+    if not isinstance(request, dict) or request.get("message") != question:
+        raise RuntimeError("prior invocation does not bind to exact question")
+    traces[identity] = trace
+    raw = json.dumps(trace, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    (private / ("replayed-trace-" + identity + ".json")).write_bytes(raw)
+    lifecycles.append({"invocation_id": identity,
+                       "status": invocation.get("status") if invocation.get("status") in statuses else "UNKNOWN",
+                       "stored_trace_canonical_sha256": hashlib.sha256(raw).hexdigest(),
+                       "stored_trace_canonical_bytes": len(raw)})
+    calls = trace.get("tool_calls")
+    executor_counts.append(len(calls) if isinstance(calls, list) else "UNKNOWN")
+    for entry in trace.get("responses", []) if isinstance(trace.get("responses"), list) else []:
+        payload = entry.get("raw") if isinstance(entry, dict) else None
+        if not isinstance(payload, dict):
+            continue
+        output = payload.get("output")
+        count = 0
+        for item in output if isinstance(output, list) else []:
+            if not isinstance(item, dict):
+                continue
+            count += item.get("type") == "function_call"
+            if item.get("type") == "message":
+                count += sum(part.get("type") == "function_call" for part in
+                             (item.get("content") if isinstance(item.get("content"), list) else [])
+                             if isinstance(part, dict))
+        detail = payload.get("incomplete_details")
+        reason = detail.get("reason") if isinstance(detail, dict) else None
+        provider_counts.append({"status": payload.get("status") if payload.get("status") in statuses else "UNKNOWN",
+                                "reason": reason if reason in reasons else None,
+                                "function_calls": count if isinstance(output, list) else "UNKNOWN"})
+
+marker = "Активный каталог: "
+if marker in question:
+    names = question.rsplit(marker, 1)[1].strip().split(",")
+    if not names or any(not name_pattern.fullmatch(name) for name in names):
+        raise RuntimeError("recorded active catalogue malformed")
+    inventory_source = "exact_persisted_user_question_active_catalogue"
+else:
+    names = []
+    for trace in traces.values():
+        for request in trace.get("api_requests", []):
+            payload = request.get("payload") if isinstance(request, dict) else None
+            tools = payload.get("tools") if isinstance(payload, dict) else None
+            for tool in tools if isinstance(tools, list) else []:
+                if isinstance(tool, dict) and tool.get("type") == "function" and name_pattern.fullmatch(str(tool.get("name"))):
+                    names.append(tool["name"])
+    names = sorted(set(names))
+    inventory_source = "recorded_request_offered_functions_only; full_catalogue_unknown"
+oracle = evaluate_tool_evidence({"recorded_active": names}, ["recorded_active"], [], turn, traces, question)
+effects = verify_file_effects(old_repo, nonce, folder)
+summary = {"status": "READ", "new_model_requests": 0, "previous_candidate_process_stopped": True,
+           "inventory_source": inventory_source, "lifecycles": lifecycles,
+           "provider_responses": provider_counts, "executor_call_counts": executor_counts,
+           "tool_evidence": oracle, "independent_file_effects": effects,
+           "external_charge_verified": False}
+print("REPLAY_SUMMARY_JSON=" + json.dumps(summary, ensure_ascii=False))
+close_memory_clients()
+'''
+    output = command([str(executable), "-c", program, str(previous_repo), str(private)],
+                     cwd=repo, env=replay_env, timeout=90, log=private / "replay.log")
+    lines = [line for line in output.decode("utf-8").splitlines() if line.startswith("REPLAY_SUMMARY_JSON=")]
+    require(len(lines) == 1, "replay did not return one structured result")
+    result = json.loads(lines[0].split("=", 1)[1])
+    require(isinstance(result, dict) and result.get("status") == "READ", "replay evidence unreadable")
+    result.update(source_run_id=run_id, storage_snapshot_sha256=snapshot_hash.hexdigest(),
+                  storage_snapshot_bytes=snapshot_bytes)
+    return result
+
+
 def write_report(report, directory):
     report_path = directory / "candidate-check.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -298,12 +447,37 @@ def main():
             # regression without spending on a model. Browser evidence follows.
             result = subprocess.run([str(executable), "-m", "pytest", "-q",
                                      "tests/test_provider_terminal_status.py",
-                                     "tests/test_logos_tools_self_check.py"],
+                                     "tests/test_logos_tools_self_check.py",
+                                     "tests/test_redmi_rdp_long_string.py"],
                                     cwd=repo, env=environment, capture_output=True, timeout=120)
             (private / "regressions.log").write_bytes(result.stdout + result.stderr)
             print((result.stdout + result.stderr).decode("utf-8", "replace")[-50000:], flush=True)
             require(result.returncode == 0, "candidate regression tests failed")
         phase(report, "terminal_status_and_evidence_regressions", regressions)
+        node = shutil.which("node")
+        if node:
+            def javascript_regressions():
+                for index, arguments in enumerate((["tests/test_trace_summary.js"],
+                                                    ["--test", "tests/test_ui_trace_summary.js"])):
+                    output = command([node, *arguments], cwd=repo, env=environment, timeout=60,
+                                     log=private / ("javascript-regression-" + str(index) + ".log"))
+                    print(output.decode("utf-8", "replace")[-20000:], flush=True)
+            phase(report, "trace_summary_javascript_regressions", javascript_regressions)
+        else:
+            report["phases"].append({"phase": "trace_summary_javascript_regressions", "status": "NOT_RUN",
+                                     "reason": "installed_node_unavailable"})
+        replay_run = os.environ.get("LOGOS_REPLAY_RUN")
+        if replay_run:
+            report["replay"] = phase(report, "replay_already_paid_browser_turn", lambda:
+                replay_previous_run(replay_run, repo, private, executable, environment))
+            report["new_model_requests"] = 0
+            report["model_evidence"] = report["replay"]["tool_evidence"].get("status", "NOT_RUN")
+            report["tool_coverage"] = report["replay"]["tool_evidence"].get("coverage", {})
+            report["independent_file_effects"] = report["replay"]["independent_file_effects"]
+            report["status"] = "PASS" if (report["tool_coverage"].get("status") == "PASS"
+                                              and report["independent_file_effects"].get("status") == "PASS") else "FAIL"
+            failed = report["status"] != "PASS"
+            raise ReplayFinished()
         phase(report, "isolated_private_credential_snapshot",
               lambda: isolated_state(repo, private, production_state, executable, environment))
 
@@ -365,6 +539,8 @@ def main():
             raise RuntimeError("browser evidence manifest unavailable")
         require(not failed, "capture failed after preserving available evidence")
         report["status"] = "PASS"
+    except ReplayFinished:
+        pass
     except Exception:
         failed = True
         report["status"] = "FAIL"

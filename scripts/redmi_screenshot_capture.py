@@ -330,12 +330,40 @@ class RDP:
                 if result.get("hasException"):
                     raise RuntimeError("The browser action failed")
                 value = result.get("result")
+                if isinstance(value, dict) and value.get("type") == "longString":
+                    value = self.read_long_string(value)
                 if not isinstance(value, str):
                     raise RuntimeError("Unexpected browser reply")
                 return json.loads(value)
             if result.get("error"):
                 raise RuntimeError("DevTools evaluation failed")
         raise RuntimeError("Missing browser result")
+
+    def read_long_string(self, grip):
+        # Firefox returns large evaluation strings by actor reference. Read the
+        # immutable value through the RDP substring API, never truncate a trace.
+        actor, length = grip.get("actor"), grip.get("length")
+        if (not isinstance(actor, str) or not actor or type(length) is not int
+                or length < 0 or length > 8 * 1024 * 1024):
+            raise RuntimeError("Invalid or oversized DevTools long string")
+        chunks = []
+        for start in range(0, length, 32768):
+            end = min(length, start + 32768)
+            self.send({"to": actor, "type": "substring", "start": start, "end": end})
+            for _ in range(200):
+                reply = self.receive()
+                if reply.get("from") != actor:
+                    continue
+                chunk = reply.get("substring")
+                if reply.get("error") or not isinstance(chunk, str):
+                    raise RuntimeError("DevTools long string read failed")
+                if len(chunk.encode("utf-16-le", "surrogatepass")) // 2 != end - start:
+                    raise RuntimeError("Incomplete DevTools long string")
+                chunks.append(chunk)
+                break
+            else:
+                raise RuntimeError("Missing DevTools long string reply")
+        return "".join(chunks).encode("utf-16-le", "surrogatepass").decode("utf-16-le")
 
     def find_logos(self):
         candidates = []
@@ -512,17 +540,23 @@ class RDP:
         return self.evaluate(actor, "JSON.stringify((()=>{const x=new XMLHttpRequest();"
                              "x.open('GET','/api/invocations/'+encodeURIComponent(" + json.dumps(invocation_id) +
                              ")+'/trace',false);x.send();if(x.status!==200)return {http_status:x.status};"
-                             "const t=JSON.parse(x.responseText);const out=r=>(r.output||[]).flatMap(i=>"
-                             "i.type==='function_call'?[i]:i.type==='message'?(i.content||[]).filter(c=>c.type==='function_call'):[])"
-                             ".map(i=>({type:'function_call',name:i.name,call_id:i.call_id,status:i.status}));"
+                             "const t=JSON.parse(x.responseText);const id=v=>typeof v==='string'&&"
+                             "/^[-A-Za-z0-9_:]{1,180}$/.test(v)&&!/gh[pousr]_|github_pat_|sk-|AQVN|BEGIN/i.test(v)?v:null;"
+                             "const state=v=>v==null?null:['completed','incomplete','failed','cancelled','queued','in_progress'].includes(v)?v:'UNKNOWN';"
+                             "const out=r=>(r.output||[]).flatMap(i=>"
+                             "i.type==='function_call'?[i]:i.type==='message'&&(i.status==null||i.status==='completed')?"
+                             "(i.content||[]).filter(c=>c.type==='function_call'):[])"
+                             ".map(i=>({type:'function_call',name:id(i.name),call_id:id(i.call_id),status:state(i.status)}));"
                              "return {context:{invocation_id:t.context?.invocation_id},"
                              "errors:(t.errors||[]).map(e=>({type:e.type||'unknown'})),"
-                             "responses:(t.responses||[]).map(r=>({step:r.step,response_id:r.response_id,raw:{"
-                             "id:r.raw?.id,status:r.raw?.status,incomplete_details:{reason:r.raw?.incomplete_details?.reason},"
-                             "error:r.raw?.error!=null?{code:r.raw.error.code||'provider_error'}:null,output:out(r.raw||{})}})),"
+                             "responses:(t.responses||[]).map(r=>({step:r.step,response_id:id(r.response_id),raw:{"
+                             "id:id(r.raw?.id),status:state(r.raw?.status),incomplete_details:{reason:"
+                             "['max_output_tokens','content_filter'].includes(r.raw?.incomplete_details?.reason)?"
+                             "r.raw.incomplete_details.reason:null},"
+                             "error:r.raw?.error!=null?{present:true}:null,output:out(r.raw||{})}})),"
                              "api_requests:(t.api_requests||[]).map(r=>({step:r.step,payload:{tools:(r.payload?.tools||[])"
                              ".map(i=>({type:i.type,name:i.name||i.function?.name}))}})),"
-                             "tool_calls:(t.tool_calls||[]).map(c=>({name:c.name||c.tool_name,call_id:c.call_id,"
+                             "tool_calls:(t.tool_calls||[]).map(c=>({name:id(c.name||c.tool_name),call_id:id(c.call_id),"
                              "step:c.step,error:!!c.error,result:{success:c.result?.success,"
                              "metadata:{phase:c.result?.metadata?.phase}},status:c.status})),"
                              "events:(t.events||[]).filter(e=>e.type==='api_request_manifest'||e.event==='api_request_manifest')};})())")

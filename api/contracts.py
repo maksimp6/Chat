@@ -148,6 +148,8 @@ TRACE_CONTEXT = _object(
         "user_id": NONEMPTY_STRING,
         "owner_id": NONEMPTY_STRING,
         "provider_key_id": NONEMPTY_STRING,
+        "agent_id": NONEMPTY_STRING,
+        "runtime_id": NONEMPTY_STRING,
     },
 )
 

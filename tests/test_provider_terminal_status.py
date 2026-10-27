@@ -217,3 +217,57 @@ def test_actual_completed_payload_completes_invocation(terminal_chat, monkeypatc
     assert invocation["status"] == "completed"
     assert invocation["result"]["provider_status"] == "completed"
     assert get_messages("terminal-chat")[-1]["source"] is None
+
+
+def test_trace_endpoint_returns_complete_native_rich_trace(terminal_chat, monkeypatch):
+    """Exercise HTTP serialization and its contract, not only direct store reads."""
+    client, routes, _ = terminal_chat
+    call = {
+        "type": "function_call", "name": "read_file", "call_id": "rich-read-call",
+        "arguments": '{"path":"fixture.txt"}', "status": "completed",
+    }
+    initial = {"id": "rich-tools-response", "status": "completed", "output": [call]}
+    final = provider_payload(text="Проверка завершена.")
+    final["id"] = "rich-final-response"
+
+    def transport(self, *, trace, **kwargs):
+        trace.set_context(agent_id="regression-agent", runtime_id="regression-runtime")
+        trace.set_reasoning_plan({"plan_id": "rich-plan", "steps": [{"tool": "read_file"}]})
+        trace.add_api_request({"tools": [{
+            "type": "function", "name": "read_file",
+            "parameters": {"type": "object", "properties": {"path": {"type": "string"}}},
+        }]}, step_index=1)
+        trace.add_response(copy.deepcopy(initial), step_index=1)
+        # Contract fixture only: trace the local deterministic fixture callback.
+        # Real tool/provider execution is checked separately by the browser run.
+        trace.track_tool_execution(
+            "read_file", {"path": "fixture.txt"},
+            lambda: {"success": True, "data": {"content": "fixture content"},
+                     "metadata": {"phase": "execution", "executor": "local"}},
+            call_id="rich-read-call", step=1,
+        )
+        trace.add_api_request({"input": [{
+            "type": "function_call_output", "call_id": "rich-read-call", "output": "fixture content",
+        }]}, step_index=2)
+        trace.add_response(copy.deepcopy(final), step_index=2)
+        return copy.deepcopy(final)
+
+    monkeypatch.setattr(routes.LogosClient, "ask_with_mcp", transport)
+    answer = client.post("/api/chat", json={
+        "conversation_id": "terminal-chat", "message": "Проверь файл",
+        "model": "yandexgpt-5-pro",
+    })
+    assert answer.status_code == 200, answer.get_json()
+    invocation_id = answer.get_json()["invocation_id"]
+    response = client.get(f"/api/invocations/{invocation_id}/trace")
+    assert response.status_code == 200, response.get_json()
+    body = response.get_json()
+    assert body["context"]["invocation_id"] == invocation_id
+    assert body["context"]["agent_id"] == "regression-agent"
+    assert body["context"]["runtime_id"] == "regression-runtime"
+    assert body["reasoning_plan"] == {"plan_id": "rich-plan", "steps": [{"tool": "read_file"}]}
+    assert body["api_requests"][0]["payload"]["tools"][0]["name"] == "read_file"
+    assert body["responses"][0]["raw"] == initial
+    assert body["responses"][-1]["raw"] == final
+    assert body["tool_calls"][0]["call_id"] == "rich-read-call"
+    assert body["tool_calls"][0]["result"]["success"] is True
