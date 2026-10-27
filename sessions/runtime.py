@@ -8,7 +8,7 @@ backend.
 
 from __future__ import annotations
 from core.env import env_require, env_snapshot
-from core.wikifunctions import clamp_integer
+from core.wikifunctions import clamp_integer, trim_string
 
 import json
 import os
@@ -84,7 +84,7 @@ class VirtualLowConsumptionServer:
             return self.runtime_id
 
     def execute(self, command: str, timeout: Optional[int] = None) -> dict[str, Any]:
-        if not isinstance(command, str) or not command.strip():
+        if not isinstance(command, str) or not trim_string(command):
             raise ValueError("command must be a non-empty string")
 
         with self._lock:

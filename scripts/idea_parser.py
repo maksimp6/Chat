@@ -26,6 +26,8 @@ from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
+from core.wikifunctions import lowercase_string, trim_string
+
 OFFER_MARKERS = [
     "если хочешь",
     "патчплейт",
@@ -93,7 +95,7 @@ def _model_category(low: str) -> str:
 
 def classify_sentence(role: str, text: str) -> str:
     """Return the category of a single dialogue sentence."""
-    low = text.lower()
+    low = lowercase_string(text)
     if any(m in low for m in OFFER_MARKERS) or OPENING_OFFER.match(low):
         return "offer"
     if role != "OWNER":
@@ -104,7 +106,12 @@ def classify_sentence(role: str, text: str) -> str:
 def split_sentences(text: str) -> list[str]:
     """Split a dialogue value into candidate sentences."""
     parts = re.split(r"(?<=[.!?…])\s+(?=[А-ЯЁA-Z«\"'])", text)
-    return [p.strip().strip("*`") for p in parts if 10 < len(p.strip()) < 600]
+    sentences = []
+    for part in parts:
+        stripped = trim_string(part)
+        if 10 < len(stripped) < 600:
+            sentences.append(stripped.strip("*`"))
+    return sentences
 
 
 def parse_deeplink_json(data: dict[str, Any]) -> Generator[tuple[str, str, str], None, None]:
@@ -126,14 +133,15 @@ def parse_markdown(text: str) -> Generator[tuple[str, str, str], None, None]:
     current: str | None = None
     buf: list[str] = []
     for line in text.splitlines():
-        stripped = line.strip()
-        head = stripped.split(":", 1)[0].strip().lower()
+        stripped = trim_string(line)
+        head_parts = stripped.split(":", 1)
+        head = lowercase_string(trim_string(head_parts[0]))
         role = speaker_lines.get(head)
         if role:
             if current and buf:
                 yield current, "", "\n".join(buf)
             current = role
-            buf = [stripped.split(":", 1)[1].strip()] if ":" in stripped else []
+            buf = [trim_string(head_parts[1])] if len(head_parts) > 1 else []
         elif current:
             buf.append(line)
     if current and buf:
@@ -185,7 +193,7 @@ def run_parser(input_path: Path, out_dir: Path, src: str) -> tuple[int, Counter[
             if cat == "proposal":
                 proposals.append({"role": role, "ts": ts, "quote": sent, "source": src})
             elif cat == "offer":
-                key = next((m for m in OFFER_MARKERS if m in sent.lower()), "unknown")
+                key = next((m for m in OFFER_MARKERS if m in lowercase_string(sent)), "unknown")
                 offers[key] += 1
             elif cat == "question":
                 questions.append({"role": role, "ts": ts, "quote": sent, "source": src})

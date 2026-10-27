@@ -1,5 +1,6 @@
 from __future__ import annotations
 from core.env import env_get
+from core.wikifunctions import trim_string
 
 import json
 from typing import Any, Mapping, Optional
@@ -24,7 +25,7 @@ def _public_base_url() -> str:
 
 
 def _sanitize_error_string(value: Any) -> str:
-    text = str(value or "").strip()
+    text = trim_string(str(value or ""))
     if not text:
         return ""
     if "Traceback (most recent call last):" in text:
@@ -106,12 +107,12 @@ def _error_response(
 def _request_protocol_version(payload: Mapping[str, Any]) -> str:
     header = request.headers.get("MCP-Protocol-Version")
     if header:
-        return header.strip()
+        return trim_string(header)
     params = payload.get("params")
     meta = params.get("_meta") if isinstance(params, Mapping) else None
     if isinstance(meta, Mapping):
         return (
-            str(meta.get("io.modelcontextprotocol/protocolVersion") or "").strip()
+            trim_string(str(meta.get("io.modelcontextprotocol/protocolVersion") or ""))
             or DEFAULT_PROTOCOL_VERSION
         )
     return DEFAULT_PROTOCOL_VERSION

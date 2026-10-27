@@ -7,6 +7,7 @@ It deliberately has no HTTP, database, tracing, or MCP side effects.
 import math
 
 from core.config import get_model_uri
+from core.wikifunctions import lowercase_string, trim_string
 from yandex_client_modules.errors import YandexClientError
 from core.model_profiles import ultra_profiles, ultra_reasoning_controllable, ultra_request_defaults
 from yandex_client_modules.metadata_validator import validate_metadata
@@ -69,7 +70,7 @@ def validate_generation_params(params):
             raise ValueError("top_logprobs must be an integer between 0 and 20")
     if "previous_response_id" in validated:
         value = validated["previous_response_id"]
-        if not isinstance(value, str) or not value.strip():
+        if not isinstance(value, str) or not trim_string(value):
             raise ValueError("previous_response_id must be a non-empty string")
     for name in ("instructions", "prompt_cache_key"):
         if name in validated and not isinstance(validated[name], str):
@@ -113,7 +114,7 @@ def validate_generation_params(params):
                 if not isinstance(text_format.get("schema"), dict):
                     raise ValueError("text.format.schema must be an object")
                 name = text_format.get("name")
-                if not isinstance(name, str) or not name.strip():
+                if not isinstance(name, str) or not trim_string(name):
                     raise ValueError("text.format.name must be a non-empty string")
                 if "strict" in text_format and not isinstance(text_format["strict"], bool):
                     raise ValueError("text.format.strict must be a boolean")
@@ -126,10 +127,10 @@ def validate_generation_params(params):
                 raise ValueError("tool_choice must be auto, none, required or a typed object")
         elif isinstance(choice, dict):
             choice_type = choice.get("type")
-            if not isinstance(choice_type, str) or not choice_type.strip():
+            if not isinstance(choice_type, str) or not trim_string(choice_type):
                 raise ValueError("tool_choice.type must be a non-empty string")
             if choice_type == "function" and (
-                not isinstance(choice.get("name"), str) or not choice["name"].strip()
+                not isinstance(choice.get("name"), str) or not trim_string(choice["name"])
             ):
                 raise ValueError("tool_choice.name must be a non-empty string for a function")
         else:
@@ -295,7 +296,7 @@ def chat_completion_to_response(data):
     text = (first.get("message") or {}).get("content")
     if finish_reason == "content_filter":
         raise YandexClientError("answer was withheld by the content filter")
-    if not isinstance(text, str) or not text.strip():
+    if not isinstance(text, str) or not trim_string(text):
         raise YandexClientError("chat completion returned no text")
     usage = data.get("usage") or {}
     incomplete = finish_reason == "length"
@@ -431,9 +432,9 @@ def _clean_mcp_tool(tool):
     if not isinstance(tool, dict) or tool.get("type") != "mcp":
         return None
     cid = str(tool.get("connector_id") or "")
-    url = str(tool.get("server_url") or "").strip()
+    url = trim_string(str(tool.get("server_url") or ""))
     # The server credential is sent to the endpoint, so it may only go to an https URL.
-    if url and not url.lower().startswith("https://"):
+    if url and not lowercase_string(url).startswith("https://"):
         return None
     if not url and not cid.startswith("connector_"):
         return None
@@ -460,7 +461,7 @@ def _clean_tools(tools):
         if (
             not isinstance(tool, dict)
             or not isinstance(tool.get("type"), str)
-            or not tool["type"].strip()
+            or not trim_string(tool["type"])
         ):
             raise ValueError("tools must be a list of typed objects")
         if tool.get("type") == "mcp":

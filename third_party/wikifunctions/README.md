@@ -10,8 +10,8 @@ files identify their changes. No Wikifunctions service is called at runtime.
 | Z21951 Clamp | Z21953, 162115 | `core.wikifunctions.clamp_integer` | File-search result count; HTTP/shell/session timeouts; two Cloud.ru list limits |
 | Z12316 regex replacement | Z12317, 285821 | `LogosWikifunctions.replaceRegex` | Browser text whitespace normalization; trace export filenames |
 | Z10079 trim | Z10081, 143512 | `LogosWikifunctions.trim` | Browser text whitespace normalization |
-| Z10079 trim (Python) | Z10082, 143513 | `core.wikifunctions.trim_string` | Conversation titles; browser semantic/pipeline and retrieval data; provider, quota and theme normalization |
-| Z10047 lowercase (Python) | Z10050, 207180 | `core.wikifunctions.lowercase_string` | Agent memory keys; browser mode/role and provider, quota, theme normalization; MCP/log keys |
+| Z10079 trim (Python) | Z10082, 143513 | `core.wikifunctions.trim_string` | Conversation titles; browser data; agent memory/context; request validation; MCP protocol; tool config; provider, quota, theme and dialogue parsing |
+| Z10047 lowercase (Python) | Z10050, 207180 | `core.wikifunctions.lowercase_string` | Agent memory keys; browser/provider/quota/theme normalization; MCP/log keys; request URL scheme and dialogue parser |
 | Z10047 lowercase string | Z10048, 207179 | `LogosWikifunctions.lowercase` | UI status/role normalization; browser emulator |
 | Z10018 uppercase string | Z10019, 216191 | `LogosWikifunctions.uppercase` | Trace labels; browser emulator |
 | Z22583 mean of float64 list | Z22587, 168295 | `core.wikifunctions.mean_float64_list` | Agent office reviews per merge |
@@ -19,7 +19,7 @@ files identify their changes. No Wikifunctions service is called at runtime.
 
 ## Shared operations
 
-Sixty-one existing string operation call sites use the pinned adapters: 26 JavaScript calls (17 case conversions and nine trims) and 35 Python calls (23 trims and 12 lowercases). The two KPI properties also use the pinned mean and median. Repeated state and boolean normalization now computes the trimmed/lowercase value once.
+Ninety-six existing string operation call sites use the pinned adapters: 26 JavaScript calls (17 case conversions and nine trims) and 70 Python calls (53 trims and 17 lowercases). The two KPI properties also use the pinned mean and median. Repeated state, boolean and evidence-reference normalization now runs once. JSON/map helpers remain unadopted because duplicate-key rejection and first-match lookup do not have a confirmed exact match.
 
 ## Static function inventory
 

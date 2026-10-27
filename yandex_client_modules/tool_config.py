@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.wikifunctions import clamp_integer
+from core.wikifunctions import clamp_integer, lowercase_string, trim_string
 
 
 def file_search_max_results(value: Any) -> int:
@@ -19,7 +19,7 @@ def _enabled(value: Any, path: str) -> bool:
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
-        normalized = value.strip().lower()
+        normalized = lowercase_string(trim_string(value))
         if normalized in {"true", "false"}:
             return normalized == "true"
     raise ValueError(f"{path} must be a boolean or the string true/false")
@@ -35,7 +35,7 @@ def _entries(value: Any, path: str) -> list[str]:
 
     # Accept text inputs, JSON string arrays and older literal backslash-n separators.
     entries = (
-        part.strip()
+        trim_string(part)
         for item in values
         for part in item.replace("\\r\\n", "\n").replace("\\n", "\n").replace(",", "\n").splitlines()
     )

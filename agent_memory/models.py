@@ -9,7 +9,7 @@ import re
 import time
 import uuid
 
-from core.wikifunctions import lowercase_string
+from core.wikifunctions import lowercase_string, trim_string
 from observability.trace_security import sanitize_trace_value
 
 
@@ -99,7 +99,7 @@ class MemoryRecord:
 
     def __post_init__(self) -> None:
         for name in ("memory_id", "kind", "scope", "text", "source_version"):
-            value = _clean_text(getattr(self, name)).strip()
+            value = trim_string(_clean_text(getattr(self, name)))
             if not value:
                 raise ValueError(f"{name} is required")
             object.__setattr__(self, name, value)
@@ -115,11 +115,11 @@ class MemoryRecord:
         object.__setattr__(self, "confidence", float(self.confidence))
 
         provenance = _sanitize_memory_value(dict(self.provenance))
-        source_type = str(provenance.get("source_type") or "").strip()
+        source_type = trim_string(str(provenance.get("source_type") or ""))
         refs = provenance.get("refs")
         if not source_type or not isinstance(refs, list | tuple) or not refs:
             raise ValueError("provenance requires source_type and non-empty refs")
-        if source_type == "github" and not str(provenance.get("repository") or "").strip():
+        if source_type == "github" and not trim_string(str(provenance.get("repository") or "")):
             raise ValueError("GitHub provenance requires repository")
         object.__setattr__(self, "provenance", _freeze(provenance))
 
@@ -133,7 +133,7 @@ class MemoryRecord:
         object.__setattr__(
             self,
             "visibility",
-            tuple(sorted(set(_clean_text(item).strip() for item in self.visibility if item))),
+            tuple(sorted(set(trim_string(_clean_text(item)) for item in self.visibility if item))),
         )
 
         for name in ("created_at", "updated_at"):
@@ -149,7 +149,7 @@ class MemoryRecord:
             object.__setattr__(self, "expires_at", expires_at)
         if self.superseded_by is not None:
             object.__setattr__(
-                self, "superseded_by", _clean_text(self.superseded_by).strip() or None
+                self, "superseded_by", trim_string(_clean_text(self.superseded_by)) or None
             )
 
     @classmethod

@@ -8,6 +8,7 @@ import json
 from types import MappingProxyType
 from typing import Any, Mapping
 
+from core.wikifunctions import trim_string
 from observability.trace_security import sanitize_trace_value
 
 
@@ -63,7 +64,7 @@ class TaskScope:
 
     def __post_init__(self) -> None:
         for name in ("repository", "work_item", "base_sha", "head_sha", "role"):
-            value = _clean_text(getattr(self, name)).strip()
+            value = trim_string(_clean_text(getattr(self, name)))
             if not value:
                 raise ValueError(f"{name} is required")
             object.__setattr__(self, name, value)
@@ -99,7 +100,7 @@ class EvidenceVersion:
     def __post_init__(self) -> None:
         for name in _EVIDENCE_COMPONENTS:
             object.__setattr__(self, name, _clean_text(getattr(self, name)))
-        if not self.task.strip():
+        if not trim_string(self.task):
             raise ValueError("task evidence version is required")
 
     def as_dict(self) -> dict[str, str]:
@@ -123,10 +124,12 @@ class EvidenceRef:
     version: str = ""
 
     def __post_init__(self) -> None:
-        if not _clean_text(self.kind).strip() or not _clean_text(self.ref).strip():
+        kind = trim_string(_clean_text(self.kind))
+        ref = trim_string(_clean_text(self.ref))
+        if not kind or not ref:
             raise ValueError("evidence kind and ref are required")
-        object.__setattr__(self, "kind", _clean_text(self.kind).strip())
-        object.__setattr__(self, "ref", _clean_text(self.ref).strip())
+        object.__setattr__(self, "kind", kind)
+        object.__setattr__(self, "ref", ref)
         object.__setattr__(self, "version", _clean_text(self.version))
 
     def as_dict(self) -> dict[str, str]:
@@ -144,7 +147,7 @@ class ContextSlice:
     input_tokens: int = 0
 
     def __post_init__(self) -> None:
-        name = _clean_text(self.name).strip()
+        name = trim_string(_clean_text(self.name))
         if not name:
             raise ValueError("slice name is required")
         unknown = sorted(set(self.depends_on) - set(_EVIDENCE_COMPONENTS))
@@ -198,8 +201,8 @@ class TaskPacket:
     escalation_target: str | None = None
 
     def __post_init__(self) -> None:
-        objective = _clean_text(self.objective).strip()
-        deliverable = _clean_text(self.expected_deliverable).strip()
+        objective = trim_string(_clean_text(self.objective))
+        deliverable = trim_string(_clean_text(self.expected_deliverable))
         if not objective or not deliverable:
             raise ValueError("objective and expected_deliverable are required")
         object.__setattr__(self, "objective", objective)
@@ -215,7 +218,7 @@ class TaskPacket:
         object.__setattr__(
             self,
             "budget_tier",
-            _clean_text(self.budget_tier).strip() or "normal",
+            trim_string(_clean_text(self.budget_tier)) or "normal",
         )
         clean_usage = sanitize_trace_value(dict(self.usage))
         object.__setattr__(self, "usage", _freeze_value(dict(clean_usage)))
