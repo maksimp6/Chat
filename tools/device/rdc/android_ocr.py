@@ -1,5 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/python
 """Read-only local OCR for RDC Android screenshots. No automated taps."""
+from core.wikifunctions import trim_string
+
 from core.env import env_snapshot
 
 import argparse
@@ -27,7 +29,7 @@ def recognize(image: Path, minimum: float = 60.0) -> list[dict]:
     )
     words = []
     for item in csv.DictReader(io.StringIO(result.stdout), delimiter="\t"):
-        token = (item.get("text") or "").strip()
+        token = trim_string((item.get("text") or ""))
         try:
             confidence = float(item.get("conf", "-1"))
         except ValueError:
@@ -55,7 +57,7 @@ def main():
     parser.add_argument("--text", default="")
     parser.add_argument("--min-confidence", type=float, default=60)
     args = parser.parse_args()
-    if args.command == "find" and not args.text.strip():
+    if args.command == "find" and not trim_string(args.text):
         parser.error("--text is required for find")
     if not 0 <= args.min_confidence <= 100:
         parser.error("--min-confidence must be 0..100")

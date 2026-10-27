@@ -5,6 +5,8 @@
 фонарик, виброотклик, яркость, громкость, контакты, SMS и камера.
 """
 
+from core.wikifunctions import lowercase_string, trim_string
+
 import subprocess
 import json
 import logging
@@ -23,8 +25,8 @@ def _run_termux_cmd(cmd: list, timeout: int = 15) -> dict:
         }
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
-        stdout = proc.stdout.strip()
-        stderr = proc.stderr.strip()
+        stdout = trim_string(proc.stdout)
+        stderr = trim_string(proc.stderr)
 
         if proc.returncode != 0:
             return {"success": False, "error": stderr or f"Код возврата {proc.returncode}"}
@@ -137,7 +139,7 @@ def set_torch(args: dict, cfg: dict = None) -> dict:
     """Включить или выключить фонарик смартфона."""
     enabled = args.get("enabled", True)
     if isinstance(enabled, str):
-        enabled = enabled.lower() in ("true", "1", "on")
+        enabled = lowercase_string(enabled) in ("true", "1", "on")
     state = "on" if enabled else "off"
     return _run_termux_cmd(["termux-torch", state])
 
@@ -201,7 +203,7 @@ def take_photo(args: dict, cfg: dict = None) -> dict:
     camera_id = str(args.get("camera_id", "0"))
     if camera_id not in {"0", "1"}:
         return {"error": "Параметр 'camera_id' должен быть 0 или 1"}
-    name = os.path.basename(str(args.get("output_path") or "").strip())
+    name = os.path.basename(trim_string(str(args.get("output_path") or "")))
     if not name or name in {".", ".."}:
         return {"error": "Параметр 'output_path' обязателен и задаёт имя файла"}
     photo_dir = (cfg or {}).get("photo_dir") or os.path.join(

@@ -1,5 +1,7 @@
 """Merge noisy OCR observations into stable screen state; read-only."""
 
+from core.wikifunctions import trim_string
+
 import re
 
 
@@ -14,7 +16,7 @@ class StateMerger:
 
     @staticmethod
     def _system_text(node):
-        text = node.get("text", "").strip()
+        text = trim_string(node.get("text", ""))
         return bool(re.fullmatch(r"\d{1,2}:\d{2}(?:\s.*)?", text))
 
     @staticmethod

@@ -1,5 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/python
 """Live Server Android actions bound to a trusted target; no arbitrary shell."""
+from core.wikifunctions import lowercase_string, trim_string
+
 from core.env import env_get, env_snapshot
 
 import argparse
@@ -23,7 +25,7 @@ def adb(*args, binary=False):
     p = subprocess.run(
         ["adb", *map(str, args)], env=ENV, capture_output=True, check=True, timeout=12
     )
-    return p.stdout if binary else p.stdout.decode(errors="replace").strip()
+    return p.stdout if binary else trim_string(p.stdout.decode(errors="replace"))
 
 
 def device():
@@ -58,7 +60,7 @@ def device():
             listed += 1
     if listed != 1:
         raise RuntimeError("Pinned Redmi 9 transport unavailable")
-    actual = adb("-s", serial, "shell", "settings", "get", "secure", "android_id").strip().lower()
+    actual = lowercase_string(trim_string(adb("-s", serial, "shell", "settings", "get", "secure", "android_id")))
     if not re.fullmatch(r"[0-9a-f]{16}", actual) or not secrets.compare_digest(
         actual, data["android_id"]
     ):
@@ -80,7 +82,7 @@ def keyguard_state(window_dump):
     )
     if not values:
         return True
-    return any(value.lower() == "true" for value in values)
+    return any(lowercase_string(value) == "true" for value in values)
 
 
 def action(a):

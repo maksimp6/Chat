@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 import math
 import threading
 import time
@@ -22,7 +24,7 @@ class ResultPending(RuntimeError):
 def _validate_collection(
     operation_id: str, timeout_s: float, max_polls: int, initial_wait_s: float
 ) -> None:
-    if not isinstance(operation_id, str) or not operation_id.strip():
+    if not isinstance(operation_id, str) or not trim_string(operation_id):
         raise ValueError("original operation_id is required")
     if type(max_polls) is not int or not 1 <= max_polls <= 8:
         raise ValueError("max_polls must be an integer in 1..8")
@@ -50,7 +52,7 @@ class RdcTask(Generic[T]):
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         if not all(
-            isinstance(value, str) and value.strip()
+            isinstance(value, str) and trim_string(value)
             for value in (owner_id, device_id, invocation_id)
         ):
             raise ValueError("owner, device and invocation are required")
@@ -87,7 +89,7 @@ class RdcTask(Generic[T]):
         A new explicit observation ID always requests fresh evidence. Cached
         evidence must not be reused as the current screen for later actions.
         """
-        if not isinstance(observation_id, str) or not observation_id.strip():
+        if not isinstance(observation_id, str) or not trim_string(observation_id):
             raise ValueError("observation_id is required")
         if not math.isfinite(max_age_s) or not 0 <= max_age_s <= 5:
             raise ValueError("observation reuse must be in 0..5 seconds")

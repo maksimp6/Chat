@@ -1,6 +1,8 @@
 """Provider-backed model discovery with a bounded in-process cache."""
 
 from __future__ import annotations
+from core.wikifunctions import trim_string
+
 from core.env import env_get
 
 import hashlib
@@ -143,9 +145,11 @@ class ModelDiscovery:
         if not isinstance(item, dict):
             return None
         raw_id = item.get("id") or item.get("model") or item.get("name")
-        if not isinstance(raw_id, str) or not raw_id.strip():
+        if not isinstance(raw_id, str):
             return None
-        raw_id = raw_id.strip()
+        raw_id = trim_string(raw_id)
+        if not raw_id:
+            return None
         if any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in raw_id):
             return None
         if "?" in raw_id or "#" in raw_id:
@@ -220,7 +224,7 @@ class ModelDiscovery:
         # Never reduce them to the base family or silently select its latest.
         registry_key = registry_key or raw_id
         name = item.get("name")
-        if not isinstance(name, str) or not name.strip():
+        if not isinstance(name, str) or not trim_string(name):
             name = existing.get("name") or model_id
         capabilities = item.get("capabilities")
         if not isinstance(capabilities, dict):
@@ -319,9 +323,12 @@ def validate_dialog_model(model_key: str) -> str:
     require an available text entry in the active credential's provider catalog.
     This function only reads credentials/catalogs; it never changes storage.
     """
-    if not isinstance(model_key, str) or not model_key.strip():
+    if not isinstance(model_key, str):
         raise ValueError("model is required")
-    model_key = canonical_model_key(model_key.strip())
+    model_key = trim_string(model_key)
+    if not model_key:
+        raise ValueError("model is required")
+    model_key = canonical_model_key(model_key)
     if model_key in EMBEDDING_MODELS or model_key in CLASSIFIER_MODELS:
         raise ValueError("service models cannot be used for dialogs")
     for registry in (TEXT_MODELS, VOICE_MODELS, IMAGE_MODELS):

@@ -1,5 +1,7 @@
 """Infer conservative spatial and semantic relationships from OCR lines."""
 
+from core.wikifunctions import trim_string
+
 import re
 
 
@@ -10,7 +12,7 @@ def build_tree(nodes):
     relations = []
     current = None
     for node in ordered:
-        text = node["text"].strip()
+        text = trim_string(node["text"])
         x, y, w, h = node["bbox"]
         if text.endswith(":") and x < 40 and len(text) > 12:
             current = {"id": node["id"], "title": text, "children": [], "confidence": 0.75}
@@ -29,7 +31,7 @@ def build_tree(nodes):
                 and other["bbox"][0] < x
                 and abs(other["bbox"][1] - y) <= 6
                 and other["bbox"][0] + other["bbox"][2] < x
-                and other["text"].strip().endswith(":")
+                and trim_string(other["text"]).endswith(":")
             ]
             if left:
                 label = max(left, key=lambda n: n["bbox"][0])
