@@ -35,10 +35,6 @@ def get_store() -> Kristall:
     return get_memory_client(memory_file_path())
 
 
-def is_memory_configured() -> bool:
-    return True
-
-
 def init_db() -> None:
     get_store()
 
