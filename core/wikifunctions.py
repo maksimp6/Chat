@@ -4,8 +4,8 @@
 # Source, original code and license: third_party/wikifunctions/.
 """Pinned local Wikifunctions implementations used by Logos."""
 
-from collections.abc import Iterable
 import statistics
+from collections.abc import Iterable
 
 
 # WIKIFUNCTIONS Z21951 / Z21953@162115 — НЕ РЕДАКТИРОВАТЬ.
