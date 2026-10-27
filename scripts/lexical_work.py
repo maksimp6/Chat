@@ -44,12 +44,27 @@ def gh(method: str, path: str, body: object | None = None) -> object:
     return json.loads(payload) if payload else {}
 
 
+def gh_paginated(path: str) -> list[dict[str, object]]:
+    """Fetch all pages: GitHub caps per_page at 100, so walk pages until empty."""
+    out: list[dict[str, object]] = []
+    page = 1
+    while True:
+        chunk = gh("GET", f"{path}{'&' if '?' in path else '?'}page={page}&per_page=100")
+        if not chunk:
+            break
+        out.extend(list(chunk))
+        if len(chunk) < 100:
+            break
+        page += 1
+    return out
+
+
 def find_issues(explicit: str) -> list[dict[str, object]]:
     """Return the issues to process: one explicit number or all labeled."""
     if explicit.strip():
         issue = gh("GET", f"issues/{explicit.strip()}")
         return [issue]
-    return list(gh("GET", f"issues?labels={LABEL}&state=open&per_page=200"))
+    return gh_paginated(f"issues?labels={LABEL}&state=open")
 
 
 def parse_body(text: str, out_dir: Path, source: str) -> str:

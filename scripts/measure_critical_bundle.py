@@ -5,7 +5,7 @@ The critical set is derived directly from templates/index.html rather than
 hardcoded, so this script and the `data-critical-script` contract enforced by
 tests/test_frontend_script_contract.py cannot silently drift apart:
 
-- the synchronous boot script (`id="alice-boot"`);
+- the synchronous boot script (`id="logos-boot"`);
 - every script tagged `data-critical-script="..."` (the fetch/dispatcher/core
   chain the boot sequence depends on to reach a usable shell);
 - the first stylesheet `<link rel="stylesheet">` in <head> (the styling the
@@ -68,10 +68,10 @@ def discover_critical_files() -> list[tuple[str, Path]]:
     files.append((f"static/{name}", _resolve(name)))
 
     boot_match = re.search(
-        r'<script\b[^>]*\bid="alice-boot"[^>]*\bsrc="\{\{ static_root \}\}/([^"?]+)\?', html
+        r'<script\b[^>]*\bid="logos-boot"[^>]*\bsrc="\{\{ static_root \}\}/([^"?]+)\?', html
     )
     if not boot_match:
-        raise RuntimeError('No script with id="alice-boot" found in templates/index.html')
+        raise RuntimeError('No script with id="logos-boot" found in templates/index.html')
     boot_name = boot_match.group(1)
     files.append((f"static/{boot_name}", _resolve(boot_name)))
 

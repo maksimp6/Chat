@@ -108,12 +108,15 @@ async function showThread(id) {
   const button = node("button", "Опубликовать комментарий");
   button.type = "submit";
   form.append(label, button);
+  // один request_id на черновик: повтор после ошибки не создаёт дубль
+  let requestKey = requestId();
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
       await api("POST", "/api/threads/" + id + "/posts", {
-        body: area.value, request_id: requestId(),
+        body: area.value, request_id: requestKey,
       });
+      requestKey = requestId();
       await refresh();
       await showThread(id);
       error("Комментарий сохранён в Memory DB");

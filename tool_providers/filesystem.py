@@ -20,6 +20,8 @@ import ast
 import sys
 import glob
 import shutil
+import signal
+import datetime
 import stat
 import difflib
 import hashlib
@@ -168,7 +170,13 @@ def write_file(args: dict) -> dict:
         existing_mode = stat.S_IMODE(os.stat(abs_path).st_mode) if os.path.exists(abs_path) else None
 
         with tempfile.NamedTemporaryFile(
-            "w", encoding="utf-8", dir=target_dir, delete=False, prefix=".tmp_", suffix=".tmp"
+            "w",
+            encoding="utf-8",
+            newline="",
+            dir=target_dir,
+            delete=False,
+            prefix=".tmp_",
+            suffix=".tmp",
         ) as tmp:
             tmp.write(content)
             tmp_path = tmp.name
@@ -205,7 +213,9 @@ def write_file(args: dict) -> dict:
                     old_content = f.read()
                 # Created on first use: importing this module must not create directories.
                 os.makedirs(BACKUP_DIR, exist_ok=True)
-                backup_file = os.path.join(BACKUP_DIR, f"{os.path.basename(abs_path)}.bak")
+                rel_name = os.path.relpath(abs_path, BASE_DIR).replace(os.sep, "__")
+                stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+                backup_file = os.path.join(BACKUP_DIR, f"{rel_name}.{stamp}.bak")
                 shutil.copy2(abs_path, backup_file)
             except Exception as be:
                 logger.warning(f"[FS] Не удалось создать бэкап {path}: {be}")
@@ -259,8 +269,11 @@ def apply_patch(args: dict, cfg: dict = None) -> dict:
         if not os.path.isfile(abs_path):
             return {"success": False, "error": f"Файл не найден: {path}"}
 
-        with open(abs_path, encoding="utf-8", errors="replace") as f:
-            content = f.read()
+        try:
+            with open(abs_path, encoding="utf-8", newline="") as f:
+                content = f.read()
+        except UnicodeDecodeError:
+            return {"success": False, "error": "Файл не в кодировке UTF-8: патч не применен"}
 
         if search_text not in content:
             return {"success": False, "error": "Искомый текст (search_text) не найден в файле."}
@@ -634,11 +647,16 @@ def list_directory(args: dict) -> dict:
         for entry in os.scandir(abs_path):
             if entry.name.startswith((".", "__pycache__")):
                 continue
+            try:
+                size = entry.stat().st_size if not entry.is_dir() else None
+            except OSError:
+                # A broken symlink has no target to stat; list it without a size.
+                size = None
             items.append(
                 {
                     "name": entry.name,
                     "is_dir": entry.is_dir(),
-                    "size": entry.stat().st_size if not entry.is_dir() else None,
+                    "size": size,
                 }
             )
         items.sort(key=lambda x: (not x["is_dir"], x["name"]))
@@ -772,26 +790,39 @@ def run_command(args: dict) -> dict:
     except (TypeError, ValueError):
         return {"error": "Параметр 'timeout' должен быть целым числом"}
     try:
-        res = subprocess.run(
+        with subprocess.Popen(
             command,
             shell=True,
             cwd=BASE_DIR,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout,
+            start_new_session=True,
             env={
                 "PATH": os.defpath,
                 "LANG": "C.UTF-8",
                 "LC_ALL": "C.UTF-8",
                 **{key: env_require(key) for key in ("SystemRoot", "WINDIR") if key in env_snapshot()},
             },
-        )
+        ) as proc:
+            try:
+                out, err = proc.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                # The shell leads its own session: kill its children too, or they outlive the timeout.
+                if os.name == "posix":
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass  # the group exited right at the deadline
+                else:
+                    proc.kill()
+                raise
         return {
-            "success": res.returncode == 0,
+            "success": proc.returncode == 0,
             "command": command,
-            "returncode": res.returncode,
-            "stdout": res.stdout.strip(),
-            "stderr": res.stderr.strip(),
+            "returncode": proc.returncode,
+            "stdout": out.strip(),
+            "stderr": err.strip(),
         }
     except subprocess.TimeoutExpired:
         return {"success": False, "error": f"Превышено время ожидания команды ({timeout} сек)"}

@@ -115,7 +115,8 @@ def _slice_triangle(triangle: Triangle, z: float) -> tuple[Point, Point] | None:
     for index in range(3):
         a = triangle[index]
         b = triangle[(index + 1) % 3]
-        if (a[2] - z) * (b[2] - z) < 0:
+        # Half-open test: a vertex exactly on the plane counts as "above", so no edge is dropped.
+        if (a[2] < z) != (b[2] < z):
             t = (z - a[2]) / (b[2] - a[2])
             crossings.append((a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])))
     if len(crossings) == 2:

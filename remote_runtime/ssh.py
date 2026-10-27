@@ -158,6 +158,8 @@ class SSHRuntime:
         if not configured_user and target.identity_map:
             configured_user = target.identity_map[0][1]
         user = self._validate_linux_user(configured_user or "")
+        if target.allowed_users and user not in target.allowed_users:
+            raise SSHRuntimeError(f"Linux user is not allowed for SSH target '{target.name}'")
         return target, user
 
     @staticmethod

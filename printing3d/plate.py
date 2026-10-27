@@ -32,7 +32,7 @@ PROFILES = {
 }
 # An optional line number may precede the code, and the code may carry leading zeros ("M0112"
 # is M112 to the firmware), so the code is read in its normalized form.
-COMMAND = re.compile(rb"^\s*(?:N\d+\s+)?([GM])0*(\d+)\b")
+COMMAND = re.compile(rb"^\s*(?:N\d+\s*)?([GM])0*(\d+)\b")
 
 
 def _command_code(line: bytes) -> bytes | None:

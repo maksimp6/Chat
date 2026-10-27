@@ -7,7 +7,7 @@ class TreasuryIdentityError(ValueError):
     """Compatibility error type for existing callers."""
 
 
-def get_current_owner_id(*, required: bool = True) -> str:
+def get_current_owner_id(*, required: bool = True) -> str | None:
     """Use one installation identity for every browser, CLI and MCP client."""
     configured = str(env_get("LOGOS_OWNER_ID") or "").strip()
     if configured:
@@ -18,7 +18,10 @@ def get_current_owner_id(*, required: bool = True) -> str:
     try:
         store = get_store()
     except KristallError:
-        return "default"
+        if required:
+            raise
+        # Do not substitute the "default" owner for a store that failed to open.
+        return None
     key = "installation/shared-owner-id"
     with store.transaction() as tx:
         selected = tx.get(key)

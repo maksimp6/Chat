@@ -40,6 +40,9 @@ CANCEL_MARKERS = (
     "не делай",
     "не нужно",
 )
+# Speaker labels of dialog chunks, as in scripts/idea_parser.py parse_markdown.
+OWNER_LABELS = frozenset(["владелец", "максим"])
+MODEL_LABELS = frozenset(["gigachat", "модель", "ассистент"])
 STOP_WORDS = frozenset(
     [
         "и",
@@ -172,10 +175,29 @@ def cancelled_later(proposals: list[dict[str, str]], later_text: str) -> list[st
         for sent in re.split(r"(?<=[.!?…])\s+", later_text):
             if not any(m in sent.lower() for m in CANCEL_MARKERS):
                 continue
-            if quote_words & meaningful_words(sent):
+            if len(quote_words & meaningful_words(sent)) >= 2:
                 marks.append(p["quote"])
                 break
     return marks
+
+
+def owner_replies(texts: list[str]) -> list[str]:
+    """Owner replies of each chunk; a speaker turn may continue into the next chunk."""
+    owner = False
+    out: list[str] = []
+    for text in texts:
+        kept: list[str] = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            head = stripped.split(":", 1)[0].strip().lower()
+            if head in OWNER_LABELS or head in MODEL_LABELS:
+                owner = head in OWNER_LABELS
+                if owner and ":" in stripped:
+                    kept.append(stripped.split(":", 1)[1].strip())
+            elif owner:
+                kept.append(line)
+        out.append("\n".join(kept))
+    return out
 
 
 def main() -> int:
@@ -188,6 +210,7 @@ def main() -> int:
     issues = gh_paginated(f"issues?labels={LABEL}&state=open")
     dialogs = [i for i in issues if not i.get("pull_request")]
     processed = 0
+    failed = 0
     for dialog in dialogs:
         number = dialog["number"]
         meta = parse_meta(str(dialog.get("body") or ""))
@@ -195,6 +218,7 @@ def main() -> int:
         chunk_numbers = [int(x) for x in re.findall(r"\d+", meta.get("chunks", ""))]
         if not declared or not chunk_numbers:
             print(f"FAIL #{number}: incomplete manifest")
+            failed += 1
             continue
         texts = chunk_texts(chunk_numbers)
         coverage = verify_full_coverage(texts, declared)
@@ -212,10 +236,13 @@ def main() -> int:
                 },
             )
             print(f"FAIL #{number}: coverage mismatch")
+            failed += 1
             continue
         proposals: list[dict[str, str]] = []
+        chunk_proposals: list[list[dict[str, str]]] = []
         offers: dict[str, int] = {}
         questions_total = 0
+        failed_chunks: list[int] = []
         for chunk_number, text in zip(chunk_numbers, texts):
             tmp = out_dir / f"input-{chunk_number}.md"
             tmp.write_text(text, encoding="utf-8")
@@ -239,15 +266,42 @@ def main() -> int:
                 print(
                     f"FAIL #{number} chunk #{chunk_number}: rc={result.returncode} {result.stderr[:200]}"
                 )
+                failed_chunks.append(chunk_number)
                 continue
-            payload = json.loads(payload_file.read_text(encoding="utf-8"))
-            proposals.extend(payload["proposals"])
-            for key, count in payload["offers"].items():
-                offers[key] = offers.get(key, 0) + int(count)
-            questions_total += len(payload["questions"])
+            try:
+                payload = json.loads(payload_file.read_text(encoding="utf-8"))
+                chunk_props = list(payload["proposals"])
+                chunk_offers = {key: int(count) for key, count in payload["offers"].items()}
+                chunk_questions = len(payload["questions"])
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                print(f"FAIL #{number} chunk #{chunk_number}: bad payload: {exc}")
+                failed_chunks.append(chunk_number)
+                continue
             payload_file.unlink()
-        later_text = "\n\n".join(texts[1:])
-        cancelled = cancelled_later(proposals, later_text)
+            chunk_proposals.append(chunk_props)
+            proposals.extend(chunk_props)
+            for key, count in chunk_offers.items():
+                offers[key] = offers.get(key, 0) + count
+            questions_total += chunk_questions
+        if failed_chunks:
+            gh(
+                "POST",
+                f"issues/{number}/comments",
+                {
+                    "body": (
+                        "## Полный цикл — FAIL\n\n"
+                        f"Разбор чанков не удался: {', '.join('#' + str(n) for n in failed_chunks)}. "
+                        "Отчёт не публикуется: полнота не доказана."
+                    )
+                },
+            )
+            print(f"FAIL #{number}: chunk parse failed")
+            failed += 1
+            continue
+        owner_texts = owner_replies(texts)
+        cancelled: list[str] = []
+        for k, own in enumerate(chunk_proposals):
+            cancelled += cancelled_later(own, "\n\n".join(owner_texts[k + 1 :]))
         final = [p for p in proposals if p["quote"] not in cancelled]
         lines = [
             "# Полный цикл лексического разбора диалога",
@@ -256,8 +310,8 @@ def main() -> int:
             "full_coverage: yes",
             "",
             "## Счётчики",
-            f"- chunks_processed: {len(texts)}",
-            f"- issues (чанков): {len(chunk_numbers)}",
+            f"- chunks_processed: {len(chunk_proposals)}",
+            f"- issues (чанков): {len(chunk_proposals)}",
             f"- proposals_total: {len(proposals)}",
             f"- proposals_final: {len(final)} (после межчанковых отмен)",
             f"- offers_total: {sum(offers.values())} hits across {len(offers)} markers",
@@ -276,8 +330,8 @@ def main() -> int:
         (out_dir / f"dialog-{number}.report.md").write_text(report, encoding="utf-8")
         processed += 1
         print(f"DONE #{number}")
-    print(f"processed dialogs: {processed}")
-    return 0
+    print(f"processed dialogs: {processed}, failed: {failed}")
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

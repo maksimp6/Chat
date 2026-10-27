@@ -54,8 +54,12 @@ def get_department(department_id: str) -> Optional[dict[str, Any]]:
     return get_store().get("department/" + _validate_id(department_id))
 
 
+class DepartmentExistsError(Exception):
+    pass
+
+
 def upsert_department(
-    data: Mapping[str, Any], department_id: Optional[str] = None
+    data: Mapping[str, Any], department_id: Optional[str] = None, *, create_only: bool = False
 ) -> dict[str, Any]:
     ident = _validate_id(department_id or data.get("id") or ("dept-" + uuid4().hex[:12]))
     name = str(data.get("name") or "").strip()
@@ -63,6 +67,8 @@ def upsert_department(
         raise ValueError("department name is required")
     with get_store().transaction() as tx:
         old = tx.get("department/" + ident)
+        if create_only and old is not None:
+            raise DepartmentExistsError(ident)
 
         def given(field: str) -> Any:
             # A field the request leaves out keeps its stored value. Defaulting it made a PUT without
@@ -105,7 +111,9 @@ def departments_create():
     if not isinstance(body, dict):
         return jsonify({"error": "invalid_department_request"}), 400
     try:
-        return jsonify({"department": upsert_department(body)}), 201
+        return jsonify({"department": upsert_department(body, create_only=True)}), 201
+    except DepartmentExistsError:
+        return jsonify({"error": "department_exists"}), 409
     except ValueError:
         return jsonify({"error": "invalid_department_request"}), 400
 

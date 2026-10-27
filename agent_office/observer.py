@@ -177,9 +177,13 @@ def classify_actor(login: str | None, text: str | None = None) -> str:
     return agent
 
 
+# Known branch prefixes; kept apart from AGENTS because "claude" has no KPI row.
+BRANCH_AGENT_PREFIXES = frozenset({*AGENTS, "claude"})
+
+
 def classify_branch(ref: str | None) -> str | None:
     prefix = (ref or "").split("/", 1)[0].lower()
-    return prefix if prefix in AGENTS else None
+    return prefix if prefix in BRANCH_AGENT_PREFIXES else None
 
 
 _MENTION = re.compile(r"(?<![\w/])@(claude|codex|copilot|logos|logos)\b", re.I)
@@ -359,6 +363,8 @@ def build_thread(
             thread.url,
         )
     )
+    # The copilot assignment in force; unassigning removes this entry and nothing else.
+    assignment: tuple[str, datetime] | None = None
     if not is_pr:
         # logos.yml also starts on the issue title, so a title mention counts like a body mention.
         _record_dispatch(
@@ -370,7 +376,8 @@ def build_thread(
         )
         for assignee in item.get("assignees") or []:
             if classify_login(_login(assignee)) == "copilot":
-                thread.dispatches.append(("copilot", created_at))
+                assignment = ("copilot", created_at)
+                thread.dispatches.append(assignment)
 
     for raw in timeline:
         event = timeline_event(raw)
@@ -405,10 +412,13 @@ def build_thread(
                 _acknowledge_backend_dispatch(thread, event.agent, event.at)
         elif not is_pr and kind == "assigned":
             if classify_login(_login(raw.get("assignee"))) == "copilot":
-                thread.dispatches.append(("copilot", event.at))
+                assignment = ("copilot", event.at)
+                thread.dispatches.append(assignment)
         elif not is_pr and kind == "unassigned":
-            if classify_login(_login(raw.get("assignee"))) == "copilot":
-                thread.dispatches = [d for d in thread.dispatches if d[0] != "copilot"]
+            if classify_login(_login(raw.get("assignee"))) == "copilot" and assignment:
+                # Only the assignment goes; @copilot mentions in the thread stay as dispatches.
+                thread.dispatches.remove(assignment)
+                assignment = None
         elif not is_pr and kind == "labeled":
             if (raw.get("label") or {}).get("name") == "logos":
                 thread.dispatches.append(("logos", event.at))

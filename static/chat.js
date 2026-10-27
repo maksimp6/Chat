@@ -829,11 +829,12 @@ document.addEventListener("DOMContentLoaded", function () {
     syncSendButton();
   }
 
-  async function recoverTurn(turn, onMissing) {
+  async function recoverTurn(turn, recovery, onMissing) {
     const started = Date.now();
     let missing = 0;
-    while (Date.now() - started < TURN_RECOVERY_MS) {
+    while (!recovery.cancelled && Date.now() - started < TURN_RECOVERY_MS) {
       await new Promise(function (resolve) { setTimeout(resolve, TURN_RECOVERY_POLL_MS); });
+      if (recovery.cancelled) break;
       let status = null;
       try {
         const response = await window.LogosDispatcher.request("/api/conversations/" + turn.conversationId + "/messages", undefined, { timeoutMs: 15000 });
@@ -844,6 +845,7 @@ document.addEventListener("DOMContentLoaded", function () {
         // Still offline: keep waiting until the window closes.
         continue;
       }
+      if (recovery.cancelled) break;
       if (status === "answered") {
         if (currentConvId === turn.conversationId) loadHistory(turn.conversationId);
         return;
@@ -858,7 +860,7 @@ document.addEventListener("DOMContentLoaded", function () {
         missing = 0;
       }
     }
-    if (currentConvId === turn.conversationId) {
+    if (!recovery.cancelled && currentConvId === turn.conversationId) {
       addMessage({ text: "Ответ ещё не пришёл. Сервер сохранит его: откройте диалог позже.", role: "error" });
     }
   }
@@ -927,7 +929,18 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     try {
       // Keep the submitted settings and text even if the user edits the next draft while waiting.
-      const params = typeof window.getResponsesParams === "function" ? window.getResponsesParams() : {};
+      let params;
+      try {
+        params = typeof window.getResponsesParams === "function" ? window.getResponsesParams() : {};
+      } catch (settingsError) {
+        // An invalid setting is not a connection problem: nothing was sent, and the message names the setting.
+        if (currentConvId === turn.conversationId) {
+          restoreImages();
+          if (!input.value) input.value = turn.text;
+          addMessage({ text: settingsError.message, role: "error" });
+        }
+        return;
+      }
       turn.params = JSON.parse(JSON.stringify(params || {}));
       if (needsConversation) {
         const createdId = await createConversation(turn.model, { select: false });
@@ -1083,13 +1096,22 @@ document.addEventListener("DOMContentLoaded", function () {
       if (canRecover && currentConvId === turn.conversationId) {
         // The server may still answer: wait for the stored answer before offering the text again.
         recovering = true;
+        // The request's controller has nothing left to stop: «Остановить» now cancels the wait instead.
+        const recovery = { cancelled: false, abort: function () { recovery.cancelled = true; } };
+        activeChatRequests.set(turn.conversationId, recovery);
         addMessage({ text: "Соединение прервалось. Ждём ответ, он сохраняется на сервере.", role: "error" });
-        recoverTurn(turn, function () {
+        recoverTurn(turn, recovery, function () {
           if (currentConvId !== turn.conversationId) return;
           restoreImages();
           if (!input.value) input.value = turn.text;
           addMessage({ text: chatErrorText(error), role: "error" });
         }).finally(function () {
+          // Stopped during the wait: the same outcome as stopping the request itself.
+          if (recovery.cancelled && currentConvId === turn.conversationId) {
+            restoreImages();
+            if (!input.value) input.value = turn.text;
+            addMessage({ text: chatErrorText({ name: "AbortError" }), role: "error" });
+          }
           releaseTurn(turn, needsConversation);
         });
       } else if (currentConvId === turn.conversationId) {

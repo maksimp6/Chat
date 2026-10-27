@@ -11,8 +11,9 @@ from pathlib import Path
 import tempfile
 import threading
 import time
+from http.client import HTTPException
 from typing import Any, Mapping, Optional
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from tool_providers.registry import registry
@@ -64,7 +65,7 @@ def _request(
             raw = response.read().decode("utf-8")
     except HTTPError as exc:
         raise GatewayHTTPError(exc.code) from exc
-    except (URLError, TimeoutError) as exc:
+    except (HTTPException, OSError) as exc:
         raise ConnectionError(f"agent gateway unavailable: {exc}") from exc
 
     if not raw:

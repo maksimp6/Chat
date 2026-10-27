@@ -1,13 +1,20 @@
 """Native shared MCP server records and per-conversation selection."""
 
 from __future__ import annotations
+import logging
 import uuid
 import time
 from typing import Any
 from urllib.parse import urlsplit
 
-from secret_store.credential_crypto import decrypt_secret, encrypt_secret
+from secret_store.credential_crypto import (
+    CredentialCryptoError,
+    decrypt_secret,
+    encrypt_secret,
+)
 from storage.db import get_store
+
+logger = logging.getLogger(__name__)
 
 # Credentials of an MCP server. Stored encrypted when a provider credential key is configured,
 # the same rule that protects provider keys.
@@ -92,14 +99,18 @@ def _request_fields(data: dict[str, Any]) -> dict[str, Any]:
 
 def list_servers(*, owner_id: str) -> list[dict[str, Any]]:
     rows = get_store().items(prefix="mcp/server/").values()
-    return [
-        _public(_open_fields(row))
-        for row in sorted(
-            (row for row in rows if isinstance(row, dict)),
-            key=lambda row: row["created_at"],
-            reverse=True,
-        )
-    ]
+    servers = []
+    for row in sorted(
+        (row for row in rows if isinstance(row, dict)),
+        key=lambda row: row["created_at"],
+        reverse=True,
+    ):
+        try:
+            servers.append(_public(_open_fields(row)))
+        except CredentialCryptoError as exc:
+            # One unreadable record must not hide the other servers of the list.
+            logger.warning("Skipping MCP server %s: %s", row.get("id"), exc)
+    return servers
 
 
 def create_server(owner_id: str, data: dict[str, Any]) -> str:

@@ -102,6 +102,12 @@ window.fetchVectorStores = function () {
       return (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + " " + units[i];
     }
 
+    // The server accepts up to 128 MB: budget a fixed base plus time at a 512 KB/s floor,
+    // capped at the dispatcher's 5-minute maximum.
+    function uploadTimeoutMs(bytes) {
+      return Math.min(30000 + Math.ceil(bytes / (512 * 1024)) * 1000, 300000);
+    }
+
     // Resolves with whether the copy worked, so the caller can say so.
     function copyToClipboard(text) {
       return Promise.resolve()
@@ -568,7 +574,11 @@ window.fetchVectorStores = function () {
           formData.append("file", file);
           formData.append("purpose", "assistants");
 
-          window.LogosDispatcher.request("/api/files", { method: "POST", body: formData })
+          window.LogosDispatcher.request(
+            "/api/files",
+            { method: "POST", body: formData },
+            { timeoutMs: uploadTimeoutMs(file.size) },
+          )
             .then(function (r) {
               if (!r.ok)
                 return r.json().then(function (err) {

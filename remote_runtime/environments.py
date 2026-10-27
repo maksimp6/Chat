@@ -9,6 +9,7 @@ contract through its deployment workflow.
 from __future__ import annotations
 from core.env import env_get
 
+import functools
 import logging
 import os
 import queue
@@ -644,6 +645,25 @@ def list_environments(owner_id: Optional[str] = None) -> list[dict[str, Any]]:
     ]
 
 
+_ENVIRONMENT_LOCKS: dict[str, Any] = {}
+_ENVIRONMENT_LOCKS_GUARD = threading.Lock()
+
+
+def _serialize_by_environment(fn):
+    """Run start, stop and delete one at a time per environment; status is read under the lock."""
+
+    @functools.wraps(fn)
+    def wrapper(environment_id: str, *args: Any, **kwargs: Any) -> Any:
+        with _ENVIRONMENT_LOCKS_GUARD:
+            # RLock: delete_environment calls stop_environment while holding the lock.
+            lock = _ENVIRONMENT_LOCKS.setdefault(environment_id, threading.RLock())
+        with lock:
+            return fn(environment_id, *args, **kwargs)
+
+    return wrapper
+
+
+@_serialize_by_environment
 def start_environment(
     environment_id: str, owner_id: Optional[str] = None, *, context=None
 ) -> dict[str, Any]:
@@ -687,6 +707,7 @@ def start_environment(
         raise
 
 
+@_serialize_by_environment
 def stop_environment(
     environment_id: str, owner_id: Optional[str] = None, *, context=None
 ) -> dict[str, Any]:
@@ -728,6 +749,7 @@ def restart_environment(
     return start_environment(environment_id, owner_id, context=context)
 
 
+@_serialize_by_environment
 def delete_environment(
     environment_id: str, owner_id: Optional[str] = None, *, context=None
 ) -> dict[str, Any]:
