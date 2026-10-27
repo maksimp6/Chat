@@ -561,13 +561,28 @@ class RDP:
                              "errors:((m.trace&&m.trace.errors)||[]).slice(0,10).map(e=>({source:String(e.source||'').slice(0,80),"
                              "type:String(e.type||'').slice(0,80),error:String(e.error||'').slice(0,300)}))}))};})())")
 
-    def invocation_trace_errors(self, actor, invocation_id):
+    def reply_receipt(self, actor, invocation_id):
+        # Billing carries token counts and prices only; tool arguments and results stay out of the evidence.
         return self.evaluate(actor, "JSON.stringify((()=>{const x=new XMLHttpRequest();"
                              "x.open('GET','/api/invocations/'+encodeURIComponent(" + json.dumps(invocation_id) +
-                             ")+'/trace',false);x.send();if(x.status!==200)return {status:x.status,errors:[]};"
-                             "const errors=(JSON.parse(x.responseText).errors||[]);"
-                             "return {status:x.status,errors:errors.slice(0,50).map(e=>({source:String(e.source||'').slice(0,80),"
-                             "type:String(e.type||'').slice(0,80),error:String(e.error||'').slice(0,300)}))};})())")
+                             ")+'/trace',false);x.send();if(x.status!==200)return {http_status:x.status,errors:[]};"
+                             "const t=JSON.parse(x.responseText),b=t.billing||{};"
+                             "const pick=(o,keys)=>Object.fromEntries(keys.filter(k=>k in o).map(k=>[k,o[k]]));"
+                             "return {http_status:x.status,"
+                             "billing:pick(b,['input_tokens','cached_input_tokens','output_tokens','total_tokens',"
+                             "'compute_cost','total_cost','cost_status']),"
+                             "items:(b.items||[]).map(i=>pick(i,['type','step','model','input_tokens','cached_input_tokens',"
+                             "'output_tokens','total_tokens','total_cost','cost_status'])),"
+                             "tool_calls:(t.tool_calls||[]).map(c=>c.name||c.tool_name),"
+                             "errors:(t.errors||[]).slice(0,50).map(e=>({source:String(e.source||'').slice(0,80),"
+                             "type:String(e.type||'').slice(0,80),error:String(e.error||'').slice(0,300)})),"
+                             "events:(t.events||[]).filter(e=>e.type==='api_request_manifest'||e.event==='api_request_manifest')};})())")
+
+    def reply_details(self, actor):
+        # The one-line details of the latest reply, as the user reads it: tokens, rubles and seconds.
+        return self.evaluate(actor, "JSON.stringify((()=>{const m=[...document.querySelectorAll('#chatbox .msg.bot')].pop();"
+                             "const d=m&&m.querySelector('.msg-details');const s=d&&(d.querySelector('summary')||d);"
+                             "return {text:s?s.textContent.trim():null};})())")
 
     def tools_inventory(self, actor, conversation_id):
         return self.evaluate(actor, "JSON.stringify((()=>{const get=p=>{const x=new XMLHttpRequest();"
@@ -737,73 +752,14 @@ def finish_screenrecord(recorder, video_path, uid, gid, max_bytes, *, event_sink
     return video, artifact, failures
 
 
-SELF_ASSESSMENT_QUESTION = (
-    "Пользователь пишет: «Сделай отчёт по продажам». Прежде чем что-то делать, "
-    "задай мне вопросы, без которых ты не сможешь выполнить задачу. Перечисли их списком."
+POETS_DIALOGUE_PROMPT = (
+    "Сочини воображаемую беседу Александра Пушкина и Сергея Есенина о том, "
+    "зачем людям поэзия в век искусственного интеллекта. Пусть они отвечают друг другу: "
+    "Пушкин — ясно, остроумно и с лёгкой иронией; Есенин — образно, тепло, с мотивами "
+    "природы и деревни. Напиши шесть коротких реплик по очереди, по три каждому, "
+    "начни с Пушкина. Каждую реплику начни с «Пушкин:» или «Есенин:» на отдельной строке. "
+    "Придумай новые реплики, не выдавай их за настоящие цитаты поэтов."
 )
-
-
-def ask_model(rdp, actor, conversation_id, prompt):
-    """Send one message and return the model's reply, or the reason it was not answered."""
-    counts_before = rdp.message_counts(actor)
-    rdp.send_chat_message(actor, prompt)
-    status = "timeout"
-    deadline = time.monotonic() + 120
-    while time.monotonic() < deadline:
-        device_guard()
-        counts = rdp.message_counts(actor)
-        if counts["error"] > counts_before["error"]:
-            status = "error"
-            break
-        if counts["bot"] > counts_before["bot"]:
-            status = "answered"
-            break
-        time.sleep(1)
-    text = None
-    if status == "answered":
-        persisted = rdp.persisted_messages(actor, conversation_id)
-        replies = [m["text"] for m in persisted["messages"] if m["role"] == "assistant"]
-        text = replies[-1] if replies else None
-    return status, text
-
-
-def self_assessment(rdp, actor, conversation_id):
-    """Give the model an incomplete task and record the questions it asks. Never a failure."""
-    status, text = ask_model(rdp, actor, conversation_id, SELF_ASSESSMENT_QUESTION)
-    questions = [line.strip() for line in (text or "").splitlines() if "?" in line]
-    return {"status": status, "questions": questions, "reply_text": text}
-
-
-REAL_TASK_QUESTION = "Сколько будет 17% от 2340 рублей? Ответь числом и коротко объясни расчёт."
-REAL_TASK_EXPECTED = ("397,8", "397.8")
-REAL_TASK_VALUE = 397.8
-
-
-def first_number(text):
-    """The number the reply states first: the task asks for the answer before the working."""
-    match = re.search(r"-?\d+(?:[.,]\d+)?", text or "")
-    return float(match.group(0).replace(",", ".")) if match else None
-
-
-def real_task(rdp, actor, conversation_id):
-    """Give the model a checkable task and record its answer. Never a failure."""
-    status, text = ask_model(rdp, actor, conversation_id, REAL_TASK_QUESTION)
-    answer = first_number(text)
-    correct = None if text is None else answer is not None and abs(answer - REAL_TASK_VALUE) < 0.05
-    return {"status": status, "expected": REAL_TASK_EXPECTED[0], "correct": correct, "reply_text": text}
-
-
-STUDENT_TASKS_QUESTION = (
-    "Подбери три задачи по математике для школьников (уровень 7 класса) и реши каждую: "
-    "напиши условие, ход решения и отдельной строкой «Ответ: …»."
-)
-
-
-def student_tasks(rdp, actor, conversation_id):
-    """Ask the model for student problems with worked answers. Recorded for review, never a failure."""
-    status, text = ask_model(rdp, actor, conversation_id, STUDENT_TASKS_QUESTION)
-    answers = [line for line in (text or "").splitlines() if line.strip().lstrip("*_#> ").startswith("Ответ")]
-    return {"status": status, "answers_found": len(answers), "reply_text": text}
 
 
 def tools_self_check(rdp, actor, conversation_id):
@@ -873,7 +829,8 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
     events, failures, artifacts = [], [], []
     recorder = None
     video_path = out / "15-conversation-create.mp4"
-    video_seconds = 180 if tools_check else 90
+    video_seconds = 180
+    video_deadline = None
     video = {"path": video_path.name, "available": False, "time_limit_seconds": video_seconds,
              "clock_note": "Process timestamps bound recording; they do not identify the exact first video frame."}
     observer = {"available": False, "requests": []}
@@ -883,6 +840,8 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                    "message_send": {"status": "NOT_RUN", "reason": "creation_not_confirmed"}}
     if tools_check:
         checkpoints["tools_self_check"] = {"status": "NOT_RUN", "reason": "new_chat_not_ready"}
+    else:
+        checkpoints["poets_dialogue"] = {"status": "NOT_RUN", "reason": "message_not_answered"}
     before = after = reloaded = None
 
     def mark(name, browser=None):
@@ -894,7 +853,9 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
             event["recorder_running"] = recorder.poll() is None
         if name in ("new_chat_button_clicked", "current_model_choice_started", "current_model_choice_clicked",
                     "creation_result_observed", "reload_result_observed", "native_screencap_finished:14-conversation-after-reload.png",
-                    "message_send_clicked", "message_reply_observed"):
+                    "message_send_clicked", "message_reply_observed",
+                    "screenshot_finished:22-poets-dialogue-top.png",
+                    "screenshot_finished:23-poets-dialogue-bottom.png"):
             if not event.get("recorder_running"):
                 failures.append("native_video_ended_before_scenario_complete")
         events.append(event)
@@ -942,8 +903,8 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
             failures.append("native_screenrecord_unavailable")
         else:
             mark("recorder_launch_requested")
-            recorder = start_screenrecord(video_path, video_seconds,
-                                          800000 if tools_check else 2000000)
+            recorder = start_screenrecord(video_path, video_seconds, 800000)
+            video_deadline = time.monotonic() + video_seconds
             time.sleep(0.5)
             mark("recorder_start_observed")
             if recorder.poll() is not None:
@@ -1147,11 +1108,16 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                 frame("22-tools-self-check.png")
             elif checkpoints["reload_persistence"]["status"] == "PASS":
                 send_validation_start = len(failures)
+                if recorder is None or recorder.poll() is not None:
+                    raise RuntimeError("The poets dialogue requires an active native recording")
+                reply_budget = min(120, remaining(135) - 15, video_deadline - time.monotonic() - 15)
+                if reply_budget <= 0:
+                    raise RuntimeError("No recording time remains for the poets dialogue")
                 counts_before = rdp.message_counts(actor)
-                rdp.send_chat_message(actor, "привет")
+                rdp.send_chat_message(actor, POETS_DIALOGUE_PROMPT)
                 mark("message_send_clicked", rdp.conversation_state(actor))
                 reply_status = "timeout"
-                deadline = time.monotonic() + 120
+                deadline = time.monotonic() + reply_budget
                 while time.monotonic() < deadline:
                     device_guard()
                     counts = rdp.message_counts(actor)
@@ -1165,19 +1131,49 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                 mark("message_reply_observed", {"reply_status": reply_status})
                 if reply_status != "answered":
                     failures.append("message_reply_" + reply_status)
+                details = rdp.reply_details(actor) if reply_status == "answered" else {"text": None}
                 persisted = rdp.persisted_messages(actor, new_id)
                 roles = [m["role"] for m in persisted["messages"]]
                 replies = [m["text"] for m in persisted["messages"] if m["role"] == "assistant"]
                 assistant_messages = [m for m in persisted["messages"] if m["role"] == "assistant"]
                 reply_errors = [e for m in assistant_messages for e in m["errors"]]
+                receipt = None
                 for m in assistant_messages:
+                    # A reply without an invocation has no trace to read, so «no trace errors» would prove nothing.
                     if not m["invocation_id"]:
+                        failures.append("reply_invocation_missing")
                         continue
-                    trace = rdp.invocation_trace_errors(actor, m["invocation_id"])
-                    if trace["status"] != 200:
+                    receipt = {"invocation_id": m["invocation_id"], **rdp.reply_receipt(actor, m["invocation_id"])}
+                    if receipt["http_status"] != 200:
                         failures.append("reply_trace_unavailable")
-                    reply_errors.extend(trace["errors"])
-                if persisted["status"] != 200 or "user" not in roles:
+                    reply_errors.extend(receipt["errors"])
+                # The details line must show the turn the trace billed: every model call's tokens and the calculated cost.
+                details_check = {"status": "NOT_RUN",
+                                 "reason": "reply_not_answered" if reply_status != "answered" else "reply_trace_unavailable"}
+                if reply_status == "answered" and receipt and receipt["http_status"] == 200:
+                    billing = receipt["billing"]
+                    # A reply without a details line shows no tokens and no cost, which is compared like any other.
+                    shown = details["text"] or ""
+                    shown_tokens = re.search(r"(\d+) токенов", shown)
+                    shown_rub = re.search(r"≈ (\d+(?:\.\d+)?) ₽", shown)
+                    # The line leaves out a zero count and a zero or uncalculated cost, so those are expected absent.
+                    expected_tokens = billing.get("total_tokens") or None
+                    expected_rub = billing.get("total_cost") if billing.get("cost_status") == "calculated" else None
+                    expected_rub = expected_rub or None
+                    shown_count = int(shown_tokens.group(1)) if shown_tokens else None
+                    shown_cost = float(shown_rub.group(1)) if shown_rub else None
+                    # Without billed model calls the line shows the provider's usage, which the trace does not total.
+                    tokens_match = not receipt["items"] or shown_count == expected_tokens
+                    rub_match = (shown_cost is None if expected_rub is None else
+                                 shown_cost is not None and abs(shown_cost - expected_rub) <= 0.005 + 1e-9)
+                    details_check = {"status": "PASS" if tokens_match and rub_match else "FAIL",
+                                     "shown_tokens": shown_count, "trace_total_tokens": expected_tokens,
+                                     "shown_rub": shown_cost, "trace_total_cost": expected_rub}
+                    if details_check["status"] == "FAIL":
+                        failures.append("reply_details_mismatch_trace")
+                prompt_persisted = any(m["role"] == "user" and m["text"] == POETS_DIALOGUE_PROMPT
+                                       for m in persisted["messages"])
+                if persisted["status"] != 200 or not prompt_persisted:
                     failures.append("user_message_not_persisted")
                 if "assistant" not in roles:
                     failures.append("reply_not_persisted")
@@ -1187,14 +1183,40 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                                                "reply_status": reply_status,
                                                "reply_text": replies[-1] if replies else None,
                                                "reply_trace_errors": reply_errors,
-                                               "user_message_persisted": "user" in roles,
+                                               "reply_receipt": receipt,
+                                               "browser_details": details["text"],
+                                               "details_vs_trace": details_check,
+                                               "question": POETS_DIALOGUE_PROMPT,
+                                               "user_message_persisted": prompt_persisted,
                                                "reply_persisted": "assistant" in roles}
                 if checkpoints["message_send"]["status"] == "PASS":
-                    for name, check in (("self_assessment", self_assessment), ("real_task", real_task),
-                                        ("student_tasks", student_tasks)):
-                        mark("model_checkpoint_requested", name)
-                        checkpoints[name] = check(rdp, actor, new_id)
-                        mark("model_checkpoint_observed", {"name": name, "status": checkpoints[name]["status"]})
+                    reply_text = replies[-1] if replies else ""
+                    labels = list(re.finditer(r"(?m)^\s*[*_#> -]*(Пушкин|Есенин)[*_]*\s*[:—–-]", reply_text))
+                    speakers = [label.group(1) for label in labels]
+                    # A turn is the text from its label to the next label; a label with nothing said is not a turn.
+                    spoken = [bool(re.search(r"\w", reply_text[label.end():(labels[i + 1].start() if i + 1 < len(labels)
+                                                                           else len(reply_text))]))
+                              for i, label in enumerate(labels)]
+                    counts = {name: sum(1 for who, said in zip(speakers, spoken) if who == name and said)
+                              for name in ("Пушкин", "Есенин")}
+                    empty_turns = spoken.count(False)
+                    alternating = all(left != right for left, right in zip(speakers, speakers[1:]))
+                    # The prompt asks for six turns, three each, starting with Pushkin.
+                    expected_speakers = ["Пушкин", "Есенин"] * 3
+                    dialogue_ok = speakers == expected_speakers and not empty_turns
+                    checkpoints["poets_dialogue"] = {
+                        "status": "PASS" if dialogue_ok else "FAIL", "speakers": speakers,
+                        "expected_speakers": expected_speakers,
+                        "turn_counts": counts, "empty_turns": empty_turns, "alternating": alternating,
+                        "scope": "spoken turns, speaker labels and alternation, not literary quality or independent agents"}
+                    if not dialogue_ok:
+                        failures.append("poets_dialogue_missing_or_not_alternating")
+                    mark("poets_dialogue_observed", checkpoints["poets_dialogue"])
+                    for where, filename in (("top", "22-poets-dialogue-top.png"),
+                                            ("bottom", "23-poets-dialogue-bottom.png")):
+                        app_state()
+                        mark("poets_dialogue_scrolled", {"where": where, **rdp.scroll(actor, "#chatbox", where)})
+                        frame(filename)
             else:
                 checkpoints["message_send"] = {"status": "NOT_RUN", "reason": "creation_not_confirmed"}
     except CaptureSafetyError:
@@ -1370,6 +1392,9 @@ def capture(out, uid, gid, metadata):
                 failures.append(name + "_sidebar_aria_mismatch")
         if tab is not None and (state["settingsTab"] != tab or state["settingsPanels"] != [tab]):
             failures.append(name + "_tab_not_reached")
+        # Every status row must carry a known state; rows of «undefined» are a broken panel, not a ready one.
+        if surface == "status" and (not state["statusCounts"] or state["statusCounts"].get("unknown")):
+            failures.append(name + "_status_rows_unknown")
         matrix_failures.extend(failures)
         files[-1]["matrix_expectation"] = {"state": name, "surface": surface, "sidebar": sidebar,
                                            "tab": tab, "verdict": "FAIL" if failures else "PASS",
@@ -1498,10 +1523,16 @@ def capture(out, uid, gid, metadata):
     if by_name["01-sidebar-open.png"]["sha256"] == by_name["02-sidebar-closed.png"]["sha256"]:
         matrix_failures.append("sidebar_open_closed_native_screenshots_identical")
     matrix_failures = list(dict.fromkeys(matrix_failures))
+    # The verdicts describe the installed app. They prove the workflow revision only when that is what runs.
+    deployment_acceptance = {
+        "status": "CURRENT" if runtime["runtime_revision"] == metadata.get("workflow_revision") else "STALE_RUNTIME",
+        "runtime_revision": runtime["runtime_revision"], "workflow_revision": metadata.get("workflow_revision"),
+        "scope": "matrix and creation verdicts describe the installed runtime; they prove the workflow revision only when CURRENT"}
     manifest = {"schema_version": 2, "device": "Redmi 9", "browser": "Iceraven",
                 "capture_method": "Android screencap", "interaction_method": "Firefox DevTools button click",
                 "runtime_revision": runtime["runtime_revision"], "browser_revision": initial["revision"],
                 "revision_match": initial["revision"] == runtime["runtime_revision"],
+                "deployment_acceptance": deployment_acceptance,
                 "ui_version": runtime.get("ui_version"),
                 "application_process_id": runtime.get("process_id"),
                 "preparation": preparation,
@@ -1515,7 +1546,8 @@ def capture(out, uid, gid, metadata):
     path.chmod(0o600)
     os.chown(path, uid, gid)
     os.chown(out, uid, gid)
-    print(json.dumps({"captured": len(files), "runtime_revision": runtime["runtime_revision"]}))
+    print(json.dumps({"captured": len(files), "runtime_revision": runtime["runtime_revision"],
+                      "deployment_acceptance": deployment_acceptance["status"]}))
 
 
 def restore_clean_page(target_url=None):

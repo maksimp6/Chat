@@ -1,0 +1,1493 @@
+{
+  "schema_version": 1,
+  "scenario": "create_conversation",
+  "events": [
+    {
+      "event": "scenario_started",
+      "wall_utc": "2026-10-26T17:37:00.236525+00:00",
+      "monotonic_ns": 91837020318011,
+      "browser": {
+        "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "current_model": "qwen3.6-35b-a3b",
+        "conversation_ids": [
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+        ],
+        "active_rows": 1,
+        "url_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "stored_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 2,
+        "empty_state": false,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793036220234,
+        "performance_ms": 38998,
+        "time_origin_ms": 1793036181235
+      }
+    },
+    {
+      "event": "recorder_launch_requested",
+      "wall_utc": "2026-10-26T17:37:00.237273+00:00",
+      "monotonic_ns": 91837020930934
+    },
+    {
+      "event": "recorder_start_observed",
+      "wall_utc": "2026-10-26T17:37:00.739176+00:00",
+      "monotonic_ns": 91837522915550,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:11-conversation-before.png",
+      "wall_utc": "2026-10-26T17:37:01.075286+00:00",
+      "monotonic_ns": 91837858987857,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:11-conversation-before.png",
+      "wall_utc": "2026-10-26T17:37:01.889192+00:00",
+      "monotonic_ns": 91838672856550,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:11-conversation-before.png",
+      "wall_utc": "2026-10-26T17:37:02.540872+00:00",
+      "monotonic_ns": 91839324543934,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:11-conversation-before.png",
+      "wall_utc": "2026-10-26T17:37:02.543203+00:00",
+      "monotonic_ns": 91839326836857,
+      "recorder_running": true
+    },
+    {
+      "event": "network_observer_installed",
+      "wall_utc": "2026-10-26T17:37:02.560402+00:00",
+      "monotonic_ns": 91839344238627,
+      "browser": {
+        "installed": true,
+        "date_ms": 1793036222558,
+        "performance_ms": 41323,
+        "time_origin_ms": 1793036181235
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "new_chat_button_attempted",
+      "wall_utc": "2026-10-26T17:37:02.575858+00:00",
+      "monotonic_ns": 91839359534704,
+      "browser": {
+        "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "current_model": "qwen3.6-35b-a3b",
+        "conversation_ids": [
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+        ],
+        "active_rows": 1,
+        "url_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "stored_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 2,
+        "empty_state": false,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793036222572,
+        "performance_ms": 41336,
+        "time_origin_ms": 1793036181235
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "new_chat_button_clicked",
+      "wall_utc": "2026-10-26T17:37:02.667958+00:00",
+      "monotonic_ns": 91839451650088,
+      "browser": {
+        "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "current_model": "qwen3.6-35b-a3b",
+        "conversation_ids": [
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+        ],
+        "active_rows": 1,
+        "url_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "stored_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 2,
+        "empty_state": false,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793036222653,
+        "performance_ms": 41418,
+        "time_origin_ms": 1793036181235
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:12-conversation-model-picker.png",
+      "wall_utc": "2026-10-26T17:37:03.198991+00:00",
+      "monotonic_ns": 91839982669396,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:12-conversation-model-picker.png",
+      "wall_utc": "2026-10-26T17:37:03.958994+00:00",
+      "monotonic_ns": 91840742732781,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:12-conversation-model-picker.png",
+      "wall_utc": "2026-10-26T17:37:04.604141+00:00",
+      "monotonic_ns": 91841387875319,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:12-conversation-model-picker.png",
+      "wall_utc": "2026-10-26T17:37:04.610736+00:00",
+      "monotonic_ns": 91841394405704,
+      "recorder_running": true
+    },
+    {
+      "event": "model_picker_phase_observed",
+      "wall_utc": "2026-10-26T17:37:05.009074+00:00",
+      "monotonic_ns": 91841792767011,
+      "browser": {
+        "conversation": {
+          "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "current_model": "qwen3.6-35b-a3b",
+          "conversation_ids": [
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "active_ids": [
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+          ],
+          "active_rows": 1,
+          "url_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "stored_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "storage_available": true,
+          "model_choices": 1,
+          "message_count": 2,
+          "empty_state": false,
+          "error_state": false,
+          "ready_state": "complete",
+          "date_ms": 1793036224994,
+          "performance_ms": 43760,
+          "time_origin_ms": 1793036181235
+        },
+        "network": {
+          "available": true,
+          "intact": true,
+          "expired": false,
+          "requests": [],
+          "samples": [
+            {
+              "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+              "conversation_ids": [
+                "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+                "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+                "a37a8de8-acc0-4016-9250-5dc03c55df47",
+                "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+                "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+                "68814db3-13c2-45ee-b776-e770f7f6065a",
+                "f371a78e-b2f3-4ace-8597-39edc00723da",
+                "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+                "38f7195d-4813-4264-8d63-5ef31aeb2734",
+                "c1181aef-2e76-451d-a15e-204bb9e81306",
+                "8915994e-1f98-49b3-b4c2-8b49badda50e",
+                "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+                "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+                "df373696-3bbd-4929-87d1-520135362bb0",
+                "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+                "93f9dce8-6517-4b42-bd46-1620207457c9",
+                "06913773-9e3e-4c4d-a510-792975a1e1c9",
+                "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+                "a20c8238-2484-46be-8120-1e8ebcb7970d",
+                "00c2d210-ccba-47d7-8d95-7e08dd487126",
+                "66b73a50-c7b4-432e-8114-00abfcdb8201",
+                "f9d785f7-60ab-47da-a554-18d11747f17a",
+                "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+                "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+                "93e2e852-0bcc-4658-be14-78f561135342",
+                "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+              ],
+              "active_ids": [
+                "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+              ],
+              "message_count": 2,
+              "empty_state": false,
+              "error_state": false,
+              "sidebar_open": true,
+              "expanded": "true",
+              "date_ms": 1793036222558,
+              "performance_ms": 41323,
+              "reason": "initial"
+            }
+          ],
+          "sample_overflow": false
+        }
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "current_model_choice_started",
+      "wall_utc": "2026-10-26T17:37:05.009281+00:00",
+      "monotonic_ns": 91841792927627,
+      "browser": {
+        "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "current_model": "qwen3.6-35b-a3b",
+        "conversation_ids": [
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+        ],
+        "active_rows": 1,
+        "url_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "stored_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 2,
+        "empty_state": false,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793036224994,
+        "performance_ms": 43760,
+        "time_origin_ms": 1793036181235
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "current_model_choice_clicked",
+      "wall_utc": "2026-10-26T17:37:05.054579+00:00",
+      "monotonic_ns": 91841838241781,
+      "recorder_running": true
+    },
+    {
+      "event": "creation_result_observed",
+      "wall_utc": "2026-10-26T17:37:06.524309+00:00",
+      "monotonic_ns": 91843308143242,
+      "browser": {
+        "current_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "current_model": "qwen3.6-35b-a3b",
+        "conversation_ids": [
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7"
+        ],
+        "active_rows": 1,
+        "url_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "stored_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 0,
+        "empty_state": true,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793036226520,
+        "performance_ms": 45285,
+        "time_origin_ms": 1793036181235
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "sidebar_after_creation",
+      "wall_utc": "2026-10-26T17:37:06.909862+00:00",
+      "monotonic_ns": 91843693566704,
+      "browser": {
+        "open": false,
+        "expanded": "false"
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:13-conversation-created.png",
+      "wall_utc": "2026-10-26T17:37:07.246750+00:00",
+      "monotonic_ns": 91844030447627,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:13-conversation-created.png",
+      "wall_utc": "2026-10-26T17:37:08.029623+00:00",
+      "monotonic_ns": 91844813316242,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:13-conversation-created.png",
+      "wall_utc": "2026-10-26T17:37:08.603184+00:00",
+      "monotonic_ns": 91845386844242,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:13-conversation-created.png",
+      "wall_utc": "2026-10-26T17:37:08.606166+00:00",
+      "monotonic_ns": 91845389831935,
+      "recorder_running": true
+    },
+    {
+      "event": "reload_requested",
+      "wall_utc": "2026-10-26T17:37:08.622638+00:00",
+      "monotonic_ns": 91845406335550,
+      "browser": {
+        "current_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "current_model": "qwen3.6-35b-a3b",
+        "conversation_ids": [
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7"
+        ],
+        "active_rows": 1,
+        "url_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "stored_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 0,
+        "empty_state": true,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793036228619,
+        "performance_ms": 47383,
+        "time_origin_ms": 1793036181235
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "reload_result_observed",
+      "wall_utc": "2026-10-26T17:37:10.118844+00:00",
+      "monotonic_ns": 91846902490319,
+      "browser": {
+        "current_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "current_model": "qwen3.6-35b-a3b",
+        "conversation_ids": [
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7"
+        ],
+        "active_rows": 1,
+        "url_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "stored_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 0,
+        "empty_state": true,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793036230114,
+        "performance_ms": 1371,
+        "time_origin_ms": 1793036228744
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "reload_server_reads_requested",
+      "wall_utc": "2026-10-26T17:37:10.490107+00:00",
+      "monotonic_ns": 91847273790704,
+      "browser": {
+        "current_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "current_model": "qwen3.6-35b-a3b",
+        "conversation_ids": [
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7"
+        ],
+        "active_rows": 1,
+        "url_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "stored_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 0,
+        "empty_state": true,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793036230114,
+        "performance_ms": 1371,
+        "time_origin_ms": 1793036228744
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "reload_server_reads_observed",
+      "wall_utc": "2026-10-26T17:37:11.403024+00:00",
+      "monotonic_ns": 91848186704550,
+      "browser": {
+        "available": true,
+        "intact": true,
+        "expired": false,
+        "requests": [
+          {
+            "id": 1,
+            "path": "/api/conversations",
+            "method": "GET",
+            "started": {
+              "date_ms": 1793036230497,
+              "performance_ms": 1753
+            },
+            "finished": {
+              "date_ms": 1793036230540,
+              "performance_ms": 1796
+            },
+            "status": 200,
+            "error": null,
+            "body_done": true,
+            "response_id": null,
+            "response_ids": [
+              "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+              "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+              "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+              "a37a8de8-acc0-4016-9250-5dc03c55df47",
+              "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+              "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+              "68814db3-13c2-45ee-b776-e770f7f6065a",
+              "f371a78e-b2f3-4ace-8597-39edc00723da",
+              "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+              "38f7195d-4813-4264-8d63-5ef31aeb2734",
+              "c1181aef-2e76-451d-a15e-204bb9e81306",
+              "8915994e-1f98-49b3-b4c2-8b49badda50e",
+              "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+              "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+              "df373696-3bbd-4929-87d1-520135362bb0",
+              "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+              "93f9dce8-6517-4b42-bd46-1620207457c9",
+              "06913773-9e3e-4c4d-a510-792975a1e1c9",
+              "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+              "a20c8238-2484-46be-8120-1e8ebcb7970d",
+              "00c2d210-ccba-47d7-8d95-7e08dd487126",
+              "66b73a50-c7b4-432e-8114-00abfcdb8201",
+              "f9d785f7-60ab-47da-a554-18d11747f17a",
+              "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+              "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+              "93e2e852-0bcc-4658-be14-78f561135342",
+              "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+            ],
+            "response_message_count": null,
+            "blocked": false
+          },
+          {
+            "id": 2,
+            "path": "/api/conversations/0c3d2a9f-4c06-4881-a8b0-94ee145823d7/messages",
+            "method": "GET",
+            "started": {
+              "date_ms": 1793036230500,
+              "performance_ms": 1756
+            },
+            "finished": {
+              "date_ms": 1793036230959,
+              "performance_ms": 2215
+            },
+            "status": 200,
+            "error": null,
+            "body_done": true,
+            "response_id": null,
+            "response_ids": null,
+            "response_message_count": 0,
+            "blocked": false
+          }
+        ],
+        "samples": [
+          {
+            "current_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+            "conversation_ids": [
+              "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+              "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+              "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+              "a37a8de8-acc0-4016-9250-5dc03c55df47",
+              "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+              "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+              "68814db3-13c2-45ee-b776-e770f7f6065a",
+              "f371a78e-b2f3-4ace-8597-39edc00723da",
+              "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+              "38f7195d-4813-4264-8d63-5ef31aeb2734",
+              "c1181aef-2e76-451d-a15e-204bb9e81306",
+              "8915994e-1f98-49b3-b4c2-8b49badda50e",
+              "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+              "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+              "df373696-3bbd-4929-87d1-520135362bb0",
+              "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+              "93f9dce8-6517-4b42-bd46-1620207457c9",
+              "06913773-9e3e-4c4d-a510-792975a1e1c9",
+              "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+              "a20c8238-2484-46be-8120-1e8ebcb7970d",
+              "00c2d210-ccba-47d7-8d95-7e08dd487126",
+              "66b73a50-c7b4-432e-8114-00abfcdb8201",
+              "f9d785f7-60ab-47da-a554-18d11747f17a",
+              "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+              "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+              "93e2e852-0bcc-4658-be14-78f561135342",
+              "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+            ],
+            "active_ids": [
+              "0c3d2a9f-4c06-4881-a8b0-94ee145823d7"
+            ],
+            "message_count": 0,
+            "empty_state": true,
+            "error_state": false,
+            "sidebar_open": false,
+            "expanded": "false",
+            "date_ms": 1793036230486,
+            "performance_ms": 1742,
+            "reason": "initial"
+          }
+        ],
+        "sample_overflow": false
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:14-conversation-after-reload.png",
+      "wall_utc": "2026-10-26T17:37:12.095249+00:00",
+      "monotonic_ns": 91848878970012,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:14-conversation-after-reload.png",
+      "wall_utc": "2026-10-26T17:37:12.855146+00:00",
+      "monotonic_ns": 91849638833166,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:14-conversation-after-reload.png",
+      "wall_utc": "2026-10-26T17:37:13.417929+00:00",
+      "monotonic_ns": 91850201632243,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:14-conversation-after-reload.png",
+      "wall_utc": "2026-10-26T17:37:13.422024+00:00",
+      "monotonic_ns": 91850205688473,
+      "recorder_running": true
+    },
+    {
+      "event": "message_send_clicked",
+      "wall_utc": "2026-10-26T17:37:13.722437+00:00",
+      "monotonic_ns": 91850506145089,
+      "browser": {
+        "current_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "current_model": "qwen3.6-35b-a3b",
+        "conversation_ids": [
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+          "a37a8de8-acc0-4016-9250-5dc03c55df47",
+          "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+          "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+          "68814db3-13c2-45ee-b776-e770f7f6065a",
+          "f371a78e-b2f3-4ace-8597-39edc00723da",
+          "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+          "38f7195d-4813-4264-8d63-5ef31aeb2734",
+          "c1181aef-2e76-451d-a15e-204bb9e81306",
+          "8915994e-1f98-49b3-b4c2-8b49badda50e",
+          "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+          "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+          "df373696-3bbd-4929-87d1-520135362bb0",
+          "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+          "93f9dce8-6517-4b42-bd46-1620207457c9",
+          "06913773-9e3e-4c4d-a510-792975a1e1c9",
+          "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+          "a20c8238-2484-46be-8120-1e8ebcb7970d",
+          "00c2d210-ccba-47d7-8d95-7e08dd487126",
+          "66b73a50-c7b4-432e-8114-00abfcdb8201",
+          "f9d785f7-60ab-47da-a554-18d11747f17a",
+          "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+          "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+          "93e2e852-0bcc-4658-be14-78f561135342",
+          "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+        ],
+        "active_ids": [
+          "0c3d2a9f-4c06-4881-a8b0-94ee145823d7"
+        ],
+        "active_rows": 1,
+        "url_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "stored_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 1,
+        "empty_state": false,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793036233719,
+        "performance_ms": 4975,
+        "time_origin_ms": 1793036228744
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "message_reply_observed",
+      "wall_utc": "2026-10-26T17:37:31.331557+00:00",
+      "monotonic_ns": 91868115248244,
+      "browser": {
+        "reply_status": "answered"
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "poets_dialogue_observed",
+      "wall_utc": "2026-10-26T17:37:32.212562+00:00",
+      "monotonic_ns": 91868996282398,
+      "browser": {
+        "status": "PASS",
+        "speakers": [
+          "Пушкин",
+          "Есенин",
+          "Пушкин",
+          "Есенин",
+          "Пушкин",
+          "Есенин"
+        ],
+        "turn_counts": {
+          "Пушкин": 3,
+          "Есенин": 3
+        },
+        "alternating": true,
+        "scope": "speaker labels and alternation, not literary quality or independent agents"
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "poets_dialogue_scrolled",
+      "wall_utc": "2026-10-26T17:37:32.629835+00:00",
+      "monotonic_ns": 91869413541475,
+      "browser": {
+        "where": "top",
+        "scrollTop": 0,
+        "scrollHeight": 1778,
+        "clientHeight": 525
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:22-poets-dialogue-top.png",
+      "wall_utc": "2026-10-26T17:37:32.984510+00:00",
+      "monotonic_ns": 91869768167552,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:22-poets-dialogue-top.png",
+      "wall_utc": "2026-10-26T17:37:33.698795+00:00",
+      "monotonic_ns": 91870482485705,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:22-poets-dialogue-top.png",
+      "wall_utc": "2026-10-26T17:37:34.311099+00:00",
+      "monotonic_ns": 91871094833782,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:22-poets-dialogue-top.png",
+      "wall_utc": "2026-10-26T17:37:34.315927+00:00",
+      "monotonic_ns": 91871099570398,
+      "recorder_running": true
+    },
+    {
+      "event": "poets_dialogue_scrolled",
+      "wall_utc": "2026-10-26T17:37:34.735777+00:00",
+      "monotonic_ns": 91871519481475,
+      "browser": {
+        "where": "bottom",
+        "scrollTop": 1252.9000244140625,
+        "scrollHeight": 1778,
+        "clientHeight": 525
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:23-poets-dialogue-bottom.png",
+      "wall_utc": "2026-10-26T17:37:35.048372+00:00",
+      "monotonic_ns": 91871832280475,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:23-poets-dialogue-bottom.png",
+      "wall_utc": "2026-10-26T17:37:35.784544+00:00",
+      "monotonic_ns": 91872568197782,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:23-poets-dialogue-bottom.png",
+      "wall_utc": "2026-10-26T17:37:36.363281+00:00",
+      "monotonic_ns": 91873147017706,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:23-poets-dialogue-bottom.png",
+      "wall_utc": "2026-10-26T17:37:36.369208+00:00",
+      "monotonic_ns": 91873152875936,
+      "recorder_running": true
+    },
+    {
+      "event": "recorder_stop_requested",
+      "wall_utc": "2026-10-26T17:37:36.739665+00:00",
+      "monotonic_ns": 91873523390629,
+      "recorder_running": true
+    },
+    {
+      "event": "recorder_stop_observed",
+      "wall_utc": "2026-10-26T17:37:37.107607+00:00",
+      "monotonic_ns": 91873891354629,
+      "recorder_running": false
+    },
+    {
+      "event": "scenario_finished",
+      "wall_utc": "2026-10-26T17:37:37.145265+00:00",
+      "monotonic_ns": 91873929009090,
+      "browser": {
+        "verdict": "PASS",
+        "failures": []
+      },
+      "recorder_running": false
+    }
+  ],
+  "result": {
+    "verdict": "PASS",
+    "failures": [],
+    "checkpoints": {
+      "new_conversation_postconditions": {
+        "status": "PASS"
+      },
+      "reload_persistence": {
+        "status": "PASS"
+      },
+      "message_send": {
+        "status": "PASS",
+        "reply_status": "answered",
+        "reply_text": "\n\nПушкин: Век двадцать пятый! Пусть машина и смогла бы строфы сплетать, как умножения таблицу, но я поверю в её душу, лишь когда увижу в её словах ключ, который не выведешь по формуле.\n\nЕсенин: Что ж ты, Александр Сергеевич, всё по уму ходишь? Да разве же железный-то разум поймет, что шепчет берёзка в поле? Нужна ли машине, что пахнет канифолью, та самая, до чего ж тоскливая, русская душа?\n\nПушкин: Славянская душа! Душа — это хорошо. Но поэзия — это не только слезы. Это ещё и жизнь, и движение, и смех. Машине дано считать, но не дано смеяться над глупостью мира. А без смеха нет и сатиры.\n\nЕсенин: Смех твой мне дорог, как гость в избе. Но без этой самой «тоски» не построить моста между сердцами. Поэзия — это не счет. Это когда кудрявый ершик, да и только, когда плачет над тобой иной раз, да и только, ветер в поле, зовущий домой.\n\nПушкин: Ветер в поле! Точно подмечено. Но поэзия — это зеркало, в которое смотрятся люди. Если зеркало напишет само, кому же тогда мы будем дивиться? Нам самим. Нам — нашей способности чувствовать.\n\nЕсенин: Так оставим же это зеркало холодному олову! Пусть лучше человек, да и только, пишет о том, что сердце поет. Ведь мы — сирени, да и только, на земле. И пока мы плачем и любим, нам нужна будет песня, да и только.",
+        "reply_trace_errors": [],
+        "question": "Сочини воображаемую беседу Александра Пушкина и Сергея Есенина о том, зачем людям поэзия в век искусственного интеллекта. Пусть они отвечают друг другу: Пушкин — ясно, остроумно и с лёгкой иронией; Есенин — образно, тепло, с мотивами природы и деревни. Напиши шесть коротких реплик по очереди, по три каждому, начни с Пушкина. Каждую реплику начни с «Пушкин:» или «Есенин:» на отдельной строке. Придумай новые реплики, не выдавай их за настоящие цитаты поэтов.",
+        "user_message_persisted": true,
+        "reply_persisted": true
+      },
+      "poets_dialogue": {
+        "status": "PASS",
+        "speakers": [
+          "Пушкин",
+          "Есенин",
+          "Пушкин",
+          "Есенин",
+          "Пушкин",
+          "Есенин"
+        ],
+        "turn_counts": {
+          "Пушкин": 3,
+          "Есенин": 3
+        },
+        "alternating": true,
+        "scope": "speaker labels and alternation, not literary quality or independent agents"
+      },
+      "creation_response": {
+        "status": "PASS",
+        "http_status": 201,
+        "confirmed_new_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7"
+      }
+    },
+    "before": {
+      "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+      "current_model": "qwen3.6-35b-a3b",
+      "conversation_ids": [
+        "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+        "a37a8de8-acc0-4016-9250-5dc03c55df47",
+        "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+        "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+        "68814db3-13c2-45ee-b776-e770f7f6065a",
+        "f371a78e-b2f3-4ace-8597-39edc00723da",
+        "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+        "38f7195d-4813-4264-8d63-5ef31aeb2734",
+        "c1181aef-2e76-451d-a15e-204bb9e81306",
+        "8915994e-1f98-49b3-b4c2-8b49badda50e",
+        "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+        "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+        "df373696-3bbd-4929-87d1-520135362bb0",
+        "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+        "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "06913773-9e3e-4c4d-a510-792975a1e1c9",
+        "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+        "a20c8238-2484-46be-8120-1e8ebcb7970d",
+        "00c2d210-ccba-47d7-8d95-7e08dd487126",
+        "66b73a50-c7b4-432e-8114-00abfcdb8201",
+        "f9d785f7-60ab-47da-a554-18d11747f17a",
+        "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+        "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+        "93e2e852-0bcc-4658-be14-78f561135342",
+        "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+      ],
+      "active_ids": [
+        "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+      ],
+      "active_rows": 1,
+      "url_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+      "stored_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+      "storage_available": true,
+      "model_choices": 1,
+      "message_count": 2,
+      "empty_state": false,
+      "error_state": false,
+      "ready_state": "complete",
+      "date_ms": 1793036220234,
+      "performance_ms": 38998,
+      "time_origin_ms": 1793036181235
+    },
+    "after_create": {
+      "current_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+      "current_model": "qwen3.6-35b-a3b",
+      "conversation_ids": [
+        "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+        "a37a8de8-acc0-4016-9250-5dc03c55df47",
+        "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+        "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+        "68814db3-13c2-45ee-b776-e770f7f6065a",
+        "f371a78e-b2f3-4ace-8597-39edc00723da",
+        "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+        "38f7195d-4813-4264-8d63-5ef31aeb2734",
+        "c1181aef-2e76-451d-a15e-204bb9e81306",
+        "8915994e-1f98-49b3-b4c2-8b49badda50e",
+        "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+        "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+        "df373696-3bbd-4929-87d1-520135362bb0",
+        "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+        "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "06913773-9e3e-4c4d-a510-792975a1e1c9",
+        "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+        "a20c8238-2484-46be-8120-1e8ebcb7970d",
+        "00c2d210-ccba-47d7-8d95-7e08dd487126",
+        "66b73a50-c7b4-432e-8114-00abfcdb8201",
+        "f9d785f7-60ab-47da-a554-18d11747f17a",
+        "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+        "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+        "93e2e852-0bcc-4658-be14-78f561135342",
+        "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+      ],
+      "active_ids": [
+        "0c3d2a9f-4c06-4881-a8b0-94ee145823d7"
+      ],
+      "active_rows": 1,
+      "url_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+      "stored_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+      "storage_available": true,
+      "model_choices": 1,
+      "message_count": 0,
+      "empty_state": true,
+      "error_state": false,
+      "ready_state": "complete",
+      "date_ms": 1793036226520,
+      "performance_ms": 45285,
+      "time_origin_ms": 1793036181235
+    },
+    "after_reload": {
+      "current_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+      "current_model": "qwen3.6-35b-a3b",
+      "conversation_ids": [
+        "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+        "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+        "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+        "a37a8de8-acc0-4016-9250-5dc03c55df47",
+        "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+        "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+        "68814db3-13c2-45ee-b776-e770f7f6065a",
+        "f371a78e-b2f3-4ace-8597-39edc00723da",
+        "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+        "38f7195d-4813-4264-8d63-5ef31aeb2734",
+        "c1181aef-2e76-451d-a15e-204bb9e81306",
+        "8915994e-1f98-49b3-b4c2-8b49badda50e",
+        "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+        "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+        "df373696-3bbd-4929-87d1-520135362bb0",
+        "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+        "93f9dce8-6517-4b42-bd46-1620207457c9",
+        "06913773-9e3e-4c4d-a510-792975a1e1c9",
+        "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+        "a20c8238-2484-46be-8120-1e8ebcb7970d",
+        "00c2d210-ccba-47d7-8d95-7e08dd487126",
+        "66b73a50-c7b4-432e-8114-00abfcdb8201",
+        "f9d785f7-60ab-47da-a554-18d11747f17a",
+        "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+        "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+        "93e2e852-0bcc-4658-be14-78f561135342",
+        "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+      ],
+      "active_ids": [
+        "0c3d2a9f-4c06-4881-a8b0-94ee145823d7"
+      ],
+      "active_rows": 1,
+      "url_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+      "stored_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+      "storage_available": true,
+      "model_choices": 1,
+      "message_count": 0,
+      "empty_state": true,
+      "error_state": false,
+      "ready_state": "complete",
+      "date_ms": 1793036231412,
+      "performance_ms": 2668,
+      "time_origin_ms": 1793036228744
+    },
+    "network": {
+      "available": true,
+      "intact": true,
+      "expired": false,
+      "requests": [
+        {
+          "id": 1,
+          "path": "/api/conversations",
+          "method": "POST",
+          "started": {
+            "date_ms": 1793036225024,
+            "performance_ms": 43788
+          },
+          "finished": {
+            "date_ms": 1793036225101,
+            "performance_ms": 43866
+          },
+          "status": 201,
+          "error": null,
+          "body_done": true,
+          "response_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "response_ids": null,
+          "response_message_count": null,
+          "blocked": false
+        },
+        {
+          "id": 2,
+          "path": "/api/conversations/0c3d2a9f-4c06-4881-a8b0-94ee145823d7/settings",
+          "method": "GET",
+          "started": {
+            "date_ms": 1793036225130,
+            "performance_ms": 43894
+          },
+          "finished": {
+            "date_ms": 1793036225581,
+            "performance_ms": 44346
+          },
+          "status": 200,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": null,
+          "response_message_count": null,
+          "blocked": false
+        },
+        {
+          "id": 3,
+          "path": "/api/conversations/0c3d2a9f-4c06-4881-a8b0-94ee145823d7/messages",
+          "method": "GET",
+          "started": {
+            "date_ms": 1793036225134,
+            "performance_ms": 43899
+          },
+          "finished": {
+            "date_ms": 1793036225570,
+            "performance_ms": 44335
+          },
+          "status": 200,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": null,
+          "response_message_count": 0,
+          "blocked": false
+        }
+      ],
+      "samples": [
+        {
+          "current_id": "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+          "conversation_ids": [
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "active_ids": [
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903"
+          ],
+          "message_count": 2,
+          "empty_state": false,
+          "error_state": false,
+          "sidebar_open": true,
+          "expanded": "true",
+          "date_ms": 1793036222558,
+          "performance_ms": 41323,
+          "reason": "initial"
+        },
+        {
+          "current_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "conversation_ids": [
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "active_ids": [
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7"
+          ],
+          "message_count": 0,
+          "empty_state": false,
+          "error_state": false,
+          "sidebar_open": false,
+          "expanded": "false",
+          "date_ms": 1793036225147,
+          "performance_ms": 43911,
+          "reason": "mutation"
+        },
+        {
+          "current_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "conversation_ids": [
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "active_ids": [
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7"
+          ],
+          "message_count": 0,
+          "empty_state": true,
+          "error_state": false,
+          "sidebar_open": false,
+          "expanded": "false",
+          "date_ms": 1793036225591,
+          "performance_ms": 44356,
+          "reason": "mutation"
+        }
+      ],
+      "sample_overflow": false
+    },
+    "reload_network": {
+      "available": true,
+      "intact": true,
+      "expired": false,
+      "requests": [
+        {
+          "id": 1,
+          "path": "/api/conversations",
+          "method": "GET",
+          "started": {
+            "date_ms": 1793036230497,
+            "performance_ms": 1753
+          },
+          "finished": {
+            "date_ms": 1793036230540,
+            "performance_ms": 1796
+          },
+          "status": 200,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": [
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "response_message_count": null,
+          "blocked": false
+        },
+        {
+          "id": 2,
+          "path": "/api/conversations/0c3d2a9f-4c06-4881-a8b0-94ee145823d7/messages",
+          "method": "GET",
+          "started": {
+            "date_ms": 1793036230500,
+            "performance_ms": 1756
+          },
+          "finished": {
+            "date_ms": 1793036230959,
+            "performance_ms": 2215
+          },
+          "status": 200,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": null,
+          "response_message_count": 0,
+          "blocked": false
+        }
+      ],
+      "samples": [
+        {
+          "current_id": "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+          "conversation_ids": [
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7",
+            "052a86cd-267e-4b38-bdb6-bb2f481ba903",
+            "aed529ed-19ae-4ce9-898e-6dd4a7242629",
+            "a37a8de8-acc0-4016-9250-5dc03c55df47",
+            "1c288e35-3ce0-4dc1-8b16-65695b49b066",
+            "d25e5502-1ca3-43c1-89b8-92e4568b15b6",
+            "68814db3-13c2-45ee-b776-e770f7f6065a",
+            "f371a78e-b2f3-4ace-8597-39edc00723da",
+            "d907e852-f0f8-48c8-aa8e-7e15a0e4e3f1",
+            "38f7195d-4813-4264-8d63-5ef31aeb2734",
+            "c1181aef-2e76-451d-a15e-204bb9e81306",
+            "8915994e-1f98-49b3-b4c2-8b49badda50e",
+            "41f1f997-28af-4a62-9b7e-e11287dc03d5",
+            "64f82257-a5f7-460a-a35e-d9a4223d8f15",
+            "df373696-3bbd-4929-87d1-520135362bb0",
+            "91dac390-30fc-4150-b3cb-d9897f6a8db5",
+            "93f9dce8-6517-4b42-bd46-1620207457c9",
+            "06913773-9e3e-4c4d-a510-792975a1e1c9",
+            "e1e5635a-1dfb-4dd0-87b6-4a4400332b5d",
+            "a20c8238-2484-46be-8120-1e8ebcb7970d",
+            "00c2d210-ccba-47d7-8d95-7e08dd487126",
+            "66b73a50-c7b4-432e-8114-00abfcdb8201",
+            "f9d785f7-60ab-47da-a554-18d11747f17a",
+            "c79093ba-e9c0-4dc8-b9cf-9b72fd9729dc",
+            "fd2c17d5-1f8b-48c6-b5f0-02d030b9c845",
+            "93e2e852-0bcc-4658-be14-78f561135342",
+            "ab4bb04b-bc00-4960-9c16-80980625cd2f"
+          ],
+          "active_ids": [
+            "0c3d2a9f-4c06-4881-a8b0-94ee145823d7"
+          ],
+          "message_count": 0,
+          "empty_state": true,
+          "error_state": false,
+          "sidebar_open": false,
+          "expanded": "false",
+          "date_ms": 1793036230486,
+          "performance_ms": 1742,
+          "reason": "initial"
+        }
+      ],
+      "sample_overflow": false
+    },
+    "video": {
+      "path": "15-conversation-create.mp4",
+      "available": true,
+      "time_limit_seconds": 180,
+      "clock_note": "Process timestamps bound recording; they do not identify the exact first video frame.",
+      "exit_code": 0
+    }
+  }
+}

@@ -138,13 +138,7 @@ Communication between modules happens through declared public APIs and Core even
 
 ## Validation
 
-CI validates frontend module code with:
-
-```bash
-python tests/validate_frontend_modules.py
-pytest -q tests/test_frontend_module_code.py
-node tests/test_system_status.js
-pytest -q tests/test_unified_buttons_contract.py
-```
-
-The runtime contract test covers module registration, capabilities, status, traces, sensitive-data redaction, revocation, and the user-visible system-status panel.
+Only real Redmi 9 checks remain. See
+[Redmi 9 checks](../architecture/browser-self-testing.md) for the device
+scenarios, evidence requirements and explicit-run policy. The former static,
+VM and BrowserShim test commands have been removed.

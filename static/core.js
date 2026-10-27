@@ -76,12 +76,13 @@ window.changeModel = function (newModel, skipPatch) {
   var textModels = modelsData.text || {};
   var voiceModels = modelsData.voice || {};
   var imageModels = modelsData.image || {};
-  var catalogLoaded =
-    Object.keys(textModels).length + Object.keys(voiceModels).length + Object.keys(imageModels).length > 0;
+  var modelKeys = Object.keys(textModels).concat(Object.keys(voiceModels), Object.keys(imageModels));
+  var catalogLoaded = modelKeys.length > 0;
   // Without a catalog (offline or degraded) keep the requested key; the server validates it.
-  if (catalogLoaded && !textModels[newModel] && !voiceModels[newModel] && !imageModels[newModel]) {
-    console.warn("[CORE] Unknown model:", newModel, "-> fallback to yandexgpt-5-lite");
-    newModel = "yandexgpt-5-pro";
+  if (catalogLoaded && modelKeys.indexOf(newModel) === -1) {
+    var fallbackModel = modelKeys.indexOf("yandexgpt-5-pro") !== -1 ? "yandexgpt-5-pro" : modelKeys[0];
+    console.warn("[CORE] Unknown model:", newModel, "-> fallback to", fallbackModel);
+    newModel = fallbackModel;
   }
   currentModel = newModel;
   currentModelType = voiceModels[currentModel] ? "voice" : imageModels[currentModel] ? "image" : "text";

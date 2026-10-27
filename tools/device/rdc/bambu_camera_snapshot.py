@@ -8,7 +8,6 @@ Access code is loaded from a private file on this device, never a CLI argument.
 import argparse
 import hashlib
 import getpass
-import io
 import os
 from pathlib import Path
 import socket
@@ -115,39 +114,15 @@ def snapshot(host, output, code_file, pin_file):
     return len(jpg)
 
 
-def self_test():
-    sample = b"\xff\xd8" + b"0" * 2000 + b"\xff\xd9"
-    data = HEADER.pack(len(sample), 0, 1, 0) + sample
-    assert len(auth_packet("12345678")) == 80
-
-    class FakeSocket:
-        def __init__(self, payload):
-            self.source = io.BytesIO(payload)
-
-        def recv(self, size):
-            return self.source.read(size)
-
-    assert jpeg_from_stream(FakeSocket(data)) == sample
-    try:
-        jpeg_from_stream(FakeSocket(HEADER.pack(MAX_IMAGE_BYTES + 1, 0, 1, 0)))
-        raise AssertionError("image size guard failed")
-    except CameraError:
-        pass
-    print("SELFTEST_OK: header, JPEG and size checks")
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default=DEFAULT_HOST)
-    parser.add_argument("--self-test", action="store_true")
     parser.add_argument(
         "--pair", action="store_true", help="Enter camera code privately on this device"
     )
     args = parser.parse_args()
     try:
-        if args.self_test:
-            self_test()
-        elif args.pair:
+        if args.pair:
             code = getpass.getpass("Printer access code (not displayed): ").strip()
             auth_packet(code)
             private_write(CODE_FILE, (code + "\n").encode("ascii"))

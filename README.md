@@ -10,7 +10,7 @@ The repository is actively evolving. This README separates shipped behavior from
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Run the backend                         | `app.py`, `start.sh`                                                                                                        |
 | Web interface                           | `static/`, `templates/`                                                                                                     |
-| Tests                                   | `tests/`                                                                                                                    |
+| Redmi 9 checks                          | [Device checks](docs/architecture/browser-self-testing.md)                                                                 |
 | Developer and diagnostic tools          | [scripts guide](scripts/README.md)                                                                                          |
 | Architecture and operating instructions | [docs index](docs/README.md)                                                                                                |
 | Python package map                      | [layout contract](docs/architecture/repository-layout.md), [remaining root files](docs/architecture/root-file-inventory.md) |
@@ -132,12 +132,11 @@ Functional checks are run explicitly when needed; there are no mandatory CI gate
 
 ## Testing
 
-```bash
-python -m compileall -q .
-pytest -q
-```
-
-For frontend/runtime work, preserve the progressive-enhancement path and BrowserShim/VM tests. Do not introduce Playwright as a runtime dependency. Browser Emulator/self-testing work is tracked in [#409](https://github.com/maksimp6/Chat/issues/409).
+Only real Redmi 9 checks remain. The offline unit/fixture suites, Chromium
+component test and their generic runners have been removed. Run device checks
+inside GitHub Actions only when explicitly requested; see
+[Redmi 9 checks](docs/architecture/browser-self-testing.md). Recorded results
+from removed suites remain historical evidence, not current application PASS.
 
 ## Documentation map
 

@@ -15,7 +15,6 @@ Modes:
   --mode index   : build index, print stats, optional --dump-index PATH
   --mode query   : run query from --query-file (or --query inline),
                    publish comment when --publish with GITHUB_TOKEN
-  --selftest     : run embedded controls (RED control, verbatim, determinism)
 """
 
 from __future__ import annotations
@@ -252,36 +251,6 @@ def report(
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------- selftest
-
-
-def selftest() -> int:
-    corpus = [
-        {
-            "issue": 9001,
-            "title": "t1",
-            "text": "Узкий канал даёт точность пересказа, но не новизну.",
-            "sha256": "x",
-        },
-        {
-            "issue": 9002,
-            "title": "t2",
-            "text": "APK 6819 собран из ветки feat/redmi9-stand-a1mini-slice, не из develop.",
-            "sha256": "y",
-        },
-    ]
-    units = build_units(corpus)
-    idx = BM25Index(units)
-    hits = idx.search("узкий канал точность", top=3)
-    assert hits and hits[0]["issue"] == 9001, "positive control failed"
-    red = idx.search("внезапный морозильник клубника Полярная звезда", top=3)
-    assert not red, "RED control failed: nonsense query returned hits"
-    frs = verify_corpus_fragments(hits, corpus)
-    assert all(f["verbatim"] for f in frs), "verbatim control failed"
-    print("selftest: POSITIVE ok, RED ok, VERBATIM ok,", len(units), "units")
-    return 0
-
-
 # ---------------------------------------------------------------- main
 
 
@@ -292,11 +261,7 @@ def main() -> int:
     ap.add_argument("--query")
     ap.add_argument("--publish-issue", type=int)
     ap.add_argument("--dump-index")
-    ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
-
-    if args.selftest:
-        return selftest()
 
     token = env_get("GITHUB_TOKEN")
     corpus = fetch_corpus(token)

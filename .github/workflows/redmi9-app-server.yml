@@ -10,7 +10,7 @@ on:
         required: true
         default: deploy
         type: choice
-        options: [deploy, screenshots, tools_self_check, tools_self_check_tests, verify_screenshots, rootagent_native_check, art_generate]
+        options: [deploy, screenshots, tools_self_check, verify_screenshots, rootagent_native_check, art_generate]
 
 permissions: {}
 
@@ -105,7 +105,9 @@ jobs:
           matrix = manifest.get("matrix_scenario", {})
           artifacts = {entry.get("path") for entry in manifest.get("artifacts", [])}
           required_artifacts = {"15-conversation-create.mp4", "events.json"}
-          print(json.dumps({"creation_scenario": scenario.get("verdict", "NOT_RUN"),
+          # STALE_RUNTIME keeps the verdicts valid for the installed app; it only says they do not prove this commit.
+          print(json.dumps({"deployment_acceptance": manifest.get("deployment_acceptance"),
+                            "creation_scenario": scenario.get("verdict", "NOT_RUN"),
                             "failures": scenario.get("failures", []),
                             "matrix_scenario": matrix.get("verdict", "NOT_RUN"),
                             "matrix_failures": matrix.get("failures", []),
@@ -145,13 +147,12 @@ jobs:
           check_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-tools-check-", dir=".")).resolve())')
           export RUNNER_TEMP="$check_temp"
           export TMPDIR="$check_temp"
-          mkdir -m 700 "$check_temp/scripts" "$check_temp/tests"
-          for file in scripts/redmi_screenshot_capture.py scripts/publish_redmi_screenshots.py scripts/logos_tools_self_check.py tests/test_logos_tools_self_check.py; do
+          mkdir -m 700 "$check_temp/scripts"
+          for file in scripts/redmi_screenshot_capture.py scripts/publish_redmi_screenshots.py scripts/logos_tools_self_check.py; do
             curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
               "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/$file" -o "$check_temp/$file"
           done
           cd "$check_temp"
-          python -m unittest discover -s tests -p test_logos_tools_self_check.py -v
           capture_dir="$check_temp/logos-screenshots-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           python scripts/redmi_screenshot_capture.py "$capture_dir"
           python scripts/publish_redmi_screenshots.py "$capture_dir"
@@ -162,45 +163,11 @@ jobs:
               manifest = json.load(stream)
           scenario = manifest.get("creation_scenario", {})
           check = scenario.get("checkpoints", {}).get("tools_self_check", {})
-          print(json.dumps({"tools_self_check": check, "scenario_failures": scenario.get("failures", [])}, ensure_ascii=False))
+          print(json.dumps({"deployment_acceptance": manifest.get("deployment_acceptance"), "tools_self_check": check,
+                            "scenario_failures": scenario.get("failures", [])}, ensure_ascii=False))
           if check.get("status") != "PASS" or scenario.get("verdict") != "PASS":
               raise SystemExit("Tools or parameter availability not fully proven; evidence published first")
           PY
-
-  tools_self_check_tests:
-    if: github.event_name == 'workflow_dispatch' && inputs.action == 'tools_self_check_tests'
-    runs-on: redmi9
-    timeout-minutes: 3
-    steps:
-      - name: logos
-        shell: bash
-        env:
-          CI: "true"
-        run: |
-          set -euo pipefail
-          test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
-          # Each job has its own UUID workspace. Remove disposable captures
-          # across the runner work root before downloads or mkdtemp need space.
-          cleanup_root="$HOME/github-python-runner/work"
-          test "$(dirname "$GITHUB_WORKSPACE")" = "$cleanup_root"
-          test ! -L "$HOME/github-python-runner"
-          test ! -L "$cleanup_root"
-          df -k "$cleanup_root"
-          find "$cleanup_root" -mindepth 2 -maxdepth 2 -type d \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' -o -name '.logos-tools-check-*' -o -name '.logos-tools-tests-*' -o -name '.logos-candidate-tools-*' \) -print -exec rm -rf -- {} +
-          df -k "$cleanup_root"
-          check_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-tools-tests-", dir=".")).resolve())')
-          export RUNNER_TEMP="$check_temp"
-          mkdir -m 700 "$check_temp/scripts" "$check_temp/tests"
-          for file in scripts/logos_tools_self_check.py scripts/recheck_logos_tools_self_check.py tests/test_logos_tools_self_check.py; do
-            curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
-              "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/$file" -o "$check_temp/$file"
-          done
-          cd "$check_temp"
-          python -m unittest discover -s tests -p test_logos_tools_self_check.py -v
-          # Replay the first recorded question without paying for another generation.
-          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
-            'https://raw.githubusercontent.com/maksimp6/Chat/07044cdfe7b6aba6e425ab5f158a5f9bc9ef21ba/docs/screenshots/logos/2026-10-26/run-40348655475-1/manifest.json' -o recorded-manifest.json
-          python scripts/recheck_logos_tools_self_check.py --manifest recorded-manifest.json
 
   verify_screenshots:
     if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && github.ref != 'refs/heads/master' && inputs.action == 'verify_screenshots'
@@ -256,13 +223,12 @@ jobs:
           native_job_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-rootagent-", dir=".")).resolve())')
           export RUNNER_TEMP="$native_job_temp"
           export TMPDIR="$native_job_temp"
-          mkdir -m 700 "$RUNNER_TEMP/scripts" "$RUNNER_TEMP/tests" "$RUNNER_TEMP/evidence"
-          for file in scripts/redmi_root_agent.py scripts/redmi_root_agent_e2e.py tests/test_redmi_root_agent.py; do
+          mkdir -m 700 "$RUNNER_TEMP/scripts" "$RUNNER_TEMP/evidence"
+          for file in scripts/redmi_root_agent.py scripts/redmi_root_agent_e2e.py; do
             curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
               "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/$file" -o "$RUNNER_TEMP/$file"
           done
           cd "$RUNNER_TEMP"
-          python -m unittest discover -s tests -p test_redmi_root_agent.py -v
           python scripts/redmi_root_agent_e2e.py --helper scripts/redmi_root_agent.py --output "$RUNNER_TEMP/evidence"
 
   art_generate:

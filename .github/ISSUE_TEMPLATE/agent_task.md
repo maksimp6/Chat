@@ -36,9 +36,8 @@ Where the change most likely belongs (paths, modules, endpoints).
 
 ## Checks to run
 
-- [ ] `python -m compileall -q .`
-- [ ] `python tests/validate_runtime_modules.py`
-- [ ] `pytest -q` (or the focused test files)
+- [ ] Only explicitly requested real Redmi 9 checks, inside GitHub Actions.
+- [ ] Record the actual device/runtime revision, result and evidence; use NOT_RUN when no check was requested.
 
 ## Out of scope
 

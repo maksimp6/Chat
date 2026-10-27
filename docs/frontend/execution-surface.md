@@ -19,8 +19,9 @@ The frontend keeps no execution state of its own. The projection holds:
 
 Nothing is invented. A missing value stays `null`/`unknown`, and the compact
 view shows it as "неизвестно". Only whitelisted metadata is copied, never
-prompts, payloads, tool arguments or credentials. `tests/test_execution_surface.js`
-enforces this with a canary.
+prompts, payloads, tool arguments or credentials. The former BrowserShim canary
+test has been removed; it is no longer evidence for this contract. Check live
+claims against the Redmi 9 rendered surface and saved traces.
 
 Chat replies that carry a trace show the compact view (`.execution-surface`)
 above the existing detailed timeline (`LogosTraceSummary`).
