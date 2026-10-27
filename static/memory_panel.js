@@ -13,10 +13,23 @@
 
   var CATEGORY_LABELS = { general: "общее" };
 
+  // Config controls take part in a save only after the stored settings were read. Otherwise a
+  // save would send values the server never confirmed and overwrite them.
+  var configLoaded = false;
+
+  function setConfigControlsReady(ready) {
+    configLoaded = ready;
+    ["memEnabled", "memLimit"].forEach(function (id) {
+      var control = byId(id);
+      if (control) control.disabled = !ready;
+    });
+  }
+
   window.loadMemoryData = async function () {
     // Old facts stay out of view while the request runs (пункт 51).
     var pending = byId("memoryFactsList");
     if (pending) pending.textContent = "Загрузка…";
+    setConfigControlsReady(false);
     try {
       var response = await window.LogosDispatcher.request("/api/memory/manage");
       if (!response.ok) throw new Error("HTTP " + response.status);
@@ -35,6 +48,7 @@
           Number.isInteger(config.max_context_facts) ? config.max_context_facts : 15,
         );
       }
+      setConfigControlsReady(true);
       if (count) count.textContent = facts.length;
       reportStatus("");
       if (!list) return;
@@ -61,24 +75,36 @@
       });
     } catch (error) {
       console.error("[Memory] Failed to load memory:", error);
+      setConfigControlsReady(false);
       var failed = byId("memoryFactsList");
       if (failed) failed.replaceChildren();
       reportStatus("Не удалось загрузить память.");
     }
   };
 
-  window.updateMemoryConfig = async function () {
-    var enabled = byId("memEnabled");
-    var limit = byId("memLimit");
-    var maxFacts = parseInt(limit && limit.value, 10);
+  window.updateMemoryConfig = async function (event) {
+    var control = event && event.target;
+    if (!configLoaded || !control) return;
+    // Send only the control the user changed; the other stored settings stay as they are.
+    var body = {};
+    if (control.id === "memEnabled") {
+      body.enabled = Boolean(control.checked);
+    } else if (control.id === "memLimit") {
+      var maxFacts = parseInt(control.value, 10);
+      if (Number.isNaN(maxFacts)) {
+        // An empty limit is not a value to save; show the stored one again.
+        await window.loadMemoryData();
+        return;
+      }
+      body.max_context_facts = maxFacts;
+    } else {
+      return;
+    }
     try {
       var response = await window.LogosDispatcher.request("/api/memory/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          enabled: Boolean(enabled && enabled.checked),
-          max_context_facts: Number.isNaN(maxFacts) ? 15 : maxFacts,
-        }),
+        body: JSON.stringify(body),
       });
       if (!response.ok) throw new Error("HTTP " + response.status);
       await window.loadMemoryData();
