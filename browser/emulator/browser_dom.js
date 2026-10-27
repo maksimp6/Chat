@@ -1,5 +1,7 @@
 "use strict";
 
+const wikifunctions = require("../../static/wikifunctions");
+
 class EventTargetShim {
   constructor() {
     this._listeners = Object.create(null);
@@ -66,7 +68,7 @@ class ClassList {
 class ElementShim extends EventTargetShim {
   constructor(tagName, attributes = {}) {
     super();
-    this.tagName = tagName.toUpperCase();
+    this.tagName = wikifunctions.uppercase(tagName);
     this.attributes = { ...attributes };
     this.children = [];
     this.parentNode = null;
@@ -76,7 +78,7 @@ class ElementShim extends EventTargetShim {
     this.dataset = new Proxy(Object.create(null), {
       set(target, key, value) {
         target[key] = String(value);
-        const attrName = "data-" + String(key).replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
+        const attrName = "data-" + String(key).replace(/[A-Z]/g, (c) => "-" + wikifunctions.lowercase(c));
         self.attributes[attrName] = String(value);
         return true;
       },
@@ -90,7 +92,7 @@ class ElementShim extends EventTargetShim {
 
     for (const [name, value] of Object.entries(attributes)) {
       if (name.startsWith("data-")) {
-        const key = name.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+        const key = name.slice(5).replace(/-([a-z])/g, (_, c) => wikifunctions.uppercase(c));
         this.dataset[key] = value;
       }
     }
@@ -557,13 +559,13 @@ function serialize(element) {
     .join(" ");
   return (
     "<" +
-    element.tagName.toLowerCase() +
+    wikifunctions.lowercase(element.tagName) +
     (attrs ? " " + attrs : "") +
     ">" +
     element._text +
     element.children.map(serialize).join("") +
     "</" +
-    element.tagName.toLowerCase() +
+    wikifunctions.lowercase(element.tagName) +
     ">"
   );
 }
