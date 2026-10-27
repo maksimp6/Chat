@@ -6,10 +6,12 @@
 (function () {
   "use strict";
 
+  // WIKIFUNCTIONS Z10079 / Z10081@143512 — НЕ РЕДАКТИРОВАТЬ.
   function trim(input) {
     return input.trim();
   }
 
+  // WIKIFUNCTIONS Z12316 / Z12317@285821 — НЕ РЕДАКТИРОВАТЬ.
   function replaceRegex(pattern, replacement, input, flags) {
     return input.replace(RegExp(pattern, flags), replacement);
   }
