@@ -1,6 +1,20 @@
 "use strict";
 
 const state = { threads: [], tasks: [], section: "threads", selected: null };
+// Зеркало transitions из project_board/store.py: в списке статусов только допустимые переходы.
+const TRANSITIONS = {
+  backlog: ["ready", "blocked"],
+  blocked: ["ready"],
+  ready: ["in_progress", "blocked"],
+  in_progress: ["review", "blocked"],
+  review: ["in_progress", "done", "blocked"],
+  done: [],
+};
+const SERVER_ERRORS = {
+  "invalid status transition": "Такой переход статуса недопустим",
+  "dependencies not done": "Сначала должны быть завершены зависимости",
+  "owner acceptance required; this is NOT merge": "Для Done нужна приёмка владельцем (это НЕ merge)",
+};
 const $ = (id) => document.getElementById(id);
 
 function node(tag, text = "", className = "") {
@@ -20,6 +34,25 @@ function requestId() {
   return crypto.randomUUID();
 }
 
+// request_id живёт до успешного ответа и привязан к содержимому: повтор той же отправки
+// после потери ответа не создаёт дубль, а изменённый черновик получает новый ключ.
+const pendingIds = new Map();
+async function postOnce(button, path, payload) {
+  const signature = path + "\n" + JSON.stringify(payload);
+  if (!pendingIds.has(signature)) pendingIds.set(signature, requestId());
+  const label = button.textContent;
+  button.disabled = true;
+  button.textContent = "Отправка…";
+  try {
+    const result = await api("POST", path, { ...payload, request_id: pendingIds.get(signature) });
+    pendingIds.delete(signature);
+    return result;
+  } finally {
+    button.disabled = false;
+    button.textContent = label;
+  }
+}
+
 async function api(method, path, data) {
   const response = await fetch(path, {
     method,
@@ -28,9 +61,11 @@ async function api(method, path, data) {
       ...(data ? { "Content-Type": "application/json" } : {}),
     },
     ...(data ? { body: JSON.stringify(data) } : {}),
+  }).catch(() => {
+    throw new Error("Нет связи с сервером");
   });
   const output = await response.json();
-  if (!response.ok) throw new Error(output.error || "HTTP " + response.status);
+  if (!response.ok) throw new Error(SERVER_ERRORS[output.error] || output.error || "HTTP " + response.status);
   return output;
 }
 
@@ -82,11 +117,13 @@ async function openItem(id) {
   try {
     if (state.section === "tasks") await showTask(id);
     else await showThread(id);
-  } catch (e) { error(e.message); }
+  } catch (e) { if (state.selected === id) error(e.message); }
 }
 
 async function showThread(id) {
   const thread = await api("GET", "/api/threads/" + encodeURIComponent(id));
+  // ответ на предыдущий клик не должен перерисовать уже открытую запись
+  if (state.selected !== id) return;
   const detail = $("detail");
   detail.replaceChildren(
     node("span", thread.category === "shame" ? "Доска позора" : "Обсуждение", "pill"),
@@ -108,25 +145,25 @@ async function showThread(id) {
   const button = node("button", "Опубликовать комментарий");
   button.type = "submit";
   form.append(label, button);
-  // один request_id на черновик: повтор после ошибки не создаёт дубль
-  let requestKey = requestId();
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      await api("POST", "/api/threads/" + id + "/posts", {
-        body: area.value, request_id: requestKey,
-      });
-      requestKey = requestId();
+      await postOnce(button, "/api/threads/" + id + "/posts", { body: area.value });
+    } catch (ex) { error(ex.message); return; }
+    // поле очищается сразу после сохранения: ошибка обновления ленты не ведёт к повтору
+    area.value = "";
+    error("Комментарий сохранён в Memory DB");
+    try {
       await refresh();
       await showThread(id);
-      error("Комментарий сохранён в Memory DB");
-    } catch (ex) { error(ex.message); }
+    } catch (ex) { error("Комментарий сохранён, но лента не обновилась: " + ex.message); }
   });
   detail.append(form);
 }
 
 async function showTask(id) {
   const task = await api("GET", "/api/tasks/" + encodeURIComponent(id));
+  if (state.selected !== id) return task;  // устаревший ответ не перерисовывает открытую задачу
   const detail = $("detail");
   detail.replaceChildren(
     node("span", task.id + " · " + task.status, "pill"),
@@ -150,7 +187,10 @@ async function showTask(id) {
   const status = node("form", "", "controls");
   const label = node("label", "Изменить статус");
   const select = node("select");
-  ["backlog", "ready", "blocked", "in_progress", "review", "done"].forEach((value) => {
+  // в списке только текущий статус и допустимые переходы: сервер отклоняет остальные
+  const allowed = TRANSITIONS[task.status] || [];
+  const statuses = ["backlog", "ready", "blocked", "in_progress", "review", "done"];
+  statuses.filter((value) => value === task.status || allowed.includes(value)).forEach((value) => {
     const option = node("option", value);
     option.value = value;
     option.selected = value === task.status;
@@ -166,15 +206,23 @@ async function showTask(id) {
   status.append(label, approvedLabel, save);
   status.addEventListener("submit", async (e) => {
     e.preventDefault();
+    // тот же статус сервер отклонил бы с 409: запрос не отправляем
+    if (select.value === task.status) {
+      error("Статус не изменился");
+      return;
+    }
+    const payload = { status: select.value, accepted_by_owner: approved.checked };
     try {
-      await api("POST", "/api/tasks/" + id + "/status", {
-        status: select.value, accepted_by_owner: approved.checked,
-        request_id: requestId(),
-      });
+      await postOnce(save, "/api/tasks/" + id + "/status", payload);
       await refresh();
       await showTask(id);
       error("Статус обновлён, без merge");
-    } catch (ex) { error(ex.message); }
+    } catch (ex) {
+      // ответ мог потеряться уже после применения: сверяем с сервером, а не показываем старый статус
+      const fresh = await reloadTask(id);
+      if (fresh && fresh.status === payload.status) error("Статус обновлён, без merge");
+      else error(fresh ? ex.message + ". Сейчас статус: " + fresh.status : ex.message);
+    }
   });
   const evidence = node("form");
   const summaryLabel = node("label", "Добавить доказательство (не VERIFIED)");
@@ -192,15 +240,23 @@ async function showTask(id) {
   evidence.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      await api("POST", "/api/tasks/" + id + "/evidence", {
-        summary: summary.value, url: url.value, request_id: requestId(),
-      });
+      await postOnce(submit, "/api/tasks/" + id + "/evidence", { summary: summary.value, url: url.value });
+      // поля очищаются сразу после сохранения: ошибка обновления не должна привести к повтору
+      summary.value = "";
+      url.value = "";
       await refresh();
       await showTask(id);
       error("Доказательство сохранено как непроверенное");
     } catch (ex) { error(ex.message); }
   });
   detail.append(status, evidence);
+  return task;
+}
+
+// Перечитать список и задачу после неоднозначной ошибки; null, если сервер недоступен.
+async function reloadTask(id) {
+  await refresh().catch(() => {});
+  return showTask(id).catch(() => null);
 }
 
 function selectSection(section) {
@@ -235,16 +291,18 @@ $("new").addEventListener("click", () => {
 $("create-thread").addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = new FormData(e.target);
+  let item;
   try {
-    const item = await api("POST", "/api/threads", {
-      title: form.get("title"), body: form.get("body"),
-      category: form.get("category"), request_id: requestId(),
+    item = await postOnce(e.target.querySelector("button"), "/api/threads", {
+      title: form.get("title"), body: form.get("body"), category: form.get("category"),
     });
+  } catch (ex) { error(ex.message); return; }
+  e.target.reset();
+  try {
     await refresh();
     await openItem(item.id);
-    e.target.reset();
     error("Обсуждение сохранено");
-  } catch (ex) { error(ex.message); }
+  } catch (ex) { error("Обсуждение сохранено, но список не обновился: " + ex.message); }
 });
 
 $("create-task").addEventListener("submit", async (e) => {
@@ -252,15 +310,18 @@ $("create-task").addEventListener("submit", async (e) => {
   const form = new FormData(e.target);
   const dependencies = String(form.get("dependencies") || "")
     .split(",").map((x) => x.trim()).filter(Boolean);
+  let item;
   try {
-    const item = await api("POST", "/api/tasks", {
-      title: form.get("title"), depends_on: dependencies, request_id: requestId(),
+    item = await postOnce(e.target.querySelector("button"), "/api/tasks", {
+      title: form.get("title"), depends_on: dependencies,
     });
+  } catch (ex) { error(ex.message); return; }
+  e.target.reset();
+  try {
     await refresh();
     await openItem(item.id);
-    e.target.reset();
     error("Задача сохранена");
-  } catch (ex) { error(ex.message); }
+  } catch (ex) { error("Задача сохранена, но список не обновился: " + ex.message); }
 });
 
 refresh().then(() => {
