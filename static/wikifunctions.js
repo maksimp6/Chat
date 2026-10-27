@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0
- * Adapted from Wikifunctions implementations Z10081@143512, Z12317@285821, Z10048@207179 and Z10019@216191.
+ * Adapted from Wikifunctions implementations Z10081@143512, Z12317@285821,
+ * Z10048@207179 and Z10019@216191.
  * Changes: descriptive names, formatting, and browser/CommonJS exports.
  * Source, original code and license: third_party/wikifunctions/.
  */
