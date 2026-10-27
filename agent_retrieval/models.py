@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Mapping
 
+from core.wikifunctions import trim_string
 from observability.trace_security import sanitize_trace_value
 
 
@@ -16,7 +17,7 @@ MAX_CHARS = 12000
 def _clean(value: Any) -> str:
     if value is None:
         return ""
-    return str(sanitize_trace_value(str(value))).strip()
+    return trim_string(str(sanitize_trace_value(str(value))))
 
 
 def _freeze(value: Any) -> Any:
