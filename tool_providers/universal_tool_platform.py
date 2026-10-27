@@ -305,6 +305,7 @@ class UniversalToolExecutor:
         authorize: Optional[Callable[[UniversalToolDefinition, UniversalToolCall], Any]] = None,
         policy: Optional[Callable[[UniversalToolDefinition, UniversalToolCall], Any]] = None,
         approval: Optional[Callable[[UniversalToolDefinition, UniversalToolCall], Any]] = None,
+        server_configs: Optional[list[dict[str, Any]]] = None,
     ) -> dict[str, Any]:
         if not isinstance(call, UniversalToolCall):
             call = UniversalToolCall(
@@ -380,6 +381,7 @@ class UniversalToolExecutor:
                 raw_result = self.registry.execute(
                     call.tool_name,
                     dict(call.arguments),
+                    **({"server_configs": server_configs} if server_configs is not None else {}),
                     context={
                         "call": call,
                         "tool": definition,

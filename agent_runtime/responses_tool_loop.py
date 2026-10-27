@@ -71,20 +71,49 @@ def run_tool_loop(
         raise ValueError("max_rounds must be a non-negative integer or None")
     response = initial_response
     rounds = 0
+    executed: set[str] = set()
     while max_rounds is None or rounds < max_rounds:
+        if not isinstance(response, dict):
+            raise ValueError("Responses API returned a non-object response")
+        # A truncated call may contain only part of its arguments. Preserve the
+        # provider failure for the caller; never execute its partial output.
+        if response.get("error") or response.get("status") not in (None, "completed"):
+            return response
         calls = extract_function_calls(response)
         if not calls:
             return response
         if should_pause is not None and should_pause(calls):
             return response
-        results = [execute_tool(call) for call in calls]
-        tool_outputs = build_continuation_input(response, results)
+        # Validate the whole batch before any side effect. In particular, a
+        # missing correlation id used to fail only AFTER executing the tool.
+        batch_ids = set()
+        for call in calls:
+            call_id = call.get("call_id") or call.get("id")
+            if not isinstance(call_id, str) or not call_id.strip():
+                raise ValueError("function_call is missing a valid call_id/id")
+            if call_id in batch_ids:
+                raise ValueError("duplicate function_call id in one response")
+            batch_ids.add(call_id)
+            if call.get("status") not in (None, "completed"):
+                raise ValueError("function_call is not completed")
+            if call_id in executed:
+                raise ValueError("function_call id already executed")
+        tool_outputs = []
+        for call in calls:
+            call_id = call.get("call_id") or call.get("id")
+            result = execute_tool(call)
+            tool_outputs.append(make_function_call_output(call, result))
+            executed.add(call_id)
         continuation_input = list(response.get("output", []) or []) + tool_outputs
         response = continue_request(continuation_input, response)
         rounds += 1
     # The last continuation can itself request a gated call. That call must reach the approval
     # check like any other batch, not fail the loop.
+    if not isinstance(response, dict):
+        raise ValueError("Responses API returned a non-object response")
     calls = extract_function_calls(response)
+    if response.get("error") or response.get("status") not in (None, "completed"):
+        return response
     if not calls:
         return response
     if should_pause is not None and should_pause(calls):

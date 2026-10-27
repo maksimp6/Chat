@@ -77,9 +77,13 @@ class YandexMcpMixin:
             )
             executor = UniversalToolExecutor(registry)
             if isinstance(trace, ExecutionTrace):
-                universal_result = executor.execute_with_trace(call, trace, policy=execution_policy)
+                universal_result = executor.execute_with_trace(
+                    call, trace, policy=execution_policy, server_configs=all_servers
+                )
             else:
-                universal_result = executor.execute(call, policy=execution_policy)
+                universal_result = executor.execute(
+                    call, policy=execution_policy, server_configs=all_servers
+                )
 
             if universal_result.get("success"):
                 result = universal_result.get("data")

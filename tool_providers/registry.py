@@ -138,7 +138,11 @@ class ToolRegistry:
         return (
             isinstance(schema, dict)
             and schema.get("type") == "object"
-            and "properties" not in schema
+            and (
+                "properties" not in schema
+                or schema.get("additionalProperties") is True
+                or isinstance(schema.get("additionalProperties"), dict)
+            )
         )
 
     @staticmethod
@@ -201,9 +205,10 @@ class ToolRegistry:
         return all(shutil.which(str(executable)) for executable in required)
 
     def _function_definition(self, name: str, cfg: Mapping[str, Any]) -> dict[str, Any]:
-        parameters = cfg.get(
-            "parameters",
-            cfg.get("inputSchema") or {"type": "object", "properties": {}},
+        # Advertise the same schema the UniversalToolExecutor validates.
+        parameters = (
+            cfg.get("inputSchema") or cfg.get("input_schema") or cfg.get("parameters")
+            or {"type": "object", "properties": {}}
         )
         return {
             "type": "function",
