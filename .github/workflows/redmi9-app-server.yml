@@ -35,7 +35,7 @@ jobs:
           # This job holds the shared capture/deploy concurrency lock. Clean
           # before downloading files or creating another temporary directory.
           df -k .
-          find . -maxdepth 1 -type d \\( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' -o -name '.logos-tools-check-*' -o -name '.logos-tools-tests-*' -o -name '.logos-candidate-tools-*' \\) -print -exec rm -rf -- {} +
+          find . -maxdepth 1 -type d \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' -o -name '.logos-tools-check-*' -o -name '.logos-tools-tests-*' -o -name '.logos-candidate-tools-*' \) -print -exec rm -rf -- {} +
           df -k .
           for file in scripts/redmi_app_server.sh scripts/redmi_app_launcher.py scripts/redmi_wifi_probe.py scripts/redmi_remove_autoupdate.py .github/workflows/redmi9-app-server.yml; do
             mkdir -p "$(dirname "$file")"
