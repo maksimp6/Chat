@@ -7,6 +7,8 @@ cloud/cloudru/api_key_provider.py.
 """
 
 from __future__ import annotations
+from core.wikifunctions import lowercase_string, trim_string
+
 from core.env import env_get
 
 from datetime import datetime, timedelta, timezone
@@ -222,14 +224,17 @@ class CloudRuIamClient:
         name: str,
         description: str = "",
     ) -> dict[str, Any]:
-        if not project_id.strip():
+        project_id = trim_string(project_id)
+        name = trim_string(name)
+        description = trim_string(description)
+        if not project_id:
             raise ValueError("project_id is required")
-        if not name.strip():
+        if not name:
             raise ValueError("name is required")
         body = {
-            "name": name.strip(),
-            "description": description.strip(),
-            "target": {"project_id": project_id.strip()},
+            "name": name,
+            "description": description,
+            "target": {"project_id": project_id},
         }
         return self._request("POST", SERVICE_ACCOUNTS_PATH, json_body=body)
 
@@ -239,14 +244,14 @@ class CloudRuIamClient:
         service_account_id: str,
         enabled: Optional[bool] = None,
     ) -> list[dict[str, Any]]:
-        if not service_account_id.strip():
+        if not trim_string(service_account_id):
             raise ValueError("service_account_id is required")
         params: dict[str, Any] = {
             "filter.service_account_id": service_account_id,
             "paths": "enabled,service_account_id",
         }
         if enabled is not None:
-            params["filter.enabled"] = str(enabled).lower()
+            params["filter.enabled"] = lowercase_string(str(enabled))
         body = self._request("GET", API_KEYS_PATH, params=params)
         keys = body.get("keys", [])
         return [dict(item) for item in keys] if isinstance(keys, list) else []
@@ -263,19 +268,32 @@ class CloudRuIamClient:
         time_slots: Optional[list[dict[str, int]]] = None,
         timezone_offset: Optional[int] = None,
     ) -> dict[str, Any]:
-        if not service_account_id.strip():
+        service_account_id = trim_string(service_account_id)
+        name = trim_string(name)
+        description = trim_string(description)
+        if not service_account_id:
             raise ValueError("service_account_id is required")
-        if not name.strip():
+        if not name:
             raise ValueError("name is required")
-        products = [item.strip() for item in products if item and item.strip()]
+        normalized_products = []
+        for item in products:
+            if item:
+                item = trim_string(item)
+                if item:
+                    normalized_products.append(item)
+        products = normalized_products
         if not products:
             raise ValueError("At least one Cloud.ru service is required")
 
         restrictions: dict[str, Any] = {}
         if ip_addresses:
-            restrictions["ip_addresses"] = {
-                "ip_addresses": [item.strip() for item in ip_addresses if item.strip()]
-            }
+            normalized_ips = []
+            for item in ip_addresses:
+                if item:
+                    item = trim_string(item)
+                    if item:
+                        normalized_ips.append(item)
+            restrictions["ip_addresses"] = {"ip_addresses": normalized_ips}
         if time_slots:
             time_range: dict[str, Any] = {"time_slots": time_slots}
             if timezone_offset is not None:
@@ -283,9 +301,9 @@ class CloudRuIamClient:
             restrictions["time_range"] = time_range
 
         body: dict[str, Any] = {
-            "name": name.strip(),
-            "description": description.strip(),
-            "service_account_id": service_account_id.strip(),
+            "name": name,
+            "description": description,
+            "service_account_id": service_account_id,
             "products": products,
         }
         if restrictions:
@@ -302,7 +320,7 @@ class CloudRuIamClient:
         expires_at: Optional[str] = None,
     ) -> dict[str, Any]:
         """Reissue a static API key while retaining its resource ID."""
-        if not api_key_id.strip():
+        if not trim_string(api_key_id):
             raise ValueError("api_key_id is required")
         path = f"{API_KEYS_PATH}/{quote(api_key_id, safe='')}/reissue"
         body = {"expires_at": expires_at} if expires_at else {}
@@ -310,9 +328,11 @@ class CloudRuIamClient:
 
     def delete_api_key(self, *, api_key_id: str) -> dict[str, Any]:
         """Revoke an API key that was issued but never stored, so no live credential is left behind."""
-        if not api_key_id.strip():
+        api_key_id = trim_string(api_key_id)
+        if not api_key_id:
             raise ValueError("api_key_id is required")
-        return self._request("DELETE", f"{API_KEYS_PATH}/{quote(api_key_id.strip(), safe='')}")
+        return self._request("DELETE", f"{API_KEYS_PATH}/{quote(api_key_id, safe='')}")
+
 
 
 __all__ = ["CloudRuIamError", "CloudRuIamClient"]

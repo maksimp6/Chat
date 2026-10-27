@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import lowercase_string, trim_string
+
 import re
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -22,7 +24,7 @@ def _optional_int(value: Any, name: str) -> int | None:
         number = int(value)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{name} must be an integer") from exc
-    if str(number) != str(value).strip() and not isinstance(value, int):
+    if str(number) != trim_string(str(value)) and not isinstance(value, int):
         raise ValueError(f"{name} must be an integer")
     if number < 1:
         raise ValueError(f"{name} must be >= 1")
@@ -51,7 +53,7 @@ def set_financing_plan(store: PrintStore, owner_id: str, data: dict[str, Any]) -
     if not isinstance(data, dict):
         raise ValueError("finance plan must be an object")
 
-    model = str(data.get("printer_model") or "").strip()
+    model = trim_string(str(data.get("printer_model") or ""))
     if not model:
         raise ValueError("printer_model is required")
 
@@ -79,10 +81,10 @@ def set_financing_plan(store: PrintStore, owner_id: str, data: dict[str, Any]) -
     if term_months is not None and monthly_payment is None:
         raise ValueError("monthly_payment is required when term_months is set")
 
-    currency = str(data.get("currency") or "RUB").strip().upper()
+    currency = trim_string(str(data.get("currency") or "RUB")).upper()
 
     now = datetime.now(UTC).replace(tzinfo=None).isoformat()
-    started_at = str(data.get("started_at") or now).strip() or now
+    started_at = trim_string(str(data.get("started_at") or now)) or now
 
     record = {
         "owner_id": owner_id,
@@ -205,7 +207,7 @@ def assess_financing(store: PrintStore, owner_id: str, data: dict[str, Any]) -> 
         raise ValueError("finance assessment must be an object")
 
     saved = get_financing_plan(store, owner_id) or {}
-    purchase_mode = str(data.get("purchase_mode") or "").strip().lower()
+    purchase_mode = lowercase_string(trim_string(str(data.get("purchase_mode") or "")))
     if not purchase_mode:
         if saved and saved.get("credit_principal") in (None, 0, 0.0):
             purchase_mode = "cash"
@@ -241,7 +243,7 @@ def assess_financing(store: PrintStore, owner_id: str, data: dict[str, Any]) -> 
     monthly_payment = resolve("monthly_payment")
     term_months = resolve("term_months")
     psk_percent = resolve("psk_percent")
-    currency = str(resolve("currency", "RUB") or "RUB").strip().upper()
+    currency = trim_string(str(resolve("currency", "RUB") or "RUB")).upper()
     expected_monthly_profit = data.get("expected_monthly_profit")
     target_coverage = data.get("target_payment_coverage")
     if target_coverage is None:

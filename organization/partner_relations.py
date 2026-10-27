@@ -8,6 +8,8 @@ but it does not pretend to have an external transport when none is configured.
 
 from __future__ import annotations
 
+from core.wikifunctions import lowercase_string, trim_string
+
 import hashlib
 import json
 from typing import Any, Mapping, Optional
@@ -76,7 +78,7 @@ def init_partner_relations_tables() -> None:
 
 
 def _validate_status(value: str, allowed: tuple[str, ...], field: str) -> str:
-    normalized = str(value or "").strip().lower()
+    normalized = lowercase_string(trim_string(str(value or "")))
     if normalized not in allowed:
         raise ValueError(f"invalid {field}")
     return normalized
@@ -106,7 +108,7 @@ def create_partner(
     arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
-    name = str(arguments.get("name") or "").strip()
+    name = trim_string(str(arguments.get("name") or ""))
     if not name:
         raise ValueError("partner name is required")
     status = _validate_status(arguments.get("status") or "lead", PARTNER_STATUSES, "partner status")
@@ -124,11 +126,11 @@ def create_partner(
             "id": partner_id,
             "owner_id": owner_id,
             "name": name,
-            "organization": str(arguments.get("organization") or "").strip(),
-            "email": str(arguments.get("email") or "").strip(),
-            "phone": str(arguments.get("phone") or "").strip(),
+            "organization": trim_string(str(arguments.get("organization") or "")),
+            "email": trim_string(str(arguments.get("email") or "")),
+            "phone": trim_string(str(arguments.get("phone") or "")),
             "status": status,
-            "notes": str(arguments.get("notes") or "").strip(),
+            "notes": trim_string(str(arguments.get("notes") or "")),
             "metadata": metadata,
             "created_at": now,
             "updated_at": now,
@@ -152,7 +154,7 @@ def list_partners(
     arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
-    status = str(arguments.get("status") or "").strip().lower()
+    status = lowercase_string(trim_string(str(arguments.get("status") or "")))
     init_partner_relations_tables()
     if status:
         _validate_status(status, PARTNER_STATUSES, "partner status")
@@ -167,7 +169,7 @@ def get_partner(
     arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
-    partner_id = str(arguments.get("partner_id") or arguments.get("id") or "").strip()
+    partner_id = trim_string(str(arguments.get("partner_id") or arguments.get("id") or ""))
     if not partner_id:
         raise ValueError("partner_id is required")
     partner = _get_partner(owner_id, partner_id)
@@ -194,7 +196,7 @@ def delete_partner(
     arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
-    partner_id = str(arguments.get("partner_id") or "").strip()
+    partner_id = trim_string(str(arguments.get("partner_id") or ""))
     if not partner_id:
         raise ValueError("partner_id is required")
     if not _get_partner(owner_id, partner_id):
@@ -218,7 +220,7 @@ def update_partner(
     arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
-    partner_id = str(arguments.get("partner_id") or "").strip()
+    partner_id = trim_string(str(arguments.get("partner_id") or ""))
     if not partner_id:
         raise ValueError("partner_id is required")
     existing = _get_partner(owner_id, partner_id)
@@ -229,9 +231,9 @@ def update_partner(
     changes: dict[str, Any] = {}
     for field in ("organization", "email", "phone", "notes"):
         if field in arguments:
-            changes[field] = str(arguments.get(field) or "").strip()
+            changes[field] = trim_string(str(arguments.get(field) or ""))
     if "name" in arguments:
-        name = str(arguments.get("name") or "").strip()
+        name = trim_string(str(arguments.get("name") or ""))
         if not name:
             raise ValueError("partner name is required")
         changes["name"] = name
@@ -259,8 +261,8 @@ def add_contact(
     arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
-    partner_id = str(arguments.get("partner_id") or "").strip()
-    name = str(arguments.get("name") or "").strip()
+    partner_id = trim_string(str(arguments.get("partner_id") or ""))
+    name = trim_string(str(arguments.get("name") or ""))
     if not partner_id or not name:
         raise ValueError("partner_id and contact name are required")
     if not _get_partner(owner_id, partner_id):
@@ -275,10 +277,10 @@ def add_contact(
             "owner_id": owner_id,
             "partner_id": partner_id,
             "name": name,
-            "role": str(arguments.get("role") or "").strip(),
-            "email": str(arguments.get("email") or "").strip(),
-            "phone": str(arguments.get("phone") or "").strip(),
-            "notes": str(arguments.get("notes") or "").strip(),
+            "role": trim_string(str(arguments.get("role") or "")),
+            "email": trim_string(str(arguments.get("email") or "")),
+            "phone": trim_string(str(arguments.get("phone") or "")),
+            "notes": trim_string(str(arguments.get("notes") or "")),
             "created_at": now,
             "updated_at": now,
         },
@@ -304,7 +306,7 @@ def list_contacts(
     arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
-    partner_id = str(arguments.get("partner_id") or "").strip()
+    partner_id = trim_string(str(arguments.get("partner_id") or ""))
     if not partner_id:
         raise ValueError("partner_id is required")
     if not _get_partner(owner_id, partner_id):
@@ -320,7 +322,7 @@ def update_contact(
     arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
-    contact_id = str(arguments.get("contact_id") or "").strip()
+    contact_id = trim_string(str(arguments.get("contact_id") or ""))
     if not contact_id:
         raise ValueError("contact_id is required")
     existing = _contact_for_owner(owner_id, contact_id)
@@ -329,12 +331,12 @@ def update_contact(
     now = unix_seconds()
     # A partial update changes only the fields it names; an empty value clears that field.
     changes = {
-        field: str(arguments[field] or "").strip()
+        field: trim_string(str(arguments[field] or ""))
         for field in ("role", "email", "phone", "notes")
         if field in arguments
     }
     if "name" in arguments:
-        name = str(arguments["name"] or "").strip()
+        name = trim_string(str(arguments["name"] or ""))
         if not name:
             raise ValueError("contact name is required")
         changes["name"] = name
@@ -356,7 +358,7 @@ def delete_contact(
     arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
-    contact_id = str(arguments.get("contact_id") or "").strip()
+    contact_id = trim_string(str(arguments.get("contact_id") or ""))
     if not contact_id:
         raise ValueError("contact_id is required")
     existing = _contact_for_owner(owner_id, contact_id)
@@ -385,9 +387,9 @@ def prepare_message(
     arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
-    partner_id = str(arguments.get("partner_id") or "").strip()
+    partner_id = trim_string(str(arguments.get("partner_id") or ""))
     body = str(arguments.get("body") or "")
-    if not partner_id or not body.strip():
+    if not partner_id or not trim_string(body):
         raise ValueError("partner_id and message body are required")
     if not _get_partner(owner_id, partner_id):
         raise ValueError("partner not found")
@@ -405,11 +407,11 @@ def prepare_message(
             "owner_id": owner_id,
             "partner_id": partner_id,
             "direction": direction,
-            "subject": str(arguments.get("subject") or "").strip(),
+            "subject": trim_string(str(arguments.get("subject") or "")),
             "body": body,
             "status": status,
-            "reference_type": str(arguments.get("reference_type") or "").strip(),
-            "reference_id": str(arguments.get("reference_id") or "").strip(),
+            "reference_type": trim_string(str(arguments.get("reference_type") or "")),
+            "reference_id": trim_string(str(arguments.get("reference_id") or "")),
             "external_ref": "",
             "created_at": now,
             "updated_at": now,
@@ -438,7 +440,7 @@ def queue_message(
     arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
-    message_id = str(arguments.get("message_id") or "").strip()
+    message_id = trim_string(str(arguments.get("message_id") or ""))
     if not message_id:
         raise ValueError("message_id is required")
     message = get_message(owner_id, message_id)
@@ -480,7 +482,7 @@ def get_thread(
     arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
-    partner_id = str(arguments.get("partner_id") or "").strip()
+    partner_id = trim_string(str(arguments.get("partner_id") or ""))
     if not partner_id:
         raise ValueError("partner_id is required")
     if not _get_partner(owner_id, partner_id):
@@ -493,7 +495,7 @@ def update_status(
     arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
-    partner_id = str(arguments.get("partner_id") or "").strip()
+    partner_id = trim_string(str(arguments.get("partner_id") or ""))
     status = _validate_status(arguments.get("status"), PARTNER_STATUSES, "partner status")
     if not partner_id or not _get_partner(owner_id, partner_id):
         raise ValueError("partner not found")
@@ -515,8 +517,8 @@ def create_followup(
     arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
-    partner_id = str(arguments.get("partner_id") or "").strip()
-    title = str(arguments.get("title") or "").strip()
+    partner_id = trim_string(str(arguments.get("partner_id") or ""))
+    title = trim_string(str(arguments.get("title") or ""))
     if not partner_id or not title:
         raise ValueError("partner_id and follow-up title are required")
     if not _get_partner(owner_id, partner_id):
@@ -535,9 +537,9 @@ def create_followup(
             "title": title,
             "due_at": due_value,
             "status": "open",
-            "notes": str(arguments.get("notes") or "").strip(),
-            "reference_type": str(arguments.get("reference_type") or "").strip(),
-            "reference_id": str(arguments.get("reference_id") or "").strip(),
+            "notes": trim_string(str(arguments.get("notes") or "")),
+            "reference_type": trim_string(str(arguments.get("reference_type") or "")),
+            "reference_id": trim_string(str(arguments.get("reference_id") or "")),
             "created_at": now,
             "updated_at": now,
         },
@@ -563,7 +565,7 @@ def complete_followup(
     arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
-    followup_id = str(arguments.get("followup_id") or "").strip()
+    followup_id = trim_string(str(arguments.get("followup_id") or ""))
     if not followup_id:
         raise ValueError("followup_id is required")
     existing = get_followup(owner_id, followup_id)

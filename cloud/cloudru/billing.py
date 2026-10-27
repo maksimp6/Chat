@@ -8,6 +8,8 @@ and reports ``total_cost=None`` instead of guessing when nothing matches.
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 from decimal import Decimal, InvalidOperation
 from typing import Any, Mapping
 
@@ -26,7 +28,7 @@ def _decimal(value: Any) -> Decimal | None:
                 return _decimal(value[key])
         return None
     try:
-        amount = Decimal(str(value).strip().replace(",", "."))
+        amount = Decimal(trim_string(str(value)).replace(",", "."))
     except (InvalidOperation, ValueError):
         return None
     return amount if amount.is_finite() else None
@@ -35,8 +37,10 @@ def _decimal(value: Any) -> Decimal | None:
 def _currency(payload: dict[str, Any]) -> str | None:
     for key in _CURRENCY_KEYS:
         value = payload.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip().upper()
+        if isinstance(value, str):
+            currency = trim_string(value)
+            if currency:
+                return currency.upper()
     return None
 
 

@@ -1,5 +1,7 @@
 """Shared extraction of user-visible text from Yandex Responses API output."""
 
+from core.wikifunctions import trim_string
+
 from typing import Any, Optional
 
 
@@ -27,9 +29,9 @@ def extract_response_text(data: dict[str, Any]) -> tuple[str, str]:
             elif part_type in ("output_text", "text"):
                 text_parts.append(str(part["text"]))
 
-    text = "".join(text_parts).strip()
+    text = trim_string("".join(text_parts))
     if not text:
-        text = str(data.get("output_text") or data.get("text") or "").strip()
+        text = trim_string(str(data.get("output_text") or data.get("text") or ""))
     return "\n\n".join(reasoning_parts), text
 
 

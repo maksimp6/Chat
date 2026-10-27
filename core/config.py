@@ -1,4 +1,6 @@
 """Logos - Configuration & Pricing"""
+from core.wikifunctions import lowercase_string, trim_string
+
 from core.env import env_get
 
 import logging
@@ -32,7 +34,7 @@ def get_donation_url():
     Only absolute http/https URLs without embedded credentials are accepted so
     the header button can never be turned into a script or credential carrier.
     """
-    raw = (env_get("LOGOS_DONATION_URL") or "").strip()
+    raw = trim_string((env_get("LOGOS_DONATION_URL") or ""))
     if not raw:
         return None
     if any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in raw):
@@ -44,7 +46,7 @@ def get_donation_url():
     except ValueError:
         logger.warning("LOGOS_DONATION_URL ignored: malformed URL")
         return None
-    if parts.scheme.lower() not in {"http", "https"} or not hostname:
+    if lowercase_string(parts.scheme) not in {"http", "https"} or not hostname:
         logger.warning("LOGOS_DONATION_URL ignored: only absolute http/https URLs are allowed")
         return None
     if parts.username is not None or parts.password is not None:
@@ -294,7 +296,7 @@ def get_model_info(model_key):
     if info is None:
         # Discovered tuned/versioned models have no public tariff. Preserve unknown
         # cost instead of inventing another model's rate or failing after execution.
-        if not isinstance(model_key, str) or not model_key.strip():
+        if not isinstance(model_key, str) or not trim_string(model_key):
             raise ValueError("model key is required")
         return {"name": model_key, "type": "text", "pricing_status": "unknown"}
     return info
@@ -309,9 +311,11 @@ def upstream_model_id(model_key: str) -> str:
 
 def get_model_uri(project_id, model_key):
     """Preserve the exact model/version while binding it to the active project."""
-    if not isinstance(project_id, str) or not project_id.strip():
+    if not isinstance(project_id, str):
         raise ValueError("Yandex project_id is required")
-    project_id = project_id.strip()
+    project_id = trim_string(project_id)
+    if not project_id:
+        raise ValueError("Yandex project_id is required")
     if (
         any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in project_id)
         or any(ch in project_id for ch in "/?#:@\\")

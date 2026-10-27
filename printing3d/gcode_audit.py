@@ -1,5 +1,7 @@
 """Fail-closed offline audit of sliced Bambu A1 mini jobs and model passports."""
 
+from core.wikifunctions import lowercase_string, trim_string
+
 import hashlib
 import json
 import math
@@ -46,7 +48,7 @@ def _opcode(command: str) -> str:
 def _verify_toolpaths(gcode: str, bed: list[int]) -> tuple[int, int]:
     count, extrusion, heaters = 0, 0, set[str]()
     for line in gcode.splitlines():
-        command = line.split(";", 1)[0].strip()
+        command = trim_string(line.split(";", 1)[0])
         if not command:
             continue
         opcode = _opcode(command)
@@ -86,8 +88,8 @@ def audit_job(path: str | Path, passport: dict[str, Any]) -> dict[str, Any]:
         if archive.testzip() is not None or not REQUIRED.issubset(archive.namelist()):
             raise ValueError("invalid sliced archive")
         gcode_bytes = archive.read("Metadata/plate_1.gcode")
-        expected_md5 = archive.read("Metadata/plate_1.gcode.md5").decode("ascii").strip()
-        if hashlib.md5(gcode_bytes, usedforsecurity=False).hexdigest().lower() != expected_md5.lower():
+        expected_md5 = trim_string(archive.read("Metadata/plate_1.gcode.md5").decode("ascii"))
+        if hashlib.md5(gcode_bytes, usedforsecurity=False).hexdigest() != lowercase_string(expected_md5):
             raise ValueError("G-code MD5 mismatch")
         settings = json.loads(archive.read("Metadata/project_settings.config"))
         plate = json.loads(archive.read("Metadata/plate_1.json"))

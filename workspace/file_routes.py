@@ -1,4 +1,6 @@
 """Flask routes for Files and Vector Stores API"""
+from core.wikifunctions import lowercase_string
+
 from core.env import env_get
 
 import os
@@ -64,7 +66,7 @@ def upload_file():
     file = request.files["file"]
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
-    ext = os.path.splitext(file.filename)[1].lower()
+    ext = lowercase_string(os.path.splitext(file.filename)[1])
     if ext not in ALLOWED_EXTENSIONS:
         return jsonify(
             {"error": f"File type not allowed. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"}

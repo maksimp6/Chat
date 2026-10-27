@@ -5,6 +5,8 @@ grant writes, shell execution, hosted tools or network access.
 """
 
 from __future__ import annotations
+from core.wikifunctions import trim_string
+
 from core.env import env_get
 
 import argparse
@@ -73,7 +75,7 @@ def _capture_provider_state(result: dict[str, Any], response: dict[str, Any]) ->
 def _capture_response(result: dict[str, Any], response: dict[str, Any]) -> None:
     diagnostics = _capture_provider_state(result, response)
     reply, reply_state = _assistant_reply(response)
-    result.update(reply=reply, reply_state=reply_state, summary=reply.strip()[:MAX_SUMMARY_CHARS])
+    result.update(reply=reply, reply_state=reply_state, summary=trim_string(reply)[:MAX_SUMMARY_CHARS])
     result["reply_chars"] = len(reply) if reply_state != "unknown" else None
     result["reply_sha256"] = (
         hashlib.sha256(reply.encode("utf-8")).hexdigest() if reply_state != "unknown" else None
@@ -119,8 +121,8 @@ def build_prompt(issue_number: int, title: str, body: str, rules: str) -> str:
 
 def seed_provider_credential() -> None:
     """Store the CI-provided Yandex key in the (temporary) credential database."""
-    api_key = env_get("YANDEX_API_KEY", "").strip()
-    project_id = env_get("YANDEX_PROJECT_ID", "").strip()
+    api_key = trim_string(env_get("YANDEX_API_KEY", ""))
+    project_id = trim_string(env_get("YANDEX_PROJECT_ID", ""))
     if not api_key or not project_id:
         raise RuntimeError("YANDEX_API_KEY and YANDEX_PROJECT_ID are required")
     from secret_store.credential_crypto import decrypt_secret, encrypt_secret
@@ -148,7 +150,7 @@ def changed_files(repo_root: Path = ROOT) -> list[str]:
         text=True,
         check=True,
     ).stdout
-    return sorted(line[3:] for line in output.splitlines() if line.strip())
+    return sorted(line[3:] for line in output.splitlines() if trim_string(line))
 
 
 def _billing_summary(billing: dict[str, Any]) -> dict[str, Any]:
@@ -333,7 +335,7 @@ def run_issue_task(
             result.update(status="failed", error="ProviderResponseError")
         elif response.get("status") not in (None, "completed"):
             result.update(status="failed", error="IncompleteResponse")
-        elif not pending and not result["reply"].strip():
+        elif not pending and not trim_string(result["reply"]):
             result.update(status="failed", error="MissingAssistantReply")
     except Exception as exc:
         trace.record_error(
@@ -379,7 +381,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     result = run_issue_task(
         args.issue,
-        args.title_file.read_text(encoding="utf-8").strip(),
+        trim_string(args.title_file.read_text(encoding="utf-8")),
         args.body_file.read_text(encoding="utf-8"),
         args.model,
         checkpoint_file=args.out,

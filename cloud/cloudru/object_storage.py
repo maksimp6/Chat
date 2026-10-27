@@ -6,6 +6,8 @@ client-visible errors: failures are mapped to the safe errors from ``storage``.
 """
 
 from __future__ import annotations
+from core.wikifunctions import lowercase_string, trim_string
+
 from core.env import env_snapshot
 
 import hashlib
@@ -49,9 +51,9 @@ def cloudru_s3_credentials(
 
     Cloud.ru expects the S3 access key ID as ``<tenant_id>:<key_id>``.
     """
-    key_id = str(key_id or "").strip()
+    key_id = trim_string(str(key_id or ""))
     key_secret = str(key_secret or "")
-    tenant_id = str(tenant_id or "").strip()
+    tenant_id = trim_string(str(tenant_id or ""))
     if not key_id or not key_secret:
         return None
     if tenant_id and ":" not in key_id:
@@ -96,7 +98,7 @@ def sign_v4(
     parts = urlsplit(url)
     amz_date = now.strftime("%Y%m%dT%H%M%SZ")
     date = amz_date[:8]
-    signed = {key.lower(): str(value).strip() for key, value in headers.items()}
+    signed = {lowercase_string(key): trim_string(str(value)) for key, value in headers.items()}
     signed["host"] = parts.netloc
     signed["x-amz-date"] = amz_date
     signed["x-amz-content-sha256"] = payload_sha256
@@ -167,12 +169,12 @@ class CloudRuObjectStorage:
         timeout: float = 30.0,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
-        bucket = str(bucket or "").strip()
+        bucket = trim_string(str(bucket or ""))
         if not bucket or "/" in bucket:
             raise StorageProviderUnavailable("Storage provider is not configured")
         self._bucket = bucket
-        self._endpoint = (str(endpoint or "").strip() or DEFAULT_ENDPOINT).rstrip("/")
-        self._region = str(region or "").strip() or DEFAULT_REGION
+        self._endpoint = (trim_string(str(endpoint or "")) or DEFAULT_ENDPOINT).rstrip("/")
+        self._region = trim_string(str(region or "")) or DEFAULT_REGION
         base = _safe_relative_path(prefix, allow_empty=True)
         self._prefix = "" if base == PurePosixPath(".") else base.as_posix()
         self._session = session or requests.Session()
@@ -299,7 +301,7 @@ class CloudRuObjectStorage:
                 except ValueError:
                     raise StorageError("Storage provider operation failed") from None
                 objects.append(self._object(relative, key, size))
-            if _child_text(tree, "IsTruncated").lower() != "true":
+            if lowercase_string(_child_text(tree, "IsTruncated")) != "true":
                 break
             token = _child_text(tree, "NextContinuationToken")
             if not token:

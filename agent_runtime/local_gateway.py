@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import lowercase_string, trim_string
+
 import json
 import math
 import re
@@ -207,9 +209,9 @@ def _recover_expired_jobs(conn, agent_id: str) -> None:
 @local_agent_bp.post("/register")
 def register_local_agent():
     data = request.get_json(silent=True) or {}
-    agent_id = str(data.get("agent_id") or f"android-{uuid4().hex[:12]}").strip()
-    name = str(data.get("name") or "Logos Android Agent").strip()
-    version = str(data.get("version") or "1.0").strip()
+    agent_id = trim_string(str(data.get("agent_id") or f"android-{uuid4().hex[:12]}"))
+    name = trim_string(str(data.get("name") or "Logos Android Agent"))
+    version = trim_string(str(data.get("version") or "1.0"))
     capabilities = data.get("capabilities") or []
 
     if not _AGENT_ID_RE.fullmatch(agent_id):
@@ -218,7 +220,12 @@ def register_local_agent():
         return jsonify({"error": "name_required"}), 400
     if not isinstance(capabilities, list) or len(capabilities) > _MAX_CAPABILITIES:
         return jsonify({"error": "invalid_capabilities"}), 400
-    capabilities = [str(item).strip() for item in capabilities if str(item).strip()]
+    normalized_capabilities = []
+    for item in capabilities:
+        capability = trim_string(str(item))
+        if capability:
+            normalized_capabilities.append(capability)
+    capabilities = normalized_capabilities
 
     now = unix_time()
 
@@ -369,7 +376,7 @@ def local_agent_result(agent_id: str, job_id: str):
     data = request.get_json(silent=True)
     if not isinstance(data, dict) or not data.get("claim_token"):
         return jsonify({"error": "claim_token_required"}), 400
-    status = str(data.get("status") or "").strip().lower()
+    status = lowercase_string(trim_string(str(data.get("status") or "")))
     if status not in {"completed", "failed"}:
         return jsonify({"error": "status_must_be_completed_or_failed"}), 400
     result = data.get("result")

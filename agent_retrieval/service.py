@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import lowercase_string
+
 from collections import Counter
 from dataclasses import replace
 import json
@@ -21,7 +23,7 @@ _TOKEN_RE = re.compile(r"[\w./#:-]+", re.UNICODE)
 
 def _tokens(value: str) -> list[str]:
     tokens: list[str] = []
-    for token in _TOKEN_RE.findall(str(value).lower()):
+    for token in _TOKEN_RE.findall(lowercase_string(str(value))):
         if len(token) <= 1:
             continue
         tokens.append(token)
@@ -227,7 +229,7 @@ def _code_hits(
         return []
     if bound_revision is not None and (
         bound_revision != query.head_sha
-        or repository_index.get("repository") != query.repository.lower()
+        or repository_index.get("repository") != lowercase_string(query.repository)
     ):
         return []
 

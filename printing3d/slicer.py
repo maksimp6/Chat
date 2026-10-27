@@ -14,6 +14,8 @@ slicer before printing.
 
 from __future__ import annotations
 
+from core.wikifunctions import lowercase_string
+
 import json
 import math
 import struct
@@ -99,7 +101,7 @@ def _read_ascii_stl(data: bytes) -> list[Triangle]:
     vertices: list[Vec3] = []
     for line in text.splitlines():
         parts = line.split()
-        if len(parts) == 4 and parts[0].lower() == "vertex":
+        if len(parts) == 4 and lowercase_string(parts[0]) == "vertex":
             try:
                 vertices.append((float(parts[1]), float(parts[2]), float(parts[3])))
             except ValueError as exc:

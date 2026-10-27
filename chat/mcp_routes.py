@@ -1,5 +1,7 @@
 """Маршруты чата с сохранением полной цепочки выполнения в БД."""
 
+from core.wikifunctions import lowercase_string, trim_string
+
 from flask import Blueprint, request, jsonify
 import logging
 import re
@@ -89,7 +91,7 @@ def _tool_call_parts(tool_call: dict[str, Any]) -> tuple[str | None, dict[str, A
         function = {}
     name = tool_call.get("name") or function.get("name")
     if name and "<|" in name:
-        name = name.split("<|", 1)[0].strip()
+        name = trim_string(name.split("<|", 1)[0])
 
     arguments = tool_call["arguments"] if "arguments" in tool_call else function.get("arguments", {})
     if isinstance(arguments, str):
@@ -112,7 +114,12 @@ def _normalize_requested_skills(data, params):
         raw = [raw]
     if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
         raise SkillRegistryError("skills must be a string or a list of strings")
-    return [item.strip() for item in raw if item.strip()]
+    normalized = []
+    for item in raw:
+        item = trim_string(item)
+        if item:
+            normalized.append(item)
+    return normalized
 
 
 # Generation and transport settings the browser may choose for a request. The server owns the
@@ -194,7 +201,7 @@ def _image_turn_history(conv_id):
     history = []
     for turn in turns[-IMAGE_HISTORY_TURNS:]:
         text = _MARKDOWN_PICTURE.sub("[картинка]", str(turn.get("text") or ""))[:IMAGE_HISTORY_TEXT_CHARS]
-        if text.strip():
+        if trim_string(text):
             history.append({"role": turn["role"], "text": text})
     return history
 
@@ -398,7 +405,7 @@ def _provider_conversation_id(client, conv_id, trace):
 
 def _validate_chat_payload(conv_id, model_key, message, attachments):
     """Validate the turn content before creating an invocation or storing a message."""
-    if not isinstance(conv_id, str) or not conv_id.strip():
+    if not isinstance(conv_id, str) or not trim_string(conv_id):
         return None, None, (jsonify({"error": "conversation_id is required"}), 400)
     if not isinstance(model_key, str):
         return None, None, (jsonify({"error": "model must be a string"}), 400)
@@ -427,7 +434,7 @@ def _validate_chat_payload(conv_id, model_key, message, attachments):
         return None, None, (jsonify({"error": "invalid_attachments", "message": str(exc)}), 400)
     if message is None and images:
         message = ""
-    if not isinstance(message, str) or (not message.strip() and not images):
+    if not isinstance(message, str) or (not trim_string(message) and not images):
         return None, None, (jsonify({"error": "message or attachments are required"}), 400)
     if images and model_key not in IMAGE_INPUT_MODEL_KEYS:
         return None, None, (jsonify({"error": "model_does_not_accept_images"}), 400)
@@ -918,7 +925,7 @@ def chat():
         logger.exception("[CHAT] Ошибка")
         internal_error_message = str(e)
         is_temperature_error = (
-            isinstance(e, ValueError) and "temperature" in internal_error_message.lower()
+            isinstance(e, ValueError) and "temperature" in lowercase_string(internal_error_message)
         )
         error_message = (
             "Некорректное значение temperature"
@@ -1159,7 +1166,7 @@ def execute_approved():
             return jsonify({"error": "conversation_not_found"}), 404
         tool_arguments = dict(arguments or {})
         if func_name == "set_ui_theme":
-            current_theme = str(data.get("current_theme") or "").strip().lower()
+            current_theme = lowercase_string(trim_string(str(data.get("current_theme") or "")))
             if current_theme and len(current_theme) <= 32 and all(
                 ch.isalnum() or ch in "-_" for ch in current_theme
             ):
@@ -1217,7 +1224,7 @@ def execute_approved():
                 provider_diagnostics["provider_status"] != "completed"
                 or provider_diagnostics["provider_error_present"]
                 or bool(extract_function_calls(synth_response))
-                or not followup_reply.strip()
+                or not trim_string(followup_reply)
             )
             usage = client.extract_usage(synth_response)
         except Exception:

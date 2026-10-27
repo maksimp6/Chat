@@ -4,6 +4,8 @@ Kept independent from ExecutionTrace so request/response capture code can be
 split out incrementally without changing the existing public class API.
 """
 
+from core.wikifunctions import lowercase_string
+
 import re
 from typing import Any
 
@@ -50,7 +52,7 @@ _PRIVATE_KEY_BEGIN = "-----BEGIN "
 
 def _is_sensitive_key(key: str) -> bool:
     """Credential-like keys, including camelCase and prefixed names such as accessKeySecret or YANDEX_API_KEY."""
-    normalized = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", key).lower().replace("-", "_")
+    normalized = lowercase_string(re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", key)).replace("-", "_")
     return bool(_SENSITIVE_KEY_RE.search(normalized))
 
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import lowercase_string, trim_string
+
 import asyncio
 from contextvars import copy_context
 import io
@@ -187,9 +189,11 @@ def _speechkit_turn(session: VoiceSession, credential, pcm: bytes, sample_rate: 
     if not isinstance(recognized_data, dict) or "error" in recognized_data:
         raise RealtimeError("SpeechKit вернул ошибку распознавания")
     value = recognized_data.get("result")
-    if not isinstance(value, str) or not value.strip():
+    if not isinstance(value, str):
         raise RealtimeError("SpeechKit не распознал речь")
-    transcript = value.strip()
+    transcript = trim_string(value)
+    if not transcript:
+        raise RealtimeError("SpeechKit не распознал речь")
     provider_event("conversation.item.input_audio_transcription.completed", transcript=transcript)
     if session.cancelled.is_set():
         raise RealtimeError("Голосовая сессия отменена")
@@ -238,7 +242,7 @@ def _speechkit_turn(session: VoiceSession, credential, pcm: bytes, sample_rate: 
             if not spoken.ok:
                 result.error_message = f"Текстовый ответ получен, но SpeechKit не синтезировал аудио: HTTP {spoken.status_code}"
                 return result
-            if (spoken.headers.get("Content-Type") or "").lower().startswith("application/json"):
+            lowercase_string((spoken.headers.get("Content-Type") or "")).startswith("application/json"):
                 result.error_message = "SpeechKit вернул ошибку вместо PCM-аудио"
                 return result
             result.audio.extend(spoken.content)
@@ -492,7 +496,7 @@ def submit_voice_text():
     except KeyError:
         return jsonify({"error": "voice_session_not_found"}), 404
     text = data.get("text")
-    if not isinstance(text, str) or not text.strip():
+    if not isinstance(text, str) or not trim_string(text):
         return jsonify({"error": "text_is_required"}), 400
     if session.transport != "realtime":
         return jsonify({"error": "speechkit_pipeline_requires_microphone_audio"}), 400

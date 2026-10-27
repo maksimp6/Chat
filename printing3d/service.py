@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 from datetime import UTC, datetime
 from typing import Any
 from decimal import Decimal
@@ -91,11 +93,11 @@ def create_order(store: PrintStore, owner_id: str, data: dict) -> dict:
     if not isinstance(data, dict):
         raise ValueError("order input must be an object")
 
-    title = str(data.get("title") or "").strip()
+    title = trim_string(str(data.get("title") or ""))
     if not title:
         raise ValueError("title is required")
 
-    status = str(data.get("status") or "lead").strip()
+    status = trim_string(str(data.get("status") or "lead"))
     if status not in ORDER_STATUSES:
         raise ValueError("invalid order status")
     if status == "paid":
@@ -122,8 +124,8 @@ def create_order(store: PrintStore, owner_id: str, data: dict) -> dict:
     record = {
         "id": order_id,
         "owner_id": owner_id,
-        "customer_name": str(data.get("customer_name") or "").strip() or None,
-        "source": str(data.get("source") or "manual").strip() or "manual",
+        "customer_name": trim_string(str(data.get("customer_name") or "")) or None,
+        "source": trim_string(str(data.get("source") or "manual")) or "manual",
         "title": title,
         "status": status,
         "currency": str(data.get("currency") or quote.get("currency") or "RUB"),
@@ -131,7 +133,7 @@ def create_order(store: PrintStore, owner_id: str, data: dict) -> dict:
         "actual_revenue": actual_revenue,
         "actual_cost": actual_cost,
         "quote": quote,
-        "notes": str(data.get("notes") or "").strip() or None,
+        "notes": trim_string(str(data.get("notes") or "")) or None,
         "settled_at": None,
         "created_at": now,
         "updated_at": now,

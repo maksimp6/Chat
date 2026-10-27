@@ -1,3 +1,5 @@
+from core.wikifunctions import trim_string
+
 import time
 import subprocess
 import os
@@ -17,7 +19,7 @@ _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,199}")
 
 
 def _name(value, label: str) -> str:
-    text = str(value or "").strip()
+    text = trim_string(str(value or ""))
     if not _NAME.fullmatch(text) or ".." in text or text.endswith(("/", ".", ".lock")):
         raise ValueError(f"недопустимое имя {label}: {text!r}")
     return text
@@ -97,7 +99,7 @@ def _is_bare_repo(repo_path: str) -> bool:
             text=True,
             timeout=5,
         )
-        return res.stdout.strip() == "true"
+        return trim_string(res.stdout) == "true"
     except Exception:
         return False
 
@@ -139,8 +141,8 @@ def _run_git(args: list, cfg: dict = None, repo_name: str = None, is_read: bool 
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
         rel_name = os.path.basename(repo_path)
-        out = res.stdout.strip()
-        err = res.stderr.strip()
+        out = trim_string(res.stdout)
+        err = trim_string(res.stderr)
 
         # Если статус коммита "nothing to commit" — это не фатальный сбой, а информационный ответ
         if res.returncode != 0 and ("nothing to commit" in out or "nothing to commit" in err):
@@ -258,7 +260,7 @@ def git_remote(args: dict, cfg: dict) -> dict:
         name = _name(args.get("name", "origin"), "remote")
     except ValueError as exc:
         return {"success": False, "error": str(exc)}
-    url = str(args.get("url") or "").strip()
+    url = trim_string(str(args.get("url") or ""))
     if action in {"add", "set_url"}:
         if not url:
             return {"success": False, "error": "URL обязателен"}

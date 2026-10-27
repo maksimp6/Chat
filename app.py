@@ -1,3 +1,5 @@
+from core.wikifunctions import lowercase_string, trim_string
+
 from core.env import env_get
 from flask import Flask, request, jsonify, render_template
 from werkzeug.exceptions import HTTPException
@@ -107,7 +109,7 @@ def _static_asset_version(root=None):
 
 
 def _runtime_revision():
-    configured = str(env_get("LOGOS_APP_REVISION") or "").strip()
+    configured = trim_string(str(env_get("LOGOS_APP_REVISION") or ""))
     if re.fullmatch(r"[0-9a-f]{40}", configured):
         return configured
     try:
@@ -115,7 +117,7 @@ def _runtime_revision():
             ["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "--verify", "HEAD"],
             capture_output=True, text=True, timeout=2, check=False,
         )
-        value = result.stdout.strip()
+        value = trim_string(result.stdout)
         if result.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", value):
             return value
     except (OSError, subprocess.SubprocessError):
@@ -274,7 +276,7 @@ MODEL_DISCOVERY = get_model_discovery()
 
 @app.route("/api/models", methods=["GET"])
 def list_models():
-    force_refresh = request.args.get("refresh", "").lower() in {"1", "true", "yes"}
+    force_refresh = lowercase_string(request.args.get("refresh", "")) in {"1", "true", "yes"}
     try:
         catalog = annotate_catalog(MODEL_DISCOVERY.get_models(force_refresh=force_refresh))
         catalog["degraded"] = False
@@ -459,7 +461,7 @@ def test_ssh_runtime_connection():
     try:
         owner_id = get_current_owner_id()
         data = request.get_json(silent=True) or {}
-        target = str(data.get("target") or "").strip()
+        target = trim_string(str(data.get("target") or ""))
         if not target:
             return jsonify({"error": "target is required"}), 400
         result = test_connection(target, owner_id)

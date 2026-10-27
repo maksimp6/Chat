@@ -12,7 +12,7 @@
 """
 from core.env import env_require, env_snapshot
 from core.restrictions import restrictions_lifted
-from core.wikifunctions import clamp_integer
+from core.wikifunctions import clamp_integer, lowercase_string, trim_string
 
 import os
 import re
@@ -55,7 +55,7 @@ def _refuse_protected(target: str) -> None:
 
 def _get_abs_path(path: str) -> str:
     """Нормализует путь и блокирует атаки Path Traversal за пределы проекта."""
-    if not path or path.strip() in (".", "./"):
+    if not path or trim_string(path) in (".", "./"):
         return BASE_DIR
     if restrictions_lifted():
         # Unrestricted: absolute paths and paths outside the project are accepted as given.
@@ -85,7 +85,7 @@ def read_file(args: dict) -> dict:
         file_size = os.path.getsize(abs_path)
         raw_whence = args.get("whence", 0)
         if isinstance(raw_whence, str):
-            w_norm = raw_whence.lower().strip()
+            w_norm = trim_string(lowercase_string(raw_whence))
             if w_norm in ("end", "seek_end", "2"):
                 whence = os.SEEK_END
             elif w_norm in ("cur", "current", "seek_cur", "1"):
@@ -182,7 +182,7 @@ def write_file(args: dict) -> dict:
                         os.remove(tmp_path)
                     except OSError:
                         pass
-                err_msg = verify.stderr.strip() or verify.stdout.strip()
+                err_msg = trim_string(verify.stderr) or trim_string(verify.stdout)
                 logger.error(f"[FS] Ошибка синтаксиса при записи в {path}: {err_msg}")
                 return {
                     "success": False,
@@ -341,7 +341,7 @@ def calculate_hash(args: dict) -> dict:
     path = args.get("path")
     if not path:
         return {"error": "Параметр 'path' обязателен"}
-    algo_name = args.get("algorithm", "sha256").lower()
+    algo_name = lowercase_string(args.get("algorithm", "sha256"))
     if algo_name not in ("sha256", "md5", "sha1"):
         return {"error": "Поддерживаются алгоритмы: sha256, md5, sha1"}
 
@@ -555,7 +555,7 @@ def copy_or_move_file(args: dict) -> dict:
     """Копирование или перемещение/переименование файлов и папок."""
     src = args.get("src")
     dst = args.get("dst")
-    action = args.get("action", "copy").lower()
+    action = lowercase_string(args.get("action", "copy"))
     if not src or not dst:
         return {"error": "Параметры 'src' и 'dst' обязательны"}
 
@@ -692,7 +692,7 @@ def grep_search(args: dict) -> dict:
                         for line_num, line in enumerate(f, start=1):
                             if regex.search(line):
                                 results.append(
-                                    {"file": rel_path, "line": line_num, "text": line.strip()[:200]}
+                                    {"file": rel_path, "line": line_num, "text": trim_string(line)[:200]}
                                 )
                                 if len(results) >= max_matches:
                                     return {
@@ -776,8 +776,8 @@ def run_command(args: dict) -> dict:
             "success": res.returncode == 0,
             "command": command,
             "returncode": res.returncode,
-            "stdout": res.stdout.strip(),
-            "stderr": res.stderr.strip(),
+            "stdout": trim_string(res.stdout),
+            "stderr": trim_string(res.stderr),
         }
     except subprocess.TimeoutExpired:
         return {"success": False, "error": f"Превышено время ожидания команды ({timeout} сек)"}

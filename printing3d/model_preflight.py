@@ -1,5 +1,7 @@
 """Source-mesh validation before any 3D printer upload."""
 
+from core.wikifunctions import lowercase_string
+
 import hashlib
 import math
 import struct
@@ -69,7 +71,7 @@ def verify_inventory_sources(
     for model in manifest["models"]:
         verified = []
         for member in model["members_manifest"]:
-            if member["path"].lower().endswith(".stl"):
+            if lowercase_string(member["path"]).endswith(".stl"):
                 path = Path(root) / member["path"]
                 verified.append({"path": member["path"], **validate_stl(path, member)})
         if not verified:
