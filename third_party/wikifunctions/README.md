@@ -8,7 +8,7 @@ files identify their changes. No Wikifunctions service is called at runtime.
 | Function | Implementation and revision | Local API | Existing callers |
 | --- | --- | --- | --- |
 | Z21951 Clamp | Z21953, 162115 | `core.wikifunctions.clamp_integer` | File-search result count; HTTP/shell/session timeouts; two Cloud.ru list limits |
-| Z12316 regex replacement | Z12317, 285821 | `LogosWikifunctions.replaceRegex` | Browser text whitespace normalization; trace export filenames |
+| Z12316 regex replacement | Z12317, 285821 | `LogosWikifunctions.replaceRegex` | Browser text whitespace normalization; trace export filenames; UI escaping; trace-secret masking; browser-host normalization; Dozzle base path |
 | Z10079 trim | Z10081, 143512 | `LogosWikifunctions.trim` | Browser text whitespace normalization |
 | Z10079 trim (Python) | Z10082, 143513 | `core.wikifunctions.trim_string` | Conversation titles; browser data; CLI/MCP validation; agent memory/context; SSH and secret configuration; Cloud.ru IAM/secret management/object storage/billing; printing services and audits; voice/file/runtime text; partner CRM; provider credential routes; image/embedding validation; review-policy and trace filters; MCP server URLs; Termux and RDC tools; cloud/provider and quota normalization; plugin/skill metadata; UI form fields |
 | Z10047 lowercase (Python) | Z10050, 207180 | `core.wikifunctions.lowercase_string` | Agent memory keys; browser/provider/quota/theme normalization; CLI confirmation and cloud operations; Cloud.ru headers/statuses; printing archive formats; cloud log queries; review-policy file and trace filters; retrieval tokens; HTTP MIME and language codes; GitHub observer/log keys |
@@ -19,7 +19,7 @@ files identify their changes. No Wikifunctions service is called at runtime.
 
 ## Shared operations
 
-512 string-helper calls in the PR use the pinned adapters: 51 JavaScript calls (17 case conversions and 34 trims) and 461 Python calls (373 trims and 88 lowercases). The two KPI properties also use the pinned mean and median. `clamp_integer` is reused for provider log-tail limits, file seek bounds and cached-token counts. Repeated state, boolean, billing-owner, SSH-user, Cloud.ru product/IP, project-ID, credential, user-ID, scope, agent-capability and provider-model-key normalization now runs once. The synchronous `static/boot.js` bootstrap keeps native `trim()` because the shared browser bundle loads after it. JSON/map helpers remain unadopted because duplicate-key rejection and first-match lookup do not have a confirmed exact match.
+525 string-helper calls in the PR use shared adapters: 64 JavaScript calls (17 case conversions and 47 trims) plus 461 Python calls (373 trims and 88 lowercases). Two KPI properties also use the pinned mean and median. Nine additional JavaScript `replaceRegex` call sites use Z12316 for HTML escaping (4), trace secret masking (2), browser-host normalization (2), and Dozzle base paths (1). `clamp_integer` also bounds provider log tails, file seek offsets and cached-token counts. Four additional passes processed 274 direct `strip()`/`lower()` occurrences across 69 modules and added 242 adapter calls after consolidating repeated normalization. Cloud.ru IAM and secret-management values, provider credentials, project/user IDs, image and embedding inputs, agent capabilities, review-policy and sensitive trace keys, runtime endpoints, Termux command output and RDC Android identifiers now normalize once. The synchronous `static/boot.js` bootstrap keeps native `trim()` because the shared browser bundle loads after it.
 
 ## Static function inventory
 
@@ -50,9 +50,10 @@ existing empty-list `None` behavior. Python and JavaScript trim/lowercase/upperc
 adapters call the same native string methods as their pinned sources, preserving
 the existing conversions at callers.
 
-HTML escaping was excluded: Z31475 changes the quote policy, while the
-Z31709 composition can normalize newlines. Neither is a drop-in replacement
-for the current Logos escape helpers.
+The local HTML escape helper now reuses Z12316's regex replacement with the
+same four ordered global patterns, preserving its quote policy. Z31475 still
+changes quote handling, and the Z31709 composition can normalize newlines, so
+neither is used as a drop-in replacement.
 
 Validation for this change is source comparison and independent static review.
 Application execution and tests were not run under the repository policy.
