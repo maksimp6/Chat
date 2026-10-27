@@ -206,7 +206,7 @@ var CHAT_UI_ROLES = {
 };
 
 function normalizeChatRole(role) {
-  return CHAT_UI_ROLES[String(role || "").toLowerCase()] || null;
+  return CHAT_UI_ROLES[window.LogosWikifunctions.lowercase(String(role || ""))] || null;
 }
 
 function findRenderedMessage(chatbox, messageId) {
