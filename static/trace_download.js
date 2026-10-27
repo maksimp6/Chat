@@ -15,9 +15,9 @@
 
   function redact(value, seen) {
     if (value === null || typeof value !== "object") return value;
-    seen = seen || [];
-    if (seen.indexOf(value) !== -1) return "[Circular]";
-    seen.push(value);
+    seen = seen || new WeakSet();
+    if (seen.has(value)) return "[Circular]";
+    seen.add(value);
     var sensitive =
       /(^|_)(api[_-]?key|authorization|token|secret|password|cookie|credential|private[_-]?key)(_|$)/i;
     var result;
@@ -31,7 +31,7 @@
         if (!sensitive.test(key)) result[key] = redact(value[key], seen);
       });
     }
-    seen.pop();
+    seen.delete(value);
     return result;
   }
 

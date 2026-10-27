@@ -7,7 +7,7 @@ upload files, or start a physical print. The transport is a separate capability.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from hashlib import sha256
+from hashlib import file_digest, sha256
 from pathlib import Path
 from typing import Protocol
 from zipfile import BadZipFile, ZipFile
@@ -47,10 +47,8 @@ def validate_job(path: Path, *, printer_model: str, approved_profile: str) -> Ap
     size = path.stat().st_size
     if not 0 < size <= MAX_JOB_BYTES:
         raise InvalidPrintJob("artifact size out of bounds")
-    digest = sha256()
     with path.open("rb") as source:
-        while chunk := source.read(1024 * 1024):
-            digest.update(chunk)
+        digest = file_digest(source, sha256)
     try:
         with ZipFile(path) as archive:
             infos = archive.infolist()

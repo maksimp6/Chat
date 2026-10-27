@@ -175,12 +175,12 @@
   }
 
   function models(responses) {
-    var seen = [];
+    var seen = new Set();
     responses.forEach(function (response) {
       var model = text(response && response.raw && response.raw.model, 80);
-      if (model && seen.indexOf(model) < 0) seen.push(model);
+      if (model) seen.add(model);
     });
-    return seen;
+    return Array.from(seen);
   }
 
   function project(input) {

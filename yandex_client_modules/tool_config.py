@@ -33,17 +33,13 @@ def _entries(value: Any, path: str) -> list[str]:
     else:
         raise ValueError(f"{path} must be a string or a list of strings")
 
-    entries = []
-    seen = set()
-    for item in values:
-        # Accept text inputs, JSON string arrays and older literal backslash-n separators.
-        separated = item.replace("\\r\\n", "\n").replace("\\n", "\n").replace(",", "\n")
-        for part in separated.splitlines():
-            entry = part.strip()
-            if entry and entry not in seen:
-                entries.append(entry)
-                seen.add(entry)
-    return entries
+    # Accept text inputs, JSON string arrays and older literal backslash-n separators.
+    entries = (
+        part.strip()
+        for item in values
+        for part in item.replace("\\r\\n", "\n").replace("\\n", "\n").replace(",", "\n").splitlines()
+    )
+    return list(dict.fromkeys(entry for entry in entries if entry))
 
 
 def normalize_tools_config(raw: Any) -> dict[str, Any]:

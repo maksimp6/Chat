@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import replace
 import json
 import math
 import re
@@ -331,10 +332,8 @@ def _bound_hits(
         if not clipped:
             continue
         selected.append(
-            RetrievalHit(
-                source_type=hit.source_type,
-                ref=hit.ref,
-                score=hit.score,
+            replace(
+                hit,
                 text=clipped,
                 metadata=hit.as_dict()["metadata"],
             )

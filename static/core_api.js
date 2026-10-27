@@ -21,16 +21,12 @@
     dispatcher: true,
   };
 
-  function now() {
-    return Date.now();
-  }
-
   function makeId(prefix) {
     traceCounter += 1;
     if (window.crypto && typeof window.crypto.randomUUID === "function") {
       return prefix + ":" + window.crypto.randomUUID();
     }
-    return prefix + ":" + now().toString(36) + ":" + traceCounter.toString(36);
+    return prefix + ":" + Date.now().toString(36) + ":" + traceCounter.toString(36);
   }
 
   function redact(value, depth, seen) {
@@ -186,7 +182,7 @@
       status: status,
       message: typeof message === "string" ? redactString(message).slice(0, 300) : "",
       metadata: safeData(metadata || {}),
-      timestamp: now(),
+      timestamp: Date.now(),
     };
     statuses.set(moduleId, value);
     notify(value);
@@ -200,7 +196,7 @@
       status: "stopped",
       message: "",
       metadata: {},
-      timestamp: now(),
+      timestamp: Date.now(),
     });
   }
 
@@ -249,7 +245,7 @@
           type: String(type),
           id: String(id),
           reason: typeof reason === "string" ? redactString(reason).slice(0, 300) : "revoked",
-          timestamp: now(),
+          timestamp: Date.now(),
         },
       }),
     );
@@ -276,7 +272,7 @@
       traceId: traceId,
       moduleId: moduleId,
       operation: typeof operation === "string" ? operation.slice(0, 200) : "operation",
-      startedAt: now(),
+      startedAt: Date.now(),
       events: [],
       errors: [],
       metadata: safeData(metadata || {}),
@@ -290,14 +286,14 @@
     function add(eventType, payload) {
       entry.events.push({
         type: eventType,
-        timestamp: now(),
+        timestamp: Date.now(),
         data: safeData(payload),
       });
       return traceId;
     }
 
     function end(status) {
-      entry.completedAt = now();
+      entry.completedAt = Date.now();
       entry.status = status || "completed";
       return safeData(entry);
     }
@@ -316,7 +312,7 @@
       error: function (error) {
         var message = error && error.message ? error.message : String(error || "error");
         entry.errors.push({
-          timestamp: now(),
+          timestamp: Date.now(),
           message: redactString(message).slice(0, 500),
         });
         return traceId;

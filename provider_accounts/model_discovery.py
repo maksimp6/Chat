@@ -81,7 +81,7 @@ class ModelDiscovery:
                     and self._cached_credential == credential_identity
                     and now - self._cached_at < self.ttl_seconds
                 ):
-                    return self._copy_catalog(self._cached)
+                    return deepcopy(self._cached)
             catalog = self._fetch(headers=headers, project_id=project_id)
         except Exception as exc:
             logger.warning("Model discovery failed: %s", self._safe_error(exc))
@@ -91,7 +91,7 @@ class ModelDiscovery:
             self._cached = catalog
             self._cached_at = time.monotonic()
             self._cached_credential = credential_identity
-        return self._copy_catalog(catalog)
+        return deepcopy(catalog)
 
     def _request_auth(self) -> tuple[dict[str, str], str | None, tuple[str, str, str]]:
         if self._credential_resolver is not None:
@@ -252,10 +252,6 @@ class ModelDiscovery:
             kind in {"text", "voice", "image"} and result["available"]
         )
         return result
-
-    @staticmethod
-    def _copy_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
-        return deepcopy(catalog)
 
     @staticmethod
     def _safe_error(exc: Exception) -> str:

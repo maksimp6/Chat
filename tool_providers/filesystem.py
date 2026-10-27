@@ -350,10 +350,8 @@ def calculate_hash(args: dict) -> dict:
         if not os.path.isfile(abs_path):
             return {"error": f"Файл '{path}' не найден"}
 
-        hasher = getattr(hashlib, algo_name)()
         with open(abs_path, "rb") as f:
-            while chunk := f.read(64 * 1024):
-                hasher.update(chunk)
+            hasher = hashlib.file_digest(f, getattr(hashlib, algo_name))
 
         return {
             "success": True,
