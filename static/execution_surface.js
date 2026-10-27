@@ -58,11 +58,11 @@
 
   function responseStatus(response) {
     var raw = response && response.raw;
-    return raw && typeof raw.status === "string" ? raw.status.toLowerCase() : "";
+    return raw && typeof raw.status === "string" ? window.LogosWikifunctions.lowercase(raw.status) : "";
   }
 
   function isTimeout(error) {
-    var kind = (text(error && error.type) + " " + text(error && error.source)).toLowerCase();
+    var kind = (window.LogosWikifunctions.lowercase(text(error && error.type) + " " + text(error && error.source)));
     return kind.indexOf("timeout") >= 0;
   }
 
