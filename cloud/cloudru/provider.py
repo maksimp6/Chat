@@ -42,7 +42,7 @@ class CloudRuProvider:
     def __init__(
         self, client: CloudRuClient | None = None, iam_client: CloudRuIamClient | None = None
     ) -> None:
-        self.client = client or CloudRuClient(iam_client=iam_client)
+        self.client = client or CloudRuClient(iam_client=iam_client, api_key_auth=False)
         self.iam_client = iam_client
 
     @staticmethod
