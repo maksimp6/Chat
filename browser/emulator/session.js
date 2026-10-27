@@ -4,6 +4,7 @@ const { DocumentShim } = require("./browser_dom");
 const { isIP } = require("node:net");
 // Vendored ipaddr.js 2.2.0; see vendor/ipaddr.LICENSE.
 const ipaddr = require("./vendor/ipaddr");
+const wikifunctions = require("../../static/wikifunctions");
 
 const DEFAULT_MAX_BYTES = 2 * 1024 * 1024;
 const DEFAULT_TEXT_LIMIT = 8000;
@@ -12,9 +13,7 @@ const DEFAULT_TIMEOUT_MS = 15000;
 class EmulatorError extends Error {}
 
 function collapse(text) {
-  return String(text || "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return wikifunctions.trim(wikifunctions.replaceRegex("\\s+", " ", String(text || ""), "g"));
 }
 
 // Literal private, loopback, link-local and metadata hosts. Pages are fetched

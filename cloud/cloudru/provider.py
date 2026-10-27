@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from core.env import env_get
+from core.wikifunctions import clamp_integer
 
 import re
 from typing import Any
@@ -394,7 +395,7 @@ class CloudRuProvider:
             "observability",
             "POST",
             path,
-            json_body={"query": query, "service": service, "limit": max(1, min(int(limit), 1000))},
+            json_body={"query": query, "service": service, "limit": clamp_integer(1, int(limit), 1000)},
         )
         entries = payload.get("items") or payload.get("logs") or []
         return {
@@ -428,7 +429,7 @@ class CloudRuProvider:
                 "query": query,
                 "service": service,
                 "window": window,
-                "limit": max(1, min(int(limit), 1000)),
+                "limit": clamp_integer(1, int(limit), 1000),
             },
         )
         series = payload.get("items") or payload.get("series") or []

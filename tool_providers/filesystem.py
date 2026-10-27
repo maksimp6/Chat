@@ -12,6 +12,7 @@
 """
 from core.env import env_require, env_snapshot
 from core.restrictions import restrictions_lifted
+from core.wikifunctions import clamp_integer
 
 import os
 import re
@@ -510,7 +511,7 @@ def http_fetch(args: dict) -> dict:
         return {"error": "Адреса link-local, включая метаданные облака, недоступны"}
 
     try:
-        timeout = max(1, min(int(args.get("timeout", 10)), 300))
+        timeout = clamp_integer(1, int(args.get("timeout", 10)), 300)
     except (TypeError, ValueError):
         return {"error": "Параметр 'timeout' должен быть целым числом"}
     max_bytes = 256 * 1024
@@ -755,7 +756,7 @@ def run_command(args: dict) -> dict:
     if _PROTECTED_COMMAND_RE.search(str(command)) and not restrictions_lifted():
         return {"error": "Команда обращается к служебным или секретным файлам и не выполняется"}
     try:
-        timeout = max(1, min(int(args.get("timeout", 30)), 300))
+        timeout = clamp_integer(1, int(args.get("timeout", 30)), 300)
     except (TypeError, ValueError):
         return {"error": "Параметр 'timeout' должен быть целым числом"}
     try:

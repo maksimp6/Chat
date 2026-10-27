@@ -1,0 +1,32 @@
+[
+  {
+    "function": "Z21951",
+    "implementation": "Z21953",
+    "revision": 162115,
+    "timestamp": "2025-02-01T15:11:07Z",
+    "source_url": "https://www.wikifunctions.org/w/index.php?title=Z21953&oldid=162115",
+    "license": "Apache-2.0",
+    "original_code_sha256": "1ec3bca8b08c2fee2b3635fb95a31393c301a01f6d5548de786c3fff9119936f",
+    "original_code": "def Z21951(Z21951K1, Z21951K2, Z21951K3):\n    if Z21951K2 < Z21951K1:\n\t    return Z21951K1\n    if Z21951K2 > Z21951K3:\n\t    return Z21951K3\n    return Z21951K2"
+  },
+  {
+    "function": "Z10079",
+    "implementation": "Z10081",
+    "revision": 143512,
+    "timestamp": "2024-12-03T05:26:13Z",
+    "source_url": "https://www.wikifunctions.org/w/index.php?title=Z10081&oldid=143512",
+    "license": "Apache-2.0",
+    "original_code_sha256": "3a82792c2e5492b02c945c70f13ae83e0664404aafeeb7126a053dd664331ff2",
+    "original_code": "function Z10079( Z10079K1 ) {\n\treturn Z10079K1.trim();\n}"
+  },
+  {
+    "function": "Z12316",
+    "implementation": "Z12317",
+    "revision": 285821,
+    "timestamp": "2026-06-23T02:48:08Z",
+    "source_url": "https://www.wikifunctions.org/w/index.php?title=Z12317&oldid=285821",
+    "license": "Apache-2.0",
+    "original_code_sha256": "67168a661d376d88f564cb23db4e533b97a21710db440c0686404eca0adb7c12",
+    "original_code": "function Z12316( Z12316K1, Z12316K2, Z12316K3, Z12316K4 ) {\n\treturn Z12316K3.replace(RegExp(Z12316K1, Z12316K4), Z12316K2);\n}"
+  }
+]

@@ -8,6 +8,7 @@ backend.
 
 from __future__ import annotations
 from core.env import env_require, env_snapshot
+from core.wikifunctions import clamp_integer
 
 import json
 import os
@@ -92,7 +93,7 @@ class VirtualLowConsumptionServer:
             env = {name: env_require(name) for name in _COMMAND_ENV_NAMES if name in env_snapshot()}
             env.update({str(k): str(v) for k, v in self.config.env.items()})
             try:
-                timeout = max(1, min(int(timeout or self.config.command_timeout_seconds), 3600))
+                timeout = clamp_integer(1, int(timeout or self.config.command_timeout_seconds), 3600)
             except (TypeError, ValueError):
                 raise ValueError("timeout must be an integer") from None
 

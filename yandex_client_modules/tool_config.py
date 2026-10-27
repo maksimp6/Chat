@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from core.wikifunctions import clamp_integer
+
 
 def file_search_max_results(value: Any) -> int:
     """Keep the provider's 1..50 result range and the existing default of 20."""
     try:
-        return max(1, min(int(20 if value is None else value), 50))
+        return clamp_integer(1, int(20 if value is None else value), 50)
     except (TypeError, ValueError, OverflowError):
         return 20
 

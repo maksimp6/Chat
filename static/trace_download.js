@@ -8,8 +8,7 @@
 
   function safeName(value) {
     return (
-      String(value || "trace")
-        .replace(/[^a-zA-Z0-9._-]+/g, "_")
+      window.LogosWikifunctions.replaceRegex("[^a-zA-Z0-9._-]+", "_", String(value || "trace"), "g")
         .slice(0, 80) || "trace"
     );
   }
