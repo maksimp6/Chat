@@ -206,14 +206,21 @@ MAX_IMAGES_PER_MESSAGE = 4
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 
-def _has_image_signature(mime: str, image_bytes: bytes) -> bool:
-    if mime == "image/png":
-        return image_bytes.startswith(b"\x89PNG\r\n\x1a\n")
-    if mime == "image/jpeg":
-        return image_bytes.startswith(b"\xff\xd8\xff")
-    if mime == "image/webp":
-        return image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP"
-    return False
+def _detect_image_mime(image_bytes: bytes) -> str | None:
+    """Return the image MIME type implied by the magic bytes, or None.
+
+    The declared MIME in a data URL is set by the client from the browser's
+    File.type, which can disagree with the actual bytes (e.g. a JPEG staged as
+    image/png). Detect the real type from the content so the provider always
+    receives a data URL whose declared type matches its bytes.
+    """
+    if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if image_bytes.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+        return "image/webp"
+    return None
 
 
 def _validated_images(raw: Any) -> list[str]:
@@ -236,8 +243,13 @@ def _validated_images(raw: Any) -> list[str]:
         if len(image_bytes) > MAX_IMAGE_BYTES:
             raise ValueError("each image must be at most 5 MB")
         mime = header[len("data:") : -len(";base64")]
-        if not _has_image_signature(mime, image_bytes):
-            raise ValueError("image content does not match its type")
+        detected = _detect_image_mime(image_bytes)
+        if detected is None:
+            raise ValueError("unsupported image format")
+        # The provider must receive a data URL whose declared type matches the
+        # bytes. Rebuild it from the detected MIME when the client mislabeled it.
+        if detected != mime:
+            url = f"data:{detected};base64,{encoded}"
         data_urls.append(url)
     return data_urls
 
