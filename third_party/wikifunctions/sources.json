@@ -48,5 +48,25 @@
     "license": "Apache-2.0",
     "original_code_sha256": "889acfc8201a106ad91f93b50be000699b4f841491d4b6db42694738a5fa346f",
     "original_code": "def Z22588(Z22588K1):\n\timport statistics\n\treturn statistics.median(Z22588K1)"
+  },
+  {
+    "function": "Z10047",
+    "implementation": "Z10048",
+    "revision": 207179,
+    "timestamp": "2025-07-31T10:55:15Z",
+    "source_url": "https://www.wikifunctions.org/w/index.php?title=Z10048&oldid=207179",
+    "license": "Apache-2.0",
+    "original_code_sha256": "c6414f40e4d335c9e6f3d7ad6f3fae0a536edc39ab576c64f83d0d60811443d6",
+    "original_code": "function Z10047( Z10047K1 ) {\n\t\n\treturn Z10047K1.toLowerCase();\n}"
+  },
+  {
+    "function": "Z10018",
+    "implementation": "Z10019",
+    "revision": 216191,
+    "timestamp": "2025-09-08T10:08:06Z",
+    "source_url": "https://www.wikifunctions.org/w/index.php?title=Z10019&oldid=216191",
+    "license": "Apache-2.0",
+    "original_code_sha256": "6cdb934087da2a064d923d25c07fec5aac2ee31af5b611df0756e5f4f327da03",
+    "original_code": "function Z10018( Z10018K1 ) {\n\treturn Z10018K1.toUpperCase();\n}"
   }
 ]
