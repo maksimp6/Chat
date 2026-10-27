@@ -1,6 +1,7 @@
 """Shared local identity for Logos data and accounting; no visitor authentication."""
 
 from core.env import env_get
+from core.wikifunctions import trim_string
 
 
 class TreasuryIdentityError(ValueError):
@@ -9,7 +10,7 @@ class TreasuryIdentityError(ValueError):
 
 def get_current_owner_id(*, required: bool = True) -> str:
     """Use one installation identity for every browser, CLI and MCP client."""
-    configured = str(env_get("LOGOS_OWNER_ID") or "").strip()
+    configured = trim_string(str(env_get("LOGOS_OWNER_ID") or ""))
     if configured:
         return configured
     from storage.db import get_store

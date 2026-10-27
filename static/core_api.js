@@ -453,7 +453,7 @@
     var button = document.createElement("button");
     button.type = "button";
     button.className =
-      "logos-btn" + (options.className ? " " + String(options.className).trim() : "");
+      "logos-btn" + (options.className ? " " + window.LogosWikifunctions.trim(String(options.className)) : "");
     button.dataset.action = options.action;
     if (options.id) button.id = String(options.id);
     if (options.params) {
@@ -478,7 +478,7 @@
 
     var modal = document.createElement("dialog");
     modal.id = String(options.id);
-    modal.className = "modal" + (options.className ? " " + String(options.className).trim() : "");
+    modal.className = "modal" + (options.className ? " " + window.LogosWikifunctions.trim(String(options.className)) : "");
     modal.hidden = true;
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
@@ -487,7 +487,7 @@
     var content = document.createElement("div");
     content.className =
       "modal-content" +
-      (options.contentClassName ? " " + String(options.contentClassName).trim() : "");
+      (options.contentClassName ? " " + window.LogosWikifunctions.trim(String(options.contentClassName)) : "");
 
     var title = document.createElement(options.titleTag || "h2");
     title.id = modal.id + "-title";

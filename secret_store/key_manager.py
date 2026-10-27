@@ -7,6 +7,7 @@ never returned by metadata/list operations.
 
 from __future__ import annotations
 from core.env import env_get
+from core.wikifunctions import trim_string
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -58,9 +59,9 @@ def _iso(value: datetime) -> str:
 
 
 def _manager_key() -> bytes:
-    raw = (
+    raw = trim_string(
         env_get("LOGOS_KEY_MANAGER_KEY") or env_get("LOGOS_PROVIDER_CREDENTIAL_KEY") or ""
-    ).strip()
+    )
     if not raw:
         raise KeyManagerError(
             "Set LOGOS_KEY_MANAGER_KEY (or LOGOS_PROVIDER_CREDENTIAL_KEY) to a Fernet key"
@@ -135,7 +136,7 @@ def store_secret(
         ("provider", provider),
         ("environment", environment),
     ):
-        if not isinstance(value, str) or not value.strip():
+        if not isinstance(value, str) or not trim_string(value):
             raise ValueError(f"{field_name} must be a non-empty string")
 
     _ensure_schema()
@@ -146,11 +147,11 @@ def store_secret(
 
     row = {
         "key_ref": ref,
-        "name": name.strip(),
-        "purpose": purpose.strip(),
-        "provider": provider.strip(),
-        "environment": environment.strip(),
-        "owner": owner.strip(),
+        "name": trim_string(name),
+        "purpose": trim_string(purpose),
+        "provider": trim_string(provider),
+        "environment": trim_string(environment),
+        "owner": trim_string(owner),
         "encrypted_secret": encrypted,
         "status": "active",
         "created_at": created_at,

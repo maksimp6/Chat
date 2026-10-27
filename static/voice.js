@@ -168,7 +168,7 @@
     if (data.type === "input_audio_buffer.speech_stopped") {
       setStatus(micTransport === "speechkit_pipeline" ? "SpeechKit распознаёт речь для выбранной текстовой модели..." : "Realtime обрабатывает запись...");
     } else if (data.type === "conversation.item.input_audio_transcription.completed") {
-      currentTranscript = String(data.transcript || "").trim();
+      currentTranscript = window.LogosWikifunctions.trim(String(data.transcript || ""));
       if (currentTranscript && !userMsgSent && typeof addMessage === "function") {
         addMessage({
           text: currentTranscript,
@@ -395,7 +395,7 @@
   async function sendText(options) {
     options = options || {};
     var text = String(options.text || "");
-    if (!text.trim()) throw new Error("Введите текст для голосовой модели");
+    if (!window.LogosWikifunctions.trim(text)) throw new Error("Введите текст для голосовой модели");
     var data = await jsonRequest("/api/voice/session", {
       model: options.model,
       conversation_id: options.conversationId,

@@ -9,6 +9,8 @@ import re
 from typing import Any, Iterable, Optional
 
 import yaml
+from core.wikifunctions import lowercase_string, trim_string
+
 
 
 DEFAULT_SKILL_ROOT = Path(__file__).resolve().parents[1] / ".agents" / "skills"
@@ -129,15 +131,16 @@ class Skill:
 def _normalize_role(role: Optional[str]) -> Optional[str]:
     if role is None:
         return None
-    normalized = re.sub(r"[^a-z0-9]+", "-", str(role).strip().lower()).strip("-")
+    normalized_role = lowercase_string(trim_string(str(role)))
+    normalized = re.sub(r"[^a-z0-9]+", "-", normalized_role).strip("-")
     return normalized or None
 
 
 def _parse_frontmatter_lines(lines: list[str], source: str) -> dict[str, Any]:
-    if not lines or lines[0].strip() != "---":
+    if not lines or trim_string(lines[0]) != "---":
         raise SkillFormatError(f"{source}: SKILL.md must start with YAML frontmatter")
     closing_index = next(
-        (i for i, line in enumerate(lines[1:], start=1) if line.strip() == "---"), None
+        (i for i, line in enumerate(lines[1:], start=1) if trim_string(line) == "---"), None
     )
     if closing_index is None:
         raise SkillFormatError(f"{source}: frontmatter is not closed")
@@ -149,7 +152,7 @@ def _parse_frontmatter_lines(lines: list[str], source: str) -> dict[str, Any]:
     if not isinstance(metadata, dict) or not all(isinstance(key, str) for key in metadata):
         raise SkillFormatError(f"{source}: frontmatter must be a mapping with string keys")
     for key in ("name", "description"):
-        if not isinstance(metadata.get(key), str) or not metadata[key].strip():
+        if not isinstance(metadata.get(key), str) or not trim_string(metadata[key]):
             raise SkillFormatError(f"{source}: frontmatter field {key} must be a non-empty string")
     return metadata
 
@@ -181,7 +184,7 @@ class SkillRegistry:
                 if size > MAX_SKILL_BYTES:
                     raise SkillFormatError(f"{name}: frontmatter exceeds {MAX_SKILL_BYTES} bytes")
                 lines.append(line)
-                if len(lines) > 1 and line.strip() == "---":
+                if len(lines) > 1 and trim_string(line) == "---":
                     break
         metadata = _parse_frontmatter_lines(lines, str(path))
         if metadata["name"] != name:
@@ -238,11 +241,11 @@ class SkillRegistry:
         text = raw.decode("utf-8")
         lines = text.splitlines()
         closing_index = next(
-            (i for i, line in enumerate(lines[1:], start=1) if line.strip() == "---"), None
+            (i for i, line in enumerate(lines[1:], start=1) if trim_string(line) == "---"), None
         )
         if closing_index is None:
             raise SkillFormatError(f"{name}: frontmatter is not closed")
-        body = "\n".join(lines[closing_index + 1 :]).strip()
+        body = trim_string("\n".join(lines[closing_index + 1 :]))
         for section in REQUIRED_SECTIONS:
             if not re.search(
                 rf"^##\s+{re.escape(section)}\s*$", body, flags=re.IGNORECASE | re.MULTILINE
@@ -281,8 +284,11 @@ def compose_skill_instructions(
 ) -> str:
     selected = list(skills)
     parts: list[str] = []
-    if base_instructions and str(base_instructions).strip():
-        parts.append(str(base_instructions).strip())
+    normalized_base_instructions = (
+        trim_string(str(base_instructions)) if base_instructions else ""
+    )
+    if normalized_base_instructions:
+        parts.append(normalized_base_instructions)
     if selected:
         parts.append(
             "Selected repository skills follow. Apply them only to this invocation. "

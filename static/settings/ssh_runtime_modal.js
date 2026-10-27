@@ -169,7 +169,7 @@
     });
 
     document.getElementById("set-ssh-save-btn").addEventListener("click", function () {
-      var targetsText = document.getElementById("set-ssh-targets").value.trim();
+      var targetsText = window.LogosWikifunctions.trim(document.getElementById("set-ssh-targets").value);
       var targets;
       try {
         targets = targetsText ? JSON.parse(targetsText) : {};
@@ -185,12 +185,12 @@
         allow_write_operations: document.getElementById("set-ssh-allow-write").checked,
         max_output_bytes:
           parseInt(document.getElementById("set-ssh-max-output").value, 10) || 1048576,
-        known_hosts: document.getElementById("set-ssh-known-hosts").value.trim() || null,
+        known_hosts: window.LogosWikifunctions.trim(document.getElementById("set-ssh-known-hosts").value) || null,
         command_allowlist: document
           .getElementById("set-ssh-command-allowlist")
           .value.split(/\r?\n/)
           .map(function (v) {
-            return v.trim();
+            return window.LogosWikifunctions.trim(v);
           })
           .filter(Boolean),
         allow_privileged_operations: document.getElementById("set-ssh-allow-privileged").checked,
@@ -222,7 +222,7 @@
     });
 
     document.getElementById("set-ssh-test-btn").addEventListener("click", function () {
-      var target = ((sshTestTargetEl && sshTestTargetEl.value) || "").trim();
+      var target = window.LogosWikifunctions.trim((sshTestTargetEl && sshTestTargetEl.value) || "");
       if (!target) {
         setSshStatus("Укажите target для проверки.", true);
         return;

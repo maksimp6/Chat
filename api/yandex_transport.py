@@ -17,6 +17,8 @@ from functools import lru_cache
 from typing import Any, BinaryIO, cast
 from urllib.parse import parse_qsl, unquote, urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+from core.wikifunctions import lowercase_string, trim_string
+
 
 from api.contracts import ContractViolation
 from api.yandex_contracts import (
@@ -220,7 +222,12 @@ def validate_yandex_request(
             raise YandexRequestBlocked("undocumented request location: " + part)
     mode = contract.get("body_format", "json")
     content_type = next(
-        (value for key, value in (headers or {}).items() if key.lower() == "content-type"), ""
+        (
+            value
+            for key, value in (headers or {}).items()
+            if lowercase_string(key) == "content-type"
+        ),
+        ""
     )
     if mode == "audio":
         if (
@@ -254,7 +261,7 @@ def validate_yandex_request(
             raise YandexRequestBlocked("multiple request body encodings")
         if (
             not isinstance(data, (bytes, str))
-            or content_type.split(";", 1)[0].strip().lower() != "application/json"
+            or lowercase_string(trim_string(content_type.split(";", 1)[0])) != "application/json"
         ):
             raise IncompleteYandexContract("non-JSON request body has no executable contract")
         try:

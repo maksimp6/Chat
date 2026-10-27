@@ -62,7 +62,7 @@
       span = Math.max(0.001, max - min);
     w.querySelectorAll(".logos-trace-timeline-row").forEach(function (row) {
       var label = row.querySelector(".logos-trace-row-label"),
-        m = label && label.textContent.trim().match(/^🤖\s*Responses API #(\d+)/);
+        m = label && window.LogosWikifunctions.trim(label.textContent).match(/^🤖\s*Responses API #(\d+)/);
       if (!m) return;
       var r = (t.responses || []).find(function (x) {
         return Number(x.step) === Number(m[1]);

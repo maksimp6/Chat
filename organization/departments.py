@@ -6,6 +6,7 @@ from typing import Any, Mapping, Optional
 from uuid import uuid4
 from flask import Blueprint, jsonify, request
 from core.clock import unix_seconds
+from core.wikifunctions import lowercase_string, trim_string
 from storage.db import get_store
 from sessions.manager import create_session, get_session
 
@@ -29,7 +30,7 @@ def init_department_tables() -> None:
 
 
 def _validate_id(value: str) -> str:
-    value = str(value or "").strip().lower()
+    value = lowercase_string(trim_string(str(value or "")))
     if not value or len(value) > 64 or any(ch not in _DEPT_ID_CHARS for ch in value):
         raise ValueError("invalid department id")
     return value
@@ -58,7 +59,7 @@ def upsert_department(
     data: Mapping[str, Any], department_id: Optional[str] = None
 ) -> dict[str, Any]:
     ident = _validate_id(department_id or data.get("id") or ("dept-" + uuid4().hex[:12]))
-    name = str(data.get("name") or "").strip()
+    name = trim_string(str(data.get("name") or ""))
     if not name:
         raise ValueError("department name is required")
     with get_store().transaction() as tx:
@@ -74,7 +75,7 @@ def upsert_department(
             "name": name,
             "type": str(given("type") or "general"),
             "description": str(given("description") or ""),
-            "agent_id": str(given("agent_id") or "").strip() or None,
+            "agent_id": trim_string(str(given("agent_id") or "")) or None,
             "system_prompt": str(given("system_prompt") or ""),
             "status": str(given("status") or "active"),
             "updated_at": unix_seconds(),

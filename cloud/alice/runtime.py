@@ -9,6 +9,7 @@ import subprocess
 from typing import Callable
 
 from cloud.base import CloudProviderError
+from core.wikifunctions import lowercase_string, trim_string
 
 
 _MANAGED_LABEL = "alice.cloud.managed"
@@ -39,7 +40,7 @@ def _default_runner(argv: list[str]) -> CommandResult:
 
 
 def _segment(value: str, field: str) -> str:
-    normalized = str(value or "").strip().lower()
+    normalized = lowercase_string(trim_string(str(value or "")))
     if not _SEGMENT.fullmatch(normalized):
         raise CloudProviderError(
             f"Invalid {field}",
@@ -79,7 +80,7 @@ class DockerRuntime:
         ]
 
     def _ensure_owned(self, name: str) -> dict[str, str]:
-        output = self._run("inspect", "--format", "{{json .Config.Labels}}", name).strip()
+        output = trim_string(self._run("inspect", "--format", "{{json .Config.Labels}}", name))
         try:
             labels = json.loads(output)
         except json.JSONDecodeError as exc:
@@ -99,7 +100,7 @@ class DockerRuntime:
         )
         resources: list[dict[str, str]] = []
         for line in output.splitlines():
-            if not line.strip():
+            if not trim_string(line):
                 continue
             try:
                 item = json.loads(line)
@@ -128,7 +129,7 @@ class DockerRuntime:
         return resources
 
     def create(self, *, lane: str, service: str, config: dict) -> dict[str, str]:
-        image = str(config.get("image") or "").strip()
+        image = trim_string(str(config.get("image") or ""))
         if not image:
             raise CloudProviderError("Container image is required", code="image_required")
         scale = int(config.get("scale", 1))
@@ -175,7 +176,7 @@ class DockerRuntime:
 
     def stats(self, *, name: str) -> dict:
         self._ensure_owned(name)
-        output = self._run("stats", "--no-stream", "--format", "{{json .}}", name).strip()
+        output = trim_string(self._run("stats", "--no-stream", "--format", "{{json .}}", name))
         try:
             value = json.loads(output)
         except json.JSONDecodeError as exc:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import Any, Callable, Optional
+from core.wikifunctions import trim_string
+
 
 from agent_runtime.gateway import AgentGateway
 from conversations.ownership import check_access, get_owned_conversation, list_owned_conversations
@@ -84,7 +86,7 @@ def _agents(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
 
 
 def _session(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
-    session_id = str(arguments.get("session_id") or "").strip()
+    session_id = trim_string(str(arguments.get("session_id") or ""))
     session = get_session(session_id) if session_id else None
     if not session:
         raise LookupError("Session not found")
@@ -100,7 +102,7 @@ def _session(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
 
 
 def _invocation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
-    invocation_id = str(arguments.get("invocation_id") or "").strip()
+    invocation_id = trim_string(str(arguments.get("invocation_id") or ""))
     status = get_invocation_status(invocation_id) if invocation_id else None
     if not status:
         raise LookupError("Invocation not found")
@@ -108,7 +110,7 @@ def _invocation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any
 
 
 def _trace(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
-    invocation_id = str(arguments.get("invocation_id") or "").strip()
+    invocation_id = trim_string(str(arguments.get("invocation_id") or ""))
     status = get_invocation_status(invocation_id) if invocation_id else None
     if not status:
         raise LookupError("Invocation not found")
@@ -139,7 +141,7 @@ def _conversations(_arguments: dict[str, Any], user: Optional[str]) -> dict[str,
 
 def _conversation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
     owner = _require_conversation_user(user)
-    conversation_id = str(arguments.get("conversation_id") or "").strip()
+    conversation_id = trim_string(str(arguments.get("conversation_id") or ""))
     if not conversation_id:
         raise ValueError("conversation_id is required")
     conversation = get_owned_conversation(conversation_id, owner)
@@ -150,7 +152,7 @@ def _conversation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, A
 
 def _conversation_messages(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
     owner = _require_conversation_user(user)
-    conversation_id = str(arguments.get("conversation_id") or "").strip()
+    conversation_id = trim_string(str(arguments.get("conversation_id") or ""))
     if not conversation_id:
         raise ValueError("conversation_id is required")
     if not check_access(conversation_id, owner):
@@ -177,7 +179,7 @@ def _project_list(args: dict, _user: Optional[str] = None) -> dict:
 
 
 def _project_read(args: dict, _user: Optional[str] = None) -> dict:
-    path = str(args.get("path") or "").strip()
+    path = trim_string(str(args.get("path") or ""))
     if not path:
         raise ValueError("path is required")
     result = read_file(
@@ -193,7 +195,7 @@ def _project_read(args: dict, _user: Optional[str] = None) -> dict:
 
 
 def _project_search(args: dict, _user: Optional[str] = None) -> dict:
-    query = str(args.get("query") or "").strip()
+    query = trim_string(str(args.get("query") or ""))
     if not query:
         raise ValueError("query is required")
     return grep_search(

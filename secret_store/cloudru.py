@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import lowercase_string, trim_string
+
 from cloud.base import CloudProviderError
 from cloud.cloudru.secret_management import CloudRuSecretManagementClient
 from secret_store.core import (
@@ -33,7 +35,9 @@ class CloudRuSecretResolver:
             raise SecretResolutionError(SecretErrorCode.INVALID_REFERENCE, ref)
 
         try:
-            status = self._client.get_version_status(ref.secret_id, ref.version_id).strip().lower()
+            status = lowercase_string(
+                trim_string(self._client.get_version_status(ref.secret_id, ref.version_id))
+            )
             if status not in _ACTIVE_STATUSES:
                 raise SecretResolutionError(SecretErrorCode.VERSION_INACTIVE, ref)
             value = self._client.get_secret_value(ref.secret_id, ref.version_id)

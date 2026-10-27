@@ -7,6 +7,7 @@ must be requested through the separate scoped execution gateway.
 
 from __future__ import annotations
 from core.env import env_get
+from core.wikifunctions import trim_string
 
 import json
 import logging
@@ -56,11 +57,11 @@ class PluginManifest:
         if unknown:
             raise PluginError(f"manifest contains unknown fields: {', '.join(unknown)}")
         required = ("id", "name", "version")
-        missing = [key for key in required if not str(data.get(key) or "").strip()]
+        missing = [key for key in required if not trim_string(str(data.get(key) or ""))]
         if missing:
             raise PluginError(f"manifest missing required fields: {', '.join(missing)}")
 
-        plugin_id = str(data["id"]).strip()
+        plugin_id = trim_string(str(data["id"]))
         if not re.fullmatch(r"[A-Za-z0-9._-]+", plugin_id):
             raise PluginError("plugin id must contain only letters, digits, '.', '_' or '-'")
 
@@ -80,8 +81,8 @@ class PluginManifest:
 
         return cls(
             id=plugin_id,
-            name=str(data["name"]).strip(),
-            version=str(data["version"]).strip(),
+            name=trim_string(str(data["name"])),
+            version=trim_string(str(data["version"])),
             api_version=api_version,
             capabilities=capabilities,
             permissions=permissions,
@@ -182,11 +183,11 @@ plugin_manager = PluginManager()
 def _string_list(value: Any, field_name: str) -> tuple[str, ...]:
     if value is None:
         return ()
-    if not isinstance(value, list) or any(
-        not isinstance(item, str) or not item.strip() for item in value
-    ):
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
         raise PluginError(f"{field_name} must be an array of non-empty strings")
-    normalized = tuple(item.strip() for item in value)
+    normalized = tuple(trim_string(item) for item in value)
+    if not all(normalized):
+        raise PluginError(f"{field_name} must be an array of non-empty strings")
     if len(set(normalized)) != len(normalized):
         raise PluginError(f"{field_name} must not contain duplicates")
     return normalized

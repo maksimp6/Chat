@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from core.env import env_get
+from core.wikifunctions import lowercase_string, trim_string
 
 import json
 import re
@@ -70,7 +71,7 @@ class BoardHandler(BaseHTTPRequestHandler):
         self._send(code, body, "application/json; charset=utf-8")
 
     def _request(self) -> dict[str, Any]:
-        mime = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+        mime = lowercase_string(trim_string(self.headers.get("Content-Type", "").split(";", 1)[0]))
         if mime != "application/json" or self.headers.get("Transfer-Encoding"):
             raise BoardError("Content-Type must be application/json")
         length = self.headers.get("Content-Length", "")

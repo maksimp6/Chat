@@ -244,14 +244,14 @@
       document.getElementById("mcp-ed-save").addEventListener("click", function () {
         var saveBtn = this;
         var payload = {
-          name: document.getElementById("mcp-ed-name").value.trim(),
+          name: window.LogosWikifunctions.trim(document.getElementById("mcp-ed-name").value),
           connector_id: document.getElementById("mcp-ed-connector").value,
-          server_url: document.getElementById("mcp-ed-url").value.trim(),
-          server_label: document.getElementById("mcp-ed-label").value.trim(),
-          authorization: document.getElementById("mcp-ed-auth").value.trim(),
-          server_description: document.getElementById("mcp-ed-desc").value.trim(),
-          headers: document.getElementById("mcp-ed-headers").value.trim(),
-          allowed_tools: document.getElementById("mcp-ed-allowed").value.trim(),
+          server_url: window.LogosWikifunctions.trim(document.getElementById("mcp-ed-url").value),
+          server_label: window.LogosWikifunctions.trim(document.getElementById("mcp-ed-label").value),
+          authorization: window.LogosWikifunctions.trim(document.getElementById("mcp-ed-auth").value),
+          server_description: window.LogosWikifunctions.trim(document.getElementById("mcp-ed-desc").value),
+          headers: window.LogosWikifunctions.trim(document.getElementById("mcp-ed-headers").value),
+          allowed_tools: window.LogosWikifunctions.trim(document.getElementById("mcp-ed-allowed").value),
           allowed_tools_read_only: document.getElementById("mcp-ed-allowed-ro").checked,
           require_approval: "never",
           defer_loading: document.getElementById("mcp-ed-defer").checked,

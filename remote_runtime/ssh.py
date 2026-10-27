@@ -7,6 +7,7 @@ remote OS identity, so Linux permissions remain the authorization boundary.
 from __future__ import annotations
 from core.env import env_get
 from core.output import limit_output
+from core.wikifunctions import trim_string
 
 import json
 import posixpath
@@ -58,7 +59,7 @@ class SSHRuntime:
         targets: Optional[Mapping[str, Mapping[str, Any]]],
     ) -> dict[str, SSHTarget]:
         if targets is None:
-            text = env_get("LOGOS_SSH_TARGETS_JSON", "").strip()
+            text = trim_string(env_get("LOGOS_SSH_TARGETS_JSON", ""))
             if not text:
                 return {}
             try:
@@ -75,7 +76,7 @@ class SSHRuntime:
         for name, cfg in raw.items():
             if not isinstance(cfg, Mapping):
                 raise SSHRuntimeError(f"SSH target '{name}' must be an object")
-            host = str(cfg.get("host") or "").strip()
+            host = trim_string(str(cfg.get("host") or ""))
             if not host:
                 raise SSHRuntimeError(f"SSH target '{name}' has no host")
             try:
@@ -91,6 +92,12 @@ class SSHRuntime:
             if not isinstance(allowed, (list, tuple)):
                 raise SSHRuntimeError(f"SSH target '{name}' has invalid allowed_users")
 
+            normalized_allowed_users = []
+            for user in allowed:
+                normalized_user = trim_string(str(user))
+                if normalized_user:
+                    normalized_allowed_users.append(normalized_user)
+
             identity_map = cfg.get("identity_map") or {}
             if not isinstance(identity_map, Mapping):
                 raise SSHRuntimeError(f"SSH target '{name}' has invalid identity_map")
@@ -98,8 +105,8 @@ class SSHRuntime:
             for identity_id, linux_user in identity_map.items():
                 normalized_identity_map.append(
                     (
-                        str(identity_id).strip(),
-                        SSHRuntime._validate_linux_user(str(linux_user).strip()),
+                        trim_string(str(identity_id)),
+                        SSHRuntime._validate_linux_user(trim_string(str(linux_user))),
                     )
                 )
 
@@ -115,16 +122,16 @@ class SSHRuntime:
                 host=host,
                 port=port,
                 default_user=(
-                    str(cfg["default_user"]).strip() if cfg.get("default_user") else None
+                    trim_string(str(cfg["default_user"])) if cfg.get("default_user") else None
                 ),
-                allowed_users=tuple(str(user).strip() for user in allowed if str(user).strip()),
+                allowed_users=tuple(normalized_allowed_users),
                 identity_file=(
-                    str(cfg["identity_file"]).strip() if cfg.get("identity_file") else None
+                    trim_string(str(cfg["identity_file"])) if cfg.get("identity_file") else None
                 ),
-                known_hosts=(str(cfg["known_hosts"]).strip() if cfg.get("known_hosts") else None),
+                known_hosts=(trim_string(str(cfg["known_hosts"])) if cfg.get("known_hosts") else None),
                 identity_map=tuple(normalized_identity_map),
                 workspace_root=(
-                    str(cfg["workspace_root"]).strip() if cfg.get("workspace_root") else None
+                    trim_string(str(cfg["workspace_root"])) if cfg.get("workspace_root") else None
                 ),
                 connect_timeout_seconds=float(cfg.get("connect_timeout_seconds", 10.0)),
                 command_timeout_seconds=float(cfg.get("command_timeout_seconds", 30.0)),
@@ -134,7 +141,7 @@ class SSHRuntime:
 
     @staticmethod
     def _validate_linux_user(user: str) -> str:
-        value = str(user or "").strip()
+        value = trim_string(str(user or ""))
         if not value or len(value) > 64:
             raise SSHRuntimeError("Linux user is required and must be <= 64 characters")
         if any(
@@ -162,7 +169,7 @@ class SSHRuntime:
 
     @staticmethod
     def _validate_remote_path(path: str) -> str:
-        value = str(path or "").strip()
+        value = trim_string(str(path or ""))
         if not value or "\x00" in value:
             raise SSHRuntimeError("Remote file path is required")
         if not value.startswith("/"):
@@ -231,7 +238,7 @@ class SSHRuntime:
         timeout_seconds: Optional[float] = None,
         identity_id: Optional[str] = None,
     ) -> dict[str, Any]:
-        command = str(command or "").strip()
+        command = trim_string(str(command or ""))
         if not command:
             raise SSHRuntimeError("Command is required")
 

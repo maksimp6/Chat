@@ -506,7 +506,7 @@
         if (c && c.type === "output_text" && typeof c.text === "string") parts.push(c.text);
       });
     });
-    return parts.join("\n").trim();
+    return window.LogosWikifunctions.trim(parts.join("\n"));
   }
 
   function addJsonToolbar(content, rerender) {

@@ -7,6 +7,7 @@ reference to an existing key file.
 
 from __future__ import annotations
 from core.env import env_get
+from core.wikifunctions import trim_string
 
 import copy
 import json
@@ -45,7 +46,7 @@ _DEFAULTS = {
 
 
 def _env_bootstrap() -> dict[str, Any]:
-    raw = env_get("LOGOS_SSH_TARGETS_JSON", "").strip()
+    raw = trim_string(env_get("LOGOS_SSH_TARGETS_JSON", ""))
     targets: dict[str, Any] = {}
     if raw:
         try:
@@ -99,14 +100,14 @@ def validate_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
     result["max_output_bytes"] = max_output
 
     known_hosts = result.get("known_hosts")
-    result["known_hosts"] = str(known_hosts).strip() if known_hosts else None
+    result["known_hosts"] = trim_string(str(known_hosts)) if known_hosts else None
 
     allowlist = result.get("command_allowlist")
     if not isinstance(allowlist, (list, tuple)):
         raise SSHRuntimeError("command_allowlist must be an array")
     normalized_allowlist = []
     for pattern in allowlist:
-        value = str(pattern or "").strip()
+        value = trim_string(str(pattern or ""))
         if not value:
             raise SSHRuntimeError("command_allowlist cannot contain empty patterns")
         if len(value) > 512:
@@ -222,15 +223,15 @@ def build_runtime() -> SSHRuntime:
 def command_matches_allowlist(command: str, allowlist: list[str]) -> bool:
     import re
 
-    value = str(command or "").strip()
+    value = trim_string(str(command or ""))
     return any(re.fullmatch(pattern, value) for pattern in allowlist)
 
 
 def is_privileged_command(command: str) -> bool:
-    value = str(command or "").strip()
+    value = trim_string(str(command or ""))
     # Every pipeline stage counts: a privileged stage after "|" is still privileged.
     return any(
-        re.match(r"^(?:sudo|su|doas|pkexec)(?:\s|$)", stage.strip()) for stage in value.split("|")
+        re.match(r"^(?:sudo|su|doas|pkexec)(?:\s|$)", trim_string(stage)) for stage in value.split("|")
     )
 
 
@@ -319,7 +320,7 @@ def test_connection(target_name: str, identity_id: str | None) -> dict[str, Any]
         "host": target.host,
         "linux_user": user,
         "status": "ok" if completed.returncode == 0 else "failed",
-        "error": completed.stderr.strip() or None,
+        "error": trim_string(completed.stderr) or None,
         "exit_code": completed.returncode,
         "duration_ms": round((time.perf_counter() - started) * 1000, 2),
         "known_hosts_configured": bool(known_hosts),

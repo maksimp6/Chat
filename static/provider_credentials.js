@@ -162,9 +162,9 @@
     save.textContent = "Подключить";
     save.className = "logos-btn btn-primary";
     save.addEventListener("click", async function () {
-      var y = document.getElementById("provider-yandex-key").value.trim();
-      var project = document.getElementById("provider-yandex-project").value.trim();
-      var cloudru = document.getElementById("provider-cloudru-key").value.trim();
+      var y = window.LogosWikifunctions.trim(document.getElementById("provider-yandex-key").value);
+      var project = window.LogosWikifunctions.trim(document.getElementById("provider-yandex-project").value);
+      var cloudru = window.LogosWikifunctions.trim(document.getElementById("provider-cloudru-key").value);
       clearFieldErrors();
       output.textContent = "";
       if (y && !project) {

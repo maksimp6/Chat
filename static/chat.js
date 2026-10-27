@@ -268,7 +268,7 @@ function addMessage({
   const bubble = document.createElement("div");
   bubble.className = "bubble";
   let htmlContent = "";
-  if (reasoning && reasoning.trim() !== "") {
+  if (reasoning && window.LogosWikifunctions.trim(reasoning) !== "") {
     htmlContent += `<details class="reasoning-details"><summary class="reasoning-summary">🧠 Ход мыслей модели</summary><div class="reasoning-content">${parseMarkdown(reasoning)}</div></details>`;
   }
   htmlContent += parseMarkdown(text);
@@ -606,7 +606,10 @@ document.addEventListener("DOMContentLoaded", function () {
     sendBtn.textContent = running ? "■" : "➤";
     sendBtn.setAttribute("aria-label", running ? "Остановить ответ" : "Отправить");
     sendBtn.disabled = !running && (
-      pending || imagesInFlight > 0 || !input || (!input.value.trim() && !pendingImages.length)
+      pending ||
+        imagesInFlight > 0 ||
+        !input ||
+        (!window.LogosWikifunctions.trim(input.value) && !pendingImages.length)
     );
   }
 
@@ -867,7 +870,7 @@ document.addEventListener("DOMContentLoaded", function () {
   async function sendTurn(retryRequest) {
     if (!input) return;
     const rawText = retryRequest ? "" : input.value;
-    const text = retryRequest ? retryRequest.text : rawText.trim();
+    const text = retryRequest ? retryRequest.text : window.LogosWikifunctions.trim(rawText);
     if (retryRequest && currentConvId !== retryRequest.conversationId) return;
     if (imagesInFlight > 0) return;
     const sentImages = retryRequest

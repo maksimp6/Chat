@@ -19,6 +19,7 @@ The scheduled workflow ``.github/workflows/agent-observer.yml`` runs it hourly.
 
 from __future__ import annotations
 from core.env import env_get
+from core.wikifunctions import lowercase_string, trim_string
 
 import argparse
 import json
@@ -137,7 +138,7 @@ def classify_login(login: str | None) -> str:
     "logos" or "codex" is not taken for that agent. Names are still self-chosen,
     so this labels activity; it does not prove who acted.
     """
-    name = (login or "").strip().lower()
+    name = lowercase_string(trim_string(login or ""))
     if not name:
         return "human"
     words = set(_LOGIN_WORD.findall(name))
@@ -178,7 +179,7 @@ def classify_actor(login: str | None, text: str | None = None) -> str:
 
 
 def classify_branch(ref: str | None) -> str | None:
-    prefix = (ref or "").split("/", 1)[0].lower()
+    prefix = lowercase_string((ref or "").split("/", 1)[0])
     return prefix if prefix in AGENTS else None
 
 
@@ -196,7 +197,7 @@ _EXECUTABLE_AUTHOR_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
 
 
 def _mention_agent(token: str) -> str:
-    name = token.lower()
+    name = lowercase_string(token)
     return _MENTION_ALIASES.get(name, name)
 
 
@@ -233,7 +234,11 @@ def _login(obj: dict[str, Any] | None) -> str:
 
 
 def _first_line(text: str | None, limit: int = 90) -> str:
-    line = next((part.strip() for part in (text or "").splitlines() if part.strip()), "")
+    line = ""
+    for part in (text or "").splitlines():
+        line = trim_string(part)
+        if line:
+            break
     line = re.sub(r"\s+", " ", line)
     return line if len(line) <= limit else line[: limit - 1] + "…"
 
@@ -268,7 +273,7 @@ def timeline_event(raw: dict[str, Any]) -> Event | None:
     if kind == "commented":
         action = f"комментарий: {_first_line(body)}" if body else "комментарий"
     elif kind == "reviewed":
-        state = (raw.get("state") or "").lower()
+        state = lowercase_string(raw.get("state") or "")
         action = {
             "approved": "одобрил PR",
             "changes_requested": "запросил изменения",
@@ -461,7 +466,7 @@ def _record_dispatch(
 
 def _is_backend_acknowledgement(agent: str, body: str | None, kind: str) -> bool:
     """Require visible backend evidence after an eligible trigger: a non-empty comment or review."""
-    return kind in {"commented", "reviewed"} and bool((body or "").strip())
+    return kind in {"commented", "reviewed"} and bool(trim_string(body or ""))
 
 
 def _acknowledge_backend_dispatch(thread: Thread, agent: str, at: datetime) -> None:
@@ -548,7 +553,7 @@ def _maintainer_outcome_after(thread: Thread, since: datetime, target: str) -> b
         if event.action == "запросил изменения":
             return True
         if event.kind == "commented":
-            body = event.action.removeprefix("комментарий:").strip()
+            body = trim_string(event.action.removeprefix("комментарий:"))
             if _MAINTAINER_STATUS.match(body):
                 return True
     return False
@@ -838,7 +843,7 @@ class GitHub:
             req.add_header("Content-Type", "application/json")
         with self._open(req, timeout=30) as response:
             body = response.read()
-            headers = {key.lower(): value for key, value in response.headers.items()}
+            headers = {lowercase_string(key): value for key, value in response.headers.items()}
         return (json.loads(body) if body else None), headers
 
     def get(self, path: str) -> Any:
@@ -861,7 +866,7 @@ def _next_link(header: str) -> str | None:
     for part in header.split(","):
         section = part.split(";")
         if len(section) > 1 and 'rel="next"' in section[1]:
-            return section[0].strip()[1:-1]
+            return trim_string(section[0])[1:-1]
     return None
 
 

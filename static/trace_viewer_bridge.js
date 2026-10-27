@@ -12,7 +12,7 @@
       var pre = details.querySelector("pre");
       if (!summary || !pre) return;
 
-      var summaryText = summary.textContent.trim();
+      var summaryText = window.LogosWikifunctions.trim(summary.textContent);
       if (!/^🔍 Trace\b/.test(summaryText)) return;
 
       var raw = pre.textContent;

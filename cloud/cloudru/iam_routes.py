@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from core.env import env_get
+from core.wikifunctions import lowercase_string, trim_string
 
 from datetime import datetime, timedelta, timezone
 import ipaddress
@@ -17,7 +18,7 @@ logger = logging.getLogger("cloudru_iam_routes")
 cloudru_iam_bp = Blueprint("cloudru_iam", __name__, url_prefix="/api/cloudru/iam")
 
 def _enabled() -> bool:
-    return env_get("CLOUDRU_IAM_WIZARD_ENABLED", "false").strip().lower() == "true"
+    return lowercase_string(trim_string(env_get("CLOUDRU_IAM_WIZARD_ENABLED", "false"))) == "true"
 
 
 def _revoke_unstored_key(client: CloudRuIamClient, key_id: str) -> None:
@@ -37,7 +38,7 @@ def _guard():
 def _parse_expiry(value: Any) -> str | None:
     if not value:
         return None
-    raw = str(value).strip()
+    raw = trim_string(str(value))
     try:
         expiry = datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError as exc:
@@ -55,7 +56,7 @@ def _parse_expiry(value: Any) -> str | None:
 def _validate_ips(values: list[str]) -> list[str]:
     result = []
     for item in values:
-        value = str(item).strip()
+        value = trim_string(str(item))
         if not value:
             continue
         try:
@@ -93,12 +94,12 @@ def create_api_key():
         return jsonify({"error": "Explicit confirmation is required"}), 400
 
     try:
-        service_account_id = str(data.get("service_account_id") or "").strip()
-        name = str(data.get("name") or "").strip()
-        description = str(data.get("description") or "").strip()
+        service_account_id = trim_string(str(data.get("service_account_id") or ""))
+        name = trim_string(str(data.get("name") or ""))
+        description = trim_string(str(data.get("description") or ""))
         products = data.get("products") or []
-        environment = str(data.get("environment") or "production").strip()
-        owner = str(data.get("owner") or "local-admin").strip()
+        environment = trim_string(str(data.get("environment") or "production"))
+        owner = trim_string(str(data.get("owner") or "local-admin"))
         ip_addresses = _validate_ips(list(data.get("ip_addresses") or []))
         time_slots = _validate_time_slots(list(data.get("time_slots") or []))
         timezone_offset = data.get("timezone")
@@ -113,7 +114,12 @@ def create_api_key():
 
         if not isinstance(products, list):
             raise ValueError("products must be a list")
-        products = [str(item).strip() for item in products if str(item).strip()]
+        normalized_products = []
+        for item in products:
+            product = trim_string(str(item))
+            if product:
+                normalized_products.append(product)
+        products = normalized_products
         if not products:
             raise ValueError("At least one Cloud.ru service is required")
 
@@ -202,7 +208,7 @@ def list_api_keys():
     guard = _guard()
     if guard:
         return guard
-    service_account_id = str(request.args.get("service_account_id") or "").strip()
+    service_account_id = trim_string(str(request.args.get("service_account_id") or ""))
     if not service_account_id:
         return jsonify({"error": "service_account_id is required"}), 400
     try:

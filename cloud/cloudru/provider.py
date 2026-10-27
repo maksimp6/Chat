@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from core.env import env_get
-from core.wikifunctions import clamp_integer
+from core.wikifunctions import clamp_integer, lowercase_string, trim_string
 
 import re
 from typing import Any
@@ -19,7 +19,7 @@ _RESOURCE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
 
 def _resource_id(value: Any) -> str:
     """A resource id goes into a request path, so only a plain identifier is accepted."""
-    text = str(value or "").strip()
+    text = trim_string(str(value or ""))
     if not _RESOURCE_ID.fullmatch(text):
         raise CloudProviderError("resource id is not a valid identifier", code="validation_error")
     return text
@@ -47,17 +47,17 @@ class CloudRuProvider:
 
     @staticmethod
     def _service_path(name: str) -> str | None:
-        value = env_get(f"CLOUDRU_{name.upper()}_PATH", "").strip()
+        value = trim_string(env_get(f"CLOUDRU_{name.upper()}_PATH", ""))
         return value if value.startswith("/") else None
 
     @staticmethod
     def _service_enabled(endpoint_env: str, path_env: str | None = None) -> bool:
-        endpoint = env_get(endpoint_env, "").strip()
+        endpoint = trim_string(env_get(endpoint_env, ""))
         if not endpoint:
             return False
         if path_env is None:
             return True
-        return bool(env_get(path_env, "").strip())
+        return bool(trim_string(env_get(path_env, "")))
 
     @staticmethod
     def _path_enabled(service: str, path_env: str) -> bool:
@@ -137,10 +137,10 @@ class CloudRuProvider:
             "provider": self.name,
             "services": services,
             "auth": {
-                "api_key": bool(env_get("CLOUDRU_API_KEY", "").strip()),
+                "api_key": bool(trim_string(env_get("CLOUDRU_API_KEY", ""))),
                 "iam_key_pair": bool(
-                    env_get("CLOUDRU_IAM_KEY_ID", "").strip()
-                    and env_get("CLOUDRU_IAM_KEY_SECRET", "").strip()
+                    trim_string(env_get("CLOUDRU_IAM_KEY_ID", ""))
+                    and trim_string(env_get("CLOUDRU_IAM_KEY_SECRET", ""))
                 ),
             },
         }
@@ -152,13 +152,13 @@ class CloudRuProvider:
         resource_type: str | None = None,
         filters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        service_name = str(service or "").strip().lower()
+        service_name = lowercase_string(trim_string(str(service or "")))
         if not service_name:
             raise CloudProviderError("service is required", code="validation_error")
 
         if service_name == "iam":
             iam = self.iam_client or CloudRuIamClient()
-            requested = str(resource_type or "service_account").strip().lower()
+            requested = lowercase_string(trim_string(str(resource_type or "service_account")))
             if requested in {"service_account", "service_accounts"}:
                 items = iam.list_service_accounts()
                 normalized = normalize_resources(self.name, "iam", "service_account", items)
@@ -170,7 +170,7 @@ class CloudRuProvider:
                     "raw_count": len(items),
                 }
             if requested in {"api_key", "api_keys"}:
-                service_account_id = str((filters or {}).get("service_account_id") or "").strip()
+                service_account_id = trim_string(str((filters or {}).get("service_account_id") or ""))
                 if not service_account_id:
                     raise CloudProviderError(
                         "service_account_id filter is required for IAM api_key inventory",
@@ -183,7 +183,7 @@ class CloudRuProvider:
                 elif isinstance(enabled_filter, bool):
                     enabled = enabled_filter
                 elif isinstance(enabled_filter, str):
-                    normalized = enabled_filter.strip().lower()
+                    normalized = lowercase_string(trim_string(enabled_filter))
                     if normalized in {"true", "1", "yes", "on"}:
                         enabled = True
                     elif normalized in {"false", "0", "no", "off"}:
@@ -259,17 +259,17 @@ class CloudRuProvider:
     def get_resource(
         self, *, resource_type: str, resource_id: str, service: str | None = None
     ) -> dict[str, Any]:
-        service_name = str(service or resource_type or "").strip().lower()
+        service_name = lowercase_string(trim_string(str(service or resource_type or "")))
         if not resource_id:
             raise CloudProviderError("resource_id is required", code="validation_error")
         if service_name == "iam":
             iam = self.iam_client or CloudRuIamClient()
-            requested = str(resource_type or "").strip().lower()
+            requested = lowercase_string(trim_string(str(resource_type or "")))
             if requested in {"service_account", "service_accounts"}:
                 for account in iam.list_service_accounts():
-                    item_id = str(
-                        account.get("id") or account.get("service_account_id") or ""
-                    ).strip()
+                    item_id = trim_string(
+                        str(account.get("id") or account.get("service_account_id") or "")
+                    )
                     if item_id == resource_id:
                         return {
                             "provider": self.name,
@@ -322,7 +322,7 @@ class CloudRuProvider:
         instance_id: str | None = None,
         extra: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        op = str(operation or "").strip().lower()
+        op = lowercase_string(trim_string(str(operation or "")))
         path = self._service_path("compute")
         if not path:
             raise CloudProviderError(
@@ -346,7 +346,7 @@ class CloudRuProvider:
             if not instance_id:
                 raise CloudProviderError("instance_id is required", code="validation_error")
             instance_id = _resource_id(instance_id)
-            action_template = env_get("CLOUDRU_COMPUTE_ACTION_PATH", "").strip()
+            action_template = trim_string(env_get("CLOUDRU_COMPUTE_ACTION_PATH", ""))
             if action_template:
                 try:
                     action_path = action_template.format(instance_id=instance_id, operation=op)
@@ -383,7 +383,7 @@ class CloudRuProvider:
     def query_logs(
         self, *, query: str, service: str | None = None, limit: int = 100
     ) -> dict[str, Any]:
-        path = env_get("CLOUDRU_OBSERVABILITY_LOGS_PATH", "").strip()
+        path = trim_string(env_get("CLOUDRU_OBSERVABILITY_LOGS_PATH", ""))
         if not path.startswith("/") or not self._path_enabled(
             "observability", "CLOUDRU_OBSERVABILITY_LOGS_PATH"
         ):
@@ -413,7 +413,7 @@ class CloudRuProvider:
         window: str | None = None,
         limit: int = 100,
     ) -> dict[str, Any]:
-        path = env_get("CLOUDRU_OBSERVABILITY_METRICS_PATH", "").strip()
+        path = trim_string(env_get("CLOUDRU_OBSERVABILITY_METRICS_PATH", ""))
         if not path.startswith("/") or not self._path_enabled(
             "observability", "CLOUDRU_OBSERVABILITY_METRICS_PATH"
         ):
@@ -448,13 +448,13 @@ class CloudRuProvider:
         resource_id: str | None = None,
         options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        path = env_get("CLOUDRU_BACKUP_PATH", "").strip()
+        path = trim_string(env_get("CLOUDRU_BACKUP_PATH", ""))
         if not path.startswith("/") or not self._path_enabled("backup", "CLOUDRU_BACKUP_PATH"):
             raise CloudProviderError(
                 "Cloud.ru backup endpoint/path is not configured",
                 code="unsupported_capability",
             )
-        op = str(operation or "").strip().lower()
+        op = lowercase_string(trim_string(str(operation or "")))
         if op not in {"create", "list", "restore", "delete"}:
             raise CloudProviderError(
                 f"Unsupported backup operation: {op}",
@@ -482,7 +482,7 @@ class CloudRuProvider:
     def costs_summary(
         self, *, period: str | None = None, group_by: str | None = None
     ) -> dict[str, Any]:
-        path = env_get("CLOUDRU_BILLING_SUMMARY_PATH", "").strip()
+        path = trim_string(env_get("CLOUDRU_BILLING_SUMMARY_PATH", ""))
         if not path.startswith("/") or not self._path_enabled(
             "billing", "CLOUDRU_BILLING_SUMMARY_PATH"
         ):
@@ -508,5 +508,5 @@ class CloudRuProvider:
             "total_cost": str(total_cost) if total_cost is not None else None,
             "complete": totals["complete"],
             "currency": totals["currency"]
-            or env_get("CLOUDRU_BILLING_CURRENCY", "RUB").strip().upper(),
+            or trim_string(env_get("CLOUDRU_BILLING_CURRENCY", "RUB")).upper(),
         }

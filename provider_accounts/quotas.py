@@ -8,6 +8,7 @@ The native Kristall write barrier serializes reservation and usage mutations.
 from __future__ import annotations
 from core.env import env_get
 from core.restrictions import restrictions_lifted
+from core.wikifunctions import lowercase_string, trim_string
 
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -131,7 +132,7 @@ def upsert_policy(
     max_requests_per_minute: int = 0,
     enabled: bool = True,
 ) -> None:
-    name = str(name or "").strip().lower()
+    name = lowercase_string(trim_string(str(name or "")))
     if not name or period_seconds < 60 or max_requests < 0 or max_requests_per_minute < 0:
         raise ValueError("invalid quota policy")
     init_quota_tables()
@@ -154,7 +155,8 @@ def upsert_policy(
 
 
 def assign_user_policy(user_id: str, policy_name: str) -> None:
-    user_id, policy_name = str(user_id or "").strip(), str(policy_name or "").strip().lower()
+    user_id = trim_string(str(user_id or ""))
+    policy_name = lowercase_string(trim_string(str(policy_name or "")))
     if not user_id or not policy_name:
         raise ValueError("user and policy are required")
     init_quota_tables()
@@ -205,9 +207,9 @@ def reserve_request(
     """
     if restrictions_lifted():
         return None
-    trusted_user_id = str(user_id or "").strip()
+    trusted_user_id = trim_string(str(user_id or ""))
     if not trusted_user_id:
-        if env_get("LOGOS_QUOTA_REQUIRE_IDENTITY", "true").strip().lower() not in {
+        if lowercase_string(trim_string(env_get("LOGOS_QUOTA_REQUIRE_IDENTITY", "true"))) not in {
             "0",
             "false",
             "no",
@@ -333,7 +335,7 @@ def record_usage(
 
 
 def get_usage(user_id: str, *, now: Optional[int] = None) -> dict[str, Any]:
-    user_id = str(user_id or "").strip()
+    user_id = trim_string(str(user_id or ""))
     if not user_id:
         raise ValueError("user_id is required")
 

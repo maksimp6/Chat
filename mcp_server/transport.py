@@ -1,5 +1,7 @@
 from __future__ import annotations
 from flask import Blueprint, Response, request
+from core.wikifunctions import trim_string
+
 
 from mcp_server.auth import _auth_user_from_request
 from mcp_server.protocol import (
@@ -25,7 +27,7 @@ def _client_error_message(exc: Exception, fallback: str) -> str:
     if "Traceback (most recent call last):" in message:
         return fallback
     lines = message.splitlines()
-    message = lines[0].strip() if lines else ""
+    message = trim_string(lines[0]) if lines else ""
     return message or fallback
 
 
@@ -133,12 +135,14 @@ def mcp_post() -> Response:
             return _error_response(request_id, -32602, "tools/call _meta must be an object")
         runtime_id = call_meta.get("logos/runtime_id")
         resource_runtime_id = call_meta.get("logos/resource_runtime_id")
-        if runtime_id is not None and (not isinstance(runtime_id, str) or not runtime_id.strip()):
+        if runtime_id is not None and (
+            not isinstance(runtime_id, str) or not trim_string(runtime_id)
+        ):
             return _error_response(
                 request_id, -32602, "logos/runtime_id must be a non-empty string"
             )
         if resource_runtime_id is not None and (
-            not isinstance(resource_runtime_id, str) or not resource_runtime_id.strip()
+            not isinstance(resource_runtime_id, str) or not trim_string(resource_runtime_id)
         ):
             return _error_response(
                 request_id, -32602, "logos/resource_runtime_id must be a non-empty string"

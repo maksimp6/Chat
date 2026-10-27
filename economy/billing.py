@@ -12,6 +12,7 @@ from core.config import (
     AUDIO_TTS_PRICE_PER_SEC,
     canonical_model_key,
 )
+from core.wikifunctions import trim_string
 
 PRICING_CURRENCY = "RUB"
 PRICING_VERSION = "config-v1"
@@ -149,15 +150,18 @@ def settle_billing_to_treasury(billing: dict[str, Any], owner_id: Optional[str])
     if not isinstance(billing, dict) or billing.get("cost_status") != "calculated":
         return {"status": "skipped", "reason": "billing_not_fully_calculated"}
 
-    if not owner_id or not str(owner_id).strip():
+    trusted_owner_id = trim_string(str(owner_id)) if owner_id else ""
+    if not trusted_owner_id:
         return {"status": "skipped", "reason": "owner_identity_missing"}
 
-    trusted_owner_id = str(owner_id).strip()
     billing_owner = billing.get("owner_id")
-    if billing_owner is None or not str(billing_owner).strip():
+    normalized_billing_owner = (
+        trim_string(str(billing_owner)) if billing_owner is not None else ""
+    )
+    if not normalized_billing_owner:
         billing["owner_id"] = trusted_owner_id
-        billing_owner = trusted_owner_id
-    if str(billing_owner).strip() != trusted_owner_id:
+        normalized_billing_owner = trusted_owner_id
+    if normalized_billing_owner != trusted_owner_id:
         raise ValueError("billing owner identity does not match the invocation owner")
 
     amount = float(billing.get("total_cost") or 0)

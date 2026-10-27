@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from core.env import env_get
+from core.wikifunctions import lowercase_string, trim_string
 
 from typing import Any
 
@@ -28,7 +29,7 @@ class CliClient:
         session: requests.Session | None = None,
     ) -> None:
         self.base_url = (base_url or env_get("LOGOS_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
-        self.model = (model or env_get("LOGOS_MODEL") or DEFAULT_MODEL).strip() or DEFAULT_MODEL
+        self.model = trim_string(model or env_get("LOGOS_MODEL") or DEFAULT_MODEL) or DEFAULT_MODEL
         self.timeout = float(timeout)
         self.http = session or requests.Session()
 
@@ -75,7 +76,7 @@ class CliClient:
             "/api/conversations",
             payload={"title": title, "model": self.model},
         )
-        conversation_id = str(payload.get("id") or "").strip()
+        conversation_id = trim_string(str(payload.get("id") or ""))
         if not conversation_id:
             raise CliError("Logos did not return a conversation id")
         return conversation_id
@@ -142,7 +143,7 @@ def _handle_approval(
         print(f"Параметры: {arguments}")
 
     try:
-        answer = input("Выполнить? [y/N] ").strip().lower()
+        answer = lowercase_string(trim_string(input("Выполнить? [y/N] ")))
     except (KeyboardInterrupt, EOFError):
         answer = ""
 
@@ -156,18 +157,18 @@ def _handle_approval(
 
 def main() -> None:
     client = CliClient()
-    conversation_id = env_get("LOGOS_CONVERSATION_ID", "").strip()
+    conversation_id = trim_string(env_get("LOGOS_CONVERSATION_ID", ""))
 
     try:
         if not conversation_id:
             conversation_id = client.create_conversation(
-                title=env_get("LOGOS_CLI_TITLE", "Logos CLI").strip() or "Logos CLI"
+                title=trim_string(env_get("LOGOS_CLI_TITLE", "Logos CLI")) or "Logos CLI"
             )
     except CliError as exc:
         print(f"Logos CLI startup failed: {exc}")
         return
 
-    session_id = env_get("LOGOS_SESSION_ID", "").strip() or conversation_id
+    session_id = trim_string(env_get("LOGOS_SESSION_ID", "")) or conversation_id
     print(
         "🚀 Logos CLI подключён к каноническому runtime. Введите запрос (или 'exit' для выхода):\n"
     )
@@ -175,11 +176,11 @@ def main() -> None:
 
     while True:
         try:
-            user_input = input("User > ").strip()
+            user_input = trim_string(input("User > "))
         except (KeyboardInterrupt, EOFError):
             break
 
-        if not user_input or user_input.lower() in {"exit", "quit"}:
+        if not user_input or lowercase_string(user_input) in {"exit", "quit"}:
             break
 
         try:

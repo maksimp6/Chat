@@ -6,6 +6,8 @@ stored directly in the native Kristall with no SQL migration.
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 from threading import RLock
 import time
 from typing import Optional, TypedDict
@@ -55,8 +57,8 @@ def get_owner(conversation_id: str) -> Optional[str]:
 
 
 def set_owner(conversation_id: str, user_id: str) -> None:
-    conversation_id = str(conversation_id).strip()
-    user_id = str(user_id).strip()
+    conversation_id = trim_string(str(conversation_id))
+    user_id = trim_string(str(user_id))
     if not conversation_id or not user_id:
         raise ValueError("conversation_id and user_id are required")
 

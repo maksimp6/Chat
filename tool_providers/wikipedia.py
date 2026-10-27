@@ -6,6 +6,8 @@ from typing import Any
 
 import requests
 import logging
+from core.wikifunctions import lowercase_string, trim_string
+
 
 logger = logging.getLogger("wikipedia_mcp")
 
@@ -21,7 +23,7 @@ _MAX_RETRY_AFTER = 5.0
 
 
 def _lang(arguments: dict[str, Any]) -> str:
-    lang = str(arguments.get("lang") or "ru").strip().lower()
+    lang = lowercase_string(trim_string(str(arguments.get("lang") or "ru")))
     if not _LANG.fullmatch(lang):
         raise ValueError(f"Недопустимый код языка Wikipedia: {lang!r}")
     return lang
@@ -89,7 +91,7 @@ def wikipedia_summary(arguments: dict, cfg: dict = None) -> dict:
         return {"success": False, "error": "Не указан заголовок статьи (title)"}
 
     lang = _lang(arguments)
-    page = requests.utils.quote(str(title).strip().replace(" ", "_"), safe="")
+    page = requests.utils.quote(trim_string(str(title)).replace(" ", "_"), safe="")
     url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{page}"
     try:
         res = _get(url)

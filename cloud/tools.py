@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 from typing import Any
+from core.wikifunctions import lowercase_string, trim_string
 
 from economy.budget_controller import BudgetLimitExceeded, CloudBudgetGuard
 from cloud.base import CloudProviderError
@@ -103,7 +104,7 @@ def _budget_refusal(provider, operation: str) -> dict[str, Any] | None:
 
 def cloud_compute(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
     provider = _provider(args)
-    operation = str(args.get("operation") or "").strip().lower()
+    operation = lowercase_string(trim_string(str(args.get("operation") or "")))
     if operation in BUDGET_GUARDED_COMPUTE_OPERATIONS:
         refusal = _budget_refusal(provider, f"cloud.compute.{operation}")
         if refusal is not None:
@@ -139,7 +140,7 @@ def cloud_metrics_query(args: dict[str, Any], cfg: dict | None = None) -> dict[s
 @_result
 def cloud_backup(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
     provider = _provider(args)
-    operation = str(args.get("operation") or "").strip().lower()
+    operation = lowercase_string(trim_string(str(args.get("operation") or "")))
     if operation in BUDGET_GUARDED_BACKUP_OPERATIONS:
         refusal = _budget_refusal(provider, f"cloud.backup.{operation}")
         if refusal is not None:

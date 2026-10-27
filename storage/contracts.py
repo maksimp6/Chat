@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from core.env import env_snapshot
+from core.wikifunctions import lowercase_string, trim_string
 
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -123,7 +124,9 @@ def storage_provider_from_env(
 ) -> StorageProvider:
     """Build the provider selected by ``LOGOS_STORAGE_PROVIDER`` (``local`` by default)."""
     env = env_snapshot() if env is None else env
-    name = str(env.get("LOGOS_STORAGE_PROVIDER", "") or "").strip().lower() or "local"
+    name = lowercase_string(
+        trim_string(str(env.get("LOGOS_STORAGE_PROVIDER", "") or ""))
+    ) or "local"
     if name == "local":
         root = env.get("LOGOS_STORAGE_LOCAL_ROOT") or local_root or DEFAULT_LOCAL_STORAGE_ROOT
         return LocalDirectoryStorage(root)
