@@ -1,5 +1,13 @@
 # #1413 D0 — native launch hold
 
+Historical implementation handoff, 23 October 2026. The branches, workflow
+inventory and test claims below belong to that original scope and revision;
+they are not a current inventory or permission to repeat tests. For new work,
+follow [AGENTS.md](../../AGENTS.md), the [current D0 matrix](../../docs/agents/logos-native-quality.md#generation-permission-court-decision-d0)
+and [court procedure](../../docs/agents/logos-court-procedure.md). Publication is
+directly to `develop`; tests are `NOT_RUN` absent a separate owner instruction.
+The launch hold remains in force.
+
 Accepted scope: owner's 2026-10-23 instruction to fix the court defects;
 [court remand D0](https://github.com/maksimp6/Chat/issues/1413#issuecomment-6366889282),
 [existing admission](https://github.com/maksimp6/Chat/issues/1413#issuecomment-6368155981).

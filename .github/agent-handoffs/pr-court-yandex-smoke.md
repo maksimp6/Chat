@@ -1,5 +1,15 @@
 # One-shot PR court / Yandex credential rehearsal
 
+> **Archive — rehearsal of 20 October 2026 and its recorded corrections.**
+> The PR, runner/model admissions, limits and test claims below belong only to
+> those historical revisions and runs. They do not authorize a new PR, paid
+> call, test or workflow now. See current [AGENTS.md](../../AGENTS.md) and the
+> [court procedure](../../docs/agents/logos-court-procedure.md): new changes go
+> by direct push to `develop`; tests are `NOT_RUN` absent a separate owner
+> command and may run only in GitHub Runner when authorized. D0 remains held.
+> A publication command does not grant model, access, deploy or merge authority.
+> Historical conduct is assessed under the rules and admission of its own date.
+
 Canonical task: owner's 2026-10-20 request to create a PR and judge that same PR in the runner after adding YANDEX_API_KEY and YANDEX_PROJECT_ID.
 
 Accepted contract: this owner request; one read-only model judgment of this exact PR, report in Actions summary and artifact; no repository write, merge, deployment or phone action. Scope is the rehearsal, not acceptance of a production autonomous reviewer.

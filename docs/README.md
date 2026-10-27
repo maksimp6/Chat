@@ -10,7 +10,7 @@
 - [Async/concurrency runtime contract](runtime/async-concurrency-contract.md) — cancellation, timeout, task/thread boundaries и atomic reservations
 - [Текущий интеграционный реестр](integration/current-scope.md) — статус и правила допуска сфокусированных PR
 - [Настройка](setup/installation.md) — установка и конфигурация
-- [Рабочий процесс разработки](development_workflow.md) — formatter, локальные проверки, CI и fail-closed merge gate
+- [Рабочий процесс разработки](development_workflow.md) — прямой push в develop, отдельный допуск к тестам и архив прежних процедур
 - [Правила надёжного кода](development/reliability.md) — идемпотентность операций и правила Power of Ten для Python/JS; «храповик» `tests/test_reliability_rules.py`
 - [Правила именования](development/naming.md) — тексты UI, код фронтенда, файлы, Python-модули, ветки и PR; проверка `tests/test_naming_conventions.py`
 - [Продакшен-конфиги и секреты деплоя](development/production-deploy-secrets.md) — решение: отдельное защищённое место и хранение секретов в Cloud.ru (не реализовано)
@@ -36,6 +36,7 @@
 - [Markdown-зеркало Cloud.ru](integrations/cloudru-docs-mirror.md) — спецификация crawler/fetch pipeline и manifest для Cloud.ru
 - [Агенты Logos](agents/overview.md) — runtime-агенты и адаптеры приложения (чат, голос, CLI, инструменты)
 - [Роли разработки в репозитории](agents/role-based-agent-office.md) — GitHub-роли (Team Lead, Backend, Docs Engineer и др.), не часть runtime Logos
+- [Процедура Суда Логоса](agents/logos-court-procedure.md) — эпизоды дела #1413, доказательства, независимое ревью и приёмка
 - [Фронтенд](frontend/overview.md) — структура пользовательского интерфейса
 - [Пробелы пользовательских сценариев](frontend/capability-gaps-2026-10-11.md) — код и локальный UI на 2026-10-11, приоритеты и критерии приёмки
 - [Повторно применимые уроки и навыки](lessons/README.md) — источники, границы истории и каталог процедур

@@ -1,5 +1,13 @@
 # Role-based GitHub agent office
 
+Current publication policy, 27 October 2026: follow [AGENTS.md](../../AGENTS.md)
+and the owner's current scoped instructions. New code is pushed directly to
+`develop`; tests remain `NOT_RUN` without a separate instruction and, when
+authorized, run only on GitHub Runner. Branch/PR/CI/merge admission examples below
+describe historical work and do not mandate that route for new changes.
+Role separation remains applicable; owner acceptance grants no merge authority.
+For court episodes use the [current procedure](logos-court-procedure.md).
+
 Logos treats repository roles as the stable contract and execution mechanisms as replaceable infrastructure.
 
 ## Layers
