@@ -6,7 +6,7 @@ It deliberately has no HTTP, database, tracing, or MCP side effects.
 
 import math
 
-from core.config import get_model_uri, upstream_model_id
+from core.config import get_model_uri
 from yandex_client_modules.errors import YandexClientError
 from core.model_profiles import ultra_profiles, ultra_reasoning_controllable, ultra_request_defaults
 from yandex_client_modules.metadata_validator import validate_metadata
@@ -267,7 +267,7 @@ def build_chat_image_payload(
         messages.append({"role": turn["role"], "content": turn["text"]})
     messages.append({"role": "user", "content": content})
     payload = {
-        "model": "gpt://" + project_id + "/" + upstream_model_id(model_key),
+        "model": get_model_uri(project_id, model_key),
         "messages": messages,
         # The answer is read as one JSON body, never as a stream.
         "stream": False,
@@ -470,4 +470,3 @@ def _clean_tools(tools):
         else:
             cleaned.append(tool)
     return cleaned
-

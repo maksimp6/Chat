@@ -58,7 +58,7 @@ PORT = 8080
 
 TEXT_MODELS = {
     "yandexgpt-5.1": {
-        "upstream": "yandexgpt/rc",
+        "upstream": "yandexgpt-5.1",
         "name": "YandexGPT Pro 5.1",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
@@ -68,7 +68,7 @@ TEXT_MODELS = {
         "output": 0.80,
     },
     "yandexgpt-5-pro": {
-        "upstream": "yandexgpt/latest",
+        "upstream": "yandexgpt-5-pro",
         "name": "YandexGPT Pro 5",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
@@ -79,6 +79,7 @@ TEXT_MODELS = {
     },
     "yandexgpt-5-lite": {
         "name": "YandexGPT Lite 5",
+        "lifecycle": {"state": "deprecated", "shutdown_on": "2026-11-15"},
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.20,
@@ -88,6 +89,7 @@ TEXT_MODELS = {
     },
     "gpt-oss-120b": {
         "name": "gpt-oss-120b",
+        "lifecycle": {"state": "deprecated", "available_until": "2026-10-30"},
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.30,
@@ -97,6 +99,7 @@ TEXT_MODELS = {
     },
     "gpt-oss-20b": {
         "name": "gpt-oss-20b",
+        "lifecycle": {"state": "deprecated", "available_until": "2026-10-30"},
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.10,
@@ -137,6 +140,7 @@ TEXT_MODELS = {
     },
     "deepseek-v4-flash": {
         "name": "DeepSeek V4 Flash",
+        "lifecycle": {"state": "deprecated", "shutdown_on": "2026-11-15"},
         # Listed as deprecated on the Yandex model page, shutdown 2026-11-15.
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
@@ -159,25 +163,94 @@ TEXT_MODELS = {
 VOICE_MODELS = {
     "speech-realtime-deepseek-v4-flash": {
         "name": "Speech Realtime DeepSeek V4 Flash",
+        "upstream": "speech-realtime-deepseek-v4-flash",
         "type": "voice",
-        "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
-        "input": 0.30,
-        "cached": 0.075,
-        "tool": 0.075,
-        "output": 0.50,
+        "transport": "realtime",
+        "voice_family": "general",
+        "capabilities": {
+            "audio_input": True, "text_input": True, "audio_output": True,
+            "tools": False, "function_calling": False,
+        },
+        "pricing_status": "unknown",
+    },
+    "speech-realtime-max-tts-live": {
+        "name": "Speech Realtime Max TTS Live",
+        "upstream": "speech-realtime-max-tts-live/latest",
+        "type": "voice",
+        "transport": "realtime",
+        "voice_family": "livetts",
+        "capabilities": {
+            "audio_input": True, "text_input": True, "audio_output": True,
+            "tools": False, "function_calling": False,
+        },
+        "pricing_status": "unknown",
+    },
+    "speech-realtime-tts-live": {
+        "name": "Speech TTS Live",
+        "upstream": "speech-realtime-tts-live/latest",
+        "type": "voice",
+        "transport": "realtime",
+        "voice_family": "livetts",
+        "capabilities": {
+            "audio_input": False, "text_input": True, "audio_output": True,
+            "tools": False, "function_calling": False,
+        },
+        "pricing_status": "unknown",
     },
 }
 
 IMAGE_MODELS = {
     "alice-ai-art": {
         "name": "Alice AI ART",
-        # The Yandex docs give the picture model URI as art://<folder>/yandex-art/latest.
-        "upstream": "yandex-art/latest",
+        "upstream": "aliceai-image-art-3.0",
         "type": "image",
         "provider": "yandex_image",
+        "transport": "images",
+        "max_prompt_characters": 500,
+        "sizes": ["1024x1024", "1536x1024", "1024x1536"],
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         # The Yandex docs list no price for this model, so its cost stays unknown.
         "pricing_status": "unknown",
+    },
+}
+
+# These models use dedicated APIs and must never be sent to the chat endpoint.
+EMBEDDING_MODELS = {
+    "text-search-doc": {
+        "name": "Text Search Document",
+        "upstream": "text-search-doc/latest",
+        "type": "embedding",
+        "dimensions": [256],
+    },
+    "text-search-query": {
+        "name": "Text Search Query",
+        "upstream": "text-search-query/latest",
+        "type": "embedding",
+        "dimensions": [256],
+    },
+    "text-embeddings-v2-doc": {
+        "name": "Text Embeddings v2 Document",
+        "upstream": "text-embeddings-v2-doc/",
+        "type": "embedding",
+        "dimensions": [128, 256, 512, 768],
+    },
+    "text-embeddings-v2-query": {
+        "name": "Text Embeddings v2 Query",
+        "upstream": "text-embeddings-v2-query/",
+        "type": "embedding",
+        "dimensions": [128, 256, 512, 768],
+    },
+}
+CLASSIFIER_MODELS = {
+    "classifier-yandexgpt-lite": {
+        "name": "YandexGPT Lite Classifier",
+        "upstream": "yandexgpt-lite/latest",
+        "type": "classifier",
+    },
+    "classifier-yandexgpt": {
+        "name": "YandexGPT Classifier",
+        "upstream": "yandexgpt/latest",
+        "type": "classifier",
     },
 }
 
@@ -205,8 +278,12 @@ def canonical_model_key(model_key: str) -> str:
 
 
 def registry_key_for_upstream(upstream_id: str) -> str | None:
+    aliases = {"yandexgpt/rc": "yandexgpt-5.1", "yandexgpt/latest": "yandexgpt-5-pro"}
+    if upstream_id in aliases:
+        return aliases[upstream_id]
     for key, info in TEXT_MODELS.items():
-        if info.get("upstream") == upstream_id:
+        upstream = info.get("upstream", key)
+        if upstream_id in {upstream, upstream + "/latest"}:
             return key
     return None
 
@@ -214,8 +291,11 @@ def registry_key_for_upstream(upstream_id: str) -> str | None:
 def get_model_info(model_key):
     info = ALL_MODELS.get(canonical_model_key(model_key))
     if info is None:
-        # An unpriced key must fail loudly, never bill at another model's tariff.
-        raise ValueError(f"model key has no tariff: {model_key}")
+        # Discovered tuned/versioned models have no public tariff. Preserve unknown
+        # cost instead of inventing another model's rate or failing after execution.
+        if not isinstance(model_key, str) or not model_key.strip():
+            raise ValueError("model key is required")
+        return {"name": model_key, "type": "text", "pricing_status": "unknown"}
     return info
 
 
@@ -227,14 +307,36 @@ def upstream_model_id(model_key: str) -> str:
 
 
 def get_model_uri(project_id, model_key):
-    """Build the Yandex model URI from the active provider credential."""
+    """Preserve the exact model/version while binding it to the active project."""
     if not isinstance(project_id, str) or not project_id.strip():
         raise ValueError("Yandex project_id is required")
+    project_id = project_id.strip()
+    if (
+        any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in project_id)
+        or any(ch in project_id for ch in "/?#:@\\")
+    ):
+        raise ValueError("invalid Yandex project_id")
     upstream = upstream_model_id(model_key)
-    # An upstream id that already names its version (yandexgpt/rc) is used as it is.
-    if "/" not in upstream:
-        upstream += "/latest"
-    return "gpt://" + project_id.strip() + "/" + upstream
+    if any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in upstream):
+        raise ValueError("invalid Yandex model ID")
+    if "?" in upstream or "#" in upstream:
+        raise ValueError("model URI cannot contain a query or fragment")
+    if upstream.startswith("gpt://"):
+        parts = urlsplit(upstream)
+        if parts.netloc != project_id or not parts.path.startswith("/"):
+            raise ValueError("model URI must belong to the active Yandex project")
+        suffix = parts.path[1:]
+    else:
+        suffix = upstream
+    if (
+        not suffix
+        or any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in suffix)
+        or any(ch in suffix for ch in "?#:\\")
+        or any(part in {"", ".", ".."} for part in suffix.split("/"))
+    ):
+        raise ValueError("invalid Yandex text model ID")
+    # Do not strip a tuned suffix, change an explicit version, or append /latest.
+    return "gpt://" + project_id + "/" + suffix
 
 
 def calculate_cost(model_key, input_tokens, output_tokens=0, cached_tokens=0, tool_tokens=0):

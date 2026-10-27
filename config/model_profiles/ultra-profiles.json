@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
   "catalog_id": "logos-ultra-2026-10-24",
-  "checked_on": "2026-10-24",
+  "checked_on": "2026-10-27",
   "canonical_issue": "https://github.com/maksimp6/Chat/issues/1413",
   "registry": {
     "path": "core/config.py",
     "base_commit": "081d07af8f854c81201c9341c46c7ed5d3ee9ecf",
     "scope": "ALL_MODELS (TEXT_MODELS + VOICE_MODELS)",
-    "expected_model_count": 11
+    "expected_model_count": 13
   },
   "policy": {
     "automatic_generation": false,
@@ -49,11 +49,11 @@
     "yandexgpt-5.1": {
       "profile_id": "ultra-yandexgpt-5.1",
       "model_key": "yandexgpt-5.1",
-      "upstream_id": "yandexgpt/rc",
+      "upstream_id": "yandexgpt-5.1",
       "kind": "text",
       "status": "prepared_not_activated",
-      "transport": "text_generation_async",
-      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/yandexgpt/rc",
+      "transport": "responses",
+      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/yandexgpt-5.1",
       "lifecycle": {
         "state": "listed",
         "stop_and_recheck_on": null,
@@ -69,43 +69,28 @@
         "local_tokenization_required": true
       },
       "output": {
-        "selection": "maximum_supported",
-        "wire_field": "completionOptions.maxTokens",
-        "requested": "32768",
+        "selection": "provider_default",
+        "wire_field": "max_output_tokens",
+        "requested": null,
         "documented_hosted_ceiling_tokens": null,
-        "basis": "existing_owner_requested_compatibility_candidate_not_output_ceiling",
-        "evidence": [
-          "async"
-        ]
+        "basis": "No undocumented application output ceiling."
       },
       "reasoning": {
         "supported": false,
         "depth_control": false,
         "wire_parameters": {},
-        "basis": "explicit_pro51_release_no_reasoning",
-        "evidence": [
-          "releases"
-        ]
+        "basis": "No documented reasoning control for this model."
       },
       "tools": {
-        "selection": "all_compatible_registered_and_authorized",
-        "function_calling": false,
-        "web_search": false,
-        "file_search": false,
-        "code_interpreter": false,
-        "mcp": false,
-        "requires_schema_and_dependency_validation": true,
-        "approval_policy": "existing_executor_approvals_unchanged",
-        "evidence": [
-          "async"
-        ]
+        "function_calling": null,
+        "web_search": null,
+        "file_search": null,
+        "code_interpreter": null,
+        "mcp": null,
+        "selection": "registered_and_authorized"
       },
       "wire_parameters": {
-        "completionOptions": {
-          "stream": false,
-          "temperature": 0.3,
-          "maxTokens": "32768"
-        }
+        "truncation": "disabled"
       },
       "blockers": [
         "hosted_output_ceiling_unverified",
@@ -124,17 +109,16 @@
         "rates_verified_on": null,
         "provider_billed_total": null,
         "include_hosted_tool_and_session_charges": true
-      },
-      "existing_profile_ref": "config/model_profiles/logos-pro51-async.json"
+      }
     },
     "yandexgpt-5-pro": {
       "profile_id": "ultra-yandexgpt-5-pro",
       "model_key": "yandexgpt-5-pro",
-      "upstream_id": "yandexgpt/latest",
+      "upstream_id": "yandexgpt-5-pro",
       "kind": "text",
       "status": "prepared_not_activated",
       "transport": "responses",
-      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/yandexgpt/latest",
+      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/yandexgpt-5-pro",
       "lifecycle": {
         "state": "listed",
         "stop_and_recheck_on": null,
@@ -211,9 +195,9 @@
       "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/yandexgpt-5-lite/latest",
       "lifecycle": {
         "state": "deprecated",
-        "stop_and_recheck_on": "2026-11-15",
+        "shutdown_on": "2026-11-15",
         "evidence": [
-          "model_page"
+          "models"
         ]
       },
       "context": {
@@ -284,10 +268,10 @@
       "transport": "responses",
       "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/gpt-oss-120b/latest",
       "lifecycle": {
-        "state": "available_until",
-        "stop_and_recheck_on": "2026-10-30",
+        "state": "deprecated",
+        "available_until": "2026-10-30",
         "evidence": [
-          "model_page"
+          "models"
         ]
       },
       "context": {
@@ -366,10 +350,10 @@
       "transport": "responses",
       "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/gpt-oss-20b/latest",
       "lifecycle": {
-        "state": "available_until",
-        "stop_and_recheck_on": "2026-10-30",
+        "state": "deprecated",
+        "available_until": "2026-10-30",
         "evidence": [
-          "model_page"
+          "models"
         ]
       },
       "context": {
@@ -680,9 +664,9 @@
       "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/deepseek-v4-flash/latest",
       "lifecycle": {
         "state": "deprecated",
-        "stop_and_recheck_on": "2026-11-15",
+        "shutdown_on": "2026-11-15",
         "evidence": [
-          "model_page"
+          "models"
         ]
       },
       "context": {
@@ -922,6 +906,123 @@
       },
       "endpoint_template": "wss://ai.api.cloud.yandex.net/v1/realtime/openai?model=gpt://${YANDEX_PROJECT_ID}/speech-realtime-deepseek-v4-flash",
       "manual_audio_commit_required": true
+    },
+    "speech-realtime-max-tts-live": {
+      "profile_id": "ultra-speech-realtime-max-tts-live",
+      "model_key": "speech-realtime-max-tts-live",
+      "upstream_id": "speech-realtime-max-tts-live/latest",
+      "kind": "voice",
+      "status": "prepared_not_activated",
+      "transport": "realtime",
+      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/speech-realtime-max-tts-live/latest",
+      "lifecycle": {
+        "state": "listed",
+        "evidence": [
+          "models"
+        ]
+      },
+      "context": {
+        "window_tokens": 1048576
+      },
+      "output": {
+        "selection": "provider_default",
+        "documented_hosted_ceiling_tokens": 393216
+      },
+      "reasoning": {
+        "supported": null,
+        "depth_control": false
+      },
+      "wire_parameters": {
+        "type": "session.update",
+        "session": {
+          "type": "realtime",
+          "instructions": "${COMPLETE_INSTRUCTIONS}",
+          "max_output_tokens": 393216,
+          "yc_timeout_seconds": 3600,
+          "output_modalities": [
+            "audio"
+          ],
+          "audio": {
+            "input": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 44100
+              },
+              "turn_detection": null
+            },
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 44100
+              },
+              "voice": "sofia",
+              "role": "support"
+            }
+          }
+        }
+      },
+      "endpoint_template": "wss://ai.api.cloud.yandex.net/v1/realtime/openai?model=gpt://${YANDEX_PROJECT_ID}/speech-realtime-max-tts-live/latest",
+      "blockers": [
+        "provider_acceptance_not_run"
+      ],
+      "verification": {
+        "provider_acceptance": "NOT_RUN",
+        "quality_acceptance": "NOT_RUN"
+      }
+    },
+    "speech-realtime-tts-live": {
+      "profile_id": "ultra-speech-realtime-tts-live",
+      "model_key": "speech-realtime-tts-live",
+      "upstream_id": "speech-realtime-tts-live/latest",
+      "kind": "voice",
+      "status": "prepared_not_activated",
+      "transport": "realtime",
+      "model_uri_template": "gpt://${YANDEX_PROJECT_ID}/speech-realtime-tts-live/latest",
+      "lifecycle": {
+        "state": "listed",
+        "evidence": [
+          "models"
+        ]
+      },
+      "context": {
+        "window_tokens": null
+      },
+      "output": {
+        "selection": "provider_default",
+        "documented_hosted_ceiling_tokens": null
+      },
+      "reasoning": {
+        "supported": false,
+        "depth_control": false
+      },
+      "wire_parameters": {
+        "type": "session.update",
+        "session": {
+          "type": "realtime",
+          "yc_timeout_seconds": 3600,
+          "output_modalities": [
+            "audio"
+          ],
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 44100
+              },
+              "voice": "sofia",
+              "role": "support"
+            }
+          }
+        }
+      },
+      "endpoint_template": "wss://ai.api.cloud.yandex.net/v1/realtime/openai?model=gpt://${YANDEX_PROJECT_ID}/speech-realtime-tts-live/latest",
+      "blockers": [
+        "provider_acceptance_not_run"
+      ],
+      "verification": {
+        "provider_acceptance": "NOT_RUN",
+        "quality_acceptance": "NOT_RUN"
+      }
     }
   }
 }

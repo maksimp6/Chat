@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from core.env import env_get
+import hashlib
 import json
 from pathlib import Path
 import time
@@ -126,8 +127,14 @@ def delete_conversation(conv_id: str) -> None:
         for key, message in store.items(prefix="chat/message/").items():
             if message["conversation_id"] == conv_id:
                 tx.delete(key)
+        for prefix in ("chat/image_request/", "chat/message-source/"):
+            for key in store.items(prefix=prefix + conv_id + "/"):
+                tx.delete(key)
         for prefix in ("chat/conversation/", "chat/settings/", "chat/yandex/"):
             tx.delete(prefix + conv_id)
+    from storage.generated_images import delete_image_files
+
+    delete_image_files(conv_id)
 
 
 def get_messages(conv_id: str) -> list[dict[str, Any]]:
@@ -166,13 +173,21 @@ def add_message(
     trace: Any = None,
     attachments: Any = None,
     total_duration_ms: Any = None,
+    deduplicate_source: bool = False,
 ) -> None:
     if not isinstance(content, str):
         content = json.dumps(content, ensure_ascii=False) if content is not None else ""
     now = int(time.time())
     key = "chat/conversation/" + conv_id
+    source_key = None
+    if deduplicate_source:
+        if not isinstance(source, str) or not source:
+            raise ValueError("deduplicated messages require a source")
+        source_key = "chat/message-source/" + conv_id + "/" + hashlib.sha256(source.encode()).hexdigest()
     with get_store().transaction() as tx:
         record = tx.get(key)
+        if source_key is not None and tx.get(source_key) is not None:
+            return
         if record is None:
             # The conversation was deleted while the turn ran. A message written now would be
             # unreachable from any conversation, so it is dropped.
@@ -198,6 +213,8 @@ def add_message(
             },
         )
         tx.set(key, {**record, "updated_at": now})
+        if source_key is not None:
+            tx.set(source_key, identity)
 
 
 def save_conv_settings(conv_id: str, settings_dict: dict[str, Any]) -> None:
@@ -243,3 +260,4 @@ def get_config(key: str, default: Any = None) -> Any:
 def set_config(key: str, value: Any) -> None:
     with get_store().transaction() as tx:
         tx.set("config/" + key, {"value": value})
+

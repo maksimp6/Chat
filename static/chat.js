@@ -213,9 +213,9 @@ function parseMarkdown(text) {
     return ph;
   });
 
-  // Generated pictures arrive as base64 data URLs; only png and jpeg are accepted.
+  // Render stored inline PNG/JPEG and only the authenticated generated-image route.
   var images = [];
-  safe = safe.replace(/!\[([^\]\n]{0,200})\]\((data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+)\)/g, function (m, alt, src) {
+  safe = safe.replace(/!\[([^\]\n]{0,200})\]\((data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+|\/api\/images\/files\/[A-Za-z0-9_-]{1,128}\/[A-Za-z0-9_-]{16,128})\)/g, function (m, alt, src) {
     var ph = "\x00IM" + images.length + "\x00";
     images.push('<img class="md-image" src="' + src + '" alt="' + alt.replace(/"/g, "") + '">');
     return ph;
@@ -705,6 +705,18 @@ function loadHistory(convId) {
             },
           });
           if (node) rendered += 1;
+          const imageRequest = msg.role === "user" && typeof msg.source === "string"
+            ? msg.source.match(/^image-request:([A-Za-z0-9_-]{16,128})$/)
+            : null;
+          if (imageRequest && !all.some(function (candidate) { return candidate.source === "image:" + imageRequest[1]; })) {
+            addMessage({
+              text: "Результат изображения можно получить без новой генерации.",
+              role: "error",
+              onRetry: function () {
+                return window.logosRecoverImage({ conversationId: convId, imageRequestId: imageRequest[1] });
+              },
+            });
+          }
         });
         if (!rendered) {
           const empty = document.createElement("div");
@@ -883,75 +895,78 @@ document.addEventListener("DOMContentLoaded", function () {
     return Boolean(modelsData && modelsData.image && modelsData.image[modelKey]);
   }
 
-  // A picture takes one generation request, then long polls on the server until it is ready.
-  // Polls one picture operation. The server holds each request up to 25 seconds, so the loop
-  // needs no timer. A failed request keeps the operation id: a retry resumes this picture
-  // instead of paying for a new one.
-  async function pollImageOperation(conversationId, operationId) {
-    const operationPath =
-      "/api/images/operations/" + encodeURIComponent(operationId) +
-      "?conversation_id=" + encodeURIComponent(conversationId);
-    for (let attempt = 0; attempt < 240; attempt++) {
-      let polled;
-      try {
-        polled = await window.LogosDispatcher.request(operationPath, {}, { timeoutMs: 60000 });
-      } catch (err) {
-        return { error: "связь прервалась, картинка не потеряна, повторите", operationId: operationId };
-      }
-      const state = await polled.json().catch(() => null);
-      if (!state || typeof state !== "object") {
-        return { error: "HTTP " + polled.status, operationId: operationId };
-      }
-      if (state.status === "done") return { reply: state.reply, cost: 0 };
-      if (state.status === "failed" || !polled.ok) {
-        return { error: state.error || "HTTP " + polled.status };
-      }
+  function imageRequestId() {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") return window.crypto.randomUUID();
+    if (window.crypto && typeof window.crypto.getRandomValues === "function") {
+      const bytes = window.crypto.getRandomValues(new Uint8Array(16));
+      return Array.from(bytes, function (byte) { return byte.toString(16).padStart(2, "0"); }).join("");
     }
-    return { error: "image generation timed out", operationId: operationId };
+    return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
   }
 
-  // One generation: start it, then poll the same operation until it finishes.
+  // Recovery reads our durable request receipt, never repeats the paid provider POST.
+  async function readImageResult(turn) {
+    const path = "/api/images/requests/" + encodeURIComponent(turn.imageRequestId) +
+      "?conversation_id=" + encodeURIComponent(turn.conversationId);
+    const deadline = Date.now() + 240000;
+    while (Date.now() < deadline) {
+      let response;
+      try {
+        response = await window.LogosDispatcher.request(path, {}, { timeoutMs: 15000 });
+      } catch (error) {
+        return { error: "Соединение прервалось. Повторите получение результата.", imageRequestId: turn.imageRequestId };
+      }
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.status === "done" && data.reply) return data;
+      if (response.status !== 202 || data.status !== "pending") {
+        return { error: data.message || data.error || "HTTP " + response.status, imageRequestId: turn.imageRequestId };
+      }
+      await new Promise(function (resolve) { setTimeout(resolve, 2000); });
+    }
+    return { error: "Результат ещё не подтверждён. Повторите получение результата.", imageRequestId: turn.imageRequestId };
+  }
+
+  window.logosRecoverImage = async function (turn) {
+    const data = await readImageResult(turn);
+    if (currentConvId !== turn.conversationId) return;
+    if (data.reply) {
+      addMessage({ text: data.reply, role: "bot", id: data.message_id });
+    } else {
+      addMessage({
+        text: "⚠️ Ошибка: " + data.error,
+        role: "error",
+        onRetry: function () { return window.logosRecoverImage(turn); },
+      });
+    }
+  };
+
   async function runImageTurn(turn) {
     if (turn.attachmentCount) {
       return { error: "Alice AI ART не принимает фото: уберите фото или выберите другую модель" };
     }
-    let started;
+    let response;
     try {
-      started = await window.LogosDispatcher.request("/api/images/generate", {
+      response = await window.LogosDispatcher.request("/api/images/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversation_id: turn.conversationId,
+          request_id: turn.imageRequestId,
           message: turn.text,
           model: turn.model,
-          retry: Boolean(turn.retry),
         }),
-      }, { timeoutMs: 60000 });
-    } catch (err) {
-      return { error: "связь прервалась при запуске генерации, повторите" };
+      }, { timeoutMs: 300000 });
+    } catch (error) {
+      return readImageResult(turn);
     }
-    const startBody = await started.json().catch(() => ({}));
-    if (!started.ok || !startBody.operation_id) {
-      return { error: startBody.message || startBody.error || "HTTP " + started.status };
-    }
-    return pollImageOperation(turn.conversationId, startBody.operation_id);
+    const data = await response.json().catch(() => ({}));
+    if (response.ok && data.status === "done" && data.reply) return data;
+    if (response.status === 202 && data.status === "pending") return readImageResult(turn);
+    return { error: data.message || data.error || "HTTP " + response.status, imageRequestId: turn.imageRequestId };
   }
 
-  // Retry after a failed poll: the same operation, never a new paid generation.
-  async function resumeImageTurn(turn, operationId) {
-    const data = await pollImageOperation(turn.conversationId, operationId);
-    if (currentConvId !== turn.conversationId) return;
-    if (data.error) {
-      addMessage({
-        text: "⚠️ Ошибка: " + data.error,
-        role: "error",
-        onRetry: function () {
-          return resumeImageTurn(turn, operationId);
-        },
-      });
-    } else {
-      addMessage({ text: data.reply, role: "bot" });
-    }
+  function isVoiceModel(modelKey) {
+    return Boolean(modelsData && modelsData.voice && modelsData.voice[modelKey]);
   }
 
   function sendMessage() {
@@ -1055,7 +1070,16 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    const turn = { conversationId: selectedAtSubmit, model: currentModel, text: text };
+    const turn = {
+      conversationId: selectedAtSubmit,
+      model: retryRequest && retryRequest.model ? retryRequest.model : currentModel,
+      text: text,
+      imageRequestId: retryRequest && retryRequest.imageRequestId ? retryRequest.imageRequestId : imageRequestId(),
+    };
+    if (isImageModel(turn.model) && Array.from(text).length > 500) {
+      window.LogosToast.error("Для Alice AI ART запрос должен содержать не больше 500 символов");
+      return;
+    }
     const needsConversation = !selectedAtSubmit;
     if (needsConversation) creatingConversation = true;
     else pendingConversations.add(turn.conversationId);
@@ -1118,7 +1142,22 @@ document.addEventListener("DOMContentLoaded", function () {
       let response;
       let data;
       if (isImageModel(turn.model)) {
-        data = await runImageTurn({ ...turn, retry: Boolean(retryRequest), attachmentCount: sentImages.length });
+        data = await runImageTurn({ ...turn, attachmentCount: sentImages.length });
+        response = { status: data.error ? 502 : 200, ok: !data.error };
+      } else if (isVoiceModel(turn.model)) {
+        try {
+          if (sentImages.length) throw new Error("Голосовая модель не принимает фото");
+          const voiceMethod = turn.model === "speech-realtime-tts-live" ? "synthesizeText" : "sendText";
+          if (!window.LogosVoice || typeof window.LogosVoice[voiceMethod] !== "function") {
+            throw new Error("Голосовой модуль ещё не загружен");
+          }
+          data = await window.LogosVoice[voiceMethod]({
+            conversationId: turn.conversationId, model: turn.model, text: turn.text,
+            instructions: turn.params.instructions,
+          });
+        } catch (error) {
+          data = { error: error.message || "Не удалось получить голосовой ответ" };
+        }
         response = { status: data.error ? 502 : 200, ok: !data.error };
       } else {
         // Counted before the send, so a lost connection can tell whether the server stored this turn.
@@ -1175,8 +1214,13 @@ document.addEventListener("DOMContentLoaded", function () {
           usage: data.usage,
           trace: data.trace,
           onRetry: function () {
-            if (data.operationId) return resumeImageTurn(turn, data.operationId);
-            return sendTurn({ text: turn.text, conversationId: turn.conversationId, images: sentImages });
+            return sendTurn({
+              text: turn.text,
+              conversationId: turn.conversationId,
+              model: turn.model,
+              images: sentImages,
+              imageRequestId: turn.imageRequestId,
+            });
           },
         });
       } else if (data.reply) {
@@ -1212,7 +1256,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     } catch (error) {
       const stopped = Boolean(error) && error.name === "AbortError";
-      const canRecover = !stopped && !isImageModel(turn.model) && typeof turn.baselineCount === "number";
+      const canRecover = !stopped && !isImageModel(turn.model) && !isVoiceModel(turn.model) && typeof turn.baselineCount === "number";
       if (canRecover && currentConvId === turn.conversationId) {
         // The server may still answer: wait for the stored answer before offering the text again.
         recovering = true;
@@ -1251,5 +1295,3 @@ document.addEventListener("DOMContentLoaded", function () {
   syncSendButton();
   if (currentConvId) loadHistory(currentConvId);
 });
-
-

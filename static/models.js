@@ -69,6 +69,8 @@ function renderModelModal() {
     var priceText = "";
     if (m.input != null && m.output != null) {
       priceText = m.input + " / " + m.output + " \u20bd/1K";
+    } else if (m.pricing_status === "unknown") {
+      priceText = "Стоимость не определена";
     }
     var badges = "";
     if (modelsData.voice && modelsData.voice[key]) badges += " \uD83C\uDFA4";
@@ -87,6 +89,16 @@ function renderModelModal() {
 
     div.appendChild(nameWrap);
     div.appendChild(price);
+    var lifecycle = m.lifecycle || {};
+    var endDate = lifecycle.shutdown_on || lifecycle.available_until;
+    if (endDate) {
+      var support = document.createElement("div");
+      support.className = "model-option-lifecycle";
+      support.textContent = lifecycle.shutdown_on
+        ? "Отключение: " + endDate
+        : "Доступна до: " + endDate;
+      div.appendChild(support);
+    }
     if (m.ultra_profile) {
       var ultra = document.createElement("div");
       ultra.className = "model-option-ultra";

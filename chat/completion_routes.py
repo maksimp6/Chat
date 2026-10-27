@@ -1,32 +1,34 @@
-"""POST /api/completion: synchronous Yandex completion transport.
+"""POST /api/completion: native synchronous YandexGPT Pro 5.1 completions.
 
-The catalog's text_generation_async label groups legacy completion models;
-this endpoint requests a synchronous response and does not claim async polling.
+This optional native transport is independent of the model's Responses chat
+profile. It never treats the context window as an output-token ceiling.
 """
 
 from __future__ import annotations
 
 import math
+from types import SimpleNamespace
 
 import requests
 from flask import Blueprint, jsonify, request
 
-from core.model_profiles import ultra_profiles
-from kristall import KristallError
+from core.config import Config, get_model_uri
 from observability.trace_manager import get_current_trace, traced_operation
-from provider_accounts.credentials import CredentialError, YANDEX, get_active_credential
-from secret_store.credential_crypto import CredentialCryptoError, decrypt_secret
-from storage.db import get_store
+from yandex_client_modules.request_mixin import (
+    _resolve_global_provider_credential,
+    provider_request_headers,
+)
 
 completion_bp = Blueprint("completion", __name__)
 
-UPSTREAM_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+UPSTREAM_URL = "https://ai.api.cloud.yandex.net/foundationModels/v1/completion"
 UPSTREAM_TIMEOUT_SECONDS = 60
 MODEL_KEY = "yandexgpt-5.1"
-TRANSPORT = "text_generation_async"
 ROLES = {"system", "user", "assistant"}
 MAX_MESSAGES = 32
 MAX_TEXT_CHARS = 32000
+MAX_INT64 = (1 << 63) - 1
+ALLOWED_FIELDS = {"model", "message", "messages", "temperature", "max_tokens"}
 
 
 class _BadInput(ValueError):
@@ -61,10 +63,9 @@ def _messages_from_body(body: dict) -> list[dict]:
     return messages
 
 
-def _completion_options(body: dict, wire_options: dict) -> dict:
-    """Profile defaults, with the caller's temperature and max_tokens checked against them."""
-    options = dict(wire_options)
-    options["stream"] = False
+def _completion_options(body: dict) -> dict:
+    """Use provider defaults unless the caller explicitly supplies an option."""
+    options = {"stream": False}
     if "temperature" in body:
         raw_temperature = body["temperature"]
         if isinstance(raw_temperature, bool):
@@ -77,10 +78,10 @@ def _completion_options(body: dict, wire_options: dict) -> dict:
             raise _BadInput("temperature must be between 0 and 1")
         options["temperature"] = temperature
     if "max_tokens" in body:
-        ceiling = int(wire_options["maxTokens"])
         limit = body["max_tokens"]
-        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= ceiling:
-            raise _BadInput(f"max_tokens must be an integer from 1 to {ceiling}")
+        # The API schema is a positive int64. The model validates its own ceiling.
+        if type(limit) is not int or not 1 <= limit <= MAX_INT64:
+            raise _BadInput("max_tokens must be a positive int64 integer")
         options["maxTokens"] = str(limit)
     return options
 
@@ -91,35 +92,35 @@ def create_completion():
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         return jsonify({"error": "json_body_required"}), 400
-    profile = ultra_profiles().get(MODEL_KEY)
-    if profile is None or profile.get("transport") != TRANSPORT:
-        return jsonify({"error": "completion_model_unavailable"}), 503
-    wire_options = (profile.get("wire_parameters") or {}).get("completionOptions")
-    if not isinstance(wire_options, dict) or "maxTokens" not in wire_options:
-        return jsonify({"error": "completion_model_unavailable"}), 503
-    template = profile.get("model_uri_template")
-    if not isinstance(template, str) or not template.startswith("gpt://"):
-        return jsonify({"error": "completion_model_unavailable"}), 503
+    unknown = set(body) - ALLOWED_FIELDS
+    if unknown:
+        return jsonify({"error": "unknown_parameters", "parameters": sorted(unknown)}), 400
+    if body.get("model", MODEL_KEY) != MODEL_KEY:
+        return jsonify({"error": "unsupported_completion_model", "model": MODEL_KEY}), 400
     try:
         messages = _messages_from_body(body)
-        options = _completion_options(body, wire_options)
+        options = _completion_options(body)
     except _BadInput as exc:
         return jsonify({"error": str(exc)}), 400
 
     try:
-        credential = get_active_credential(get_store(), decrypt_secret, provider=YANDEX)
-    except (CredentialError, CredentialCryptoError, KristallError, OSError, ValueError):
+        credential = _resolve_global_provider_credential(
+            SimpleNamespace(_config=Config), get_current_trace()
+        )
+        model_uri = get_model_uri(credential.project_id, MODEL_KEY)
+        headers = provider_request_headers(credential)
+        headers["x-folder-id"] = credential.project_id
+    except Exception:
         return jsonify({"error": "completion_not_configured"}), 503
     if not credential.api_key or not str(credential.project_id or "").strip():
         return jsonify({"error": "completion_not_configured"}), 503
 
-    model_uri = template.replace("${YANDEX_PROJECT_ID}", credential.project_id)
     payload = {"modelUri": model_uri, "completionOptions": options, "messages": messages}
     try:
         response = requests.post(
             UPSTREAM_URL,
             json=payload,
-            headers={"Authorization": f"Api-Key {credential.api_key}"},
+            headers=headers,
             timeout=UPSTREAM_TIMEOUT_SECONDS,
         )
     except requests.RequestException:
@@ -128,14 +129,43 @@ def create_completion():
         detail = f"upstream status {response.status_code}"
         return jsonify({"error": "completion_upstream_failed", "detail": detail}), 502
     try:
-        result = response.json()["result"]
-        reply = result["alternatives"][0]["message"]["text"]
+        data = response.json()
+        if not isinstance(data, dict) or "error" in data:
+            raise ValueError("invalid completion response")
+        # Current native REST returns this object directly; retain compatibility
+        # with the former result envelope without accepting error envelopes.
+        result = data.get("result", data)
+        if not isinstance(result, dict) or "error" in result:
+            raise ValueError("invalid completion response")
+        alternative = result["alternatives"][0]
+        reply = alternative["message"]["text"]
+        status = alternative["status"]
         usage = result.get("usage")
-        if not isinstance(reply, str) or (usage is not None and not isinstance(usage, dict)):
+        if (
+            not isinstance(reply, str)
+            or not isinstance(status, str)
+            or (usage is not None and not isinstance(usage, dict))
+        ):
             raise ValueError("invalid completion response")
     except (ValueError, KeyError, IndexError, TypeError, AttributeError):
         return jsonify({"error": "completion_upstream_invalid"}), 502
     trace = get_current_trace()
     if trace is not None:
-        trace.add_event("completion_usage", {"model": MODEL_KEY, "usage": usage})
-    return jsonify({"model": model_uri, "reply": reply, "usage": usage, "transport": "completion"})
+        trace.add_event("completion_usage", {"model": MODEL_KEY, "usage": usage, "status": status})
+    if status != "ALTERNATIVE_STATUS_FINAL":
+        return jsonify({
+            "error": "completion_incomplete",
+            "model": model_uri,
+            "reply": reply,
+            "usage": usage,
+            "provider_status": status,
+            "transport": "completion",
+        }), 502
+    return jsonify({
+        "model": model_uri,
+        "reply": reply,
+        "usage": usage,
+        "provider_status": status,
+        "provider_model_version": result.get("modelVersion"),
+        "transport": "completion",
+    })

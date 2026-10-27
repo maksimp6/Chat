@@ -1,54 +1,59 @@
 (function () {
+  "use strict";
+
   var micBtn = null;
   var voiceStatus = null;
   var waveformCanvas = null;
   var waveCtx = null;
-
   var sessionId = null;
   var audioContext = null;
   var mediaStream = null;
   var source = null;
   var processor = null;
-  var mediaRecorder = null;
-  var mediaChunks = [];
   var pcmChunks = [];
+  var recordedSamples = 0;
+  var maxAudioBytes = 1024 * 1024;
+  var recordingRate = 16000;
   var isRecording = false;
   var isConnecting = false;
+  var isProcessing = false;
   var eventSource = null;
   var currentTranscript = "";
   var currentReply = "";
   var userMsgSent = false;
   var botMsgSent = false;
+  var sessionError = "";
+  var micConversationId = null;
+  var micModel = null;
+  var micTransport = "realtime";
+  var micTimeout = null;
   var audioPlayer = null;
-  var recordedChunks = 0;
-  var recordedSamples = 0;
-
-  var RECORDER_SLICE_MS = 1000;
-  var MAX_RECORDER_SLICES = 29;
-  var MAX_PCM_SECONDS = 8;
+  var textSessions = new Map();
 
   function request(url, init, timeoutMs) {
     return window.LogosDispatcher.request(url, init, { timeoutMs: timeoutMs || 30000 });
   }
 
-  function stopWhenLimitReached(limitReached) {
-    if (limitReached && isRecording) toggleVoice();
-  }
-
-  function log(msg) {
-    console.log("[VOICE]", msg);
+  async function jsonRequest(url, body) {
+    var res = await request(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    var data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.message || data.error || "HTTP " + res.status);
+    return data;
   }
 
   function setStatus(text) {
-    log("Status: " + text);
     if (voiceStatus) voiceStatus.textContent = text;
   }
 
   function clearWaveform() {
     if (!waveCtx || !waveformCanvas) return;
-    var w = (waveformCanvas.width = waveformCanvas.offsetWidth || 320);
-    var h = (waveformCanvas.height = waveformCanvas.offsetHeight || 48);
-    waveCtx.clearRect(0, 0, w, h);
+    waveformCanvas.width = waveformCanvas.offsetWidth || 320;
+    waveformCanvas.height = waveformCanvas.offsetHeight || 48;
+    waveCtx.clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
   }
 
   function drawWaveform(level) {
@@ -67,181 +72,88 @@
     waveCtx.stroke();
   }
 
-  function wavFromPcm(chunks, sampleRate) {
-    var length = chunks.reduce(function (n, c) {
-      return n + c.length;
-    }, 0);
-    var buffer = new ArrayBuffer(44 + length * 2);
+  function wavFromPcm(chunks, inputRate) {
+    var length = chunks.reduce(function (n, chunk) { return n + chunk.length; }, 0);
+    var input = new Float32Array(length);
+    var position = 0;
+    chunks.forEach(function (chunk) { input.set(chunk, position); position += chunk.length; });
+    // Realtime accepts PCM, not a browser-specific Ogg/WebM recorder container.
+    // Resample explicitly because mobile AudioContext may ignore the requested rate.
+    var outputRate = 16000;
+    var outputLength = Math.floor(length * outputRate / inputRate);
+    var buffer = new ArrayBuffer(44 + outputLength * 2);
     var view = new DataView(buffer);
     function str(offset, value) {
       for (var i = 0; i < value.length; i++) view.setUint8(offset + i, value.charCodeAt(i));
     }
     str(0, "RIFF");
-    view.setUint32(4, 36 + length * 2, true);
+    view.setUint32(4, 36 + outputLength * 2, true);
     str(8, "WAVE");
     str(12, "fmt ");
     view.setUint32(16, 16, true);
     view.setUint16(20, 1, true);
     view.setUint16(22, 1, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * 2, true);
+    view.setUint32(24, outputRate, true);
+    view.setUint32(28, outputRate * 2, true);
     view.setUint16(32, 2, true);
     view.setUint16(34, 16, true);
     str(36, "data");
-    view.setUint32(40, length * 2, true);
-    var offset = 44;
-    chunks.forEach(function (chunk) {
-      for (var i = 0; i < chunk.length; i++, offset += 2) {
-        var sample = Math.max(-1, Math.min(1, chunk[i]));
-        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
-      }
-    });
+    view.setUint32(40, outputLength * 2, true);
+    for (var n = 0; n < outputLength; n++) {
+      var start = Math.floor(n * inputRate / outputRate);
+      var end = Math.max(start + 1, Math.floor((n + 1) * inputRate / outputRate));
+      var sum = 0;
+      var count = 0;
+      for (var j = start; j < end && j < length; j++) { sum += input[j]; count++; }
+      var sample = Math.max(-1, Math.min(1, count ? sum / count : 0));
+      view.setInt16(44 + n * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+    }
     return new Blob([buffer], { type: "audio/wav" });
-  }
-
-  async function uploadAudio(blob) {
-    if (!sessionId) return;
-    var body = await blob.arrayBuffer();
-    var res = await request("/api/voice/audio?session_id=" + encodeURIComponent(sessionId), {
-      method: "POST",
-      headers: { "Content-Type": blob.type || "application/octet-stream" },
-      body: body,
-    });
-    if (!res.ok) throw new Error("Не удалось передать аудио: HTTP " + res.status);
   }
 
   function playAudio(url) {
     if (audioPlayer) {
       audioPlayer.pause();
-      audioPlayer.src = "";
+      audioPlayer.removeAttribute("src");
+      audioPlayer.remove();
     }
     audioPlayer = new Audio(url);
-    audioPlayer.play().catch(function (err) {
-      log("Audio playback requires user gesture: " + err.message);
+    audioPlayer.controls = true;
+    audioPlayer.preload = "auto";
+    audioPlayer.style.maxWidth = "100%";
+    // Keep controls available when Android requires another gesture for playback.
+    if (voiceStatus && voiceStatus.parentNode) voiceStatus.parentNode.appendChild(audioPlayer);
+    audioPlayer.play().catch(function () {
+      setStatus("Аудио готово. Нажмите ▶ на плеере.");
     });
   }
 
-  async function finishRecording() {
-    var blob = null;
-    if (mediaRecorder) {
-      blob = await new Promise(function (resolve) {
-        mediaRecorder.addEventListener(
-          "stop",
-          function () {
-            resolve(new Blob(mediaChunks, { type: mediaRecorder.mimeType || "audio/ogg" }));
-          },
-          { once: true },
-        );
-        mediaRecorder.stop();
-      });
-    } else if (pcmChunks.length && audioContext) {
-      blob = wavFromPcm(pcmChunks, audioContext.sampleRate);
+  function releaseRecording() {
+    if (processor) { processor.disconnect(); processor.onaudioprocess = null; processor = null; }
+    if (source) { source.disconnect(); source = null; }
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(function (track) { track.stop(); });
+      mediaStream = null;
     }
-    if (!blob || !blob.size) throw new Error("Запись голоса пуста");
-    await uploadAudio(blob);
-    var response = await request("/api/voice/close", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: sessionId }),
-    });
-    if (!response.ok)
-      throw new Error("Не удалось завершить голосовую сессию: HTTP " + response.status);
+    if (audioContext) { audioContext.close().catch(function () {}); audioContext = null; }
+    clearWaveform();
   }
 
-  // Best effort: a session the server opened must not stay open when recording never started.
-  function closeServerSession() {
-    if (!sessionId) return;
-    var id = sessionId;
-    sessionId = null;
-    request("/api/voice/close", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: id }),
-    }).catch(function (err) {
-      log("Session close failed: " + err.message);
-    });
+  function cancelServer(id) {
+    if (!id) return Promise.resolve();
+    return jsonRequest("/api/voice/close", { session_id: id, cancel: true }).catch(function () {});
   }
 
-  async function startRecording() {
-    try {
-      mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
-      });
-    } catch (err) {
-      setStatus(
-        "Ошибка микрофона: " +
-          (err && err.name === "NotAllowedError"
-            ? "нет доступа к микрофону"
-            : err && err.name === "NotFoundError"
-              ? "микрофон не найден"
-              : "не удалось начать запись"),
-      );
-      isConnecting = false;
-      closeServerSession();
-      return;
-    }
-
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    source = audioContext.createMediaStreamSource(mediaStream);
-    pcmChunks = [];
-    mediaChunks = [];
-    recordedChunks = 0;
-    recordedSamples = 0;
-
-    var mime = "";
-    if (window.MediaRecorder) {
-      if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) mime = "audio/ogg;codecs=opus";
-      else if (MediaRecorder.isTypeSupported("audio/ogg")) mime = "audio/ogg";
-    }
-    if (mime) {
-      mediaRecorder = new MediaRecorder(mediaStream, { mimeType: mime });
-      mediaRecorder.ondataavailable = function (e) {
-        if (e.data && e.data.size) mediaChunks.push(e.data);
-        recordedChunks += 1;
-        stopWhenLimitReached(recordedChunks >= MAX_RECORDER_SLICES);
-      };
-      mediaRecorder.start(RECORDER_SLICE_MS);
-    } else {
-      processor = audioContext.createScriptProcessor(4096, 1, 1);
-      source.connect(processor);
-      processor.connect(audioContext.destination);
-      processor.onaudioprocess = function (e) {
-        if (!isRecording) return;
-        var input = e.inputBuffer.getChannelData(0);
-        var copy = new Float32Array(input.length);
-        copy.set(input);
-        pcmChunks.push(copy);
-        recordedSamples += copy.length;
-        var sum = 0;
-        for (var i = 0; i < input.length; i++) sum += input[i] * input[i];
-        drawWaveform(Math.min(1, Math.sqrt(sum / input.length) * 5));
-        stopWhenLimitReached(recordedSamples >= audioContext.sampleRate * MAX_PCM_SECONDS);
-      };
-    }
-
-    isRecording = true;
-    isConnecting = false;
-    if (micBtn) micBtn.classList.add("recording");
-    setStatus("Говорите...");
-
-    eventSource = new EventSource("/api/voice/events?session_id=" + encodeURIComponent(sessionId));
-    eventSource.onmessage = function (e) {
-      try {
-        handleServerEvent(JSON.parse(e.data));
-      } catch (err) {
-        log("SSE parse: " + err.message);
-      }
-    };
-    eventSource.onerror = function () {
-      log("SSE error");
-    };
+  function closeMicEvents() {
+    if (eventSource) { eventSource.close(); eventSource = null; }
   }
 
   function handleServerEvent(data) {
-    var type = data.type;
-    if (type === "input_audio_buffer.speech_stopped") {
-      setStatus("Распознаю...");
-    } else if (type === "conversation.item.input_audio_transcription.completed") {
+    var viewingSession = typeof currentConvId !== "undefined" && currentConvId === micConversationId;
+    if (!viewingSession && data.type !== "response.done") return;
+    if (data.type === "input_audio_buffer.speech_stopped") {
+      setStatus(micTransport === "speechkit_pipeline" ? "SpeechKit распознаёт речь для выбранной текстовой модели..." : "Realtime обрабатывает запись...");
+    } else if (data.type === "conversation.item.input_audio_transcription.completed") {
       currentTranscript = String(data.transcript || "").trim();
       if (currentTranscript && !userMsgSent && typeof addMessage === "function") {
         addMessage({
@@ -252,7 +164,7 @@
         userMsgSent = true;
       }
       setStatus("Вы: " + currentTranscript);
-    } else if (type === "response.output_text.done") {
+    } else if (data.type === "response.output_text.done") {
       currentReply = data.text || "";
       if (currentReply && !botMsgSent && typeof addMessage === "function") {
         addMessage({
@@ -262,108 +174,247 @@
         });
         botMsgSent = true;
       }
-      setStatus("Ответ готов");
-    } else if (type === "response.output_audio.ready") {
+    } else if (data.type === "response.output_audio.ready") {
       playAudio(data.audio_url);
-    } else if (type === "error") {
-      setStatus("Ошибка сервера голосовой сессии. Попробуйте ещё раз.");
-    } else if (type === "response.done") {
-      setStatus("");
-      if (eventSource) {
-        eventSource.close();
-        eventSource = null;
-      }
+    } else if (data.type === "error") {
+      sessionError = (data.error || {}).message || "Ошибка Realtime API";
+      setStatus(sessionError);
+    } else if (data.type === "response.done") {
+      if (viewingSession) setStatus(sessionError || (data.status === "completed" ? "Ответ готов" : "Ответ не завершён"));
+      closeMicEvents();
+      if (micTimeout) { window.clearTimeout(micTimeout); micTimeout = null; }
       sessionId = null;
-      currentTranscript = "";
-      currentReply = "";
-      userMsgSent = false;
-      botMsgSent = false;
+      micConversationId = null;
+      micModel = null;
+      isProcessing = false;
     }
+  }
+
+  async function startRecording() {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+    });
+    var AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    audioContext = new AudioContextClass({ sampleRate: 16000 });
+    if (audioContext.state === "suspended") await audioContext.resume();
+    recordingRate = audioContext.sampleRate;
+    source = audioContext.createMediaStreamSource(mediaStream);
+    processor = audioContext.createScriptProcessor(4096, 1, 1);
+    pcmChunks = [];
+    recordedSamples = 0;
+    processor.onaudioprocess = function (event) {
+      if (!isRecording) return;
+      if (typeof currentConvId !== "undefined" && (currentConvId !== micConversationId || currentModel !== micModel)) {
+        cancel();
+        return;
+      }
+      var input = event.inputBuffer.getChannelData(0);
+      var remaining = Math.floor((maxAudioBytes - 44) / 2 * recordingRate / 16000) - recordedSamples;
+      var copy = new Float32Array(Math.max(0, Math.min(input.length, remaining)));
+      copy.set(input.subarray(0, copy.length));
+      pcmChunks.push(copy);
+      recordedSamples += copy.length;
+      var sum = 0;
+      for (var i = 0; i < input.length; i++) sum += input[i] * input[i];
+      drawWaveform(Math.min(1, Math.sqrt(sum / input.length) * 5));
+      if (remaining <= input.length) toggleVoice();
+    };
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+    isRecording = true;
+    isConnecting = false;
+    if (micBtn) micBtn.classList.add("recording");
+    setStatus((micTransport === "speechkit_pipeline" ? "SpeechKit → выбранная текстовая модель. " : "Realtime. ") + "Говорите; повторное нажатие отправит запись.");
+    eventSource = new EventSource("/api/voice/events?session_id=" + encodeURIComponent(sessionId));
+    eventSource.onmessage = function (event) {
+      try { handleServerEvent(JSON.parse(event.data)); }
+      catch (err) { setStatus("Не удалось прочитать событие голосовой сессии"); }
+    };
+    eventSource.onerror = function () {
+      // EventSource resumes from Last-Event-ID; the backend retains its event log.
+      if (sessionId && isProcessing) setStatus("Восстанавливаю события голосового ответа...");
+      if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+        cancel();
+        setStatus("События голосовой сессии недоступны");
+      }
+    };
   }
 
   async function toggleVoice() {
     if (isRecording) {
       isRecording = false;
+      isProcessing = true;
       if (micBtn) micBtn.classList.remove("recording");
-      setStatus("Обрабатываю...");
+      setStatus("Передаю запись в Realtime...");
+      var id = sessionId;
+      var blob = wavFromPcm(pcmChunks, recordingRate);
+      releaseRecording();
+      pcmChunks = [];
       try {
-        if (processor) {
-          processor.disconnect();
-          processor = null;
+        if (!blob.size || blob.size <= 44) throw new Error("Запись голоса пуста");
+        var res = await request("/api/voice/audio?session_id=" + encodeURIComponent(id), {
+          method: "POST", headers: { "Content-Type": "audio/wav" }, body: await blob.arrayBuffer(),
+        });
+        if (!res.ok) {
+          var error = await res.json();
+          throw new Error(error.error || "Не удалось передать запись");
         }
-        if (source) {
-          source.disconnect();
-          source = null;
-        }
-        if (mediaStream) {
-          mediaStream.getTracks().forEach(function (t) {
-            t.stop();
-          });
-          mediaStream = null;
-        }
-        await finishRecording();
+        await jsonRequest("/api/voice/close", { session_id: id });
       } catch (err) {
-        setStatus("Не удалось завершить запись. Попробуйте ещё раз.");
-        if (eventSource) {
-          eventSource.close();
-          eventSource = null;
-        }
+        closeMicEvents();
+        await cancelServer(id);
         sessionId = null;
-      } finally {
-        if (audioContext) {
-          audioContext.close();
-          audioContext = null;
-        }
-        mediaRecorder = null;
-        pcmChunks = [];
-        mediaChunks = [];
+        isProcessing = false;
+        setStatus(err.message || "Не удалось передать запись");
       }
       return;
     }
-    if (isConnecting) return;
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setStatus("Микрофон не поддерживается браузером");
+    if (isConnecting || isProcessing) return;
+    var model = typeof currentModel !== "undefined" ? currentModel : "";
+    if (model === "speech-realtime-tts-live") {
+      setStatus("Speech TTS Live: введите текст и нажмите отправку для озвучивания.");
       return;
     }
-
-    var modelKey =
-      (typeof currentModel !== "undefined" ? currentModel : "speech-realtime-deepseek-v4-flash") ||
-      "speech-realtime-deepseek-v4-flash";
+    var textModel = typeof modelsData !== "undefined" && modelsData.text && modelsData.text[model];
+    if (!textModel && ["speech-realtime-deepseek-v4-flash", "speech-realtime-max-tts-live"].indexOf(model) === -1) {
+      setStatus("Для микрофона выберите текстовую или голосовую модель.");
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus("Микрофон недоступен: требуется поддерживаемый браузер и безопасное подключение");
+      return;
+    }
     isConnecting = true;
     setStatus("Подключение...");
     try {
-      var res = await request("/api/voice/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: modelKey,
-          voice: "filipp",
-          conversation_id: typeof currentConvId !== "undefined" ? currentConvId : null,
-          response_mode: (document.getElementById("response-mode-select") || {}).value || "audio",
-        }),
+      if (typeof currentConvId === "undefined" || !currentConvId) {
+        if (typeof createConversation !== "function") throw new Error("Создайте диалог для голосового запроса");
+        var created = await createConversation(model);
+        if (!created) throw new Error("Не удалось создать диалог");
+        if (currentConvId !== created) throw new Error("Выбран другой диалог; начните запись в нём");
+      }
+      if (currentModel !== model) throw new Error("Модель изменена; начните запись с выбранной моделью");
+      micConversationId = currentConvId;
+      micModel = model;
+      micTransport = textModel ? "speechkit_pipeline" : "realtime";
+      var params = typeof window.getResponsesParams === "function" ? window.getResponsesParams() : {};
+      var data = await jsonRequest("/api/voice/session", {
+        model: model,
+        transport: micTransport,
+        conversation_id: micConversationId,
+        instructions: params.instructions,
+        response_mode: (document.getElementById("response-mode-select") || {}).value || "audio",
       });
-      var data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || "HTTP " + res.status);
       sessionId = data.session_id;
+      var startedSession = sessionId;
+      micTimeout = window.setTimeout(function () {
+        if (sessionId !== startedSession) return;
+        cancel();
+        setStatus("Истекло время голосовой сессии");
+      }, data.ttl_seconds * 1000);
+      maxAudioBytes = data.max_audio_bytes;
       currentTranscript = "";
       currentReply = "";
       userMsgSent = false;
       botMsgSent = false;
+      sessionError = "";
       await startRecording();
     } catch (err) {
-      setStatus("Не удалось начать голосовую сессию. Попробуйте ещё раз.");
-      isConnecting = false;
+      releaseRecording();
+      closeMicEvents();
+      await cancelServer(sessionId);
       sessionId = null;
+      if (micTimeout) { window.clearTimeout(micTimeout); micTimeout = null; }
+      isRecording = false;
+      isConnecting = false;
+      setStatus(err.message || "Не удалось начать голосовую сессию");
     }
   }
 
+  async function sendText(options) {
+    options = options || {};
+    var text = String(options.text || "");
+    if (!text.trim()) throw new Error("Введите текст для голосовой модели");
+    var data = await jsonRequest("/api/voice/session", {
+      model: options.model,
+      conversation_id: options.conversationId,
+      instructions: options.instructions,
+      response_mode: options.responseMode || "both",
+    });
+    var id = data.session_id;
+    return new Promise(function (resolve, reject) {
+      var reply = "";
+      var failure = "";
+      var events = new EventSource("/api/voice/events?session_id=" + encodeURIComponent(id));
+      var timeout = window.setTimeout(function () {
+        finish(new Error("Истекло время голосовой сессии"));
+        cancelServer(id);
+      }, data.ttl_seconds * 1000);
+      function finish(error, result) {
+        events.close();
+        window.clearTimeout(timeout);
+        textSessions.delete(id);
+        if (error) reject(error);
+        else resolve(result);
+      }
+      textSessions.set(id, function () {
+        finish(new Error("Голосовая сессия отменена"));
+        cancelServer(id);
+      });
+      events.onmessage = function (event) {
+        var payload;
+        try { payload = JSON.parse(event.data); }
+        catch (err) { finish(new Error("Некорректное событие Realtime")); cancelServer(id); return; }
+        if (payload.type === "response.output_text.done") reply = payload.text || "";
+        else if (payload.type === "response.output_audio.ready") {
+          if (typeof currentConvId !== "undefined" && currentConvId === options.conversationId) playAudio(payload.audio_url);
+        }
+        else if (payload.type === "error") failure = (payload.error || {}).message || "Ошибка Realtime API";
+        else if (payload.type === "response.done") {
+          if (failure || payload.status !== "completed") {
+            finish(new Error(failure || "Realtime не завершил ответ"));
+          } else {
+            finish(null, { reply: reply, usage: payload.usage || {}, model: payload.model,
+                           conversation_id: payload.conversation_id, response_id: payload.response_id });
+          }
+        }
+      };
+      events.onerror = function () {
+        if (events.readyState === EventSource.CLOSED) {
+          finish(new Error("События голосовой сессии недоступны"));
+          cancelServer(id);
+        }
+      };
+      jsonRequest("/api/voice/text", { session_id: id, text: text }).catch(function (err) {
+        finish(err);
+        cancelServer(id);
+      });
+    });
+  }
+
+  function cancel() {
+    isRecording = false;
+    isConnecting = false;
+    isProcessing = false;
+    if (micTimeout) { window.clearTimeout(micTimeout); micTimeout = null; }
+    if (micBtn) micBtn.classList.remove("recording");
+    releaseRecording();
+    closeMicEvents();
+    var id = sessionId;
+    sessionId = null;
+    cancelServer(id);
+    textSessions.forEach(function (abort) { abort(); });
+    if (audioPlayer) audioPlayer.pause();
+    setStatus("Голосовая сессия отменена");
+  }
+
+  window.LogosVoice = { sendText: sendText, synthesizeText: sendText, cancel: cancel };
   document.addEventListener("DOMContentLoaded", function () {
     micBtn = document.getElementById("mic-btn");
     voiceStatus = document.getElementById("voice-status");
     waveformCanvas = document.getElementById("waveform");
     waveCtx = waveformCanvas ? waveformCanvas.getContext("2d") : null;
     if (micBtn) micBtn.addEventListener("click", toggleVoice);
-    else log("WARNING: #mic-btn not found in DOM");
     clearWaveform();
   });
 })();

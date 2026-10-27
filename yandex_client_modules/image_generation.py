@@ -1,76 +1,76 @@
-"""Alice AI ART through the Yandex Images API: start an operation, then read it.
-
-Generation is asynchronous. The start call returns an operation id, and the result is
-read from the operation endpoint once it is done. The documented result is a base64
-image in ``response.image``.
-"""
+"""Alice AI ART through the synchronous OpenAI-compatible Yandex Images API."""
 
 import base64
+import binascii
 from typing import Any
 
 import requests
 
-from core.config import upstream_model_id
+from core.config import IMAGE_MODELS, upstream_model_id
 
-GENERATE_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/imageGenerationAsync"
-OPERATION_URL = "https://operation.api.cloud.yandex.net/operations/"
-MIME_TYPE = "image/jpeg"
-MAX_IMAGE_BYTES = 4 * 1024 * 1024
-REQUEST_TIMEOUT_SECONDS = 60
-# A poll is answered from the provider within this bound; the chat route holds each poll for 25 seconds.
-OPERATION_TIMEOUT_SECONDS = 20
+GENERATE_URL = "https://ai.api.cloud.yandex.net/v1/images/generations"
+MAX_PROMPT_CHARS = 500
+# Room for the supported 1536×1024 PNG output, including RGBA and metadata.
+MAX_IMAGE_BYTES = 16 * 1024 * 1024
+REQUEST_TIMEOUT_SECONDS = 180
+IMAGE_SIZES = {"auto", "1x1", "1024x1024", "1536x1024", "1024x1536"}
 
 
 class ImageGenerationError(RuntimeError):
     pass
 
 
-def build_generation_payload(project_id: str, model_key: str, prompt: str) -> dict[str, Any]:
-    return {
-        "modelUri": "art://" + project_id.strip() + "/" + upstream_model_id(model_key),
-        "messages": [{"text": prompt}],
-        "generationOptions": {"mimeType": MIME_TYPE},
+def build_generation_payload(
+    project_id: str, model_key: str, prompt: str, size: str | None = None
+) -> dict[str, Any]:
+    if not isinstance(project_id, str) or not project_id.strip():
+        raise ValueError("Yandex project_id is required")
+    if not isinstance(model_key, str) or model_key not in IMAGE_MODELS:
+        raise ValueError("not_an_image_model")
+    if not isinstance(prompt, str) or not prompt.strip():
+        raise ValueError("message is required")
+    if len(prompt) > MAX_PROMPT_CHARS:
+        raise ValueError("prompt_too_long")
+    if size is not None and (not isinstance(size, str) or size not in IMAGE_SIZES):
+        raise ValueError("invalid_image_size")
+    payload = {
+        "model": "art://" + project_id.strip() + "/" + upstream_model_id(model_key),
+        "prompt": prompt,
     }
+    if size is not None:
+        payload["size"] = size
+    return payload
 
 
-def start_generation(headers: dict[str, str], payload: dict[str, Any]) -> str:
+def generate_image(headers: dict[str, str], payload: dict[str, Any]) -> tuple[bytes, str]:
+    # Generation is paid and non-idempotent. Never retry this POST automatically.
     response = requests.post(
         GENERATE_URL, json=payload, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS
     )
     response.raise_for_status()
-    operation_id = response.json().get("id")
-    if not isinstance(operation_id, str) or not operation_id:
-        raise ImageGenerationError("provider returned no operation id")
-    return operation_id
-
-
-def read_operation(headers: dict[str, str], operation_id: str) -> dict[str, Any]:
-    response = requests.get(
-        OPERATION_URL + operation_id, headers=headers, timeout=OPERATION_TIMEOUT_SECONDS
-    )
-    response.raise_for_status()
-    data = response.json()
-    if not isinstance(data, dict):
-        raise ImageGenerationError("provider returned an invalid operation")
-    return data
-
-
-def image_from_operation(operation: dict[str, Any]) -> str | None:
-    """Return a data URL once the operation has produced an image, or None while it runs."""
-    error = operation.get("error")
-    if error:
-        message = error.get("message") if isinstance(error, dict) else None
-        raise ImageGenerationError(str(message or "generation failed")[:200])
-    if not operation.get("done"):
-        return None
-    response = operation.get("response")
-    encoded = response.get("image") if isinstance(response, dict) else None
+    try:
+        result = response.json()
+    except ValueError as exc:
+        raise ImageGenerationError("provider returned invalid JSON") from exc
+    if not isinstance(result, dict) or "error" in result:
+        raise ImageGenerationError("provider returned an image generation error")
+    images = result.get("data")
+    image = images[0] if isinstance(images, list) and len(images) == 1 else None
+    encoded = image.get("b64_json") if isinstance(image, dict) else None
     if not isinstance(encoded, str) or not encoded:
-        raise ImageGenerationError("operation finished without an image")
+        raise ImageGenerationError("provider returned no image")
+    if len(encoded) > ((MAX_IMAGE_BYTES + 2) // 3) * 4:
+        raise ImageGenerationError("generated image is larger than the artifact limit")
     try:
         raw = base64.b64decode(encoded, validate=True)
-    except ValueError as exc:
+    except (ValueError, binascii.Error) as exc:
         raise ImageGenerationError("generated image is not valid base64") from exc
     if len(raw) > MAX_IMAGE_BYTES:
-        raise ImageGenerationError("generated image is larger than the chat limit")
-    return "data:" + MIME_TYPE + ";base64," + encoded
+        raise ImageGenerationError("generated image is larger than the artifact limit")
+    if raw.startswith(b"\x89PNG\r\n\x1a\n"):
+        mime_type = "image/png"
+    elif raw.startswith(b"\xff\xd8\xff"):
+        mime_type = "image/jpeg"
+    else:
+        raise ImageGenerationError("provider returned an unsupported image format")
+    return raw, mime_type

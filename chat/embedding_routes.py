@@ -1,41 +1,37 @@
-"""POST /api/embeddings: Yandex text-search embeddings."""
+"""POST /api/embeddings: the four public Yandex embedding models."""
 
 from __future__ import annotations
 
 import math
 import time
+from types import SimpleNamespace
 
 import requests
 from flask import Blueprint, jsonify, request
 
+from core.config import Config, EMBEDDING_MODELS
 from core.env import env_get
 from economy.knowledge_economics import KnowledgeCostConfig, calculate_knowledge_cost
-from kristall import KristallError
 from observability import system_log
 from observability.trace_manager import get_current_trace, traced_operation
-from provider_accounts.credentials import CredentialError, YANDEX, get_active_credential
-from secret_store.credential_crypto import CredentialCryptoError, decrypt_secret
-from storage.db import get_store
+from yandex_client_modules.request_mixin import (
+    _resolve_global_provider_credential,
+    provider_request_headers,
+)
 
 embedding_bp = Blueprint("embeddings", __name__)
 logger = system_log.get_logger("embeddings")
 
-UPSTREAM_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/textEmbedding"
+UPSTREAM_URL = "https://ai.api.cloud.yandex.net/v1/embeddings"
 MAX_BATCH = 64  # same cap as scripts/rag_pipeline.py: the server key pays for every text
-# The catalog records two input limits (2048 and 8192 tokens) and does not pick one.
-# 4000 characters is a guess, not a measured limit.
-MAX_TEXT_CHARS = 4000
+# The provider enforces its model-specific token limit. Character counts cannot
+# stand in for the provider tokenizer and must not truncate or reject valid text.
 UPSTREAM_TIMEOUT_SECONDS = 30
 # Whole-request budget, so a batch cannot hold a Flask worker for 30 seconds per text.
 REQUEST_BUDGET_SECONDS = 60
 MODES = {"doc": "text-search-doc", "query": "text-search-query"}
-# Embedding models listed in config/model_profiles/yandex-ultra-profiles.json (PR #1572).
-EMBEDDING_MODELS = {
-    "text-search-doc",
-    "text-search-query",
-    "text-embeddings-v2-doc",
-    "text-embeddings-v2-query",
-}
+V2_DIMENSIONS = {128, 256, 512, 768}
+ALLOWED_FIELDS = {"text", "texts", "model", "mode", "dimensions"}
 
 
 class _BadInput(ValueError):
@@ -64,8 +60,6 @@ def _texts_from_body(body: dict) -> tuple[list[str], bool]:
     for item in items:
         if not isinstance(item, str) or not item.strip():
             raise _BadInput("every text must be a non-empty string")
-        if len(item) > MAX_TEXT_CHARS:
-            raise _BadInput(f"every text must be at most {MAX_TEXT_CHARS} characters")
     return items, single
 
 
@@ -78,21 +72,32 @@ def _token_count(value) -> int:
 
 
 def _embed_one(
-    key: str, model_uri: str, text: str, *, timeout: float = UPSTREAM_TIMEOUT_SECONDS
+    headers: dict[str, str],
+    model_uri: str,
+    text: str,
+    *,
+    dimensions: int | None = None,
+    timeout: float = UPSTREAM_TIMEOUT_SECONDS,
 ) -> tuple[list[float], int]:
+    payload = {"model": model_uri, "input": text, "encoding_format": "float"}
+    if dimensions is not None:
+        payload["dimensions"] = dimensions
     response = requests.post(
         UPSTREAM_URL,
-        json={"modelUri": model_uri, "text": text},
-        headers={"Authorization": f"Api-Key {key}"},
+        json=payload,
+        headers=headers,
         timeout=timeout,
     )
     if response.status_code != 200:
         raise requests.HTTPError(f"upstream status {response.status_code}")
     data = response.json()
-    vector = data.get("embedding") if isinstance(data, dict) else None
-    tokens = _token_count(data.get("numTokens")) if isinstance(data, dict) else 0
+    usage = data.get("usage") if isinstance(data, dict) else None
+    tokens = _token_count(usage.get("prompt_tokens")) if isinstance(usage, dict) else 0
+    records = data.get("data") if isinstance(data, dict) and "error" not in data else None
+    record = records[0] if isinstance(records, list) and len(records) == 1 else None
+    vector = record.get("embedding") if isinstance(record, dict) else None
     try:
-        valid = isinstance(vector, list) and bool(vector) and all(
+        valid = isinstance(vector, list) and len(vector) == (dimensions or 256) and all(
             type(value) in (int, float) and math.isfinite(value) for value in vector
         )
     except OverflowError:
@@ -120,6 +125,9 @@ def create_embeddings():
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         return jsonify({"error": "json_body_required"}), 400
+    unknown = set(body) - ALLOWED_FIELDS
+    if unknown:
+        return jsonify({"error": "unknown_parameters", "parameters": sorted(unknown)}), 400
     if "model" in body and "mode" in body:
         return jsonify({"error": "send model or mode, not both"}), 400
     if "model" in body:
@@ -134,19 +142,29 @@ def create_embeddings():
         if not isinstance(mode, str) or mode not in MODES:
             return jsonify({"error": "mode must be doc or query"}), 400
         model_name = MODES[mode]
+    dimensions = body.get("dimensions")
+    if "dimensions" in body:
+        if not model_name.startswith("text-embeddings-v2-"):
+            return jsonify({"error": "dimensions requires an embedding v2 model"}), 400
+        if type(dimensions) is not int or dimensions not in V2_DIMENSIONS:
+            return jsonify({"error": "invalid_dimensions", "dimensions": sorted(V2_DIMENSIONS)}), 400
     try:
         items, single = _texts_from_body(body)
     except _BadInput as exc:
         return jsonify({"error": str(exc)}), 400
 
     try:
-        credential = get_active_credential(get_store(), decrypt_secret, provider=YANDEX)
-    except (CredentialError, CredentialCryptoError, KristallError, OSError, ValueError):
+        credential = _resolve_global_provider_credential(
+            SimpleNamespace(_config=Config), get_current_trace()
+        )
+        headers = provider_request_headers(credential)
+        headers["x-project"] = credential.project_id
+    except Exception:
         return jsonify({"error": "embeddings_not_configured"}), 503
     if not credential.api_key or not str(credential.project_id or "").strip():
         return jsonify({"error": "embeddings_not_configured"}), 503
 
-    model_uri = f"emb://{credential.project_id}/{model_name}"
+    model_uri = f"emb://{credential.project_id.strip()}/{EMBEDDING_MODELS[model_name]['upstream']}"
     vectors, total_tokens = [], 0
     started = time.monotonic()
     for text in items:
@@ -164,7 +182,8 @@ def create_embeddings():
             )
         try:
             vector, tokens = _embed_one(
-                credential.api_key, model_uri, text,
+                headers, model_uri, text,
+                dimensions=dimensions,
                 timeout=min(UPSTREAM_TIMEOUT_SECONDS, remaining),
             )
         except (requests.RequestException, ValueError) as exc:
@@ -196,7 +215,12 @@ def create_embeddings():
             "model": model_name, "texts": len(items), "tokens": total_tokens,
         })
     logger.info("embeddings model=%s texts=%d tokens=%d", model_name, len(items), total_tokens)
-    payload = {"model": model_uri, "tokens": total_tokens, "cost": _cost(total_tokens)}
+    payload = {
+        "model": model_uri,
+        "tokens": total_tokens,
+        "cost": _cost(total_tokens),
+        "dimensions": dimensions or 256,
+    }
     if single:
         payload["embedding"] = vectors[0]
     else:

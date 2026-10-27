@@ -9,7 +9,14 @@ from typing import Any
 from dataclasses import dataclass
 import base64
 from yandex_client_modules.client import YandexResponsesClient
-from core.config import TEXT_MODELS, Config
+from core.config import (
+    CLASSIFIER_MODELS,
+    EMBEDDING_MODELS,
+    IMAGE_MODELS,
+    TEXT_MODELS,
+    VOICE_MODELS,
+    Config,
+)
 from core.model_profiles import completion_model_keys
 from yandex_client_modules.request_builder import validate_generation_params
 from yandex_client_modules.request_mixin import _transport_timeout
@@ -393,6 +400,22 @@ def _validate_chat_payload(conv_id, model_key, message, attachments):
         return None, None, (jsonify({"error": "conversation_id is required"}), 400)
     if not isinstance(model_key, str):
         return None, None, (jsonify({"error": "model must be a string"}), 400)
+    # These technologies have their own transports; never substitute a text turn.
+    endpoint = None
+    if (
+        model_key in VOICE_MODELS
+        or model_key.startswith("speech-realtime-")
+        or "/speech-realtime-" in model_key
+    ):
+        endpoint = "/api/voice/session"
+    elif model_key in IMAGE_MODELS or model_key.startswith("art://"):
+        endpoint = "/api/images/generate"
+    elif model_key in EMBEDDING_MODELS or model_key.startswith("emb://"):
+        endpoint = "/api/embeddings"
+    elif model_key in CLASSIFIER_MODELS or model_key.startswith("cls://"):
+        endpoint = "/api/classify"
+    if endpoint is not None:
+        return None, None, (jsonify({"error": "model_requires_dedicated_api", "endpoint": endpoint}), 400)
     if isinstance(model_key, str) and model_key in completion_model_keys():
         # These models speak the completion API; sending them through Responses is wrong.
         return None, None, (jsonify({"error": "model_uses_completion_api", "endpoint": "/api/completion"}), 400)
@@ -1207,5 +1230,3 @@ def execute_approved():
     except Exception:
         logger.exception("[TOOL_APPROVAL] Tool execution failed")
         return jsonify({"error": "tool_execution_failed"}), 500
-
-
