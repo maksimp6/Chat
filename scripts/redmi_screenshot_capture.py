@@ -6,6 +6,8 @@ import json
 import os
 from pathlib import Path
 import re
+import resource
+import shutil
 import shlex
 import signal
 import socket
@@ -27,6 +29,38 @@ LOGOS_URL = "http://127.0.0.1:8080/"
 # yandexgpt, which is YandexGPT Pro 5 in the model picker.
 TOOLS_CHECK_MODEL = "yandexgpt-5-pro"
 CAPTURE_DEADLINE = None
+CAPTURE_STORAGE_ROOT = None
+MAX_TEMP_CAPTURE_BYTES = 256 * 1024 * 1024
+MIN_CAPTURE_FREE_BYTES = 512 * 1024 * 1024
+MAX_VIDEO_BYTES = 20 * 1024 * 1024
+
+
+def capture_storage_guard():
+    if CAPTURE_STORAGE_ROOT is None:
+        return
+    root = CAPTURE_STORAGE_ROOT
+    if shutil.disk_usage(root).free < MIN_CAPTURE_FREE_BYTES:
+        raise CaptureSafetyError("Capture stopped: less than 512 MiB free")
+    total = 0
+    for folder in root.iterdir():
+        if folder.is_symlink() or not folder.is_dir() or not folder.name.startswith((
+            ".logos-screenshots-", ".logos-tools-check-", ".logos-candidate-tools-",
+            ".logos-screenshot-verification-",
+        )):
+            continue
+        for directory, dirs, names in os.walk(folder, followlinks=False):
+            dirs[:] = [name for name in dirs if not Path(directory, name).is_symlink()]
+            for name in names:
+                path = Path(directory, name)
+                if not path.is_symlink() and path.suffix.lower() in {".mp4", ".png"}:
+                    total += path.stat().st_size
+                    if total >= MAX_TEMP_CAPTURE_BYTES:
+                        raise CaptureSafetyError("Capture stopped: temporary media reached 256 MiB")
+
+
+def limit_recording_file():
+    # Kernel-enforced boundary also applies while Python waits for browser/model I/O.
+    resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_VIDEO_BYTES, MAX_VIDEO_BYTES))
 
 
 def capture_url(value):
@@ -108,6 +142,7 @@ def unlocked_screen(state):
 
 
 def device_guard():
+    capture_storage_guard()
     try:
         return checked_device_guard()
     except CaptureSafetyError:
@@ -645,11 +680,13 @@ DIALOGS_VIDEO_NAME = "16-dialogs-walk.mp4"
 
 def start_screenrecord(video_path, time_limit, bit_rate):
     """Start the device recorder, or return None when the device has no screenrecord binary."""
+    capture_storage_guard()
     if not Path(ROOT + "screenrecord").is_file():
         return None
     return subprocess.Popen([ROOT + "screenrecord", "--bugreport", "--size", "720x1560",
                              "--bit-rate", str(bit_rate), "--time-limit", str(time_limit), str(video_path)],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                            preexec_fn=limit_recording_file)
 
 
 def finish_screenrecord(recorder, video_path, uid, gid, max_bytes):
@@ -894,10 +931,8 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
             failures.append("native_screenrecord_unavailable")
         else:
             mark("recorder_launch_requested")
-            recorder = subprocess.Popen([ROOT + "screenrecord", "--bugreport", "--size", "720x1560",
-                                         "--bit-rate", "800000" if tools_check else "2000000",
-                                         "--time-limit", str(video_seconds), str(video_path)],
-                                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            recorder = start_screenrecord(video_path, video_seconds,
+                                          800000 if tools_check else 2000000)
             time.sleep(0.5)
             mark("recorder_start_observed")
             if recorder.poll() is not None:
@@ -1513,7 +1548,20 @@ def restore_clean_page(target_url=None):
 
 
 def main():
-    global LOGOS_URL
+    global LOGOS_URL, CAPTURE_STORAGE_ROOT
+    # Both the runner driver and its root child enforce the same storage budget.
+    if len(sys.argv) > 2 and sys.argv[1] == "_capture":
+        capture_output = Path(sys.argv[2]).resolve()
+    elif len(sys.argv) == 2 and not sys.argv[1].startswith("_"):
+        capture_output = Path(sys.argv[1]).resolve()
+    else:
+        capture_output = None
+    if capture_output is not None:
+        workspace = next((path.parent for path in capture_output.parents
+                          if path.name.startswith((".logos-screenshots-", ".logos-tools-check-",
+                                                   ".logos-candidate-tools-"))), None)
+        CAPTURE_STORAGE_ROOT = workspace or capture_output.parent
+        capture_storage_guard()
     if len(sys.argv) == 6 and sys.argv[1] == "_capture":
         metadata = json.loads(sys.argv[5])
         LOGOS_URL = capture_url(metadata.get("capture_url", LOGOS_URL))
