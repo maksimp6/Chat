@@ -1,0 +1,816 @@
+{
+  "schema_version": 1,
+  "scenario": "create_conversation",
+  "events": [
+    {
+      "event": "scenario_started",
+      "wall_utc": "2026-10-27T03:47:34.163395+00:00",
+      "monotonic_ns": 128470947096887,
+      "browser": {
+        "current_id": null,
+        "current_model": "yandexgpt-5-pro",
+        "conversation_ids": [],
+        "active_ids": [],
+        "active_rows": 0,
+        "url_id": null,
+        "stored_id": null,
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 0,
+        "empty_state": true,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793072854160,
+        "performance_ms": 7184,
+        "time_origin_ms": 1793072846976
+      }
+    },
+    {
+      "event": "recorder_launch_requested",
+      "wall_utc": "2026-10-27T03:47:34.163936+00:00",
+      "monotonic_ns": 128470947585502
+    },
+    {
+      "event": "recorder_start_observed",
+      "wall_utc": "2026-10-27T03:47:34.666781+00:00",
+      "monotonic_ns": 128471450509810,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:11-conversation-before.png",
+      "wall_utc": "2026-10-27T03:47:35.043950+00:00",
+      "monotonic_ns": 128471827641425,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:11-conversation-before.png",
+      "wall_utc": "2026-10-27T03:47:35.809974+00:00",
+      "monotonic_ns": 128472593635272,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:11-conversation-before.png",
+      "wall_utc": "2026-10-27T03:47:36.414864+00:00",
+      "monotonic_ns": 128473198565810,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:11-conversation-before.png",
+      "wall_utc": "2026-10-27T03:47:36.418239+00:00",
+      "monotonic_ns": 128473201903887,
+      "recorder_running": true
+    },
+    {
+      "event": "network_observer_installed",
+      "wall_utc": "2026-10-27T03:47:36.440325+00:00",
+      "monotonic_ns": 128473224151887,
+      "browser": {
+        "installed": true,
+        "date_ms": 1793072856437,
+        "performance_ms": 9461,
+        "time_origin_ms": 1793072846976
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "new_chat_button_attempted",
+      "wall_utc": "2026-10-27T03:47:36.453109+00:00",
+      "monotonic_ns": 128473236793118,
+      "browser": {
+        "current_id": null,
+        "current_model": "yandexgpt-5-pro",
+        "conversation_ids": [],
+        "active_ids": [],
+        "active_rows": 0,
+        "url_id": null,
+        "stored_id": null,
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 0,
+        "empty_state": true,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793072856449,
+        "performance_ms": 9473,
+        "time_origin_ms": 1793072846976
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "new_chat_button_clicked",
+      "wall_utc": "2026-10-27T03:47:36.547573+00:00",
+      "monotonic_ns": 128473331259272,
+      "browser": {
+        "current_id": null,
+        "current_model": "yandexgpt-5-pro",
+        "conversation_ids": [],
+        "active_ids": [],
+        "active_rows": 0,
+        "url_id": null,
+        "stored_id": null,
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 0,
+        "empty_state": true,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793072856533,
+        "performance_ms": 9557,
+        "time_origin_ms": 1793072846976
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:12-conversation-model-picker.png",
+      "wall_utc": "2026-10-27T03:47:37.073934+00:00",
+      "monotonic_ns": 128473857587964,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:12-conversation-model-picker.png",
+      "wall_utc": "2026-10-27T03:47:37.819224+00:00",
+      "monotonic_ns": 128474602930349,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:12-conversation-model-picker.png",
+      "wall_utc": "2026-10-27T03:47:38.411455+00:00",
+      "monotonic_ns": 128475195186964,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:12-conversation-model-picker.png",
+      "wall_utc": "2026-10-27T03:47:38.417058+00:00",
+      "monotonic_ns": 128475200688580,
+      "recorder_running": true
+    },
+    {
+      "event": "model_picker_phase_observed",
+      "wall_utc": "2026-10-27T03:47:38.778785+00:00",
+      "monotonic_ns": 128475562478656,
+      "browser": {
+        "conversation": {
+          "current_id": null,
+          "current_model": "yandexgpt-5-pro",
+          "conversation_ids": [],
+          "active_ids": [],
+          "active_rows": 0,
+          "url_id": null,
+          "stored_id": null,
+          "storage_available": true,
+          "model_choices": 1,
+          "message_count": 0,
+          "empty_state": true,
+          "error_state": false,
+          "ready_state": "complete",
+          "date_ms": 1793072858766,
+          "performance_ms": 11789,
+          "time_origin_ms": 1793072846976
+        },
+        "network": {
+          "available": true,
+          "intact": true,
+          "expired": false,
+          "requests": [],
+          "samples": [
+            {
+              "current_id": null,
+              "conversation_ids": [],
+              "active_ids": [],
+              "message_count": 0,
+              "empty_state": true,
+              "error_state": false,
+              "sidebar_open": true,
+              "expanded": "true",
+              "date_ms": 1793072856436,
+              "performance_ms": 9460,
+              "reason": "initial"
+            }
+          ],
+          "sample_overflow": false
+        }
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "current_model_choice_started",
+      "wall_utc": "2026-10-27T03:47:38.778986+00:00",
+      "monotonic_ns": 128475562622426,
+      "browser": {
+        "current_id": null,
+        "current_model": "yandexgpt-5-pro",
+        "conversation_ids": [],
+        "active_ids": [],
+        "active_rows": 0,
+        "url_id": null,
+        "stored_id": null,
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 0,
+        "empty_state": true,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793072858766,
+        "performance_ms": 11789,
+        "time_origin_ms": 1793072846976
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "current_model_choice_clicked",
+      "wall_utc": "2026-10-27T03:47:38.823885+00:00",
+      "monotonic_ns": 128475607542733,
+      "recorder_running": true
+    },
+    {
+      "event": "creation_result_observed",
+      "wall_utc": "2026-10-27T03:47:39.769072+00:00",
+      "monotonic_ns": 128476552773733,
+      "browser": {
+        "current_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+        "current_model": "yandexgpt-5-pro",
+        "conversation_ids": [
+          "c104c466-b60f-4370-95ac-48f60580e0ea"
+        ],
+        "active_ids": [
+          "c104c466-b60f-4370-95ac-48f60580e0ea"
+        ],
+        "active_rows": 1,
+        "url_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+        "stored_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 0,
+        "empty_state": true,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793072859764,
+        "performance_ms": 12789,
+        "time_origin_ms": 1793072846976
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "sidebar_after_creation",
+      "wall_utc": "2026-10-27T03:47:40.134411+00:00",
+      "monotonic_ns": 128476918067887,
+      "browser": {
+        "open": false,
+        "expanded": "false"
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:13-conversation-created.png",
+      "wall_utc": "2026-10-27T03:47:40.503349+00:00",
+      "monotonic_ns": 128477287078426,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:13-conversation-created.png",
+      "wall_utc": "2026-10-27T03:47:41.302320+00:00",
+      "monotonic_ns": 128478086002349,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:13-conversation-created.png",
+      "wall_utc": "2026-10-27T03:47:41.893408+00:00",
+      "monotonic_ns": 128478677112811,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:13-conversation-created.png",
+      "wall_utc": "2026-10-27T03:47:41.897363+00:00",
+      "monotonic_ns": 128478681030734,
+      "recorder_running": true
+    },
+    {
+      "event": "reload_requested",
+      "wall_utc": "2026-10-27T03:47:41.913064+00:00",
+      "monotonic_ns": 128478696767964,
+      "browser": {
+        "current_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+        "current_model": "yandexgpt-5-pro",
+        "conversation_ids": [
+          "c104c466-b60f-4370-95ac-48f60580e0ea"
+        ],
+        "active_ids": [
+          "c104c466-b60f-4370-95ac-48f60580e0ea"
+        ],
+        "active_rows": 1,
+        "url_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+        "stored_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 0,
+        "empty_state": true,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793072861908,
+        "performance_ms": 14932,
+        "time_origin_ms": 1793072846976
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "reload_result_observed",
+      "wall_utc": "2026-10-27T03:47:43.140621+00:00",
+      "monotonic_ns": 128479924304888,
+      "browser": {
+        "current_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+        "current_model": "yandexgpt-5-pro",
+        "conversation_ids": [
+          "c104c466-b60f-4370-95ac-48f60580e0ea"
+        ],
+        "active_ids": [
+          "c104c466-b60f-4370-95ac-48f60580e0ea"
+        ],
+        "active_rows": 1,
+        "url_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+        "stored_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 0,
+        "empty_state": true,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793072863136,
+        "performance_ms": 1115,
+        "time_origin_ms": 1793072862023
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "reload_server_reads_requested",
+      "wall_utc": "2026-10-27T03:47:43.519374+00:00",
+      "monotonic_ns": 128480303069195,
+      "browser": {
+        "current_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+        "current_model": "yandexgpt-5-pro",
+        "conversation_ids": [
+          "c104c466-b60f-4370-95ac-48f60580e0ea"
+        ],
+        "active_ids": [
+          "c104c466-b60f-4370-95ac-48f60580e0ea"
+        ],
+        "active_rows": 1,
+        "url_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+        "stored_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+        "storage_available": true,
+        "model_choices": 1,
+        "message_count": 0,
+        "empty_state": true,
+        "error_state": false,
+        "ready_state": "complete",
+        "date_ms": 1793072863136,
+        "performance_ms": 1115,
+        "time_origin_ms": 1793072862023
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "reload_server_reads_observed",
+      "wall_utc": "2026-10-27T03:47:43.923440+00:00",
+      "monotonic_ns": 128480707153734,
+      "browser": {
+        "available": true,
+        "intact": true,
+        "expired": false,
+        "requests": [
+          {
+            "id": 1,
+            "path": "/api/conversations",
+            "method": "GET",
+            "started": {
+              "date_ms": 1793072863527,
+              "performance_ms": 1505
+            },
+            "finished": {
+              "date_ms": 1793072863574,
+              "performance_ms": 1551
+            },
+            "status": 200,
+            "error": null,
+            "body_done": true,
+            "response_id": null,
+            "response_ids": [
+              "c104c466-b60f-4370-95ac-48f60580e0ea"
+            ],
+            "response_message_count": null,
+            "blocked": false
+          },
+          {
+            "id": 2,
+            "path": "/api/conversations/c104c466-b60f-4370-95ac-48f60580e0ea/messages",
+            "method": "GET",
+            "started": {
+              "date_ms": 1793072863530,
+              "performance_ms": 1509
+            },
+            "finished": {
+              "date_ms": 1793072863581,
+              "performance_ms": 1558
+            },
+            "status": 200,
+            "error": null,
+            "body_done": true,
+            "response_id": null,
+            "response_ids": null,
+            "response_message_count": 0,
+            "blocked": false
+          }
+        ],
+        "samples": [
+          {
+            "current_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+            "conversation_ids": [
+              "c104c466-b60f-4370-95ac-48f60580e0ea"
+            ],
+            "active_ids": [
+              "c104c466-b60f-4370-95ac-48f60580e0ea"
+            ],
+            "message_count": 0,
+            "empty_state": true,
+            "error_state": false,
+            "sidebar_open": false,
+            "expanded": "false",
+            "date_ms": 1793072863515,
+            "performance_ms": 1492,
+            "reason": "initial"
+          }
+        ],
+        "sample_overflow": false
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:14-conversation-after-reload.png",
+      "wall_utc": "2026-10-27T03:47:44.686854+00:00",
+      "monotonic_ns": 128481470550734,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:14-conversation-after-reload.png",
+      "wall_utc": "2026-10-27T03:47:45.523911+00:00",
+      "monotonic_ns": 128482307574118,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:14-conversation-after-reload.png",
+      "wall_utc": "2026-10-27T03:47:46.118299+00:00",
+      "monotonic_ns": 128482901962118,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:14-conversation-after-reload.png",
+      "wall_utc": "2026-10-27T03:47:46.120382+00:00",
+      "monotonic_ns": 128482904139657,
+      "recorder_running": true
+    },
+    {
+      "event": "tools_self_check_requested",
+      "wall_utc": "2026-10-27T03:47:46.120658+00:00",
+      "monotonic_ns": 128482904283888,
+      "recorder_running": true
+    },
+    {
+      "event": "observation_error",
+      "wall_utc": "2026-10-27T03:48:02.562827+00:00",
+      "monotonic_ns": 128499346625427,
+      "browser": {
+        "exception_type": "RuntimeError"
+      },
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_started:13-conversation-observation-error.png",
+      "wall_utc": "2026-10-27T03:48:02.858171+00:00",
+      "monotonic_ns": 128499641883658,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_started:13-conversation-observation-error.png",
+      "wall_utc": "2026-10-27T03:48:03.678886+00:00",
+      "monotonic_ns": 128500462553735,
+      "recorder_running": true
+    },
+    {
+      "event": "native_screencap_finished:13-conversation-observation-error.png",
+      "wall_utc": "2026-10-27T03:48:04.313084+00:00",
+      "monotonic_ns": 128501096812581,
+      "recorder_running": true
+    },
+    {
+      "event": "screenshot_finished:13-conversation-observation-error.png",
+      "wall_utc": "2026-10-27T03:48:04.319329+00:00",
+      "monotonic_ns": 128501103013196,
+      "recorder_running": true
+    },
+    {
+      "event": "recorder_stop_requested",
+      "wall_utc": "2026-10-27T03:48:04.700497+00:00",
+      "monotonic_ns": 128501484182966,
+      "recorder_running": true
+    },
+    {
+      "event": "recorder_stop_observed",
+      "wall_utc": "2026-10-27T03:48:05.169402+00:00",
+      "monotonic_ns": 128501953153812,
+      "recorder_running": false
+    },
+    {
+      "event": "scenario_finished",
+      "wall_utc": "2026-10-27T03:48:05.184868+00:00",
+      "monotonic_ns": 128501968615889,
+      "browser": {
+        "verdict": "FAIL",
+        "failures": [
+          "conversation_observation_failed"
+        ]
+      },
+      "recorder_running": false
+    }
+  ],
+  "result": {
+    "verdict": "FAIL",
+    "failures": [
+      "conversation_observation_failed"
+    ],
+    "checkpoints": {
+      "new_conversation_postconditions": {
+        "status": "PASS"
+      },
+      "reload_persistence": {
+        "status": "PASS"
+      },
+      "message_send": {
+        "status": "NOT_RUN",
+        "reason": "creation_not_confirmed"
+      },
+      "tools_self_check": {
+        "status": "ERROR",
+        "reason": "check_interrupted"
+      },
+      "creation_response": {
+        "status": "PASS",
+        "http_status": 201,
+        "confirmed_new_id": "c104c466-b60f-4370-95ac-48f60580e0ea"
+      }
+    },
+    "before": {
+      "current_id": null,
+      "current_model": "yandexgpt-5-pro",
+      "conversation_ids": [],
+      "active_ids": [],
+      "active_rows": 0,
+      "url_id": null,
+      "stored_id": null,
+      "storage_available": true,
+      "model_choices": 1,
+      "message_count": 0,
+      "empty_state": true,
+      "error_state": false,
+      "ready_state": "complete",
+      "date_ms": 1793072854160,
+      "performance_ms": 7184,
+      "time_origin_ms": 1793072846976
+    },
+    "after_create": {
+      "current_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+      "current_model": "yandexgpt-5-pro",
+      "conversation_ids": [
+        "c104c466-b60f-4370-95ac-48f60580e0ea"
+      ],
+      "active_ids": [
+        "c104c466-b60f-4370-95ac-48f60580e0ea"
+      ],
+      "active_rows": 1,
+      "url_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+      "stored_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+      "storage_available": true,
+      "model_choices": 1,
+      "message_count": 0,
+      "empty_state": true,
+      "error_state": false,
+      "ready_state": "complete",
+      "date_ms": 1793072859764,
+      "performance_ms": 12789,
+      "time_origin_ms": 1793072846976
+    },
+    "after_reload": {
+      "current_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+      "current_model": "yandexgpt-5-pro",
+      "conversation_ids": [
+        "c104c466-b60f-4370-95ac-48f60580e0ea"
+      ],
+      "active_ids": [
+        "c104c466-b60f-4370-95ac-48f60580e0ea"
+      ],
+      "active_rows": 1,
+      "url_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+      "stored_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+      "storage_available": true,
+      "model_choices": 1,
+      "message_count": 0,
+      "empty_state": true,
+      "error_state": false,
+      "ready_state": "complete",
+      "date_ms": 1793072863934,
+      "performance_ms": 1912,
+      "time_origin_ms": 1793072862023
+    },
+    "network": {
+      "available": true,
+      "intact": true,
+      "expired": false,
+      "requests": [
+        {
+          "id": 1,
+          "path": "/api/conversations",
+          "method": "POST",
+          "started": {
+            "date_ms": 1793072858805,
+            "performance_ms": 11829
+          },
+          "finished": {
+            "date_ms": 1793072858871,
+            "performance_ms": 11895
+          },
+          "status": 201,
+          "error": null,
+          "body_done": true,
+          "response_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+          "response_ids": null,
+          "response_message_count": null,
+          "blocked": false
+        },
+        {
+          "id": 2,
+          "path": "/api/conversations/c104c466-b60f-4370-95ac-48f60580e0ea/settings",
+          "method": "GET",
+          "started": {
+            "date_ms": 1793072858916,
+            "performance_ms": 11939
+          },
+          "finished": {
+            "date_ms": 1793072858968,
+            "performance_ms": 11992
+          },
+          "status": 200,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": null,
+          "response_message_count": null,
+          "blocked": false
+        },
+        {
+          "id": 3,
+          "path": "/api/conversations/c104c466-b60f-4370-95ac-48f60580e0ea/messages",
+          "method": "GET",
+          "started": {
+            "date_ms": 1793072858926,
+            "performance_ms": 11950
+          },
+          "finished": {
+            "date_ms": 1793072858976,
+            "performance_ms": 12000
+          },
+          "status": 200,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": null,
+          "response_message_count": 0,
+          "blocked": false
+        }
+      ],
+      "samples": [
+        {
+          "current_id": null,
+          "conversation_ids": [],
+          "active_ids": [],
+          "message_count": 0,
+          "empty_state": true,
+          "error_state": false,
+          "sidebar_open": true,
+          "expanded": "true",
+          "date_ms": 1793072856436,
+          "performance_ms": 9460,
+          "reason": "initial"
+        },
+        {
+          "current_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+          "conversation_ids": [
+            "c104c466-b60f-4370-95ac-48f60580e0ea"
+          ],
+          "active_ids": [
+            "c104c466-b60f-4370-95ac-48f60580e0ea"
+          ],
+          "message_count": 0,
+          "empty_state": false,
+          "error_state": false,
+          "sidebar_open": false,
+          "expanded": "false",
+          "date_ms": 1793072858932,
+          "performance_ms": 11956,
+          "reason": "mutation"
+        },
+        {
+          "current_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+          "conversation_ids": [
+            "c104c466-b60f-4370-95ac-48f60580e0ea"
+          ],
+          "active_ids": [
+            "c104c466-b60f-4370-95ac-48f60580e0ea"
+          ],
+          "message_count": 0,
+          "empty_state": true,
+          "error_state": false,
+          "sidebar_open": false,
+          "expanded": "false",
+          "date_ms": 1793072858982,
+          "performance_ms": 12006,
+          "reason": "mutation"
+        }
+      ],
+      "sample_overflow": false
+    },
+    "reload_network": {
+      "available": true,
+      "intact": true,
+      "expired": false,
+      "requests": [
+        {
+          "id": 1,
+          "path": "/api/conversations",
+          "method": "GET",
+          "started": {
+            "date_ms": 1793072863527,
+            "performance_ms": 1505
+          },
+          "finished": {
+            "date_ms": 1793072863574,
+            "performance_ms": 1551
+          },
+          "status": 200,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": [
+            "c104c466-b60f-4370-95ac-48f60580e0ea"
+          ],
+          "response_message_count": null,
+          "blocked": false
+        },
+        {
+          "id": 2,
+          "path": "/api/conversations/c104c466-b60f-4370-95ac-48f60580e0ea/messages",
+          "method": "GET",
+          "started": {
+            "date_ms": 1793072863530,
+            "performance_ms": 1509
+          },
+          "finished": {
+            "date_ms": 1793072863581,
+            "performance_ms": 1558
+          },
+          "status": 200,
+          "error": null,
+          "body_done": true,
+          "response_id": null,
+          "response_ids": null,
+          "response_message_count": 0,
+          "blocked": false
+        }
+      ],
+      "samples": [
+        {
+          "current_id": "c104c466-b60f-4370-95ac-48f60580e0ea",
+          "conversation_ids": [
+            "c104c466-b60f-4370-95ac-48f60580e0ea"
+          ],
+          "active_ids": [
+            "c104c466-b60f-4370-95ac-48f60580e0ea"
+          ],
+          "message_count": 0,
+          "empty_state": true,
+          "error_state": false,
+          "sidebar_open": false,
+          "expanded": "false",
+          "date_ms": 1793072863515,
+          "performance_ms": 1492,
+          "reason": "initial"
+        }
+      ],
+      "sample_overflow": false
+    },
+    "video": {
+      "path": "15-conversation-create.mp4",
+      "available": true,
+      "time_limit_seconds": 180,
+      "clock_note": "Process timestamps bound recording; they do not identify the exact first video frame.",
+      "exit_code": 0
+    }
+  }
+}
