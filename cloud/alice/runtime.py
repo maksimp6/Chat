@@ -9,7 +9,7 @@ import subprocess
 from typing import Callable
 
 from cloud.base import CloudProviderError
-from core.wikifunctions import lowercase_string, trim_string
+from core.wikifunctions import clamp_integer, lowercase_string, trim_string
 
 
 _MANAGED_LABEL = "alice.cloud.managed"
@@ -171,7 +171,7 @@ class DockerRuntime:
 
     def logs(self, *, name: str, limit: int) -> str:
         self._ensure_owned(name)
-        bounded = max(1, min(int(limit), 1000))
+        bounded = clamp_integer(1, int(limit), 1000)
         return self._run("logs", "--tail", str(bounded), name)
 
     def stats(self, *, name: str) -> dict:

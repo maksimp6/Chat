@@ -19,7 +19,7 @@ files identify their changes. No Wikifunctions service is called at runtime.
 
 ## Shared operations
 
-512 string-helper calls in the PR use the pinned adapters: 51 JavaScript calls (17 case conversions and 34 trims) and 461 Python calls (373 trims and 88 lowercases). The two KPI properties also use the pinned mean and median. `clamp_integer` is reused for file seek bounds and cached-token counts. Repeated state, boolean, billing-owner, SSH-user, Cloud.ru product/IP, project-ID, credential, user-ID, scope, agent-capability and provider-model-key normalization now runs once. The synchronous `static/boot.js` bootstrap keeps native `trim()` because the shared browser bundle loads after it. JSON/map helpers remain unadopted because duplicate-key rejection and first-match lookup do not have a confirmed exact match.
+512 string-helper calls in the PR use the pinned adapters: 51 JavaScript calls (17 case conversions and 34 trims) and 461 Python calls (373 trims and 88 lowercases). The two KPI properties also use the pinned mean and median. `clamp_integer` is reused for provider log-tail limits, file seek bounds and cached-token counts. Repeated state, boolean, billing-owner, SSH-user, Cloud.ru product/IP, project-ID, credential, user-ID, scope, agent-capability and provider-model-key normalization now runs once. The synchronous `static/boot.js` bootstrap keeps native `trim()` because the shared browser bundle loads after it. JSON/map helpers remain unadopted because duplicate-key rejection and first-match lookup do not have a confirmed exact match.
 
 ## Static function inventory
 
