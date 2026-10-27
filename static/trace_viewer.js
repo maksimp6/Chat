@@ -545,7 +545,7 @@
       el(
         "div",
         { className: "logos-trace-inspector-sub" },
-        item.kind.toUpperCase() + (item.data.step ? " · step " + item.data.step : ""),
+        window.LogosWikifunctions.uppercase(item.kind) + (item.data.step ? " · step " + item.data.step : ""),
       ),
     );
     var tabs = el("div", { className: "logos-trace-tabs" }),
