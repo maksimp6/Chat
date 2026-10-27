@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Mapping, Optional
+import math
 import time
 
 from core.restrictions import restrictions_lifted
@@ -152,6 +153,9 @@ def validate_json_schema(value: Any, schema: Mapping[str, Any], path: str = "$")
 
     errors: list[str] = []
 
+    if isinstance(value, float) and not math.isfinite(value):
+        return [f"{path}: number must be finite"]
+
     enum = schema.get("enum")
     if isinstance(enum, list) and value not in enum:
         errors.append(f"{path}: value is not one of enum choices")
@@ -163,14 +167,13 @@ def validate_json_schema(value: Any, schema: Mapping[str, Any], path: str = "$")
 
     any_of = schema.get("anyOf")
     if isinstance(any_of, list):
-        if any(
+        if not any(
             not validate_json_schema(value, option, path)
             for option in any_of
             if isinstance(option, Mapping)
         ):
-            return []
-        errors.append(f"{path}: value does not match anyOf")
-        return errors
+            errors.append(f"{path}: value does not match anyOf")
+            return errors
 
     expected_type = schema.get("type")
     if isinstance(expected_type, list):
@@ -210,22 +213,24 @@ def validate_json_schema(value: Any, schema: Mapping[str, Any], path: str = "$")
                 errors.extend(validate_json_schema(item, item_schema, f"{path}[{index}]"))
 
     if isinstance(value, Mapping):
-        properties = schema.get("properties")
-        if isinstance(properties, Mapping):
-            required = schema.get("required") or []
-            for name in required:
-                if name not in value:
-                    errors.append(f"{path}.{name}: required property is missing")
+        properties = schema.get("properties") or {}
+        if not isinstance(properties, Mapping):
+            properties = {}
+        for name in schema.get("required") or []:
+            if name not in value:
+                errors.append(f"{path}.{name}: required property is missing")
 
-            additional = schema.get("additionalProperties", True)
-            if additional is False:
-                unknown = [key for key in value if key not in properties]
-                for key in unknown:
-                    errors.append(f"{path}.{key}: additional property is not allowed")
-
-            for name, item_schema in properties.items():
-                if name in value and isinstance(item_schema, Mapping):
-                    errors.extend(validate_json_schema(value[name], item_schema, f"{path}.{name}"))
+        additional = schema.get("additionalProperties", True)
+        for name, item in value.items():
+            if name in properties:
+                item_schema = properties[name]
+            elif additional is False:
+                errors.append(f"{path}.{name}: additional property is not allowed")
+                continue
+            else:
+                item_schema = additional
+            if isinstance(item_schema, Mapping):
+                errors.extend(validate_json_schema(item, item_schema, f"{path}.{name}"))
 
     return errors
 
@@ -308,9 +313,15 @@ class UniversalToolExecutor:
         server_configs: Optional[list[dict[str, Any]]] = None,
     ) -> dict[str, Any]:
         if not isinstance(call, UniversalToolCall):
+            if not isinstance(call, Mapping):
+                return UniversalToolResult(
+                    False,
+                    error="Tool call must be an object",
+                    metadata={"phase": "validation"},
+                ).to_mapping()
             call = UniversalToolCall(
                 tool_name=str(call.get("tool_name") or call.get("name") or ""),
-                arguments=dict(call.get("arguments") or {}),
+                arguments=call.get("arguments", {}),
                 call_id=call.get("call_id"),
                 transport=str(call.get("transport") or "internal"),
                 trace_id=call.get("trace_id"),
@@ -319,8 +330,24 @@ class UniversalToolExecutor:
                 user_id=None,
                 # A mapping never grants approval; the host sets it on UniversalToolCall.
                 approved=False,
-                metadata=dict(call.get("metadata") or {}),
+                metadata=call.get("metadata") or {},
             )
+
+        if not isinstance(call.arguments, Mapping) or any(
+            not isinstance(key, str) for key in call.arguments
+        ):
+            return UniversalToolResult(
+                False,
+                error="Tool arguments must be an object with string keys",
+                metadata={"tool": call.tool_name, "phase": "validation", "call_id": call.call_id},
+            ).to_mapping()
+
+        if not isinstance(call.metadata, Mapping):
+            return UniversalToolResult(
+                False,
+                error="Tool metadata must be an object",
+                metadata={"tool": call.tool_name, "phase": "validation", "call_id": call.call_id},
+            ).to_mapping()
 
         raw_definition = self.registry.get_universal_definition(call.tool_name)
         if raw_definition is None:
@@ -435,8 +462,9 @@ class UniversalToolExecutor:
             return self.execute(call, **hooks)
 
         definition = self.registry.get_universal_definition(call.tool_name)
-        trace_arguments = dict(call.arguments)
-        if definition is not None:
+        arguments = dict(call.arguments) if isinstance(call.arguments, Mapping) else call.arguments
+        trace_arguments = dict(arguments) if isinstance(arguments, Mapping) else arguments
+        if definition is not None and isinstance(trace_arguments, Mapping):
             redact = set(dict(definition.metadata or {}).get("trace_redact_arguments") or ())
             for key in redact:
                 if key in trace_arguments:
@@ -444,11 +472,15 @@ class UniversalToolExecutor:
 
         traced_call = replace(
             call,
-            metadata={**dict(call.metadata), "execution_trace": trace},
+            metadata=(
+                {**dict(call.metadata), "execution_trace": trace}
+                if isinstance(call.metadata, Mapping)
+                else call.metadata
+            ),
         )
         result = trace.track_tool_execution(
             call.tool_name,
-            dict(call.arguments),
+            arguments,
             lambda: self.execute(traced_call, **hooks),
             call_id=call.call_id,
             step=None,
@@ -521,7 +553,8 @@ class UniversalToolExecutor:
         call: UniversalToolCall,
     ) -> dict[str, Any]:
         if isinstance(raw_result, Mapping) and "success" in raw_result:
-            success = bool(raw_result.get("success"))
+            has_error = raw_result.get("error") is not None or raw_result.get("isError") is True
+            success = raw_result.get("success") is True and not has_error
             if success and "data" not in raw_result:
                 data = {
                     key: value
@@ -530,12 +563,22 @@ class UniversalToolExecutor:
                 }
             else:
                 data = raw_result.get("data")
-            error = None if success else raw_result.get("error")
+            error = (
+                None
+                if success
+                else raw_result.get("error")
+                or (raw_result.get("content") if raw_result.get("isError") is True else None)
+                or "Tool execution failed"
+            )
+            if not isinstance(raw_result.get("success"), bool) and not has_error:
+                error = "Tool returned a non-boolean success flag"
             metadata = dict(raw_result.get("metadata") or {})
-        elif isinstance(raw_result, Mapping) and raw_result.get("error"):
+        elif isinstance(raw_result, Mapping) and (
+            raw_result.get("error") is not None or raw_result.get("isError") is True
+        ):
             success = False
             data = None
-            error = str(raw_result.get("error"))
+            error = str(raw_result.get("error") or raw_result.get("content") or "Tool execution failed")
             metadata = {"phase": "execution"}
         else:
             success = True

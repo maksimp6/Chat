@@ -391,22 +391,30 @@ def build_response_payload(
         payload["reasoning"] = {"effort": params["reasoning_effort"]}
 
     raw_tools = params.get("tools")
-    if raw_tools:
-        cleaned_tools = _clean_tools(raw_tools)
-        if cleaned_tools:
-            payload["tools"] = cleaned_tools
-            payload["tool_choice"] = params.get("tool_choice") or "auto"
-            max_tool_calls = params.get("max_tool_calls")
-            # The input schema documents an integer. Omit an unset limit rather
-            # than relying on nullable response fields to prove POST support.
-            if max_tool_calls is not None:
-                payload["max_tool_calls"] = max_tool_calls
+    cleaned_tools = _clean_tools(raw_tools) if raw_tools is not None else []
+    tool_choice = params.get("tool_choice", "auto")
+    if not cleaned_tools and (tool_choice == "required" or isinstance(tool_choice, dict)):
+        raise ValueError("tool_choice requires an available tool in tools")
+    if isinstance(tool_choice, dict) and tool_choice.get("type") == "function":
+        if not any(
+            tool.get("type") == "function" and tool.get("name") == tool_choice["name"]
+            for tool in cleaned_tools
+        ):
+            raise ValueError("tool_choice.name must name an available function in tools")
+    if cleaned_tools:
+        payload["tools"] = cleaned_tools
+        payload["tool_choice"] = tool_choice
+        max_tool_calls = params.get("max_tool_calls")
+        # The input schema documents an integer. Omit an unset limit rather
+        # than relying on nullable response fields to prove POST support.
+        if max_tool_calls is not None:
+            payload["max_tool_calls"] = max_tool_calls
 
-            ptc = params.get("parallel_tool_calls")
-            if ptc is not None:
-                payload["parallel_tool_calls"] = ptc
-            else:
-                payload["parallel_tool_calls"] = True
+        ptc = params.get("parallel_tool_calls")
+        if ptc is not None:
+            payload["parallel_tool_calls"] = ptc
+        else:
+            payload["parallel_tool_calls"] = True
 
     previous_response_id = params.get("previous_response_id")
     if previous_response_id and yandex_conv_id:
@@ -446,10 +454,16 @@ def _clean_mcp_tool(tool):
 
 def _clean_tools(tools):
     if not isinstance(tools, list):
-        return tools
+        raise ValueError("tools must be a list of typed objects")
     cleaned = []
     for tool in tools:
-        if isinstance(tool, dict) and tool.get("type") == "mcp":
+        if (
+            not isinstance(tool, dict)
+            or not isinstance(tool.get("type"), str)
+            or not tool["type"].strip()
+        ):
+            raise ValueError("tools must be a list of typed objects")
+        if tool.get("type") == "mcp":
             result = _clean_mcp_tool(tool)
             if result is not None:
                 cleaned.append(result)

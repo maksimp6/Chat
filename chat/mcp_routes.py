@@ -153,7 +153,9 @@ def _record_provider_output(trace, response):
     """What the provider returned for one request: the status, the output kinds and the calls it asked for."""
     if not isinstance(trace, ExecutionTrace) or not isinstance(response, dict):
         return
-    output = response.get("output") or []
+    output = response.get("output")
+    if not isinstance(output, list):
+        output = []
     trace.add_event(
         "provider_output_observed",
         {
@@ -292,7 +294,7 @@ class LogosClient(YandexResponsesClient):
                 result = self._execute_single_tool(
                     call, tool_servers, trace=trace, **policy_kwargs
                 )
-                if result.get("error"):
+                if result.get("error") is not None:
                     return {"error": result["error"], "tool": result.get("name")}
                 return result.get("result")
 
@@ -307,6 +309,16 @@ class LogosClient(YandexResponsesClient):
 
             def continue_request(input_items, previous_response):
                 continuation_params = dict(base_params)
+                # The initial forced choice has been satisfied. Permit a final
+                # answer instead of forcing the same action again with a new id.
+                choice = continuation_params.get("tool_choice")
+                if choice == "required":
+                    continuation_params["tool_choice"] = "auto"
+                elif isinstance(choice, dict):
+                    continuation_params["tool_choice"] = (
+                        {**choice, "mode": "auto"}
+                        if choice.get("type") == "allowed_tools" else "auto"
+                    )
                 # The provider conversation already contains the answered calls.
                 if conversation_id:
                     continuation_params["input"] = [

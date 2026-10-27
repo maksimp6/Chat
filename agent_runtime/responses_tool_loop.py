@@ -6,18 +6,26 @@ import json
 from typing import Any, Callable, Iterable
 
 
-def extract_function_calls(response: dict[str, Any]) -> list[dict[str, Any]]:
+def extract_function_calls(response: Any) -> list[dict[str, Any]]:
     """Return function calls from a Responses API output payload."""
     calls: list[dict[str, Any]] = []
-    for item in response.get("output", []) or []:
+    if not isinstance(response, dict):
+        return calls
+    output = response.get("output")
+    if not isinstance(output, list):
+        return calls
+    for item in output:
         if not isinstance(item, dict):
             continue
         if item.get("type") == "function_call":
             calls.append(item)
         elif item.get("type") == "message":
+            content = item.get("content")
+            if not isinstance(content, list):
+                continue
             calls.extend(
                 part
-                for part in item.get("content", []) or []
+                for part in content
                 if isinstance(part, dict) and part.get("type") == "function_call"
             )
     return calls
@@ -77,7 +85,7 @@ def run_tool_loop(
             raise ValueError("Responses API returned a non-object response")
         # A truncated call may contain only part of its arguments. Preserve the
         # provider failure for the caller; never execute its partial output.
-        if response.get("error") is not None or response.get("status") not in (None, "completed"):
+        if response.get("error") is not None or response.get("status") != "completed":
             return response
         calls = extract_function_calls(response)
         if not calls:
@@ -112,7 +120,7 @@ def run_tool_loop(
     if not isinstance(response, dict):
         raise ValueError("Responses API returned a non-object response")
     calls = extract_function_calls(response)
-    if response.get("error") is not None or response.get("status") not in (None, "completed"):
+    if response.get("error") is not None or response.get("status") != "completed":
         return response
     if not calls:
         return response

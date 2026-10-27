@@ -31,8 +31,6 @@ class YandexMcpMixin:
         if not isinstance(function, dict):
             function = {}
         name = tc.get("name") or function.get("name")
-        if name and "<|" in name:
-            name = name.split("<|")[0].strip()
 
         args = tc["arguments"] if "arguments" in tc else function.get("arguments", {})
 
@@ -50,6 +48,11 @@ class YandexMcpMixin:
 
         try:
             try:
+                if not isinstance(name, str) or not name.strip():
+                    raise ValueError("Invalid tool name: expected a non-empty string")
+                name = name.split("<|", 1)[0].strip()
+                if not name:
+                    raise ValueError("Invalid tool name: expected a non-empty string")
                 if isinstance(args, str):
                     try:
                         args = json.loads(args)
@@ -102,7 +105,7 @@ class YandexMcpMixin:
 
         except Exception as exc:
             result = None
-            error = str(exc)
+            error = str(exc) or type(exc).__name__
 
             api_logger.exception("[LOCAL TOOL ERROR] name=%s call_id=%s", name, call_id)
 
