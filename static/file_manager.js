@@ -1,5 +1,6 @@
 window.fetchVectorStores = function () {
-  return window.LogosDispatcher.request("/api/vector-stores")
+  // Same budget as the file list (LIST_TIMEOUT_MS below): the server may wait 30 s per attempt.
+  return window.LogosDispatcher.request("/api/vector-stores", undefined, { timeoutMs: 90000 })
     .then(function (r) {
       return r
         .json()
@@ -14,7 +15,9 @@ window.fetchVectorStores = function () {
               else if (data.error && typeof data.error.message === "string")
                 message = data.error.message;
             }
-            throw new Error("Vector Stores: " + message);
+            var failure = new Error("Vector Stores: " + message);
+            failure.status = r.status;
+            throw failure;
           }
           return data;
         });
@@ -47,6 +50,39 @@ window.fetchVectorStores = function () {
 
 (function () {
   "use strict";
+
+  var LIST_TIMEOUT_MS = 90000;
+  var NO_ANSWER_TEXT = "Сервер не ответил вовремя или нет связи. Повторите.";
+
+  // A non-OK response as an Error that keeps its status, so a gateway timeout can be told apart.
+  function statusError(r, message) {
+    var error = new Error(message || "HTTP " + r.status);
+    error.status = r.status;
+    return error;
+  }
+
+  function readJson(r) {
+    return r.json().catch(function () {
+      return {};
+    });
+  }
+
+  // True when no usable answer came back: a browser timeout, a network failure or a 504.
+  function isNoAnswer(error) {
+    return (
+      Boolean(error) &&
+      (error.status === 504 ||
+        error instanceof TypeError ||
+        error.name === "AbortError" ||
+        error.name === "TimeoutError")
+    );
+  }
+
+  // Browser errors are in English and do not help the user, so a no-answer case gets Russian text.
+  function describeError(error) {
+    if (isNoAnswer(error)) return NO_ANSWER_TEXT;
+    return (error && error.message) || "Неизвестная ошибка";
+  }
 
   window.openFileManagerModal = function () {
     var UI = window.SettingsUI;
@@ -87,6 +123,8 @@ window.fetchVectorStores = function () {
       "</div>",
       // === Секция файлов ===
       '<h3 style="margin:0 0 10px;font-size:15px;color:var(--m-text,#222);">Файлы</h3>',
+      // Upload rows and their errors live here, not in #file-list, which is rebuilt on every refresh.
+      '<div id="file-upload-status"></div>',
       '<div id="file-list" style="max-height:400px;overflow-y:auto;">',
       '    <div style="padding:20px;text-align:center;color:var(--m-muted,#999);">Загрузка списка файлов...</div>',
       "</div>",
@@ -252,15 +290,18 @@ window.fetchVectorStores = function () {
         .catch(function (error) {
           console.error("[FILE MANAGER] Vector Stores load failed:", error);
           if (!cont) return;
-          var message =
-            error && error.message ? error.message : "Не удалось загрузить Vector Stores.";
+          var message = describeError(error);
+          // A timeout says nothing about the provider key, so the key hint is shown for real answers only.
+          var keyHint = isNoAnswer(error)
+            ? ""
+            : '<div style="margin-bottom:8px;color:var(--m-muted,#666);">Проверьте ключ провайдера и доступ к векторным хранилищам в настройках.</div>';
           cont.innerHTML =
             '<div style="padding:12px;color:var(--m-danger,#c33);font-size:12px;">' +
             '<div style="font-weight:600;margin-bottom:6px;">Не удалось загрузить векторные хранилища</div>' +
             '<div style="margin-bottom:8px;word-break:break-word;">' +
             window.SettingsUI.escapeHtml(message) +
             "</div>" +
-            '<div style="margin-bottom:8px;color:var(--m-muted,#666);">Проверьте ключ провайдера и доступ к векторным хранилищам в настройках.</div>' +
+            keyHint +
             '<button class="logos-btn file-manager-vs-refresh-btn" id="btn-retry-vs">Повторить</button>' +
             "</div>";
           var retry = document.getElementById("btn-retry-vs");
@@ -346,53 +387,64 @@ window.fetchVectorStores = function () {
         fileListEl.appendChild(state);
       }
 
-      renderAddFilesState("Загрузка...", false);
+      // Loads the files that can be added. A failure leaves a retry button in the panel.
+      function loadAddableFiles() {
+        renderAddFilesState("Загрузка...", false);
 
-      window.LogosDispatcher.request("/api/files")
-        .then(function (r) {
-          return r.json().then(function (data) {
-            if (!r.ok) throw new Error((data && data.error) || "HTTP " + r.status);
-            return data;
+        window.LogosDispatcher.request("/api/files", undefined, { timeoutMs: LIST_TIMEOUT_MS })
+          .then(function (r) {
+            if (r.ok) return r.json();
+            return readJson(r).then(function (data) {
+              throw statusError(r, data && data.error);
+            });
+          })
+          .then(function (data) {
+            var files = Array.isArray(data.data) ? data.data : [];
+            if (files.length === 0) {
+              renderAddFilesState("Нет файлов. Загрузите их в менеджере.", false);
+              return;
+            }
+            fileListEl.replaceChildren();
+            files.forEach(function (f) {
+              var row = document.createElement("label");
+              row.className = "file-manager-add-row";
+
+              var checkbox = document.createElement("input");
+              checkbox.type = "checkbox";
+              checkbox.className = "vs-add-file-chk";
+              checkbox.value = f.id || "";
+
+              var filename = document.createElement("span");
+              filename.className = "file-manager-add-name";
+              filename.textContent = f.filename || "";
+
+              var size = document.createElement("span");
+              size.className = "file-manager-add-size";
+              size.textContent = formatBytes(f.bytes);
+
+              row.appendChild(checkbox);
+              row.appendChild(filename);
+              row.appendChild(size);
+              fileListEl.appendChild(row);
+            });
+          })
+          .catch(function (e) {
+            renderAddFilesState("Не удалось загрузить список файлов. " + describeError(e), true);
+            var retry = document.createElement("button");
+            retry.type = "button";
+            retry.className = "logos-btn file-manager-secondary-btn";
+            retry.textContent = "Повторить";
+            retry.addEventListener("click", loadAddableFiles);
+            fileListEl.appendChild(retry);
           });
-        })
-        .then(function (data) {
-          var files = Array.isArray(data.data) ? data.data : [];
-          if (files.length === 0) {
-            renderAddFilesState("Нет файлов. Загрузите их в менеджере.", false);
-            return;
-          }
-          fileListEl.replaceChildren();
-          files.forEach(function (f) {
-            var row = document.createElement("label");
-            row.className = "file-manager-add-row";
+      }
 
-            var checkbox = document.createElement("input");
-            checkbox.type = "checkbox";
-            checkbox.className = "vs-add-file-chk";
-            checkbox.value = f.id || "";
-
-            var filename = document.createElement("span");
-            filename.className = "file-manager-add-name";
-            filename.textContent = f.filename || "";
-
-            var size = document.createElement("span");
-            size.className = "file-manager-add-size";
-            size.textContent = formatBytes(f.bytes);
-
-            row.appendChild(checkbox);
-            row.appendChild(filename);
-            row.appendChild(size);
-            fileListEl.appendChild(row);
-          });
-        })
-        .catch(function (e) {
-          renderAddFilesState("Ошибка: " + e.message, true);
-        });
+      loadAddableFiles();
 
       confirm.addEventListener("click", function () {
         var checked = [];
         fileListEl.querySelectorAll(".vs-add-file-chk:checked").forEach(function (chk) {
-          checked.push(chk.value);
+          checked.push(chk);
         });
         if (checked.length === 0) {
           LogosToast.error("Выберите файлы");
@@ -402,26 +454,38 @@ window.fetchVectorStores = function () {
         confirm.disabled = true;
         confirm.textContent = "Добавление...";
 
-        window.LogosDispatcher.request(
-          "/api/vector-stores/" + encodeURIComponent(vsId) + "/files",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ file_ids: checked }),
-          },
-        )
-          .then(function (r) {
-            return r.json().then(function (data) {
-              if (!r.ok) throw new Error((data && data.error) || "HTTP " + r.status);
-              return data;
+        // The route takes one file_id per request. An added file is unchecked, so a retry
+        // after a failure does not add it a second time.
+        function addFrom(index) {
+          if (index >= checked.length) return Promise.resolve();
+          return window.LogosDispatcher.request(
+            "/api/vector-stores/" + encodeURIComponent(vsId) + "/files",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ file_id: checked[index].value }),
+            },
+          )
+            .then(function (r) {
+              if (!r.ok)
+                return readJson(r).then(function (data) {
+                  throw statusError(r, data && data.error);
+                });
+            })
+            .then(function () {
+              checked[index].checked = false;
+              return addFrom(index + 1);
             });
-          })
+        }
+
+        addFrom(0)
           .then(function () {
             closeAddModal();
             loadVsList();
           })
           .catch(function (e) {
-            LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
+            loadVsList();
+            LogosToast.error("Не удалось добавить файл. " + describeError(e));
           })
           .finally(function () {
             if (!document.getElementById("vs-add-confirm")) return;
@@ -455,6 +519,9 @@ window.fetchVectorStores = function () {
           UI.escapeHtml(file.id.substring(0, 12)) +
           "...</code></div>",
         "</div>",
+        '<a class="logos-btn file-manager-secondary-btn" href="/api/files/' +
+          encodeURIComponent(file.id) +
+          '/content" download>Скачать</a>',
         '<button class="logos-btn fm-delete-btn" data-id="' +
           UI.escapeHtml(file.id) +
           '">Удалить</button>',
@@ -479,12 +546,13 @@ window.fetchVectorStores = function () {
 
     function loadFiles() {
       var list = document.getElementById("file-list");
+      if (!list) return;
       list.innerHTML =
         '<div style="padding:20px;text-align:center;color:var(--m-muted,#999);">Загрузка списка файлов...</div>';
 
-      window.LogosDispatcher.request("/api/files")
+      window.LogosDispatcher.request("/api/files", undefined, { timeoutMs: LIST_TIMEOUT_MS })
         .then(function (r) {
-          if (!r.ok) throw new Error("HTTP " + r.status);
+          if (!r.ok) throw statusError(r);
           return r.json();
         })
         .then(function (data) {
@@ -503,55 +571,59 @@ window.fetchVectorStores = function () {
               var fileId = this.getAttribute("data-id");
               if (!confirm("Удалить файл? Он будет удалён из всех хранилищ.")) return;
               var deleteBtn = this;
-              var originalLabel = deleteBtn.innerText;
               deleteBtn.disabled = true;
               deleteBtn.innerText = "...";
-              // A failed delete leaves the file in place, so the button must be usable again.
-              function restoreDeleteBtn() {
-                deleteBtn.disabled = false;
-                deleteBtn.innerText = originalLabel;
-              }
-              window.LogosDispatcher.request("/api/files/" + fileId, { method: "DELETE" })
+              // The server waits up to 30 s for a DELETE and does not retry it, so wait a little longer.
+              window.LogosDispatcher.request(
+                "/api/files/" + fileId,
+                { method: "DELETE" },
+                { timeoutMs: 35000 },
+              )
                 .then(function (r) {
+                  // 404: the file is already gone on the server, so its row is stale and goes too.
+                  if (r.status === 404) return { deleted: true };
+                  if (!r.ok) throw statusError(r);
                   return r.json();
                 })
                 .then(function (res) {
-                  if (res.deleted || res.ok) {
-                    var row = document.getElementById("file-row-" + fileId);
-                    if (row) row.remove();
-                    if (list.children.length === 0) {
-                      list.innerHTML =
-                        '<div style="padding:20px;text-align:center;color:var(--m-muted,#999);">Нет загруженных файлов.</div>';
-                    }
-                  } else {
-                    restoreDeleteBtn();
-                    LogosToast.error("Ошибка: " + (res.error || "неизвестно"));
+                  if (!res.deleted && !res.ok) throw new Error("delete not confirmed");
+                  var row = document.getElementById("file-row-" + fileId);
+                  if (row) row.remove();
+                  if (list.children.length === 0) {
+                    list.innerHTML =
+                      '<div style="padding:20px;text-align:center;color:var(--m-muted,#999);">Нет загруженных файлов.</div>';
                   }
                 })
-                .catch(function (e) {
-                  restoreDeleteBtn();
-                  LogosToast.error("Ошибка сети. Проверьте соединение.");
+                .catch(function () {
+                  // The outcome is unclear or the delete failed: reload to show what the server has now.
+                  LogosToast.error("Не удалось удалить файл. Список обновлён.");
+                  loadFiles();
                 });
             });
           });
         })
         .catch(function (e) {
           list.innerHTML =
-            '<div style="padding:20px;text-align:center;color:var(--m-danger,#c33);">Ошибка: ' +
-            UI.escapeHtml(e.message) +
+            '<div style="padding:20px;text-align:center;color:var(--m-danger,#c33);">' +
+            '<div style="margin-bottom:10px;">Не удалось загрузить список файлов. ' +
+            UI.escapeHtml(describeError(e)) +
+            "</div>" +
+            '<button class="logos-btn file-manager-secondary-btn" id="btn-retry-files" type="button">Повторить</button>' +
             "</div>";
+          var retry = document.getElementById("btn-retry-files");
+          if (retry) retry.addEventListener("click", loadFiles);
         });
     }
 
-    // Загрузка файлов
+    // Загрузка файлов.
+    // Строки загрузок и ошибок лежат в #file-upload-status, а не в #file-list: список
+    // перечитывается целиком, и вместе с ним исчезли бы строки ошибок и незавершённых загрузок.
+    var uploadStatusEl = document.getElementById("file-upload-status");
+    var pendingUploads = 0;
+
     document.getElementById("file-upload").addEventListener("change", function (e) {
       var files = e.target.files;
       if (!files.length) return;
-
-      var list = document.getElementById("file-list");
-      if (list.children.length === 1 && list.children[0].innerText.includes("Нет загруженных")) {
-        list.innerHTML = "";
-      }
 
       for (var i = 0; i < files.length; i++) {
         (function (file) {
@@ -568,7 +640,8 @@ window.fetchVectorStores = function () {
               "</div>",
             "</div>",
           ].join("");
-          list.insertBefore(div, list.firstChild);
+          uploadStatusEl.appendChild(div);
+          pendingUploads += 1;
 
           var formData = new FormData();
           formData.append("file", file);
@@ -581,27 +654,34 @@ window.fetchVectorStores = function () {
           )
             .then(function (r) {
               if (!r.ok)
-                return r.json().then(function (err) {
-                  throw new Error(err.error || "HTTP " + r.status);
+                return readJson(r).then(function (body) {
+                  throw statusError(r, body && body.error);
                 });
-              return r.json();
             })
-            .then(function (res) {
+            .then(function () {
               div.remove();
-              loadFiles();
             })
             .catch(function (err) {
+              // A timed-out upload may still have been saved, so the user is told to check the list first.
+              var text = isNoAnswer(err)
+                ? "Сервер не ответил вовремя: файл мог сохраниться. Проверьте список, прежде чем загружать его снова."
+                : err.message;
               div.innerHTML = [
                 '<div style="flex:1;min-width:0;">',
                 '    <div style="font-weight:bold;color:var(--m-danger,#c33);word-break:break-all;">' +
                   UI.escapeHtml(file.name) +
                   ' <span style="font-size:11px;">(ошибка)</span></div>',
                 '    <div style="font-size:12px;color:var(--m-muted,#666);">' +
-                  UI.escapeHtml(err.message) +
+                  UI.escapeHtml(text) +
                   "</div>",
                 "</div>",
               ].join("");
               div.style.opacity = "1";
+            })
+            .finally(function () {
+              pendingUploads -= 1;
+              // The list is rebuilt once, after the last upload settles, so no row disappears early.
+              if (pendingUploads === 0) loadFiles();
             });
         })(files[i]);
       }

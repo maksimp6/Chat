@@ -17,11 +17,14 @@ from yandex_client_modules.request_mixin import (
     provider_request_headers,
 )
 
+# The client waits up to 5 minutes for an upload, so the server must wait at least as long.
+UPLOAD_TIMEOUT_SECONDS = 300
+
 
 class YandexFileManagerMixin:
     """Миксин для Files и Vector Stores. Подключается к YandexResponsesClient."""
 
-    def _fm_request(self, method, url, **kwargs):
+    def _fm_request(self, method, url, timeout=30, **kwargs):
         """Запрос с retry + логирование через _log_request/_log_response.
         Для multipart убирает Content-Type из заголовков сессии."""
         credential = _resolve_global_provider_credential(self)
@@ -58,7 +61,7 @@ class YandexFileManagerMixin:
             while True:
                 self._log_request(method, url, **kwargs)
                 try:
-                    resp = session.request(method, url, timeout=30, **kwargs)
+                    resp = session.request(method, url, timeout=timeout, **kwargs)
                     self._log_response(resp)
                     return resp
                 except requests.exceptions.RequestException as exc:
@@ -76,7 +79,10 @@ class YandexFileManagerMixin:
                         # including failures while consuming a body, stays logged.
                         retry = retry.increment(method=method, url=url, error=exc)
                     except MaxRetryError:
-                        raise YandexClientError(message) from exc
+                        # A provider that does not answer in time is a gateway timeout (504), so the
+                        # client can say that the file may already have been saved.
+                        status = 504 if isinstance(exc, requests.exceptions.Timeout) else None
+                        raise YandexClientError(message, status_code=status) from exc
                     retry.sleep()
         finally:
             session.close()
@@ -129,7 +135,13 @@ class YandexFileManagerMixin:
         data = {"purpose": purpose}
         if expires_after:
             data["expires_after"] = json.dumps(expires_after)
-        resp = self._fm_request("POST", f"{self.base_url}/files", files=files, data=data)
+        resp = self._fm_request(
+            "POST",
+            f"{self.base_url}/files",
+            files=files,
+            data=data,
+            timeout=UPLOAD_TIMEOUT_SECONDS,
+        )
         if resp.status_code >= 400:
             self._fm_handle_error(resp, "Upload file")
         result = resp.json()
