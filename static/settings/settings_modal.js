@@ -183,13 +183,13 @@
         web_search: {
           enabled: document.getElementById("tools-ws-en").checked,
           context_size: document.getElementById("tools-ws-context").value,
-          allowed_domains: document.getElementById("tools-ws-allow").window.LogosWikifunctions.trim(value),
-          blocked_domains: document.getElementById("tools-ws-block").window.LogosWikifunctions.trim(value),
+          allowed_domains: window.LogosWikifunctions.trim(document.getElementById("tools-ws-allow").value),
+          blocked_domains: window.LogosWikifunctions.trim(document.getElementById("tools-ws-block").value),
         },
         code_interpreter: { enabled: document.getElementById("tools-ci-en").checked },
         file_search: {
           enabled: document.getElementById("tools-fs-en").checked,
-          vector_store_ids: document.getElementById("tools-fs-vids").window.LogosWikifunctions.trim(value),
+          vector_store_ids: window.LogosWikifunctions.trim(document.getElementById("tools-fs-vids").value),
           max_results: Math.max(
             1,
             parseInt(document.getElementById("tools-fs-max").value, 10) || 20,
