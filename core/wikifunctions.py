@@ -4,6 +4,9 @@
 # Source, original code and license: third_party/wikifunctions/.
 """Pinned local Wikifunctions implementations used by Logos."""
 
+from collections.abc import Iterable
+import statistics
+
 
 # WIKIFUNCTIONS Z21951 / Z21953@162115 — НЕ РЕДАКТИРОВАТЬ.
 def clamp_integer(minimum: int, value: int, maximum: int) -> int:
@@ -13,3 +16,15 @@ def clamp_integer(minimum: int, value: int, maximum: int) -> int:
     if value > maximum:
         return maximum
     return value
+
+
+# WIKIFUNCTIONS Z22583 / Z22587@168295 — НЕ РЕДАКТИРОВАТЬ.
+def mean_float64_list(values: Iterable[int | float]) -> float:
+    """Mean of numeric values using the pinned Wikifunctions Python implementation."""
+    return statistics.mean(values)
+
+
+# WIKIFUNCTIONS Z22588 / Z22589@168298 — НЕ РЕДАКТИРОВАТЬ.
+def median_float64_list(values: Iterable[int | float]) -> float:
+    """Median of numeric values using the pinned Wikifunctions Python implementation."""
+    return statistics.median(values)
