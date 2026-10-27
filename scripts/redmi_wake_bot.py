@@ -35,7 +35,7 @@ PACKAGE_HINTS: dict[str, tuple[str, ...]] = {
     "яндекс": ("yandex",),
 }
 
-CLAUSE_SPLIT = re.compile(r"[,;.!?]|\\bи затем\\b|\\bпотом\\b|\\bзатем\\b", re.IGNORECASE)
+CLAUSE_SPLIT = re.compile(r"[,;.!?]|\bи затем\b|\bпотом\b|\bзатем\b", re.IGNORECASE)
 
 
 def run(
@@ -129,11 +129,11 @@ def execute(clause: str) -> bool:
         return unlock()
     if "разбуди" in low or "wake" in low:
         return wake()
-    match = re.match(r"(?:открой|запусти|open|launch)\\s+(.+)", low)
+    match = re.match(r"(?:открой|запусти|open|launch)\s+(.+)", low)
     if match:
         return open_app(match.group(1).strip())
     print(f"SKIP: unknown clause '{clause.strip()}'")
-    return True
+    return False
 
 
 def main() -> int:

@@ -54,7 +54,9 @@ def compute_kpis(
         kpi = kpis.get(thread.owner_agent)
         if thread.kind == "issue":
             for agent in {agent for agent, at in thread.dispatches if at >= since}:
-                kpis[agent].tasks_given += 1
+                # Mentions of agents without a KPI row (e.g. @claude) are not counted.
+                if agent in kpis:
+                    kpis[agent].tasks_given += 1
             continue
         if kpi is None:
             continue

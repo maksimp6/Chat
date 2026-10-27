@@ -37,7 +37,10 @@ def build_actions(s):
     s = replace(
         s,
         'POLICY = pathlib.Path.home() / ".logos-rdc" / "live-device.json"',
-        'POLICY = pathlib.Path(os.environ.get("LOGOS_LIVE_DEVICE_POLICY", str(pathlib.Path.home() / ".logos-rdc" / "live-device.json")))',
+        # Default must point at the staged policy that enroll_policy() writes to DEST.
+        'POLICY = pathlib.Path(os.environ.get("LOGOS_LIVE_DEVICE_POLICY", '
+        + repr(str(DEST / "live-device.json"))
+        + "))",
         "policy path",
     )
     start = s.index("def device():")

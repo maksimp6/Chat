@@ -196,6 +196,8 @@
           ),
         },
       };
+      // Tool selection is saved by PUT /tools; this loaded copy would overwrite it.
+      delete settings.active_tool_categories;
       var status = document.getElementById("tools-status");
       status.textContent = "";
       var localSave = currentConvId
@@ -571,6 +573,7 @@
         settings[key] = readSettingsField(SETTINGS_FIELDS[key], fieldElement(key));
       });
       if (ultra) applyUltraProfile(settings, ultra);
+      delete settings.active_tool_categories;
       Storage.save(settings, currentConvId).then(closeModal, showSaveError);
     });
   };

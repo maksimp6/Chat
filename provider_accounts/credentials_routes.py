@@ -24,6 +24,7 @@ from provider_accounts.credentials import (
     YANDEX,
     ProviderCredential,
     CredentialError,
+    ExpiredCredentialError,
     NoActiveCredentialError,
     get_active_credential,
     replace_active_credential,
@@ -190,7 +191,11 @@ def _status_for(provider: str) -> dict:
 
 
 def _perform_health_check(provider: str) -> dict:
-    credential = _load_credential(provider)
+    try:
+        credential = _load_credential(provider)
+    except ExpiredCredentialError:
+        # Not recorded: record_health_check rejects "expired", so the cached health stays as it was.
+        return {"status": "expired", "error": "credential_expired"}
     if credential is None:
         return {"status": "not_configured", "error": None}
     try:

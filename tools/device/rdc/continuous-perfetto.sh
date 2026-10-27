@@ -14,6 +14,7 @@ while :; do
   FILE="$BASE/chatgpt-ring-$SLOT.pftrace"
   echo "CAPTURE $(date -Is) slot=$SLOT" >> "$LOG"
   adb -s "$SERIAL" shell perfetto -o "$FILE" -t 60s -b 16mb -s 32mb -a com.openai.chatgpt sched/sched_switch sched/sched_wakeup dalvik gfx view >> "$LOG" 2>&1
-  echo "DONE $(date -Is) slot=$SLOT status=$?" >> "$LOG"
+  rc=$?
+  echo "DONE $(date -Is) slot=$SLOT status=$rc" >> "$LOG"
   sleep 1
 done

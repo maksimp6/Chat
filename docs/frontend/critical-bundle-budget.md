@@ -13,7 +13,7 @@ enhancement work tracked by #227; this is scoped to bundle size only.
 
 The repository already has a critical-vs-optional script contract, enforced
 by `tests/test_frontend_script_contract.py`: `templates/index.html` loads a
-synchronous `id="alice-boot"` script first, then a chain of scripts marked
+synchronous `id="logos-boot"` script first, then a chain of scripts marked
 `data-critical-script="core-api|ui-runtime|dispatcher|core"`, before any
 other application module. That chain is the fetch/dispatcher/startup glue
 the shell needs to render and to make a request at all. Everything else
@@ -27,7 +27,7 @@ script contract test cannot silently drift apart:
 
 - `templates/index.html` — the shell markup itself;
 - the first `<link rel="stylesheet">` in `<head>` — `static/style.css`;
-- the synchronous `id="alice-boot"` script — `static/boot.js`;
+- the synchronous `id="logos-boot"` script — `static/boot.js`;
 - every script carrying `data-critical-script="..."` — currently
   `core_api.js`, `ui_runtime.js`, `dispatcher.js`, `core.js`.
 

@@ -77,9 +77,10 @@ def handle_client(conn: socket.socket, store: MemoryStore, allowed_uid: int) -> 
         return
     try:
         result = _operate(store, receive(conn))
-        response = (json.dumps(result, separators=(",", ":")) + "\n").encode()
+        response = (json.dumps(result, ensure_ascii=False, separators=(",", ":")) + "\n").encode()
         if len(response) > MAX_RESPONSE:
-            return
+            fallback = {"ok": False, "error": "response_too_large"}
+            response = (json.dumps(fallback, separators=(",", ":")) + "\n").encode()
         conn.sendall(response)
     except (ValueError, TypeError, KeyError, OSError, TimeoutError):
         return

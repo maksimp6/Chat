@@ -21,6 +21,7 @@ Categories (lexicon-driven, no external deps):
 import json
 import re
 import sys
+import textwrap
 from collections import Counter
 from collections.abc import Generator
 from pathlib import Path
@@ -73,7 +74,7 @@ OPENING_ACTION = re.compile(r"^(как |что если |зачем |сдела�
 
 def _owner_category(low: str, length: int) -> str:
     """Classify an OWNER sentence by its lowercase text."""
-    if any(h in low for h in RELAY_MARKERS) and (length > 600 or "```" in low or "pr #" in low):
+    if any(h in low for h in RELAY_MARKERS) and ("```" in low or "pr #" in low):
         return "relay"
     if any(m in low for m in RELAY_MARKERS):
         return "relay"
@@ -94,8 +95,6 @@ def _model_category(low: str) -> str:
 def classify_sentence(role: str, text: str) -> str:
     """Return the category of a single dialogue sentence."""
     low = text.lower()
-    if any(m in low for m in OFFER_MARKERS) or OPENING_OFFER.match(low):
-        return "offer"
     if role != "OWNER":
         return _model_category(low)
     return _owner_category(low, len(text))
@@ -104,7 +103,15 @@ def classify_sentence(role: str, text: str) -> str:
 def split_sentences(text: str) -> list[str]:
     """Split a dialogue value into candidate sentences."""
     parts = re.split(r"(?<=[.!?…])\s+(?=[А-ЯЁA-Z«\"'])", text)
-    return [p.strip().strip("*`") for p in parts if 10 < len(p.strip()) < 600]
+    sents: list[str] = []
+    for part in parts:
+        sent = part.strip()
+        if len(sent) < 600:
+            sents.append(sent)
+        else:
+            # over-long segment: split by line breaks, then by length, so no text is dropped
+            sents += [piece for line in sent.splitlines() for piece in textwrap.wrap(line, 599)]
+    return [p.strip().strip("*`") for p in sents if 10 < len(p)]
 
 
 def parse_deeplink_json(data: dict[str, Any]) -> Generator[tuple[str, str, str], None, None]:

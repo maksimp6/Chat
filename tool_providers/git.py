@@ -69,16 +69,18 @@ def _resolve_repo_path(repo_name: str = None, cfg: dict = None) -> str:
             return target
         return ""
 
+    # A relative name such as "../x" can leave the roots, so every candidate is checked.
+    roots = _allowed_roots(cfg)
     candidate = os.path.join(base_dir, target)
-    if os.path.isdir(candidate):
+    if os.path.isdir(candidate) and _inside(candidate, roots):
         return candidate
 
     for fallback in ["/sdcard/repo", "/sdcard", os.getcwd()]:
         alt = os.path.join(fallback, target)
-        if os.path.isdir(alt):
+        if os.path.isdir(alt) and _inside(alt, roots):
             return alt
 
-    return candidate
+    return candidate if _inside(candidate, roots) else ""
 
 
 def _is_bare_repo(repo_path: str) -> bool:
@@ -240,12 +242,17 @@ def git_commit(args: dict, cfg: dict) -> dict:
     # Автоматическая индексация перед коммитом
     if files:
         target = [files] if isinstance(files, str) else files
-        _run_git(["add", "--"] + target, cfg, repo, is_read=False)
+        add_res = _run_git(["add", "--"] + target, cfg, repo, is_read=False)
+        # Only the named paths are committed, not everything else already staged.
+        commit_cmd = ["commit", "-m", msg, "--"] + target
     else:
-        _run_git(["add", "-A"], cfg, repo, is_read=False)
+        add_res = _run_git(["add", "-A"], cfg, repo, is_read=False)
+        commit_cmd = ["commit", "-m", msg]
+    if not add_res.get("success"):
+        return add_res
 
     time.sleep(0.15)
-    return _run_git(["commit", "-m", msg], cfg, repo, is_read=False)
+    return _run_git(commit_cmd, cfg, repo, is_read=False)
 
 
 @write_op

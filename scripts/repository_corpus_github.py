@@ -41,6 +41,13 @@ def _remaining(deadline):
     return remaining
 
 
+def _require_complete_body(response, received):
+    """A body shorter than its declared Content-Length was cut off before the end."""
+    declared = response.headers.get("Content-Length")
+    if declared is not None and declared.isdigit() and int(declared) != received:
+        raise CollectionError("response_body_incomplete")
+
+
 def _public_attachment_url(url):
     parsed = urlsplit(url)
     return (
@@ -271,6 +278,7 @@ class GitHubReader:
             if self.downloaded_bytes > self.max_total_bytes:
                 self.stop_reason = "download_budget_exhausted"
                 raise CollectionError(self.stop_reason)
+            _require_complete_body(response, len(raw))
             return raw, response.headers.get("ETag")
 
     def _http_error(self, error, cached):
@@ -360,6 +368,7 @@ class GitHubReader:
                     raise CollectionError(self.stop_reason)
                 chunks.append(chunk)
             _remaining(deadline)
+            _require_complete_body(response, size)
             return b"".join(chunks), response.headers.get("ETag")
 
     def graphql(self, query: str, variables: dict) -> dict:

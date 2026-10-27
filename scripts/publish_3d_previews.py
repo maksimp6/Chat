@@ -265,8 +265,9 @@ def render_report(
         source_sha = _sha(model["sha"])
         try:
             mesh, png = bounded_render(_blob(api, source_sha), filename)
-        except PreviewError as exc:
+        except (PreviewError, PublishError) as exc:
             # A misleading image is worse than an explicit unavailable result.
+            # One oversized or unreadable model must not drop the whole PR report.
             images.append((path, None, str(exc), None))
             continue
         destination = _preview_path(pr_number, path)

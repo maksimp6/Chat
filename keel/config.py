@@ -42,7 +42,8 @@ def _validate_no_plaintext_secrets(
             if "ref" in value and isinstance(value.get("ref"), str):
                 if not value["ref"].startswith("logos/"):
                     raise ConfigError(f"Invalid secret ref pattern at {path}.{key}: {value['ref']}")
-                continue
+                # The ref is the only secret field; the other keys still get the plaintext check.
+                value = {k: v for k, v in value.items() if k != "ref"}
 
             is_secrets_section = is_secrets_file or key == "secrets"
             _validate_no_plaintext_secrets(value, f"{path}.{key}", is_secrets_section)

@@ -369,6 +369,11 @@ def save_dialog_settings(conv_id):
             settings["tools_config"] = normalize_tools_config(settings["tools_config"])
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
+    if "active_tool_categories" not in settings:
+        # Tool selection is saved by PUT /tools; a settings save must not drop it.
+        stored = get_conv_settings(conv_id) or {}
+        if "active_tool_categories" in stored:
+            settings["active_tool_categories"] = stored["active_tool_categories"]
     save_conv_settings(conv_id, settings)
     return jsonify({"status": "ok"})
 

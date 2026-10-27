@@ -188,12 +188,13 @@
           body.yandex_project_id = project;
         }
         if (cloudru) body.cloudru_api_key = cloudru;
+        // The server may spend two 30 s provider calls (key check, old key revoke) before it answers.
         var response = await window.LogosDispatcher.request("/api/provider-credentials", {
           method: "PUT",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
-        });
+        }, { timeoutMs: 60000 });
         var data = await response.json().catch(function () {
           return {};
         });
@@ -215,8 +216,14 @@
         document.getElementById("provider-cloudru-key").value = "";
         await fetchStatus(output);
       } catch (error) {
-        output.textContent =
-          "Ошибка подключения: " + (error instanceof TypeError ? "нет связи с сервером" : error.message);
+        // A client timeout does not stop the server, so the key may already be stored.
+        if (error && (error.name === "AbortError" || error.name === "TimeoutError")) {
+          output.textContent =
+            "Сервер не ответил вовремя. Проверка ключа могла завершиться, и ключ мог быть сохранён: проверьте статус перед повторной отправкой.";
+        } else {
+          output.textContent =
+            "Ошибка подключения: " + (error instanceof TypeError ? "нет связи с сервером" : error.message);
+        }
       } finally {
         save.disabled = false;
       }

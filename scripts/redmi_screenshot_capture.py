@@ -319,8 +319,8 @@ class RDP:
     def __init__(self, deadline=None):
         self.deadline = deadline if deadline is not None else CAPTURE_DEADLINE
         self.s = socket.socket(socket.AF_UNIX)
-        self.s.settimeout(remaining(3, self.deadline))
         try:
+            self.s.settimeout(remaining(3, self.deadline))
             self.s.connect(SOCKET)
             self.buffer = b""
             self.receive()
@@ -1552,16 +1552,17 @@ def capture(out, uid, gid, metadata):
 
 def restore_clean_page(target_url=None):
     """Leave the phone on the plain app page: no open picker and no capture query in the address bar."""
+    # The capture deadline may already be spent here, so the restore gets its own short budget.
     try:
-        rdp = RDP()
+        rdp = RDP(deadline=time.monotonic() + 15)
         try:
             actor = rdp.find_logos()
             rdp.evaluate(actor, "JSON.stringify((()=>{setTimeout(()=>location.replace(" +
                          json.dumps(target_url or LOGOS_URL) + "),100);return {scheduled:true};})())")
         finally:
             rdp.s.close()
-    except Exception:
-        pass
+    except Exception as error:
+        print("Clean page restore failed: " + str(error), file=sys.stderr)
 
 
 def main():
@@ -1611,6 +1612,9 @@ def main():
     if result.returncode:
         # No job token is in the capture child's environment or argv.
         raise RuntimeError(result.stderr.decode(errors="replace")[-1800:] or "Capture failed")
+    if result.stderr:
+        # Forward non-fatal child messages, such as a failed return to the clean page.
+        print(result.stderr.decode(errors="replace")[-1800:], file=sys.stderr)
     print(result.stdout.decode().strip())
 
 

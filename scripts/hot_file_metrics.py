@@ -90,7 +90,11 @@ def _split_rename_path(path: str) -> tuple[str, str] | None:
         if "=>" not in inner:
             return None
         old_inner, new_inner = (part.strip() for part in inner.split("=>", 1))
-        return prefix + old_inner + suffix, prefix + new_inner + suffix
+        head = prefix.rstrip("/")
+        tail = suffix.lstrip("/")
+        old_path = "/".join(part for part in (head, old_inner, tail) if part)
+        new_path = "/".join(part for part in (head, new_inner, tail) if part)
+        return old_path, new_path
     old_path, new_path = (part.strip() for part in path.split("=>", 1))
     return old_path, new_path
 

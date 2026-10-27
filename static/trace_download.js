@@ -92,6 +92,12 @@
     }
   }
 
+  // The server accepts up to 128 MB: budget a fixed base plus time at a 512 KB/s floor,
+  // capped at the dispatcher's 5-minute maximum.
+  function uploadTimeoutMs(bytes) {
+    return Math.min(30000 + Math.ceil(bytes / (512 * 1024)) * 1000, 300000);
+  }
+
   function uploadToFileManager() {
     var payload;
     try {
@@ -101,8 +107,9 @@
       return;
     }
 
+    var blob = new Blob([payload], { type: "application/json" });
     var form = new FormData();
-    form.append("file", new Blob([payload], { type: "application/json" }), traceFilename());
+    form.append("file", blob, traceFilename());
     form.append("purpose", "assistants");
 
     var button = document.getElementById(uploadButtonId);
@@ -111,7 +118,11 @@
       button.textContent = "⏳ Загрузка...";
     }
 
-    window.LogosDispatcher.request("/api/files", { method: "POST", body: form })
+    window.LogosDispatcher.request(
+      "/api/files",
+      { method: "POST", body: form },
+      { timeoutMs: uploadTimeoutMs(blob.size) },
+    )
       .then(function (response) {
         return response
           .json()
