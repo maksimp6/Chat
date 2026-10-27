@@ -1,0 +1,240 @@
+{
+  "scope": "offline_regressions_on_physical_runner_not_live_e2e",
+  "source_sha": "450be1acf9bd1a386771dd5c356d92147297e93f",
+  "device_model": "Redmi 9",
+  "run_id": "40381634312",
+  "runner_name": "redmi9-python",
+  "free_bytes_before": 172650496,
+  "groups": [
+    {
+      "command": [
+        "/data/data/com.termux/files/home/logos-local/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=short",
+        "-p",
+        "pr1621_isolation",
+        "--basetemp",
+        "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/core-files-runner/pytest-state",
+        "--junitxml",
+        "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/core-files-runner/junit.xml",
+        "tests/test_trace_security.py",
+        "tests/test_system_log.py",
+        "tests/test_redmi_runner_safety.py",
+        "tests/test_tool_providers_safety.py",
+        "tests/test_browser_safety.py",
+        "tests/test_printing3d_gcode_edges.py"
+      ],
+      "exit_code": 1,
+      "timed_out": false,
+      "seconds": 14.072,
+      "log": "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/core-files-runner/output.log",
+      "log_sha256": "f6de4e5e0ec7ced9034c9feff99a414407bc52e22524d30aa8a1f141cbace567",
+      "log_discarded_bytes": 0,
+      "name": "core-files-runner",
+      "counts": {
+        "tests": 69,
+        "failures": 4,
+        "errors": 0,
+        "skipped": 0
+      },
+      "junit": "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/core-files-runner/junit.xml",
+      "verdict": "FAIL"
+    },
+    {
+      "command": [
+        "/data/data/com.termux/files/home/logos-local/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=short",
+        "-p",
+        "pr1621_isolation",
+        "--basetemp",
+        "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/credentials/pytest-state",
+        "--junitxml",
+        "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/credentials/junit.xml",
+        "tests/test_provider_credentials.py",
+        "tests/test_provider_credentials_routes.py"
+      ],
+      "exit_code": 1,
+      "timed_out": false,
+      "seconds": 4.787,
+      "log": "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/credentials/output.log",
+      "log_sha256": "c532e343483a18ca3f21f99a36ab841966ea78e6db25d5ab9796ea44584a6a20",
+      "log_discarded_bytes": 0,
+      "name": "credentials",
+      "counts": {
+        "tests": 36,
+        "failures": 10,
+        "errors": 0,
+        "skipped": 0
+      },
+      "junit": "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/credentials/junit.xml",
+      "verdict": "FAIL"
+    },
+    {
+      "command": [
+        "/data/data/com.termux/files/home/logos-local/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=short",
+        "-p",
+        "pr1621_isolation",
+        "--basetemp",
+        "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/messages-images-voice/pytest-state",
+        "--junitxml",
+        "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/messages-images-voice/junit.xml",
+        "tests/test_chat_provider_conversation.py",
+        "tests/test_image_blobs.py",
+        "tests/test_voice_routes.py",
+        "tests/test_logos_client_paths.py",
+        "tests/test_chat_no_auth.py"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 7.091,
+      "log": "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/messages-images-voice/output.log",
+      "log_sha256": "3a89d4225add4d34b1f1302e21dd7b93df62f0a55e9b71ff799564f705706cf6",
+      "log_discarded_bytes": 0,
+      "name": "messages-images-voice",
+      "counts": {
+        "tests": 32,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "junit": "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/messages-images-voice/junit.xml",
+      "verdict": "PASS"
+    },
+    {
+      "command": [
+        "/data/data/com.termux/files/home/logos-local/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=short",
+        "-p",
+        "pr1621_isolation",
+        "--basetemp",
+        "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/agent-delivery/pytest-state",
+        "--junitxml",
+        "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/agent-delivery/junit.xml",
+        "tests/test_agent_runtime_delivery.py",
+        "tests/test_admin_no_auth.py"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 6.213,
+      "log": "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/agent-delivery/output.log",
+      "log_sha256": "c991c94b20f2fd4b4d992b73e9d2c54426e5b13b1334806af6b5aa0955eecde9",
+      "log_discarded_bytes": 0,
+      "name": "agent-delivery",
+      "counts": {
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "junit": "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/agent-delivery/junit.xml",
+      "verdict": "PASS"
+    },
+    {
+      "command": [
+        "/data/data/com.termux/files/home/logos-local/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=short",
+        "-p",
+        "pr1621_isolation",
+        "--basetemp",
+        "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/environment-lifecycle/pytest-state",
+        "--junitxml",
+        "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/environment-lifecycle/junit.xml",
+        "tests/test_environment_runtime_failures.py"
+      ],
+      "exit_code": 1,
+      "timed_out": false,
+      "seconds": 3.113,
+      "log": "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/environment-lifecycle/output.log",
+      "log_sha256": "41f45c9e7eff4f4c5652fa4bd935a1afde743b51020170404fd1bb9e1e65e486",
+      "log_discarded_bytes": 0,
+      "name": "environment-lifecycle",
+      "counts": {
+        "tests": 16,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      },
+      "junit": "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/environment-lifecycle/junit.xml",
+      "verdict": "FAIL"
+    },
+    {
+      "name": "javascript",
+      "commands": [
+        {
+          "command": [
+            "/data/data/com.termux/files/usr/bin/node",
+            "--require",
+            "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/harness/node-guard.cjs",
+            "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/source/tests/test_browser_emulator.js"
+          ],
+          "exit_code": 0,
+          "timed_out": false,
+          "seconds": 1.113,
+          "log": "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/javascript/test_browser_emulator.js.log",
+          "log_sha256": "d8e07e517846989b26fcca44f8b47f032fbfc285d4e20c38e465860efa4837f9",
+          "log_discarded_bytes": 0
+        },
+        {
+          "command": [
+            "/data/data/com.termux/files/usr/bin/node",
+            "--require",
+            "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/harness/node-guard.cjs",
+            "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/source/tests/test_voice_recording.js"
+          ],
+          "exit_code": 0,
+          "timed_out": false,
+          "seconds": 0.816,
+          "log": "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/javascript/test_voice_recording.js.log",
+          "log_sha256": "b1022b778409b7df3ceee520d501ac4f869f5f125f6a5473a708cd7e852037ed",
+          "log_discarded_bytes": 0
+        }
+      ],
+      "verdict": "PASS",
+      "reason": null
+    }
+  ],
+  "live_provider_requests": "blocked_by_network_guard",
+  "production_deployment": "NOT_RUN",
+  "negative_control": {
+    "command": [
+      "/data/data/com.termux/files/home/logos-local/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "--tb=short",
+      "--junitxml",
+      "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/negative-control/junit.xml",
+      "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/negative-control/test_expected_failure.py"
+    ],
+    "exit_code": 1,
+    "timed_out": false,
+    "seconds": 1.587,
+    "log": "/data/data/com.termux/files/home/github-python-runner/work/87bb9eb1-3962-5635-b7df-39e974927de4/.logos-pr1621.8GJSjY/results/negative-control/output.log",
+    "log_sha256": "d2a6fae9a577e12dabf026dfd497d02bfdd476d422981c441073eb3429946489",
+    "log_discarded_bytes": 0,
+    "counts": {
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0
+    },
+    "verdict": "PASS"
+  },
+  "verdict": "FAIL",
+  "free_bytes_after": 170340352
+}

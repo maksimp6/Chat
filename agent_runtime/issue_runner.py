@@ -131,6 +131,15 @@ def seed_provider_credential() -> None:
     bootstrap_credential(conn, api_key, project_id, encrypt_secret, decrypt=decrypt_secret)
 
 
+def change_snapshot(repo_root: Path = ROOT) -> dict[str, str]:
+    """Digest of each changed path's content, so an edit to a file that was already dirty still shows."""
+    snapshot = {}
+    for name in changed_files(repo_root):
+        path = repo_root / name
+        snapshot[name] = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else "<absent>"
+    return snapshot
+
+
 def changed_files(repo_root: Path = ROOT) -> list[str]:
     output = subprocess.run(
         ["git", "status", "--porcelain", "--untracked-files=all"],
@@ -266,7 +275,7 @@ def run_issue_task(
 
     rules_path = repo_root / "AGENTS.md"
     rules = rules_path.read_text(encoding="utf-8") if rules_path.exists() else ""
-    before = set(changed_files(repo_root))
+    before = change_snapshot(repo_root)
     session = f"github-issue-{issue_number}"
     invocation = create_invocation(session, session, metadata={"source": "logos.yml"})
     trace = create_invocation_trace(invocation)
@@ -335,7 +344,8 @@ def run_issue_task(
         result["status"] = "failed"
         result["error"] = type(exc).__name__
 
-    files = sorted(set(changed_files(repo_root)) - before)
+    after = change_snapshot(repo_root)
+    files = sorted(name for name in set(before) | set(after) if before.get(name) != after.get(name))
     result["changed_files"] = files
     if files:
         result.update(status="failed", error="ReadOnlyScopeViolation")

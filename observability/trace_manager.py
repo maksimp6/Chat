@@ -20,6 +20,7 @@ from observability.trace_security import (
     MAX_ITEMS,
     MAX_REPR,
     SENSITIVE_KEYS,
+    redact_text,
     safe_repr,
     sanitize_trace_value,
 )
@@ -380,8 +381,11 @@ class ExecutionTrace:
         return self._redact_registered_values(
             {
                 "exception_type": type(exc).__name__,
-                "exception_message": str(exc),
-                "traceback": traceback.format_exception(type(exc), exc, exc.__traceback__),
+                "exception_message": redact_text(str(exc)),
+                "traceback": [
+                    redact_text(line)
+                    for line in traceback.format_exception(type(exc), exc, exc.__traceback__)
+                ],
                 "frames": frames,
             }
         )

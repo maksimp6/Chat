@@ -1,7 +1,0 @@
-Yandex AI Studio Russian documentation source snapshot
-Revision: fddbac0226d030d57d089b730f92abd02e583df2
-Source date: 2026-03-02T14:48:47Z; retrieved 2026-10-23.
-Original source files are unmodified. CC BY 4.0.
-Copyright: YANDEX LLC, 2018 and contributors; see source/LICENSE and source/AUTHORS.
-Current documentation: https://aistudio.yandex.ru/ru/docs/
-Manifest lists files, hashes, sizes and unresolved includes.

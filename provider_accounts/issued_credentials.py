@@ -27,16 +27,24 @@ def encryption_ready():
         return False
 
 
-def issuance_status():
-    db = get_store()
+def _active_row(db):
     identity = db.get("provider/active/yandex")
     row = db.get("provider/credential/" + str(identity)) if identity is not None else None
+    return identity, row
+
+
+def _credential_summary(row):
+    return {
+        k: row.get(k) for k in ("fingerprint", "provider_key_id", "project_id", "expires_at")
+    } if row else None
+
+
+def issuance_status():
+    _, row = _active_row(get_store())
     return {
         "encryption_ready": encryption_ready(),
         "configured": row is not None,
-        "credential": {
-            k: row.get(k) for k in ("fingerprint", "provider_key_id", "project_id", "expires_at")
-        } if row else None,
+        "credential": _credential_summary(row),
     }
 
 
@@ -68,7 +76,9 @@ def import_yandex_key(payload):
     if issued > now + timedelta(minutes=5) or expires <= now or not timedelta(0) < expires-issued <= timedelta(days=90):
         raise ImportRejected("invalid_key_lifetime")
     db = get_store()
-    current = issuance_status()["credential"]
+    # One read yields the active id and its row, so the replacement below is checked against the same key.
+    active_id, active_row = _active_row(db)
+    current = _credential_summary(active_row)
     fingerprint = fingerprint_key(secret)
     # An expired key is replaced by the runner's new key; a key still valid is never overwritten.
     replacing = bool(current) and _date(current["expires_at"]) <= now
@@ -85,6 +95,7 @@ def import_yandex_key(payload):
             replace_active_credential(
                 db, secret, payload["project_id"], encrypt_secret, "yandex",
                 provider_key_id=payload["provider_key_id"], now=issued, ttl=expires-issued,
+                expected_active_id=active_id,
             )
         else:
             bootstrap_credential(

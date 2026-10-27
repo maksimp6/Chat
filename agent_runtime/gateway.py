@@ -47,6 +47,10 @@ class AgentInvocationError(AgentGatewayError):
     pass
 
 
+class AgentTimeoutError(AgentInvocationError):
+    """The handler may still be running, so retrying it could repeat its side effect."""
+
+
 class AgentPermissionError(AgentGatewayError):
     pass
 
@@ -337,7 +341,7 @@ class AgentGateway:
             future = pool.submit(handler, payload)
             return future.result(timeout=timeout_seconds)
         except FutureTimeoutError as exc:
-            raise AgentInvocationError(
+            raise AgentTimeoutError(
                 f"agent invocation timed out after {timeout_seconds:.2f}s"
             ) from exc
         finally:
@@ -437,6 +441,7 @@ class AgentGateway:
                 )
             except Exception as exc:
                 last_error = f"{type(exc).__name__}: {exc}"
+                timed_out = isinstance(exc, AgentTimeoutError)
                 with self._lock:
                     self._record_failure(agent_id, time.monotonic())
                 self._trace_error(trace, f"agent:{agent_id}", last_error, invocation_id)
@@ -447,11 +452,12 @@ class AgentGateway:
                         "agent_id": agent_id,
                         "invocation_id": invocation_id,
                         "attempt": attempt,
-                        "will_retry": attempt <= retries,
+                        "will_retry": attempt <= retries and not timed_out,
                     },
                 )
-                if attempt <= retries:
+                if attempt <= retries and not timed_out:
                     continue
+                break
         return InvocationResult(
             invocation_id,
             agent_id,

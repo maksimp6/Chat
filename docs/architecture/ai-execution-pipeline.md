@@ -70,9 +70,9 @@ response
 
 ## На апгрейд
 
-- `local_tool_agent.py` — живой Android/local transport adapter;
-- `agent_gateway.py` — provider-neutral/A2A routing;
-- `local_agent_gateway.py` — HTTP transport/runtime gateway, имя и границы нужно уточнить.
+- `agents/local_worker.py` — живой Android/local transport adapter;
+- `agents/gateway.py` — provider-neutral/A2A routing;
+- `agents/local_gateway.py` — HTTP transport/runtime gateway, имя и границы нужно уточнить.
 
 ## Правило
 

@@ -732,9 +732,14 @@ def delete_environment(
     environment_id: str, owner_id: Optional[str] = None, *, context=None
 ) -> dict[str, Any]:
     item = _require(environment_id, owner_id)
-    if item["status"] == "RUNNING":
+    with _RUNTIME_WORKERS_LOCK:
+        runtime = _RUNTIME_WORKERS.get(environment_id)
+    # A failed stop can leave a worker alive; finish stopping it before removing its data.
+    if item["status"] == "RUNNING" or (runtime is not None and item["status"] == "FAILED"):
         stop_environment(environment_id, owner_id, context=context)
         item = _require(environment_id, owner_id)
+    elif runtime is not None:
+        runtime.stop()
     _transition(item["status"], "DELETING")
     item.update({"status": "DELETING", "deleted_at": unix_seconds()})
     _record_trace(item, "DELETE_ENVIRONMENT", "SUCCESS", context=context)

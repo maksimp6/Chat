@@ -19,6 +19,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from observability.trace_manager import get_current_trace
+from observability.trace_security import redact_text
 
 ROOT_LOGGER_NAME = "logos"
 DEFAULT_LOG_FILE = "system.jsonl"
@@ -54,12 +55,12 @@ class JsonFormatter(logging.Formatter):
             ),
             "level": record.levelname,
             "logger": record.name,
-            "message": record.getMessage(),
+            "message": redact_text(record.getMessage()),
             "trace_id": getattr(record, "trace_id", None),
             "invocation_id": getattr(record, "invocation_id", None),
         }
         if record.exc_info:
-            entry["exception"] = self.formatException(record.exc_info)
+            entry["exception"] = redact_text(self.formatException(record.exc_info))
         return json.dumps(entry, ensure_ascii=False)
 
 

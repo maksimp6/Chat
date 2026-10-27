@@ -38,7 +38,9 @@ def _opcode(command: str) -> str:
         words.pop(0)
     if not words:
         return ""
-    return re.sub(r"^([GM])0*(\d+)$", r"\1\2", words[0].upper())
+    # A code may run into its parameters ("G1X300", "M112S0"), so only the leading code is taken.
+    match = re.match(r"([GM])0*(\d+)", words[0].upper())
+    return f"{match.group(1)}{match.group(2)}" if match else words[0].upper()
 
 
 def _verify_toolpaths(gcode: str, bed: list[int]) -> tuple[int, int]:
@@ -52,9 +54,18 @@ def _verify_toolpaths(gcode: str, bed: list[int]) -> tuple[int, int]:
             raise ValueError("unexpected dangerous firmware command")
         if opcode in ("M190", "M109"):
             heaters.add(opcode)
-        if opcode in ("G0", "G1", "G2", "G3"):
+        if opcode == "G91":
+            # Relative positions are not tracked, so the absolute bounds check would be wrong.
+            raise ValueError("relative positioning is not audited")
+        if opcode == "G92" and MOVE.search(command):
+            # Resetting the position moves the origin, so later absolute bounds would not hold.
+            raise ValueError("position reset is not audited")
+        if opcode in ("G2", "G3"):
+            # The swept path of an arc is not bounded here, only its end point would be.
+            raise ValueError("arc moves are not audited")
+        if opcode in ("G0", "G1"):
             count += 1
-            if opcode == "G1" and re.search(r"(?:^|\s)E[-+\d.]", command):
+            if opcode == "G1" and re.search(r"(?<![A-Za-z])E[-+\d.]", command):
                 extrusion += 1
             _verify_motion_bounds(command, bed)
     if count < 10 or extrusion < 10 or heaters != {"M190", "M109"}:

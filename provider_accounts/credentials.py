@@ -82,6 +82,8 @@ def get_active_credential(
     decrypt: Callable[[str], str],
     now: Optional[datetime] = None,
     provider: str = YANDEX,
+    *,
+    allow_expired: bool = False,
 ) -> ProviderCredential:
     if provider not in SUPPORTED_PROVIDERS:
         raise ValueError(f"Unsupported provider: {provider}")
@@ -90,7 +92,8 @@ def get_active_credential(
     if row is None or row["status"] != ACTIVE:
         raise NoActiveCredentialError(f"No active {provider} provider credential")
     expires = _as_utc(row["expires_at"])
-    if _as_utc(now or utcnow()) >= expires:
+    # allow_expired lets a replacement read the superseded key's identity; it must not be used to call the provider.
+    if not allow_expired and _as_utc(now or utcnow()) >= expires:
         raise ExpiredCredentialError(f"Active {provider} provider credential expired")
     secret = decrypt(row["api_key_encrypted"])
     return ProviderCredential(
@@ -168,12 +171,16 @@ def replace_active_credential(
     provider_key_id: Optional[str] = None,
     now: Optional[datetime] = None,
     ttl: timedelta = KEY_TTL,
+    expected_active_id: Optional[int] = None,
 ) -> ProviderCredential:
     if provider not in SUPPORTED_PROVIDERS or not api_key:
         raise ValueError("valid provider and nonempty api_key required")
     issued, expires = issue_window(now, ttl=ttl)
     encrypted = encrypt(api_key)
     with db.transaction() as tx:
+        # Checked inside the transaction: a key that became active after the caller's read is never overwritten.
+        if expected_active_id is not None and tx.get("provider/active/" + provider) != expected_active_id:
+            raise CredentialError("Provider credential changed before replacement")
         identity = _publish_credential(
             tx,
             encrypted,

@@ -1,0 +1,150 @@
+{
+  "report": {
+    "scope": "offline_regressions_on_physical_runner_not_live_e2e",
+    "focus": "stl_readiness",
+    "source_sha": "2afa92965668cc0b9f7c36457b352d6785e9d7b2",
+    "device_model": "Redmi 9",
+    "run_id": "40383967914",
+    "runner_name": "redmi9-python",
+    "free_bytes_before": 114577408,
+    "groups": [
+      {
+        "command": [
+          "/data/data/com.termux/files/home/logos-local/.venv/bin/python",
+          "-m",
+          "pytest",
+          "-q",
+          "--tb=short",
+          "-p",
+          "pr1621_isolation",
+          "--basetemp",
+          "/data/data/com.termux/files/home/github-python-runner/work/f47e5c6c-46b6-5b53-b41e-4d348855839f/.logos-pr1621.0pPA4K/results/stl-readiness-followup/pytest-state",
+          "--junitxml",
+          "/data/data/com.termux/files/home/github-python-runner/work/f47e5c6c-46b6-5b53-b41e-4d348855839f/.logos-pr1621.0pPA4K/results/stl-readiness-followup/junit.xml",
+          "tests/test_printing3d_gcode_edges.py::test_readiness_rejects_unknown_model_and_records_evidence",
+          "tests/test_printing3d_gcode_edges.py::test_readiness_operator_gate_requires_every_other_check"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "seconds": 2.746,
+        "log": "/data/data/com.termux/files/home/github-python-runner/work/f47e5c6c-46b6-5b53-b41e-4d348855839f/.logos-pr1621.0pPA4K/results/stl-readiness-followup/output.log",
+        "log_sha256": "d35b836cc3e05d3a73bce48b20c7a49869054fe0053993beb9f095d2e2c0807c",
+        "log_discarded_bytes": 0,
+        "name": "stl-readiness-followup",
+        "counts": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "junit": "/data/data/com.termux/files/home/github-python-runner/work/f47e5c6c-46b6-5b53-b41e-4d348855839f/.logos-pr1621.0pPA4K/results/stl-readiness-followup/junit.xml",
+        "verdict": "PASS"
+      }
+    ],
+    "live_provider_requests": "blocked_by_network_guard",
+    "production_deployment": "NOT_RUN",
+    "negative_control": {
+      "command": [
+        "/data/data/com.termux/files/home/logos-local/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=short",
+        "--junitxml",
+        "/data/data/com.termux/files/home/github-python-runner/work/f47e5c6c-46b6-5b53-b41e-4d348855839f/.logos-pr1621.0pPA4K/results/negative-control/junit.xml",
+        "/data/data/com.termux/files/home/github-python-runner/work/f47e5c6c-46b6-5b53-b41e-4d348855839f/.logos-pr1621.0pPA4K/results/negative-control/test_expected_failure.py"
+      ],
+      "exit_code": 1,
+      "timed_out": false,
+      "seconds": 1.769,
+      "log": "/data/data/com.termux/files/home/github-python-runner/work/f47e5c6c-46b6-5b53-b41e-4d348855839f/.logos-pr1621.0pPA4K/results/negative-control/output.log",
+      "log_sha256": "d2a6fae9a577e12dabf026dfd497d02bfdd476d422981c441073eb3429946489",
+      "log_discarded_bytes": 0,
+      "counts": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      },
+      "verdict": "PASS"
+    },
+    "verdict": "PASS",
+    "free_bytes_after": 114442240
+  },
+  "stl_asset_verification": {
+    "scope": "stl_fixture_hydration",
+    "source_sha": "2afa92965668cc0b9f7c36457b352d6785e9d7b2",
+    "verified": [
+      {
+        "path": "printing3d/assets/oem_spindle_v03/parts/a1mini_oem_wide_hub_HALF_A.stl",
+        "bytes": 126284,
+        "sha256": "617e40eb88b46712f1a91cde02d8545c9709945a77b83863cf757289d399058b"
+      },
+      {
+        "path": "printing3d/assets/oem_spindle_v03/parts/a1mini_oem_wide_hub_HALF_B.stl",
+        "bytes": 126284,
+        "sha256": "f69cec6a98cde018afbd5c53399d4b76744d5c367f048472de44f2727d24f6f1"
+      },
+      {
+        "path": "printing3d/assets/oem_spindle_v03/parts/a1mini_oem_wide_hub_END_RETAINER.stl",
+        "bytes": 33484,
+        "sha256": "af1cf4643f9c9277642b5c7357cb64db53db772bc13ee1220733b5aae10e3888"
+      },
+      {
+        "path": "printing3d/assets/oem_spindle_v03/parts/alignment_pin_PRINT_4.stl",
+        "bytes": 49384,
+        "sha256": "449ec86150e60facbd28e57c61f678989e1fbfc1ad22c886620e31fcb384650e"
+      },
+      {
+        "path": "printing3d/assets/oem_spindle_v03/gauges/fit_gauge_stock_spindle_18mm_HALF.stl",
+        "bytes": 18284,
+        "sha256": "16cb7bb7135b26e6e6254dec2a59e676d5dbd3e4f5d792a8afc35ccb36783e90"
+      },
+      {
+        "path": "printing3d/assets/oem_spindle_v03/gauges/fit_gauge_stock_spindle_20mm_HALF.stl",
+        "bytes": 18284,
+        "sha256": "d9c13226ad2436e4a295257e77034da4555c9530bf1881ab7869751895309112"
+      },
+      {
+        "path": "printing3d/assets/oem_spindle_v03/gauges/fit_gauge_stock_spindle_22mm_HALF.stl",
+        "bytes": 18284,
+        "sha256": "e1e464f9f87983f542ffe8bbd7c4d3ff8092b84fe57749127a1dc4f681eab042"
+      },
+      {
+        "path": "printing3d/assets/oem_spindle_v03/gauges/fit_gauge_stock_spindle_24mm_HALF.stl",
+        "bytes": 18284,
+        "sha256": "09708605a6898f8e75514b483f4479f1588debf39439fc2cc6f26136696d0e33"
+      },
+      {
+        "path": "printing3d/assets/desk_spool_v01/parts/base_frame.stl",
+        "bytes": 6284,
+        "sha256": "01794175c431e85af2e8acfb6a022e91651cbd419c11be8004da866e06a85c76"
+      },
+      {
+        "path": "printing3d/assets/desk_spool_v01/parts/upright_A_print_twice.stl",
+        "bytes": 10884,
+        "sha256": "04fae68183e27b688d2ca0561f1e0142722196d62a7c3f728fa4b4ff3ceefad0"
+      },
+      {
+        "path": "printing3d/assets/desk_spool_v01/parts/axle_D_section.stl",
+        "bytes": 40284,
+        "sha256": "0518998a2f416eae925dca52c1b1542d67df6ac22ac82bf948f0d825eabcc12d"
+      },
+      {
+        "path": "printing3d/assets/desk_spool_v02/adapters/ring_for_spool_bore_36mm_PRINT_2.stl",
+        "bytes": 47484,
+        "sha256": "e6e69ae39ed5203e979d55a536358b2960f6a0d1756042d2a19bd010af70f815"
+      },
+      {
+        "path": "printing3d/assets/desk_spool_v02/adapters/ring_for_spool_bore_52mm_PRINT_2.stl",
+        "bytes": 73084,
+        "sha256": "6370624ef30b2b1d8d1cb199aa76527aee2e4f9bb48c8cd663d03b3576629d65"
+      },
+      {
+        "path": "printing3d/assets/desk_spool_v02/adapters/ring_for_spool_bore_55mm_PRINT_2.stl",
+        "bytes": 73084,
+        "sha256": "9c393891a16fd4a2aa8ec47cc94b896d7d90724bd01f7997ed21e05d1dc28b9c"
+      }
+    ]
+  }
+}
