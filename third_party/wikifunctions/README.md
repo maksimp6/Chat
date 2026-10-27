@@ -10,10 +10,12 @@ files identify their changes. No Wikifunctions service is called at runtime.
 | Z21951 Clamp | Z21953, 162115 | `core.wikifunctions.clamp_integer` | File-search result count; HTTP/shell/session timeouts; two Cloud.ru list limits |
 | Z12316 regex replacement | Z12317, 285821 | `LogosWikifunctions.replaceRegex` | Browser text whitespace normalization; trace export filenames |
 | Z10079 trim | Z10081, 143512 | `LogosWikifunctions.trim` | Browser text whitespace normalization |
+| Z22583 mean of float64 list | Z22587, 168295 | `core.wikifunctions.mean_float64_list` | Agent office reviews per merge |
+| Z22588 median of float64 list | Z22589, 168298 | `core.wikifunctions.median_float64_list` | Agent office lead time |
 
 ## Static function inventory
 
-At `develop` commit `e3f7bfa08267d004b23c5d024aafc38c6e05f1c2`, a source-only scan counted **4,385 function definitions** in first-party Python and JavaScript: 3,367 Python definitions and 1,018 JavaScript definitions. Of these, **3 are pinned Wikifunctions implementations (0.07%)**: `clamp_integer` (Z21951), `trim` (Z10079) and `replaceRegex` (Z12316). The 100-candidate inventory tracked separately is not a count of implementations already adopted from Wikifunctions.
+At baseline `develop` commit `e3f7bfa08267d004b23c5d024aafc38c6e05f1c2`, a source-only scan counted **4,385 function definitions**: 3,367 Python and 1,018 JavaScript. This change adds two Python adapters, bringing the branch count to **4,387** (3,369 Python and 1,018 JavaScript). **Five are pinned Wikifunctions implementations (0.11%)**: `clamp_integer` (Z21951), `trim` (Z10079), `replaceRegex` (Z12316), `mean_float64_list` (Z22583) and `median_float64_list` (Z22588). The separate 100-candidate inventory is not a count of adopted implementations.
 
 The scan covered 401 tracked `.py` files (400 non-empty) and 48 `.js`, `.cjs`, `.mjs`, `.jsx`, `.ts` or `.tsx` files. It counted Python `def`/`async def` declarations, JavaScript `function` declarations/expressions, arrow functions and method-shorthand definitions. It excluded `vendor`, `node_modules`, `third_party`, tests/ `__tests__`, `.agents`, and all other languages. This is a syntactic source count, not a runtime or semantic count. See [the audit details](../../docs/audits/2026-10-27-wikifunctions-static-function-inventory.md).
 
