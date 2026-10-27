@@ -28,3 +28,15 @@ def mean_float64_list(values: Iterable[int | float]) -> float:
 def median_float64_list(values: Iterable[int | float]) -> float:
     """Median of numeric values using the pinned Wikifunctions Python implementation."""
     return statistics.median(values)
+
+
+# WIKIFUNCTIONS Z10079 / Z10082@143513 — НЕ РЕДАКТИРОВАТЬ.
+def trim_string(value: str) -> str:
+    """Trim surrounding whitespace with the pinned Python implementation."""
+    return value.strip()
+
+
+# WIKIFUNCTIONS Z10047 / Z10050@207180 — НЕ РЕДАКТИРОВАТЬ.
+def lowercase_string(value: str) -> str:
+    """Lowercase a string with the pinned Python implementation."""
+    return value.lower()
