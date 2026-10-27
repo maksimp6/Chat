@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import base64
 from yandex_client_modules.client import YandexResponsesClient
 from core.config import (
+    CLASSIFIER_MODELS,
     EMBEDDING_MODELS,
     IMAGE_MODELS,
     TEXT_MODELS,
@@ -17,6 +18,7 @@ from core.config import (
     Config,
 )
 from core.model_profiles import completion_model_keys
+from provider_accounts.model_discovery import ModelDiscoveryError, validate_dialog_model
 from yandex_client_modules.request_builder import validate_generation_params
 from yandex_client_modules.request_mixin import _transport_timeout
 from yandex_client_modules.tool_config import normalize_tools_config
@@ -400,8 +402,6 @@ def _validate_chat_payload(conv_id, model_key, message, attachments):
         return None, None, (jsonify({"error": "conversation_id is required"}), 400)
     if not isinstance(model_key, str):
         return None, None, (jsonify({"error": "model must be a string"}), 400)
-    if model_key.startswith(("cls://", "classifier-")) or "/classifier-" in model_key:
-        return None, None, (jsonify({"error": "model_type_not_supported"}), 400)
     # These technologies have their own transports; never substitute a text turn.
     endpoint = None
     if (
@@ -414,6 +414,8 @@ def _validate_chat_payload(conv_id, model_key, message, attachments):
         endpoint = "/api/images/generate"
     elif model_key in EMBEDDING_MODELS or model_key.startswith("emb://"):
         endpoint = "/api/embeddings"
+    elif model_key in CLASSIFIER_MODELS or model_key.startswith("cls://") or "/classifier-" in model_key:
+        endpoint = "/api/classify"
     if endpoint is not None:
         return None, None, (jsonify({"error": "model_requires_dedicated_api", "endpoint": endpoint}), 400)
     if isinstance(model_key, str) and model_key in completion_model_keys():
@@ -1093,18 +1095,23 @@ def conversations():
         data = request.get_json(silent=True) or {}
         if not isinstance(data, dict):
             return jsonify({"error": "JSON object is required"}), 400
+        try:
+            model = validate_dialog_model(data.get("model", "yandexgpt-5-pro"))
+        except ValueError:
+            return jsonify({"error": "model_not_available_for_dialog"}), 400
+        except ModelDiscoveryError:
+            return jsonify({"error": "model_catalog_unavailable"}), 503
         creation_trace = ExecutionTrace()
         creation_trace.set_request(
             {
                 "operation": "create_conversation",
-                "model": data.get("model", "yandexgpt-5-pro"),
+                "model": model,
             }
         )
         # A Logos chat gets its local id at once. The provider conversation is created on the first
         # message, so a provider outage can no longer lose the chat itself.
         conv_id = str(uuid.uuid4())
         title = normalize_conversation_title(data.get("title"))
-        model = data.get("model", "yandexgpt-5-pro")
         set_owner(conv_id, owner_id)
         create_conversation(conv_id, title, model, provider_pending=True)
         creation_trace.add_event(
@@ -1257,4 +1264,3 @@ def execute_approved():
     except Exception:
         logger.exception("[TOOL_APPROVAL] Tool execution failed")
         return jsonify({"error": "tool_execution_failed"}), 500
-

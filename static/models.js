@@ -58,6 +58,7 @@ function renderModelModal() {
   }
   Object.keys(allModels).forEach(function (key) {
     var m = allModels[key];
+    if (!["text", "voice", "image"].includes(m.type) || m.dialog_selectable === false) return;
     var unavailable = m.available === false;
     var div = document.createElement("button");
     div.type = "button";
@@ -111,7 +112,7 @@ function renderModelModal() {
       var creatingNewChat = window.isCreatingNewChat === true;
       if (typeof window.changeModel === "function") {
         // A new chat must not rewrite the model of the conversation that is still current.
-        window.changeModel(key, creatingNewChat);
+        if (window.changeModel(key, creatingNewChat) === false) return;
       }
       if (modelModal) window.LogosCoreAPI.ui.modal.close(modelModal);
       if (creatingNewChat) {
@@ -125,6 +126,10 @@ function renderModelModal() {
 
 function createConversation(modelKey, options) {
   options = options || {};
+  if (typeof window.isDialogModel === "function" && !window.isDialogModel(modelKey)) {
+    if (window.LogosToast) window.LogosToast.error("Эта модель не предназначена для диалога");
+    return Promise.resolve(null);
+  }
   var selectedBeforeCreation = currentConvId;
   return window.LogosDispatcher.request("/api/conversations", {
     method: "POST",

@@ -3,6 +3,8 @@ let conversations = [];
 let currentModel = "yandexgpt-5-pro";
 let currentModelType = "text";
 let modelsData = { text: {}, voice: {}, image: {} };
+let modelSelectionSequence = 0;
+const modelSelectionSaves = new Map();
 let coreInitialized = false;
 let coreEnhancementStarted = false;
 let modelLoadState = { status: "idle", message: "" };
@@ -71,40 +73,78 @@ function fetchWithTimeout(input, init, timeoutMs) {
   return window.LogosDispatcher.request(input, init, { timeoutMs: timeoutMs });
 }
 
-window.changeModel = function (newModel, skipPatch) {
-  newModel = LEGACY_MODEL_KEYS[newModel] || newModel;
+window.isDialogModel = function (modelKey) {
+  if (typeof modelKey !== "string" || !modelKey.trim()) return false;
+  if (/^(?:emb|cls):\/\//.test(modelKey) || /(?:^|\/)(?:classifier-|text-search-|text-embeddings)/.test(modelKey)) {
+    return false;
+  }
   var textModels = modelsData.text || {};
   var voiceModels = modelsData.voice || {};
   var imageModels = modelsData.image || {};
   var modelKeys = Object.keys(textModels).concat(Object.keys(voiceModels), Object.keys(imageModels));
   var catalogLoaded = modelKeys.length > 0;
-  // Without a catalog (offline or degraded) keep the requested key; the server validates it.
-  if (catalogLoaded && modelKeys.indexOf(newModel) === -1) {
-    var fallbackModel = modelKeys.indexOf("yandexgpt-5-pro") !== -1 ? "yandexgpt-5-pro" : modelKeys[0];
-    console.warn("[CORE] Unknown model:", newModel, "-> fallback to", fallbackModel);
-    newModel = fallbackModel;
+  // The server validates selection when the browser has no loaded catalog.
+  if (!catalogLoaded) return true;
+  var entry = textModels[modelKey] || voiceModels[modelKey] || imageModels[modelKey];
+  return Boolean(entry && ["text", "voice", "image"].includes(entry.type) &&
+    entry.dialog_selectable !== false && entry.available !== false);
+};
+
+window.changeModel = function (newModel, skipPatch) {
+  newModel = LEGACY_MODEL_KEYS[newModel] || newModel;
+  if (!window.isDialogModel(newModel)) {
+    if (window.LogosToast) window.LogosToast.error("Эта модель не предназначена для диалога");
+    return false;
   }
+  if (!skipPatch && currentConvId && modelSelectionSaves.has(currentConvId)) {
+    if (window.LogosToast) window.LogosToast.error("Дождитесь сохранения выбранной модели");
+    return false;
+  }
+  var previousModel = currentModel;
+  var previousType = currentModelType;
+  var previousStoredModel = localStorage.getItem("current_model");
+  var voiceModels = modelsData.voice || {};
+  var imageModels = modelsData.image || {};
   currentModel = newModel;
   currentModelType = voiceModels[currentModel] ? "voice" : imageModels[currentModel] ? "image" : "text";
   localStorage.setItem("current_model", currentModel);
 
   if (!skipPatch && currentConvId) {
-    window.LogosDispatcher.request("/api/conversations/" + currentConvId, {
+    var selectedConvId = currentConvId;
+    var conv = conversations.find(function (c) {
+      return c.id === selectedConvId;
+    });
+    var previousConversationModel = conv && conv.model;
+    var selectionId = ++modelSelectionSequence;
+    modelSelectionSaves.set(selectedConvId, selectionId);
+    window.LogosDispatcher.request("/api/conversations/" + selectedConvId, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: newModel }),
+    }).then(function (response) {
+      if (!response.ok) throw new Error("HTTP " + response.status);
     }).catch(function (e) {
       console.error("[CORE] Model save failed:", e);
-    });
-
-    var conv = conversations.find(function (c) {
-      return c.id === currentConvId;
+      if (modelSelectionSaves.get(selectedConvId) !== selectionId) return;
+      if (conv && conv.model === newModel) conv.model = previousConversationModel;
+      if (currentConvId === selectedConvId && currentModel === newModel) {
+        currentModel = previousModel;
+        currentModelType = previousType;
+        if (previousStoredModel === null) localStorage.removeItem("current_model");
+        else localStorage.setItem("current_model", previousStoredModel);
+        if (typeof updateModelButton === "function") updateModelButton();
+        if (typeof updateUIForModel === "function") updateUIForModel();
+      }
+      if (window.LogosToast) window.LogosToast.error("Не удалось сохранить выбранную модель");
+    }).finally(function () {
+      if (modelSelectionSaves.get(selectedConvId) === selectionId) modelSelectionSaves.delete(selectedConvId);
     });
     if (conv) conv.model = newModel;
   }
 
   if (typeof updateModelButton === "function") updateModelButton();
   if (typeof updateUIForModel === "function") updateUIForModel();
+  return true;
 };
 
 function initializeShell() {

@@ -15,10 +15,13 @@ from urllib.parse import urlsplit
 import requests
 
 from core.config import (
+    CLASSIFIER_MODELS,
     EMBEDDING_MODELS,
     IMAGE_MODELS,
     TEXT_MODELS,
     VOICE_MODELS,
+    canonical_model_key,
+    get_model_uri,
     registry_key_for_upstream,
 )
 
@@ -159,6 +162,7 @@ class ModelDiscovery:
             kind = {
                 "gpt": "text",
                 "emb": "embedding",
+                "cls": "classifier",
                 "art": "image",
             }.get(parsed.scheme)
             if kind is None or not parsed.netloc or "@" in parsed.netloc or ":" in parsed.netloc:
@@ -179,33 +183,30 @@ class ModelDiscovery:
         elif model_id.startswith(("text-search-", "text-embeddings")):
             kind = "embedding"
         elif model_id.startswith("classifier-"):
-            return None
+            kind = "classifier"
         elif model_id.startswith(("aliceai-image-", "yandex-art")):
             kind = "image"
         if not segments[-1] and kind != "embedding":
             # The published v2 embeddings URI ends with '/'; preserve it.
             return None
-        if any(
-            isinstance(value, str) and value in {"classifier", "classification"}
-            for value in (item.get("type"), item.get("model_type"))
-        ):
-            return None
-        declared_type = item.get("type") or item.get("model_type")
-        if isinstance(declared_type, str):
-            if declared_type in {"audio", "voice", "realtime", "stt", "tts"}:
-                kind = "voice"
-            elif declared_type in {
-                "image", "embedding", "embeddings"
-            }:
-                kind = {"embeddings": "embedding"}.get(
-                    declared_type, declared_type
-                )
+        # A generic type="model" must not hide model_type="classifier".
+        for declared_type in (item.get("type"), item.get("model_type")):
+            if isinstance(declared_type, str):
+                if declared_type in {"audio", "voice", "realtime", "stt", "tts"}:
+                    kind = "voice"
+                elif declared_type in {
+                    "image", "embedding", "embeddings", "classifier", "classification"
+                }:
+                    kind = {"embeddings": "embedding", "classification": "classifier"}.get(
+                        declared_type, declared_type
+                    )
 
         registries = {
             "text": TEXT_MODELS,
             "voice": VOICE_MODELS,
             "image": IMAGE_MODELS,
             "embedding": EMBEDDING_MODELS,
+            "classifier": CLASSIFIER_MODELS,
         }
         registry = registries[kind]
         registry_key = registry_key_for_upstream(model_id) if kind == "text" else None
@@ -247,6 +248,9 @@ class ModelDiscovery:
                 # adapter for it. Keep it visible without advertising execution.
                 result["available"] = False
                 result["availability_reason"] = "runtime_adapter_not_registered"
+        result["dialog_selectable"] = (
+            kind in {"text", "voice", "image"} and result["available"]
+        )
         return result
 
     @staticmethod
@@ -292,9 +296,65 @@ def invalidate_model_discovery_cache() -> None:
 
 
 def static_model_catalog() -> dict[str, Any]:
-    return {
-        "text": {key: dict(value) for key, value in TEXT_MODELS.items()},
-        "voice": {key: dict(value) for key, value in VOICE_MODELS.items()},
-        "image": {key: dict(value) for key, value in IMAGE_MODELS.items()},
-        "embedding": {key: dict(value) for key, value in EMBEDDING_MODELS.items()},
+    registries = {
+        "text": TEXT_MODELS,
+        "voice": VOICE_MODELS,
+        "image": IMAGE_MODELS,
+        "embedding": EMBEDDING_MODELS,
+        "classifier": CLASSIFIER_MODELS,
     }
+    return {
+        kind: {
+            key: {
+                **deepcopy(value),
+                "dialog_selectable": kind in {"text", "voice", "image"}
+                and value.get("available") is not False,
+            }
+            for key, value in registry.items()
+        }
+        for kind, registry in registries.items()
+    }
+
+
+def validate_dialog_model(model_key: str) -> str:
+    """Accept dialog models without removing service models from the inventory.
+
+    Registered dialog models work during catalog outages. Private/tuned models
+    require an available text entry in the active credential's provider catalog.
+    This function only reads credentials/catalogs; it never changes storage.
+    """
+    if not isinstance(model_key, str) or not model_key.strip():
+        raise ValueError("model is required")
+    model_key = canonical_model_key(model_key.strip())
+    if model_key in EMBEDDING_MODELS or model_key in CLASSIFIER_MODELS:
+        raise ValueError("service models cannot be used for dialogs")
+    for registry in (TEXT_MODELS, VOICE_MODELS, IMAGE_MODELS):
+        if model_key in registry:
+            if registry[model_key].get("available") is False:
+                raise ValueError("model is unavailable for dialogs")
+            return model_key
+
+    normalized = ModelDiscovery._normalize_model({"id": model_key})
+    if normalized is None or normalized["type"] != "text":
+        raise ValueError("model is not a text dialog model")
+    catalog = get_model_discovery().get_models()
+    text_models = catalog.get("text") or {}
+    entry = text_models.get(model_key)
+    if entry is None:
+        entry = next(
+            (
+                item for item in text_models.values()
+                if item.get("provider_model_id") == model_key
+            ),
+            None,
+        )
+    if not isinstance(entry, dict) or entry.get("available") is not True:
+        raise ValueError("model is not available in the text catalog")
+    try:
+        credential = _active_provider_credential()
+    except Exception as exc:
+        raise ModelDiscoveryError("provider credential is unavailable") from exc
+    # get_model_uri checks full URI syntax and binds a tuned/versioned URI to
+    # the currently active folder without replacing or stripping its version.
+    get_model_uri(credential.project_id, model_key)
+    return model_key
