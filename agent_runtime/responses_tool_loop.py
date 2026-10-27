@@ -77,7 +77,7 @@ def run_tool_loop(
             raise ValueError("Responses API returned a non-object response")
         # A truncated call may contain only part of its arguments. Preserve the
         # provider failure for the caller; never execute its partial output.
-        if response.get("error") or response.get("status") not in (None, "completed"):
+        if response.get("error") is not None or response.get("status") not in (None, "completed"):
             return response
         calls = extract_function_calls(response)
         if not calls:
@@ -112,7 +112,7 @@ def run_tool_loop(
     if not isinstance(response, dict):
         raise ValueError("Responses API returned a non-object response")
     calls = extract_function_calls(response)
-    if response.get("error") or response.get("status") not in (None, "completed"):
+    if response.get("error") is not None or response.get("status") not in (None, "completed"):
         return response
     if not calls:
         return response

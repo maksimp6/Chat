@@ -28,8 +28,10 @@ class ToolLoopIntegrityTests(unittest.TestCase):
                 self.assertEqual(executed, [])
 
     def test_error_with_completed_status_does_not_execute(self):
-        original = {**response("one"), "error": {"code": "provider_failure"}}
-        self.assertIs(run_tool_loop(original, lambda _: self.fail("executed"), None), original)
+        for error in ({"code": "provider_failure"}, {}, ""):
+            with self.subTest(error=error):
+                original = {**response("one"), "error": error}
+                self.assertIs(run_tool_loop(original, lambda _: self.fail("executed"), None), original)
 
     def test_invalid_second_id_prevents_first_side_effect(self):
         for bad_id in (None, "", "  ", 42, ["bad"]):
