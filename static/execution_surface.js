@@ -62,7 +62,7 @@
   }
 
   function isTimeout(error) {
-    var kind = (window.LogosWikifunctions.lowercase(text(error && error.type) + " " + text(error && error.source)));
+    var kind = window.LogosWikifunctions.lowercase(text(error && error.type) + " " + text(error && error.source));
     return kind.indexOf("timeout") >= 0;
   }
 
