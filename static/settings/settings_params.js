@@ -28,7 +28,7 @@
     if (value === undefined || value === null) return fallback;
     if (typeof value === "boolean") return value;
     if (typeof value === "string" && /^(true|false)$/i.test(value.trim())) {
-      return value.trim().toLowerCase() === "true";
+      return window.LogosWikifunctions.lowercase(value.trim()) === "true";
     }
     throw new Error(name + ": требуется true или false");
   }
