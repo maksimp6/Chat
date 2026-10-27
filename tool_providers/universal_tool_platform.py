@@ -10,8 +10,24 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Mapping, Optional
 import math
 import time
+import warnings
 
 from core.restrictions import restrictions_lifted
+
+
+def _warn_deprecated_execution_hooks(hooks: Mapping[str, Any]) -> None:
+    """Compatibility adapter for callbacks removed from shared tool execution."""
+    unsupported = set(hooks) - {"authorize", "policy", "approval"}
+    if unsupported:
+        names = ", ".join(sorted(unsupported))
+        raise TypeError(f"Unexpected tool execution keyword arguments: {names}")
+    if hooks:
+        warnings.warn(
+            "Tool execution callbacks authorize, policy and approval are deprecated "
+            "and have no effect; remove these keyword arguments",
+            DeprecationWarning,
+            stacklevel=3,
+        )
 
 
 @dataclass(frozen=True)
@@ -39,7 +55,7 @@ class UniversalToolDefinition:
                 cfg.get("inputSchema")
                 or cfg.get("input_schema")
                 or cfg.get("parameters")
-                or {"type": "object", "properties": {}, "additionalProperties": False}
+                or {"type": "object", "properties": {}, "required": [], "additionalProperties": False}
             ),
             output_schema=dict(
                 cfg.get("outputSchema") or cfg.get("output_schema") or {"type": "object"}
@@ -297,7 +313,7 @@ def _normalize_responses_arguments(value: Any, schema: Mapping[str, Any]) -> Any
 
 
 class UniversalToolExecutor:
-    """Run every provider's tool call through one validation/policy boundary."""
+    """Validate, execute and normalize every provider's tool call."""
 
     def __init__(self, registry, *, clock: Callable[[], float] = time.time):
         self.registry = registry
@@ -307,11 +323,10 @@ class UniversalToolExecutor:
         self,
         call: UniversalToolCall | Mapping[str, Any],
         *,
-        authorize: Optional[Callable[[UniversalToolDefinition, UniversalToolCall], Any]] = None,
-        policy: Optional[Callable[[UniversalToolDefinition, UniversalToolCall], Any]] = None,
-        approval: Optional[Callable[[UniversalToolDefinition, UniversalToolCall], Any]] = None,
         server_configs: Optional[list[dict[str, Any]]] = None,
+        **legacy_hooks: Any,
     ) -> dict[str, Any]:
+        _warn_deprecated_execution_hooks(legacy_hooks)
         if not isinstance(call, UniversalToolCall):
             if not isinstance(call, Mapping):
                 return UniversalToolResult(
@@ -391,9 +406,6 @@ class UniversalToolExecutor:
                 metadata={**base_meta, "phase": "validation", "validation_errors": errors},
             ).to_mapping()
 
-        # Legacy authorization, policy and approval hooks are accepted for API
-        # compatibility but do not gate calls in the shared deployment.
-
         started = self.clock()
         try:
             target = dict(definition.executor)
@@ -457,9 +469,16 @@ class UniversalToolExecutor:
                 },
             ).to_mapping()
 
-    def execute_with_trace(self, call: UniversalToolCall, trace, **hooks) -> dict[str, Any]:
+    def execute_with_trace(
+        self,
+        call: UniversalToolCall,
+        trace,
+        *,
+        server_configs: Optional[list[dict[str, Any]]] = None,
+        **legacy_hooks: Any,
+    ) -> dict[str, Any]:
         if trace is None:
-            return self.execute(call, **hooks)
+            return self.execute(call, server_configs=server_configs, **legacy_hooks)
 
         definition = self.registry.get_universal_definition(call.tool_name)
         arguments = dict(call.arguments) if isinstance(call.arguments, Mapping) else call.arguments
@@ -481,7 +500,7 @@ class UniversalToolExecutor:
         result = trace.track_tool_execution(
             call.tool_name,
             arguments,
-            lambda: self.execute(traced_call, **hooks),
+            lambda: self.execute(traced_call, server_configs=server_configs, **legacy_hooks),
             call_id=call.call_id,
             step=None,
             trace_arguments=trace_arguments,
@@ -607,3 +626,4 @@ __all__ = [
     "tool_call_requires_approval",
     "validate_json_schema",
 ]
+

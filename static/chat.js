@@ -80,43 +80,35 @@ function renderApprovalCard(toolCall, origMsg) {
             if (data.execution_result && typeof window.applyThemeAssistantResult === "function") {
               window.applyThemeAssistantResult(data.execution_result);
             }
-            addMessage(
-              data.reply,
-              "bot",
-              false,
-              data.cost || 0,
-              data.timings,
-              null,
-              data.reasoning,
-              data.usage,
-              data.trace,
-            );
+            addMessage({
+              text: data.reply,
+              role: "bot",
+              cost: data.cost || 0,
+              timings: data.timings,
+              reasoning: data.reasoning,
+              usage: data.usage,
+              trace: data.trace,
+            });
           } else {
-            addMessage(
-              "⚠️ Ошибка выполнения: " + (data.error || `HTTP ${result.status}`),
-              "error",
-              false,
-              0,
-              null,
-              null,
-              null,
-              null,
-              data.trace,
-            );
+            addMessage({
+              text: "⚠️ Ошибка выполнения: " + (data.error || `HTTP ${result.status}`),
+              role: "error",
+              trace: data.trace,
+            });
           }
         });
       })
       .catch(() => {
         card.remove();
         deliverApprovalOutput(cardConvId, function () {
-          addMessage("Сетевая ошибка при выполнении действия", "error", false, 0);
+          addMessage({ text: "Сетевая ошибка при выполнении действия", role: "error" });
         });
       });
   });
 
   rejectBtn.addEventListener("click", function () {
     card.remove();
-    addMessage(`⛔ Действие "${toolCall.name}" отклонено пользователем.`, "bot", true, 0);
+    addMessage({ text: `⛔ Действие "${toolCall.name}" отклонено пользователем.`, role: "bot" });
   });
 }
 
@@ -432,23 +424,22 @@ function buildDetails(content, usage, totalDurationMs, cost) {
   return details;
 }
 
-function addMessage(
+function addMessage({
   text,
   role,
-  save,
-  cost,
+  cost = 0,
   timings,
   totalDurationMs,
   reasoning,
   usage,
   trace,
-  options,
-) {
+  id: messageId,
+  onRetry,
+}) {
   const chatbox = document.getElementById("chatbox");
   if (!chatbox) return null;
   const uiRole = normalizeChatRole(role);
   if (!uiRole) return null;
-  const messageId = options && options.id;
   const existing = findRenderedMessage(chatbox, messageId);
   if (existing) return existing;
   const emptyState = chatbox.querySelector(".empty-state");
@@ -467,7 +458,7 @@ function addMessage(
   bubble.innerHTML = htmlContent;
   msg.appendChild(bubble);
 
-  if (uiRole === "error" && options && typeof options.onRetry === "function") {
+  if (uiRole === "error" && typeof onRetry === "function") {
     const retryBtn = document.createElement("button");
     retryBtn.type = "button";
     retryBtn.className = "logos-btn msg-retry-btn";
@@ -475,7 +466,7 @@ function addMessage(
     retryBtn.addEventListener("click", async function () {
       retryBtn.disabled = true;
       try {
-        await options.onRetry();
+        await onRetry();
       } finally {
         retryBtn.disabled = false;
       }
@@ -695,27 +686,24 @@ function loadHistory(convId) {
           const retryText = msg.source === "error" && previous && previous.role === "user" ? previous.text : null;
           // A user message that carried photos shows their count, as it did when it was sent.
           const photos = msg.role === "user" && msg.attachments ? msg.attachments.images : 0;
-          const node = addMessage(
-            photos ? (msg.text ? msg.text + " · фото: " : "Фото: ") + photos : msg.text,
-            msg.source === "error" ? "error" : msg.role,
-            false,
-            msg.cost || 0,
-            msg.timings,
-            msg.total_duration_ms || 0,
-            msg.reasoning,
-            msg.usage,
-            msg.trace,
-            {
-              id: msg.id,
-              onRetry: retryText === null ? undefined : function () {
-                return window.logosRetryTurn({
-                  text: retryText,
-                  conversationId: convId,
-                  imageCount: previous.attachments ? previous.attachments.images || 0 : 0,
-                });
-              },
+          const node = addMessage({
+            text: photos ? (msg.text ? msg.text + " · фото: " : "Фото: ") + photos : msg.text,
+            role: msg.source === "error" ? "error" : msg.role,
+            cost: msg.cost || 0,
+            timings: msg.timings,
+            totalDurationMs: msg.total_duration_ms || 0,
+            reasoning: msg.reasoning,
+            usage: msg.usage,
+            trace: msg.trace,
+            id: msg.id,
+            onRetry: retryText === null ? undefined : function () {
+              return window.logosRetryTurn({
+                text: retryText,
+                conversationId: convId,
+                imageCount: previous.attachments ? previous.attachments.images || 0 : 0,
+              });
             },
-          );
+          });
           if (node) rendered += 1;
         });
         if (!rendered) {
@@ -954,13 +942,15 @@ document.addEventListener("DOMContentLoaded", function () {
     const data = await pollImageOperation(turn.conversationId, operationId);
     if (currentConvId !== turn.conversationId) return;
     if (data.error) {
-      addMessage("⚠️ Ошибка: " + data.error, "error", false, 0, null, null, null, null, null, {
+      addMessage({
+        text: "⚠️ Ошибка: " + data.error,
+        role: "error",
         onRetry: function () {
           return resumeImageTurn(turn, operationId);
         },
       });
     } else {
-      addMessage(data.reply, "bot", false, 0);
+      addMessage({ text: data.reply, role: "bot" });
     }
   }
 
@@ -1036,7 +1026,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
     if (currentConvId === turn.conversationId) {
-      addMessage("Ответ ещё не пришёл. Сервер сохранит его: откройте диалог позже.", "error", false, 0);
+      addMessage({ text: "Ответ ещё не пришёл. Сервер сохранит его: откройте диалог позже.", role: "error" });
     }
   }
 
@@ -1111,14 +1101,12 @@ document.addEventListener("DOMContentLoaded", function () {
         // A retry already has its user message in the chat, so it is not painted twice.
         if (!retryRequest) {
           if (input.value === rawText) input.value = "";
-          addMessage(
-            sentImages.length
+          addMessage({
+            text: sentImages.length
               ? (turn.text ? turn.text + " · фото: " : "Фото: ") + sentImages.length
               : turn.text,
-            "user",
-            false,
-            0,
-          );
+            role: "user",
+          });
         }
         const chatbox = document.getElementById("chatbox");
         typingEl = document.createElement("div");
@@ -1177,17 +1165,33 @@ document.addEventListener("DOMContentLoaded", function () {
         restoreImages();
         // The failed text goes back to the field, unless the user already started a new draft.
         if (!input.value) input.value = turn.text;
-        addMessage(data.reply || "⚠️ Ошибка: " + errorReasonText(data), "error", false, data.cost || 0, data.timings,
-          clientTotalMs, data.reasoning, data.usage, data.trace, {
-            onRetry: function () {
-              if (data.operationId) return resumeImageTurn(turn, data.operationId);
-              return sendTurn({ text: turn.text, conversationId: turn.conversationId, images: sentImages });
-            },
-          });
+        addMessage({
+          text: data.reply || "⚠️ Ошибка: " + errorReasonText(data),
+          role: "error",
+          cost: data.cost || 0,
+          timings: data.timings,
+          totalDurationMs: clientTotalMs,
+          reasoning: data.reasoning,
+          usage: data.usage,
+          trace: data.trace,
+          onRetry: function () {
+            if (data.operationId) return resumeImageTurn(turn, data.operationId);
+            return sendTurn({ text: turn.text, conversationId: turn.conversationId, images: sentImages });
+          },
+        });
       } else if (data.reply) {
         // The server's duration is the one stored with the reply, so the details read the same after a reload.
-        const replyNode = addMessage(data.reply, "bot", false, data.cost || 0, data.timings,
-          data.total_duration_ms || clientTotalMs, data.reasoning, data.usage, data.trace, { id: data.message_id });
+        const replyNode = addMessage({
+          text: data.reply,
+          role: "bot",
+          cost: data.cost || 0,
+          timings: data.timings,
+          totalDurationMs: data.total_duration_ms || clientTotalMs,
+          reasoning: data.reasoning,
+          usage: data.usage,
+          trace: data.trace,
+          id: data.message_id,
+        });
         // A reply taller than the chat opens at its first line, not its last.
         const replyBox = document.getElementById("chatbox");
         if (replyNode && replyBox && replyNode.offsetHeight > replyBox.clientHeight) {
@@ -1195,9 +1199,16 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       } else {
         restoreImages();
-        addMessage("⚠️ Ошибка: " + (data.detail || data.title || "HTTP " + response.status),
-          "error", false, data.cost || 0, data.timings, clientTotalMs,
-          data.reasoning, data.usage, data.trace);
+        addMessage({
+          text: "⚠️ Ошибка: " + (data.detail || data.title || "HTTP " + response.status),
+          role: "error",
+          cost: data.cost || 0,
+          timings: data.timings,
+          totalDurationMs: clientTotalMs,
+          reasoning: data.reasoning,
+          usage: data.usage,
+          trace: data.trace,
+        });
       }
     } catch (error) {
       const stopped = Boolean(error) && error.name === "AbortError";
@@ -1205,19 +1216,19 @@ document.addEventListener("DOMContentLoaded", function () {
       if (canRecover && currentConvId === turn.conversationId) {
         // The server may still answer: wait for the stored answer before offering the text again.
         recovering = true;
-        addMessage("Соединение прервалось. Ждём ответ, он сохраняется на сервере.", "error", false, 0);
+        addMessage({ text: "Соединение прервалось. Ждём ответ, он сохраняется на сервере.", role: "error" });
         recoverTurn(turn, function () {
           if (currentConvId !== turn.conversationId) return;
           restoreImages();
           if (!input.value) input.value = turn.text;
-          addMessage(chatErrorText(error), "error", false, 0);
+          addMessage({ text: chatErrorText(error), role: "error" });
         }).finally(function () {
           releaseTurn(turn, needsConversation);
         });
       } else if (currentConvId === turn.conversationId) {
         restoreImages();
         if (!input.value) input.value = turn.text;
-        addMessage(chatErrorText(error), "error", false, 0);
+        addMessage({ text: chatErrorText(error), role: "error" });
       }
     } finally {
       if (typingEl) typingEl.remove();
@@ -1240,4 +1251,5 @@ document.addEventListener("DOMContentLoaded", function () {
   syncSendButton();
   if (currentConvId) loadHistory(currentConvId);
 });
+
 

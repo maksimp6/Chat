@@ -7,6 +7,7 @@ from kristall.store import (
     Kristall,
     Store,
     KristallError,
+    KristallLimitError,
     Transaction,
 )
 
@@ -17,5 +18,7 @@ __all__ = [
     "Kristall",
     "Store",
     "KristallError",
+    "KristallLimitError",
     "Transaction",
 ]
+

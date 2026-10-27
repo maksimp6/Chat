@@ -70,37 +70,23 @@ class ToolRegistry:
 
     @staticmethod
     def _normalize_cfg(category: str, name: str, cfg: Mapping[str, Any]) -> dict[str, Any]:
+        # Registry presentation/category defaults enrich the shared definition;
+        # schema aliases and type/default normalization have a single owner.
         result = dict(cfg)
         result.setdefault("title", name.replace("_", " ").strip().title())
-        result.setdefault(
-            "inputSchema",
-            result.get("input_schema")
-            or result.get("parameters")
-            or {
-                "type": "object",
-                "properties": {},
-                "required": [],
-                "additionalProperties": False,
-            },
-        )
-        result.setdefault("outputSchema", result.get("output_schema") or {"type": "object"})
-        result.setdefault("capabilities", list(result.get("capabilities") or [category]))
-        result.setdefault("risk_level", str(result.get("risk_level") or "medium"))
-        result.setdefault("read_only", bool(result.get("read_only", False)))
-        result.setdefault(
-            "requires_approval",
-            bool(result.get("requires_approval", not result["read_only"])),
-        )
+        result.setdefault("capabilities", [category])
+        result.setdefault("requires_approval", not bool(result.get("read_only", False)))
+        normalized = UniversalToolDefinition.from_mapping(name, result).to_mapping()
+        normalized.pop("name")
+        result.update(normalized)
         # MCP is the universal external tool surface. Every registered tool
         # must be callable through the MCP adapter; preserve any existing
         # transport declarations while adding MCP rather than requiring every
         # legacy tool implementation to be edited individually.
-        transports = list(result.get("supported_transports") or ("responses_api", "local_agent"))
+        transports = result["supported_transports"]
         if "mcp" not in transports:
             transports.append("mcp")
         result["supported_transports"] = transports
-        result.setdefault("executor", dict(result.get("executor") or {"type": "local"}))
-        result.setdefault("metadata", dict(result.get("metadata") or {}))
         return result
 
     def _register(self, category: str, name: str, cfg: Mapping[str, Any]):
@@ -206,10 +192,7 @@ class ToolRegistry:
 
     def _function_definition(self, name: str, cfg: Mapping[str, Any]) -> dict[str, Any]:
         # Advertise the same schema the UniversalToolExecutor validates.
-        parameters = (
-            cfg.get("inputSchema") or cfg.get("input_schema") or cfg.get("parameters")
-            or {"type": "object", "properties": {}}
-        )
+        parameters = UniversalToolDefinition.from_mapping(name, cfg).input_schema
         return {
             "type": "function",
             "name": name,
@@ -311,3 +294,4 @@ class ToolRegistry:
 registry = ToolRegistry()
 
 __all__ = ["ToolRegistry", "registry"]
+

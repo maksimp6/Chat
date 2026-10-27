@@ -252,32 +252,179 @@
     );
   }
 
+  // IDs, display values and readers live together so a field has one binding.
+  var SETTINGS_FIELDS = {
+    temperature: {
+      id: "set-temp", label: "Temperature", type: "number", read: "float", fallback: 0.7,
+      extra: ' step="0.1" min="0" max="2"',
+    },
+    top_p: {
+      id: "set-topp", label: "Top P", type: "number", read: "float", fallback: 1.0,
+      extra: ' step="0.05" min="0" max="1"',
+    },
+    max_output_tokens: {
+      id: "set-tokens", label: "Токены ответа (0 — максимум провайдера)",
+      type: "number", read: "integer", fallback: 0, extra: ' step="100" min="0"',
+    },
+    truncation: {
+      id: "set-trunc", label: "Truncation", type: "select", ultraFixed: true,
+      choices: [["disabled", "Disabled"], ["auto", "Auto"]],
+    },
+    reasoning_effort: {
+      id: "set-reasoning", label: "Глубина размышлений", type: "select",
+      displayFallback: "medium", ultraFixed: true,
+      choices: [["disabled", "Disabled"], ["low", "Low"], ["medium", "Medium"], ["high", "High"]],
+    },
+    store: { id: "set-store", label: "Сохранять ответы", type: "checkbox", enabledByDefault: true },
+    background: { id: "set-bg", label: "Фоновый опрос", type: "checkbox", enabledByDefault: true },
+    stream: { id: "set-stream", label: "Потоковый режим", type: "checkbox" },
+    instructions: {
+      id: "set-instructions", label: "Системный промпт (Instructions)",
+      type: "textarea", extra: "height:70px;",
+    },
+    text_format: {
+      id: "set-text-fmt", label: "Формат", type: "select",
+      choices: [["text", "Обычный текст (Text)"], ["json", "Строгий JSON (json_schema)"]],
+    },
+    text_verbosity: {
+      id: "set-verbosity", label: "Детализация (Verbosity)", type: "select",
+      choices: [["medium", "Medium"], ["concise", "Concise"], ["verbose", "Verbose"]],
+    },
+    json_schema_name: {
+      id: "set-js-name", label: "Название схемы", type: "text", read: "trim",
+      displayFallback: "response", extra: ' style="margin-bottom:8px;"',
+    },
+    json_schema: {
+      id: "set-js-schema", label: "JSON Schema definition", type: "textarea", read: "trim",
+      displayFallback: "", extra: "height:100px;font-family:monospace;font-size:11px;",
+    },
+    tool_choice: {
+      id: "set-tool-choice", label: "Tool Choice", type: "select",
+      choices: [["auto", "Auto"], ["required", "Required"], ["none", "None"]],
+    },
+    max_tool_calls: {
+      id: "set-max-tools", label: "Max Tool Calls", type: "number", read: "integer",
+      fallback: null, displayFallback: "", extra: ' min="1"',
+    },
+    parallel_tool_calls: {
+      id: "set-parallel-tools", label: "Параллельные вызовы (Parallel Tool Calls)",
+      type: "checkbox", enabledByDefault: true,
+    },
+    top_logprobs: {
+      id: "set-logprobs", label: "Top Logprobs", type: "number", read: "integer",
+      fallback: 0, displayFallback: 0, extra: ' min="0" max="5"',
+    },
+    service_tier: {
+      id: "set-tier", label: "Service Tier", type: "select",
+      choices: [["auto", "Auto (Default)"], ["priority", "Priority"]],
+    },
+    previous_response_id: {
+      id: "set-prev-id", label: "Previous Response ID", type: "text", read: "trim",
+      displayFallback: "", extra: ' placeholder="UUID"',
+    },
+    prompt_cache_key: {
+      id: "set-cache-key", label: "Prompt Cache Key", type: "text", read: "trim",
+      displayFallback: "", extra: ' placeholder="cache-id"',
+    },
+    prompt_id: {
+      id: "set-prompt-id", label: "Prompt ID (Шаблон)", type: "text", read: "trim",
+      displayFallback: "", extra: ' placeholder="Шаблон Yandex Studio"',
+    },
+    prompt_version: {
+      id: "set-prompt-ver", label: "Prompt Version", type: "text", read: "trim",
+      displayFallback: "", extra: ' placeholder="latest"',
+    },
+    prompt_variables: {
+      id: "set-prompt-vars", label: "Prompt Variables (JSON)", type: "text", read: "trim",
+      displayFallback: "", extra: ' placeholder=\'{"key":"val"}\'',
+    },
+    conv_metadata: {
+      id: "set-conv-meta", label: "Диалоговые метаданные (Metadata JSON)", type: "textarea",
+      read: "trim", displayFallback: "", extra: "height:60px;font-family:monospace;font-size:11px;",
+    },
+  };
+
+  function readSettingsField(field, element) {
+    if (field.type === "checkbox") return element.checked;
+    if (field.read === "float") {
+      var number = parseFloat(element.value);
+      return Number.isNaN(number) ? field.fallback : number;
+    }
+    if (field.read === "integer") return parseInt(element.value, 10) || field.fallback;
+    return field.read === "trim" ? element.value.trim() : element.value;
+  }
+
   window.openSettingsModal = function () {
     var UI = window.SettingsUI;
+    var CoreUI = window.LogosCoreAPI.ui;
     var Storage = window.SettingsStorage;
     var settings = Storage.load(currentConvId);
     var ultra = ultraProfileFor(typeof currentModel !== "undefined" ? currentModel : "");
     if (ultra) settings = applyUltraProfile(settings, ultra);
 
     var existing = document.getElementById("settings-modal-custom");
-    if (existing) existing.remove();
+    if (existing) {
+      CoreUI.modal.close(existing);
+      existing.remove();
+    }
 
-    var ov = document.createElement("div");
-    ov.id = "settings-modal-custom";
-    ov.style.cssText =
-      "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10002;display:flex;align-items:center;justify-content:center;";
-
-    var md = document.createElement("div");
-    md.className = "settings-modal-panel";
+    var ov = CoreUI.modal.create({
+      id: "settings-modal-custom",
+      title: "⚙️ Конфигурация LLM & Responses API",
+      contentClassName: "settings-modal-panel",
+    });
+    ov.style.zIndex = "10002";
+    var md = ov.querySelector(".modal-content");
     md.style.cssText =
       "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);display:flex;flex-direction:column;";
+    var title = md.querySelector(".modal-title");
+    title.style.cssText = "margin:0;font-size:18px;color:var(--m-text,#222);";
+    var closeButton = md.querySelector(".modal-close");
+    closeButton.id = "set-close-btn";
+    closeButton.classList.add("settings-contract-btn");
+
+    function fieldElement(key) {
+      return md.querySelector("#" + SETTINGS_FIELDS[key].id);
+    }
+
+    function fieldHtml(key) {
+      var field = SETTINGS_FIELDS[key];
+      var value = settings[key];
+      if (!value && Object.prototype.hasOwnProperty.call(field, "displayFallback")) {
+        value = field.displayFallback;
+      }
+      if (field.type === "checkbox") {
+        var checked = field.enabledByDefault ? value !== false : value === true;
+        return UI.chk(field.id, checked, field.label);
+      }
+      var control;
+      if (field.type === "select") {
+        var options = field.choices.map(function (choice) {
+          return '<option value="' + UI.escapeHtml(choice[0]) + '"' +
+            (value === choice[0] ? " selected" : "") + ">" +
+            UI.escapeHtml(choice[1]) + "</option>";
+        }).join("");
+        control = UI.sel(field.id, options);
+      } else if (field.type === "textarea") {
+        control = UI.ta(field.id, value, field.extra);
+      } else {
+        control = UI.inp(field.id, field.type, value, field.extra);
+      }
+      return UI.lbl(field.label) + control;
+    }
+
+    function row(keys) {
+      var cells = keys.map(function (key) {
+        return "<div>" + (key ? fieldHtml(key) : "") + "</div>";
+      });
+      return keys.length === 3
+        ? UI.gap3(cells[0], cells[1], cells[2])
+        : UI.gap2(cells[0], cells[1]);
+    }
 
     var tabsHeader = [
       '<div class="settings-modal-top">',
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">',
-      '    <h2 style="margin:0;font-size:18px;color:var(--m-text,#222);">⚙️ Конфигурация LLM & Responses API</h2>',
-      '    <button class="logos-btn settings-contract-btn" id="set-close-btn">&times;</button>',
-      "</div>",
+      '<div class="settings-modal-heading" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"></div>',
       '<div class="llm-tabs" style="display:flex;gap:6px;border-bottom:1px solid var(--m-border,#ddd);flex-wrap:wrap;">',
       '    <button class="logos-btn llm-tab-btn active settings-contract-btn" data-tab="tab-gen">Сэмплинг</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-output">Формат вывода</button>',
@@ -292,110 +439,23 @@
       '<div id="tab-gen" class="llm-tab-content">',
       UI.section("Базовый сэмплинг"),
       ultraProfileNote(ultra),
-      UI.gap2(
-        "<div>" +
-          UI.lbl("Temperature") +
-          UI.inp("set-temp", "number", settings.temperature, ' step="0.1" min="0" max="2"') +
-          "</div>",
-        "<div>" +
-          UI.lbl("Top P") +
-          UI.inp("set-topp", "number", settings.top_p, ' step="0.05" min="0" max="1"') +
-          "</div>",
-      ),
-      UI.gap2(
-        "<div>" +
-          UI.lbl("Токены ответа (0 — максимум провайдера)") +
-          UI.inp("set-tokens", "number", settings.max_output_tokens, ' step="100" min="0"') +
-          "</div>",
-        "<div>" +
-          UI.lbl("Truncation") +
-          UI.sel(
-            "set-trunc",
-            '<option value="disabled"' +
-              (settings.truncation === "disabled" ? " selected" : "") +
-              '>Disabled</option><option value="auto"' +
-              (settings.truncation === "auto" ? " selected" : "") +
-              ">Auto</option>",
-          ) +
-          "</div>",
-      ),
-      UI.gap2(
-        "<div>" +
-          UI.lbl("Глубина размышлений") +
-          UI.sel(
-            "set-reasoning",
-            '<option value="disabled"' +
-              (settings.reasoning_effort === "disabled" ? " selected" : "") +
-              '>Disabled</option><option value="low"' +
-              (settings.reasoning_effort === "low" ? " selected" : "") +
-              '>Low</option><option value="medium"' +
-              (!settings.reasoning_effort || settings.reasoning_effort === "medium"
-                ? " selected"
-                : "") +
-              '>Medium</option><option value="high"' +
-              (settings.reasoning_effort === "high" ? " selected" : "") +
-              ">High</option>",
-          ) +
-          "</div>",
-        "<div></div>",
-      ),
-      UI.gap3(
-        "<div>" + UI.chk("set-store", settings.store !== false, "Сохранять ответы") + "</div>",
-        "<div>" + UI.chk("set-bg", settings.background !== false, "Фоновый опрос") + "</div>",
-        "<div>" + UI.chk("set-stream", settings.stream === true, "Потоковый режим") + "</div>",
-      ),
-      '<div style="margin-top:10px;">' +
-        UI.lbl("Системный промпт (Instructions)") +
-        UI.ta("set-instructions", settings.instructions, "height:70px;") +
-        "</div>",
+      row(["temperature", "top_p"]),
+      row(["max_output_tokens", "truncation"]),
+      row(["reasoning_effort", null]),
+      row(["store", "background", "stream"]),
+      '<div style="margin-top:10px;">' + fieldHtml("instructions") + "</div>",
       "</div>",
     ].join("");
 
     var tabOutput = [
       '<div id="tab-output" class="llm-tab-content" style="display:none;">',
       UI.section("Структура ответа (Text / JSON Schema)"),
-      UI.gap2(
-        "<div>" +
-          UI.lbl("Формат") +
-          UI.sel(
-            "set-text-fmt",
-            '<option value="text"' +
-              (settings.text_format === "text" ? " selected" : "") +
-              '>Обычный текст (Text)</option><option value="json"' +
-              (settings.text_format === "json" ? " selected" : "") +
-              ">Строгий JSON (json_schema)</option>",
-          ) +
-          "</div>",
-        "<div>" +
-          UI.lbl("Детализация (Verbosity)") +
-          UI.sel(
-            "set-verbosity",
-            '<option value="medium"' +
-              (settings.text_verbosity === "medium" ? " selected" : "") +
-              '>Medium</option><option value="concise"' +
-              (settings.text_verbosity === "concise" ? " selected" : "") +
-              '>Concise</option><option value="verbose"' +
-              (settings.text_verbosity === "verbose" ? " selected" : "") +
-              ">Verbose</option>",
-          ) +
-          "</div>",
-      ),
+      row(["text_format", "text_verbosity"]),
       '<div id="json-schema-wrap" style="' +
         (settings.text_format === "json" ? "" : "display:none;") +
         'margin-top:10px;">',
-      UI.lbl("Название схемы") +
-        UI.inp(
-          "set-js-name",
-          "text",
-          settings.json_schema_name || "response",
-          ' style="margin-bottom:8px;"',
-        ),
-      UI.lbl("JSON Schema definition") +
-        UI.ta(
-          "set-js-schema",
-          settings.json_schema || "",
-          "height:100px;font-family:monospace;font-size:11px;",
-        ),
+      fieldHtml("json_schema_name"),
+      fieldHtml("json_schema"),
       "</div>",
       "</div>",
     ].join("");
@@ -403,135 +463,35 @@
     var tabRouting = [
       '<div id="tab-routing" class="llm-tab-content" style="display:none;">',
       UI.section("Политики Tool Calling"),
-      UI.gap2(
-        "<div>" +
-          UI.lbl("Tool Choice") +
-          UI.sel(
-            "set-tool-choice",
-            '<option value="auto"' +
-              (settings.tool_choice === "auto" ? " selected" : "") +
-              '>Auto</option><option value="required"' +
-              (settings.tool_choice === "required" ? " selected" : "") +
-              '>Required</option><option value="none"' +
-              (settings.tool_choice === "none" ? " selected" : "") +
-              ">None</option>",
-          ) +
-          "</div>",
-        "<div>" +
-          UI.lbl("Max Tool Calls") +
-          UI.inp("set-max-tools", "number", settings.max_tool_calls || "", ' min="1"') +
-          "</div>",
-      ),
-      UI.gap2(
-        "<div>" +
-          UI.chk(
-            "set-parallel-tools",
-            settings.parallel_tool_calls !== false,
-            "Параллельные вызовы (Parallel Tool Calls)",
-          ) +
-          "</div>",
-        "<div>" +
-          UI.lbl("Top Logprobs") +
-          UI.inp("set-logprobs", "number", settings.top_logprobs || 0, ' min="0" max="5"') +
-          "</div>",
-      ),
+      row(["tool_choice", "max_tool_calls"]),
+      row(["parallel_tool_calls", "top_logprobs"]),
       UI.section("Приоритеты облака"),
-      UI.gap2(
-        "<div>" +
-          UI.lbl("Service Tier") +
-          UI.sel(
-            "set-tier",
-            '<option value="auto"' +
-              (settings.service_tier === "auto" ? " selected" : "") +
-              '>Auto (Default)</option><option value="priority"' +
-              (settings.service_tier === "priority" ? " selected" : "") +
-              ">Priority</option>",
-          ) +
-          "</div>",
-        "<div>" +
-          UI.lbl("Previous Response ID") +
-          UI.inp(
-            "set-prev-id",
-            "text",
-            settings.previous_response_id || "",
-            ' placeholder="UUID"',
-          ) +
-          "</div>",
-      ),
+      row(["service_tier", "previous_response_id"]),
       "</div>",
     ].join("");
 
     var tabAdv = [
       '<div id="tab-adv" class="llm-tab-content" style="display:none;">',
       UI.section("Промпт-шаблоны и кэширование"),
-      UI.gap2(
-        "<div>" +
-          UI.lbl("Prompt Cache Key") +
-          UI.inp(
-            "set-cache-key",
-            "text",
-            settings.prompt_cache_key || "",
-            ' placeholder="cache-id"',
-          ) +
-          "</div>",
-        "<div>" +
-          UI.lbl("Prompt ID (Шаблон)") +
-          UI.inp(
-            "set-prompt-id",
-            "text",
-            settings.prompt_id || "",
-            ' placeholder="Шаблон Yandex Studio"',
-          ) +
-          "</div>",
-      ),
-      UI.gap2(
-        "<div>" +
-          UI.lbl("Prompt Version") +
-          UI.inp("set-prompt-ver", "text", settings.prompt_version || "", ' placeholder="latest"') +
-          "</div>",
-        "<div>" +
-          UI.lbl("Prompt Variables (JSON)") +
-          UI.inp(
-            "set-prompt-vars",
-            "text",
-            settings.prompt_variables || "",
-            ' placeholder=\'{"key":"val"}\'',
-          ) +
-          "</div>",
-      ),
-      '<div style="margin-top:10px;">' +
-        UI.lbl("Диалоговые метаданные (Metadata JSON)") +
-        UI.ta(
-          "set-conv-meta",
-          settings.conv_metadata || "",
-          "height:60px;font-family:monospace;font-size:11px;",
-        ) +
-        "</div>",
+      row(["prompt_cache_key", "prompt_id"]),
+      row(["prompt_version", "prompt_variables"]),
+      '<div style="margin-top:10px;">' + fieldHtml("conv_metadata") + "</div>",
       "</div>",
     ].join("");
 
     var activeTheme = window.LogosTheme ? window.LogosTheme.getStored() : "light";
-    var themeOptions = Object.keys(
-      (window.LogosTheme && window.LogosTheme.themes) || {
-        light: "Светлая",
-        dark: "Тёмная",
-        dim: "Приглушённая",
-        "high-contrast": "Высокий контраст",
-      },
-    )
-      .map(function (key) {
-        var label = ((window.LogosTheme && window.LogosTheme.themes) || {})[key] || key;
-        return (
-          '<option value="' +
-          UI.escapeHtml(key) +
-          '"' +
-          (activeTheme === key ? " selected" : "") +
-          ">" +
-          UI.escapeHtml(label) +
-          "</option>"
-        );
-      })
-      .join("");
+    var themes = (window.LogosTheme && window.LogosTheme.themes) || {
+      light: "Светлая",
+      dark: "Тёмная",
+      dim: "Приглушённая",
+      "high-contrast": "Высокий контраст",
+    };
+    var themeOptions = Object.keys(themes).map(function (key) {
+      var label = ((window.LogosTheme && window.LogosTheme.themes) || {})[key] || key;
+      return '<option value="' + UI.escapeHtml(key) + '"' +
+        (activeTheme === key ? " selected" : "") + ">" +
+        UI.escapeHtml(label) + "</option>";
+    }).join("");
 
     var tabTheme = [
       '<div id="tab-theme" class="llm-tab-content" style="display:none;">',
@@ -553,29 +513,28 @@
     ].join("");
 
     md.innerHTML = tabsHeader + tabGen + tabOutput + tabRouting + tabAdv + tabTheme + footer;
-    ov.appendChild(md);
-    // Внутри .logos-pro-app, чтобы получить стили кнопок и вкладок этого приложения (пункт 25).
+    var heading = md.querySelector(".settings-modal-heading");
+    heading.appendChild(title);
+    heading.appendChild(closeButton);
+    // Keep the shared modal's accessible title and close action in the sticky header.
     (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
+    CoreUI.modal.open(ov);
 
     function closeModal() {
-      ov.remove();
+      CoreUI.modal.close(ov);
     }
     function showSaveError() {
-      document.getElementById("set-status").textContent =
+      md.querySelector("#set-status").textContent =
         "Не удалось сохранить на сервер. Настройки сохранены только в этом браузере.";
     }
-    document.getElementById("set-close-btn").addEventListener("click", closeModal);
     ov.addEventListener("click", function (e) {
       if (e.target === ov) closeModal();
     });
 
-    // Truncation and reasoning are fixed by the Ultra profile; the output cap stays editable.
-    if (ultra) {
-      ["set-trunc", "set-reasoning"].forEach(function (id) {
-        var field = document.getElementById(id);
-        if (field) field.disabled = true;
-      });
-    }
+    // Truncation and reasoning are fixed by Ultra; the output cap stays editable.
+    Object.keys(SETTINGS_FIELDS).forEach(function (key) {
+      if (ultra && SETTINGS_FIELDS[key].ultraFixed) fieldElement(key).disabled = true;
+    });
 
     md.querySelectorAll(".llm-tab-btn").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -585,67 +544,35 @@
         md.querySelectorAll(".llm-tab-content").forEach(function (c) {
           c.style.display = "none";
         });
-
         btn.classList.add("active");
-
-        var target = document.getElementById(btn.getAttribute("data-tab"));
+        var target = md.querySelector("#" + btn.getAttribute("data-tab"));
         if (target) target.style.display = "block";
       });
     });
 
-    var themeSelect = document.getElementById("set-theme");
-    if (themeSelect) {
-      themeSelect.addEventListener("change", function () {
-        if (window.LogosTheme) window.LogosTheme.apply(this.value, true);
-      });
-    }
+    var themeSelect = md.querySelector("#set-theme");
+    themeSelect.addEventListener("change", function () {
+      if (window.LogosTheme) window.LogosTheme.apply(this.value, true);
+    });
 
-    document.getElementById("set-text-fmt").addEventListener("change", function () {
-      document.getElementById("json-schema-wrap").style.display =
+    fieldElement("text_format").addEventListener("change", function () {
+      md.querySelector("#json-schema-wrap").style.display =
         this.value === "json" ? "block" : "none";
     });
 
-    document.getElementById("set-reset-btn").addEventListener("click", function () {
+    md.querySelector("#set-reset-btn").addEventListener("click", function () {
       if (!confirm("Сбросить параметры генерации к значениям по умолчанию?")) return;
       var defs = window.resetSettings(currentConvId);
       Storage.save(defs, currentConvId).then(closeModal, showSaveError);
     });
 
-    document.getElementById("set-save-btn").addEventListener("click", function () {
-      // Zero is a valid temperature and top_p; only a non-number falls back to the default.
-      var temperature = parseFloat(document.getElementById("set-temp").value);
-      settings.temperature = Number.isNaN(temperature) ? 0.7 : temperature;
-      var topP = parseFloat(document.getElementById("set-topp").value);
-      settings.top_p = Number.isNaN(topP) ? 1.0 : topP;
-      settings.max_output_tokens =
-        parseInt(document.getElementById("set-tokens").value, 10) || 0;
-      settings.truncation = document.getElementById("set-trunc").value;
-      settings.reasoning_effort = document.getElementById("set-reasoning").value;
-      settings.store = document.getElementById("set-store").checked;
-      settings.background = document.getElementById("set-bg").checked;
-      settings.stream = document.getElementById("set-stream").checked;
-      settings.instructions = document.getElementById("set-instructions").value;
-
-      settings.text_format = document.getElementById("set-text-fmt").value;
-      settings.text_verbosity = document.getElementById("set-verbosity").value;
-      settings.json_schema_name = document.getElementById("set-js-name").value.trim();
-      settings.json_schema = document.getElementById("set-js-schema").value.trim();
-
-      settings.tool_choice = document.getElementById("set-tool-choice").value;
-      settings.max_tool_calls = parseInt(document.getElementById("set-max-tools").value, 10) || null;
-      settings.parallel_tool_calls = document.getElementById("set-parallel-tools").checked;
-      settings.top_logprobs = parseInt(document.getElementById("set-logprobs").value, 10) || 0;
-
-      settings.service_tier = document.getElementById("set-tier").value;
-      settings.previous_response_id = document.getElementById("set-prev-id").value.trim();
-
-      settings.prompt_cache_key = document.getElementById("set-cache-key").value.trim();
-      settings.prompt_id = document.getElementById("set-prompt-id").value.trim();
-      settings.prompt_version = document.getElementById("set-prompt-ver").value.trim();
-      settings.prompt_variables = document.getElementById("set-prompt-vars").value.trim();
-      settings.conv_metadata = document.getElementById("set-conv-meta").value.trim();
+    md.querySelector("#set-save-btn").addEventListener("click", function () {
+      Object.keys(SETTINGS_FIELDS).forEach(function (key) {
+        settings[key] = readSettingsField(SETTINGS_FIELDS[key], fieldElement(key));
+      });
       if (ultra) applyUltraProfile(settings, ultra);
       Storage.save(settings, currentConvId).then(closeModal, showSaveError);
     });
   };
 })();
+

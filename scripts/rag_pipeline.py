@@ -19,16 +19,21 @@ Modes:
 """
 
 from __future__ import annotations
-from core.env import env_get
 
 import argparse
 import hashlib
 import json
-import math
-import re
+import os
 import sys
 import urllib.request
-from collections import Counter
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from core.env import env_get
+from scripts.retrieval_core import BM25Index as _BM25Index
+from scripts.retrieval_core import split_sentences as _split_sentences
+from scripts.retrieval_core import tokenize as _tokenize
 
 REPO = env_get("GITHUB_REPOSITORY", "maksimp6/Chat")
 API = f"https://api.github.com/repos/{REPO}"
@@ -137,17 +142,11 @@ def fetch_corpus(token: str | None) -> list[dict]:
 
 
 def split_sentences(text: str) -> list[str]:
-    sents = []
-    for m in re.finditer(r"[^.!?\u2026\n]+[.!?…]*", text):
-        s = m.group().strip()
-        if len(s) > 25:
-            sents.append(s)
-    return sents
+    return _split_sentences(text, min_chars=26)
 
 
 def tokenize(s: str) -> list[str]:
-    words = re.findall(r"[а-яёa-z0-9]+", s.lower())
-    return [w for w in words if w not in STOP and len(w) > 2]
+    return _tokenize(s, stop_words=STOP, min_chars=3)
 
 
 def build_units(corpus: list[dict]) -> list[dict]:
@@ -168,57 +167,16 @@ def build_units(corpus: list[dict]) -> list[dict]:
 # ---------------------------------------------------------------- BM25
 
 
-class BM25Index:
+class BM25Index(_BM25Index):
     def __init__(self, units: list[dict]):
-        self.units = units
-        self.N = len(units)
-        self.avgdl = sum(len(u["tokens"]) for u in units) / max(self.N, 1)
-        self.df = Counter()
-        for u in units:
-            self.df.update(set(u["tokens"]))
-        self.k1, self.b = 1.5, 0.75
-
-    def _idf(self, term: str) -> float:
-        df = self.df.get(term, 0)
-        return math.log(1 + (self.N - df + 0.5) / (df + 0.5))
+        super().__init__(units, k1=1.5, b=0.75, score_precision=3)
 
     def search(self, query: str, top: int = TOP_K) -> list[dict]:
-        qt = tokenize(query)
-        results = []
-        for u in self.units:
-            tc = Counter(u["tokens"])
-            score = 0.0
-            for t in qt:
-                f = tc.get(t, 0)
-                if not f:
-                    continue
-                dl = len(u["tokens"])
-                score += (
-                    self._idf(t)
-                    * f
-                    * (self.k1 + 1)
-                    / (f + self.k1 * (1 - self.b + self.b * dl / self.avgdl))
-                )
-            if score > 0:
-                results.append(
-                    {
-                        "score": round(score, 3),
-                        "issue": u["issue"],
-                        "text": u["text"],
-                        "sha256": u["sha256"],
-                    }
-                )
-        results.sort(key=lambda r: -r["score"])
-        # diversity: cap per issue so one chunk cannot eat the whole answer
-        capped, seen = [], Counter()
-        for r in results:
-            if seen[r["issue"]] >= PER_ISSUE_CAP:
-                continue
-            capped.append(r)
-            seen[r["issue"]] += 1
-            if len(capped) >= top:
-                break
-        return capped
+        ranked = self.search_tokens(tokenize(query), top=top, per_issue_cap=PER_ISSUE_CAP)
+        return [
+            {"score": unit["score"], "issue": unit["issue"], "text": unit["text"], "sha256": unit["sha256"]}
+            for unit in ranked
+        ]
 
 
 # ---------------------------------------------------------------- embedding stage 2 (optional)
@@ -390,3 +348,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+

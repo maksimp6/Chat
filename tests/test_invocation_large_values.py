@@ -8,7 +8,7 @@ import pytest
 from agent_memory.client import close_memory_clients
 from invocation import manager
 from invocation.trace import create_invocation_trace
-from kristall import KristallError
+from kristall import KristallError, KristallLimitError
 from kristall.store import MAX_JOURNAL_FRAME_BYTES
 from scripts import logos_dialogue as dialogue
 from storage.db import get_store, memory_file_path
@@ -372,8 +372,16 @@ def test_validly_hashed_chunk_with_invalid_serialization_is_rejected(encoded):
 
 
 @pytest.mark.parametrize("target", ["trace", "result"])
-@pytest.mark.parametrize("reason", ["recovery required", "journal frame exceeds size limit"])
-def test_native_write_error_propagates_without_losing_prior_state(monkeypatch, target, reason):
+@pytest.mark.parametrize(
+    ("error_type", "reason", "expected_attempts"),
+    [
+        (KristallError, "recovery required", 1),
+        (KristallLimitError, "journal frame exceeds size limit", 2),
+    ],
+)
+def test_native_write_error_propagates_without_losing_prior_state(
+    monkeypatch, target, error_type, reason, expected_attempts
+):
     context = invocation()
     assert manager.persist_invocation_trace(context.invocation_id, {"prior": True})
     engine = get_store()._engine
@@ -383,7 +391,7 @@ def test_native_write_error_propagates_without_losing_prior_state(monkeypatch, t
     def reject(changes):
         if any(change["key"] == manager._key(context.invocation_id) for change in changes):
             attempts.append(True)
-            raise KristallError(reason)
+            raise error_type(reason)
         return encode(changes)
 
     monkeypatch.setattr(engine, "_encode_frame", reject)
@@ -392,7 +400,7 @@ def test_native_write_error_propagates_without_losing_prior_state(monkeypatch, t
             manager.persist_invocation_trace(context.invocation_id, {"next": True})
         else:
             manager.finish_invocation(context.invocation_id, {"reply": "new"})
-    assert len(attempts) == (2 if reason in manager._VALUE_LIMIT_ERRORS else 1)
+    assert len(attempts) == expected_attempts
     loaded = manager.get_invocation(context.invocation_id)
     assert loaded["trace"] == {"prior": True}
     assert loaded["status"] == "running"
@@ -446,3 +454,4 @@ def test_small_serialization_with_native_node_overflow_uses_verified_chunks():
         tx.set(manager._key(context.invocation_id), record)
     assert manager.persist_invocation_trace(context.invocation_id, value)
     assert manager.get_invocation(context.invocation_id)["trace"] == value
+

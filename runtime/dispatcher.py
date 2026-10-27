@@ -7,7 +7,11 @@ from pathlib import Path
 from threading import RLock, local
 from typing import Any, Callable, Mapping
 
-from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_providers.universal_tool_platform import (
+    UniversalToolCall,
+    UniversalToolExecutor,
+    _warn_deprecated_execution_hooks,
+)
 from storage.contracts import (
     StorageCredentialsMissing,
     StorageError,
@@ -48,14 +52,8 @@ class RuntimeContext:
 
 
 RuntimeHandler = Callable[[RuntimeContext, Mapping[str, Any]], Any]
+# Kept for consumers importing the former callback annotation.
 RuntimeToolPolicy = Callable[[RuntimeContext, Any, UniversalToolCall], Any]
-
-
-@dataclass(frozen=True)
-class _RuntimeToolBoundary:
-    executor: UniversalToolExecutor
-    policy: RuntimeToolPolicy | None = None
-    approval: RuntimeToolPolicy | None = None
 
 
 class RuntimeDispatcher:
@@ -69,7 +67,7 @@ class RuntimeDispatcher:
         self._lock = RLock()
         self._runtimes: dict[str, RuntimeContext] = {}
         self._operations: dict[str, RuntimeHandler] = {}
-        self._tool_boundaries: dict[str, _RuntimeToolBoundary] = {}
+        self._tool_boundaries: dict[str, UniversalToolExecutor] = {}
         self._storage_providers: dict[tuple[str, str | None, str], StorageProvider] = {}
         self._storage_credentials: Callable[[RuntimeContext, str], object | None] | None = None
         self._local = local()
@@ -144,11 +142,9 @@ class RuntimeDispatcher:
         self,
         runtime_id: str,
         executor: UniversalToolExecutor,
-        *,
-        policy: RuntimeToolPolicy | None = None,
-        approval: RuntimeToolPolicy | None = None,
+        **legacy_hooks: Any,
     ) -> None:
-        """Bind one policy-controlled tool executor to an existing runtime.
+        """Bind one tool executor to an existing runtime.
 
         Runtime code receives only the ``tools.execute`` dispatcher operation;
         the registry, MCP connectors, and credentials owned by the executor stay
@@ -157,16 +153,9 @@ class RuntimeDispatcher:
         self.context(runtime_id)
         if not isinstance(executor, UniversalToolExecutor):
             raise TypeError("executor must be a UniversalToolExecutor")
-        if policy is not None and not callable(policy):
-            raise TypeError("tool policy must be callable")
-        if approval is not None and not callable(approval):
-            raise TypeError("tool approval must be callable")
+        _warn_deprecated_execution_hooks(legacy_hooks)
         with self._lock:
-            self._tool_boundaries[runtime_id] = _RuntimeToolBoundary(
-                executor=executor,
-                policy=policy,
-                approval=approval,
-            )
+            self._tool_boundaries[runtime_id] = executor
 
     def register_operation(self, name: str, handler: RuntimeHandler) -> None:
         name = str(name or "").strip()
@@ -284,8 +273,8 @@ class RuntimeDispatcher:
 
     def _execute_tool(self, context: RuntimeContext, payload: Mapping[str, Any]) -> dict[str, Any]:
         with self._lock:
-            boundary = self._tool_boundaries.get(context.runtime_id)
-        if boundary is None:
+            executor = self._tool_boundaries.get(context.runtime_id)
+        if executor is None:
             raise RuntimeOperationNotFound(
                 f"{TOOL_EXECUTE_OPERATION} is not configured for {context.runtime_id!r}"
             )
@@ -320,18 +309,5 @@ class RuntimeDispatcher:
             },
         )
 
-        def apply_policy(definition, tool_call):
-            if boundary.policy is None:
-                return True
-            return boundary.policy(context, definition, tool_call)
+        return executor.execute(call)
 
-        def apply_approval(definition, tool_call):
-            if boundary.approval is None:
-                return False
-            return boundary.approval(context, definition, tool_call)
-
-        return boundary.executor.execute(
-            call,
-            policy=apply_policy,
-            approval=apply_approval,
-        )

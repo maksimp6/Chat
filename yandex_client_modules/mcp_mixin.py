@@ -81,11 +81,11 @@ class YandexMcpMixin:
             executor = UniversalToolExecutor(registry)
             if isinstance(trace, ExecutionTrace):
                 universal_result = executor.execute_with_trace(
-                    call, trace, policy=execution_policy, server_configs=all_servers
+                    call, trace, server_configs=all_servers
                 )
             else:
                 universal_result = executor.execute(
-                    call, policy=execution_policy, server_configs=all_servers
+                    call, server_configs=all_servers
                 )
 
             if universal_result.get("success"):
@@ -296,4 +296,5 @@ class YandexMcpMixin:
             ask_params["execution_trace"] = trace
 
         return self.ask(message, model_key, conversation_id, ask_params, execution_trace=trace)
+
 

@@ -195,7 +195,7 @@ assert.equal(
 
 // Chat integration: assistant messages with a trace show the compact surface
 const chat = boot([path.join(ROOT, "static", "chat.js")]);
-chat.context.addMessage("Ответ", "bot", false, 0, null, 0, null, null, finishedTrace());
+chat.context.addMessage({ text: "Ответ", role: "bot", trace: finishedTrace() });
 const surfaceEl = chat.document.querySelector(".execution-surface");
 assert.ok(surfaceEl, "chat renders the execution surface for traced replies");
 assert.ok(!chat.document.getElementById("chatbox").textContent.includes(CANARY));

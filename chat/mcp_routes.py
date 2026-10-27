@@ -6,6 +6,7 @@ import re
 import json as _json
 import uuid
 from typing import Any
+from dataclasses import dataclass
 import base64
 from yandex_client_modules.client import YandexResponsesClient
 from core.config import TEXT_MODELS, Config
@@ -386,6 +387,343 @@ def _provider_conversation_id(client, conv_id, trace):
     return provider_id
 
 
+def _validate_chat_payload(conv_id, model_key, message, attachments):
+    """Validate the turn content before creating an invocation or storing a message."""
+    if not isinstance(conv_id, str) or not conv_id.strip():
+        return None, None, (jsonify({"error": "conversation_id is required"}), 400)
+    if not isinstance(model_key, str):
+        return None, None, (jsonify({"error": "model must be a string"}), 400)
+    if isinstance(model_key, str) and model_key in completion_model_keys():
+        # These models speak the completion API; sending them through Responses is wrong.
+        return None, None, (jsonify({"error": "model_uses_completion_api", "endpoint": "/api/completion"}), 400)
+    try:
+        images = _validated_images(attachments)
+    except ValueError as exc:
+        return None, None, (jsonify({"error": "invalid_attachments", "message": str(exc)}), 400)
+    if message is None and images:
+        message = ""
+    if not isinstance(message, str) or (not message.strip() and not images):
+        return None, None, (jsonify({"error": "message or attachments are required"}), 400)
+    if images and model_key not in IMAGE_INPUT_MODEL_KEYS:
+        return None, None, (jsonify({"error": "model_does_not_accept_images"}), 400)
+
+    return message, images, None
+
+
+@dataclass(frozen=True)
+class _ChatReply:
+    reply: Any
+    reasoning: Any
+    usage: Any
+    timings: Any
+    provider_diagnostics: dict[str, Any]
+    provider_failed: bool
+    provider_error: str | None
+    provider_message: str | None
+    partial_output: Any
+
+
+def _execute_chat_model(message, model_key, invocation, params, trace):
+    """Run one provider/tool turn and collect its terminal response."""
+    client = LogosClient(Config)
+    provider_conversation_id = _provider_conversation_id(client, invocation.conversation_id, trace)
+
+    if isinstance(trace, ExecutionTrace):
+        trace.add_event(
+            "turn_limits",
+            {"poll_timeout": params["poll_timeout"], "max_rounds": params["max_rounds"]},
+        )
+    response = client.ask_with_mcp(
+        message=message,
+        model_key=model_key,
+        conversation_id=provider_conversation_id,
+        settings_conversation_id=invocation.conversation_id,
+        params=params,
+        trace=trace,
+    )
+
+    api_requests = trace.trace.get("api_requests", [])
+    if api_requests:
+        first_api_start = api_requests[0].get("timestamp")
+        request_init = next(
+            (
+                event
+                for event in trace.trace.get("events", [])
+                if event.get("type") == "request_initialized"
+            ),
+            None,
+        )
+        request_init_timestamp = request_init.get("timestamp") if request_init else None
+        if isinstance(request_init_timestamp, (int, float)) and isinstance(
+            first_api_start, (int, float)
+        ):
+            pre_api_ms = round(max(0.0, first_api_start - request_init_timestamp) * 1000, 2)
+            trace.trace.setdefault("timings", {})["pre_api_pipeline"] = {
+                "start_timestamp": request_init_timestamp,
+                "end_timestamp": first_api_start,
+                "duration_ms": pre_api_ms,
+            }
+            trace.trace.setdefault("events", []).append(
+                {
+                    "type": "pre_api_pipeline_completed",
+                    "timestamp": first_api_start,
+                    "payload": {
+                        "start_timestamp": request_init_timestamp,
+                        "end_timestamp": first_api_start,
+                        "timing_ms": pre_api_ms,
+                        "step": api_requests[0].get("step", 1),
+                    },
+                }
+            )
+
+    return _build_chat_reply(client, response, trace)
+
+
+def _build_chat_reply(client, response, trace) -> _ChatReply:
+    """Interpret provider completion without publishing history or settling billing."""
+    provider_message = None
+    invalid_provider_response = not isinstance(response, dict)
+    provider_diagnostics = {}
+    capture_provider_diagnostics(provider_diagnostics, {} if invalid_provider_response else response)
+    provider_status = provider_diagnostics["provider_status"]
+    pending_calls = [] if invalid_provider_response else extract_function_calls(response)
+    if invalid_provider_response:
+        # Keep the invalid JSON value as evidence too; never convert arbitrary
+        # provider data into an assistant reply or replace the last valid raw.
+        trace.add_event(
+            "provider_invalid_response",
+            {"response_type": type(response).__name__, "raw": response},
+        )
+    provider_failed = (
+        provider_status != "completed"
+        or provider_diagnostics["provider_error_present"]
+        or bool(pending_calls)
+    )
+    provider_error = None
+    if provider_failed:
+        provider_error = (
+            "provider_invalid_response" if invalid_provider_response
+            else "provider_tool_calls_unresolved" if pending_calls
+            else "provider_error" if provider_diagnostics["provider_error_present"]
+            else "provider_" + provider_status
+        )
+        if invalid_provider_response:
+            provider_message = "Провайдер вернул ответ неверного формата"
+        elif pending_calls:
+            provider_message = "Вызовы инструментов из ответа провайдера не завершены"
+        elif provider_diagnostics["provider_error_present"]:
+            provider_message = "Провайдер вернул ошибку"
+        else:
+            provider_message = "Ответ провайдера не завершён: " + provider_status
+        if provider_diagnostics.get("provider_reason"):
+            provider_message += " (" + provider_diagnostics["provider_reason"] + ")"
+        trace.record_error("provider_response", provider_message, error_type=provider_error)
+    trace.add_event(
+        "provider_terminal_state",
+        {**provider_diagnostics, "invocation_status": "failed" if provider_failed else "completed"},
+    )
+
+    reasoning, reply = ("", "") if invalid_provider_response else client.extract_reasoning_and_text(response)
+    partial_output = reply if provider_failed else None
+    if provider_failed:
+        if not partial_output:
+            # Only this request's trace is consulted. The final raw response
+            # and its status remain untouched even when an earlier tool round
+            # supplied the last available assistant text.
+            partial_output, _ = extract_last_response_text(trace.trace.get("responses", []))
+        reply = format_partial_output_message(partial_output, provider_message)
+    elif not reply:
+        raise RuntimeError("Модель не вернула текстовый ответ. Повторите запрос.")
+    usage = client.extract_usage(response)
+    timings = response.get("step_timings", []) if isinstance(response, dict) else []
+    return _ChatReply(
+        reply=reply,
+        reasoning=reasoning,
+        usage=usage,
+        timings=timings,
+        provider_diagnostics=provider_diagnostics,
+        provider_failed=provider_failed,
+        provider_error=provider_error,
+        provider_message=provider_message,
+        partial_output=partial_output,
+    )
+
+
+def _finalize_chat_turn(
+    invocation, trace, result: _ChatReply, *, total_ms, selected_skill_metadata, conversation_title
+):
+    """Freeze the trace, settle billing, persist the reply, then finish its invocation."""
+    reply = result.reply
+    reasoning = result.reasoning
+    usage = result.usage
+    timings = result.timings
+    provider_diagnostics = result.provider_diagnostics
+    provider_failed = result.provider_failed
+    provider_error = result.provider_error
+    provider_message = result.provider_message
+    partial_output = result.partial_output
+    trace_data = trace.finalize()
+
+    try:
+        settlement = settle_billing_to_treasury(
+            trace_data.get("billing") or {},
+            invocation.user_id,
+        )
+    except Exception as settlement_error:
+        logger.exception("[BILLING] Treasury settlement failed")
+        # The full exception stays in the server log above; the trace gets only fixed text and a known code.
+        failure_code = "insufficient_balance" if str(settlement_error) == "insufficient balance" else None
+        _append_post_final_error(
+            trace_data,
+            "treasury_settlement",
+            "treasury settlement failed" + (f": {failure_code}" if failure_code else ""),
+            type(settlement_error).__name__,
+        )
+        settlement = {"status": "failed", "reason": "treasury_settlement_failed"}
+
+    trace_data.setdefault("billing", {})["settlement"] = settlement
+    billing = trace_data.get("billing") or {}
+    cost = _turn_cost(billing)
+    if billing.get("items"):
+        # The reply shows the tokens of the whole turn, every model call, the same total its cost is billed on.
+        usage = {
+            **(usage if isinstance(usage, dict) else {}),
+            "input_tokens": billing.get("input_tokens", 0),
+            "output_tokens": billing.get("output_tokens", 0),
+            "cached_tokens": billing.get("cached_input_tokens", 0),
+            "total_tokens": billing.get("total_tokens", 0),
+        }
+
+    persist_invocation_trace(invocation.invocation_id, trace_data)
+    add_message(
+        invocation.conversation_id,
+        "assistant",
+        str(reply),
+        cost=cost,
+        timings=timings,
+        usage=usage,
+        trace={"trace_id": invocation.trace_id, "invocation_id": invocation.invocation_id, "storage": "invocation"},
+        total_duration_ms=total_ms,
+        source="error" if provider_failed else None,
+    )
+    outcome = {
+        "reply": reply,
+        "usage": usage,
+        "cost": cost,
+        "settlement": settlement,
+        **provider_diagnostics,
+    }
+    if provider_failed:
+        fail_invocation(
+            invocation.invocation_id,
+            error={
+                **outcome,
+                "code": provider_error,
+                "message": provider_message,
+                "partial_output": partial_output or None,
+            },
+        )
+    else:
+        finish_invocation(invocation.invocation_id, result=outcome)
+
+    return jsonify(
+        {
+            "reply": reply,
+            "usage": usage,
+            "cost": cost,
+            "timings": timings,
+            "total_duration_ms": total_ms,
+            "reasoning": reasoning,
+            "invocation_id": invocation.invocation_id,
+            "session_id": invocation.session_id,
+            "conversation_id": invocation.conversation_id,
+            "trace_id": invocation.trace_id,
+            "trace": trace_data,
+            "skills": selected_skill_metadata,
+            "title": conversation_title or get_conversation_title(invocation.conversation_id),
+            "status": "failed" if provider_failed else "completed",
+            **provider_diagnostics,
+            **({"error": provider_error, "partial_output": partial_output or None} if provider_failed else {}),
+        }
+    ), 502 if provider_failed else 200
+
+
+def _chat_error_response(
+    error, *, trace, invocation, conv_id, can_write, error_message, is_temperature_error
+):
+    """Publish an error using only the invocation context established by this request."""
+    if trace.finalized:
+        # The failure happened after the trace was frozen (e.g. while
+        # persisting the reply); report it only in the returned copy.
+        trace_data = trace.finalize()
+        _append_post_final_error(
+            trace_data, "chat_pipeline", error_message, type(error).__name__
+        )
+    else:
+        if is_temperature_error:
+            trace.add_event(
+                "validation_failed",
+                {
+                    "field": "temperature",
+                    "error": error_message,
+                },
+            )
+        trace.record_error(
+            "chat_pipeline",
+            error_message,
+            error_type=type(error).__name__,
+        )
+        record_yandex_mcp_activity(trace)
+        if isinstance(error, ProviderQuotaExceeded):
+            trace.add_event(
+                "provider_quota_http_response",
+                {
+                    "status_code": 429,
+                    "reason": error.reason,
+                    "user_id": error.user_id,
+                },
+            )
+        trace_data = trace.finalize()
+    if isinstance(error, ProviderQuotaExceeded):
+        if invocation is not None:
+            persist_invocation_trace(invocation.invocation_id, trace_data)
+            fail_invocation(invocation.invocation_id, error=error.to_dict()["error"])
+        return jsonify(
+            {
+                **error.to_dict(),
+                "reply": "⚠️ Лимит запросов исчерпан. Повторите после указанного времени сброса.",
+                "invocation_id": invocation.invocation_id if invocation else None,
+                "session_id": invocation.session_id if invocation else None,
+                "conversation_id": invocation.conversation_id if invocation else conv_id,
+                "trace_id": invocation.trace_id if invocation else trace.trace_id,
+                "trace": trace_data,
+            }
+        ), 429
+    responses = trace_data.get("responses", [])
+    partial_output, _ = extract_last_response_text(responses)
+    reply = format_partial_output_message(partial_output, error_message)
+
+    if invocation is not None:
+        persist_invocation_trace(invocation.invocation_id, trace_data)
+    if can_write:
+        add_message(conv_id, "assistant", reply, trace={"trace_id": invocation.trace_id, "invocation_id": invocation.invocation_id, "storage": "invocation"} if invocation else {}, source="error")
+    if invocation is not None:
+        fail_invocation(invocation.invocation_id, error={"message": error_message})
+
+    return jsonify(
+        {
+            "error": error_message,
+            "reply": reply,
+            "partial_output": partial_output if partial_output else None,
+            "invocation_id": invocation.invocation_id if invocation else None,
+            "session_id": invocation.session_id if invocation else None,
+            "conversation_id": invocation.conversation_id if invocation else conv_id,
+            "trace_id": invocation.trace_id if invocation else trace.trace_id,
+            "trace": trace_data,
+        }
+    ), 500
+
+
 @mcp_bp.route("/api/chat", methods=["POST"])
 def chat():
     import time as _time
@@ -394,14 +732,11 @@ def chat():
     trace = None
     trace_token = None
     invocation = None
-    trace_data = {}
     conv_id = None
     session_id = None
     message = None
     model_key = "yandexgpt-5-pro"
-    partial_output = None
     error_message = None
-    selected_skill_metadata = []
 
     try:
         data = request.get_json(silent=True)
@@ -429,23 +764,11 @@ def chat():
         except (ValueError, SkillRegistryError) as exc:
             return jsonify({"error": "invalid_params", "message": str(exc)}), 400
 
-        if not isinstance(conv_id, str) or not conv_id.strip():
-            return jsonify({"error": "conversation_id is required"}), 400
-        if not isinstance(model_key, str):
-            return jsonify({"error": "model must be a string"}), 400
-        if isinstance(model_key, str) and model_key in completion_model_keys():
-            # These models speak the completion API; sending them through Responses is wrong.
-            return jsonify({"error": "model_uses_completion_api", "endpoint": "/api/completion"}), 400
-        try:
-            images = _validated_images(data.get("attachments"))
-        except ValueError as exc:
-            return jsonify({"error": "invalid_attachments", "message": str(exc)}), 400
-        if message is None and images:
-            message = ""
-        if not isinstance(message, str) or (not message.strip() and not images):
-            return jsonify({"error": "message or attachments are required"}), 400
-        if images and model_key not in IMAGE_INPUT_MODEL_KEYS:
-            return jsonify({"error": "model_does_not_accept_images"}), 400
+        message, images, invalid_payload = _validate_chat_payload(
+            conv_id, model_key, message, data.get("attachments")
+        )
+        if invalid_payload is not None:
+            return invalid_payload
 
         owner_id = get_current_owner_id(required=False)
         if not check_access(conv_id, owner_id):
@@ -531,196 +854,16 @@ def chat():
             invocation.conversation_id,
             message,
         )
-        client = LogosClient(Config)
-        provider_conversation_id = _provider_conversation_id(client, invocation.conversation_id, trace)
-
-        if isinstance(trace, ExecutionTrace):
-            trace.add_event(
-                "turn_limits",
-                {"poll_timeout": params["poll_timeout"], "max_rounds": params["max_rounds"]},
-            )
-        response = client.ask_with_mcp(
-            message=message,
-            model_key=model_key,
-            conversation_id=provider_conversation_id,
-            settings_conversation_id=invocation.conversation_id,
-            params=params,
-            trace=trace,
-        )
-
-        api_requests = trace.trace.get("api_requests", [])
-        if api_requests:
-            first_api_start = api_requests[0].get("timestamp")
-            request_init = next(
-                (
-                    event
-                    for event in trace.trace.get("events", [])
-                    if event.get("type") == "request_initialized"
-                ),
-                None,
-            )
-            request_init_timestamp = request_init.get("timestamp") if request_init else None
-            if isinstance(request_init_timestamp, (int, float)) and isinstance(
-                first_api_start, (int, float)
-            ):
-                pre_api_ms = round(max(0.0, first_api_start - request_init_timestamp) * 1000, 2)
-                trace.trace.setdefault("timings", {})["pre_api_pipeline"] = {
-                    "start_timestamp": request_init_timestamp,
-                    "end_timestamp": first_api_start,
-                    "duration_ms": pre_api_ms,
-                }
-                trace.trace.setdefault("events", []).append(
-                    {
-                        "type": "pre_api_pipeline_completed",
-                        "timestamp": first_api_start,
-                        "payload": {
-                            "start_timestamp": request_init_timestamp,
-                            "end_timestamp": first_api_start,
-                            "timing_ms": pre_api_ms,
-                            "step": api_requests[0].get("step", 1),
-                        },
-                    }
-                )
-
-        invalid_provider_response = not isinstance(response, dict)
-        provider_diagnostics = {}
-        capture_provider_diagnostics(provider_diagnostics, {} if invalid_provider_response else response)
-        provider_status = provider_diagnostics["provider_status"]
-        pending_calls = [] if invalid_provider_response else extract_function_calls(response)
-        if invalid_provider_response:
-            # Keep the invalid JSON value as evidence too; never convert arbitrary
-            # provider data into an assistant reply or replace the last valid raw.
-            trace.add_event(
-                "provider_invalid_response",
-                {"response_type": type(response).__name__, "raw": response},
-            )
-        provider_failed = (
-            provider_status != "completed"
-            or provider_diagnostics["provider_error_present"]
-            or bool(pending_calls)
-        )
-        provider_error = None
-        if provider_failed:
-            provider_error = (
-                "provider_invalid_response" if invalid_provider_response
-                else "provider_tool_calls_unresolved" if pending_calls
-                else "provider_error" if provider_diagnostics["provider_error_present"]
-                else "provider_" + provider_status
-            )
-            if invalid_provider_response:
-                provider_message = "Провайдер вернул ответ неверного формата"
-            elif pending_calls:
-                provider_message = "Вызовы инструментов из ответа провайдера не завершены"
-            elif provider_diagnostics["provider_error_present"]:
-                provider_message = "Провайдер вернул ошибку"
-            else:
-                provider_message = "Ответ провайдера не завершён: " + provider_status
-            if provider_diagnostics.get("provider_reason"):
-                provider_message += " (" + provider_diagnostics["provider_reason"] + ")"
-            trace.record_error("provider_response", provider_message, error_type=provider_error)
-        trace.add_event(
-            "provider_terminal_state",
-            {**provider_diagnostics, "invocation_status": "failed" if provider_failed else "completed"},
-        )
-
-        reasoning, reply = ("", "") if invalid_provider_response else client.extract_reasoning_and_text(response)
-        partial_output = reply if provider_failed else None
-        if provider_failed:
-            if not partial_output:
-                # Only this request's trace is consulted. The final raw response
-                # and its status remain untouched even when an earlier tool round
-                # supplied the last available assistant text.
-                partial_output, _ = extract_last_response_text(trace.trace.get("responses", []))
-            reply = format_partial_output_message(partial_output, provider_message)
-        elif not reply:
-            raise RuntimeError("Модель не вернула текстовый ответ. Повторите запрос.")
-        usage = client.extract_usage(response)
-        timings = response.get("step_timings", []) if isinstance(response, dict) else []
+        result = _execute_chat_model(message, model_key, invocation, params, trace)
         total_ms = round((_time.perf_counter() - t_start) * 1000)
-        trace_data = trace.finalize()
-
-        try:
-            settlement = settle_billing_to_treasury(
-                trace_data.get("billing") or {},
-                invocation.user_id,
-            )
-        except Exception as settlement_error:
-            logger.exception("[BILLING] Treasury settlement failed")
-            # The full exception stays in the server log above; the trace gets only fixed text and a known code.
-            failure_code = "insufficient_balance" if str(settlement_error) == "insufficient balance" else None
-            _append_post_final_error(
-                trace_data,
-                "treasury_settlement",
-                "treasury settlement failed" + (f": {failure_code}" if failure_code else ""),
-                type(settlement_error).__name__,
-            )
-            settlement = {"status": "failed", "reason": "treasury_settlement_failed"}
-
-        trace_data.setdefault("billing", {})["settlement"] = settlement
-        billing = trace_data.get("billing") or {}
-        cost = _turn_cost(billing)
-        if billing.get("items"):
-            # The reply shows the tokens of the whole turn, every model call, the same total its cost is billed on.
-            usage = {
-                **(usage if isinstance(usage, dict) else {}),
-                "input_tokens": billing.get("input_tokens", 0),
-                "output_tokens": billing.get("output_tokens", 0),
-                "cached_tokens": billing.get("cached_input_tokens", 0),
-                "total_tokens": billing.get("total_tokens", 0),
-            }
-
-        persist_invocation_trace(invocation.invocation_id, trace_data)
-        add_message(
-            invocation.conversation_id,
-            "assistant",
-            str(reply),
-            cost=cost,
-            timings=timings,
-            usage=usage,
-            trace={"trace_id": invocation.trace_id, "invocation_id": invocation.invocation_id, "storage": "invocation"},
-            total_duration_ms=total_ms,
-            source="error" if provider_failed else None,
+        return _finalize_chat_turn(
+            invocation,
+            trace,
+            result,
+            total_ms=total_ms,
+            selected_skill_metadata=selected_skill_metadata,
+            conversation_title=conversation_title,
         )
-        outcome = {
-            "reply": reply,
-            "usage": usage,
-            "cost": cost,
-            "settlement": settlement,
-            **provider_diagnostics,
-        }
-        if provider_failed:
-            fail_invocation(
-                invocation.invocation_id,
-                error={
-                    **outcome,
-                    "code": provider_error,
-                    "message": provider_message,
-                    "partial_output": partial_output or None,
-                },
-            )
-        else:
-            finish_invocation(invocation.invocation_id, result=outcome)
-
-        return jsonify(
-            {
-                "reply": reply,
-                "usage": usage,
-                "cost": cost,
-                "timings": timings,
-                "total_duration_ms": total_ms,
-                "reasoning": reasoning,
-                "invocation_id": invocation.invocation_id,
-                "session_id": invocation.session_id,
-                "conversation_id": invocation.conversation_id,
-                "trace_id": invocation.trace_id,
-                "trace": trace_data,
-                "skills": selected_skill_metadata,
-                "title": conversation_title or get_conversation_title(invocation.conversation_id),
-                "status": "failed" if provider_failed else "completed",
-                **provider_diagnostics,
-                **({"error": provider_error, "partial_output": partial_output or None} if provider_failed else {}),
-            }
-        ), 502 if provider_failed else 200
     except Exception as e:
         logger.exception("[CHAT] Ошибка")
         internal_error_message = str(e)
@@ -753,76 +896,15 @@ def chat():
                     start_invocation(invocation.invocation_id)
                 else:
                     trace = ExecutionTrace()
-            if trace.finalized:
-                # The failure happened after the trace was frozen (e.g. while
-                # persisting the reply); report it only in the returned copy.
-                trace_data = trace.finalize()
-                _append_post_final_error(
-                    trace_data, "chat_pipeline", error_message, type(e).__name__
-                )
-            else:
-                if is_temperature_error:
-                    trace.add_event(
-                        "validation_failed",
-                        {
-                            "field": "temperature",
-                            "error": error_message,
-                        },
-                    )
-                trace.record_error(
-                    "chat_pipeline",
-                    error_message,
-                    error_type=type(e).__name__,
-                )
-                record_yandex_mcp_activity(trace)
-                if isinstance(e, ProviderQuotaExceeded):
-                    trace.add_event(
-                        "provider_quota_http_response",
-                        {
-                            "status_code": 429,
-                            "reason": e.reason,
-                            "user_id": e.user_id,
-                        },
-                    )
-                trace_data = trace.finalize()
-            if isinstance(e, ProviderQuotaExceeded):
-                if invocation is not None:
-                    persist_invocation_trace(invocation.invocation_id, trace_data)
-                    fail_invocation(invocation.invocation_id, error=e.to_dict()["error"])
-                return jsonify(
-                    {
-                        **e.to_dict(),
-                        "reply": "⚠️ Лимит запросов исчерпан. Повторите после указанного времени сброса.",
-                        "invocation_id": invocation.invocation_id if invocation else None,
-                        "session_id": invocation.session_id if invocation else None,
-                        "conversation_id": invocation.conversation_id if invocation else conv_id,
-                        "trace_id": invocation.trace_id if invocation else trace.trace_id,
-                        "trace": trace_data,
-                    }
-                ), 429
-            responses = trace_data.get("responses", [])
-            partial_output, _ = extract_last_response_text(responses)
-            reply = format_partial_output_message(partial_output, error_message)
-
-            if invocation is not None:
-                persist_invocation_trace(invocation.invocation_id, trace_data)
-            if can_write:
-                add_message(conv_id, "assistant", reply, trace={"trace_id": invocation.trace_id, "invocation_id": invocation.invocation_id, "storage": "invocation"} if invocation else {}, source="error")
-            if invocation is not None:
-                fail_invocation(invocation.invocation_id, error={"message": error_message})
-
-            return jsonify(
-                {
-                    "error": error_message,
-                    "reply": reply,
-                    "partial_output": partial_output if partial_output else None,
-                    "invocation_id": invocation.invocation_id if invocation else None,
-                    "session_id": invocation.session_id if invocation else None,
-                    "conversation_id": invocation.conversation_id if invocation else conv_id,
-                    "trace_id": invocation.trace_id if invocation else trace.trace_id,
-                    "trace": trace_data,
-                }
-            ), 500
+            return _chat_error_response(
+                e,
+                trace=trace,
+                invocation=invocation,
+                conv_id=conv_id,
+                can_write=can_write,
+                error_message=error_message,
+                is_temperature_error=is_temperature_error,
+            )
         except Exception:
             logger.exception("[CHAT] Не удалось сохранить ExecutionTrace")
             return jsonify(
@@ -1125,4 +1207,5 @@ def execute_approved():
     except Exception:
         logger.exception("[TOOL_APPROVAL] Tool execution failed")
         return jsonify({"error": "tool_execution_failed"}), 500
+
 

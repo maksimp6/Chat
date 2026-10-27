@@ -14,7 +14,7 @@ from core.clock import unix_seconds
 from storage.db import memory_file_path
 from invocation.context import InvocationContext
 from sessions.manager import create_session, restore_session
-from kristall import KristallError
+from kristall import KristallError, KristallLimitError
 from kristall.store import MAX_JOURNAL_FRAME_BYTES
 
 import logging
@@ -25,11 +25,6 @@ _INVOCATION_PREFIX = "runtime_invocation:"
 _VALUE_CHUNK_PREFIX = "runtime_invocation_value:"
 _VALUE_CHUNK_BYTES = MAX_JOURNAL_FRAME_BYTES // 4
 _INLINE_VALUE_BYTES = MAX_JOURNAL_FRAME_BYTES // 2
-_VALUE_LIMIT_ERRORS = {
-    "value text exceeds size limit",
-    "value structure exceeds limit",
-    "journal frame exceeds size limit",
-}
 # "token" matches credential names such as access_token, but not usage counters such as
 # input_tokens, total_tokens or output_tokens, which the saved trace needs.
 _SENSITIVE_KEY_RE = re.compile(
@@ -180,18 +175,23 @@ def _prepare_value(
     generation = uuid.uuid4().hex
     count = (len(encoded) + _VALUE_CHUNK_BYTES - 1) // _VALUE_CHUNK_BYTES
     prefix = f"{_VALUE_CHUNK_PREFIX}{invocation_id}:{field}:{generation}:"
-    store = get_memory_client(memory_file_path())
-    for index in range(count):
-        part = encoded[index * _VALUE_CHUNK_BYTES : (index + 1) * _VALUE_CHUNK_BYTES]
-        with store.transaction() as tx:
-            tx.set(prefix + str(index), {"data": base64.b64encode(part).decode("ascii")})
-    return None, {
+    manifest = {
         "format": "kristall-invocation-value-v1",
         "generation": generation,
         "chunks": count,
         "bytes": len(encoded),
         "sha256": hashlib.sha256(encoded).hexdigest(),
     }
+    store = get_memory_client(memory_file_path())
+    try:
+        for index in range(count):
+            part = encoded[index * _VALUE_CHUNK_BYTES : (index + 1) * _VALUE_CHUNK_BYTES]
+            with store.transaction() as tx:
+                tx.set(prefix + str(index), {"data": base64.b64encode(part).decode("ascii")})
+    except Exception:
+        _discard_prepared_chunks(invocation_id, field, manifest)
+        raise
+    return None, manifest
 
 
 def _assign_value(
@@ -214,34 +214,62 @@ def persist_invocation_trace(invocation_id: str, trace: Any) -> bool:
     """
     if hasattr(trace, "finalize"):
         trace = trace.finalize()
+    return _publish_invocation_values(invocation_id, {"trace": trace or {}})
+
+
+def _publish_invocation_values(
+    invocation_id: str, values: dict[str, Any], *, status: str | None = None
+) -> bool:
+    """Publish prepared fields together; retry only a typed native size rejection."""
     key = _key(invocation_id)
     store = get_memory_client(memory_file_path())
-    if store.get(key) is None:
+    record = store.get(key)
+    if record is None or (status is not None and record["status"] not in {"created", "running"}):
         return False
     force_chunks = False
     while True:
-        prepared = _prepare_value(invocation_id, "trace", trace or {}, force_chunks=force_chunks)
-        stored = False
+        prepared: dict[str, tuple[Any, Optional[dict[str, Any]]]] = {}
+        try:
+            for field, value in values.items():
+                prepared[field] = _prepare_value(
+                    invocation_id, field, value, force_chunks=force_chunks
+                )
+        except Exception:
+            _discard_values(invocation_id, prepared)
+            raise
+        published = False
         try:
             with store.transaction() as tx:
                 record = tx.get(key)
-                if record is not None:
-                    _assign_value(record, "trace", prepared)
+                if record is not None and (
+                    status is None or record["status"] in {"created", "running"}
+                ):
+                    if status is not None:
+                        record["status"] = status
+                        record["completed_at"] = unix_seconds()
+                    for field, value in prepared.items():
+                        _assign_value(record, field, value)
                     tx.set(key, record)
-                    stored = True
-        except KristallError as exc:
-            _discard_prepared_chunks(invocation_id, "trace", prepared[1])
-            if force_chunks or str(exc) not in _VALUE_LIMIT_ERRORS:
+                    published = True
+        except KristallLimitError:
+            _discard_values(invocation_id, prepared)
+            if force_chunks:
                 raise
             force_chunks = True
             continue
         except Exception:
-            _discard_prepared_chunks(invocation_id, "trace", prepared[1])
+            _discard_values(invocation_id, prepared)
             raise
-        if not stored:
-            _discard_prepared_chunks(invocation_id, "trace", prepared[1])
-            return False
-        return True
+        if not published:
+            _discard_values(invocation_id, prepared)
+        return published
+
+
+def _discard_values(
+    invocation_id: str, prepared: dict[str, tuple[Any, Optional[dict[str, Any]]]]
+) -> None:
+    for field, (_value, manifest) in prepared.items():
+        _discard_prepared_chunks(invocation_id, field, manifest)
 
 
 def _discard_prepared_chunks(
@@ -313,42 +341,9 @@ def cancel_invocation(invocation_id: str, reason: Any = None) -> bool:
 
 
 def _complete(invocation_id: str, status: str, result: Any = None, error: Any = None) -> bool:
-    key = _key(invocation_id)
-    store = get_memory_client(memory_file_path())
-    record = store.get(key)
-    if record is None or record["status"] not in {"created", "running"}:
-        return False
-    force_chunks = False
-    while True:
-        prepared_result = _prepare_value(invocation_id, "result", result, force_chunks=force_chunks)
-        prepared_error = _prepare_value(invocation_id, "error", error, force_chunks=force_chunks)
-        published = False
-        try:
-            with store.transaction() as tx:
-                record = tx.get(key)
-                if record is not None and record["status"] in {"created", "running"}:
-                    record["status"] = status
-                    record["completed_at"] = unix_seconds()
-                    _assign_value(record, "result", prepared_result)
-                    _assign_value(record, "error", prepared_error)
-                    tx.set(key, record)
-                    published = True
-        except KristallError as exc:
-            _discard_prepared_chunks(invocation_id, "result", prepared_result[1])
-            _discard_prepared_chunks(invocation_id, "error", prepared_error[1])
-            if force_chunks or str(exc) not in _VALUE_LIMIT_ERRORS:
-                raise
-            force_chunks = True
-            continue
-        except Exception:
-            _discard_prepared_chunks(invocation_id, "result", prepared_result[1])
-            _discard_prepared_chunks(invocation_id, "error", prepared_error[1])
-            raise
-        if not published:
-            _discard_prepared_chunks(invocation_id, "result", prepared_result[1])
-            _discard_prepared_chunks(invocation_id, "error", prepared_error[1])
-            return False
-        return True
+    return _publish_invocation_values(
+        invocation_id, {"result": result, "error": error}, status=status
+    )
 
 
 def get_invocation_owner(invocation_id: str) -> Optional[str]:
@@ -369,3 +364,4 @@ def get_invocation(invocation_id: str) -> Optional[dict[str, Any]]:
         if field + "_chunks" in value:
             value[field] = _read_chunked_value(invocation_id, field, value.pop(field + "_chunks"))
     return value
+

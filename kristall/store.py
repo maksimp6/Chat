@@ -9,15 +9,15 @@ from __future__ import annotations
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
-from itertools import chain
 import fcntl
 import hashlib
 import json
-import math
 import os
 from pathlib import Path
 from threading import RLock, get_ident
 from typing import Any, Iterator, Protocol, TypeVar
+
+from kristall.value_validation import walk_value, validate_json_values, validate_journal_changes
 
 
 MAX_JOURNAL_FRAME_BYTES = 1024 * 1024  # 1 MiB including newline
@@ -32,52 +32,24 @@ class KristallError(RuntimeError):
     """Persistence, integrity, or ownership failure."""
 
 
+class KristallLimitError(KristallError):
+    """A value or encoded journal frame exceeds the configured storage limits."""
+
+
 def _validate_name(name: str) -> None:
     if not isinstance(name, str) or not name:
         raise KristallError("name must be a nonempty string")
 
 
-def _check_text_budget(value: Any, used: int) -> int:
-    """Check UTF-8 incrementally without allocating a full encoded text copy."""
-    if type(value) is not str:
-        return used
-    for offset in range(0, len(value), 16384):
-        try:
-            used += len(value[offset : offset + 16384].encode("utf-8"))
-        except UnicodeEncodeError as exc:
-            raise KristallError("invalid Unicode text") from exc
-        if used > MAX_VALUE_TEXT_BYTES:
-            raise KristallError("value text exceeds size limit")
-    return used
-
-
 def _walk_value(value: Any) -> Iterator[Any]:
-    """Bound traversal before recursive copying/encoding; allow shared subtrees."""
-    stack: list[tuple[Iterator[Any], int, int | None]] = [(iter((value,)), 0, None)]
-    active: set[int] = set()
-    nodes = 0
-    text_bytes = 0
-    while stack:
-        children, depth, identity = stack[-1]
-        try:
-            item = next(children)
-        except StopIteration:
-            stack.pop()
-            if identity is not None:
-                active.remove(identity)
-            continue
-        nodes += 1
-        if depth > MAX_VALUE_DEPTH or nodes > MAX_VALUE_NODES:
-            raise KristallError("value structure exceeds limit")
-        text_bytes = _check_text_budget(item, text_bytes)
-        yield item
-        if type(item) in (list, tuple, dict):
-            identity = id(item)
-            if identity in active:
-                raise KristallError("cyclic value structure")
-            active.add(identity)
-            descendants = chain(item.keys(), item.values()) if type(item) is dict else iter(item)
-            stack.append((descendants, depth + 1, identity))
+    return walk_value(
+        value,
+        max_depth=MAX_VALUE_DEPTH,
+        max_nodes=MAX_VALUE_NODES,
+        max_text_bytes=MAX_VALUE_TEXT_BYTES,
+        error_type=KristallError,
+        limit_error_type=KristallLimitError,
+    )
 
 
 def _validate_value_shape(value: Any) -> None:
@@ -87,36 +59,11 @@ def _validate_value_shape(value: Any) -> None:
 
 
 def _validate_value(value: Any) -> None:
-    """Reject JSON coercions that would change RAM values after replay."""
-    for item in _walk_value(value):
-        if item is None or type(item) in (str, bool, int, list):
-            continue
-        if type(item) is float and math.isfinite(item):
-            continue
-        if type(item) is dict and all(type(key) is str for key in item):
-            continue
-        raise KristallError("unsupported JSON value")
+    validate_json_values(_walk_value(value), KristallError)
 
 
 def _validate_journal_changes(changes: list[Any]) -> list[tuple[str, str, str, Any]]:
-    """Validate every change before any committed state mutation."""
-    validated: list[tuple[str, str, str, Any]] = []
-    for change in changes:
-        if not isinstance(change, dict):
-            raise ValueError("invalid journal change")
-        namespace, key = change["namespace"], change["key"]
-        if not isinstance(namespace, str) or not isinstance(key, str):
-            raise ValueError("invalid journal key")
-        operation = change["op"]
-        if operation == "set":
-            value = change["value"]
-            _validate_value(value)
-            validated.append((operation, namespace, key, value))
-        elif operation == "delete":
-            validated.append((operation, namespace, key, None))
-        else:
-            raise ValueError("invalid journal operation")
-    return validated
+    return validate_journal_changes(changes, _validate_value)
 
 
 def _validate_checkpoint(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -249,7 +196,7 @@ class _JournalStore:
                 if not frame:
                     break
                 if len(frame) > MAX_JOURNAL_FRAME_BYTES:
-                    raise KristallError("journal frame exceeds size limit")
+                    raise KristallLimitError("journal frame exceeds size limit")
                 if not frame.endswith(b"\n"):
                     raise KristallError("incomplete journal tail; recovery required")
                 state, sequence, digest = _JournalStore._apply_verified_frame(
@@ -356,7 +303,7 @@ class _JournalStore:
                 + b"\n"
             )
             if len(frame) > MAX_JOURNAL_FRAME_BYTES:
-                raise KristallError("journal frame exceeds size limit")
+                raise KristallLimitError("journal frame exceeds size limit")
             return frame, digest
         except (TypeError, ValueError, OverflowError) as exc:
             raise KristallError("unsupported JSON value") from exc
@@ -889,3 +836,4 @@ class _JournalTransaction:
     def _pending_changes(self) -> list[dict[str, Any]]:
         self._ensure_open()
         return [self._changes[key] for key in sorted(self._changes)]
+

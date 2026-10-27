@@ -696,11 +696,13 @@ def start_screenrecord(video_path, time_limit, bit_rate):
                             preexec_fn=limit_recording_file)
 
 
-def finish_screenrecord(recorder, video_path, uid, gid, max_bytes):
+def finish_screenrecord(recorder, video_path, uid, gid, max_bytes, *, event_sink=None):
     """Stop a device recording; keep it only when its MP4 container is complete."""
     failures = []
     video = {"path": video_path.name, "available": False}
     artifact = None
+    if event_sink is not None:
+        event_sink("recorder_stop_requested")
     if recorder.poll() is None:
         try:
             recorder.send_signal(signal.SIGINT)
@@ -715,6 +717,8 @@ def finish_screenrecord(recorder, video_path, uid, gid, max_bytes):
             pass
         recorder.wait(timeout=3)
         failures.append("native_screenrecord_stop_failed")
+    if event_sink is not None:
+        event_sink("recorder_stop_observed")
     video["exit_code"] = recorder.returncode
     if video_path.is_file() and 16 <= video_path.stat().st_size <= max_bytes:
         from publish_redmi_screenshots import validate_mp4
@@ -1217,38 +1221,12 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
         except Exception:
             safety_error = CaptureSafetyError("The final recording view could not be verified as clean local Logos")
         if recorder is not None:
-            mark("recorder_stop_requested")
-            if recorder.poll() is None:
-                try:
-                    recorder.send_signal(signal.SIGINT)
-                except ProcessLookupError:
-                    pass
-            try:
-                recorder.wait(timeout=8)
-            except subprocess.TimeoutExpired:
-                try:
-                    recorder.kill()
-                except ProcessLookupError:
-                    pass
-                recorder.wait(timeout=3)
-                failures.append("native_screenrecord_stop_failed")
-            mark("recorder_stop_observed")
-            video["exit_code"] = recorder.returncode
-            if video_path.is_file() and 16 <= video_path.stat().st_size <= 20 * 1024 * 1024:
-                content = video_path.read_bytes()
-                from publish_redmi_screenshots import validate_mp4
-                try:
-                    validate_mp4(video_path)
-                    valid_video = True
-                except Exception:
-                    valid_video = False
-                if valid_video:
-                    video["available"] = True
-                    video_path.chmod(0o600)
-                    os.chown(video_path, uid, gid)
-                    artifacts.append({"path": video_path.name, "sha256": hashlib.sha256(content).hexdigest(), "size": len(content)})
-            if not video["available"]:
-                failures.append("native_video_artifact_unavailable")
+            finished_video, artifact, recording_failures = finish_screenrecord(
+                recorder, video_path, uid, gid, max_bytes=MAX_VIDEO_BYTES, event_sink=mark)
+            video.update(finished_video)
+            failures.extend(recording_failures)
+            if artifact is not None:
+                artifacts.append(artifact)
         if safety_error is not None:
             raise safety_error
     failures = list(dict.fromkeys(failures))
@@ -1610,3 +1588,4 @@ if __name__ == "__main__":
     except Exception as error:
         print("Screenshot capture failed: " + str(error), file=sys.stderr)
         sys.exit(1)
+

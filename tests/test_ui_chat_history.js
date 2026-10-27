@@ -104,9 +104,10 @@ test("a slow response for a conversation the user has left does not overwrite th
 
 test("usage without an output count shows zero instead of 'undefined'", async () => {
   const { document, context } = instantBoot();
-  context.addMessage("ответ", "bot", false, 0, null, null, null, {
-    total_tokens: 5,
-    input_tokens: 3,
+  context.addMessage({
+    text: "ответ",
+    role: "bot",
+    usage: { total_tokens: 5, input_tokens: 3 },
   });
 
   const summary = document.querySelector(".msg-meta-summary").textContent;
@@ -131,7 +132,7 @@ test("a denied clipboard shows a failure on the copy button instead of an unhand
       AbortSignal,
     },
   });
-  context.addMessage("ответ", "bot", false, 0);
+  context.addMessage({ text: "ответ", role: "bot" });
   document.querySelector(".copy-btn").click();
   await settle();
 

@@ -55,20 +55,16 @@ function rendered(document) {
 (async () => {
   const { context, document } = boot();
 
-  context.addMessage("human", "user", false, 0, null, 0, null, null, null, {
-    id: "m1",
-  });
-  context.addMessage("assistant", "assistant", false, 0, null, 0, null, null, null, { id: "m2" });
-  context.addMessage("ignored", "system", false, 0, null, 0, null, null, null, {
-    id: "m3",
-  });
+  context.addMessage({ text: "human", role: "user", id: "m1" });
+  context.addMessage({ text: "assistant", role: "assistant", id: "m2" });
+  context.addMessage({ text: "ignored", role: "system", id: "m3" });
 
   assert.deepEqual(rendered(document), [
     { role: "user", text: "human" },
     { role: "bot", text: "assistant" },
   ]);
 
-  context.addMessage("assistant", "assistant", false, 0, null, 0, null, null, null, { id: "m2" });
+  context.addMessage({ text: "assistant", role: "assistant", id: "m2" });
   assert.equal(rendered(document).length, 2);
 
   const history = boot({

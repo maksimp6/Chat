@@ -244,7 +244,9 @@
     } else if (type === "conversation.item.input_audio_transcription.completed") {
       currentTranscript = String(data.transcript || "").trim();
       if (currentTranscript && !userMsgSent && typeof addMessage === "function") {
-        addMessage(currentTranscript, "user", false, 0, null, 0, null, null, null, {
+        addMessage({
+          text: currentTranscript,
+          role: "user",
           id: data.item_id ? "voice-" + data.item_id : null,
         });
         userMsgSent = true;
@@ -253,7 +255,9 @@
     } else if (type === "response.output_text.done") {
       currentReply = data.text || "";
       if (currentReply && !botMsgSent && typeof addMessage === "function") {
-        addMessage(currentReply, "bot", false, 0, null, 0, null, null, null, {
+        addMessage({
+          text: currentReply,
+          role: "bot",
           id: data.response_id ? "voice-reply-" + data.response_id : null,
         });
         botMsgSent = true;

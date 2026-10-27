@@ -47,8 +47,8 @@ fs.writeFileSync(harnessPath, harness, "utf-8");
       "![Alice AI ART](" + picture + ")",
     ].join("\n\n");
     if (typeof addMessage !== "function") return { addMessageAvailable: false };
-    addMessage("Нарисуй круг и покажи формулы", "user", false, 0);
-    addMessage(text, "bot", false, 0);
+    addMessage({ text: "Нарисуй круг и покажи формулы", role: "user" });
+    addMessage({ text: text, role: "bot" });
     return { addMessageAvailable: true };
   });
 
