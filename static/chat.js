@@ -65,7 +65,7 @@ function renderApprovalCard(toolCall, origMsg) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(approvalPayload),
-    })
+    }, { timeoutMs: 300000 })
       .then(async (r) => {
         const data = await r.json().catch(() => ({}));
         return { ok: r.ok, status: r.status, data };
@@ -101,7 +101,7 @@ function renderApprovalCard(toolCall, origMsg) {
       .catch(() => {
         card.remove();
         deliverApprovalOutput(cardConvId, function () {
-          addMessage({ text: "Сетевая ошибка при выполнении действия", role: "error" });
+          addMessage({ text: "Результат действия не получен. Действие могло выполниться: проверьте диалог.", role: "error" });
         });
       });
   });
@@ -386,11 +386,13 @@ function addMessage({
       }
     }
     if (traceObj && typeof traceObj === "object" && Object.keys(traceObj).length > 0) {
-      if (window.LogosExecutionSurface) {
+      // A stored message keeps only a reference to its trace, which is read on demand; summarising the reference would show the run as unfinished.
+      const storedReference = traceObj.storage === "invocation";
+      if (window.LogosExecutionSurface && !storedReference) {
         const surface = window.LogosExecutionSurface.project(traceObj);
         if (surface) metaWrap.appendChild(window.LogosExecutionSurface.render(surface));
       }
-      if (window.LogosTraceSummary && typeof window.LogosTraceSummary.build === "function") {
+      if (window.LogosTraceSummary && typeof window.LogosTraceSummary.build === "function" && !storedReference) {
         const technical = window.LogosTraceSummary.build(traceObj);
         if (technical && technical.items && technical.items.length > 0) {
           const technicalEl = document.createElement("details");
@@ -483,13 +485,50 @@ function addMessage({
   return msg;
 }
 
+// A photo request stored with its question is checked once after a reload: a finished photo is shown,
+// a pending or failed one is named as such, and no result is promised before the check.
+function checkStoredImageRequest(convId, anchor, imageRequestId) {
+  const path = "/api/images/requests/" + encodeURIComponent(imageRequestId) +
+    "?conversation_id=" + encodeURIComponent(convId);
+  window.LogosDispatcher.request(path, {}, { timeoutMs: 15000 })
+    .then(
+      async function (response) {
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && data.status === "done" && data.reply) return { reply: data.reply, id: data.message_id };
+        if (response.status === 202 && data.status === "pending") return { text: "Изображение ещё формируется.", retry: true };
+        return { text: "⚠️ Ошибка: " + (data.message || data.error || "HTTP " + response.status) };
+      },
+      function () {
+        return { text: "Не удалось проверить изображение. Проверьте соединение.", retry: true };
+      },
+    )
+    .then(function (result) {
+      // The chat may have been left, or its history redrawn, while the check was running.
+      if (currentConvId !== convId || !anchor.isConnected) return;
+      const node = addMessage({
+        text: result.reply || result.text,
+        role: result.reply ? "bot" : "error",
+        id: result.id,
+        onRetry: result.retry
+          ? function () { return window.logosRecoverImage({ conversationId: convId, imageRequestId: imageRequestId }); }
+          : undefined,
+      });
+      // The answer belongs right after its question, not at the end of the chat.
+      if (node) anchor.after(node);
+    });
+}
+
 function loadHistory(convId) {
   const chatbox = document.getElementById("chatbox");
   if (!chatbox) return;
   chatbox.replaceChildren();
   return window.LogosDispatcher.request(`/api/conversations/${convId}/messages`)
     .then((r) => {
-      if (!r.ok) throw new Error("HTTP " + r.status);
+      if (!r.ok) {
+        const error = new Error("HTTP " + r.status);
+        error.status = r.status;
+        throw error;
+      }
       return r.json();
     })
     .then((data) => {
@@ -497,10 +536,12 @@ function loadHistory(convId) {
       if (convId !== currentConvId) return;
       try {
         let rendered = 0;
+        // The question still waiting for an answer, as the messages are read in order.
+        let question = null;
         (data.messages || []).forEach((msg, index, all) => {
-          // A stored error answers the user message right before it; «Повторить» re-sends that message.
-          const previous = index > 0 ? all[index - 1] : null;
-          const retryText = msg.source === "error" && previous && previous.role === "user" ? previous.text : null;
+          // A stored error answers the open question; «Повторить» re-sends it, and only the newest error keeps the button.
+          const owner = msg.source === "error" && index === all.length - 1 ? question : null;
+          const retryText = owner ? owner.text : null;
           // A user message that carried photos shows their count, as it did when it was sent.
           const photos = msg.role === "user" && msg.attachments ? msg.attachments.images : 0;
           const node = addMessage({
@@ -517,8 +558,9 @@ function loadHistory(convId) {
               return window.logosRetryTurn({
                 text: retryText,
                 conversationId: convId,
-                userMessageId: previous.id,
-                imageCount: previous.attachments ? previous.attachments.images || 0 : 0,
+                userMessageId: owner.id,
+                imageCount: owner.attachments ? owner.attachments.images || 0 : 0,
+                replaces: node,
               });
             },
           });
@@ -527,15 +569,17 @@ function loadHistory(convId) {
             ? msg.source.match(/^image-request:([A-Za-z0-9_-]{16,128})$/)
             : null;
           if (imageRequest && !all.some(function (candidate) { return candidate.source === "image:" + imageRequest[1]; })) {
-            addMessage({
-              text: "Результат изображения можно получить без новой генерации.",
-              role: "error",
-              onRetry: function () {
-                return window.logosRecoverImage({ conversationId: convId, imageRequestId: imageRequest[1] });
-              },
-            });
+            if (node) checkStoredImageRequest(convId, node, imageRequest[1]);
           }
+          if (msg.role === "user") question = msg;
+          else if (msg.source !== "error") question = null;
         });
+        const stored = data.messages || [];
+        const lastStored = stored[stored.length - 1];
+        // A plain question with no answer yet is still being answered on the server: wait for it, as after a lost connection.
+        if (lastStored && lastStored.role === "user" && !lastStored.source && typeof window.logosResumeWaitingTurn === "function") {
+          window.logosResumeWaitingTurn(convId, stored.length - 1);
+        }
         if (!rendered) {
           const empty = document.createElement("div");
           empty.className = "empty-state";
@@ -553,6 +597,12 @@ function loadHistory(convId) {
     })
     .catch((err) => {
       if (convId !== currentConvId) return;
+      if (err && err.status === 404) {
+        // Deleted in another tab or on another device: the chat leaves this list, and no retry is offered for it.
+        window.LogosToast.error("Диалог удалён.");
+        if (typeof deleteConv === "function") deleteConv(convId);
+        return;
+      }
       console.error("[CHAT] Fetch history error:", err);
       const error = document.createElement("div");
       error.className = "empty-state error-state";
@@ -584,6 +634,8 @@ document.addEventListener("DOMContentLoaded", function () {
     if (data.error === "model_does_not_accept_images") {
       return "Эта модель не принимает фото. Выберите модель с поддержкой фото.";
     }
+    if (data.error === "invalid_params") return data.message || "Параметры запроса не приняты. Проверьте настройки.";
+    if (data.error === "request_too_large") return "Запрос слишком большой: уберите фото или уменьшите их.";
     return data.error;
   }
 
@@ -860,10 +912,42 @@ document.addEventListener("DOMContentLoaded", function () {
         missing = 0;
       }
     }
-    if (!recovery.cancelled && currentConvId === turn.conversationId) {
-      addMessage({ text: "Ответ ещё не пришёл. Сервер сохранит его: откройте диалог позже.", role: "error" });
+    if (!recovery.cancelled) {
+      deliverApprovalOutput(turn.conversationId, function () {
+        addMessage({ text: "Ответ ещё не пришёл. Сервер сохранит его: откройте диалог позже.", role: "error" });
+      });
     }
   }
+
+  // After a reload, or in another tab, a question with no answer yet is still being answered: its answer is awaited here.
+  window.logosResumeWaitingTurn = function (convId, baselineCount) {
+    if (pendingConversations.has(convId) || activeChatRequests.has(convId)) return;
+    // The baseline is the count before the open question, so the question itself reads as pending.
+    const turn = { conversationId: convId, baselineCount: baselineCount };
+    const recovery = { cancelled: false, abort: function () { recovery.cancelled = true; } };
+    pendingConversations.add(convId);
+    activeChatRequests.set(convId, recovery);
+    let typingEl = null;
+    if (currentConvId === convId) {
+      const chatbox = document.getElementById("chatbox");
+      typingEl = document.createElement("div");
+      typingEl.className = "typing";
+      typingEl.innerHTML = "<span></span><span></span><span></span>";
+      if (chatbox) chatbox.appendChild(typingEl);
+    }
+    syncSendButton();
+    recoverTurn(turn, recovery, function () {
+      // The question itself has disappeared: there is nothing left to wait for.
+    }).finally(function () {
+      if (typingEl) typingEl.remove();
+      if (recovery.cancelled) {
+        deliverApprovalOutput(convId, function () {
+          addMessage({ text: chatErrorText({ name: "AbortError" }), role: "error" });
+        });
+      }
+      releaseTurn(turn, false);
+    });
+  };
 
   // A live retry keeps its photos; a history retry only knows their count and asks for them again.
   async function sendTurn(retryRequest) {
@@ -901,6 +985,10 @@ document.addEventListener("DOMContentLoaded", function () {
     if (isImageModel(turn.model) && Array.from(text).length > 500) {
       window.LogosToast.error("Для Alice AI ART запрос должен содержать не больше 500 символов");
       return;
+    }
+    // «Повторить» replaces its error: the error keeps its text, but no longer offers a retry.
+    if (retryRequest && retryRequest.replaces) {
+      retryRequest.replaces.querySelectorAll(".msg-retry-btn").forEach(function (button) { button.remove(); });
     }
     const needsConversation = !selectedAtSubmit;
     if (needsConversation) creatingConversation = true;
@@ -952,12 +1040,20 @@ document.addEventListener("DOMContentLoaded", function () {
         pendingConversations.add(createdId);
         // Selecting another chat while creation is pending must not pull the user back.
         if (currentConvId === selectedAtSubmit) await selectConv(createdId);
+        // The user moved on while the chat was created: the message is not sent into a chat they are not viewing.
+        if (currentConvId !== createdId) {
+          if (!input.value) input.value = turn.text;
+          window.LogosToast.error("Диалог создан, но сообщение не отправлено. Откройте его и отправьте снова.");
+          return;
+        }
       }
 
       if (currentConvId === turn.conversationId) {
         // A retry already has its user message in the chat, so it is not painted twice.
         if (!retryRequest) {
           if (input.value === rawText) input.value = "";
+          // A newer question makes the earlier errors stale: only the newest error keeps its «Повторить».
+          document.querySelectorAll("#chatbox .msg-retry-btn").forEach(function (button) { button.remove(); });
           addMessage({
             text: sentImages.length
               ? (turn.text ? turn.text + " · фото: " : "Фото: ") + sentImages.length
@@ -1015,7 +1111,15 @@ document.addEventListener("DOMContentLoaded", function () {
             }),
           }),
         }, { timeoutMs: 300000 });
-        data = await response.json().catch(() => ({}));
+        // A gateway page is not the server's answer. A 413 names its cause; other non-JSON answers are recovered like a lost connection.
+        const body = await response.json().catch(() => null);
+        if (body !== null) {
+          data = body;
+        } else if (response.status === 413) {
+          data = { error: "request_too_large" };
+        } else {
+          throw new TypeError("Ответ сервера не распознан: HTTP " + response.status);
+        }
       }
       const clientTotalMs = Math.round(performance.now() - t0);
       if (data.title && typeof conversations !== "undefined" && Array.isArray(conversations)) {
@@ -1035,11 +1139,21 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       // The backend persists this turn; never paint its late answer into a different conversation.
       if (currentConvId !== turn.conversationId) return;
-      if (data.error) {
-        restoreImages();
-        // The failed text goes back to the field, unless the user already started a new draft.
+      if (data.error === "conversation_not_found") {
+        // The chat was deleted elsewhere: it leaves this list, and the unsent text goes back to the field.
         if (!input.value) input.value = turn.text;
-        addMessage({
+        window.LogosToast.error("Диалог удалён в другом окне или на другом устройстве.");
+        if (typeof deleteConv === "function") deleteConv(turn.conversationId);
+        return;
+      }
+      if (data.error) {
+        // A question the server stored is not returned to the field: «Повторить» on its error sends it once.
+        if (!data.user_message_id) {
+          restoreImages();
+          // The failed text goes back to the field, unless the user already started a new draft.
+          if (!input.value) input.value = turn.text;
+        }
+        const errorNode = addMessage({
           text: data.reply || "⚠️ Ошибка: " + errorReasonText(data),
           role: "error",
           cost: data.cost || 0,
@@ -1056,6 +1170,7 @@ document.addEventListener("DOMContentLoaded", function () {
               images: sentImages,
               userMessageId: data.user_message_id || turn.userMessageId,
               imageRequestId: turn.imageRequestId,
+              replaces: errorNode,
             });
           },
         });
@@ -1093,31 +1208,39 @@ document.addEventListener("DOMContentLoaded", function () {
     } catch (error) {
       const stopped = Boolean(error) && error.name === "AbortError";
       const canRecover = !stopped && !isImageModel(turn.model) && !isVoiceModel(turn.model) && typeof turn.baselineCount === "number";
-      if (canRecover && currentConvId === turn.conversationId) {
+      // The chat may have been left: its outcome is kept for it, and shown when it is opened again.
+      if (canRecover) {
         // The server may still answer: wait for the stored answer before offering the text again.
         recovering = true;
         // The request's controller has nothing left to stop: «Остановить» now cancels the wait instead.
         const recovery = { cancelled: false, abort: function () { recovery.cancelled = true; } };
         activeChatRequests.set(turn.conversationId, recovery);
-        addMessage({ text: "Соединение прервалось. Ждём ответ, он сохраняется на сервере.", role: "error" });
+        deliverApprovalOutput(turn.conversationId, function () {
+          addMessage({ text: "Соединение прервалось. Ждём ответ, он сохраняется на сервере.", role: "error" });
+        });
         recoverTurn(turn, recovery, function () {
-          if (currentConvId !== turn.conversationId) return;
-          restoreImages();
-          if (!input.value) input.value = turn.text;
-          addMessage({ text: chatErrorText(error), role: "error" });
-        }).finally(function () {
-          // Stopped during the wait: the same outcome as stopping the request itself.
-          if (recovery.cancelled && currentConvId === turn.conversationId) {
+          deliverApprovalOutput(turn.conversationId, function () {
             restoreImages();
             if (!input.value) input.value = turn.text;
-            addMessage({ text: chatErrorText({ name: "AbortError" }), role: "error" });
+            addMessage({ text: chatErrorText(error), role: "error" });
+          });
+        }).finally(function () {
+          // Stopped during the wait: the same outcome as stopping the request itself.
+          if (recovery.cancelled) {
+            deliverApprovalOutput(turn.conversationId, function () {
+              restoreImages();
+              if (!input.value) input.value = turn.text;
+              addMessage({ text: chatErrorText({ name: "AbortError" }), role: "error" });
+            });
           }
           releaseTurn(turn, needsConversation);
         });
-      } else if (currentConvId === turn.conversationId) {
-        restoreImages();
-        if (!input.value) input.value = turn.text;
-        addMessage({ text: chatErrorText(error), role: "error" });
+      } else {
+        deliverApprovalOutput(turn.conversationId, function () {
+          restoreImages();
+          if (!input.value) input.value = turn.text;
+          addMessage({ text: chatErrorText(error), role: "error" });
+        });
       }
     } finally {
       if (typingEl) typingEl.remove();
@@ -1132,7 +1255,8 @@ document.addEventListener("DOMContentLoaded", function () {
       // Enter that confirms an IME word is not a send.
       if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
         e.preventDefault();
-        sendMessage();
+        // Enter only sends: during an answer the send is refused with a hint, and «Стоп» alone stops it.
+        sendTurn(null);
       }
     });
 
