@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import lowercase_string
+
 from collections import Counter
 from dataclasses import dataclass
 import math
@@ -16,7 +18,7 @@ _TOKEN_RE = re.compile(r"[\w./:-]{2,}", re.UNICODE)
 
 
 def _tokens(text: str) -> list[str]:
-    return [token.lower() for token in _TOKEN_RE.findall(text)]
+    return [lowercase_string(token) for token in _TOKEN_RE.findall(text)]
 
 
 def _metadata_text(document: RetrievalDocument) -> str:

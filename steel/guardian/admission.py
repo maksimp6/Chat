@@ -3,6 +3,8 @@
 Admission is not a sandbox, resource limiter, or worker executor.
 """
 
+from core.wikifunctions import trim_string
+
 from dataclasses import dataclass
 from enum import Enum
 from typing import cast
@@ -46,7 +48,7 @@ def _valid_capabilities(value: object) -> bool:
         return False
     capabilities = cast(frozenset[object], value)
     return all(
-        type(item) is str and bool(item.strip()) and item in KNOWN_CAPABILITIES
+        type(item) is str and bool(trim_string(item)) and item in KNOWN_CAPABILITIES
         for item in capabilities
     )
 

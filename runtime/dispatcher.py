@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import RLock, local
@@ -113,7 +115,7 @@ class RuntimeDispatcher:
         namespace: str | None = None,
         root: str | None = None,
     ) -> RuntimeContext:
-        runtime_id = str(runtime_id or "").strip()
+        runtime_id = trim_string(str(runtime_id or ""))
         if not runtime_id:
             raise ValueError("runtime_id is required")
         context = RuntimeContext(
@@ -158,7 +160,7 @@ class RuntimeDispatcher:
             self._tool_boundaries[runtime_id] = executor
 
     def register_operation(self, name: str, handler: RuntimeHandler) -> None:
-        name = str(name or "").strip()
+        name = trim_string(str(name or ""))
         if not name:
             raise ValueError("operation name is required")
         if not callable(handler):

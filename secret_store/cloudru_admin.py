@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import lowercase_string
+
 import re
 import uuid
 
@@ -17,7 +19,7 @@ class CloudRuSecretAdminBackend:
         self._client = client
 
     def create(self, *, purpose: str, value: SecretValue) -> SecretAdminResult:
-        stem = _SAFE.sub("-", purpose.lower()).strip("-") or "secret"
+        stem = _SAFE.sub("-", lowercase_string(purpose)).strip("-") or "secret"
         name = f"logos-{stem[:32]}-{uuid.uuid4().hex[:12]}"
         secret_id, version_id = self._client.create_secret(
             name=name,

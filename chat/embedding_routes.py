@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 import math
 import time
 from types import SimpleNamespace
@@ -58,7 +60,7 @@ def _texts_from_body(body: dict) -> tuple[list[str], bool]:
         if len(items) > MAX_BATCH:
             raise _BadInput(f"texts accepts at most {MAX_BATCH} items per request")
     for item in items:
-        if not isinstance(item, str) or not item.strip():
+        if not isinstance(item, str) or not trim_string(item):
             raise _BadInput("every text must be a non-empty string")
     return items, single
 
@@ -161,10 +163,10 @@ def create_embeddings():
         headers["x-project"] = credential.project_id
     except Exception:
         return jsonify({"error": "embeddings_not_configured"}), 503
-    if not credential.api_key or not str(credential.project_id or "").strip():
+    if not credential.api_key or not trim_string(str(credential.project_id or "")):
         return jsonify({"error": "embeddings_not_configured"}), 503
 
-    model_uri = f"emb://{credential.project_id.strip()}/{EMBEDDING_MODELS[model_name]['upstream']}"
+    model_uri = f"emb://{trim_string(credential.project_id)}/{EMBEDDING_MODELS[model_name]['upstream']}"
     vectors, total_tokens = [], 0
     started = time.monotonic()
     for text in items:

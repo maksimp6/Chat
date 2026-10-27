@@ -6,6 +6,8 @@ device identifiers and access codes are supplied at runtime, not committed.
 
 from __future__ import annotations
 
+from core.wikifunctions import lowercase_string
+
 import hashlib
 import io
 import os
@@ -130,7 +132,7 @@ class PrinterStorage:
         if not isinstance(filename, str) or not SAFE.fullmatch(filename):
             raise PrinterTransferError("unsafe printer SD filename")
         if video:
-            if not filename.lower().endswith((".mp4", ".avi")):
+            if not lowercase_string(filename).endswith((".mp4", ".avi")):
                 raise PrinterTransferError("unsupported printer recording extension")
         elif not filename.endswith(".gcode.3mf"):
             raise PrinterTransferError("only sliced .gcode.3mf may be staged")

@@ -1,5 +1,7 @@
 """Centralized execution trace for the Logos chat pipeline."""
 
+from core.wikifunctions import lowercase_string
+
 import copy
 import json
 import re
@@ -360,8 +362,9 @@ class ExecutionTrace:
         for frame, lineno in traceback.walk_tb(tb):
             locals_snapshot = {}
             for name, value in frame.f_locals.items():
-                if name.lower() in self._SENSITIVE_KEYS or any(
-                    secret in name.lower()
+                normalized_name = lowercase_string(name)
+                if normalized_name in self._SENSITIVE_KEYS or any(
+                    secret in normalized_name
                     for secret in ("api_key", "password", "secret", "token", "credential")
                 ):
                     locals_snapshot[name] = "<redacted>"

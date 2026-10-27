@@ -1,6 +1,8 @@
 """Provider-agnostic gateway for Logos agents."""
 
 from __future__ import annotations
+from core.wikifunctions import trim_string
+
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
@@ -20,7 +22,7 @@ _MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 
 def _require_http_endpoint(endpoint: str, name: str) -> None:
     # urllib also opens file:// and other schemes; a remote agent endpoint is http(s) only.
-    if urlsplit(endpoint.strip()).scheme not in {"http", "https"}:
+    if urlsplit(trim_string(endpoint)).scheme not in {"http", "https"}:
         raise ValueError(f"{name} must use http or https")
 
 
@@ -111,7 +113,7 @@ class A2AClient:
     def __init__(
         self, config: A2AClientConfig, token_provider: Optional[TokenProvider] = None
     ) -> None:
-        if not config.endpoint.strip():
+        if not trim_string(config.endpoint):
             raise ValueError("A2A endpoint must not be empty")
         _require_http_endpoint(config.endpoint, "A2A endpoint")
         if config.timeout_seconds <= 0:
@@ -173,7 +175,7 @@ class RESTAgentClient:
         token_provider: Optional[TokenProvider] = None,
         timeout_seconds: float = 30.0,
     ) -> None:
-        if not endpoint.strip():
+        if not trim_string(endpoint):
             raise ValueError("REST endpoint must not be empty")
         _require_http_endpoint(endpoint, "REST endpoint")
         if timeout_seconds <= 0:
@@ -258,7 +260,7 @@ class AgentGateway:
         self._lock = RLock()
 
     def register(self, descriptor: AgentDescriptor, handler: AgentHandler) -> None:
-        if not descriptor.agent_id.strip():
+        if not trim_string(descriptor.agent_id):
             raise ValueError("agent_id must not be empty")
         if not callable(handler):
             raise TypeError("handler must be callable")

@@ -10,8 +10,8 @@ files identify their changes. No Wikifunctions service is called at runtime.
 | Z21951 Clamp | Z21953, 162115 | `core.wikifunctions.clamp_integer` | File-search result count; HTTP/shell/session timeouts; two Cloud.ru list limits |
 | Z12316 regex replacement | Z12317, 285821 | `LogosWikifunctions.replaceRegex` | Browser text whitespace normalization; trace export filenames |
 | Z10079 trim | Z10081, 143512 | `LogosWikifunctions.trim` | Browser text whitespace normalization |
-| Z10079 trim (Python) | Z10082, 143513 | `core.wikifunctions.trim_string` | Conversation titles; browser data; CLI/MCP validation; agent memory/context; SSH and secret configuration; Cloud.ru IAM/object storage/billing; printing services and audits; voice/file/runtime text; partner CRM; image-generation validation; review-policy filenames; MCP server URLs; project tree sorting; cloud/provider and quota normalization; plugin/skill metadata; UI form fields |
-| Z10047 lowercase (Python) | Z10050, 207180 | `core.wikifunctions.lowercase_string` | Agent memory keys; browser/provider/quota/theme normalization; CLI confirmation and cloud operations; Cloud.ru headers/statuses; printing archive formats; cloud log queries; review-policy file filters; HTTP MIME and language codes; GitHub observer/log keys |
+| Z10079 trim (Python) | Z10082, 143513 | `core.wikifunctions.trim_string` | Conversation titles; browser data; CLI/MCP validation; agent memory/context; SSH and secret configuration; Cloud.ru IAM/secret management/object storage/billing; printing services and audits; voice/file/runtime text; partner CRM; provider credential routes; image/embedding validation; review-policy and trace filters; MCP server URLs; project tree sorting; cloud/provider and quota normalization; plugin/skill metadata; UI form fields |
+| Z10047 lowercase (Python) | Z10050, 207180 | `core.wikifunctions.lowercase_string` | Agent memory keys; browser/provider/quota/theme normalization; CLI confirmation and cloud operations; Cloud.ru headers/statuses; printing archive formats; cloud log queries; review-policy file and trace filters; retrieval tokens; HTTP MIME and language codes; GitHub observer/log keys |
 | Z10047 lowercase string | Z10048, 207179 | `LogosWikifunctions.lowercase` | UI status/role normalization; browser emulator |
 | Z10018 uppercase string | Z10019, 216191 | `LogosWikifunctions.uppercase` | Trace labels; browser emulator |
 | Z22583 mean of float64 list | Z22587, 168295 | `core.wikifunctions.mean_float64_list` | Agent office reviews per merge |
@@ -19,7 +19,7 @@ files identify their changes. No Wikifunctions service is called at runtime.
 
 ## Shared operations
 
-446 string-helper calls in the PR use the pinned adapters: 51 JavaScript calls (17 case conversions and 34 trims) and 395 Python calls (317 trims and 78 lowercases). The two KPI properties also use the pinned mean and median. Repeated state, boolean, billing-owner, SSH-user, Cloud.ru product/IP, project-ID, billing-currency, user-ID, scope and agent-capability normalization now runs once. The synchronous `static/boot.js` bootstrap keeps native `trim()` because the shared browser bundle loads after it. JSON/map helpers remain unadopted because duplicate-key rejection and first-match lookup do not have a confirmed exact match.
+493 string-helper calls in the PR use the pinned adapters: 51 JavaScript calls (17 case conversions and 34 trims) and 442 Python calls (357 trims and 85 lowercases). The two KPI properties also use the pinned mean and median. Repeated state, boolean, billing-owner, SSH-user, Cloud.ru product/IP, project-ID, credential, user-ID, scope and agent-capability normalization now runs once. The synchronous `static/boot.js` bootstrap keeps native `trim()` because the shared browser bundle loads after it. JSON/map helpers remain unadopted because duplicate-key rejection and first-match lookup do not have a confirmed exact match.
 
 ## Static function inventory
 

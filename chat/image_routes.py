@@ -1,5 +1,7 @@
 """Generate one Alice AI ART picture per durable, conversation-bound request."""
 
+from core.wikifunctions import trim_string
+
 import hashlib
 import json
 import re
@@ -133,9 +135,11 @@ def generate_image():
         return jsonify({"error": "invalid_conversation_id"}), 400
     if not isinstance(request_id, str) or not REQUEST_ID_PATTERN.fullmatch(request_id):
         return jsonify({"error": "request_id is required"}), 400
-    if not isinstance(prompt, str) or not prompt.strip():
+    if not isinstance(prompt, str):
         return jsonify({"error": "message is required"}), 400
-    prompt = prompt.strip()
+    prompt = trim_string(prompt)
+    if not prompt:
+        return jsonify({"error": "message is required"}), 400
     if len(prompt) > MAX_PROMPT_CHARS:
         return jsonify({"error": "prompt_too_long", "limit": MAX_PROMPT_CHARS}), 400
     if size is not None and (not isinstance(size, str) or size not in IMAGE_SIZES):

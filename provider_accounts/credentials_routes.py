@@ -1,6 +1,8 @@
 """Provider credential configuration and health-check API."""
 
 from __future__ import annotations
+from core.wikifunctions import trim_string
+
 from core.env import env_get
 
 from datetime import datetime, timedelta, timezone
@@ -87,10 +89,13 @@ def _cloudru_ttl() -> timedelta:
 
 def _provider_client(provider: str, project_id: str | None = None):
     if provider == YANDEX:
-        if not isinstance(project_id, str) or not project_id.strip():
+        if not isinstance(project_id, str):
+            raise CredentialError("Yandex project_id is required for provider client")
+        project_id = trim_string(project_id)
+        if not project_id:
             raise CredentialError("Yandex project_id is required for provider client")
         return YandexApiKeyProvider(
-            project_id=project_id.strip(),
+            project_id=project_id,
             ai_endpoint=config.BASE_URL,
         )
     if provider == CLOUDRU:
@@ -283,8 +288,10 @@ def cloudru_service_accounts():
     def pick(*names):
         for name in names:
             value = payload.get(name)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
+            if isinstance(value, str):
+                value = trim_string(value)
+                if value:
+                    return value
         return ""
 
     key_id = pick("iam_key_id", "keyId", "key_id", "accessKeyId", "access_key_id")
@@ -371,8 +378,10 @@ def bootstrap_cloudru():
     def pick(*names):
         for name in names:
             value = payload.get(name)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
+            if isinstance(value, str):
+                value = trim_string(value)
+                if value:
+                    return value
         return ""
 
     key_id = pick("iam_key_id", "keyId", "key_id", "accessKeyId", "access_key_id")
@@ -384,8 +393,8 @@ def bootstrap_cloudru():
         "accessKeySecret",
         "access_key_secret",
     )
-    project_id = request.form.get("project_id", "").strip() or pick("projectId", "project_id")
-    requested_sa_id = request.form.get("service_account_id", "").strip() or pick(
+    project_id = trim_string(request.form.get("project_id", "")) or pick("projectId", "project_id")
+    requested_sa_id = trim_string(request.form.get("service_account_id", "")) or pick(
         "serviceAccountId", "service_account_id"
     )
     if not key_id or not key_secret:
@@ -520,13 +529,16 @@ def update_provider_credentials():
         (YANDEX, yandex_api_key),
         (CLOUDRU, data.get("cloudru_api_key")),
     )
-    supplied = [
-        (provider, value.strip())
-        for provider, value in values
-        if isinstance(value, str) and value.strip()
-    ]
-    if isinstance(yandex_api_key, str) and yandex_api_key.strip():
-        if not isinstance(yandex_project_id, str) or not yandex_project_id.strip():
+    supplied = []
+    for provider, value in values:
+        if isinstance(value, str):
+            value = trim_string(value)
+            if value:
+                supplied.append((provider, value))
+    if isinstance(yandex_api_key, str):
+        yandex_api_key = trim_string(yandex_api_key)
+    if yandex_api_key:
+        if not isinstance(yandex_project_id, str):
             return jsonify(
                 {
                     "error": "yandex_project_id_required",
@@ -534,15 +546,25 @@ def update_provider_credentials():
                     "detail": "Yandex Cloud Project ID is required together with the API key.",
                 }
             ), 400
-        yandex_project_id = yandex_project_id.strip()
-    elif isinstance(yandex_project_id, str) and yandex_project_id.strip():
-        return jsonify(
-            {
-                "error": "yandex_api_key_required",
-                "provider": YANDEX,
-                "detail": "Yandex Cloud API key is required together with the Project ID.",
-            }
-        ), 400
+        yandex_project_id = trim_string(yandex_project_id)
+        if not yandex_project_id:
+            return jsonify(
+                {
+                    "error": "yandex_project_id_required",
+                    "provider": YANDEX,
+                    "detail": "Yandex Cloud Project ID is required together with the API key.",
+                }
+            ), 400
+    elif isinstance(yandex_project_id, str):
+        yandex_project_id = trim_string(yandex_project_id)
+        if yandex_project_id:
+            return jsonify(
+                {
+                    "error": "yandex_api_key_required",
+                    "provider": YANDEX,
+                    "detail": "Yandex Cloud API key is required together with the Project ID.",
+                }
+            ), 400
     if not supplied:
         return jsonify({"error": "Yandex Cloud API key or Cloud.ru API key is required"}), 400
     if any(len(value) > 4096 for _, value in supplied):

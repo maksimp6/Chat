@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 from collections.abc import Mapping
 import re
 from typing import Any
@@ -56,6 +58,6 @@ def snapshot_revision(index: Mapping[str, Any]) -> str | None:
         if not isinstance(value, str) or not re.fullmatch(pattern, value):
             raise ValueError("invalid snapshot identity")
     parser_version = index.get("parser_version")
-    if not isinstance(parser_version, str) or not parser_version.strip():
+    if not isinstance(parser_version, str) or not trim_string(parser_version):
         raise ValueError("missing snapshot parser version")
     return str(index["source_version"])

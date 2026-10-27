@@ -5,6 +5,8 @@ No user-defined code, plugin loading, subprocess, network or printer interaction
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 import copy
 import io
 import math
@@ -40,14 +42,17 @@ def vector3(value: object, name: str, low: float, high: float) -> list[float]:
 
 
 def new_scene(model_id: str, name: str = "Untitled model") -> dict[str, Any]:
-    if not isinstance(name, str) or not name.strip() or len(name) > 120:
+    if not isinstance(name, str):
+        raise ValueError("name must have 1..120 characters")
+    normalized_name = trim_string(name)
+    if not normalized_name or len(name) > 120:
         raise ValueError("name must have 1..120 characters")
     if any(ord(c) < 32 for c in name):
         raise ValueError("name contains control characters")
     return {
         "schema_version": 1,
         "model_id": str(uuid.UUID(model_id)),
-        "name": name.strip(),
+        "name": normalized_name,
         "parent_revision": None,
         "objects": [],
     }

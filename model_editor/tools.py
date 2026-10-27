@@ -6,6 +6,8 @@ commands. Scene edits produce new immutable versions; no auto-print or upload.
 
 from __future__ import annotations
 
+from core.wikifunctions import trim_string
+
 from typing import Any
 
 from storage.contracts import storage_provider_from_env
@@ -19,9 +21,8 @@ def _store(cfg: dict[str, Any] | None = None) -> ModelStore:
     context = (cfg or {}).get("_universal_context") or {}
     call = context.get("call") if isinstance(context, dict) else None
     user_id = getattr(call, "user_id", None)
-    if user_id and str(user_id).strip():
-        owner = str(user_id).strip()
-    else:
+    owner = trim_string(str(user_id)) if user_id else ""
+    if not owner:
         # Same trusted identity fallback used by 3D business tools.
         from economy.treasury_identity import get_current_owner_id
 

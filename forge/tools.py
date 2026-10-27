@@ -1,6 +1,8 @@
 """Universal local tools for the Logos 3D-printing business domain."""
 
 from __future__ import annotations
+from core.wikifunctions import trim_string
+
 from core.env import env_get
 
 import hashlib
@@ -88,7 +90,7 @@ def list_orders(
     """Read the current owner's 3D-printing order queue."""
     owner_id = _trusted_owner(cfg)
     raw_status = arguments.get("status")
-    status = str(raw_status).strip() if raw_status else None
+    status = trim_string(str(raw_status)) if raw_status else None
     return {"orders": service.list_orders(_store(), owner_id, status=status)}
 
 
@@ -146,7 +148,7 @@ def create_order_tool(
     cfg: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Persist an accepted order after approval at the universal tool boundary."""
-    status = str(arguments.get("status") or "quote").strip()
+    status = trim_string(str(arguments.get("status") or "quote"))
     if status not in ORDER_CREATE_STATUSES:
         raise ValueError(f"status must be one of {', '.join(ORDER_CREATE_STATUSES)}")
     data: dict[str, Any] = {

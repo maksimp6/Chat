@@ -5,6 +5,8 @@ This module uses the separate admin IAM identity and never logs or traces payloa
 """
 
 from __future__ import annotations
+from core.wikifunctions import trim_string
+
 from core.env import env_get
 
 import base64
@@ -27,9 +29,9 @@ class CloudRuSecretManagementAdminClient:
         timeout: float = 10.0,
     ) -> None:
         self.iam_client = iam_client or CloudRuIamClient()
-        self.parent_id = (
+        self.parent_id = trim_string(
             parent_id or env_get("CLOUDRU_SECRET_MANAGEMENT_PARENT_ID") or ""
-        ).strip()
+        )
         self.timeout = float(timeout)
         self._client = CloudRuClient(
             iam_client=self.iam_client,
@@ -51,7 +53,7 @@ class CloudRuSecretManagementAdminClient:
             "payload": {"data": self._encoded(value)},
         }
         response = self._request("POST", "/v1/secrets", payload)
-        secret_id = str(response.get("id") or response.get("secret_id") or "").strip()
+        secret_id = trim_string(str(response.get("id") or response.get("secret_id") or ""))
         version_id = self._version_id(response)
         if not secret_id or not version_id:
             raise CloudProviderError(
@@ -62,7 +64,7 @@ class CloudRuSecretManagementAdminClient:
 
     def create_version(self, *, secret_id: str, value: str) -> str:
         self._ensure_admin()
-        secret_id = secret_id.strip()
+        secret_id = trim_string(secret_id)
         if not secret_id:
             raise ValueError("secret_id is required")
         response = self._request(
@@ -80,7 +82,7 @@ class CloudRuSecretManagementAdminClient:
 
     def delete_secret(self, secret_id: str) -> None:
         self._ensure_admin()
-        secret_id = secret_id.strip()
+        secret_id = trim_string(secret_id)
         if not secret_id:
             raise ValueError("secret_id is required")
         self._request("DELETE", SECRET_PATH.format(secret_id=secret_id))
@@ -157,10 +159,10 @@ class CloudRuSecretManagementAdminClient:
     def _version_id(payload: dict[str, Any]) -> str:
         direct = payload.get("version_id") or payload.get("versionId")
         if direct:
-            return str(direct).strip()
+            return trim_string(str(direct))
         version = payload.get("version")
         if isinstance(version, dict):
-            return str(version.get("id") or version.get("version_id") or "").strip()
+            return trim_string(str(version.get("id") or version.get("version_id") or ""))
         return ""
 
 

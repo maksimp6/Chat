@@ -6,6 +6,8 @@ The OAuth token provider must come from Logos's server-side SecretProvider.
 
 from __future__ import annotations
 
+from core.wikifunctions import lowercase_string, trim_string
+
 import hashlib
 import json
 import os
@@ -152,7 +154,7 @@ class GoogleDriveResumableClient:
             raise ArchiveError("unexpected Drive API upload endpoint")
         try:
             token = self._token_provider()
-            if not isinstance(token, str) or not token.strip():
+            if not isinstance(token, str) or not trim_string(token):
                 raise ArchiveError("Drive OAuth is not configured")
             request = urllib.request.Request(
                 url,
@@ -231,7 +233,7 @@ class GoogleDriveResumableClient:
                 ".mp4": "video/mp4",
                 ".avi": "video/x-msvideo",
                 ".mkv": "video/x-matroska",
-            }[source.suffix.lower()],
+            }[lowercase_string(source.suffix)],
             "appProperties": {
                 "job_id": proof.job_id,
                 "owner_hash": proof.owner_hash,

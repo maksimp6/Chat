@@ -7,6 +7,8 @@ contract through its deployment workflow.
 """
 
 from __future__ import annotations
+from core.wikifunctions import lowercase_string, trim_string
+
 from core.env import env_get
 
 import logging
@@ -83,15 +85,15 @@ def _run_git(*args: str, cwd: Optional[Path] = None) -> str:
         raise GitUnavailable("git is unavailable") from exc
     if result.returncode:
         # git's stderr names server paths, so it is logged here and not returned to the caller.
-        logger.info("git %s failed: %s", args[0], result.stderr.strip())
+        logger.info("git %s failed: %s", args[0], trim_string(result.stderr))
         raise ValueError("git command failed")
-    return result.stdout.strip()
+    return trim_string(result.stdout)
 
 
 def resolve_commit(branch: str, commit_sha: Optional[str] = None) -> str:
     """Resolve a branch/ref to one immutable commit without shell evaluation."""
-    branch_value = str(branch or "").strip()
-    value = str(commit_sha or branch_value).strip()
+    branch_value = trim_string(str(branch or ""))
+    value = trim_string(str(commit_sha or branch_value))
     if not branch_value:
         raise ValueError("branch is required")
     if not value:
@@ -116,7 +118,7 @@ def resolve_commit(branch: str, commit_sha: Optional[str] = None) -> str:
         except ValueError as exc:
             # The commit exists but is not on this branch, so the reason must not be reported as a missing ref.
             raise ValueError("commit is not reachable from branch") from exc
-    if len(resolved) != 40 or any(ch not in "0123456789abcdef" for ch in resolved.lower()):
+    if len(resolved) != 40 or any(ch not in "0123456789abcdef" for ch in lowercase_string(resolved)):
         raise ValueError("git did not return a commit SHA")
     return resolved
 
@@ -609,7 +611,7 @@ def create_environment(
     environment_id = str(uuid.uuid4())
     item = {
         "environment_id": environment_id,
-        "branch_name": branch.strip(),
+        "branch_name": trim_string(branch),
         "commit_sha": resolved,
         "status": "CREATING",
         "url": _public_url(environment_id),

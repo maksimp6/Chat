@@ -1,6 +1,8 @@
 """Extract facts and persist individual records directly in native Kristall."""
 
 from __future__ import annotations
+from core.wikifunctions import trim_string
+
 from core.env import env_require
 
 import hashlib
@@ -76,11 +78,11 @@ def save_global_memory_facts(facts: list[dict[str, Any]], *, now: int | None = N
             fact = entry.get("fact")
             if not isinstance(fact, str):
                 continue
-            fact = fact.strip()
+            fact = trim_string(fact)
             if not fact or len(fact) > 8192:
                 continue
             category = entry.get("category", "general")
-            if not isinstance(category, str) or not category.strip():
+            if not isinstance(category, str) or not trim_string(category):
                 category = "general"
             key = _FACT_PREFIX + hashlib.sha256(fact.encode("utf-8")).hexdigest()
             if tx.get(key) is not None:

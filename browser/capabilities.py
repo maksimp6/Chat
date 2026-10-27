@@ -8,6 +8,8 @@ silently gaining cloud-session or credential access.
 
 from __future__ import annotations
 
+from core.wikifunctions import lowercase_string, trim_string
+
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
@@ -138,7 +140,7 @@ def validate_browser_action(action: BrowserAction) -> list[str]:
     errors: list[str] = []
     if action.action not in contract.actions:
         errors.append(f"action is not supported by {action.capability}: {action.action}")
-    if not action.target.strip():
+    if not trim_string(action.target):
         errors.append("browser action target is required")
     return errors
 
@@ -159,7 +161,7 @@ _TOKEN_COUNTER_KEYS = frozenset(
 
 
 def _sensitive_key(key: str) -> bool:
-    lowered = key.lower().replace("-", "_")
+    lowered = lowercase_string(key).replace("-", "_")
     if lowered in _TOKEN_COUNTER_KEYS:
         return False
     return any(part in lowered for part in _SENSITIVE_KEY_PARTS)
