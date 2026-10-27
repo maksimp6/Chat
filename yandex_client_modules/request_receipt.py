@@ -27,6 +27,12 @@ _EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh"}
 _INPUT_TYPES = {"message", "function_call", "function_call_output", "reasoning"}
 _CONTENT_TYPES = {"input_text", "input_image", "input_audio", "input_file", "output_text"}
 _TOOL_TYPES = {"function", "mcp", "file_search", "web_search", "code_interpreter"}
+_FUNCTION_NAME = re.compile(r"[A-Za-z0-9_.:-]{1,128}\Z")
+_FUNCTION_NAME_CREDENTIAL = re.compile(r"gh[pousr]_|github_pat_|sk-|AQVN|BEGIN", re.IGNORECASE)
+# Both dimensions stay below the generic trace sanitizer's 50-item boundary.
+# This bounds receipt metadata only; it never changes the provider's tool list.
+_FUNCTION_NAMES_PER_BATCH = 40
+_FUNCTION_NAME_BATCHES = 50
 
 
 def _fingerprint(value: Any) -> dict[str, Any]:
@@ -108,11 +114,33 @@ def _tools_manifest(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(tools, list):
         return result
     counts = dict.fromkeys(sorted(_TOOL_TYPES | {"other"}), 0)
+    names = []
+    names_complete = True
     for tool in tools:
         kind = tool.get("type") if isinstance(tool, dict) else None
         kind = kind if isinstance(kind, str) and kind in _TOOL_TYPES else "other"
         counts[kind] += 1
-    result.update(count=len(tools), types=counts)
+        if kind == "other":
+            names_complete = False
+        if kind != "function":
+            continue
+        function = tool.get("function")
+        name = tool.get("name") or (function.get("name") if isinstance(function, dict) else None)
+        if (not isinstance(name, str) or not _FUNCTION_NAME.fullmatch(name)
+                or _FUNCTION_NAME_CREDENTIAL.search(name)):
+            names_complete = False
+            continue
+        if len(names) >= _FUNCTION_NAMES_PER_BATCH * _FUNCTION_NAME_BATCHES:
+            names_complete = False
+            continue
+        names.append(name)
+    result.update(
+        count=len(tools), types=counts,
+        function_name_count=counts["function"],
+        function_names_complete=names_complete,
+        function_name_batches=[names[index:index + _FUNCTION_NAMES_PER_BATCH]
+                               for index in range(0, len(names), _FUNCTION_NAMES_PER_BATCH)],
+    )
     return result
 
 

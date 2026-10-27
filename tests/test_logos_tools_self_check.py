@@ -16,7 +16,8 @@ if not (os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("CI") == "
     raise RuntimeError("LOCAL_TESTS_FORBIDDEN: run this check in a GitHub Actions runner job")
 
 from scripts.logos_tools_self_check import (
-    SELF_CHECK_QUESTION, build_self_check_question, evaluate_tool_evidence, verify_file_effects,
+    SAFE_SELF_CHECK_TOOLS, SELF_CHECK_QUESTION, build_self_check_question,
+    evaluate_tool_evidence, verify_file_effects,
 )
 
 
@@ -211,6 +212,46 @@ class ToolsSelfCheckTests(unittest.TestCase):
         self.assertEqual(report["status"], "PARTIAL")
         self.assertEqual(next(row for row in report["tools"] if row["name"] == "file_stat")["status"], "NOT_OFFERED")
 
+    def test_complete_batched_receipt_recovers_inventory_beyond_trace_list_cap(self):
+        names = ["tool_" + str(index) for index in range(93)]
+        self.categories = {"filesystem": names, "device": ["device_action"]}
+        self.trace["api_requests"][0]["payload"]["tools"] = [
+            {"type": "web_search"}, *({"type": "function", "name": name} for name in names[:49]),
+            "<truncated: 44 more items>",
+        ]
+        self.trace["events"] = [{"type": "api_request_manifest", "payload": {"manifest": {
+            "capture_stage": "assembled_payload_before_post",
+            "tools": {"count": 94, "types": {"function": 93, "web_search": 1},
+                      "function_names_complete": True, "function_name_count": 93,
+                      "function_name_batches": [names[index:index + 40] for index in range(0, 93, 40)]},
+        }}}]
+        report = self.evaluate()
+        self.assertEqual(report["inventory"]["status"], "CAPTURED")
+        self.assertEqual(set(report["inventory"]["offered"]), set(names))
+        self.assertEqual(report["inventory"]["not_offered"], [])
+        self.assertEqual(report["coverage"]["offered_count"], 93)
+        self.assertEqual(report["coverage"]["catalogue_count"], 93)
+        self.assertEqual(report["inventory"]["sources"], ["assembled_request_manifest_function_names"])
+
+    def test_malformed_receipt_and_truncated_payload_never_claim_missing_tools(self):
+        self.trace["api_requests"][0]["payload"]["tools"] = [
+            {"type": "function", "name": "read_file"}, "<truncated: 1 more items>",
+        ]
+        for names, count, complete in [(["read_file"], 2, True),
+                                        (["read_file", "read_file"], 2, True),
+                                        (["read_file", "SECRET_CANARY"], 2, False)]:
+            with self.subTest(names=names, count=count, complete=complete):
+                self.trace["events"] = [{"type": "api_request_manifest", "payload": {"manifest": {
+                    "capture_stage": "assembled_payload_before_post",
+                    "tools": {"types": {"function": 2}, "function_names_complete": complete,
+                              "function_name_count": count, "function_name_batches": [names]},
+                }}}]
+                report = self.evaluate()
+                self.assertEqual(report["inventory"]["status"], "PARTIAL")
+                self.assertEqual(report["inventory"]["not_offered"], [])
+                self.assertIsNone(report["coverage"]["offered_count"])
+                self.assertNotIn("SECRET_CANARY", json.dumps(report))
+
     def test_empty_or_disabled_inventory_never_passes(self):
         self.assertEqual(self.evaluate(categories={})["status"], "ERROR")
         self.assertEqual(self.evaluate(active_categories=[])["status"], "NOT_RUN")
@@ -248,16 +289,42 @@ class ToolsSelfCheckTests(unittest.TestCase):
         nonce = "a" * 32
         folder = "tmp/logos-tools-check-" + nonce
         question = build_self_check_question(
-            {"categories": self.categories, "active_categories": self.active}, nonce, folder)
+            {"categories": self.categories, "active_categories": self.active}, nonce, folder,
+            project_root="/isolated-candidate")
         self.assertIn('"name":"write_file"', question)
         self.assertIn('"source_path":"' + folder + '/payload.txt"', question)
         self.assertIn('"archive_path":"' + folder + '/payload.zip"', question)
         self.assertIn("LOGOS_TOOLS_SELF_CHECK:" + nonce, question)
         self.assertNotIn("device_action", question)
-        self.assertLess(len(question), 2200)
+        self.assertLess(len(question), 6500)
+        encoded_calls = question.split("Выполни последовательно: ", 1)[1].split(
+            " Удалять можно только", 1)[0]
+        calls = json.loads(encoded_calls)
+        self.assertEqual(len(calls), 22)
+        self.assertEqual({call["name"] for call in calls}, SAFE_SELF_CHECK_TOOLS)
+        self.assertEqual(len(SAFE_SELF_CHECK_TOOLS), 20)
+        for call in calls:
+            if call["name"].startswith("git_"):
+                self.assertEqual(call["arguments"]["repo_path"], "/isolated-candidate")
+            if call["name"] == "delete_path":
+                self.assertEqual(call["arguments"]["path"], folder + "/delete-me.txt")
+            if call["name"] == "grep_search":
+                self.assertEqual(call["arguments"]["file_pattern"], "scratch-" + nonce + ".txt")
         for invalid in ["/tmp/absolute", "tmp/../escape", "tmp/logos-tools-check-" + "b" * 32]:
             with self.subTest(folder=invalid), self.assertRaises(ValueError):
                 build_self_check_question({"categories": self.categories, "active_categories": self.active}, nonce, invalid)
+
+    def test_standalone_helper_without_explicit_candidate_keeps_four_file_calls(self):
+        nonce = "d" * 32
+        question = build_self_check_question(
+            {"categories": self.categories, "active_categories": self.active}, nonce,
+            "tmp/logos-tools-check-" + nonce)
+        encoded_calls = question.split("Выполни последовательно: ", 1)[1].split(
+            " Удалять можно только", 1)[0]
+        calls = json.loads(encoded_calls)
+        self.assertEqual(len(calls), 4)
+        self.assertEqual({call["name"] for call in calls},
+                         {"write_file", "read_file", "calculate_hash", "zip_compress"})
 
     def test_file_effects_require_exact_nonce_bytes_and_zip_contents(self):
         nonce = "c" * 32
@@ -275,6 +342,39 @@ class ToolsSelfCheckTests(unittest.TestCase):
             self.assertEqual(report["actual_sha256"], report["expected_sha256"])
             (target / "payload.txt").write_bytes(b"wrong nonce")
             self.assertEqual(verify_file_effects(directory, nonce, folder)["status"], "FAIL")
+
+    def test_extended_file_effects_require_all_five_additional_postconditions(self):
+        nonce = "e" * 32
+        folder = "tmp/logos-tools-check-" + nonce
+        content = ("LOGOS_TOOLS_SELF_CHECK:" + nonce).encode()
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / folder
+            target.mkdir(parents=True)
+            (target / "payload.txt").write_bytes(content)
+            with zipfile.ZipFile(target / "payload.zip", "w") as archive:
+                archive.writestr("payload.txt", content)
+            self.assertEqual(verify_file_effects(directory, nonce, folder)["status"], "PASS")
+            self.assertEqual(verify_file_effects(directory, nonce, folder, extended=True)["status"], "FAIL")
+            (target / ("scratch-" + nonce + ".txt")).write_bytes(("after:" + nonce).encode())
+            (target / "empty").mkdir()
+            (target / "extracted").mkdir()
+            (target / "extracted/payload.txt").write_bytes(content)
+            (target / "fixture.py").write_bytes(b"answer = 42\n")
+            report = verify_file_effects(directory, nonce, folder, extended=True)
+            self.assertEqual(report["status"], "PASS")
+            self.assertEqual(len(report["checks"]), 7)
+            for path, replacement in [
+                (target / ("scratch-" + nonce + ".txt"), b"unpatched"),
+                (target / "extracted/payload.txt", b"wrong nonce"),
+                (target / "fixture.py", b"unexpected code"),
+            ]:
+                with self.subTest(path=path.name):
+                    original = path.read_bytes()
+                    path.write_bytes(replacement)
+                    self.assertEqual(verify_file_effects(directory, nonce, folder, extended=True)["status"], "FAIL")
+                    path.write_bytes(original)
+            (target / "delete-me.txt").write_bytes(content)
+            self.assertEqual(verify_file_effects(directory, nonce, folder, extended=True)["status"], "FAIL")
 
 
 if __name__ == "__main__":

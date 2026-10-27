@@ -77,7 +77,9 @@ def phase(report, name, action):
         # Exception text from storage/network libraries may contain private data.
         entry.update(status="FAIL", error_type=type(error).__name__)
         raise
-    entry["status"] = "PASS"
+    entry["status"] = (result.get("status") if isinstance(result, dict)
+                       and result.get("status") in {"PASS", "FAIL", "NOT_RUN", "PARTIAL", "NOT_PROVEN"}
+                       else "PASS")
     return result
 
 
@@ -233,9 +235,9 @@ def independent_file_effects(repo, fixture, executable, env, private):
     program = (
         "import json, pathlib, sys; "
         "from scripts.logos_tools_self_check import verify_file_effects; "
-        "print(json.dumps(verify_file_effects(pathlib.Path.cwd(), sys.argv[1], sys.argv[2])))"
+        "print(json.dumps(verify_file_effects(pathlib.Path.cwd(), sys.argv[1], sys.argv[2], extended=sys.argv[3]=='1')))"
     )
-    output = command([str(executable), "-c", program, nonce, folder], cwd=repo, env=env,
+    output = command([str(executable), "-c", program, nonce, folder, "1" if fixture.get("extended") is True else "0"], cwd=repo, env=env,
                      timeout=20, log=private / "independent-file-effects.log")
     result = json.loads(output)
     require(isinstance(result, dict) and result.get("status") in {"PASS", "FAIL", "NOT_RUN"},
@@ -448,7 +450,8 @@ def main():
             result = subprocess.run([str(executable), "-m", "pytest", "-q",
                                      "tests/test_provider_terminal_status.py",
                                      "tests/test_logos_tools_self_check.py",
-                                     "tests/test_redmi_rdp_long_string.py"],
+                                     "tests/test_redmi_rdp_long_string.py",
+                                     "tests/test_tool_inventory_receipt.py"],
                                     cwd=repo, env=environment, capture_output=True, timeout=120)
             (private / "regressions.log").write_bytes(result.stdout + result.stderr)
             print((result.stdout + result.stderr).decode("utf-8", "replace")[-50000:], flush=True)

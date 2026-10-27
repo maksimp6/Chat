@@ -783,7 +783,8 @@ def tools_self_check(rdp, actor, conversation_id):
     # #msg-input is input[type=text]; it removes line breaks before sending.
     nonce = uuid.uuid4().hex
     folder = "tmp/logos-tools-check-" + nonce
-    question = build_self_check_question(inventory, nonce, folder)
+    candidate_root = str(Path(__file__).resolve().parents[1]) if LOGOS_URL.endswith(":8081/") else None
+    question = build_self_check_question(inventory, nonce, folder, project_root=candidate_root)
     rdp.send_chat_message(actor, question)
     # Leave time to finalize the recording and publish even when the app times out.
     deadline = time.monotonic() + max(0, remaining(120) - 15)
@@ -807,7 +808,7 @@ def tools_self_check(rdp, actor, conversation_id):
     report = evaluate_tool_evidence(inventory["categories"], inventory["active_categories"],
                                     before["messages"], after["messages"], traces, question)
     report["question"] = question
-    report["file_fixture"] = {"nonce": nonce, "folder": folder}
+    report["file_fixture"] = {"nonce": nonce, "folder": folder, "extended": candidate_root is not None}
     report["execution_traces"] = traces
     report["browser_observation"] = rdp.evaluate(actor, "JSON.stringify({"
         "tool_summaries:[...document.querySelectorAll('.msg-technical-summary')]"

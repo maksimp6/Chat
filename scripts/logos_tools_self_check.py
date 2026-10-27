@@ -14,8 +14,8 @@ SELF_CHECK_QUESTION = (
     "Не заменяй function_call текстом о выполнении. Читай только собственные тестовые данные; "
     "записывай только в указанную новую временную папку. Секреты, личные данные, устройства, "
     "платные дополнительные сервисы и внешние публикации не затрагивай. Не меняй доступ, "
-    "настройки или ограничения; требуемое разрешение обозначь BLOCKED. Остальные инструменты "
-    "проверяй только безопасными реальными вызовами в этой области; неприменимые обозначь "
+    "настройки или ограничения; требуемое разрешение обозначь BLOCKED. Выполняй только "
+    "перечисленный ниже безопасный пакет; все остальные инструменты обозначь "
     "NOT_RUN с короткой причиной. Каталог и твои слова не доказывают вызов или отсутствие "
     "лимитов. Итог до 12 строк: фактические вызовы, SHA256, ошибки и NOT_RUN; неизвестное UNKNOWN."
 )
@@ -35,6 +35,12 @@ _EFFORT = {"none", "minimal", "low", "medium", "high", "xhigh", "max"}
 _TOOL_TYPES = {"function", "mcp", "file_search", "web_search", "code_interpreter", "other"}
 _RESPONSE_STATUSES = {"completed", "incomplete", "failed", "cancelled", "queued", "in_progress"}
 _INCOMPLETE_REASONS = {"max_output_tokens", "content_filter"}
+SAFE_SELF_CHECK_TOOLS = frozenset({
+    "write_file", "read_file", "calculate_hash", "zip_compress", "make_directory",
+    "apply_patch", "copy_or_move_file", "delete_path", "zip_extract", "list_directory",
+    "glob_search", "grep_search", "file_stat", "python_ast_outline", "get_system_info",
+    "local_runtime_exec", "git_status", "git_log", "git_diff", "git_branches",
+})
 
 
 def _name(value):
@@ -53,9 +59,16 @@ def _fixture_paths(nonce, folder):
     return folder + "/payload.txt", folder + "/payload.zip", "LOGOS_TOOLS_SELF_CHECK:" + nonce
 
 
-def build_self_check_question(inventory, nonce, folder):
+def build_self_check_question(inventory, nonce, folder, project_root=None):
     """Keep the task small enough to call tools before generating a long catalogue review."""
     text_path, archive_path, content = _fixture_paths(nonce, folder)
+    root = Path(project_root) if project_root is not None else None
+    if root is not None and (not root.is_absolute() or any(part in {".", ".."} for part in root.parts)):
+        raise ValueError("Use the absolute isolated candidate repository root")
+    scratch_name = "scratch-" + nonce + ".txt"
+    scratch = folder + "/" + scratch_name
+    duplicate = folder + "/delete-me.txt"
+    fixture = folder + "/fixture.py"
     calls = [
         {"name": "write_file", "arguments": {"path": text_path, "content": content}},
         {"name": "read_file", "arguments": {"path": text_path, "offset": 0,
@@ -63,6 +76,28 @@ def build_self_check_question(inventory, nonce, folder):
         {"name": "calculate_hash", "arguments": {"path": text_path, "algorithm": "sha256"}},
         {"name": "zip_compress", "arguments": {"source_path": text_path, "archive_path": archive_path}},
     ]
+    if root is not None:
+        calls.extend([
+        {"name": "make_directory", "arguments": {"path": folder + "/empty"}},
+        {"name": "write_file", "arguments": {"path": scratch, "content": "before:" + nonce}},
+        {"name": "apply_patch", "arguments": {"path": scratch, "search_text": "before:", "replace_text": "after:"}},
+        {"name": "copy_or_move_file", "arguments": {"src": scratch, "dst": duplicate, "action": "copy"}},
+        {"name": "delete_path", "arguments": {"path": duplicate}},
+        {"name": "zip_extract", "arguments": {"archive_path": archive_path, "target_dir": folder + "/extracted"}},
+        {"name": "list_directory", "arguments": {"path": folder}},
+        {"name": "glob_search", "arguments": {"pattern": folder + "/*"}},
+        {"name": "grep_search", "arguments": {"query": nonce, "file_pattern": scratch_name, "max_matches": 5}},
+        {"name": "file_stat", "arguments": {"path": text_path}},
+        {"name": "write_file", "arguments": {"path": fixture, "content": "answer = 42\n"}},
+        {"name": "python_ast_outline", "arguments": {"path": fixture}},
+        {"name": "get_system_info", "arguments": {}},
+        {"name": "local_runtime_exec", "arguments": {"command": "printf '%s' " + nonce,
+                                                       "cwd": str(root / folder), "timeout_seconds": 5}},
+        {"name": "git_status", "arguments": {"repo_path": str(root)}},
+        {"name": "git_log", "arguments": {"repo_path": str(root), "limit": 1}},
+        {"name": "git_diff", "arguments": {"repo_path": str(root), "file_path": scratch}},
+        {"name": "git_branches", "arguments": {"repo_path": str(root)}},
+        ])
     categories = inventory.get("categories") if isinstance(inventory, dict) else None
     active = inventory.get("active_categories") if isinstance(inventory, dict) else None
     if (not isinstance(categories, dict) or not isinstance(active, list)
@@ -70,14 +105,16 @@ def build_self_check_question(inventory, nonce, folder):
                    or any(not _name(name) for name in names) for category, names in categories.items())
             or any(not isinstance(category, str) or category not in categories for category in active)):
         raise ValueError("Tool inventory is unavailable or invalid")
-    names = sorted({name for category in active for name in categories[category]})
-    return (SELF_CHECK_QUESTION + " Выполни последовательно: "
+    names = {name for category in active for name in categories[category]}
+    package = ("20 различных инструментов, 22 вызова с учётом тестовых файлов. "
+               "Git читает только явно указанный кандидат. " if root is not None else "4 инструмента, 4 вызова. ")
+    return (SELF_CHECK_QUESTION + " Пакет: " + package + "Выполни последовательно: "
             + json.dumps(calls, ensure_ascii=False, separators=(",", ":"))
-            + " Не удаляй созданные файлы: раннер независимо проверит их. Активный каталог: "
-            + ",".join(names))
+            + " Удалять можно только delete-me.txt; payload.txt и payload.zip сохрани для независимой проверки. "
+            + "В активном каталоге " + str(len(names)) + " инструментов. Остальные NOT_RUN: вне безопасного пакета.")
 
 
-def verify_file_effects(project_root, nonce, folder):
+def verify_file_effects(project_root, nonce, folder, extended=False):
     """Independently inspect only the nonce-bound test files, never execute a tool."""
     text_path, archive_path, content = _fixture_paths(nonce, folder)
     root = Path(project_root).resolve()
@@ -85,17 +122,25 @@ def verify_file_effects(project_root, nonce, folder):
     report = {"status": "FAIL", "scope": "nonce_bound_text_and_zip_effects_only",
               "expected_sha256": hashlib.sha256(expected).hexdigest(), "checks": {}}
     try:
-        paths = [root / text_path, root / archive_path]
-        for path in paths:
+        def guarded_path(relative):
+            path = root / relative
             for part in [path, *path.parents]:
                 if part == root:
                     break
                 if part.is_symlink():
                     raise ValueError("Test path is a symlink")
+            return path
+
+        def read_regular(path):
             size = path.stat()
             if not stat.S_ISREG(size.st_mode) or size.st_size > 1024 * 1024:
                 raise ValueError("Test artifact is not a bounded regular file")
-        payload = paths[0].read_bytes()
+            return path.read_bytes()
+
+        paths = [guarded_path(text_path), guarded_path(archive_path)]
+        payload = read_regular(paths[0])
+        # Check the archive's file type and bound before ZipFile opens it.
+        read_regular(paths[1])
         report["checks"]["text_matches_nonce"] = payload == expected
         report["actual_sha256"] = hashlib.sha256(payload).hexdigest()
         with zipfile.ZipFile(paths[1]) as archive:
@@ -103,6 +148,17 @@ def verify_file_effects(project_root, nonce, folder):
             valid = (len(entries) == 1 and entries[0].filename == "payload.txt"
                      and entries[0].file_size == len(expected))
             report["checks"]["zip_contains_exact_nonce_file"] = valid and archive.read(entries[0]) == expected
+        if extended:
+            report["scope"] = "nonce_bound_extended_test_file_effects_only"
+            report["checks"]["scratch_patch_matches_nonce"] = read_regular(guarded_path(
+                folder + "/scratch-" + nonce + ".txt")) == ("after:" + nonce).encode("utf-8")
+            deleted = guarded_path(folder + "/delete-me.txt")
+            report["checks"]["temporary_copy_deleted"] = not deleted.exists()
+            report["checks"]["zip_extracted_exact_nonce_file"] = read_regular(guarded_path(
+                folder + "/extracted/payload.txt")) == expected
+            report["checks"]["temporary_directory_created"] = guarded_path(folder + "/empty").is_dir()
+            report["checks"]["ast_fixture_matches"] = read_regular(guarded_path(
+                folder + "/fixture.py")) == b"answer = 42\n"
         if all(report["checks"].values()):
             report["status"] = "PASS"
     except (OSError, ValueError, RuntimeError, zipfile.BadZipFile):
@@ -230,6 +286,33 @@ def _provider_evidence(trace):
 
 def _offered_evidence(trace):
     """Inspect the captured outgoing payload, rather than treating a catalogue as sent."""
+    receipts = []
+    for event in trace.get("events", []) if isinstance(trace.get("events"), list) else []:
+        if not isinstance(event, dict) or event.get("type") != "api_request_manifest":
+            continue
+        payload = event.get("payload")
+        manifest = payload.get("manifest") if isinstance(payload, dict) else None
+        if not isinstance(manifest, dict) or manifest.get("capture_stage") != "assembled_payload_before_post":
+            continue
+        tools = manifest.get("tools")
+        if not isinstance(tools, dict) or tools.get("function_names_complete") is not True:
+            continue
+        batches, count, types = (tools.get("function_name_batches"),
+                                  tools.get("function_name_count"), tools.get("types"))
+        if (not isinstance(batches, list) or type(count) is not int or count < 0
+                or not isinstance(types, dict) or type(types.get("function")) is not int
+                or types["function"] != count
+                or any(not isinstance(batch, list) or len(batch) > 40 for batch in batches)):
+            continue
+        names = [name for batch in batches for name in batch]
+        if len(names) != count or any(not _name(name) for name in names) or len(set(names)) != count:
+            continue
+        receipts.append({"names": set(names), "complete": True,
+                         "source": "assembled_request_manifest_function_names"})
+    # api_requests.payload is independently sanitized and may have lost every
+    # item after its first 50. Complete pre-sanitization receipts take precedence.
+    if receipts:
+        return receipts
     inventories = []
     for entry in trace.get("api_requests", []) if isinstance(trace.get("api_requests"), list) else []:
         payload = entry.get("payload") if isinstance(entry, dict) else None
@@ -242,7 +325,11 @@ def _offered_evidence(trace):
             if not isinstance(tool, dict):
                 malformed = True
                 continue
-            if tool.get("type") != "function":
+            kind = tool.get("type")
+            if not isinstance(kind, str) or kind not in _TOOL_TYPES or kind == "other":
+                malformed = True
+                continue
+            if kind != "function":
                 continue
             function = tool.get("function")
             name = tool.get("name") or (function.get("name") if isinstance(function, dict) else None)
@@ -250,7 +337,8 @@ def _offered_evidence(trace):
                 names.add(name)
             else:
                 malformed = True
-        inventories.append({"names": names, "complete": not malformed})
+        inventories.append({"names": names, "complete": not malformed,
+                            "source": "captured_api_request_payload"})
     return inventories
 
 
@@ -304,6 +392,7 @@ def evaluate_tool_evidence(categories, active_categories, before_messages, after
     report = {
         "status": "NOT_RUN", "tools": [], "inactive_tools": [],
         "coverage": {"status": "NOT_RUN", "expected": 0, "called": 0, "succeeded": 0,
+                     "catalogue_count": 0, "offered_count": None,
                      "scope": "active_catalogue_model_linked_call_envelopes_only; effects_not_independently_verified"},
         "limits": {"status": "UNKNOWN", "unbounded": "UNKNOWN", "parameter_domains": "UNKNOWN",
                    "provider_effective": "UNKNOWN", "requests": [],
@@ -323,6 +412,7 @@ def evaluate_tool_evidence(categories, active_categories, before_messages, after
     inactive = {name for category, names in categories.items() if category not in active for name in names} - expected
     report["inactive_tools"] = sorted(inactive)
     report["coverage"]["expected"] = len(expected)
+    report["coverage"]["catalogue_count"] = len(expected)
     report["tools"] = [{"name": name, "status": "NOT_RUN", "calls": []} for name in sorted(expected)]
     ids, reason = _bind_reply(before_messages, after_messages, question)
     if reason:
@@ -364,11 +454,15 @@ def evaluate_tool_evidence(categories, active_categories, before_messages, after
             calls[name].append(evidence)
     offered = set().union(*(item["names"] for item in inventories)) if inventories else set()
     if inventories:
+        complete_inventory = all(item["complete"] for item in inventories)
         report["inventory"].update(
-            status="CAPTURED" if all(item["complete"] for item in inventories) else "PARTIAL",
-            offered=sorted(offered), not_offered=sorted(expected - offered),
+            status="CAPTURED" if complete_inventory else "PARTIAL",
+            offered=sorted(offered), not_offered=sorted(expected - offered) if complete_inventory else [],
             offered_outside_catalogue=sorted(offered - expected),
+            sources=sorted({item["source"] for item in inventories}),
         )
+        if complete_inventory:
+            report["coverage"]["offered_count"] = len(offered)
     for row in report["tools"]:
         row["calls"] = calls[row["name"]]
         statuses = {call["status"] for call in row["calls"]}
