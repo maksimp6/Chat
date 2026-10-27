@@ -113,8 +113,8 @@ class FileSecretAliasStore:
         fd, raw_path = tempfile.mkstemp(prefix=".aliases-", dir=parent)
         tmp = Path(raw_path)
         try:
-            os.fchmod(fd, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8", closefd=True) as handle:
+                os.fchmod(handle.fileno(), 0o600)
                 json.dump(payload, handle, sort_keys=True, separators=(",", ":"))
                 handle.flush()
                 os.fsync(handle.fileno())

@@ -2,6 +2,7 @@
 (function () {
   "use strict";
   function finite(v) {
+    if (v === null || v === undefined || v === "") return null;
     var n = Number(v);
     return Number.isFinite(n) ? n : null;
   }

@@ -278,8 +278,10 @@
             return r.json();
           })
           .then(function () {
-            editorEl.remove();
-            editorEl = null;
+            if (editorEl === e) {
+              e.remove();
+              editorEl = null;
+            }
             refreshList();
           })
           .catch(function (e) {

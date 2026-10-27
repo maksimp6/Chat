@@ -115,20 +115,19 @@ class RuntimeLoader:
                 raise RuntimeLoadError(
                     "revision imports are not supported by the single-interpreter runtime contract"
                 )
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-                if node.func.id in {
-                    "__import__",
-                    "compile",
-                    "delattr",
-                    "eval",
-                    "exec",
-                    "getattr",
-                    "globals",
-                    "locals",
-                    "setattr",
-                    "vars",
-                }:
-                    raise RuntimeLoadError(f"revision call to {node.func.id}() is not supported")
+            if isinstance(node, ast.Name) and node.id in {
+                "__import__",
+                "compile",
+                "delattr",
+                "eval",
+                "exec",
+                "getattr",
+                "globals",
+                "locals",
+                "setattr",
+                "vars",
+            }:
+                raise RuntimeLoadError(f"revision use of {node.id} is not supported")
             if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
                 raise RuntimeLoadError("revision access to dunder attributes is not supported")
             # str.format resolves attribute paths such as "{0.__globals__}" at runtime.

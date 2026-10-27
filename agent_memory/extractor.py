@@ -123,6 +123,8 @@ def extract_and_save_facts(dialog_messages: list) -> int:
         if response.status_code != 200:
             return 0
         parsed = json.loads(response.json()["result"]["alternatives"][0]["message"]["text"])
+        if not isinstance(parsed, dict):
+            return 0
         facts = parsed.get("facts", [])
         if not isinstance(facts, list):
             return 0

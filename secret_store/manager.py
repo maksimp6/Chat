@@ -13,7 +13,7 @@ import re
 from typing import Protocol
 
 from secret_store.admin import SecretAdminBackend
-from secret_store.core import SecretRef, SecretResolutionError, SecretResolver, SecretValue
+from secret_store.core import SecretRef, SecretResolver, SecretValue
 
 _ALIAS_RE = re.compile(r"^[a-z][a-z0-9_-]{1,63}$")
 _AUDIT_LIMIT = 1000
@@ -100,8 +100,8 @@ class SecretManager:
     ) -> SecretAlias:
         admin = self._require_admin()
         result = admin.create(purpose=secret_purpose, value=value)
-        entry = SecretAlias(alias=alias, ref=result.ref, allowed_purposes=allowed_purposes)
         try:
+            entry = SecretAlias(alias=alias, ref=result.ref, allowed_purposes=allowed_purposes)
             self._store.put(entry)
         except Exception:
             # Without its alias the new secret can never be used, so remove it instead of orphaning it.
@@ -170,7 +170,7 @@ class SecretManager:
             raise SecretAliasError("secret purpose is not allowed")
         try:
             value = self._resolver.resolve(entry.ref)
-        except SecretResolutionError:
+        except Exception:
             self._record(alias, purpose, "use", False)
             raise
         self._record(alias, purpose, "use", True)
