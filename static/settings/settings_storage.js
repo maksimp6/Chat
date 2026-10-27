@@ -216,7 +216,13 @@
     return fetchRecord(convId).then(function (record) {
       // Tool selection is saved by PUT /tools; a settings save must not write back a copy of it.
       delete record.active_tool_categories;
-      return save(Object.assign(record, changes), convId);
+      var storedTools = record.tools_config || {};
+      var merged = Object.assign(record, changes);
+      // tools_config is merged tool by tool, so a tool that `changes` does not name keeps its stored value.
+      if (changes.tools_config) {
+        merged.tools_config = Object.assign({}, storedTools, changes.tools_config);
+      }
+      return save(merged, convId);
     });
   }
 

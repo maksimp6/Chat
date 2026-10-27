@@ -6,6 +6,7 @@ from economy.treasury_identity import get_current_owner_id
 from observability.trace_manager import ExecutionTrace
 from tool_providers.registry import registry
 import mcp_server.storage as mcp_storage
+from agent_memory.manager import get_controlled_memory_summary
 from storage.db import get_conv_settings
 
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
@@ -289,6 +290,16 @@ class YandexMcpMixin:
         # The server owns the tool list: a caller's "tools" entry never reaches the provider.
         ask_params = dict(params)
         ask_params.pop("tools", None)
+        # Global memory reaches the system prompt of chat turns only. Settings (enabled, facts
+        # limit, categories) are applied inside the summary builder.
+        if settings_id and execution_policy is None:
+            try:
+                memory_summary = get_controlled_memory_summary()
+            except Exception:
+                api_logger.exception("[MEMORY] Память не подключена к ответу")
+                memory_summary = ""
+            if memory_summary:
+                ask_params["instructions"] = (ask_params.get("instructions") or "") + memory_summary
         if tools or execution_policy is not None:
             ask_params["tools"] = tools
 

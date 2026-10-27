@@ -16,6 +16,8 @@
     var convId = currentConvId;
     var settings = Storage.load(convId);
     var unknownAtOpen = Boolean(convId) && Storage.isUnknown(convId);
+    // The category selection as it was loaded when the window opened (null until the list loads).
+    var openCategories = null;
     var cfg = settings.tools_config || {};
     var ws = cfg.web_search || {};
     var fs = cfg.file_search || {};
@@ -145,6 +147,7 @@
           activeData && activeData.active_tool_categories !== null
             ? activeData.active_tool_categories
             : Object.keys(categories);
+        openCategories = active.slice();
         listEl.innerHTML = Object.keys(categories)
           .map(function (cat) {
             var isChecked = active.indexOf(cat) !== -1;
@@ -233,18 +236,29 @@
           "Категории инструментов сохраняются в беседе. Откройте или создайте беседу и повторите.";
         return;
       }
-      var localSave = window.LogosDispatcher.request("/api/conversations/" + convId + "/tools", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ active_tool_categories: selected }),
-      }).then(function (r) {
-        if (!r.ok) throw new Error("HTTP " + r.status);
+      // The category list is written only when this window changed it, so a change made elsewhere is kept.
+      var sameSelection =
+        openCategories !== null &&
+        JSON.stringify(selected.slice().sort()) === JSON.stringify(openCategories.slice().sort());
+      var localSave = sameSelection
+        ? Promise.resolve()
+        : window.LogosDispatcher.request("/api/conversations/" + convId + "/tools", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ active_tool_categories: selected }),
+          }).then(function (r) {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+          });
+      // Only the tools this window changed are written, each over the stored record, so a tool left
+      // alone here keeps the value stored now, and other settings stay as saved.
+      var changedTools = {};
+      Object.keys(toolsConfig).forEach(function (key) {
+        if (JSON.stringify(toolsConfig[key]) !== JSON.stringify((settings.tools_config || {})[key])) {
+          changedTools[key] = toolsConfig[key];
+        }
       });
-      // Only a changed config is written, and only over the stored record, so other settings stay as saved.
       var changes = {};
-      if (JSON.stringify(toolsConfig) !== JSON.stringify(settings.tools_config)) {
-        changes.tools_config = toolsConfig;
-      }
+      if (Object.keys(changedTools).length) changes.tools_config = changedTools;
       var settingsSave = Object.keys(changes).length
         ? Storage.saveChanges(changes, convId)
         : Promise.resolve();
