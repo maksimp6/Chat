@@ -296,6 +296,15 @@ class LogosClient(YandexResponsesClient):
                     return {"error": result["error"], "tool": result.get("name")}
                 return result.get("result")
 
+            # Retain the original request and all tool rounds without a provider conversation.
+            from yandex_client_modules.request_builder import _response_input
+
+            initial_input = _response_input(base_params, message)
+            continuation_history = (
+                [{"role": "user", "content": initial_input}]
+                if isinstance(initial_input, str) else list(initial_input)
+            )
+
             def continue_request(input_items, previous_response):
                 continuation_params = dict(base_params)
                 # The provider conversation already contains the answered calls.
@@ -305,7 +314,8 @@ class LogosClient(YandexResponsesClient):
                         if isinstance(item, dict) and item.get("type") == "function_call_output"
                     ]
                 else:
-                    continuation_params["input"] = input_items
+                    continuation_history.extend(input_items)
+                    continuation_params["input"] = list(continuation_history)
                 continuation_params["background"] = base_params.get("background", True)
                 response = self._ask_provider(
                     message="",
