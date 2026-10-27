@@ -106,15 +106,33 @@ start_app() {
   if timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/"$1"' _ "$port" 2>/dev/null; then
     echo 'Port belongs to an untracked listener; refusing duplicate startup' >&2; return 1
   fi
-  local revision
+  local revision launcher launcher_tmp
   revision=$(git -C "$app" rev-parse HEAD 2>/dev/null || printf unknown)
-  if [[ $wifi_required == 1 ]]; then
-    if ! cmp -s "$script_dir/redmi_app_launcher.py" "$state/start-logos.py"; then
-      [[ -f $state/start-logos.py.before-wifi ]] || cp "$state/start-logos.py" "$state/start-logos.py.before-wifi" || return 1
-      cp "$script_dir/redmi_app_launcher.py" "$state/start-logos.py.next" || return 1
-      chmod 700 "$state/start-logos.py.next" || return 1
-      mv "$state/start-logos.py.next" "$state/start-logos.py" || return 1
+  # The app checkout changes on both deploy and rollback. A workflow-local
+  # launcher stays at the event SHA and must not override the selected revision.
+  launcher="$app/scripts/redmi_app_launcher.py"
+  if [[ ! -f $launcher || -L $launcher || -L $app/scripts || -L $state/start-logos.py ]]; then
+    echo 'The checked-out application launcher must be a regular file' >&2
+    return 1
+  fi
+  if ! cmp -s "$launcher" "$state/start-logos.py"; then
+    if [[ -f $state/start-logos.py && ! -f $state/start-logos.py.before-wifi ]]; then
+      if [[ -e $state/start-logos.py.before-wifi || -L $state/start-logos.py.before-wifi ]]; then
+        echo 'The saved application launcher is not a regular file' >&2
+        return 1
+      fi
+      cp -- "$state/start-logos.py" "$state/start-logos.py.before-wifi" || return 1
     fi
+    launcher_tmp=$(mktemp "$state/start-logos.py.XXXXXX") || return 1
+    if ! cp -- "$launcher" "$launcher_tmp" \
+        || ! chmod 700 "$launcher_tmp" \
+        || ! sync -f "$launcher_tmp" \
+        || ! mv -fT -- "$launcher_tmp" "$state/start-logos.py"; then
+      rm -f -- "$launcher_tmp"
+      return 1
+    fi
+  fi
+  if [[ $wifi_required == 1 ]]; then
     printf '{"bind_host":"0.0.0.0","require_wifi":true}\n' >"$state/server-network.json.next" || return 1
     mv "$state/server-network.json.next" "$state/server-network.json" || return 1
   fi

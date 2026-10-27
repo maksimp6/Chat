@@ -174,7 +174,8 @@ def add_message(
     attachments: Any = None,
     total_duration_ms: Any = None,
     deduplicate_source: bool = False,
-) -> None:
+) -> int | None:
+    """Return the message ID only after its transaction has committed."""
     if not isinstance(content, str):
         content = json.dumps(content, ensure_ascii=False) if content is not None else ""
     now = int(time.time())
@@ -215,6 +216,15 @@ def add_message(
         tx.set(key, {**record, "updated_at": now})
         if source_key is not None:
             tx.set(source_key, identity)
+    return identity
+
+
+def get_message(conv_id: str, message_id: int) -> dict[str, Any] | None:
+    """Read one stored message only when it belongs to the requested conversation."""
+    record = get_store().get("chat/message/" + str(message_id))
+    if not isinstance(record, dict) or record.get("conversation_id") != conv_id:
+        return None
+    return record
 
 
 def save_conv_settings(conv_id: str, settings_dict: dict[str, Any]) -> None:
@@ -260,4 +270,5 @@ def get_config(key: str, default: Any = None) -> Any:
 def set_config(key: str, value: Any) -> None:
     with get_store().transaction() as tx:
         tx.set("config/" + key, {"value": value})
+
 

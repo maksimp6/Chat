@@ -39,6 +39,7 @@ from storage.db import (
     is_provider_pending,
     set_yandex_conversation,
     get_messages,
+    get_message,
     add_message,
     get_conv_settings,
     save_conv_settings,
@@ -572,7 +573,8 @@ def _build_chat_reply(client, response, trace) -> _ChatReply:
 
 
 def _finalize_chat_turn(
-    invocation, trace, result: _ChatReply, *, total_ms, selected_skill_metadata, conversation_title
+    invocation, trace, result: _ChatReply, *, total_ms, selected_skill_metadata,
+    conversation_title, user_message_id=None
 ):
     """Freeze the trace, settle billing, persist the reply, then finish its invocation."""
     reply = result.reply
@@ -630,6 +632,7 @@ def _finalize_chat_turn(
     )
     outcome = {
         "reply": reply,
+        "user_message_id": user_message_id,
         "usage": usage,
         "cost": cost,
         "settlement": settlement,
@@ -651,6 +654,7 @@ def _finalize_chat_turn(
     return jsonify(
         {
             "reply": reply,
+            "user_message_id": user_message_id,
             "usage": usage,
             "cost": cost,
             "timings": timings,
@@ -671,7 +675,8 @@ def _finalize_chat_turn(
 
 
 def _chat_error_response(
-    error, *, trace, invocation, conv_id, can_write, error_message, is_temperature_error
+    error, *, trace, invocation, conv_id, can_write, error_message, is_temperature_error,
+    user_message_id=None
 ):
     """Publish an error using only the invocation context established by this request."""
     if trace.finalized:
@@ -714,6 +719,7 @@ def _chat_error_response(
             {
                 **error.to_dict(),
                 "reply": "⚠️ Лимит запросов исчерпан. Повторите после указанного времени сброса.",
+                "user_message_id": user_message_id,
                 "invocation_id": invocation.invocation_id if invocation else None,
                 "session_id": invocation.session_id if invocation else None,
                 "conversation_id": invocation.conversation_id if invocation else conv_id,
@@ -736,6 +742,7 @@ def _chat_error_response(
         {
             "error": error_message,
             "reply": reply,
+            "user_message_id": user_message_id,
             "partial_output": partial_output if partial_output else None,
             "invocation_id": invocation.invocation_id if invocation else None,
             "session_id": invocation.session_id if invocation else None,
@@ -759,6 +766,7 @@ def chat():
     message = None
     model_key = "yandexgpt-5-pro"
     error_message = None
+    user_message_id = None
 
     try:
         data = request.get_json(silent=True)
@@ -767,10 +775,15 @@ def chat():
         conv_id = data.get("conversation_id")
         session_id = data.get("session_id") or conv_id
         message = data.get("message")
-        # A retry re-runs the last message already stored, so it must not store that message twice.
+        # Only an exact persisted message ID permits omitting a new user record.
         retry = data.get("retry", False)
         if not isinstance(retry, bool):
             return jsonify({"error": "invalid_params", "message": "retry must be a boolean"}), 400
+        retry_message_id = data.get("retry_message_id")
+        if retry_message_id is not None and (
+            type(retry_message_id) is not int or retry_message_id < 1 or not retry
+        ):
+            return jsonify({"error": "invalid_params", "message": "retry_message_id requires retry and a positive integer"}), 400
         raw_params = data.get("params")
         if raw_params is not None and not isinstance(raw_params, dict):
             return jsonify({"error": "invalid_params", "message": "params must be an object"}), 400
@@ -802,6 +815,16 @@ def chat():
             normalize_tools_config(conv_settings.get("tools_config", {}))
         except ValueError as exc:
             return jsonify({"error": "invalid_settings", "message": str(exc)}), 400
+        if retry and retry_message_id is not None:
+            original = get_message(conv_id, retry_message_id)
+            if (
+                original is None
+                or original.get("role") != "user"
+                or original.get("content") != (message or "[Фото]")
+                or (original.get("attachments") or {}).get("images", 0) != len(images)
+            ):
+                return jsonify({"error": "invalid_retry_message", "message": "The saved user message does not match this retry"}), 409
+            user_message_id = retry_message_id
         invocation = create_invocation(
             session_id,
             conv_id,
@@ -864,14 +887,16 @@ def chat():
         if active_tools is not None:
             params["active_tool_categories"] = active_tools
 
-        if not retry:
+        if user_message_id is None:
             # The photo count is kept with the message, so a reloaded chat still shows which turn had photos.
-            add_message(
+            user_message_id = add_message(
                 invocation.conversation_id,
                 "user",
                 message or "[Фото]",
                 attachments={"images": len(images)} if images else None,
             )
+            if user_message_id is None:
+                raise LookupError("Conversation was deleted before the user message was stored")
         conversation_title = maybe_update_conversation_title(
             invocation.conversation_id,
             message,
@@ -885,6 +910,7 @@ def chat():
             total_ms=total_ms,
             selected_skill_metadata=selected_skill_metadata,
             conversation_title=conversation_title,
+            user_message_id=user_message_id,
         )
     except Exception as e:
         logger.exception("[CHAT] Ошибка")
@@ -926,6 +952,7 @@ def chat():
                 can_write=can_write,
                 error_message=error_message,
                 is_temperature_error=is_temperature_error,
+                user_message_id=user_message_id,
             )
         except Exception:
             logger.exception("[CHAT] Не удалось сохранить ExecutionTrace")
@@ -933,6 +960,7 @@ def chat():
                 {
                     "error": error_message,
                     "reply": f"⚠️ Ошибка: {error_message}",
+                    "user_message_id": user_message_id,
                     "partial_output": None,
                     "trace": {},
                 }
@@ -1229,3 +1257,4 @@ def execute_approved():
     except Exception:
         logger.exception("[TOOL_APPROVAL] Tool execution failed")
         return jsonify({"error": "tool_execution_failed"}), 500
+

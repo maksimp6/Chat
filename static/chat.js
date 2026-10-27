@@ -700,6 +700,7 @@ function loadHistory(convId) {
               return window.logosRetryTurn({
                 text: retryText,
                 conversationId: convId,
+                userMessageId: previous.id,
                 imageCount: previous.attachments ? previous.attachments.images || 0 : 0,
               });
             },
@@ -1074,6 +1075,8 @@ document.addEventListener("DOMContentLoaded", function () {
       conversationId: selectedAtSubmit,
       model: retryRequest && retryRequest.model ? retryRequest.model : currentModel,
       text: text,
+      userMessageId: retryRequest && Number.isInteger(retryRequest.userMessageId) && retryRequest.userMessageId > 0
+        ? retryRequest.userMessageId : null,
       imageRequestId: retryRequest && retryRequest.imageRequestId ? retryRequest.imageRequestId : imageRequestId(),
     };
     if (isImageModel(turn.model) && Array.from(text).length > 500) {
@@ -1172,7 +1175,9 @@ document.addEventListener("DOMContentLoaded", function () {
           body: JSON.stringify({
             message: turn.text,
             conversation_id: turn.conversationId,
-            retry: Boolean(retryRequest),
+            // Replaying the local bubble does not prove the server stored its user message.
+            retry: turn.userMessageId !== null,
+            retry_message_id: turn.userMessageId === null ? undefined : turn.userMessageId,
             model: turn.model,
             params: turn.params,
             attachments: sentImages.map(function (image) {
@@ -1219,6 +1224,7 @@ document.addEventListener("DOMContentLoaded", function () {
               conversationId: turn.conversationId,
               model: turn.model,
               images: sentImages,
+              userMessageId: data.user_message_id || turn.userMessageId,
               imageRequestId: turn.imageRequestId,
             });
           },
@@ -1295,3 +1301,4 @@ document.addEventListener("DOMContentLoaded", function () {
   syncSendButton();
   if (currentConvId) loadHistory(currentConvId);
 });
+
