@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 import json
 from typing import Any, Iterable, Mapping, Sequence
 
+from core.wikifunctions import trim_string
+
 
 INTERACTIVE_ROLES = frozenset(
     {
@@ -33,7 +35,7 @@ def _stable_json(value: Any) -> str:
 def _bounded_text(value: Any, limit: int) -> str | None:
     if value is None:
         return None
-    text = str(value).strip()
+    text = trim_string(str(value))
     if not text:
         return None
     if len(text) <= limit:
@@ -48,7 +50,7 @@ def _normalize_states(value: Any) -> tuple[str, ...]:
         values = list(value)
     else:
         values = []
-    return tuple(sorted({str(item).strip() for item in values if str(item).strip()}))
+    return tuple(sorted({trim_string(str(item)) for item in values if trim_string(str(item))}))
 
 
 def _node_value(raw: Mapping[str, Any]) -> Any:
