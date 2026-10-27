@@ -1,9 +1,11 @@
 # Wikifunctions code reused by Logos
 
 The pinned implementations in `sources.json` are adapted locally under
-Apache-2.0; see `LICENSE-2.0.txt`. Each record retains the original source code,
-its SHA-256, implementation ID, revision and permanent source URL. The adapted
-files identify their changes. No Wikifunctions service is called at runtime.
+Apache-2.0; see `LICENSE-2.0.txt`. Code records retain the original source code,
+its SHA-256, implementation ID, revision and permanent source URL. The Z29125
+record retains the exact composition object, its SHA-256, and both function and
+implementation revisions. The adapted files identify their changes. No
+Wikifunctions service is called at runtime.
 
 | Function | Implementation and revision | Local API | Existing callers |
 | --- | --- | --- | --- |
@@ -16,14 +18,15 @@ files identify their changes. No Wikifunctions service is called at runtime.
 | Z10018 uppercase string | Z10019, 216191 | `LogosWikifunctions.uppercase` | Trace labels; browser emulator |
 | Z22583 mean of float64 list | Z22587, 168295 | `core.wikifunctions.mean_float64_list` | Agent office reviews per merge |
 | Z22588 median of float64 list | Z22589, 168298 | `core.wikifunctions.median_float64_list` | Agent office lead time |
+| Z29125 rotate a 2D point about origin | Z29126 composition, 226362 | `core.wikifunctions.rotate_2d_point` | Model editor X/Y/Z plane rotations |
 
 ## Shared operations
 
-526 string-helper calls in the PR use shared adapters: 65 JavaScript calls (17 case conversions and 48 trims) plus 461 Python calls (373 trims and 88 lowercases). Two KPI properties also use the pinned mean and median. Nine additional JavaScript `replaceRegex` call sites use Z12316 for HTML escaping (4), trace secret masking (2), browser-host normalization (2), and Dozzle base paths (1). `clamp_integer` also bounds provider log tails, file seek offsets and cached-token counts. Four additional passes processed 274 direct `strip()`/`lower()` occurrences across 69 modules and added 242 adapter calls after consolidating repeated normalization. Cloud.ru IAM and secret-management values, provider credentials, project/user IDs, image and embedding inputs, agent capabilities, review-policy and sensitive trace keys, runtime endpoints, Termux command output and RDC Android identifiers now normalize once. The synchronous `static/boot.js` bootstrap keeps native `trim()` because the shared browser bundle loads after it.
+526 string-helper calls in the PR use shared adapters: 65 JavaScript calls (17 case conversions and 48 trims) plus 461 Python calls (373 trims and 88 lowercases). Two KPI properties also use the pinned mean and median. Nine additional JavaScript `replaceRegex` call sites use Z12316 for HTML escaping (4), trace secret masking (2), browser-host normalization (2), and Dozzle base paths (1). Three custom rotation steps in `model_editor.engine._transform` use `rotate_2d_point` from Z29125. `clamp_integer` also bounds provider log tails, file seek offsets and cached-token counts. Four additional passes processed 274 direct `strip()`/`lower()` occurrences across 69 modules and added 242 adapter calls after consolidating repeated normalization. Cloud.ru IAM and secret-management values, provider credentials, project/user IDs, image and embedding inputs, agent capabilities, review-policy and sensitive trace keys, runtime endpoints, Termux command output and RDC Android identifiers now normalize once. The synchronous `static/boot.js` bootstrap keeps native `trim()` because the shared browser bundle loads after it.
 
 ## Static function inventory
 
-At baseline `develop` commit `e3f7bfa08267d004b23c5d024aafc38c6e05f1c2`, a source-only scan counted **4,385 function definitions**: 3,367 Python and 1,018 JavaScript. This change adds six local adapters (four Python and two JavaScript), bringing the branch count to **4,391** (3,371 Python and 1,020 JavaScript). They represent **7 distinct Wikifunctions IDs** and **9 pinned local implementations** (0.16% and 0.20% of definitions, respectively). The separate 100-candidate inventory is not a count of adopted implementations.
+At baseline `develop` commit `e3f7bfa08267d004b23c5d024aafc38c6e05f1c2`, a source-only scan counted **4,385 function definitions**: 3,367 Python and 1,018 JavaScript. This change adds seven local adapters (five Python and two JavaScript), bringing the branch count to **4,392** (3,372 Python and 1,020 JavaScript). They represent **8 distinct Wikifunctions IDs** and **10 pinned local implementations** (0.18% and 0.23% of definitions, respectively). The separate 100-candidate inventory is not a count of adopted implementations.
 
 The scan covered 401 tracked `.py` files (400 non-empty) and 48 `.js`, `.cjs`, `.mjs`, `.jsx`, `.ts` or `.tsx` files. It counted Python `def`/`async def` declarations, JavaScript `function` declarations/expressions, arrow functions and method-shorthand definitions. It excluded `vendor`, `node_modules`, `third_party`, tests/ `__tests__`, `.agents`, and all other languages. This is a syntactic source count, not a runtime or semantic count. See [the audit details](../../docs/audits/2026-10-27-wikifunctions-static-function-inventory.md).
 
@@ -46,7 +49,13 @@ same ECMAScript string operations as their pinned source implementations.
 
 The Wikifunctions mean and median implementations delegate to Python's
 `statistics.mean` and `statistics.median`; the agent KPI properties retain their
-existing empty-list `None` behavior. Python and JavaScript trim/lowercase/uppercase
+existing empty-list `None` behavior.
+
+Z29125 accepts two float64 coordinates and a radian angle, and returns the
+counterclockwise rotated point. `model_editor.engine._transform` calls it for
+the YZ, XZ, and XY planes in the previous rotation order; the XZ-plane call
+passes the negated angle to preserve the existing orientation. Scale and
+translation remain in the application. Python and JavaScript trim/lowercase/uppercase
 adapters call the same native string methods as their pinned sources, preserving
 the existing conversions at callers.
 

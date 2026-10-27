@@ -5,7 +5,7 @@ No user-defined code, plugin loading, subprocess, network or printer interaction
 
 from __future__ import annotations
 
-from core.wikifunctions import trim_string
+from core.wikifunctions import rotate_2d_point, trim_string
 
 import copy
 import io
@@ -260,9 +260,9 @@ def _local_triangles(obj: Mapping[str, Any]) -> list[Triangle]:
 def _transform(point: Vec3, obj: Mapping[str, Any]) -> Vec3:
     x, y, z = (v * s for v, s in zip(point, obj["scale"]))
     rx, ry, rz = (math.radians(a) for a in obj["rotation_deg"])
-    y, z = y * math.cos(rx) - z * math.sin(rx), y * math.sin(rx) + z * math.cos(rx)
-    x, z = x * math.cos(ry) + z * math.sin(ry), -x * math.sin(ry) + z * math.cos(ry)
-    x, y = x * math.cos(rz) - y * math.sin(rz), x * math.sin(rz) + y * math.cos(rz)
+    y, z = rotate_2d_point(y, z, rx)
+    x, z = rotate_2d_point(x, z, -ry)
+    x, y = rotate_2d_point(x, y, rz)
     t = obj["translation_mm"]
     return x + t[0], y + t[1], z + t[2]
 

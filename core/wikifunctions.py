@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-# Adapted from Wikifunctions Z21953, revision 162115 (function Z21951).
-# Changes: descriptive names, integer annotations and normalized indentation.
-# Source, original code and license: third_party/wikifunctions/.
+# Adapted from pinned Wikifunctions code and compositions.
+# Sources, revisions, local changes and licenses: third_party/wikifunctions/.
 """Pinned local Wikifunctions implementations used by Logos."""
 
+import math
 import statistics
 from collections.abc import Iterable
 
@@ -28,6 +28,14 @@ def mean_float64_list(values: Iterable[int | float]) -> float:
 def median_float64_list(values: Iterable[int | float]) -> float:
     """Median of numeric values using the pinned Wikifunctions Python implementation."""
     return statistics.median(values)
+
+
+# WIKIFUNCTIONS Z29125 / Z29126@226362 — НЕ РЕДАКТИРОВАТЬ.
+def rotate_2d_point(x: float, y: float, angle_radians: float) -> list[float]:
+    """Rotate a Cartesian point counterclockwise around the origin."""
+    cosine = math.cos(angle_radians)
+    sine = math.sin(angle_radians)
+    return [x * cosine - y * sine, x * sine + y * cosine]
 
 
 # WIKIFUNCTIONS Z10079 / Z10082@143513 — НЕ РЕДАКТИРОВАТЬ.

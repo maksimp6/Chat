@@ -88,5 +88,135 @@
     "license": "Apache-2.0",
     "original_code_sha256": "1904ab415ec8a2333803715a1258fb5302006a6b31dc1c40d29267a158cdf9d7",
     "original_code": "def Z10047(Z10047K1):\n\t\n\treturn Z10047K1.lower()"
+  },
+  {
+    "function": "Z29125",
+    "implementation": "Z29126",
+    "function_revision": 226638,
+    "revision": 226362,
+    "timestamp": "2025-10-30T10:40:08Z",
+    "source_url": "https://www.wikifunctions.org/w/index.php?title=Z29126&oldid=226362",
+    "function_source_url": "https://www.wikifunctions.org/w/index.php?title=Z29125&oldid=226638",
+    "license": "Apache-2.0",
+    "source_kind": "composition",
+    "original_implementation_sha256": "a2f54784da9a85ee13d3490fc73444545af6ba866e4255b66b001d52b6e8d436",
+    "original_implementation": {
+      "Z1K1": "Z2",
+      "Z2K1": {
+        "Z1K1": "Z6",
+        "Z6K1": "Z29126"
+      },
+      "Z2K2": {
+        "Z1K1": "Z14",
+        "Z14K1": "Z29125",
+        "Z14K2": {
+          "Z1K1": "Z7",
+          "Z7K1": "Z810",
+          "Z810K1": {
+            "Z1K1": "Z7",
+            "Z7K1": "Z21031",
+            "Z21031K1": {
+              "Z1K1": "Z7",
+              "Z7K1": "Z21032",
+              "Z21032K1": {
+                "Z1K1": "Z18",
+                "Z18K1": "Z29125K1"
+              },
+              "Z21032K2": {
+                "Z1K1": "Z7",
+                "Z7K1": "Z12473",
+                "Z12473K1": {
+                  "Z1K1": "Z18",
+                  "Z18K1": "Z29125K3"
+                }
+              }
+            },
+            "Z21031K2": {
+              "Z1K1": "Z7",
+              "Z7K1": "Z21032",
+              "Z21032K1": {
+                "Z1K1": "Z18",
+                "Z18K1": "Z29125K2"
+              },
+              "Z21032K2": {
+                "Z1K1": "Z7",
+                "Z7K1": "Z16463",
+                "Z16463K1": {
+                  "Z1K1": "Z18",
+                  "Z18K1": "Z29125K3"
+                }
+              }
+            }
+          },
+          "Z810K2": [
+            "Z1",
+            {
+              "Z1K1": "Z7",
+              "Z7K1": "Z20849",
+              "Z20849K1": {
+                "Z1K1": "Z7",
+                "Z7K1": "Z21032",
+                "Z21032K1": {
+                  "Z1K1": "Z18",
+                  "Z18K1": "Z29125K1"
+                },
+                "Z21032K2": {
+                  "Z1K1": "Z7",
+                  "Z7K1": "Z16463",
+                  "Z16463K1": {
+                    "Z1K1": "Z18",
+                    "Z18K1": "Z29125K3"
+                  }
+                }
+              },
+              "Z20849K2": {
+                "Z1K1": "Z7",
+                "Z7K1": "Z21032",
+                "Z21032K1": {
+                  "Z1K1": "Z18",
+                  "Z18K1": "Z29125K2"
+                },
+                "Z21032K2": {
+                  "Z1K1": "Z7",
+                  "Z7K1": "Z12473",
+                  "Z12473K1": {
+                    "Z1K1": "Z18",
+                    "Z18K1": "Z29125K3"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "Z2K3": {
+        "Z1K1": "Z12",
+        "Z12K1": [
+          "Z11",
+          {
+            "Z1K1": "Z11",
+            "Z11K1": "Z1078",
+            "Z11K2": "Putar titik 2D - komposisi"
+          },
+          {
+            "Z1K1": "Z11",
+            "Z11K1": "Z1002",
+            "Z11K2": "Rotate point - composition"
+          }
+        ]
+      },
+      "Z2K4": {
+        "Z1K1": "Z32",
+        "Z32K1": [
+          "Z31"
+        ]
+      },
+      "Z2K5": {
+        "Z1K1": "Z12",
+        "Z12K1": [
+          "Z11"
+        ]
+      }
+    }
   }
 ]
