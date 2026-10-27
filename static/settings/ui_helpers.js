@@ -163,7 +163,7 @@
     return str
       .split(",")
       .map(function (d) {
-        return d.trim();
+        return window.LogosWikifunctions.trim(d);
       })
       .filter(Boolean);
   }

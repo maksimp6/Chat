@@ -141,7 +141,7 @@ function createConversation(modelKey, options) {
       if (!r.ok || data.error) {
         throw new Error(data.error || data.detail || data.title || "HTTP " + r.status);
       }
-      if (typeof data.id !== "string" || !data.id.trim()) {
+      if (typeof data.id !== "string" || !window.LogosWikifunctions.trim(data.id)) {
         throw new Error("Сервер не вернул идентификатор диалога");
       }
       var conversation = {

@@ -19,7 +19,7 @@
 
   function value(id) {
     var node = document.getElementById(id);
-    return node ? node.value.trim() : "";
+    return node ? window.LogosWikifunctions.trim(node.value) : "";
   }
 
   function build() {
@@ -93,13 +93,13 @@
     var products = value("cloudru-iam-products")
       .split(",")
       .map(function (x) {
-        return x.trim();
+        return window.LogosWikifunctions.trim(x);
       })
       .filter(Boolean);
     var ips = value("cloudru-iam-ips")
       .split(",")
       .map(function (x) {
-        return x.trim();
+        return window.LogosWikifunctions.trim(x);
       })
       .filter(Boolean);
     var expiry = value("cloudru-iam-expires");

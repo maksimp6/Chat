@@ -264,7 +264,7 @@ window.fetchVectorStores = function () {
 
     // Создание нового Vector Store
     document.getElementById("btn-create-vs").addEventListener("click", function () {
-      var name = document.getElementById("vs-name-input").value.trim();
+      var name = document.getElementById("vs-name-input").window.LogosWikifunctions.trim(value);
       if (!name) {
         LogosToast.error("Введите название");
         return;

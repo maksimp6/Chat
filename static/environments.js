@@ -60,7 +60,7 @@
       try {
         await request("/api/environments", {
           method: "POST",
-          body: JSON.stringify({ branch: input.value.trim() }),
+          body: JSON.stringify({ branch: window.LogosWikifunctions.trim(input.value) }),
         });
         input.value = "";
         await load();

@@ -113,7 +113,7 @@ function renderSidebar() {
       function finish(save) {
         if (finished) return;
         finished = true;
-        var name = input.value.trim();
+        var name = window.LogosWikifunctions.trim(input.value);
         input.replaceWith(titleSpan);
         if (save && name && name !== conv.title) saveTitle(name);
       }

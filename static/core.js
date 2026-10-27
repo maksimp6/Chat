@@ -74,7 +74,7 @@ function fetchWithTimeout(input, init, timeoutMs) {
 }
 
 window.isDialogModel = function (modelKey) {
-  if (typeof modelKey !== "string" || !modelKey.trim()) return false;
+  if (typeof modelKey !== "string" || !window.LogosWikifunctions.trim(modelKey)) return false;
   if (/^(?:emb|cls):\/\//.test(modelKey) || /(?:^|\/)(?:classifier-|text-search-|text-embeddings)/.test(modelKey)) {
     return false;
   }
