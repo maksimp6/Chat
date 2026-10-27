@@ -19,7 +19,7 @@ function collapse(text) {
 // Literal private, loopback, link-local and metadata hosts. Pages are fetched
 // on behalf of the agent, so these must never be reachable through the emulator.
 function isNonPublicHost(hostname) {
-  const host = hostname.replace(/^\[|\]$/g, "").replace(/\.$/, "").toLowerCase();
+  const host = wikifunctions.lowercase(hostname.replace(/^\[|\]$/g, "").replace(/\.$/, ""));
   if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return true;
   // DNS labels such as fc-example.com are not IPv6 literals. URL parsing
   // canonicalizes IP notation before this boundary; net.isIP checks its type.
@@ -125,7 +125,7 @@ class EmulatorSession {
       inputs: [...root.querySelectorAll("input"), ...root.querySelectorAll("textarea")].map(
         (el) => ({
           name: el.getAttribute("name"),
-          type: el.getAttribute("type") || el.tagName.toLowerCase(),
+          type: el.getAttribute("type") || wikifunctions.lowercase(el.tagName),
           value: (el.getAttribute("type") || "") === "password" ? null : el.value,
         }),
       ),
