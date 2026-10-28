@@ -53,6 +53,7 @@ entry-blocks = [
     "agent_shell/__main__.py",
     "scripts/logos_dialogue.py",
     "scripts/logos_tool_probe.py",
+    "scripts/logos_narration.py",
 ]
 embedded-programs = ["scripts/redmi_candidate_tools_check.py"]
 standalone-downloads = [
@@ -97,7 +98,8 @@ printing3d = { packages = ["printing3d", "forge"], forbid = [["printing3d", "for
     "scripts/repository_rag_verify.py", "scripts/logos_dialogue.py", "scripts/logos_quality.py",
     "scripts/logos_tool_probe.py", "scripts/logos_once.py", "scripts/logos_launch_hold.py",
     "scripts/logos_generation_gate.py", "scripts/logos_provider_receipt.py",
-    "scripts/logos_responses_tool_loop.py",
+    "scripts/logos_responses_tool_loop.py", "scripts/logos_knowledge_host.py",
+    "scripts/_logos_knowledge_binding.py",
 ] }
 "tools.redmi-evidence" = { flat = true, files = [
     "scripts/logos_tools_self_check.py", "scripts/recheck_logos_tools_self_check.py",
@@ -118,7 +120,10 @@ printing3d = { packages = ["printing3d", "forge"], forbid = [["printing3d", "for
     "scripts/vision_loopback.py", "scripts/vision_perturbations.py", "scripts/vision_shapes.py",
     "scripts/visual_object_benchmark.py", "scripts/visual_object_contract.py",
 ] }
-"tools.narration" = { files = ["scripts/logos_narration.py", "scripts/narration_trace_security.py"] }
+"tools.narration" = { files = [
+    "scripts/logos_narration.py", "scripts/narration_trace_security.py", "scripts/narration_host.py",
+    "scripts/_narration_binding.py",
+] }
 "tools.ai-index" = { files = ["scripts/build_ai_index.py", "scripts/ai_index_provenance.py"] }
 "tools.device-rdc" = { flat = true, dirs = ["tools/device/rdc"] }
 "tools.android" = { flat = true, dirs = ["tools/android"] }
@@ -229,8 +234,10 @@ copies = [
     "economy/_binding.py",
     "forge/_binding.py",
     "invocation/_binding.py",
+    "scripts/_logos_knowledge_binding.py",
     "mcp_server/_binding.py",
     "model_editor/_binding.py",
+    "scripts/_narration_binding.py",
     "observability/_binding.py",
     "organization/_binding.py",
     "plugin_system/_binding.py",

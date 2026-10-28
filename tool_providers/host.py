@@ -17,7 +17,9 @@ from tool_providers._binding import Binding, HostNotBound
 class Host:
     KristallError: Any  # kristall.KristallError
     SSHRuntimeError: Any  # remote_runtime.ssh.SSHRuntimeError
-    assert_operation_allowed: Any  # remote_runtime.ssh_settings.assert_operation_allowed
+    assert_operation_allowed: (
+        Any  # remote_runtime.ssh_settings.assert_operation_allowed
+    )
     build_runtime: Any  # remote_runtime.ssh_settings.build_runtime
     enqueue_local_tool_job: Any  # agent_runtime.local_gateway.enqueue_local_tool_job
     external_tool_sources: Any  # composition.tool_sources.SOURCES
@@ -31,7 +33,19 @@ bind = _binding.bind
 current = _binding.current
 bound = _binding.names()
 
-__all__ = ["Host", "HostNotBound", "bind", "bound", "current", "provide", "assert_operation_allowed", "build_runtime", "enqueue_local_tool_job", "memory_file_path", "wait_for_local_tool_job"]
+__all__ = [
+    "Host",
+    "HostNotBound",
+    "bind",
+    "bound",
+    "current",
+    "provide",
+    "assert_operation_allowed",
+    "build_runtime",
+    "enqueue_local_tool_job",
+    "memory_file_path",
+    "wait_for_local_tool_job",
+]
 
 
 def assert_operation_allowed(*args: Any, **kwargs: Any) -> Any:

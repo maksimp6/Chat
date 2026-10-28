@@ -16,7 +16,10 @@ from secret_store._binding import Binding, HostNotBound
 @dataclass(frozen=True, kw_only=True)
 class Host:
     CloudProviderError: Any  # cloud.base.CloudProviderError
-    CloudRuSecretManagementClient: Any  # cloud.cloudru.secret_management.CloudRuSecretManagementClient
+    CloudRuSecretManagementClient: (
+        Any  # cloud.cloudru.secret_management.CloudRuSecretManagementClient
+    )
+    get_current_trace: Any  # observability.trace_manager.get_current_trace
     get_store: Any  # storage.db.get_store
 
 
@@ -26,7 +29,20 @@ bind = _binding.bind
 current = _binding.current
 bound = _binding.names()
 
-__all__ = ["Host", "HostNotBound", "bind", "bound", "current", "provide", "get_store"]
+__all__ = [
+    "Host",
+    "HostNotBound",
+    "bind",
+    "bound",
+    "current",
+    "provide",
+    "get_current_trace",
+    "get_store",
+]
+
+
+def get_current_trace(*args: Any, **kwargs: Any) -> Any:
+    return current().get_current_trace(*args, **kwargs)
 
 
 def get_store(*args: Any, **kwargs: Any) -> Any:

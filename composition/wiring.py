@@ -6,6 +6,8 @@ host the first time the unit needs it."""
 
 from __future__ import annotations
 
+from importlib import import_module
+
 from core.env import load_env_file
 
 
@@ -45,6 +47,7 @@ def _agent_runtime():
     import tool_providers.filesystem as filesystem
     from invocation.manager import finish_invocation as finish_invocation
     from storage.db import get_store as get_store
+    from composition.application import initialize as initialize_application
     from invocation.manager import persist_invocation_trace as persist_invocation_trace
     from tool_providers.registry import registry as registry
     from invocation.manager import start_invocation as start_invocation
@@ -66,6 +69,7 @@ def _agent_runtime():
         filesystem=filesystem,
         finish_invocation=finish_invocation,
         get_store=get_store,
+        initialize_application=initialize_application,
         persist_invocation_trace=persist_invocation_trace,
         registry=registry,
         start_invocation=start_invocation,
@@ -404,6 +408,59 @@ def _invocation():
     )
 
 
+def _logos_knowledge():
+    from scripts import logos_knowledge_host as host
+    from core.config import Config as Config
+    from storage.memory_db import DatabaseError as DatabaseError
+    from chat.mcp_routes import LogosClient as LogosClient
+    from tool_providers.universal_tool_platform import (
+        UniversalToolCall as UniversalToolCall,
+    )
+    from tool_providers.universal_tool_platform import (
+        UniversalToolExecutor as UniversalToolExecutor,
+    )
+    from yandex_client_modules.errors import YandexClientError as YandexClientError
+    from yandex_client_modules.request_mixin import (
+        resolve_global_provider_credential as _resolve_global_provider_credential,
+    )
+    from invocation.manager import create_invocation as create_invocation
+    from invocation.trace import create_invocation_trace as create_invocation_trace
+    from invocation.manager import fail_invocation as fail_invocation
+    import tool_providers.filesystem as filesystem
+    from invocation.manager import finish_invocation as finish_invocation
+    from composition.application import initialize as initialize_application
+    from invocation.manager import persist_invocation_trace as persist_invocation_trace
+    from tool_providers.registry import registry as registry
+    from agent_runtime.issue_runner import (
+        seed_provider_credential as seed_provider_credential,
+    )
+    from invocation.manager import start_invocation as start_invocation
+    from tool_providers.universal_tool_platform import (
+        validate_json_schema as validate_json_schema,
+    )
+
+    return host.Host(
+        Config=Config,
+        DatabaseError=DatabaseError,
+        LogosClient=LogosClient,
+        UniversalToolCall=UniversalToolCall,
+        UniversalToolExecutor=UniversalToolExecutor,
+        YandexClientError=YandexClientError,
+        _resolve_global_provider_credential=_resolve_global_provider_credential,
+        create_invocation=create_invocation,
+        create_invocation_trace=create_invocation_trace,
+        fail_invocation=fail_invocation,
+        filesystem=filesystem,
+        finish_invocation=finish_invocation,
+        initialize_application=initialize_application,
+        persist_invocation_trace=persist_invocation_trace,
+        registry=registry,
+        seed_provider_credential=seed_provider_credential,
+        start_invocation=start_invocation,
+        validate_json_schema=validate_json_schema,
+    )
+
+
 def _mcp_server():
     from mcp_server import host
     from core.config import ALL_MODELS as ALL_MODELS
@@ -498,6 +555,13 @@ def _model_editor():
         get_current_owner_id=get_current_owner_id,
         storage_provider_from_env=storage_provider_from_env,
     )
+
+
+def _narration():
+    from scripts import narration_host as host
+    from api.yandex_transport import yandex_request as yandex_request
+
+    return host.Host(yandex_request=yandex_request)
 
 
 def _observability():
@@ -728,11 +792,13 @@ def _secret_store():
     from cloud.cloudru.secret_management import (
         CloudRuSecretManagementClient as CloudRuSecretManagementClient,
     )
+    from observability.trace_manager import get_current_trace as get_current_trace
     from storage.db import get_store as get_store
 
     return host.Host(
         CloudProviderError=CloudProviderError,
         CloudRuSecretManagementClient=CloudRuSecretManagementClient,
+        get_current_trace=get_current_trace,
         get_store=get_store,
     )
 
@@ -875,80 +941,46 @@ def _yandex_client_modules():
     )
 
 
+# Each unit's host module and factory, in registration order.
+_HOSTS = {
+    "agent_memory": ("agent_memory.host", _agent_memory),
+    "agent_runtime": ("agent_runtime.host", _agent_runtime),
+    "agent_shell": ("agent_shell.host", _agent_shell),
+    "chat": ("chat.host", _chat),
+    "cloud": ("cloud.host", _cloud),
+    "conversations": ("conversations.host", _conversations),
+    "economy": ("economy.host", _economy),
+    "forge": ("forge.host", _forge),
+    "invocation": ("invocation.host", _invocation),
+    "logos_knowledge": ("scripts.logos_knowledge_host", _logos_knowledge),
+    "mcp_server": ("mcp_server.host", _mcp_server),
+    "model_editor": ("model_editor.host", _model_editor),
+    "narration": ("scripts.narration_host", _narration),
+    "observability": ("observability.host", _observability),
+    "organization": ("organization.host", _organization),
+    "plugin_system": ("plugin_system.host", _plugin_system),
+    "printing3d": ("printing3d.host", _printing3d),
+    "project_board": ("project_board.host", _project_board),
+    "provider_accounts": ("provider_accounts.host", _provider_accounts),
+    "remote_runtime": ("remote_runtime.host", _remote_runtime),
+    "runtime": ("runtime.host", _runtime),
+    "secret_store": ("secret_store.host", _secret_store),
+    "sessions": ("sessions.host", _sessions),
+    "storage": ("storage.host", _storage),
+    "tool_providers": ("tool_providers.host", _tool_providers),
+    "workspace": ("workspace.host", _workspace),
+    "yandex_client_modules": ("yandex_client_modules.host", _yandex_client_modules),
+}
+
+
+def register_units(*units: str) -> None:
+    """Register the factories of these units only; ``core/.env`` is not loaded."""
+    for unit in units:
+        module, factory = _HOSTS[unit]
+        import_module(module).provide(factory)
+
+
 def register_all() -> None:
+    """Load ``core/.env`` and register every unit's factory."""
     load_env_file()
-    from agent_memory import host as agent_memory_host
-
-    agent_memory_host.provide(_agent_memory)
-    from agent_runtime import host as agent_runtime_host
-
-    agent_runtime_host.provide(_agent_runtime)
-    from agent_shell import host as agent_shell_host
-
-    agent_shell_host.provide(_agent_shell)
-    from chat import host as chat_host
-
-    chat_host.provide(_chat)
-    from cloud import host as cloud_host
-
-    cloud_host.provide(_cloud)
-    from conversations import host as conversations_host
-
-    conversations_host.provide(_conversations)
-    from economy import host as economy_host
-
-    economy_host.provide(_economy)
-    from forge import host as forge_host
-
-    forge_host.provide(_forge)
-    from invocation import host as invocation_host
-
-    invocation_host.provide(_invocation)
-    from mcp_server import host as mcp_server_host
-
-    mcp_server_host.provide(_mcp_server)
-    from model_editor import host as model_editor_host
-
-    model_editor_host.provide(_model_editor)
-    from observability import host as observability_host
-
-    observability_host.provide(_observability)
-    from organization import host as organization_host
-
-    organization_host.provide(_organization)
-    from plugin_system import host as plugin_system_host
-
-    plugin_system_host.provide(_plugin_system)
-    from printing3d import host as printing3d_host
-
-    printing3d_host.provide(_printing3d)
-    from project_board import host as project_board_host
-
-    project_board_host.provide(_project_board)
-    from provider_accounts import host as provider_accounts_host
-
-    provider_accounts_host.provide(_provider_accounts)
-    from remote_runtime import host as remote_runtime_host
-
-    remote_runtime_host.provide(_remote_runtime)
-    from runtime import host as runtime_host
-
-    runtime_host.provide(_runtime)
-    from secret_store import host as secret_store_host
-
-    secret_store_host.provide(_secret_store)
-    from sessions import host as sessions_host
-
-    sessions_host.provide(_sessions)
-    from storage import host as storage_host
-
-    storage_host.provide(_storage)
-    from tool_providers import host as tool_providers_host
-
-    tool_providers_host.provide(_tool_providers)
-    from workspace import host as workspace_host
-
-    workspace_host.provide(_workspace)
-    from yandex_client_modules import host as yandex_client_modules_host
-
-    yandex_client_modules_host.provide(_yandex_client_modules)
+    register_units(*_HOSTS)

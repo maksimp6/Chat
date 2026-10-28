@@ -17,7 +17,9 @@ from observability._binding import Binding, HostNotBound
 class Host:
     aggregate_billing: Any  # economy.billing.aggregate_billing
     build_ai_billing_item: Any  # economy.billing.build_ai_billing_item
-    build_compute_billing_item: Any  # economy.compute_resources.build_compute_billing_item
+    build_compute_billing_item: (
+        Any  # economy.compute_resources.build_compute_billing_item
+    )
 
 
 _binding: Binding[Host] = Binding("observability")
@@ -26,7 +28,17 @@ bind = _binding.bind
 current = _binding.current
 bound = _binding.names()
 
-__all__ = ["Host", "HostNotBound", "bind", "bound", "current", "provide", "aggregate_billing", "build_ai_billing_item", "build_compute_billing_item"]
+__all__ = [
+    "Host",
+    "HostNotBound",
+    "bind",
+    "bound",
+    "current",
+    "provide",
+    "aggregate_billing",
+    "build_ai_billing_item",
+    "build_compute_billing_item",
+]
 
 
 def aggregate_billing(*args: Any, **kwargs: Any) -> Any:

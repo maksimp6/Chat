@@ -27,7 +27,16 @@ bind = _binding.bind
 current = _binding.current
 bound = _binding.names()
 
-__all__ = ["Host", "HostNotBound", "bind", "bound", "current", "provide", "current_runtime_data_root", "get_memory_client"]
+__all__ = [
+    "Host",
+    "HostNotBound",
+    "bind",
+    "bound",
+    "current",
+    "provide",
+    "current_runtime_data_root",
+    "get_memory_client",
+]
 
 
 def current_runtime_data_root(*args: Any, **kwargs: Any) -> Any:

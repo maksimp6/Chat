@@ -23,16 +23,18 @@ from scripts.logos_launch_hold import (
     enforce_native_launch_hold,
     hold_receipt,
 )
-from invocation.manager import (
+from scripts.logos_knowledge_host import (
+    _resolve_global_provider_credential,
+    bound,
     create_invocation,
+    create_invocation_trace,
     fail_invocation,
     finish_invocation,
+    initialize_application,
     persist_invocation_trace,
+    seed_provider_credential,
     start_invocation,
 )
-from invocation.trace import create_invocation_trace
-from storage.memory_db import DatabaseError
-from yandex_client_modules.errors import YandexClientError
 from scripts.logos_quality import (
     MODEL,
     OWNER_DIRECTIVE,
@@ -51,16 +53,27 @@ DIALOGUE_INSTRUCTIONS = (
     "Отличай исторические сведения от религиозных представлений и других интерпретаций.\n"
     + OWNER_DIRECTIVE
 )
-RUNTIME_ERRORS = (
-    OSError,
-    RuntimeError,
-    ValueError,
-    TypeError,
-    LookupError,
-    ImportError,
-    DatabaseError,
-    YandexClientError,
-)
+
+
+def _runtime_errors() -> tuple[type[BaseException], ...]:
+    """Errors a dialogue reports in its result instead of raising."""
+    return (
+        OSError,
+        RuntimeError,
+        ValueError,
+        TypeError,
+        LookupError,
+        ImportError,
+        bound.DatabaseError,
+        bound.YandexClientError,
+    )
+
+
+def __getattr__(name: str) -> Any:
+    """``RUNTIME_ERRORS`` is built when used: two of its classes come through ports."""
+    if name == "RUNTIME_ERRORS":
+        return _runtime_errors()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def build_prompt(
@@ -89,12 +102,8 @@ def build_prompt(
 
 
 def _native_client():
-    from agent_runtime.issue_runner import seed_provider_credential
-    from chat.mcp_routes import LogosClient
-    from core.config import Config
-
     seed_provider_credential()
-    return LogosClient(Config)
+    return bound.LogosClient(bound.Config)
 
 
 def _new_result() -> dict[str, Any]:
@@ -275,7 +284,7 @@ def _finish(invocation, trace, result: dict[str, Any]) -> None:
             saved = finish_invocation(invocation.invocation_id, result=result)
         if not saved:
             raise RuntimeError("invocation completion unavailable")
-    except RUNTIME_ERRORS as exc:
+    except _runtime_errors() as exc:
         reasons = {
             "value text exceeds size limit": "value_text_limit",
             "value structure exceeds limit": "value_structure_limit",
@@ -358,9 +367,7 @@ def run_dialogue(
 
         verify_checkout(context_packet, Path(repo_root))
         prompt = build_prompt(question, Path(repo_root), context_packet)
-        import app  # noqa: F401 -- initialize the native database schema and tools
-
-        from tool_providers.registry import registry
+        initialize_application()  # the native database schema and tools
         from scripts.logos_project_tools import register_project_reader
 
         # The read token belongs to the scoped read transport, never to shell env,
@@ -375,7 +382,9 @@ def run_dialogue(
         ):
             raise ValueError("Knowledge and initial context must be the same snapshot")
         vector_ids = knowledge_receipt["vector_store_ids"]
-        params = dialogue_params(vector_ids, list(registry.get_available_categories()))
+        params = dialogue_params(
+            vector_ids, list(bound.registry.get_available_categories())
+        )
         params["instructions"] = DIALOGUE_INSTRUCTIONS
         result["capability_receipt"] = capability_receipt(params)
         result["capability_receipt"]["initial_input"] = {
@@ -405,7 +414,7 @@ def run_dialogue(
         )
         client = (client_factory or _native_client)()
         _ask(client, prompt, trace, result, params)
-    except RUNTIME_ERRORS as exc:
+    except _runtime_errors() as exc:
         result.update(status="failed", error=type(exc).__name__)
         if isinstance(exc, NativeLogosLaunchBlocked):
             result["launch_hold"] = hold_receipt()
@@ -416,7 +425,7 @@ def run_dialogue(
     if trace is not None and invocation is not None:
         try:
             _finish(invocation, trace, result)
-        except RUNTIME_ERRORS as exc:
+        except _runtime_errors() as exc:
             result.update(status="failed", error=type(exc).__name__)
     return result
 
@@ -460,10 +469,7 @@ def inspect_response(
             raise ValueError("The response ID must be a UUID string")
         response_id = str(uuid.UUID(response_id))
         result["response_ids"] = [response_id]
-        import app  # noqa: F401 -- initialize the native credential and invocation store
-        from yandex_client_modules.request_mixin import (
-            _resolve_global_provider_credential,
-        )
+        initialize_application()  # the native credential and invocation store
 
         session_id = "github-response-" + str(uuid.uuid4())
         invocation = create_invocation(
@@ -492,7 +498,7 @@ def inspect_response(
         trace.add_response(data, step_index=1, kind="retrieved_response")
         _provider_diagnostics(result, data)
         result["status"] = "retrieved"
-    except RUNTIME_ERRORS as exc:
+    except _runtime_errors() as exc:
         result.update(status="failed", error=type(exc).__name__)
         if trace is not None:
             trace.record_error(
@@ -503,7 +509,7 @@ def inspect_response(
     if trace is not None and invocation is not None:
         try:
             _finish(invocation, trace, result)
-        except RUNTIME_ERRORS as exc:
+        except _runtime_errors() as exc:
             result.update(status="failed", error=type(exc).__name__)
     return result
 
@@ -541,7 +547,7 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 checkpoint_file=args.out,
             )
-    except RUNTIME_ERRORS as exc:
+    except _runtime_errors() as exc:
         result = _new_result()
         result["error"] = type(exc).__name__
     args.out.write_text(

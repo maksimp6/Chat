@@ -16,6 +16,8 @@ import threading
 import zipfile
 from pathlib import Path
 
+from scripts.logos_knowledge_host import bound, validate_json_schema
+
 PROBE_ERRORS = (
     AssertionError,
     OSError,
@@ -28,10 +30,9 @@ PROBE_ERRORS = (
     zipfile.BadZipFile,
 )
 
-if __name__ == "__main__":
-    from composition import wiring
 
-    wiring.register_all()
+def main() -> int:
+    """Run the audit and print its report; 0 when every check completed."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--external",
@@ -60,22 +61,15 @@ if __name__ == "__main__":
     try:
         from scripts.logos_knowledge import DEFAULT_STORE_ID
         from scripts.logos_quality import MODEL, dialogue_params
-        from tool_providers import filesystem
-        from tool_providers.registry import registry
-        from tool_providers.universal_tool_platform import (
-            UniversalToolCall,
-            UniversalToolExecutor,
-            validate_json_schema,
-        )
 
-        check(Path(filesystem.BASE_DIR).resolve() == ROOT)
-        executor = UniversalToolExecutor(registry)
-        categories = registry.get_available_categories()
+        check(Path(bound.filesystem.BASE_DIR).resolve() == ROOT)
+        executor = bound.UniversalToolExecutor(bound.registry)
+        categories = bound.registry.get_available_categories()
         report["categories"] = {
             name: len(names) for name, names in sorted(categories.items())
         }
         native = dialogue_params([DEFAULT_STORE_ID], list(categories))
-        native_definitions = registry.get_definitions(
+        native_definitions = bound.registry.get_definitions(
             set(native["active_tool_categories"])
         )
         offered_names = {tool["name"] for tool in native_definitions}
@@ -102,7 +96,7 @@ if __name__ == "__main__":
         # logos-tools deliberately executes only temporary filesystem fixtures.
         # Native dialogue uses the full profile above after knowledge preparation.
         active = ["filesystem"]
-        definitions = registry.get_definitions(set(active))
+        definitions = bound.registry.get_definitions(set(active))
         exposed = {tool["name"]: tool["parameters"] for tool in definitions}
         report["mode"] = "logos-tools"
         report["generation_requests"] = 0
@@ -121,7 +115,7 @@ if __name__ == "__main__":
 
         def invoke(name, arguments):
             return executor.execute(
-                UniversalToolCall(
+                bound.UniversalToolCall(
                     tool_name=name,
                     arguments=arguments,
                     transport="responses_api",
@@ -412,7 +406,7 @@ if __name__ == "__main__":
         }
         for name, (arguments, verify) in defaults.items():
             probe(name, arguments, verify, section="defaults")
-            original = registry.get_universal_definition(name).input_schema
+            original = bound.registry.get_universal_definition(name).input_schema
             optional = set(original.get("properties", {})) - set(
                 original.get("required", [])
             )
@@ -466,4 +460,11 @@ if __name__ == "__main__":
             raise RuntimeError("audit output exceeds native trace limit")
         print(encoded)
 
-    raise SystemExit(0 if report["status"] == "completed" else 1)
+    return 0 if report["status"] == "completed" else 1
+
+
+if __name__ == "__main__":
+    from composition import wiring
+
+    wiring.register_all()
+    raise SystemExit(main())

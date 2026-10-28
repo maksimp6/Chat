@@ -662,6 +662,7 @@ def check_standalone(
             continue
         own = set(umap.unit_files(unit))
         own_modules = {module_name(f): f for f in own}
+        declared = local_requirements(own)
         flat_names = {}
         for f in own:
             flat_names.setdefault(Path(f).stem, f)
@@ -687,7 +688,7 @@ def check_standalone(
                     if not name:
                         continue
                     top = name.split(".")[0]
-                    if top in std or top in cfg.third_party:
+                    if top in std or top in cfg.third_party or top in declared:
                         continue
                     if optional and top in cfg.optional_third_party:
                         continue
@@ -707,6 +708,13 @@ def check_standalone(
                         found = sibling if sibling in own else package
                     if found is None and umap.flat.get(unit) and top in flat_names:
                         found = flat_names[top]
+                    if (
+                        found is None
+                        and imported
+                        and all(f"{name}.{item}" in own_modules for item in imported)
+                    ):
+                        # ``from scripts import x``: a namespace package of own modules.
+                        continue
                     if found is None:
                         violations.append(
                             Violation(
@@ -739,6 +747,20 @@ def check_standalone(
                                 )
                             )
                             failing.add(unit)
+
+
+def local_requirements(files: set[str]) -> set[str]:
+    """Import names a unit declares in a requirements.txt next to its own files."""
+    names: set[str] = set()
+    for directory in sorted({Path(f).parent for f in files}):
+        requirements = ROOT / directory / "requirements.txt"
+        if not requirements.is_file():
+            continue
+        for line in requirements.read_text(encoding="utf-8").splitlines():
+            match = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", line.split("#", 1)[0])
+            if match:
+                names.add(match.group(1).lower().replace("-", "_"))
+    return names
 
 
 def module_level_state(tree: ast.AST) -> list[int]:
@@ -940,7 +962,10 @@ def check_wiring(umap: UnitMap, violations: list[Violation]) -> None:
         (ROOT / f).read_text(encoding="utf-8") for f in sorted(umap.root_files)
     )
     for path in umap.files:
-        if Path(path).name != "host.py" or umap.unit_of[path] == "<root>":
+        name = Path(path).name
+        if name != "host.py" and not name.endswith("_host.py"):
+            continue
+        if umap.unit_of[path] == "<root>":
             continue
         unit = umap.unit_of[path]
         tree = parse(path)
@@ -955,8 +980,7 @@ def check_wiring(umap: UnitMap, violations: list[Violation]) -> None:
                                 "W", path, stmt.lineno, "Host field has a default"
                             )
                         )
-        package = path.split("/")[0]
-        if not re.search(rf"\b{re.escape(package)}\b", root_text):
+        if not re.search(rf"\b{re.escape(module_name(path))}\b", root_text):
             violations.append(
                 Violation("W", path, 0, f"{unit} host is never bound by a root")
             )

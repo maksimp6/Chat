@@ -1,0 +1,3 @@
+# yandex_drops_case.py only (CAD kernel and mesh export); not application dependencies.
+cadquery
+trimesh

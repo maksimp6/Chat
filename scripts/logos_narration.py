@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 from urllib.parse import urlencode
 
+from scripts.narration_host import yandex_request
 from scripts.narration_trace_security import sanitize_trace_value
 
 TTS_URL = "https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize"
@@ -92,9 +93,9 @@ def build_story(result: dict, max_chars: int = MAX_CHARS) -> tuple[str, bool]:
 
 def synthesize(text: str, voice: str) -> bytes:
     # Lazy import: offline story generation works before #1569 is merged.
-    # Missing contract transport fails closed; there is no raw HTTP fallback.
+    # The contract transport is a port resolved on first use; a missing one fails
+    # closed and there is no raw HTTP fallback.
     import requests
-    from api.yandex_transport import yandex_request
 
     if voice not in VOICES or not text or len(text) > CHUNK_CHARS:
         raise ValueError("Invalid SpeechKit chunk")
@@ -207,4 +208,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    from composition import wiring
+
+    wiring.register_units("narration")
     raise SystemExit(main())

@@ -17,7 +17,7 @@ from secret_store.contract import (
     SecretReference,
     SecretResolverError,
 )
-from trace_manager import get_current_trace
+from secret_store.host import get_current_trace
 
 
 class FakeSecretBackend:

@@ -35,7 +35,18 @@ bind = _binding.bind
 current = _binding.current
 bound = _binding.names()
 
-__all__ = ["Host", "HostNotBound", "bind", "bound", "current", "provide", "get_current_trace", "secret_storage_ready", "ssh_runtime_exec", "store_secret"]
+__all__ = [
+    "Host",
+    "HostNotBound",
+    "bind",
+    "bound",
+    "current",
+    "provide",
+    "get_current_trace",
+    "secret_storage_ready",
+    "ssh_runtime_exec",
+    "store_secret",
+]
 
 
 def get_current_trace(*args: Any, **kwargs: Any) -> Any:

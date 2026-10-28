@@ -11,7 +11,7 @@ from urllib.parse import parse_qsl, urljoin, urlsplit
 import requests
 
 from scripts.semantic_pipeline import _redact_repository_text
-from tool_providers.registry import registry
+from scripts.logos_knowledge_host import bound
 
 _FIELDS = "id body url createdAt updatedAt author { login }"
 _PAGE = "pageInfo { hasNextPage endCursor }"
@@ -259,7 +259,7 @@ def register_project_reader(
     ):
         raise ValueError("Project reader requires a string token and owner/repository")
     reader = _ProjectReader(token.strip(), repository, session or requests.Session())
-    target = tool_registry or registry
+    target = tool_registry or bound.registry
     for name, func, properties, description in (
         (
             "github_read_project",

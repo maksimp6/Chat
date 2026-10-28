@@ -39,6 +39,7 @@ from agent_runtime.host import (
     fail_invocation,
     finish_invocation,
     get_store,
+    initialize_application,
     persist_invocation_trace,
     start_invocation,
 )
@@ -296,7 +297,7 @@ def run_issue_task(
         }
     require_external_review_store(repo_root)
     execution_policy = build_review_policy(repo_root)
-    import app  # noqa: F401  -- initializes the database schema and blueprints
+    initialize_application()  # the database schema and blueprints
     from agent_runtime.responses_tool_loop import extract_function_calls
 
     client_factory = client_factory or _default_client_factory(model_key)

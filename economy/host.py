@@ -31,7 +31,17 @@ bind = _binding.bind
 current = _binding.current
 bound = _binding.names()
 
-__all__ = ["Host", "HostNotBound", "bind", "bound", "current", "provide", "canonical_model_key", "get_current_trace", "get_store"]
+__all__ = [
+    "Host",
+    "HostNotBound",
+    "bind",
+    "bound",
+    "current",
+    "provide",
+    "canonical_model_key",
+    "get_current_trace",
+    "get_store",
+]
 
 
 def canonical_model_key(*args: Any, **kwargs: Any) -> Any:
