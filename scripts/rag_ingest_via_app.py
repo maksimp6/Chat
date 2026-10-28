@@ -11,6 +11,7 @@ shapes are masked and e-mail addresses are replaced by hashes. Nothing is droppe
 """
 
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -106,6 +107,10 @@ def github(url):
                 time.sleep(10 * (attempt + 1))
                 continue
             raise
+        except (http.client.IncompleteRead, ConnectionError, TimeoutError):
+            # The phone's link sometimes cuts a large page short; the page is asked for again.
+            time.sleep(10 * (attempt + 1))
+            continue
     raise RuntimeError("github request failed after retries")
 
 
