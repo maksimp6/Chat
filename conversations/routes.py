@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from flask import Flask, jsonify, request
 
-from conversations.ownership import check_access, delete_owner
+from conversations.ownership import _conversation_record, check_access, delete_owner
 from conversations.host import (
     bound,
     delete_conversation,
@@ -48,7 +48,10 @@ def set_conv_title(conv_id):
     if not title:
         return jsonify({"error": "Title is required"}), 400
     update_conversation_title(conv_id, title, owner_id)
-    return jsonify({"status": "ok", "title": title})
+    record = _conversation_record(conv_id)
+    return jsonify(
+        {"status": "ok", "title": record["title"] if record is not None else title}
+    )
 
 
 def set_conv_model(conv_id):

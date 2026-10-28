@@ -13,6 +13,7 @@ from functools import wraps
 from typing import Any, Optional, Callable
 from observability.host import (
     aggregate_billing,
+    bound,
     build_ai_billing_item,
     build_compute_billing_item,
 )
@@ -167,9 +168,9 @@ class ExecutionTrace:
             "timings": {},
             "errors": [],
             "billing": {
-                "currency": "RUB",
-                "provider": "yandex_ai_studio",
-                "pricing_version": "config-v1",
+                "currency": bound.PRICING_CURRENCY,
+                "provider": bound.PROVIDER,
+                "pricing_version": bound.PRICING_VERSION,
                 "items": [],
             },
             "provider_key": None,

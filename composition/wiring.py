@@ -528,11 +528,17 @@ def _narration():
 
 def _observability():
     from observability import host
+    from economy.billing import PRICING_CURRENCY
+    from economy.billing import PRICING_VERSION
+    from economy.billing import PROVIDER
     from economy.billing import aggregate_billing
     from economy.billing import build_ai_billing_item
     from economy.compute_resources import build_compute_billing_item
 
     return host.Host(
+        PRICING_CURRENCY=PRICING_CURRENCY,
+        PRICING_VERSION=PRICING_VERSION,
+        PROVIDER=PROVIDER,
         aggregate_billing=aggregate_billing,
         build_ai_billing_item=build_ai_billing_item,
         build_compute_billing_item=build_compute_billing_item,
@@ -775,6 +781,7 @@ def _tool_providers():
     from agent_runtime.local_gateway import enqueue_local_tool_job
     from composition.tool_sources import SOURCES as external_tool_sources
     from storage.records import memory_file_path
+    from remote_runtime.ssh_settings import runtime_for_operation
     from agent_runtime.local_gateway import wait_for_local_tool_job
 
     return host.Host(
@@ -785,6 +792,7 @@ def _tool_providers():
         enqueue_local_tool_job=enqueue_local_tool_job,
         external_tool_sources=external_tool_sources,
         memory_file_path=memory_file_path,
+        runtime_for_operation=runtime_for_operation,
         wait_for_local_tool_job=wait_for_local_tool_job,
     )
 

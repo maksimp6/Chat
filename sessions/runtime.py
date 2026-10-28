@@ -7,10 +7,12 @@ backend.
 """
 
 from __future__ import annotations
+from sessions._vendor.output import newline_text, read_output
 from sessions._vendor.wikifunctions import clamp_integer
 
 import json
 import os
+import signal
 import subprocess
 import threading
 import time
@@ -131,14 +133,43 @@ class VirtualLowConsumptionServer:
 
             started = time.perf_counter()
             try:
-                completed = subprocess.run(
+                with subprocess.Popen(
                     limited,
                     shell=True,
                     cwd=self.config.cwd,
                     env=env,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    start_new_session=True,
+                ) as proc:
+                    try:
+                        # The result keeps max_output_bytes characters: four bytes per
+                        # character is the widest UTF-8, and also covers CRLF collapsing.
+                        stdout, stderr = read_output(
+                            proc, timeout, 4 * self.config.max_output_bytes
+                        )
+                    except subprocess.TimeoutExpired as exc:
+                        # The shell leads its own session: kill its children too, or they outlive the timeout.
+                        if os.name == "posix":
+                            try:
+                                os.killpg(proc.pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass  # the group exited right at the deadline
+                            proc.wait()
+                        else:
+                            proc.kill()
+                            out, err = proc.communicate()
+                            # Text mode used to translate newlines here too.
+                            exc.stdout, exc.stderr = newline_text(out or b""), newline_text(err or b"")
+                        raise
+                    except BaseException:
+                        proc.kill()
+                        raise
+                completed = subprocess.CompletedProcess(
+                    proc.args,
+                    proc.returncode,
+                    newline_text(stdout),
+                    newline_text(stderr),
                 )
                 self._touch()
                 return {

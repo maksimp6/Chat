@@ -15,6 +15,9 @@ from observability._binding import Binding, HostNotBound
 
 @dataclass(frozen=True, kw_only=True)
 class Host:
+    PRICING_CURRENCY: Any  # economy.billing.PRICING_CURRENCY
+    PRICING_VERSION: Any  # economy.billing.PRICING_VERSION
+    PROVIDER: Any  # economy.billing.PROVIDER
     aggregate_billing: Any  # economy.billing.aggregate_billing
     build_ai_billing_item: Any  # economy.billing.build_ai_billing_item
     build_compute_billing_item: (

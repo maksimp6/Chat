@@ -113,7 +113,9 @@ class YandexMcpMixin:
                 "[LOCAL TOOL RESULT] name=%s call_id=%s\\n%s",
                 name,
                 call_id,
-                json.dumps(_sanitize_for_log(result), ensure_ascii=False, indent=2)
+                json.dumps(
+                    _sanitize_for_log(result), ensure_ascii=False, indent=2, default=str
+                )
                 if isinstance(result, (dict, list))
                 else str(result),
             )
@@ -130,7 +132,7 @@ class YandexMcpMixin:
         duration_ms = round((t_end - t_start) * 1000, 2)
 
         content_str = (
-            json.dumps(result, ensure_ascii=False)
+            json.dumps(result, ensure_ascii=False, default=str)
             if isinstance(result, (dict, list))
             else str(result)
             if result is not None

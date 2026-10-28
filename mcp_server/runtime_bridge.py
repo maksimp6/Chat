@@ -154,8 +154,15 @@ def _handle_call(
                 raise PermissionError(result.get("error") or "Tool approval required")
             if phase == "execution":
                 execution_error = str(result.get("error") or "Tool execution failed")
-                if execution_error.startswith("LookupError:"):
-                    raise LookupError(execution_error.split(":", 1)[1].strip())
+                error_type = (result.get("metadata") or {}).get("error_type")
+                # Results from producers that record no type (older local agents,
+                # browser adapters) still carry it only as the message prefix.
+                if error_type == "LookupError" or (
+                    error_type is None and execution_error.startswith("LookupError:")
+                ):
+                    raise LookupError(
+                        execution_error.removeprefix("LookupError:").strip()
+                    )
             raise RuntimeError(result.get("error") or "Tool execution failed")
 
         try:

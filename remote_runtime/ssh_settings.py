@@ -220,7 +220,10 @@ def public_settings() -> dict[str, Any]:
 
 
 def build_runtime() -> SSHRuntime:
-    settings = get_settings()
+    return _runtime_from_settings(get_settings())
+
+
+def _runtime_from_settings(settings: Mapping[str, Any]) -> SSHRuntime:
     if not settings["enabled"]:
         raise SSHRuntimeError("SSH Runtime is disabled in settings")
     targets = copy.deepcopy(settings["targets"])
@@ -250,7 +253,25 @@ def is_privileged_command(command: str) -> bool:
 def assert_operation_allowed(
     operation: str, *, command: str | None = None, approved: bool = False
 ) -> None:
+    _check_operation(get_settings(), operation, command=command, approved=approved)
+
+
+def runtime_for_operation(
+    operation: str, *, command: str | None = None, approved: bool = False
+) -> SSHRuntime:
+    """Check the operation and build the runtime from one validated read of the settings."""
     settings = get_settings()
+    _check_operation(settings, operation, command=command, approved=approved)
+    return _runtime_from_settings(settings)
+
+
+def _check_operation(
+    settings: Mapping[str, Any],
+    operation: str,
+    *,
+    command: str | None = None,
+    approved: bool = False,
+) -> None:
     if not settings["enabled"]:
         raise SSHRuntimeError("SSH Runtime is disabled in settings")
 
@@ -378,6 +399,7 @@ __all__ = [
     "build_runtime",
     "get_settings",
     "public_settings",
+    "runtime_for_operation",
     "save_settings",
     "test_connection",
     "validate_settings",
