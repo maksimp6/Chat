@@ -741,11 +741,18 @@ document.addEventListener("DOMContentLoaded", function () {
           window.LogosToast.error("Фото «" + file.name + "»: нужен PNG, JPEG или WebP до 5 МБ");
           continue;
         }
+        // The photo belongs to the chat and model it was picked in, even if the user switches while it is read.
+        const scope = currentConvId + "|" + currentModel;
         imagesInFlight += 1;
         syncSendButton();
         try {
-          pendingImages.push({ name: file.name, dataUrl: await readAsDataUrl(file) });
-          renderPendingImages();
+          const dataUrl = await readAsDataUrl(file);
+          if (currentConvId + "|" + currentModel !== scope) {
+            window.LogosToast.error("Фото «" + file.name + "» не прикреплено: сменился диалог или модель");
+          } else {
+            pendingImages.push({ name: file.name, dataUrl: dataUrl });
+            renderPendingImages();
+          }
         } catch (error) {
           window.LogosToast.error("Не удалось прочитать фото «" + file.name + "»");
         } finally {

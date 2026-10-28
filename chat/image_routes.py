@@ -205,6 +205,13 @@ def generate_image():
             tx.set(key, record)
         return _request_response(conv_id, request_id, record)
     except Exception:
+        # The paid result was received but not stored: record it, so the request is not left pending and
+        # no second paid request starts with the same id ("storage_failed" is neither pending nor failed).
+        _fail_request(
+            key, "image_generation_storage_failed",
+            "Результат генерации получен, но не сохранён на сервере. Повторная платная генерация не запускалась.",
+            status="storage_failed",
+        )
         return jsonify({"error": "image_generation_storage_failed", "request_id": request_id}), 503
 
 
