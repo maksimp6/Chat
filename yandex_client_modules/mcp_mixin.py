@@ -390,6 +390,16 @@ class YandexMcpMixin:
             # Nothing to call (every tool switched off): a required call cannot be met.
             ask_params["tool_choice"] = "auto"
             note("tool_choice", "tool_choice required released to auto: no tool in this turn")
+        elif ask_params.get("tool_choice") == "required" and not any(
+            tool.get("type") in ("function", "mcp") for tool in tools
+        ):
+            # Alice AI LLM answered without any call when only hosted tools came with
+            # "required" (#1660, invocation a0fc6a4a). Name the hosted tool instead,
+            # File Search first.
+            hosted_types = [tool.get("type") for tool in tools]
+            ask_params["tool_choice"] = {
+                "type": "file_search" if "file_search" in hosted_types else hosted_types[0]
+            }
 
         if trace is not None and isinstance(trace, bound.ExecutionTrace):
             ask_params["execution_trace"] = trace
