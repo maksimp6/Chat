@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from hashlib import sha256
-import json
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any
 
 from agent_context._vendor.trace_security import sanitize_trace_value
-
 
 _EVIDENCE_COMPONENTS = ("task", "ci", "review", "trace", "files", "skills", "policy")
 

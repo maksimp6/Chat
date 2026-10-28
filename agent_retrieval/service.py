@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-from collections import Counter
-from dataclasses import replace
 import json
 import math
 import re
-from typing import Any, Mapping
+from collections import Counter
+from collections.abc import Mapping
+from dataclasses import replace
+from typing import Any
 
 from agent_retrieval._vendor.provenance import snapshot_revision
-
 from agent_retrieval.models import RetrievalBundle, RetrievalHit, RetrievalQuery
-
 
 _TOKEN_RE = re.compile(r"[\w./#:-]+", re.UNICODE)
 

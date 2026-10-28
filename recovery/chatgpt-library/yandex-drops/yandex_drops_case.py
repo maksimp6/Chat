@@ -17,15 +17,15 @@ Charging port position and hinge relief are placeholders, not product measuremen
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 import hashlib
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import cadquery as cq
-from cadquery import exporters
 import trimesh
+from cadquery import exporters
 
 
 @dataclass(frozen=True)

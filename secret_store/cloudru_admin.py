@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import re
 import uuid
+from typing import Any
 
 from secret_store.admin import SecretAdminResult
 from secret_store.core import SecretRef, SecretValue
-from typing import Any
 
 _SAFE = re.compile(r"[^a-z0-9-]+")
 

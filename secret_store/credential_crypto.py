@@ -1,10 +1,10 @@
 """Encrypted storage boundary for deployment-wide provider credentials."""
 
 from __future__ import annotations
-import os
 
 import base64
 import hashlib
+import os
 
 
 class CredentialCryptoError(RuntimeError):

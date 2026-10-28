@@ -31,9 +31,9 @@ __all__ = [
     "bind",
     "bound",
     "current",
-    "provide",
     "get_current_owner_id",
     "get_store",
+    "provide",
 ]
 
 

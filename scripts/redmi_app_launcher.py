@@ -3,9 +3,9 @@
 import errno
 import json
 import os
-from pathlib import Path
 import socket
 import subprocess
+from pathlib import Path
 
 
 def main():

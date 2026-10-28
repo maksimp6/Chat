@@ -11,31 +11,31 @@
 - Запуск команд через shell текущей ОС (subprocess) и сбор сведений о системе
 """
 
-from tool_providers._vendor.restrictions import restrictions_lifted
-from tool_providers._vendor.wikifunctions import clamp_integer
-
-import os
-import re
 import ast
-import sys
-import glob
+import datetime
+import difflib
 import fnmatch
+import glob
+import hashlib
+import ipaddress
+import logging
+import os
+import platform
+import re
 import shutil
 import signal
-import datetime
-import stat
-import difflib
-import hashlib
-import zipfile
-import logging
-import tempfile
-import platform
-import ipaddress
 import socket
+import stat
 import subprocess
+import sys
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
+
+from tool_providers._vendor.restrictions import restrictions_lifted
+from tool_providers._vendor.wikifunctions import clamp_integer
 
 logger = logging.getLogger("logos.tool_providers.filesystem")
 

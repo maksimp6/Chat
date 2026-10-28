@@ -5,10 +5,10 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from cloud.base import CloudProviderError
-from cloud.registry import ensure_default_providers, resolve_provider_name
 from cloud._vendor.schema import object_schema
+from cloud.base import CloudProviderError
 from cloud.host import bound, get_current_trace, ssh_runtime_exec
+from cloud.registry import ensure_default_providers, resolve_provider_name
 
 
 def _provider(args: dict[str, Any]):

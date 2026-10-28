@@ -1,11 +1,11 @@
 """Локальные MCP-инструменты для поиска и чтения статей в Wikipedia."""
 
+import logging
 import re
 import time
 from typing import Any
 
 import requests
-import logging
 
 logger = logging.getLogger("logos.tool_providers.wikipedia")
 

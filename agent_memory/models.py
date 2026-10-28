@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from types import MappingProxyType
-from typing import Any, Mapping
 import re
 import time
 import uuid
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from types import MappingProxyType
+from typing import Any
 
 from agent_memory._vendor.trace_security import sanitize_trace_value
-
 
 MEMORY_KINDS = frozenset({"task", "project", "role", "process", "user_status"})
 MEMORY_STATUSES = frozenset({"active", "stale", "superseded"})

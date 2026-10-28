@@ -8,16 +8,14 @@ credential state, private traces and process logs remain inside RUNNER_TEMP.
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import shutil
 import socket
 import subprocess
-import sys
 import tempfile
 import time
+from pathlib import Path
 from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
-
 
 REPOSITORY = "maksimp6/Chat"
 PORT = 8081

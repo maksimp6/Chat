@@ -6,23 +6,12 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
-from typing import Any, Callable
 import uuid
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 
-from scripts.logos_provider_receipt import (
-    assistant_text,
-    capture_provider_diagnostics as _provider_diagnostics,
-    provider_echo,
-    provider_token as _provider_token,
-)
-from scripts.logos_responses_tool_loop import extract_function_calls
-from scripts.logos_launch_hold import (
-    NativeLogosLaunchBlocked,
-    enforce_native_launch_hold,
-    hold_receipt,
-)
 from scripts.logos_knowledge_host import (
     _resolve_global_provider_credential,
     bound,
@@ -35,12 +24,28 @@ from scripts.logos_knowledge_host import (
     seed_provider_credential,
     start_invocation,
 )
+from scripts.logos_launch_hold import (
+    NativeLogosLaunchBlocked,
+    enforce_native_launch_hold,
+    hold_receipt,
+)
+from scripts.logos_provider_receipt import (
+    assistant_text,
+    provider_echo,
+)
+from scripts.logos_provider_receipt import (
+    capture_provider_diagnostics as _provider_diagnostics,
+)
+from scripts.logos_provider_receipt import (
+    provider_token as _provider_token,
+)
 from scripts.logos_quality import (
     MODEL,
     OWNER_DIRECTIVE,
     capability_receipt,
     dialogue_params,
 )
+from scripts.logos_responses_tool_loop import extract_function_calls
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MODEL = MODEL

@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TypedDict
-from typing import Any
-
+from typing import Any, TypedDict
 
 OWNER_PREFIX = "conversation_owner:"
 
@@ -66,4 +64,4 @@ class ConversationOwnershipStore:
             tx.delete(key)
 
 
-__all__ = ["ConversationOwnershipStore", "OWNER_PREFIX", "OwnershipRecord"]
+__all__ = ["OWNER_PREFIX", "ConversationOwnershipStore", "OwnershipRecord"]

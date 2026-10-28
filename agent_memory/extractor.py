@@ -1,11 +1,11 @@
 """Extract facts and persist individual records directly in native Kristall."""
 
 from __future__ import annotations
-import os
 
 import hashlib
 import json
 import logging
+import os
 import time
 from typing import Any
 

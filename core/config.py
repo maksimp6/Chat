@@ -1,10 +1,10 @@
 """Logos - Configuration & Pricing"""
 
-from core.env import env_get
-
 import logging
 from pathlib import Path
 from urllib.parse import urlsplit
+
+from core.env import env_get
 
 logger = logging.getLogger("logos.core.config")
 

@@ -1,10 +1,12 @@
 """Flask routes for Files and Vector Stores API"""
 
-import os
 import logging
+import os
 import re
 from urllib.parse import quote
-from flask import Blueprint, request, jsonify, Response
+
+from flask import Blueprint, Response, jsonify, request
+
 from workspace.host import bound
 
 logger = logging.getLogger("logos.workspace.file_routes")

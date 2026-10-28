@@ -1,11 +1,10 @@
 """Audit a filesystem subset; inventory the full native profile without invoking it."""
 
-import os
-
 import argparse
 import hashlib
 import http.server
 import json
+import os
 import re
 import shlex
 import shutil

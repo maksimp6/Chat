@@ -32,9 +32,9 @@ import tempfile
 import threading
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 __all__ = [
     "case_body",
@@ -90,19 +90,23 @@ def _message(report: dict[str, Any]) -> str:
 def fingerprint(report: dict[str, Any]) -> str:
     """One open case per distinct error: code and message, not the invocation."""
     error = _error_fields(report)
-    key = json.dumps([str(error.get("code") or ""), _message(report)], ensure_ascii=False)
+    key = json.dumps(
+        [str(error.get("code") or ""), _message(report)], ensure_ascii=False
+    )
     return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
 
 
 def _iso(timestamp: Any) -> str:
     if isinstance(timestamp, (int, float)) and not isinstance(timestamp, bool):
-        return datetime.fromtimestamp(timestamp, timezone.utc).isoformat()
+        return datetime.fromtimestamp(timestamp, UTC).isoformat()
     return "UNKNOWN"
 
 
 def _q(value: Any) -> str:
     """A YAML scalar that survives any text: JSON strings are valid YAML."""
-    return json.dumps("UNKNOWN" if value in (None, "") else str(value), ensure_ascii=False)
+    return json.dumps(
+        "UNKNOWN" if value in (None, "") else str(value), ensure_ascii=False
+    )
 
 
 # --- encrypted LFS evidence (same steps as scripts/redmi_publish_diagnostics.sh)
@@ -130,7 +134,7 @@ def _month(when: datetime) -> str:
 def _month_after(month: str, months: int) -> datetime:
     year, number = (int(part) for part in month.split("-"))
     index = year * 12 + number - 1 + months
-    return datetime(index // 12, index % 12 + 1, 1, tzinfo=timezone.utc)
+    return datetime(index // 12, index % 12 + 1, 1, tzinfo=UTC)
 
 
 def _monthly_recipient(now: datetime) -> str:
@@ -191,7 +195,14 @@ def _publish(files: list[tuple[Path, str]], token: str, message: str) -> dict[st
         _git(["init", "-q"], work, env)
         _git(["remote", "add", "origin", remote], work, env)
         heads = subprocess.run(
-            ["git", "ls-remote", "--exit-code", "--heads", "origin", "refs/heads/" + branch],
+            [
+                "git",
+                "ls-remote",
+                "--exit-code",
+                "--heads",
+                "origin",
+                "refs/heads/" + branch,
+            ],
             cwd=work,
             env=env,
             capture_output=True,
@@ -204,9 +215,13 @@ def _publish(files: list[tuple[Path, str]], token: str, message: str) -> dict[st
         else:
             raise RuntimeError(f"git ls-remote exited {heads.returncode}")
         _git(["config", "user.name", "Logos Court"], work, env)
-        _git(["config", "user.email", "logos-court@users.noreply.github.com"], work, env)
+        _git(
+            ["config", "user.email", "logos-court@users.noreply.github.com"], work, env
+        )
         _git(["lfs", "install", "--local"], work, env)
-        (work / ".gitattributes").write_text("*.age filter=lfs diff=lfs merge=lfs -text\n")
+        (work / ".gitattributes").write_text(
+            "*.age filter=lfs diff=lfs merge=lfs -text\n"
+        )
         sealed = {}
         for source, dest in files:
             target = work / dest
@@ -225,14 +240,34 @@ def _publish(files: list[tuple[Path, str]], token: str, message: str) -> dict[st
             # Read it back from GitHub into a fresh store: a local object is no upload proof.
             verify = Path(tmp) / "verify"
             _git(
-                ["clone", "-q", "--no-checkout", "--single-branch", "--branch", branch, remote, str(verify)],
+                [
+                    "clone",
+                    "-q",
+                    "--no-checkout",
+                    "--single-branch",
+                    "--branch",
+                    branch,
+                    remote,
+                    str(verify),
+                ],
                 Path(tmp),
                 env,
             )
             _git(["lfs", "install", "--local"], verify, env)
             _git(["checkout", "-q", "--detach", commit], verify, env)
             for dest, sha in sealed.items():
-                _git(["lfs", "fetch", "--include=" + dest, "--exclude=", "origin", commit], verify, env)
+                _git(
+                    [
+                        "lfs",
+                        "fetch",
+                        "--include=" + dest,
+                        "--exclude=",
+                        "origin",
+                        commit,
+                    ],
+                    verify,
+                    env,
+                )
                 _git(["lfs", "checkout", dest], verify, env)
                 if _sha256_file(verify / dest) != sha:
                     raise RuntimeError(f"{dest} read back from GitHub differs")
@@ -246,9 +281,9 @@ def _publish(files: list[tuple[Path, str]], token: str, message: str) -> dict[st
     }
 
 
-def publish_due_keys(token: str, now: Optional[datetime] = None) -> list[str]:
+def publish_due_keys(token: str, now: datetime | None = None) -> list[str]:
     """Publish every month key whose month ended at least a month ago."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     published = []
     for key in _due_keys(now):
         receipt = _publish(
@@ -262,23 +297,28 @@ def publish_due_keys(token: str, now: Optional[datetime] = None) -> list[str]:
 
 def store_evidence(report: dict[str, Any], token: str) -> dict[str, str]:
     """The full error, encrypted to this month's key, in LFS; never plaintext."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     try:
         recipient = _monthly_recipient(now)
         with tempfile.TemporaryDirectory() as tmp:
             plain = Path(tmp) / "evidence.json"
             plain.write_text(
-                json.dumps(report, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
+                json.dumps(report, ensure_ascii=False, indent=2, default=str),
+                encoding="utf-8",
             )
             sealed = Path(tmp) / "evidence.json.age"
-            subprocess.run(["age", "-r", recipient, "-o", str(sealed), str(plain)], check=True)
+            subprocess.run(
+                ["age", "-r", recipient, "-o", str(sealed), str(plain)], check=True
+            )
             dest = (
                 f"court/{_month(now)}/{fingerprint(report)}/"
                 f"{report.get('invocation_id') or 'unknown'}.json.age"
             )
             receipt = _publish([(sealed, dest)], token, "Court evidence " + dest)
             receipt["key"] = f"keys/{_month(now)}.agekey"
-            receipt["key_published_from"] = _month_after(_month(now), 2).date().isoformat()
+            receipt["key_published_from"] = (
+                _month_after(_month(now), 2).date().isoformat()
+            )
             return receipt
     except Exception as exc:
         log.exception("court evidence not stored: %s", _message(report))
@@ -316,7 +356,9 @@ def _occurrence(report: dict[str, Any], now: datetime, evidence: dict[str, str])
         if error.get(key) is not None
     }
     if provider:
-        sources.append("provider " + json.dumps(provider, ensure_ascii=False, default=str))
+        sources.append(
+            "provider " + json.dumps(provider, ensure_ascii=False, default=str)
+        )
     fact = f"Ход завершился ошибкой: {_message(report)}"
     if error.get("partial_output"):
         fact += ". Частичный ответ есть, он только в зашифрованной улике"
@@ -339,9 +381,9 @@ def _fit(text: str) -> str:
 
 
 def case_body(
-    report: dict[str, Any], evidence: dict[str, str], now: Optional[datetime] = None
+    report: dict[str, Any], evidence: dict[str, str], now: datetime | None = None
 ) -> str:
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     fp = fingerprint(report)
     repo = _repo()
     card = "\n".join(
@@ -381,7 +423,9 @@ def case_body(
     )
 
 
-def _comment_body(report: dict[str, Any], evidence: dict[str, str], now: datetime) -> str:
+def _comment_body(
+    report: dict[str, Any], evidence: dict[str, str], now: datetime
+) -> str:
     return _fit(
         f"Повтор ошибки ({MARKER}:{fingerprint(report)}).\n\n"
         f"```yaml\n{_occurrence(report, now, evidence)}\n```\n"
@@ -403,7 +447,7 @@ def _request(method: str, path: str, token: str, payload: Any = None) -> Any:
         return json.loads(resp.read().decode("utf-8") or "null")
 
 
-def _find_open_case(fp: str, token: str) -> Optional[int]:
+def _find_open_case(fp: str, token: str) -> int | None:
     with _known_lock:
         if fp in _known_cases:
             return _known_cases[fp]
@@ -413,15 +457,16 @@ def _find_open_case(fp: str, token: str) -> Optional[int]:
     return items[0]["number"] if items else None
 
 
-def file_case_now(report: dict[str, Any]) -> Optional[str]:
+def file_case_now(report: dict[str, Any]) -> str | None:
     """Open the case, or add the repeat to the open one; return its URL."""
     token = _token()
     if not token:
         log.warning(
-            "court case not filed, no LOGOS_COURT_TOKEN/GITHUB_TOKEN: %s", _message(report)
+            "court case not filed, no LOGOS_COURT_TOKEN/GITHUB_TOKEN: %s",
+            _message(report),
         )
         return None
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     fp = fingerprint(report)
     repo = _repo()
     evidence = store_evidence(report, token)

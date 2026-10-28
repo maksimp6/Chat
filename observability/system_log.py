@@ -8,13 +8,13 @@ are mirrored into that trace as ``system_log`` events.
 """
 
 from __future__ import annotations
-import os
 
 import json
 import logging
+import os
 import sys
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -51,7 +51,7 @@ class TraceContextFilter(logging.Filter):
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         entry = {
-            "timestamp": datetime.fromtimestamp(record.created, timezone.utc).strftime(
+            "timestamp": datetime.fromtimestamp(record.created, UTC).strftime(
                 "%Y-%m-%dT%H:%M:%S.%fZ"
             ),
             "level": record.levelname,

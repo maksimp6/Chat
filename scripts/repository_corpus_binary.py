@@ -11,12 +11,12 @@ import gzip
 import hashlib
 import io
 import os
-from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
 import sys
 import tarfile
 import tempfile
+from pathlib import Path, PurePosixPath
 
 from scripts.semantic_pipeline import _repository_path_is_sensitive
 

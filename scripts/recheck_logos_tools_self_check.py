@@ -5,9 +5,9 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 from urllib.parse import quote
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 

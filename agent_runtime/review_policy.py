@@ -1,13 +1,12 @@
 """Trusted source-file scope for the headless read-only Issue worker."""
 
 import os
-
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-import subprocess
+from typing import Any
 
 from agent_runtime._vendor.read_only_policy import ReadOnlyToolPolicy
-from typing import Any
 from agent_runtime.host import (
     bound,
     current_runtime_data_root,

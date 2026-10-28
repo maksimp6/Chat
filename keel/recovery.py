@@ -1,7 +1,7 @@
 """Recovery: automated recovery from failures."""
 
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 
 logger = logging.getLogger("logos.keel.recovery")
 

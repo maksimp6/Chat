@@ -10,17 +10,17 @@ This module is NOT wired to the running Redmi 9 broker and is not a cutover.
 
 from __future__ import annotations
 
-import hashlib
 import hmac
 import json
 import secrets
 import socket
 import threading
 import time
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 ALLOWED = frozenset(("move", "click", "right", "scroll", "down", "up"))
 MAX_PACKET = 1024

@@ -10,8 +10,8 @@ from urllib.parse import parse_qsl, urljoin, urlsplit
 
 import requests
 
-from scripts.semantic_pipeline import _redact_repository_text
 from scripts.logos_knowledge_host import bound
+from scripts.semantic_pipeline import _redact_repository_text
 
 _FIELDS = "id body url createdAt updatedAt author { login }"
 _PAGE = "pageInfo { hasNextPage endCursor }"

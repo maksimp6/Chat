@@ -1,9 +1,9 @@
 """Explicit transport selection; no fallback across network trust boundaries."""
 
-from printer_service.printers.gateway import Transport
-from printer_service.printers.models import PrinterIdentity
-from printer_service.printers.lan import probe
 from printer_service.printers.cloud_api import DisabledCloudApi
+from printer_service.printers.gateway import Transport
+from printer_service.printers.lan import probe
+from printer_service.printers.models import PrinterIdentity
 
 
 def identify(mode: Transport, *, host: str | None = None) -> PrinterIdentity:

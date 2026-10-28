@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 from urllib.parse import unquote
 
 HEADING_RE = re.compile(r"^##\s+(.+?)\s*$")

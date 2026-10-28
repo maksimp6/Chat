@@ -6,11 +6,11 @@ falls back to process-local MemoryDatabase or SQL.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import json
 import re
-from typing import Callable, Protocol
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Protocol
 from uuid import uuid4
 
 _SECRET = re.compile(
@@ -62,7 +62,7 @@ class MemoryLogAdapter:
             trace_id=trace_id,
             source=source,
             level=level.upper(),
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             message=redact(message),
         )
         payload = json.dumps(event.__dict__, ensure_ascii=False, sort_keys=True).encode(

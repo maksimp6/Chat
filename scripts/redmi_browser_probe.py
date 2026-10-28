@@ -11,11 +11,11 @@ key is created, and it reads no values.
 
 import json
 import os
-from pathlib import Path
 import shlex
 import subprocess
 import sys
 import time
+from pathlib import Path
 from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))

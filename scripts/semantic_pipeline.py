@@ -39,7 +39,7 @@ import time
 import urllib.request
 import uuid
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import quote, urlencode
 
 if __package__ in {None, ""}:
@@ -254,7 +254,7 @@ def fetch_corpus(token: str | None, corpus_kind: str = "dialogues") -> list[dict
     label = f"labels={LABEL_SOURCE}&" if corpus_kind == "dialogues" else ""
     corpus, seen = [], set()
     total = 0
-    retrieved_at = datetime.now(timezone.utc).isoformat()
+    retrieved_at = datetime.now(UTC).isoformat()
     for page in range(1, 51):
         data = api_get(
             f"/issues?{label}state=all&sort=created&direction=asc&per_page=100&page={page}",

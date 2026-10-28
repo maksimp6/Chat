@@ -7,12 +7,13 @@ non-secret provider metadata/fingerprints.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
 import threading
-from typing import Any, Callable, Optional
-from provider_accounts.host import bound, fingerprint_key, get_current_trace
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
+from provider_accounts.host import bound, fingerprint_key, get_current_trace
 
 KEY_TTL = timedelta(hours=12)
 ROTATE_BEFORE = timedelta(hours=1)
@@ -45,12 +46,12 @@ class ProviderCredential:
     api_key: str = field(repr=False)
     project_id: str = ""
     provider: str = YANDEX
-    id: Optional[int] = None
-    provider_key_id: Optional[str] = None
-    yandex_key_id: Optional[str] = None
-    issued_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
-    fingerprint: Optional[str] = None
+    id: int | None = None
+    provider_key_id: str | None = None
+    yandex_key_id: str | None = None
+    issued_at: datetime | None = None
+    expires_at: datetime | None = None
+    fingerprint: str | None = None
 
     @property
     def trace_key_id(self) -> str:
@@ -64,13 +65,13 @@ class ProviderCredential:
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _as_utc(value: datetime | str) -> datetime:
     if isinstance(value, str):
         value = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
 def create_schema(db: Any) -> None:
@@ -80,7 +81,7 @@ def create_schema(db: Any) -> None:
 def get_active_credential(
     db: Any,
     decrypt: Callable[[str], str],
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
     provider: str = YANDEX,
     *,
     allow_expired: bool = False,
@@ -114,7 +115,7 @@ def get_active_credential(
 def get_active_key(
     db: Any,
     decrypt: Callable[[str], str],
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
     provider: str = YANDEX,
 ) -> str:
     return get_active_credential(db, decrypt, now, provider=provider).api_key
@@ -125,10 +126,10 @@ def bootstrap_credential(
     api_key: str,
     project_id: str,
     encrypt: Callable[[str], str],
-    now: Optional[datetime] = None,
-    decrypt: Optional[Callable[[str], str]] = None,
+    now: datetime | None = None,
+    decrypt: Callable[[str], str] | None = None,
     provider: str = YANDEX,
-    provider_key_id: Optional[str] = None,
+    provider_key_id: str | None = None,
     ttl: timedelta = KEY_TTL,
 ) -> ProviderCredential:
     if provider not in SUPPORTED_PROVIDERS or not api_key:
@@ -174,10 +175,10 @@ def replace_active_credential(
     encrypt: Callable[[str], str],
     provider: str,
     *,
-    provider_key_id: Optional[str] = None,
-    now: Optional[datetime] = None,
+    provider_key_id: str | None = None,
+    now: datetime | None = None,
     ttl: timedelta = KEY_TTL,
-    expected_active_id: Optional[int] = None,
+    expected_active_id: int | None = None,
 ) -> ProviderCredential:
     if provider not in SUPPORTED_PROVIDERS or not api_key:
         raise ValueError("valid provider and nonempty api_key required")
@@ -215,10 +216,10 @@ def replace_active_credential(
 
 def replace_active_credentials(
     db: Any,
-    replacements: list[tuple[str, str, str, Optional[str], str]],
+    replacements: list[tuple[str, str, str, str | None, str]],
     encrypt: Callable[[str], str],
     *,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
     ttl: timedelta = KEY_TTL,
 ) -> None:
     """Store several providers' new keys and their health status in one transaction.
@@ -263,8 +264,8 @@ def replace_active_credentials(
 def resolve_client_credential(
     config: Any,
     db: Any = None,
-    decrypt: Optional[Callable[[str], str]] = None,
-    encrypt: Optional[Callable[[str], str]] = None,
+    decrypt: Callable[[str], str] | None = None,
+    encrypt: Callable[[str], str] | None = None,
     provider: str = YANDEX,
 ) -> ProviderCredential:
     if db is None:
@@ -280,7 +281,7 @@ def resolve_client_credential(
 
 def list_provider_credentials(
     db: Any,
-    provider: Optional[str] = None,
+    provider: str | None = None,
 ) -> list[dict[str, Any]]:
     rows = [
         row
@@ -294,11 +295,11 @@ def list_provider_credentials(
     ]
 
 
-def rotation_needed(expires_at: datetime | str, now: Optional[datetime] = None) -> bool:
+def rotation_needed(expires_at: datetime | str, now: datetime | None = None) -> bool:
     return _as_utc(expires_at) - _as_utc(now or utcnow()) <= ROTATE_BEFORE
 
 
-def should_revoke(expires_at: datetime | str, now: Optional[datetime] = None) -> bool:
+def should_revoke(expires_at: datetime | str, now: datetime | None = None) -> bool:
     return _as_utc(now or utcnow()) >= _as_utc(expires_at)
 
 
@@ -311,7 +312,7 @@ def promote_rotated_key(
     issued_at: datetime,
     expires_at: datetime,
     provider: str = YANDEX,
-    fingerprint: Optional[str] = None,
+    fingerprint: str | None = None,
 ) -> None:
     with db.transaction() as tx:
         if tx.get("provider/active/" + provider) != old_id:
@@ -329,7 +330,7 @@ def promote_rotated_key(
 
 
 def issue_window(
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
     ttl: timedelta = KEY_TTL,
 ) -> tuple[datetime, datetime]:
     issued = _as_utc(now or utcnow())
@@ -343,8 +344,8 @@ def record_health_check(
     provider: str,
     *,
     status: str,
-    error: Optional[str] = None,
-    checked_at: Optional[datetime] = None,
+    error: str | None = None,
+    checked_at: datetime | None = None,
     # Kept for existing callers and ignored: every call is its own committed native transaction.
     commit: bool = True,
 ) -> None:
@@ -385,7 +386,7 @@ class SecretManagementRef:
     purpose: str
     secret_id: str
     pinned_version_id: str
-    previous_version_id: Optional[str]
+    previous_version_id: str | None
     updated_at: datetime
 
 
@@ -395,7 +396,7 @@ def set_secret_management_ref(
     secret_id: str,
     version_id: str,
     *,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> SecretManagementRef:
     purpose, secret_id, version_id = (
         purpose.strip(),
@@ -425,7 +426,7 @@ def set_secret_management_ref(
     return _ref_from_record(row)
 
 
-def get_secret_management_ref(db: Any, purpose: str) -> Optional[SecretManagementRef]:
+def get_secret_management_ref(db: Any, purpose: str) -> SecretManagementRef | None:
     row = db.get("secret/ref/" + purpose)
     return _ref_from_record(row) if row else None
 
@@ -434,7 +435,7 @@ def rollback_secret_management_ref(
     db: Any,
     purpose: str,
     *,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> SecretManagementRef:
     key = "secret/ref/" + purpose
     with db.transaction() as tx:
@@ -535,7 +536,7 @@ def _publish_credential(
 
 def get_cloudru_iam_credentials(
     db: Any, decrypt: Callable[[str], str]
-) -> Optional[dict[str, str]]:
+) -> dict[str, str] | None:
     row = db.get("provider/cloudru-iam")
     if row is None:
         return None
@@ -554,9 +555,9 @@ def save_cloudru_iam_credentials(
     key_id: str,
     key_secret: str,
     project_id: str,
-    service_account_id: Optional[str],
+    service_account_id: str | None,
     encrypt: Callable[[str], str],
-    expires_at: Optional[datetime] = None,
+    expires_at: datetime | None = None,
 ) -> None:
     if not key_id.strip() or not key_secret:
         raise ValueError("IAM key id and secret are required")

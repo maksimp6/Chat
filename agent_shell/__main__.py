@@ -1,10 +1,10 @@
 """CLI: python -m agent_shell add|list|run-next|approve|show|recover."""
 
 from __future__ import annotations
-import os
 
 import argparse
 import json
+import os
 import sys
 
 from agent_shell.handlers import default_handlers

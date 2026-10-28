@@ -6,23 +6,23 @@ No SQL, background flush, or unsafe pickle deserialization.
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from copy import deepcopy
-from dataclasses import dataclass
 import fcntl
 import hashlib
 import json
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
+from copy import deepcopy
+from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock, get_ident
-from typing import Any, Iterator, Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from memory_engine._vendor.value_validation import (
-    walk_value,
-    validate_json_values,
     validate_journal_changes,
+    validate_json_values,
+    walk_value,
 )
-
 
 MAX_JOURNAL_FRAME_BYTES = 1024 * 1024  # 1 MiB including newline
 MAX_VALUE_DEPTH = 64

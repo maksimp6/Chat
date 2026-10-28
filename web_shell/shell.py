@@ -9,7 +9,6 @@ from typing import Any
 from flask import Flask, current_app, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
 
-from web_shell.version import boot_version
 from web_shell.host import (
     bound,
     current_runtime_base_path,
@@ -19,6 +18,7 @@ from web_shell.host import (
     memory_file_path,
     problem,
 )
+from web_shell.version import boot_version
 
 logger = logging.getLogger("logos.web_shell")
 

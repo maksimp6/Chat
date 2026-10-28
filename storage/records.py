@@ -4,12 +4,14 @@ This was ``storage.db``; that module name still works and re-exports these names
 """
 
 from __future__ import annotations
-import os
+
 import hashlib
 import json
-from pathlib import Path
+import os
 import time
+from pathlib import Path
 from typing import Any
+
 from storage.host import bound, current_runtime_data_root, get_memory_client
 
 DB_PATH = os.environ.get("LOGOS_DB_PATH", "").strip()
@@ -302,9 +304,9 @@ def set_config(key: str, value: Any) -> None:
 
 
 __all__ = [
+    "DB_PATH",
     "add_message",
     "create_conversation",
-    "DB_PATH",
     "delete_conversation",
     "get_config",
     "get_conv_settings",

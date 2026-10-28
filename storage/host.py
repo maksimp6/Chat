@@ -33,9 +33,9 @@ __all__ = [
     "bind",
     "bound",
     "current",
-    "provide",
     "current_runtime_data_root",
     "get_memory_client",
+    "provide",
 ]
 
 

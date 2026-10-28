@@ -14,23 +14,10 @@ import subprocess
 import sys
 import tempfile
 import uuid
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
-from agent_runtime.logos_launch_hold import (
-    NativeLogosLaunchBlocked,
-    enforce_native_launch_hold,
-    hold_receipt,
-)
-from agent_runtime.provider_receipt import (
-    assistant_text as _assistant_reply,
-    capture_provider_diagnostics,
-)
-from agent_runtime.review_policy import (
-    ISSUE_REVIEW_POLICY,
-    build_review_policy,
-    require_external_review_store,
-)
 from agent_runtime.host import (
     bootstrap_credential,
     bound,
@@ -42,6 +29,22 @@ from agent_runtime.host import (
     initialize_application,
     persist_invocation_trace,
     start_invocation,
+)
+from agent_runtime.logos_launch_hold import (
+    NativeLogosLaunchBlocked,
+    enforce_native_launch_hold,
+    hold_receipt,
+)
+from agent_runtime.provider_receipt import (
+    assistant_text as _assistant_reply,
+)
+from agent_runtime.provider_receipt import (
+    capture_provider_diagnostics,
+)
+from agent_runtime.review_policy import (
+    ISSUE_REVIEW_POLICY,
+    build_review_policy,
+    require_external_review_store,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -297,7 +300,7 @@ def run_issue_task(
     body: str,
     model_key: str = DEFAULT_MODEL,
     *,
-    client_factory: Optional[Callable[[], Any]] = None,
+    client_factory: Callable[[], Any] | None = None,
     repo_root: Path = ROOT,
     checkpoint_file: Path | None = None,
 ) -> dict[str, Any]:
@@ -413,7 +416,7 @@ def run_issue_task(
     return result
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--issue", type=int, required=True)
     parser.add_argument("--title-file", type=Path, required=True)

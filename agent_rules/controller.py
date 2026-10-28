@@ -6,17 +6,17 @@ Do not expose controller construction or policy files as agent tools.
 
 from __future__ import annotations
 
-from copy import deepcopy
-from dataclasses import dataclass
 import hashlib
 import hmac
 import json
-from pathlib import Path
 import secrets
+from collections.abc import Callable, Mapping
+from copy import deepcopy
+from dataclasses import dataclass
+from pathlib import Path
 from threading import RLock
 from types import MappingProxyType
-from typing import Callable, Mapping, Protocol, Any
-
+from typing import Any, Protocol
 
 RULES = MappingProxyType(
     {

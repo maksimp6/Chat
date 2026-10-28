@@ -11,12 +11,12 @@ import socket
 import struct
 import threading
 import time
-from typing import Callable
+from collections.abc import Callable
 
 from printer_service.printers.bambu_a1mini import (
     PrinterProtocolError,
-    decode_probe,
     _recv_exact,
+    decode_probe,
 )
 from printer_service.printers.lan_socket import connect_lan
 

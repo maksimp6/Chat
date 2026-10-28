@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
-from pathlib import Path
 import re
-from typing import Any, Iterable, Optional
+from collections.abc import Iterable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 import yaml
 
 from agent_skills._vendor.wikifunctions import unique_strings
-
 
 DEFAULT_SKILL_ROOT = Path(__file__).resolve().parents[1] / ".agents" / "skills"
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -131,7 +131,7 @@ class Skill:
 # WIKIFUNCTIONS-CANDIDATE WF-02: https://www.wikifunctions.org/wiki/Z10193 + Z10079 + Z10047.
 # Собрать нормализатор роли из Python regex/trim/lowercase; сохранить None и str(role),
 # шаблон [^a-z0-9]+, отдельную обрезку дефисов по краям и None для пустого результата.
-def _normalize_role(role: Optional[str]) -> Optional[str]:
+def _normalize_role(role: str | None) -> str | None:
     if role is None:
         return None
     normalized = re.sub(r"[^a-z0-9]+", "-", str(role).strip().lower()).strip("-")
@@ -215,7 +215,7 @@ class SkillRegistry:
             and (entry / "SKILL.md").is_file()
         ]
 
-    def _allowed_for_role(self, role: Optional[str]) -> Optional[set[str]]:
+    def _allowed_for_role(self, role: str | None) -> set[str] | None:
         normalized = _normalize_role(role)
         if normalized is None:
             return None
@@ -223,7 +223,7 @@ class SkillRegistry:
             raise SkillPolicyError(f"unknown role: {role}")
         return ROLE_SKILL_ALLOWLIST[normalized]
 
-    def catalog(self, role: Optional[str] = None) -> list[dict[str, str]]:
+    def catalog(self, role: str | None = None) -> list[dict[str, str]]:
         allowed = self._allowed_for_role(role)
         result = []
         for name in self._names():
@@ -243,7 +243,7 @@ class SkillRegistry:
             )
         return result
 
-    def load(self, name: str, role: Optional[str] = None) -> Skill:
+    def load(self, name: str, role: str | None = None) -> Skill:
         allowed = self._allowed_for_role(role)
         if allowed is not None and name not in allowed:
             raise SkillPolicyError(
@@ -280,9 +280,7 @@ class SkillRegistry:
             body=body,
         )
 
-    def load_many(
-        self, names: Iterable[str], role: Optional[str] = None
-    ) -> list[Skill]:
+    def load_many(self, names: Iterable[str], role: str | None = None) -> list[Skill]:
         unique: list[str] = []
         for name in unique_strings(names):
             if len(unique) >= MAX_SELECTED_SKILLS:
@@ -300,7 +298,7 @@ class SkillRegistry:
 
 
 def compose_skill_instructions(
-    skills: Iterable[Skill], *, base_instructions: Optional[str] = None
+    skills: Iterable[Skill], *, base_instructions: str | None = None
 ) -> str:
     selected = list(skills)
     parts: list[str] = []

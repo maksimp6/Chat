@@ -5,12 +5,12 @@ Only same-repository changed 3D blobs under printing3d/models/ are eligible.
 """
 
 from __future__ import annotations
-import os
 
 import argparse
 import base64
 import hashlib
 import json
+import os
 import re
 import sys
 import time

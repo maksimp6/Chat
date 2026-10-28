@@ -13,6 +13,7 @@ import stat
 import struct
 import threading
 from pathlib import Path
+
 from remote_input.security.grants import MAX_PACKET, GrantError, ProtectedVerifier
 
 

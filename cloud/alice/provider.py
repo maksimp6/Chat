@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from cloud.base import CloudProviderError
 from cloud.alice.runtime import DockerRuntime
+from cloud.base import CloudProviderError
 
 
 class AliceCloudProvider:

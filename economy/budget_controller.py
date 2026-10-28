@@ -7,15 +7,17 @@ returning from DEMO to REAL.
 """
 
 from __future__ import annotations
-import os
 
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from decimal import ROUND_CEILING, Decimal, InvalidOperation as DecimalInvalidOperation
-from enum import Enum
+import os
 import threading
 import uuid
-from typing import Any, Callable, Optional, TYPE_CHECKING
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from decimal import ROUND_CEILING, Decimal
+from decimal import InvalidOperation as DecimalInvalidOperation
+from enum import Enum
+from typing import TYPE_CHECKING, Any
 
 from economy._vendor.restrictions import restrictions_lifted
 from economy.host import bound
@@ -100,10 +102,10 @@ class BudgetAccount:
     limits: BudgetLimits = field(
         default_factory=lambda: BudgetLimits(Decimal("0"), Decimal("0"), Decimal("0"))
     )
-    locked_until: Optional[datetime] = None
+    locked_until: datetime | None = None
     # Part of ``spent`` that predates the current loss period. Refunds consume it
     # first, so returning earlier spend cannot free up today's daily-loss headroom.
-    carried_spent: Optional[Decimal] = None
+    carried_spent: Decimal | None = None
 
     def __post_init__(self) -> None:
         self.allocated = _money(self.allocated)
@@ -111,9 +113,7 @@ class BudgetAccount:
         self.reserved = _money(self.reserved)
         self.won = _money(self.won)
         self.loss_today = _money(self.loss_today)
-        self.loss_period = (
-            self.loss_period or datetime.now(timezone.utc).date().isoformat()
-        )
+        self.loss_period = self.loss_period or datetime.now(UTC).date().isoformat()
         self.currency = self.currency.upper()
         if self.carried_spent is None:
             self.carried_spent = max(Decimal("0.00"), self.spent - self.loss_today)
@@ -124,8 +124,8 @@ class BudgetAccount:
     def available(self) -> Decimal:
         return self.allocated + self.won - self.spent - self.reserved
 
-    def status(self, now: Optional[datetime] = None) -> BudgetStatus:
-        now = now or datetime.now(timezone.utc)
+    def status(self, now: datetime | None = None) -> BudgetStatus:
+        now = now or datetime.now(UTC)
         if self.locked_until is not None and now < self.locked_until:
             return BudgetStatus.SUSPENDED
         if self.available <= 0:
@@ -147,11 +147,11 @@ class BudgetController:
         real: BudgetAccount,
         demo: BudgetAccount,
         *,
-        trace_sink: Optional[TraceSink] = None,
+        trace_sink: TraceSink | None = None,
         fallback_to_demo: bool = True,
         cooldown_seconds: int = 0,
-        clock: Optional[Clock] = None,
-        repository: Optional["BudgetRepository"] = None,
+        clock: Clock | None = None,
+        repository: "BudgetRepository" | None = None,
         persistence_actor: str = "budget-controller",
     ) -> None:
         if real.account_type is not AccountType.REAL:
@@ -170,7 +170,7 @@ class BudgetController:
         self.fallback_to_demo = fallback_to_demo
         self.cooldown_seconds = cooldown_seconds
         self._trace_sink = trace_sink
-        self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._clock = clock or (lambda: datetime.now(UTC))
         self._repository = repository
         self._persistence_actor = persistence_actor
         self._lock = threading.RLock()
@@ -280,7 +280,7 @@ class BudgetController:
             )
 
     def reserve(
-        self, amount: Any, *, account_type: Optional[AccountType] = None
+        self, amount: Any, *, account_type: AccountType | None = None
     ) -> dict[str, Any]:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
@@ -315,7 +315,7 @@ class BudgetController:
         self,
         amount: Any,
         *,
-        account_type: Optional[AccountType] = None,
+        account_type: AccountType | None = None,
     ) -> dict[str, Any]:
         """Convert an existing reservation into a spend atomically."""
         with self._lock:
@@ -345,7 +345,7 @@ class BudgetController:
             return self.snapshot()
 
     def spend(
-        self, amount: Any, *, account_type: Optional[AccountType] = None
+        self, amount: Any, *, account_type: AccountType | None = None
     ) -> dict[str, Any]:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
@@ -388,7 +388,7 @@ class BudgetController:
             return self.snapshot()
 
     def _record_win(
-        self, amount: Any, *, account_type: Optional[AccountType] = None
+        self, amount: Any, *, account_type: AccountType | None = None
     ) -> dict[str, Any]:
         """Record a provider-confirmed win. Private: nothing in the app may mint wins,
         and no provider settlement path exists yet to call this."""
@@ -410,7 +410,7 @@ class BudgetController:
             return self.snapshot()
 
     def release_reservation(
-        self, amount: Any, *, account_type: Optional[AccountType] = None
+        self, amount: Any, *, account_type: AccountType | None = None
     ) -> dict[str, Any]:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
@@ -432,7 +432,7 @@ class BudgetController:
             return self.snapshot()
 
     def refund(
-        self, amount: Any, *, account_type: Optional[AccountType] = None
+        self, amount: Any, *, account_type: AccountType | None = None
     ) -> dict[str, Any]:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
@@ -510,7 +510,7 @@ class BudgetController:
         account_type: AccountType,
         amount: Decimal,
         *,
-        actor: Optional[str] = None,
+        actor: str | None = None,
     ) -> None:
         if self._repository is None:
             return
@@ -614,8 +614,8 @@ class BudgetController:
     def _now(self) -> datetime:
         current = self._clock()
         if current.tzinfo is None:
-            return current.replace(tzinfo=timezone.utc)
-        return current.astimezone(timezone.utc)
+            return current.replace(tzinfo=UTC)
+        return current.astimezone(UTC)
 
     @staticmethod
     def _require_actor(actor: str) -> None:
@@ -650,7 +650,7 @@ class CloudSpendStatus(str, Enum):
 class CloudBudgetLimits:
     """Monthly cloud spend limit checked against provider billing data."""
 
-    monthly_limit: Optional[Decimal]
+    monthly_limit: Decimal | None
     warn_ratio: Decimal = Decimal("0.80")
     currency: str = "RUB"
 
@@ -664,7 +664,7 @@ class CloudBudgetLimits:
         object.__setattr__(self, "currency", self.currency.strip().upper())
 
     @classmethod
-    def from_env(cls, env: Optional[dict[str, str]] = None) -> "CloudBudgetLimits":
+    def from_env(cls, env: dict[str, str] | None = None) -> "CloudBudgetLimits":
 
         source = dict(os.environ) if env is None else env
         raw_limit = str(source.get("CLOUDRU_MONTHLY_BUDGET", "")).strip()
@@ -723,21 +723,21 @@ class CloudBudgetGuard:
     def __init__(
         self,
         provider: Any,
-        limits: Optional[CloudBudgetLimits] = None,
+        limits: CloudBudgetLimits | None = None,
         *,
-        period: Optional[str] = None,
+        period: str | None = None,
         cache_seconds: int = 300,
-        clock: Optional[Clock] = None,
-        trace_sink: Optional[TraceSink] = None,
+        clock: Clock | None = None,
+        trace_sink: TraceSink | None = None,
     ) -> None:
         self._provider = provider
         self.limits = limits or CloudBudgetLimits.from_env()
         self._period = period
         self._cache_seconds = max(0, int(cache_seconds))
-        self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._clock = clock or (lambda: datetime.now(UTC))
         self._trace_sink = trace_sink
-        self._cached: Optional[dict[str, Any]] = None
-        self._cached_at: Optional[datetime] = None
+        self._cached: dict[str, Any] | None = None
+        self._cached_at: datetime | None = None
         self._lock = threading.Lock()
 
     def status(self, *, refresh: bool = False) -> dict[str, Any]:

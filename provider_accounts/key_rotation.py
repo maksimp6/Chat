@@ -8,17 +8,18 @@ before promotion.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Callable, Protocol, Any
+from typing import Any, Protocol
 
 from provider_accounts.credentials import (
     fingerprint_key,
     issue_window,
     promote_rotated_key,
+    record_health_check,
     rotation_needed,
     should_revoke,
-    record_health_check,
 )
 
 logger = logging.getLogger("logos.provider_accounts.key_rotation")

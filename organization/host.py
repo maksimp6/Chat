@@ -36,12 +36,12 @@ __all__ = [
     "HostNotBound",
     "bind",
     "bound",
-    "current",
-    "provide",
     "create_session",
+    "current",
     "get_current_owner_id",
     "get_session",
     "get_store",
+    "provide",
     "validate_json_schema",
 ]
 

@@ -10,7 +10,6 @@ import math
 import re
 from typing import Any
 
-
 SENSITIVE_KEYS: set[str] = {
     "api_key",
     "apikey",

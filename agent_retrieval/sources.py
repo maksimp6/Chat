@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable, Protocol
-
+from typing import Any, Protocol
 
 from .legacy_models import RetrievalDocument, RetrievalQuery
 

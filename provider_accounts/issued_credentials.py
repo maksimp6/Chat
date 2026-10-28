@@ -1,8 +1,8 @@
 """Import runner-issued Yandex keys; this module never contacts a provider."""
 
-from datetime import datetime, timedelta, timezone
 import hmac
 import re
+from datetime import UTC, datetime, timedelta
 
 from provider_accounts.credentials import (
     bootstrap_credential,
@@ -63,7 +63,7 @@ def _date(value):
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         if parsed.tzinfo is None:
             raise ValueError()
-        return parsed.astimezone(timezone.utc)
+        return parsed.astimezone(UTC)
     except (AttributeError, TypeError, ValueError):
         raise ImportRejected("invalid_key_lifetime") from None
 
@@ -87,7 +87,7 @@ def import_yandex_key(payload):
     ):
         raise ImportRejected("invalid_api_key")
     issued, expires = _date(payload.get("issued_at")), _date(payload.get("expires_at"))
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # Runner IAM keys live 12 hours; console API keys can live up to 90 days.
     if (
         issued > now + timedelta(minutes=5)

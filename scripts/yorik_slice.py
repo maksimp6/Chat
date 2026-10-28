@@ -1,15 +1,13 @@
 """Slice the reviewed Yorik mesh using the pinned PR1101 Bambu profiles."""
 
-import os
-
 import argparse
 import hashlib
 import json
-from pathlib import Path
+import os
 import struct
 import subprocess
 import zipfile
-
+from pathlib import Path
 
 OUTPUT = "Yorik_A1mini_PLA.gcode.3mf"
 

@@ -7,10 +7,8 @@ import time
 from typing import Any
 
 from agent_memory.client import get_memory_client
-
-from agent_memory.models import MemoryLookup, MemoryRecord
 from agent_memory.host import memory_file_path
-
+from agent_memory.models import MemoryLookup, MemoryRecord
 
 _MEMORY_PREFIX = "agent_memory:"
 logger = logging.getLogger("logos.agent_memory.repository")

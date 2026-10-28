@@ -7,15 +7,15 @@ cloud/cloudru/api_key_provider.py.
 """
 
 from __future__ import annotations
-import os
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+import os
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from urllib.parse import quote
 
 import requests
-from cloud.host import get_current_trace
 
+from cloud.host import get_current_trace
 
 API_KEYS_PATH = "/api/v1/service-accounts/credentials/api-keys"
 SERVICE_ACCOUNTS_PATH = "/api/v1/service-accounts"
@@ -30,9 +30,9 @@ class CloudRuIamClient:
     def __init__(
         self,
         *,
-        key_id: Optional[str] = None,
-        key_secret: Optional[str] = None,
-        endpoint: Optional[str] = None,
+        key_id: str | None = None,
+        key_secret: str | None = None,
+        endpoint: str | None = None,
         timeout: float = 20.0,
     ) -> None:
         self.endpoint = (
@@ -42,11 +42,11 @@ class CloudRuIamClient:
         self.key_id = key_id or os.environ.get("CLOUDRU_IAM_KEY_ID")
         self.key_secret = key_secret or os.environ.get("CLOUDRU_IAM_KEY_SECRET")
         self.timeout = timeout
-        self._access_token: Optional[str] = None
-        self._access_token_expires_at: Optional[datetime] = None
+        self._access_token: str | None = None
+        self._access_token_expires_at: datetime | None = None
 
     def _token(self) -> str:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if (
             self._access_token
             and self._access_token_expires_at
@@ -60,7 +60,7 @@ class CloudRuIamClient:
             )
 
         trace = get_current_trace()
-        started = datetime.now(timezone.utc)
+        started = datetime.now(UTC)
         if trace:
             trace.add_event(
                 "provider_api_request",
@@ -95,8 +95,7 @@ class CloudRuIamClient:
                         "path": TOKEN_PATH,
                         "http_status": response.status_code,
                         "timing_ms": round(
-                            (datetime.now(timezone.utc) - started).total_seconds()
-                            * 1000,
+                            (datetime.now(UTC) - started).total_seconds() * 1000,
                             2,
                         ),
                         "success": True,
@@ -121,8 +120,7 @@ class CloudRuIamClient:
                             getattr(exc, "response", None), "status_code", None
                         ),
                         "timing_ms": round(
-                            (datetime.now(timezone.utc) - started).total_seconds()
-                            * 1000,
+                            (datetime.now(UTC) - started).total_seconds() * 1000,
                             2,
                         ),
                         "success": False,
@@ -146,11 +144,11 @@ class CloudRuIamClient:
         method: str,
         path: str,
         *,
-        params: Optional[dict[str, Any]] = None,
-        json_body: Optional[dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
+        json_body: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         trace = get_current_trace()
-        started = datetime.now(timezone.utc)
+        started = datetime.now(UTC)
         if trace:
             trace.add_event(
                 "provider_api_request",
@@ -190,8 +188,7 @@ class CloudRuIamClient:
                         "path": path,
                         "http_status": response.status_code,
                         "timing_ms": round(
-                            (datetime.now(timezone.utc) - started).total_seconds()
-                            * 1000,
+                            (datetime.now(UTC) - started).total_seconds() * 1000,
                             2,
                         ),
                         "success": True,
@@ -211,8 +208,7 @@ class CloudRuIamClient:
                         "path": path,
                         "http_status": status_code,
                         "timing_ms": round(
-                            (datetime.now(timezone.utc) - started).total_seconds()
-                            * 1000,
+                            (datetime.now(UTC) - started).total_seconds() * 1000,
                             2,
                         ),
                         "success": False,
@@ -263,7 +259,7 @@ class CloudRuIamClient:
         self,
         *,
         service_account_id: str,
-        enabled: Optional[bool] = None,
+        enabled: bool | None = None,
     ) -> list[dict[str, Any]]:
         if not service_account_id.strip():
             raise ValueError("service_account_id is required")
@@ -284,10 +280,10 @@ class CloudRuIamClient:
         name: str,
         description: str = "",
         products: list[str],
-        expires_at: Optional[str] = None,
-        ip_addresses: Optional[list[str]] = None,
-        time_slots: Optional[list[dict[str, int]]] = None,
-        timezone_offset: Optional[int] = None,
+        expires_at: str | None = None,
+        ip_addresses: list[str] | None = None,
+        time_slots: list[dict[str, int]] | None = None,
+        timezone_offset: int | None = None,
     ) -> dict[str, Any]:
         if not service_account_id.strip():
             raise ValueError("service_account_id is required")
@@ -325,7 +321,7 @@ class CloudRuIamClient:
         self,
         *,
         api_key_id: str,
-        expires_at: Optional[str] = None,
+        expires_at: str | None = None,
     ) -> dict[str, Any]:
         """Reissue a static API key while retaining its resource ID."""
         if not api_key_id.strip():
@@ -343,4 +339,4 @@ class CloudRuIamClient:
         )
 
 
-__all__ = ["CloudRuIamError", "CloudRuIamClient"]
+__all__ = ["CloudRuIamClient", "CloudRuIamError"]

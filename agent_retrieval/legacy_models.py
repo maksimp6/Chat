@@ -7,9 +7,10 @@ retriever.py and sources.py, which then failed to import; they use this module i
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any
 
 from agent_retrieval._vendor.trace_security import sanitize_trace_value
 

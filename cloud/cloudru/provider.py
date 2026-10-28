@@ -1,18 +1,18 @@
 """Cloud.ru provider implementation for the provider-neutral cloud surface."""
 
 from __future__ import annotations
-import os
-from cloud._vendor.wikifunctions import clamp_integer
 
+import os
 import re
 from typing import Any
 from urllib.parse import quote
 
+from cloud._vendor.wikifunctions import clamp_integer
 from cloud.base import CloudProviderError
 from cloud.cloudru.billing import parse_consumption_total
 from cloud.cloudru.client import CloudRuClient
-from cloud.models import normalize_resource, normalize_resources
 from cloud.cloudru.iam import CloudRuIamClient
+from cloud.models import normalize_resource, normalize_resources
 
 _RESOURCE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
 

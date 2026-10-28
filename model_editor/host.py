@@ -32,8 +32,8 @@ __all__ = [
     "bind",
     "bound",
     "current",
-    "provide",
     "get_current_owner_id",
+    "provide",
     "storage_provider_from_env",
 ]
 

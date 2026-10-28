@@ -1,8 +1,9 @@
 """Shared JSON graph validation without filesystem or store lifecycle policy."""
 
-from itertools import chain
 import math
-from typing import Any, Callable, Iterator
+from collections.abc import Callable, Iterator
+from itertools import chain
+from typing import Any
 
 
 def walk_value(

@@ -1,7 +1,7 @@
 """Semantic economics for knowledge items and agent operations."""
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 CURRENCY = "RUB"
 PRICING_VERSION = "knowledge-config-v2"
@@ -11,12 +11,12 @@ OBJECT_STORAGE_PRICING_UPDATED = "2026-06-30"
 
 @dataclass(frozen=True)
 class KnowledgeCostConfig:
-    text_per_kb: Optional[float] = None
-    embedding_per_1k_tokens: Optional[float] = None
-    vector_storage_per_mb_day: Optional[float] = None
-    metadata_per_kb_day: Optional[float] = None
-    backup_per_mb_day: Optional[float] = None
-    retrieval_per_1k_items: Optional[float] = None
+    text_per_kb: float | None = None
+    embedding_per_1k_tokens: float | None = None
+    vector_storage_per_mb_day: float | None = None
+    metadata_per_kb_day: float | None = None
+    backup_per_mb_day: float | None = None
+    retrieval_per_1k_items: float | None = None
 
 
 @dataclass(frozen=True)
@@ -26,9 +26,9 @@ class ProviderStorageTariff:
     region: str
     storage_per_gb_month: float
     free_storage_gb_month: float = 0.0
-    get_per_10k: Optional[float] = None
+    get_per_10k: float | None = None
     free_get_per_month: int = 0
-    write_per_10k: Optional[float] = None
+    write_per_10k: float | None = None
     free_write_per_month: int = 0
     currency: str = CURRENCY
     pricing_version: str = PRICING_VERSION
@@ -49,7 +49,7 @@ YANDEX_OBJECT_STORAGE_STANDARD_RU = ProviderStorageTariff(
 )
 
 
-def _cost(rate: Optional[float], units: float) -> Optional[float]:
+def _cost(rate: float | None, units: float) -> float | None:
     if rate is None:
         return None
     return round(max(0.0, units) * rate, 6)
@@ -152,13 +152,13 @@ def record_knowledge_operation(
     *,
     knowledge_item_id: str,
     operation: str,
-    invocation_id: Optional[str] = None,
-    trace_id: Optional[str] = None,
-    session_id: Optional[str] = None,
-    conversation_id: Optional[str] = None,
-    cost: Optional[dict[str, Any]] = None,
-    value: Optional[float] = None,
-    quality: Optional[float] = None,
+    invocation_id: str | None = None,
+    trace_id: str | None = None,
+    session_id: str | None = None,
+    conversation_id: str | None = None,
+    cost: dict[str, Any] | None = None,
+    value: float | None = None,
+    quality: float | None = None,
 ) -> dict[str, Any]:
     entry = {
         "knowledge_item_id": str(knowledge_item_id),
@@ -214,8 +214,8 @@ class PolicyBudgetController:
         trace_id: str,
         cost: float,
         value: float,
-        quality: Optional[float] = None,
-        reason: Optional[str] = None,
+        quality: float | None = None,
+        reason: str | None = None,
     ) -> dict[str, Any]:
         cost = max(0.0, float(cost))
         value = float(value)

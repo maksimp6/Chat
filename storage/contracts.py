@@ -1,11 +1,13 @@
 """Provider-neutral storage contracts and the repository-local adapter."""
 
 from __future__ import annotations
-import os
 
+import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Mapping, Protocol
+from typing import Protocol
+
 from storage.host import bound
 
 

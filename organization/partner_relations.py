@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any, Mapping, Optional
+import time
+from collections.abc import Mapping
+from typing import Any
 from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
 
-import time
 from organization._vendor.schema import object_schema
 from organization.host import (
     bound,
@@ -23,7 +24,6 @@ from organization.host import (
     get_store,
     validate_json_schema,
 )
-
 
 partner_relations_bp = Blueprint(
     "partner_relations",
@@ -58,12 +58,12 @@ def _parse(value: Any, default: Any) -> Any:
     return parsed
 
 
-def _trusted_owner(cfg: Optional[dict[str, Any]] = None) -> str:
+def _trusted_owner(cfg: dict[str, Any] | None = None) -> str:
     return get_current_owner_id()
 
 
 def _trace_event(
-    cfg: Optional[dict[str, Any]], event_type: str, payload: dict[str, Any]
+    cfg: dict[str, Any] | None, event_type: str, payload: dict[str, Any]
 ) -> None:
     context = (cfg or {}).get("_universal_context") if isinstance(cfg, dict) else None
     call = context.get("call") if isinstance(context, dict) else None
@@ -108,12 +108,12 @@ def _followup_row(row: Any) -> dict[str, Any]:
     return {key: value for key, value in row.items() if key != "owner_id"}
 
 
-def _get_partner(owner_id: str, partner_id: str) -> Optional[dict[str, Any]]:
+def _get_partner(owner_id: str, partner_id: str) -> dict[str, Any] | None:
     return _get_owned("partner", str(partner_id), owner_id)
 
 
 def create_partner(
-    arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
+    arguments: Mapping[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     name = str(arguments.get("name") or "").strip()
@@ -161,7 +161,7 @@ def create_partner(
 
 
 def list_partners(
-    arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
+    arguments: Mapping[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     status = str(arguments.get("status") or "").strip().lower()
@@ -178,7 +178,7 @@ def list_partners(
 
 
 def get_partner(
-    arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
+    arguments: Mapping[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     partner_id = str(arguments.get("partner_id") or arguments.get("id") or "").strip()
@@ -205,7 +205,7 @@ def get_partner(
 
 
 def delete_partner(
-    arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
+    arguments: Mapping[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     partner_id = str(arguments.get("partner_id") or "").strip()
@@ -231,7 +231,7 @@ def delete_partner(
 
 
 def update_partner(
-    arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
+    arguments: Mapping[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     partner_id = str(arguments.get("partner_id") or "").strip()
@@ -272,7 +272,7 @@ def update_partner(
 
 
 def add_contact(
-    arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
+    arguments: Mapping[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     partner_id = str(arguments.get("partner_id") or "").strip()
@@ -312,12 +312,12 @@ def add_contact(
     return {"contact": _contact_for_owner(owner_id, contact_id)}
 
 
-def _contact_for_owner(owner_id: str, contact_id: str) -> Optional[dict[str, Any]]:
+def _contact_for_owner(owner_id: str, contact_id: str) -> dict[str, Any] | None:
     return _get_owned("contact", contact_id, owner_id)
 
 
 def list_contacts(
-    arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
+    arguments: Mapping[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     partner_id = str(arguments.get("partner_id") or "").strip()
@@ -333,7 +333,7 @@ def list_contacts(
 
 
 def update_contact(
-    arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
+    arguments: Mapping[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     contact_id = str(arguments.get("contact_id") or "").strip()
@@ -369,7 +369,7 @@ def update_contact(
 
 
 def delete_contact(
-    arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
+    arguments: Mapping[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     contact_id = str(arguments.get("contact_id") or "").strip()
@@ -402,7 +402,7 @@ def delete_contact(
 
 
 def prepare_message(
-    arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
+    arguments: Mapping[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     partner_id = str(arguments.get("partner_id") or "").strip()
@@ -455,12 +455,12 @@ def prepare_message(
     }
 
 
-def get_message(owner_id: str, message_id: str) -> Optional[dict[str, Any]]:
+def get_message(owner_id: str, message_id: str) -> dict[str, Any] | None:
     return _get_owned("message", message_id, owner_id)
 
 
 def queue_message(
-    arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
+    arguments: Mapping[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     message_id = str(arguments.get("message_id") or "").strip()
@@ -502,7 +502,7 @@ def queue_message(
 
 
 def get_thread(
-    arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
+    arguments: Mapping[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     partner_id = str(arguments.get("partner_id") or "").strip()
@@ -517,7 +517,7 @@ def get_thread(
 
 
 def update_status(
-    arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
+    arguments: Mapping[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     partner_id = str(arguments.get("partner_id") or "").strip()
@@ -546,7 +546,7 @@ def update_status(
 
 
 def create_followup(
-    arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
+    arguments: Mapping[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     partner_id = str(arguments.get("partner_id") or "").strip()
@@ -589,12 +589,12 @@ def create_followup(
     return get_followup(owner_id, followup_id) or {}
 
 
-def get_followup(owner_id: str, followup_id: str) -> Optional[dict[str, Any]]:
+def get_followup(owner_id: str, followup_id: str) -> dict[str, Any] | None:
     return _get_owned("followup", followup_id, owner_id)
 
 
 def complete_followup(
-    arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None
+    arguments: Mapping[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     followup_id = str(arguments.get("followup_id") or "").strip()
@@ -1191,9 +1191,9 @@ def ensure_partner_department() -> None:
 __all__ = [
     "PARTNER_TOOLS",
     "ensure_partner_department",
-    "prepare_partner_relations_records",
     "init_partner_relations_tables",
     "partner_relations_bp",
+    "prepare_partner_relations_records",
 ]
 
 
@@ -1257,7 +1257,7 @@ def _stored_key(kind: str, identity: str, owner_id: str) -> str:
     return matches[0] if matches else preferred
 
 
-def _get_owned(kind: str, identity: str, owner_id: str) -> Optional[dict[str, Any]]:
+def _get_owned(kind: str, identity: str, owner_id: str) -> dict[str, Any] | None:
     row = get_store().get(_stored_key(kind, identity, owner_id))
     return (
         {key: value for key, value in row.items() if key != "owner_id"} if row else None
@@ -1265,7 +1265,7 @@ def _get_owned(kind: str, identity: str, owner_id: str) -> Optional[dict[str, An
 
 
 def _owned_rows(
-    kind: str, owner_id: str, partner_id: Optional[str] = None
+    kind: str, owner_id: str, partner_id: str | None = None
 ) -> list[dict[str, Any]]:
     return [
         row

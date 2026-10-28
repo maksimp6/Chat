@@ -19,9 +19,9 @@ import math
 import struct
 import sys
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Sequence
 
 Vec3 = tuple[float, float, float]
 Point = tuple[float, float]

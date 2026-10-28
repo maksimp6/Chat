@@ -1,7 +1,7 @@
 """Trace correlation helpers for MCP activity managed by Yandex AI Studio."""
 
-from typing import Any, Iterable
-
+from collections.abc import Iterable
+from typing import Any
 
 _MCP_TYPE_MARKERS = ("mcp",)
 _MCP_KEY_MARKERS = ("mcp_call", "mcp_server", "mcp_tool", "mcp_list", "mcp_approval")

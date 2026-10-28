@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 
-def env_get(name: str, default: Optional[str] = None) -> Optional[str]:
+def env_get(name: str, default: str | None = None) -> str | None:
     return os.environ.get(name, default)
 
 

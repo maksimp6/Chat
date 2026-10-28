@@ -13,8 +13,6 @@ from typing import Any
 from printer_service.printers.models import (
     MODEL_CODES,
     PrinterIdentity,
-    merge_report,
-    summarize_status,
 )
 
 _FRAME_START = b"\xa5\xa5"

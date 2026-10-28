@@ -1,38 +1,37 @@
 """Provider credential configuration and health-check API."""
 
 from __future__ import annotations
-import os
 
-from datetime import datetime, timedelta, timezone
 import logging
+import os
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from flask import Blueprint, jsonify, request
 
-from provider_accounts.credentials import list_provider_credentials
 from provider_accounts.credentials import (
     CLOUDRU,
     YANDEX,
-    ProviderCredential,
     CredentialError,
     ExpiredCredentialError,
     NoActiveCredentialError,
+    ProviderCredential,
     get_active_credential,
+    list_provider_credentials,
+    record_health_check,
     replace_active_credential,
     replace_active_credentials,
     rotation_needed,
-    should_revoke,
-    record_health_check,
     save_cloudru_iam_credentials,
+    should_revoke,
 )
-from provider_accounts.model_discovery import invalidate_model_discovery_cache
 from provider_accounts.host import (
     bound,
     encryption_configured,
     get_store,
     traced_operation,
 )
-
+from provider_accounts.model_discovery import invalidate_model_discovery_cache
 
 logger = logging.getLogger("logos.provider_credentials")
 
@@ -318,7 +317,7 @@ def cloudru_service_accounts():
         try:
             if datetime.fromisoformat(
                 expires_raw.replace("Z", "+00:00")
-            ) <= datetime.now(timezone.utc):
+            ) <= datetime.now(UTC):
                 return jsonify({"error": "cloudru_iam_master_key_expired"}), 401
         except ValueError:
             return jsonify({"error": "invalid_cloudru_iam_master_key_expiry"}), 400
@@ -449,7 +448,7 @@ def bootstrap_cloudru():
             iam_expires_at = datetime.fromisoformat(
                 iam_expires_raw.replace("Z", "+00:00")
             )
-            if iam_expires_at <= datetime.now(timezone.utc):
+            if iam_expires_at <= datetime.now(UTC):
                 return jsonify({"error": "cloudru_iam_master_key_expired"}), 401
         except ValueError:
             return jsonify({"error": "invalid_cloudru_iam_master_key_expiry"}), 400
@@ -462,7 +461,7 @@ def bootstrap_cloudru():
         # API-key creation as a separate operation and requires the caller to have
         # the appropriate project role.
         management = bound.CloudRuIamClient(key_id=key_id, key_secret=key_secret)
-        expires_at = datetime.now(timezone.utc) + _cloudru_ttl()
+        expires_at = datetime.now(UTC) + _cloudru_ttl()
         key = management.create_api_key(
             service_account_id=service_account_id,
             name="Logos Pro Foundation Models",

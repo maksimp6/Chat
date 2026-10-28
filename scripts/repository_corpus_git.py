@@ -9,9 +9,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
+from pathlib import Path
 from urllib.parse import quote, quote_from_bytes
 
 from scripts.semantic_pipeline import _repository_path_is_sensitive

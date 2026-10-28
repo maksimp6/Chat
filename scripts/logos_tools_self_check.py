@@ -3,11 +3,10 @@
 import hashlib
 import json
 import math
-from pathlib import Path
 import re
 import stat
 import zipfile
-
+from pathlib import Path
 
 SELF_CHECK_QUESTION = (
     "Логос, сначала выполни настоящие вызовы инструментов, затем дай краткий итог. "

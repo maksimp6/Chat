@@ -9,10 +9,10 @@ from __future__ import annotations
 from typing import Any
 
 from model_editor._vendor.schema import object_schema
+from model_editor.host import get_current_owner_id, storage_provider_from_env
 
 from .engine import add_primitive, edit_primitive, number, vector3
 from .store import ModelStore
-from model_editor.host import get_current_owner_id, storage_provider_from_env
 
 
 def _store(cfg: dict[str, Any] | None = None) -> ModelStore:

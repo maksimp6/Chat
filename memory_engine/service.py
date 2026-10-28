@@ -8,16 +8,16 @@ UID; untrusted code must never execute under the service UID.
 from __future__ import annotations
 
 import argparse
-from collections import deque
-from concurrent.futures import ThreadPoolExecutor
 import json
 import logging
 import os
-from pathlib import Path
 import socket
 import struct
 import threading
 import time
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 from memory_engine import MemoryStore, StoreError
 

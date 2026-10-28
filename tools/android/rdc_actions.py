@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Minimal Android control via an existing, authorized ADB connection."""
 
-import os
 import argparse
 import json
-from pathlib import Path
+import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 # adb needs only its own locations and terminal basics; other secrets stay out of its env.
 ADB_ENV_NAMES = frozenset(

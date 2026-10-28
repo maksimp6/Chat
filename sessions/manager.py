@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import re
-import uuid
-from typing import Any, Optional
-
 import time
+import uuid
+from typing import Any
+
 from sessions.host import get_memory_client, memory_file_path
 
 _SESSION_PREFIX = "runtime_session:"
@@ -37,7 +37,7 @@ def _key(session_id: str) -> str:
 
 
 def create_session(
-    session_id: Optional[str] = None, metadata: Optional[dict[str, Any]] = None
+    session_id: str | None = None, metadata: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     session_id = session_id or str(uuid.uuid4())
     now = int(time.time())
@@ -56,7 +56,7 @@ def create_session(
     return record
 
 
-def get_session(session_id: str) -> Optional[dict[str, Any]]:
+def get_session(session_id: str) -> dict[str, Any] | None:
     value = get_memory_client(memory_file_path()).get(_key(session_id))
     if value is None:
         return None
@@ -66,7 +66,7 @@ def get_session(session_id: str) -> Optional[dict[str, Any]]:
     return value
 
 
-def restore_session(session_id: str) -> Optional[dict[str, Any]]:
+def restore_session(session_id: str) -> dict[str, Any] | None:
     key = _key(session_id)
     with get_memory_client(memory_file_path()).transaction() as tx:
         record = tx.get(key)
@@ -82,9 +82,9 @@ def restore_session(session_id: str) -> Optional[dict[str, Any]]:
 
 def update_session(
     session_id: str,
-    metadata: Optional[dict[str, Any]] = None,
-    status: Optional[str] = None,
-) -> Optional[dict[str, Any]]:
+    metadata: dict[str, Any] | None = None,
+    status: str | None = None,
+) -> dict[str, Any] | None:
     if status is not None and status not in {
         "active",
         "completed",

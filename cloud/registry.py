@@ -1,12 +1,11 @@
 """Runtime registry for cloud providers."""
 
 from __future__ import annotations
-import os
 
+import os
 from typing import Any
 
-from cloud.base import CloudProviderError
-from cloud.base import CloudProvider
+from cloud.base import CloudProvider, CloudProviderError
 
 
 class CloudProviderRegistry:

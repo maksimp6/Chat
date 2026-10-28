@@ -41,14 +41,14 @@ import io
 import json
 import os
 import re
-import tokenize
 import subprocess
 import symtable
 import sys
+import tokenize
 import tomllib
 from dataclasses import dataclass, field
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 COUNTERS = "ERSVILAWD"

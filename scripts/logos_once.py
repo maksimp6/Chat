@@ -5,12 +5,12 @@ change a model profile, or retry a failed command or provider request.
 """
 
 from __future__ import annotations
-import os
 
 import base64
 import hashlib
 import html
 import json
+import os
 import re
 import secrets
 import subprocess

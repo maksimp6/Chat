@@ -1,9 +1,9 @@
 """Local HTTP API for Logos Board without a sign-in requirement."""
 
 from __future__ import annotations
-import os
 
 import json
+import os
 import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path

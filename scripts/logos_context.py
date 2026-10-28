@@ -6,11 +6,11 @@ evidence; comments do not acquire permission to override the owner or approvals.
 """
 
 from __future__ import annotations
-import os
 
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import urllib.error

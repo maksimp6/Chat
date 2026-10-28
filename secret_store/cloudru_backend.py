@@ -8,6 +8,8 @@ preserved by delegation rather than reimplementation.
 
 from __future__ import annotations
 
+from typing import Any
+
 from secret_store.contract import (
     AUTH_FAILED,
     AUTH_NOT_CONFIGURED,
@@ -18,7 +20,6 @@ from secret_store.contract import (
     SecretReference,
     SecretResolverError,
 )
-from typing import Any
 from secret_store.host import bound
 
 # Map Cloud.ru-specific error codes to the canonical contract codes.

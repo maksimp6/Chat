@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
-
 
 _KNOWN_BACKEND_STATUSES: frozenset[str] = frozenset({"completed", "failed"})
 
@@ -18,14 +16,14 @@ class AgentTaskEvidence:
     dispatch_created: bool = False
     mention_delivered: bool = False
     subscribed: bool = False
-    workflow_status: Optional[str] = None
-    workflow_conclusion: Optional[str] = None
+    workflow_status: str | None = None
+    workflow_conclusion: str | None = None
     backend_triggered: bool = False
-    backend_status: Optional[str] = None
+    backend_status: str | None = None
     deliverable_refs: tuple[str, ...] = field(default_factory=tuple)
-    validation_status: Optional[str] = None
+    validation_status: str | None = None
     review_complete: bool = False
-    blocker: Optional[str] = None
+    blocker: str | None = None
     cancelled: bool = False
     stall_detected: bool = False
 

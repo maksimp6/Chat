@@ -17,10 +17,9 @@ Chunk bodies must concatenate (in the declared order, no separators) to exactly
 the source document. Mismatch = FAIL, no report is generalized.
 """
 
-import os
-
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys

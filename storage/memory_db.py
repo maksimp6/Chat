@@ -6,10 +6,11 @@ API, while this engine owns tables, constraints and transactions in memory.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from copy import deepcopy
 from dataclasses import dataclass
 from threading import RLock
-from typing import Any, Callable, Iterable
+from typing import Any
 
 
 class DatabaseError(Exception):

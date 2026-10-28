@@ -1,11 +1,13 @@
 """Native durable budget accounts and idempotent operations on Kristall."""
 
 from __future__ import annotations
-from datetime import datetime, timedelta, timezone
-from decimal import ROUND_CEILING, Decimal
+
 import json
 import uuid
+from datetime import UTC, datetime, timedelta
+from decimal import ROUND_CEILING, Decimal
 from typing import Any
+
 from economy._vendor.restrictions import restrictions_lifted
 from economy.host import get_current_trace, get_store
 
@@ -90,7 +92,7 @@ class BudgetRepository:
         replay_key = "budget/idempotency/" + json.dumps(
             [budget_id, idempotency_key], separators=(",", ":")
         )
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         with store.transaction() as tx:
             old = tx.get(replay_key) if idempotency_key else None
             if old is not None:

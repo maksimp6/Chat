@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from storage.records import (  # noqa: F401
+    DB_PATH,
+    _update_conversation,
     add_message,
     create_conversation,
-    DB_PATH,
     delete_conversation,
     get_config,
     get_conv_settings,
@@ -28,13 +29,12 @@ from storage.records import (  # noqa: F401
     set_yandex_conversation,
     update_conversation_model,
     update_conversation_title,
-    _update_conversation,
 )
 
 __all__ = [
+    "DB_PATH",
     "add_message",
     "create_conversation",
-    "DB_PATH",
     "delete_conversation",
     "get_config",
     "get_conv_settings",

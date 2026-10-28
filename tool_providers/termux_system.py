@@ -5,11 +5,11 @@
 фонарик, виброотклик, яркость, громкость, контакты, SMS и камера.
 """
 
-import subprocess
 import json
 import logging
-import shutil
 import os
+import shutil
+import subprocess
 
 logger = logging.getLogger("logos.tool_providers.termux_system")
 

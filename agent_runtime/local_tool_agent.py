@@ -3,20 +3,21 @@
 from __future__ import annotations
 
 import fcntl
-import json
 import hashlib
+import json
 import logging
 import os
-from pathlib import Path
 import tempfile
 import threading
 import time
+from collections.abc import Mapping
 from http.client import HTTPException
-from typing import Any, Mapping, Optional
+from pathlib import Path
+from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
-from agent_runtime.host import bound
 
+from agent_runtime.host import bound
 
 logger = logging.getLogger("logos.agent_runtime.local_tool_agent")
 
@@ -51,8 +52,8 @@ def _request(
     method: str,
     url: str,
     *,
-    token: Optional[str] = None,
-    payload: Optional[Mapping[str, Any]] = None,
+    token: str | None = None,
+    payload: Mapping[str, Any] | None = None,
     timeout: float = 15,
 ) -> Any:
     body = None
@@ -87,9 +88,9 @@ def register_agent(
     gateway_url: str,
     bootstrap_token: str = "",
     *,
-    agent_id: Optional[str] = None,
+    agent_id: str | None = None,
     name: str = "Logos Android Agent",
-    capabilities: Optional[list[str]] = None,
+    capabilities: list[str] | None = None,
     version: str = "1.0",
 ) -> str:
     """Register an agent and return its descriptor as JSON. Legacy token arguments are ignored."""
@@ -128,8 +129,8 @@ class LocalToolAgent:
         token: str = "",
         *,
         poll_interval: float = 2.0,
-        stop_event: Optional[threading.Event] = None,
-        outbox_dir: Optional[str | Path] = None,
+        stop_event: threading.Event | None = None,
+        outbox_dir: str | Path | None = None,
     ) -> None:
         self.gateway_url = gateway_url.rstrip("/")
         self.agent_id = agent_id
@@ -479,9 +480,9 @@ def start_agent(
     gateway_url: str,
     bootstrap_token: str = "",
     *,
-    agent_id: Optional[str] = None,
+    agent_id: str | None = None,
     name: str = "Logos Android Agent",
-    capabilities: Optional[list[str]] = None,
+    capabilities: list[str] | None = None,
     version: str = "1.0",
 ) -> tuple[LocalToolAgent, str]:
     registration = json.loads(

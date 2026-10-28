@@ -6,11 +6,11 @@ arguments.  Caller decides the path; this module never creates a password.
 
 from __future__ import annotations
 
+import os
+import stat
 from dataclasses import dataclass
 from ipaddress import IPv4Address
-import os
 from pathlib import Path
-import stat
 
 from .bambu_lan import _certificate_fingerprint, printer_report_topic, read_live_status
 

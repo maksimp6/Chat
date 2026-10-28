@@ -1,11 +1,13 @@
 """Durable paper balance ledger; no real payment processing."""
 
 from __future__ import annotations
-from decimal import Decimal, InvalidOperation
+
 import json
 import threading
+from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any
-from datetime import datetime, timezone
+
 from economy.host import get_store
 
 
@@ -34,7 +36,7 @@ def _empty_account(owner_id: str) -> dict[str, Any]:
         "owner_id": owner_id,
         "balance": "0",
         "currency": "RUB",
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -105,7 +107,7 @@ def _record_in(
     current = _money(account["balance"])
     if kind == "debit" and current < value:
         raise ValueError("insufficient balance")
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     identity = int(tx.get("treasury/next-ledger-id") or 0) + 1
     balance = current + value if kind == "credit" else current - value
     tx.set(account_key, {**account, "balance": str(balance), "updated_at": now})

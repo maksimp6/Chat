@@ -1,13 +1,14 @@
 """Native shared MCP server records and per-conversation selection."""
 
 from __future__ import annotations
+
 import logging
-import uuid
 import time
+import uuid
 from typing import Any
 from urllib.parse import urlsplit
-from mcp_server.host import bound, decrypt_secret, encrypt_secret, get_store
 
+from mcp_server.host import bound, decrypt_secret, encrypt_secret, get_store
 
 logger = logging.getLogger("logos.mcp_server.storage")
 

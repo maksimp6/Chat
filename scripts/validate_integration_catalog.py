@@ -4,10 +4,10 @@
 from __future__ import annotations
 
 import argparse
-from datetime import date
 import json
-from pathlib import Path
 import re
+from datetime import date
+from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]

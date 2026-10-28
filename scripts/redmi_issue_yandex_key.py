@@ -1,14 +1,14 @@
 """Runner-side IAM issuance and local app delivery. Never invokes a model."""
 
-from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import sys
 import urllib.error
 import urllib.request
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 IAM = "https://iam.api.cloud.yandex.net/iam/v1"
 APP = "http://127.0.0.1:8080/api/provider-credentials/yandex"
@@ -70,7 +70,7 @@ def _expired(credential):
         )
     except ValueError:
         return False
-    return expires.tzinfo is not None and expires <= datetime.now(timezone.utc)
+    return expires.tzinfo is not None and expires <= datetime.now(UTC)
 
 
 def issue_and_deliver(env, pending, call=request_json):
@@ -97,7 +97,7 @@ def issue_and_deliver(env, pending, call=request_json):
     account = call("GET", IAM + "/serviceAccounts/" + env[names[1]], headers)
     if account.get("id") != env[names[1]] or account.get("folderId") != env[names[2]]:
         raise Failed("service_account_folder_mismatch")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires = now + timedelta(hours=12)
     pending.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     # A failed/ambiguous mint must not silently create another key on a rerun.

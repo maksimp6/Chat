@@ -1,6 +1,7 @@
 """Shared local identity for Logos data and accounting; no visitor authentication."""
 
 import os
+
 from economy.host import bound, get_store
 
 

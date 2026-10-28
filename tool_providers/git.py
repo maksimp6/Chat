@@ -1,11 +1,11 @@
 """Git tools: read and write operations on allowed local repositories; names that could be read as options are refused."""
 
-import time
-import subprocess
-import os
 import logging
+import os
 import re
+import subprocess
 import threading
+import time
 from functools import wraps
 
 logger = logging.getLogger("logos.tool_providers.git")

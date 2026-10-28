@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import cast
 
-
 KNOWN_CAPABILITIES = frozenset({"inspect"})
 
 

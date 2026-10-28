@@ -7,6 +7,8 @@ from printer_service.printers.bambu_a1mini import (
 )
 from printer_service.printers.lan_address import (
     private_ipv4 as require_lan_host,
+)
+from printer_service.printers.lan_address import (
     resolve_lan,
 )
 

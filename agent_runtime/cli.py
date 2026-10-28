@@ -1,12 +1,11 @@
 """Thin CLI/Termux adapter for the canonical Logos runtime."""
 
 from __future__ import annotations
-import os
 
+import os
 from typing import Any
 
 import requests
-
 
 DEFAULT_BASE_URL = "http://127.0.0.1:5000"
 DEFAULT_MODEL = "yandexgpt-5-pro"

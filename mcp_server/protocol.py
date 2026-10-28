@@ -1,10 +1,11 @@
 """MCP JSON-RPC protocol: supported versions, server identity, and sanitized result and error responses."""
 
 from __future__ import annotations
-import os
 
 import json
-from typing import Any, Mapping, Optional
+import os
+from collections.abc import Mapping
+from typing import Any
 
 from flask import Response, request
 
@@ -69,7 +70,7 @@ def _jsonrpc_error(
     data: Any = None,
     *,
     status: int = 400,
-    headers: Optional[Mapping[str, str]] = None,
+    headers: Mapping[str, str] | None = None,
 ) -> Response:
     error: dict[str, Any] = {"code": code, "message": _sanitize_error_string(message)}
     if data is not None:
@@ -93,7 +94,7 @@ def _error_response(
     data: Any = None,
     *,
     status: int = 400,
-    headers: Optional[Mapping[str, str]] = None,
+    headers: Mapping[str, str] | None = None,
 ) -> Response:
     return _jsonrpc_error(
         request_id,

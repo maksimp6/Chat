@@ -1,13 +1,13 @@
 """Reconciler: apply actions to bring reality to desired state."""
 
-from typing import Any
 import logging
+from typing import Any
 
 from keel.planner import Action, ActionType
 from keel.providers.cloudru import (
     create_container,
-    update_container,
     delete_container,
+    update_container,
 )
 
 logger = logging.getLogger("logos.keel.reconciler")

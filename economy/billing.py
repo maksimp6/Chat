@@ -5,9 +5,9 @@ models never become a confirmed zero-cost invocation.
 """
 
 import logging
-from typing import Any, Optional
-from economy.host import bound, canonical_model_key
+from typing import Any
 
+from economy.host import bound, canonical_model_key
 
 logger = logging.getLogger("logos.economy.billing")
 
@@ -30,10 +30,10 @@ def extract_cached_tokens(usage: dict[str, Any]) -> int:
 
 
 def build_ai_billing_item(
-    model_key: Optional[str],
-    usage: Optional[dict[str, Any]],
+    model_key: str | None,
+    usage: dict[str, Any] | None,
     step: int,
-    response_id: Optional[str] = None,
+    response_id: str | None = None,
 ) -> dict[str, Any]:
     usage_missing = not isinstance(usage, dict)
     usage = {} if usage_missing else usage
@@ -141,9 +141,7 @@ def _readable_billing_item(item: Any) -> bool:
     return True
 
 
-def aggregate_billing(
-    items, context: Optional[dict[str, Any]] = None
-) -> dict[str, Any]:
+def aggregate_billing(items, context: dict[str, Any] | None = None) -> dict[str, Any]:
     # One malformed item must not discard the whole aggregate. It is left out of every
     # sum, logged, and counted as an unknown cost, so the total is never settled as
     # complete without it.
@@ -226,7 +224,7 @@ def aggregate_billing(
 
 
 def settle_billing_to_treasury(
-    billing: dict[str, Any], owner_id: Optional[str]
+    billing: dict[str, Any], owner_id: str | None
 ) -> dict[str, Any]:
     """Post a fully calculated trace billing aggregate exactly once."""
     if not isinstance(billing, dict) or billing.get("cost_status") != "calculated":

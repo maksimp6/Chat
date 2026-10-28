@@ -1,18 +1,20 @@
 """Provider-backed model discovery with a bounded in-process cache."""
 
 from __future__ import annotations
-import os
 
 import hashlib
 import logging
+import os
 import threading
 import time
+from collections.abc import Callable
 from copy import deepcopy
 from types import SimpleNamespace
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import urlsplit
 
 import requests
+
 from provider_accounts.host import (
     bound,
     canonical_model_key,
@@ -20,7 +22,6 @@ from provider_accounts.host import (
     provider_request_headers,
     registry_key_for_upstream,
 )
-
 
 logger = logging.getLogger("logos.provider_accounts.model_discovery")
 

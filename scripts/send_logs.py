@@ -1,12 +1,13 @@
 """Send the JSON logs in execution_logs/ to the Yandex AI Studio log endpoint, with credential-like values redacted."""
 
-import requests
 import json
 import os
 import re
 import uuid
 from datetime import datetime
 from pathlib import Path
+
+import requests
 
 LOGS_DIR = Path(__file__).resolve().parents[1] / "execution_logs"
 # Whole-word credential names only: "input_tokens" is usage data and must still be sent.

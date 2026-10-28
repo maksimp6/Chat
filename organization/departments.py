@@ -1,11 +1,15 @@
 """First-class Department registry and API for Logos."""
 
 from __future__ import annotations
+
 import json
-from typing import Any, Mapping, Optional
-from uuid import uuid4
-from flask import Blueprint, jsonify, request
 import time
+from collections.abc import Mapping
+from typing import Any
+from uuid import uuid4
+
+from flask import Blueprint, jsonify, request
+
 from organization.host import create_session, get_session, get_store
 
 departments_bp = Blueprint("departments", __name__, url_prefix="/api/departments")
@@ -38,7 +42,7 @@ def _validate_id(value: str) -> str:
     return value
 
 
-def _find_department(department_id: str) -> Optional[dict[str, Any]]:
+def _find_department(department_id: str) -> dict[str, Any] | None:
     # A malformed id is simply not a department here; the caller answers 404, not 500.
     try:
         return get_department(department_id)
@@ -53,7 +57,7 @@ def list_departments() -> list[dict[str, Any]]:
     )
 
 
-def get_department(department_id: str) -> Optional[dict[str, Any]]:
+def get_department(department_id: str) -> dict[str, Any] | None:
     return get_store().get("department/" + _validate_id(department_id))
 
 
@@ -63,7 +67,7 @@ class DepartmentExistsError(Exception):
 
 def upsert_department(
     data: Mapping[str, Any],
-    department_id: Optional[str] = None,
+    department_id: str | None = None,
     *,
     create_only: bool = False,
 ) -> dict[str, Any]:

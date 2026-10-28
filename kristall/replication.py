@@ -6,18 +6,22 @@ The caller supplies already reassembled bounded messages from a trusted channel.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import hmac
 import json
 import re
+from dataclasses import dataclass
 from typing import Any
 
 from kristall.store import (
     MAX_JOURNAL_FRAME_BYTES,
-    Kristall as MemoryStore,
-    KristallError as StoreError,
     _validate_value,
+)
+from kristall.store import (
+    Kristall as MemoryStore,
+)
+from kristall.store import (
+    KristallError as StoreError,
 )
 
 

@@ -5,18 +5,19 @@ remote OS identity, so Linux permissions remain the authorization boundary.
 """
 
 from __future__ import annotations
-import os
-from remote_runtime._vendor.output import limit_output, newline_text, read_output
 
 import json
-import posixpath
 import math
+import os
+import posixpath
 import shlex
 import subprocess
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import PurePosixPath
-from typing import Any, Mapping, Optional
+from typing import Any
 
+from remote_runtime._vendor.output import limit_output, newline_text, read_output
 
 _MAX_WRITE_BYTES = 10 * 1024 * 1024
 
@@ -29,7 +30,7 @@ class SSHRuntimeError(RuntimeError):
     and the tools.
     """
 
-    def __init__(self, *args: Any, code: Optional[str] = None) -> None:
+    def __init__(self, *args: Any, code: str | None = None) -> None:
         super().__init__(*args)
         self.code = code
 
@@ -39,12 +40,12 @@ class SSHTarget:
     name: str
     host: str
     port: int = 22
-    default_user: Optional[str] = None
+    default_user: str | None = None
     allowed_users: tuple[str, ...] = ()
-    identity_file: Optional[str] = None
-    known_hosts: Optional[str] = None
+    identity_file: str | None = None
+    known_hosts: str | None = None
     identity_map: tuple[tuple[str, str], ...] = ()
-    workspace_root: Optional[str] = None
+    workspace_root: str | None = None
     connect_timeout_seconds: float = 10.0
     command_timeout_seconds: float = 30.0
     max_output_bytes: int = 1048576
@@ -55,9 +56,9 @@ class SSHRuntime:
 
     def __init__(
         self,
-        targets: Optional[Mapping[str, Mapping[str, Any]]] = None,
+        targets: Mapping[str, Mapping[str, Any]] | None = None,
         *,
-        known_hosts: Optional[str] = None,
+        known_hosts: str | None = None,
     ) -> None:
         self._targets = self._load_targets(targets)
         self._default_known_hosts = known_hosts or os.environ.get(
@@ -66,7 +67,7 @@ class SSHRuntime:
 
     @staticmethod
     def _load_targets(
-        targets: Optional[Mapping[str, Mapping[str, Any]]],
+        targets: Mapping[str, Mapping[str, Any]] | None,
     ) -> dict[str, SSHTarget]:
         if targets is None:
             text = os.environ.get("LOGOS_SSH_TARGETS_JSON", "").strip()
@@ -180,7 +181,7 @@ class SSHRuntime:
     def _resolve_target(
         self,
         target_name: str,
-        identity_id: Optional[str] = None,
+        identity_id: str | None = None,
     ) -> tuple[SSHTarget, str]:
         target = self._targets.get(str(target_name))
         if target is None:
@@ -210,7 +211,7 @@ class SSHRuntime:
         return value
 
     @staticmethod
-    def _path_within_workspace(path: str, workspace_root: Optional[str]) -> str:
+    def _path_within_workspace(path: str, workspace_root: str | None) -> str:
         normalized = posixpath.normpath(path)
         if not workspace_root:
             return normalized
@@ -225,7 +226,7 @@ class SSHRuntime:
 
     @staticmethod
     def _wrap_remote_command(
-        command: str, timeout: float, home: Optional[str] = None
+        command: str, timeout: float, home: str | None = None
     ) -> str:
         """Run the command with a server-side timeout and minimal environment.
 
@@ -283,8 +284,8 @@ class SSHRuntime:
         *,
         target: str,
         command: str,
-        timeout_seconds: Optional[float] = None,
-        identity_id: Optional[str] = None,
+        timeout_seconds: float | None = None,
+        identity_id: str | None = None,
     ) -> dict[str, Any]:
         command = str(command or "").strip()
         if not command:
@@ -340,8 +341,8 @@ class SSHRuntime:
         *,
         target: str,
         path: str,
-        timeout_seconds: Optional[float] = None,
-        identity_id: Optional[str] = None,
+        timeout_seconds: float | None = None,
+        identity_id: str | None = None,
     ) -> dict[str, Any]:
         remote_path = self._validate_remote_path(path)
         target_config = self._targets.get(str(target))
@@ -373,8 +374,8 @@ class SSHRuntime:
         target: str,
         path: str,
         content: str,
-        timeout_seconds: Optional[float] = None,
-        identity_id: Optional[str] = None,
+        timeout_seconds: float | None = None,
+        identity_id: str | None = None,
     ) -> dict[str, Any]:
         remote_path = self._validate_remote_path(path)
         target_config = self._targets.get(str(target))

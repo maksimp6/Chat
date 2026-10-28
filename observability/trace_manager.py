@@ -6,11 +6,13 @@ import logging
 import re
 import threading
 import time
-import uuid
 import traceback
+import uuid
+from collections.abc import Callable
 from contextvars import ContextVar
 from functools import wraps
-from typing import Any, Optional, Callable
+from typing import Any, Optional
+
 from observability.host import (
     aggregate_billing,
     bound,
@@ -147,13 +149,13 @@ class ExecutionTrace:
     _MAX_ITEMS = MAX_ITEMS
     _INTERNAL_EVENT_TYPES = {"trace_finalized"}
 
-    def __init__(self, trace_id: Optional[str] = None):
+    def __init__(self, trace_id: str | None = None):
         self.trace_id = trace_id or str(uuid.uuid4())
         self.start_perf = time.perf_counter()
         self._start_thread_cpu = time.thread_time()
         self._owner_thread = threading.get_ident()
         self._finalized = False
-        self._final_result: Optional[dict[str, Any]] = None
+        self._final_result: dict[str, Any] | None = None
         self._sensitive_values: set[str] = set()
         self._sensitive_values_lock = threading.RLock()
         self.trace: dict[str, Any] = {
@@ -279,12 +281,12 @@ class ExecutionTrace:
         self,
         key_id: str,
         *,
-        fingerprint: Optional[str] = None,
-        issued_at: Optional[Any] = None,
-        expires_at: Optional[Any] = None,
-        project_id: Optional[str] = None,
-        source: Optional[str] = None,
-        key_mask: Optional[str] = None,
+        fingerprint: str | None = None,
+        issued_at: Any | None = None,
+        expires_at: Any | None = None,
+        project_id: str | None = None,
+        source: str | None = None,
+        key_mask: str | None = None,
     ) -> None:
         """Bind a non-secret provider-key identity to this trace."""
         self._ensure_mutable()
@@ -320,12 +322,12 @@ class ExecutionTrace:
     @_guarded
     def set_context(
         self,
-        invocation_id: Optional[str] = None,
-        session_id: Optional[str] = None,
-        conversation_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        agent_id: Optional[str] = None,
-        runtime_id: Optional[str] = None,
+        invocation_id: str | None = None,
+        session_id: str | None = None,
+        conversation_id: str | None = None,
+        user_id: str | None = None,
+        agent_id: str | None = None,
+        runtime_id: str | None = None,
     ) -> None:
         self._ensure_mutable()
         context = self.trace.setdefault("context", {})
@@ -359,7 +361,7 @@ class ExecutionTrace:
         *,
         source: str,
         version: str,
-        role: Optional[str] = None,
+        role: str | None = None,
     ) -> None:
         """Record one lazily loaded repository skill without storing its prompt body."""
         self._ensure_mutable()
@@ -450,12 +452,12 @@ class ExecutionTrace:
             }
         )
 
-    def _request_timing_for_step(self, step_index: int) -> Optional[float]:
+    def _request_timing_for_step(self, step_index: int) -> float | None:
         return request_timing_for_step(self.trace, step_index)
 
     def _infer_response_start(
         self, step_index: int, end_timestamp: float
-    ) -> Optional[float]:
+    ) -> float | None:
         return infer_response_start(self.trace, step_index, end_timestamp)
 
     def get_step_correlation_id(self, step_index: int) -> str:
@@ -467,8 +469,8 @@ class ExecutionTrace:
         self,
         payload: dict[str, Any],
         step_index: int = 1,
-        start_timestamp: Optional[float] = None,
-        provider_key_id: Optional[str] = None,
+        start_timestamp: float | None = None,
+        provider_key_id: str | None = None,
     ) -> int:
         self._ensure_mutable()
         provider_key_id = provider_key_id or (self.trace.get("provider_key") or {}).get(
@@ -501,7 +503,7 @@ class ExecutionTrace:
         return sanitize_trace_value(value, depth)
 
     def _update_billing_for_response(
-        self, clean_raw: dict[str, Any], step_index: int, response_id: Optional[str]
+        self, clean_raw: dict[str, Any], step_index: int, response_id: str | None
     ) -> None:
         if not isinstance(clean_raw, dict):
             return
@@ -556,12 +558,12 @@ class ExecutionTrace:
         self,
         raw_json: dict[str, Any],
         step_index: int = 1,
-        start_timestamp: Optional[float] = None,
-        end_timestamp: Optional[float] = None,
-        timing_ms: Optional[float] = None,
+        start_timestamp: float | None = None,
+        end_timestamp: float | None = None,
+        timing_ms: float | None = None,
         kind: str = "response",
         deduplicate: bool = False,
-        provider_key_id: Optional[str] = None,
+        provider_key_id: str | None = None,
         **kwargs,
     ) -> None:
         """Store one logical Responses API operation; polling snapshots stay nested in it."""
@@ -695,11 +697,11 @@ class ExecutionTrace:
         arguments: dict[str, Any],
         executor_fn,
         *args,
-        call_id: Optional[str] = None,
-        parent_id: Optional[str] = None,
-        step: Optional[int] = None,
-        server: Optional[str] = None,
-        trace_arguments: Optional[dict[str, Any]] = None,
+        call_id: str | None = None,
+        parent_id: str | None = None,
+        step: int | None = None,
+        server: str | None = None,
+        trace_arguments: dict[str, Any] | None = None,
         **kwargs,
     ) -> Any:
         self._ensure_mutable()
@@ -806,7 +808,7 @@ class ExecutionTrace:
     def record_reasoning_event(
         self,
         event_type: str,
-        payload: Optional[dict[str, Any]] = None,
+        payload: dict[str, Any] | None = None,
     ) -> None:
         """Record explicit planning state without storing private model reasoning."""
         self._ensure_mutable()
@@ -823,9 +825,7 @@ class ExecutionTrace:
         self.add_event(event_type, self._sanitize_trace_value(payload or {}))
 
     @_guarded
-    def add_event(
-        self, event_type: str, payload: Optional[dict[str, Any]] = None
-    ) -> None:
+    def add_event(self, event_type: str, payload: dict[str, Any] | None = None) -> None:
         self._ensure_mutable()
         if event_type in self._INTERNAL_EVENT_TYPES:
             return
@@ -876,11 +876,11 @@ class ExecutionTrace:
         self,
         source: str,
         message: str,
-        call_id: Optional[str] = None,
-        parent_id: Optional[str] = None,
-        step: Optional[int] = None,
-        error_type: Optional[str] = None,
-        exception: Optional[BaseException] = None,
+        call_id: str | None = None,
+        parent_id: str | None = None,
+        step: int | None = None,
+        error_type: str | None = None,
+        exception: BaseException | None = None,
     ) -> None:
         self._ensure_mutable()
         redacted_message = self._redact_registered_values(message)
@@ -924,7 +924,7 @@ class ExecutionTrace:
         return self._redact_registered_values(snapshot)
 
     @_guarded
-    def _build_snapshot(self, *, end_perf: Optional[float] = None) -> dict[str, Any]:
+    def _build_snapshot(self, *, end_perf: float | None = None) -> dict[str, Any]:
         """Build a read-only view and derive billing solely from source billing items.
 
         The trace is copied once; only the derived billing is made JSON-safe again."""

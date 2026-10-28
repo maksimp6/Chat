@@ -6,15 +6,15 @@ The native Kristall write barrier serializes reservation and usage mutations.
 """
 
 from __future__ import annotations
+
 import os
 import time
-from provider_accounts._vendor.restrictions import restrictions_lifted
-
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Optional
-from provider_accounts.host import get_store
+from typing import Any
 
+from provider_accounts._vendor.restrictions import restrictions_lifted
+from provider_accounts.host import get_store
 
 DEFAULT_POLICY = "default"
 DEFAULT_PERIOD_SECONDS = 86400
@@ -188,7 +188,7 @@ def get_user_policy(user_id: str) -> dict[str, Any]:
         return _policy_for(tx, user_id)
 
 
-def release_request(reservation: Optional[QuotaReservation]) -> None:
+def release_request(reservation: QuotaReservation | None) -> None:
     """Return a reservation whose provider call produced no answer.
 
     The counts are lowered only while the reserved period and rate window are still current, so a
@@ -216,8 +216,8 @@ def release_request(reservation: Optional[QuotaReservation]) -> None:
 
 
 def reserve_request(
-    user_id: Optional[str], *, now: Optional[int] = None
-) -> Optional[QuotaReservation]:
+    user_id: str | None, *, now: int | None = None
+) -> QuotaReservation | None:
     """Atomically reserve one provider request for a trusted user.
 
     A missing identity fails closed by default: an uncounted provider call would
@@ -325,7 +325,7 @@ def reserve_request(
 
 
 def record_usage(
-    reservation: Optional[QuotaReservation],
+    reservation: QuotaReservation | None,
     *,
     token_count: int = 0,
     cost: float = 0.0,
@@ -356,7 +356,7 @@ def record_usage(
             )
 
 
-def get_usage(user_id: str, *, now: Optional[int] = None) -> dict[str, Any]:
+def get_usage(user_id: str, *, now: int | None = None) -> dict[str, Any]:
     user_id = str(user_id or "").strip()
     if not user_id:
         raise ValueError("user_id is required")
@@ -407,8 +407,8 @@ __all__ = [
     "assign_user_policy",
     "get_usage",
     "get_user_policy",
-    "prepare_quota_records",
     "init_quota_tables",
+    "prepare_quota_records",
     "record_usage",
     "reserve_request",
     "upsert_policy",

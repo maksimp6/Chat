@@ -1,18 +1,17 @@
 """Cloud.ru cloud API client with trace-safe logging."""
 
 from __future__ import annotations
-import os
 
-from datetime import datetime, timezone
+import os
+from datetime import UTC, datetime
 from typing import Any
 
 import requests
 
+from cloud._vendor.trace_security import sanitize_trace_value
 from cloud.base import CloudProviderError
 from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
-from cloud._vendor.trace_security import sanitize_trace_value
 from cloud.host import get_current_trace
-
 
 DEFAULT_ENDPOINTS = {
     "iam": "https://iam.api.cloud.ru",
@@ -91,7 +90,7 @@ class CloudRuClient:
         url = f"{base_url}{path}"
 
         trace = get_current_trace()
-        started = datetime.now(timezone.utc)
+        started = datetime.now(UTC)
         request_event = {
             "provider": "cloudru",
             "service": service,
@@ -122,9 +121,7 @@ class CloudRuClient:
             response.raise_for_status()
         except requests.RequestException as exc:
             status = getattr(getattr(exc, "response", None), "status_code", None)
-            elapsed_ms = round(
-                (datetime.now(timezone.utc) - started).total_seconds() * 1000, 2
-            )
+            elapsed_ms = round((datetime.now(UTC) - started).total_seconds() * 1000, 2)
             if trace:
                 trace.add_event(
                     "provider_api_response",
@@ -156,9 +153,7 @@ class CloudRuClient:
                 http_status=status,
             ) from exc
 
-        elapsed_ms = round(
-            (datetime.now(timezone.utc) - started).total_seconds() * 1000, 2
-        )
+        elapsed_ms = round((datetime.now(UTC) - started).total_seconds() * 1000, 2)
         if trace:
             trace.add_event(
                 "provider_api_response",

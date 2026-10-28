@@ -18,21 +18,21 @@ The scheduled workflow ``.github/workflows/agent-observer.yml`` runs it hourly.
 """
 
 from __future__ import annotations
-import os
 
 import argparse
 import json
+import os
 import re
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from collections import Counter
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from collections.abc import Callable
 
 API_ROOT = "https://api.github.com"
 TRACKING_LABEL = "agent-observer"

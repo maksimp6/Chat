@@ -37,14 +37,14 @@ bound = _binding.names()
 __all__ = [
     "Host",
     "HostNotBound",
+    "assert_operation_allowed",
     "bind",
     "bound",
-    "current",
-    "provide",
-    "assert_operation_allowed",
     "build_runtime",
+    "current",
     "enqueue_local_tool_job",
     "memory_file_path",
+    "provide",
     "runtime_for_operation",
     "wait_for_local_tool_job",
 ]

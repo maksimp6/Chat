@@ -4,10 +4,10 @@ import argparse
 import hashlib
 import ipaddress
 import json
-from pathlib import Path
 import subprocess
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 
 class ProbeFailure(RuntimeError):

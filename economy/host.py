@@ -36,11 +36,11 @@ __all__ = [
     "HostNotBound",
     "bind",
     "bound",
-    "current",
-    "provide",
     "canonical_model_key",
+    "current",
     "get_current_trace",
     "get_store",
+    "provide",
 ]
 
 

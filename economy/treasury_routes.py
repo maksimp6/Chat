@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from flask import Flask, jsonify, request
 
+from economy.host import get_store
 from economy.treasury import demo_top_up, get_account
 from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
-from economy.host import get_store
 
 
 def treasury_account():

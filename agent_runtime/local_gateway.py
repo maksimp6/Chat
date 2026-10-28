@@ -7,12 +7,13 @@ import math
 import re
 import threading
 import time
-from typing import Any, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any
 from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
-from agent_runtime.host import get_store
 
+from agent_runtime.host import get_store
 
 local_agent_bp = Blueprint("local_agents", __name__, url_prefix="/api/local-agents")
 
@@ -136,7 +137,7 @@ def _json(value: Any) -> str:
     )
 
 
-def _parse_json(value: Optional[str], default: Any) -> Any:
+def _parse_json(value: str | None, default: Any) -> Any:
     try:
         return json.loads(value or "")
     except (TypeError, ValueError, json.JSONDecodeError):
@@ -177,9 +178,9 @@ def enqueue_local_tool_job(
     tool_name: str,
     arguments: Mapping[str, Any],
     *,
-    metadata: Optional[Mapping[str, Any]] = None,
-    trace_id: Optional[str] = None,
-    invocation_id: Optional[str] = None,
+    metadata: Mapping[str, Any] | None = None,
+    trace_id: str | None = None,
+    invocation_id: str | None = None,
 ) -> str:
     """Persist a tool job for a connected agent.
 
@@ -573,8 +574,8 @@ def local_agent_health():
 
 __all__ = [
     "enqueue_local_tool_job",
-    "wait_for_local_tool_job",
-    "prepare_local_agent_records",
     "init_local_agent_tables",
     "local_agent_bp",
+    "prepare_local_agent_records",
+    "wait_for_local_tool_job",
 ]

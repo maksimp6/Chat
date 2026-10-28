@@ -9,7 +9,7 @@ provider-neutral environment shape (`environment_manager.py` records) to the
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from cloud.base import CloudProviderError
 from cloud.cloudru.provider import CloudRuProvider
@@ -22,7 +22,7 @@ class CloudRuEnvironmentAdapter:
     name = "cloudru"
 
     def __init__(
-        self, environment: Dict[str, Any], *, provider: Optional[CloudRuProvider] = None
+        self, environment: dict[str, Any], *, provider: CloudRuProvider | None = None
     ):
         self.environment = environment
         self._provider = provider
@@ -40,7 +40,7 @@ class CloudRuEnvironmentAdapter:
             )
         return str(remote_id)
 
-    def provision(self) -> Dict[str, Any]:
+    def provision(self) -> dict[str, Any]:
         provider = self._provider_instance()
         result = provider.environment_create(
             name=self.environment["environment_id"],
@@ -58,11 +58,11 @@ class CloudRuEnvironmentAdapter:
             )
         return {"cloud_resource_id": str(remote_id)}
 
-    def start(self) -> Dict[str, Any]:
+    def start(self) -> dict[str, Any]:
         self._provider_instance().environment_start(remote_id=self._remote_id())
         return {}
 
-    def execute(self, command: str, *, timeout_seconds: float = 30.0) -> Dict[str, Any]:
+    def execute(self, command: str, *, timeout_seconds: float = 30.0) -> dict[str, Any]:
         result = self._provider_instance().environment_exec(
             remote_id=self._remote_id(),
             command=command,

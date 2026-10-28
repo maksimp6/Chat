@@ -11,7 +11,6 @@ import binascii
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import select
 import shlex
@@ -22,6 +21,7 @@ import subprocess
 import sys
 import time
 import zlib
+from pathlib import Path
 
 MOUSE = "/data/adb/alice-mouse/control.sock"
 DAEMON_SHA256 = "9d25ff623eb29fc9b9f72e9e2126d52144db2181508229aac91eb4cd0de38516"

@@ -7,10 +7,10 @@ never returned by metadata/list operations.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import os
-from typing import Any, Optional
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
 
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -46,13 +46,13 @@ class KeyMetadata:
     owner: str
     status: str
     created_at: str
-    expires_at: Optional[str]
-    rotated_from: Optional[str]
+    expires_at: str | None
+    rotated_from: str | None
     fingerprint: str
 
 
 def _iso(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _manager_key() -> bytes:
@@ -113,7 +113,7 @@ def _check_active(row: DatabaseRow) -> None:
     expires_at = row["expires_at"]
     if expires_at:
         expires = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
-        if datetime.now(timezone.utc) >= expires:
+        if datetime.now(UTC) >= expires:
             raise KeyExpiredError(f"Key '{row['key_ref']}' is expired")
 
 
@@ -125,9 +125,9 @@ def _new_row(
     provider: str,
     environment: str,
     owner: str,
-    expires_at: Optional[datetime],
-    key_ref: Optional[str],
-    rotated_from: Optional[str],
+    expires_at: datetime | None,
+    key_ref: str | None,
+    rotated_from: str | None,
 ) -> DatabaseRow:
     if not isinstance(secret, str) or not secret:
         raise ValueError("secret must be a non-empty string")
@@ -142,7 +142,7 @@ def _new_row(
 
     _ensure_schema()
     ref = key_ref or f"key_{os.urandom(16).hex()}"
-    created_at = _iso(datetime.now(timezone.utc))
+    created_at = _iso(datetime.now(UTC))
     expires_value = _iso(expires_at) if expires_at else None
     encrypted = _fernet().encrypt(secret.encode("utf-8")).decode("ascii")
 
@@ -172,9 +172,9 @@ def store_secret(
     provider: str,
     environment: str = "production",
     owner: str = "",
-    expires_at: Optional[datetime] = None,
-    key_ref: Optional[str] = None,
-    rotated_from: Optional[str] = None,
+    expires_at: datetime | None = None,
+    key_ref: str | None = None,
+    rotated_from: str | None = None,
 ) -> KeyMetadata:
     row = _new_row(
         secret=secret,
@@ -212,9 +212,9 @@ def get_metadata(key_ref: str) -> KeyMetadata:
 
 def list_keys(
     *,
-    provider: Optional[str] = None,
-    purpose: Optional[str] = None,
-    environment: Optional[str] = None,
+    provider: str | None = None,
+    purpose: str | None = None,
+    environment: str | None = None,
     include_revoked: bool = False,
 ) -> list[KeyMetadata]:
     rows = get_store().items(prefix="key-manager/").values()
@@ -244,7 +244,7 @@ def revoke_key(key_ref: str) -> None:
                 {
                     **row,
                     "status": "revoked",
-                    "revoked_at": _iso(datetime.now(timezone.utc)),
+                    "revoked_at": _iso(datetime.now(UTC)),
                 },
             )
 
@@ -264,8 +264,8 @@ def rotate_key(
     key_ref: str,
     *,
     secret: str,
-    expires_at: Optional[datetime] = None,
-    name: Optional[str] = None,
+    expires_at: datetime | None = None,
+    name: str | None = None,
 ) -> KeyMetadata:
     old = _get_row(key_ref)
     _check_active(old)
@@ -298,7 +298,7 @@ def rotate_key(
             {
                 **current,
                 "status": "revoked",
-                "revoked_at": _iso(datetime.now(timezone.utc)),
+                "revoked_at": _iso(datetime.now(UTC)),
             },
         )
     return _metadata(row)
@@ -321,17 +321,17 @@ def _metadata(row: DatabaseRow) -> KeyMetadata:
 
 
 __all__ = [
-    "KeyManagerError",
-    "KeyNotFoundError",
     "KeyExpiredError",
-    "KeyRevokedError",
+    "KeyManagerError",
     "KeyMetadata",
+    "KeyNotFoundError",
+    "KeyRevokedError",
     "create_schema",
-    "store_secret",
-    "read_secret",
+    "delete_key",
     "get_metadata",
     "list_keys",
+    "read_secret",
     "revoke_key",
     "rotate_key",
-    "delete_key",
+    "store_secret",
 ]

@@ -5,12 +5,12 @@ It reuses the pinned Bambu Studio profiles from the already proven cube lane.
 """
 
 from __future__ import annotations
-import os
 
 import argparse
 import hashlib
 import json
 import math
+import os
 import struct
 import subprocess
 import sys

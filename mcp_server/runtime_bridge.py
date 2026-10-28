@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-import threading
 import json
+import threading
 import uuid
-from typing import Any, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any
+
 from mcp_server.host import (
     bind_current_trace,
     bound,
@@ -17,7 +19,6 @@ from mcp_server.host import (
     reset_current_trace,
     start_invocation,
 )
-
 
 # Runtime-scoped MCP calls enter the same dispatcher boundary as preview code.
 # Deployment code registers available runtimes on this dispatcher; credentials
@@ -56,7 +57,7 @@ class ToolOutputError(RuntimeError):
 def _handle_call(
     name: str,
     arguments: Any,
-    user: Optional[str],
+    user: str | None,
     *,
     runtime_id: str | None = None,
     resource_runtime_id: str | None = None,

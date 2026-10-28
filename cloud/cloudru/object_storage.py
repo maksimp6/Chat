@@ -6,20 +6,21 @@ client-visible errors: failures are mapped to the safe errors from ``storage``.
 """
 
 from __future__ import annotations
-import os
 
 import hashlib
 import hmac
+import os
 import xml.etree.ElementTree as ET
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import PurePosixPath
-from typing import Any, Callable, Mapping
+from typing import Any
 from urllib.parse import quote, urlsplit
 
 import requests
-from cloud.host import bound
 
+from cloud.host import bound
 
 DEFAULT_ENDPOINT = "https://s3.cloud.ru"
 DEFAULT_REGION = "ru-central-1"
@@ -174,7 +175,7 @@ class CloudRuObjectStorage:
         self._prefix = "" if base == PurePosixPath(".") else base.as_posix()
         self._session = session or requests.Session()
         self._timeout = timeout
-        self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._clock = clock or (lambda: datetime.now(UTC))
 
     @classmethod
     def from_env(

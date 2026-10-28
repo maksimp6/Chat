@@ -6,16 +6,17 @@ access code from a local secret provider, never from repository configuration.
 
 from __future__ import annotations
 
-import importlib
 import hashlib
 import hmac
+import importlib
 import json
 import ssl
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
-from .service import record_bambu_print_report
 from .bambu_telemetry import parse_bambu_report
+from .service import record_bambu_print_report
 
 
 def printer_report_topic(serial: str) -> str:

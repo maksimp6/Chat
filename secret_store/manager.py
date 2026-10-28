@@ -6,10 +6,10 @@ canonical SecretRef metadata and authorizes a runtime purpose before resolution.
 
 from __future__ import annotations
 
+import re
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime, timezone
-import re
+from datetime import UTC, datetime
 from typing import Protocol
 
 from secret_store.admin import SecretAdminBackend
@@ -196,7 +196,7 @@ class SecretManager:
                 purpose=purpose,
                 operation=operation,
                 success=success,
-                occurred_at=datetime.now(timezone.utc).isoformat(),
+                occurred_at=datetime.now(UTC).isoformat(),
             )
         )
 

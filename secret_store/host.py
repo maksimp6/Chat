@@ -35,9 +35,9 @@ __all__ = [
     "bind",
     "bound",
     "current",
-    "provide",
     "get_current_trace",
     "get_store",
+    "provide",
 ]
 
 

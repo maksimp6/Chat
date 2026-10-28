@@ -5,13 +5,14 @@ No containers, .NET or pip dependencies. OpenSSL performs RSA operations.
 """
 
 from __future__ import annotations
+
 import argparse
 import base64
 import datetime
 import fcntl
+import hashlib
 import json
 import os
-from pathlib import Path
 import platform
 import re
 import shutil
@@ -22,11 +23,11 @@ import tarfile
 import tempfile
 import threading
 import time
-import hashlib
 import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from pathlib import Path
 
 PROTOCOL_VERSION = "2.338.1"
 USER_AGENT = "GitHubActionsRunner/2.338.1 RedmiPythonRunner/0.1"
@@ -66,7 +67,7 @@ def month_of(when):
 def month_after(month, months):
     year, number = (int(part) for part in month.split("-"))
     index = year * 12 + number - 1 + months
-    return datetime.datetime(index // 12, index % 12 + 1, 1, tzinfo=datetime.timezone.utc)
+    return datetime.datetime(index // 12, index % 12 + 1, 1, tzinfo=datetime.UTC)
 
 
 def monthly_recipient(now):
@@ -95,7 +96,8 @@ def due_keys(now):
 
 def age_encrypt(source, target, now):
     subprocess.run(
-        ["age", "-r", monthly_recipient(now), "-o", str(target), str(source)], check=True
+        ["age", "-r", monthly_recipient(now), "-o", str(target), str(source)],
+        check=True,
     )
 
 
@@ -129,8 +131,17 @@ def publish_files(files, repo, branch, token, message):
         _git(["init", "-q"], work, env)
         _git(["remote", "add", "origin", remote], work, env)
         heads = subprocess.run(
-            ["git", "ls-remote", "--exit-code", "--heads", "origin", "refs/heads/" + branch],
-            cwd=work, env=env, capture_output=True,
+            [
+                "git",
+                "ls-remote",
+                "--exit-code",
+                "--heads",
+                "origin",
+                "refs/heads/" + branch,
+            ],
+            cwd=work,
+            env=env,
+            capture_output=True,
         )
         if heads.returncode == 0:
             _git(["fetch", "--quiet", "origin", "refs/heads/" + branch], work, env)
@@ -140,9 +151,15 @@ def publish_files(files, repo, branch, token, message):
         else:
             raise RuntimeError(f"git ls-remote exited {heads.returncode}")
         _git(["config", "user.name", "Redmi 9 job archive"], work, env)
-        _git(["config", "user.email", "redmi9-diagnostics@users.noreply.github.com"], work, env)
+        _git(
+            ["config", "user.email", "redmi9-diagnostics@users.noreply.github.com"],
+            work,
+            env,
+        )
         _git(["lfs", "install", "--local"], work, env)
-        (work / ".gitattributes").write_text("*.age filter=lfs diff=lfs merge=lfs -text\n")
+        (work / ".gitattributes").write_text(
+            "*.age filter=lfs diff=lfs merge=lfs -text\n"
+        )
         sealed = {}
         for source, dest in files:
             target = work / dest
@@ -161,23 +178,47 @@ def publish_files(files, repo, branch, token, message):
             # Read it back from GitHub into a fresh store: a local object is no upload proof.
             verify = Path(tmp) / "verify"
             _git(
-                ["clone", "-q", "--no-checkout", "--single-branch", "--branch", branch, remote, str(verify)],
-                Path(tmp), env,
+                [
+                    "clone",
+                    "-q",
+                    "--no-checkout",
+                    "--single-branch",
+                    "--branch",
+                    branch,
+                    remote,
+                    str(verify),
+                ],
+                Path(tmp),
+                env,
             )
             _git(["lfs", "install", "--local"], verify, env)
             _git(["checkout", "-q", "--detach", commit], verify, env)
             for dest, sha in sealed.items():
-                _git(["lfs", "fetch", "--include=" + dest, "--exclude=", "origin", commit], verify, env)
+                _git(
+                    [
+                        "lfs",
+                        "fetch",
+                        "--include=" + dest,
+                        "--exclude=",
+                        "origin",
+                        commit,
+                    ],
+                    verify,
+                    env,
+                )
                 _git(["lfs", "checkout", dest], verify, env)
                 if sha256_file(verify / dest) != sha:
                     raise RuntimeError(f"{dest} read back from GitHub differs")
-    return {"status": "remote_verified", "commit": commit, "branch": branch, "files": sorted(d for _, d in files)}
+    return {
+        "status": "remote_verified",
+        "commit": commit,
+        "branch": branch,
+        "files": sorted(d for _, d in files),
+    }
 
 
 def timestamp():
-    return (
-        datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
-    )
+    return datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z")
 
 
 class APIError(RuntimeError):
@@ -1048,7 +1089,7 @@ class Job:
         until then it waits for the next job's token."""
         spool = self.listener.state / "workspace-spool"
         captured = not work.is_dir()
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         try:
             spool.mkdir(mode=0o700, exist_ok=True)
             if work.is_dir():
@@ -1064,7 +1105,9 @@ class Job:
                         "conclusion": result,
                         "archived_at": timestamp(),
                         "key": f"keys/{month_of(now)}.agekey",
-                        "key_published_from": month_after(month_of(now), 2).date().isoformat(),
+                        "key_published_from": month_after(month_of(now), 2)
+                        .date()
+                        .isoformat(),
                     },
                 )
                 captured = True
@@ -1080,18 +1123,26 @@ class Job:
                 meta_path = spool / f"{job_id}.json"
                 if not meta_path.exists():
                     secure_json(meta_path, {"job_id": job_id})
-                month = json.loads(meta_path.read_text()).get("key", "")[5:12] or month_of(now)
+                month = json.loads(meta_path.read_text()).get("key", "")[
+                    5:12
+                ] or month_of(now)
                 dest = f"android/redmi9/workspaces/{month}/{archive.name}"
                 receipt = publish_files(
                     [(archive, dest), (meta_path, dest + ".json")],
-                    repo, WORKSPACE_BRANCH, token, "Archive " + dest,
+                    repo,
+                    WORKSPACE_BRANCH,
+                    token,
+                    "Archive " + dest,
                 )
                 print("WORKSPACE_LFS_REMOTE_VERIFIED", json.dumps(receipt), flush=True)
                 archive.unlink()
                 meta_path.unlink(missing_ok=True)
             for key in due_keys(now):
                 receipt = publish_files(
-                    [(key, f"keys/{key.name}")], repo, WORKSPACE_BRANCH, token,
+                    [(key, f"keys/{key.name}")],
+                    repo,
+                    WORKSPACE_BRANCH,
+                    token,
                     f"Publish workspace key {key.stem}",
                 )
                 secure_json(key.with_name(key.name + ".published"), receipt)

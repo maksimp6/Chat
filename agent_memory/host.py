@@ -31,8 +31,8 @@ __all__ = [
     "bind",
     "bound",
     "current",
-    "provide",
     "memory_file_path",
+    "provide",
 ]
 
 

@@ -51,12 +51,11 @@ __all__ = [
     "Host",
     "HostNotBound",
     "bind",
-    "bound",
-    "current",
-    "provide",
     "bootstrap_credential",
+    "bound",
     "create_invocation",
     "create_invocation_trace",
+    "current",
     "current_runtime_data_root",
     "current_runtime_id",
     "fail_invocation",
@@ -64,6 +63,7 @@ __all__ = [
     "get_store",
     "initialize_application",
     "persist_invocation_trace",
+    "provide",
     "start_invocation",
 ]
 

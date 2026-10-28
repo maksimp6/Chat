@@ -1,7 +1,8 @@
 """Invocation-scoped ExecutionTrace ownership helpers."""
 
-from invocation.context import InvocationContext
 from typing import Any
+
+from invocation.context import InvocationContext
 from invocation.host import bound
 
 

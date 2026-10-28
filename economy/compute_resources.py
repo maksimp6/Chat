@@ -8,11 +8,10 @@ and is already paid for through provider token pricing.
     cost      = energy_wh / 1000 * price_per_kwh
 """
 
-import os
-
 import logging
 import math
-from typing import Any, Optional
+import os
+from typing import Any
 
 logger = logging.getLogger("logos.economy.compute_resources")
 
@@ -22,7 +21,7 @@ PROVIDER = "logos_compute"
 DEFAULT_CPU_WATTS_PER_CORE = 15.0
 
 
-def _positive_env_float(name: str) -> Optional[float]:
+def _positive_env_float(name: str) -> float | None:
     raw = (os.environ.get(name) or "").strip()
     if not raw:
         return None
@@ -37,7 +36,7 @@ def _positive_env_float(name: str) -> Optional[float]:
     return value
 
 
-def get_energy_pricing() -> dict[str, Optional[float]]:
+def get_energy_pricing() -> dict[str, float | None]:
     watts = _positive_env_float("LOGOS_CPU_WATTS_PER_CORE")
     return {
         "watts_per_core": DEFAULT_CPU_WATTS_PER_CORE if watts is None else watts,
@@ -46,9 +45,9 @@ def get_energy_pricing() -> dict[str, Optional[float]]:
 
 
 def build_compute_billing_item(
-    cpu_seconds: Optional[float],
-    wall_seconds: Optional[float] = None,
-    pricing: Optional[dict[str, Optional[float]]] = None,
+    cpu_seconds: float | None,
+    wall_seconds: float | None = None,
+    pricing: dict[str, float | None] | None = None,
 ) -> dict[str, Any]:
     pricing = pricing or get_energy_pricing()
     watts = float(pricing["watts_per_core"])

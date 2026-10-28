@@ -18,7 +18,7 @@ import sys
 import time
 import zipfile
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote
 
@@ -176,7 +176,7 @@ class CorpusArchive:
             else []
         )
         self.observed = set()
-        self.captured_at = datetime.now(timezone.utc).isoformat()
+        self.captured_at = datetime.now(UTC).isoformat()
         self.expanded_bytes = 0
 
     def gap(
@@ -938,7 +938,7 @@ def _github_pass(args, archive, reader, number, epoch):
 
     before = _github_progress(reader, args.repository)
     source_count, gap_count = len(archive.entries), len(archive.gaps)
-    started_at = datetime.now(timezone.utc).isoformat()
+    started_at = datetime.now(UTC).isoformat()
     collection = collect_github(
         args.repository, reader.token, archive, reader=reader, epoch=epoch
     )
@@ -955,7 +955,7 @@ def _github_pass(args, archive, reader, number, epoch):
     return {
         "pass": number,
         "started_at": started_at,
-        "finished_at": datetime.now(timezone.utc).isoformat(),
+        "finished_at": datetime.now(UTC).isoformat(),
         "collection": collection,
         "new_source_versions": new_sources,
         "progress_before": before,
@@ -972,7 +972,7 @@ def _collect_github_passes(args, archive, result):
 
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("CODEX_GITHUB_TOKEN", "")
     state = {
-        "epoch": datetime.now(timezone.utc).isoformat(),
+        "epoch": datetime.now(UTC).isoformat(),
         "requested": args.github_passes,
         "completed": 0,
         "max_requests_per_pass": args.github_max_requests,

@@ -1,7 +1,6 @@
 """Universal tool definitions backed by the SSH Runtime."""
 
 from __future__ import annotations
-from tool_providers._vendor.output import limit_output, newline_text, read_output
 
 import math
 import os
@@ -9,8 +8,9 @@ import shutil
 import signal
 import subprocess
 from typing import Any
-from tool_providers.host import bound, runtime_for_operation
 
+from tool_providers._vendor.output import limit_output, newline_text, read_output
+from tool_providers.host import bound, runtime_for_operation
 
 # Tests may inject a runtime instance. Production resolves the persisted
 # SSH Runtime settings for every operation so settings changes take effect
@@ -143,7 +143,10 @@ def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
                     proc.kill()
                     out, err = proc.communicate()
                     # Text mode used to translate newlines here too.
-                    exc.stdout, exc.stderr = newline_text(out or b""), newline_text(err or b"")
+                    exc.stdout, exc.stderr = (
+                        newline_text(out or b""),
+                        newline_text(err or b""),
+                    )
                 raise
             except BaseException:
                 proc.kill()

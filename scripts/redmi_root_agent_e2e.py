@@ -6,18 +6,17 @@ import hashlib
 import json
 import math
 import os
-from pathlib import Path
 import secrets
 import shlex
-import subprocess
 import struct
+import subprocess
 import sys
 import threading
 import time
 import zlib
 from collections import Counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-
+from pathlib import Path
 
 PAGE = b"""<!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
 <title>RootAgent physical input check</title>

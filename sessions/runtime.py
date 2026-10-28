@@ -7,8 +7,6 @@ backend.
 """
 
 from __future__ import annotations
-from sessions._vendor.output import newline_text, read_output
-from sessions._vendor.wikifunctions import clamp_integer
 
 import json
 import os
@@ -19,7 +17,10 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
+
+from sessions._vendor.output import newline_text, read_output
+from sessions._vendor.wikifunctions import clamp_integer
 
 try:
     import resource
@@ -72,7 +73,7 @@ class VirtualLowConsumptionServer:
         "failed",
     }
 
-    def __init__(self, session_id: str, config: Optional[VirtualServerConfig] = None):
+    def __init__(self, session_id: str, config: VirtualServerConfig | None = None):
         self.session_id = session_id
         self.config = config or VirtualServerConfig()
         self.state = "stopped"
@@ -102,7 +103,7 @@ class VirtualLowConsumptionServer:
             self._touch()
             return self.runtime_id
 
-    def execute(self, command: str, timeout: Optional[int] = None) -> dict[str, Any]:
+    def execute(self, command: str, timeout: int | None = None) -> dict[str, Any]:
         if not isinstance(command, str) or not command.strip():
             raise ValueError("command must be a non-empty string")
 
@@ -160,7 +161,10 @@ class VirtualLowConsumptionServer:
                             proc.kill()
                             out, err = proc.communicate()
                             # Text mode used to translate newlines here too.
-                            exc.stdout, exc.stderr = newline_text(out or b""), newline_text(err or b"")
+                            exc.stdout, exc.stderr = (
+                                newline_text(out or b""),
+                                newline_text(err or b""),
+                            )
                         raise
                     except BaseException:
                         proc.kill()
@@ -210,7 +214,7 @@ class VirtualLowConsumptionServer:
             if self.state == "running":
                 self.state = "idle"
 
-    def reap_if_idle(self, now: Optional[float] = None) -> bool:
+    def reap_if_idle(self, now: float | None = None) -> bool:
         now = time.time() if now is None else now
         with self._lock:
             if (
@@ -252,7 +256,7 @@ class ReadyMadeSession:
     def create_runtime(self) -> VirtualLowConsumptionServer:
         return VirtualLowConsumptionServer(self.id, self.virtual_server)
 
-    def clone(self, name: str, session_id: Optional[str] = None) -> "ReadyMadeSession":
+    def clone(self, name: str, session_id: str | None = None) -> "ReadyMadeSession":
         data = asdict(self)
         data["id"] = session_id or f"sess_{uuid.uuid4().hex}"
         data["name"] = name

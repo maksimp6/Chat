@@ -6,7 +6,8 @@ access codes for cloud credentials. This interface is read-only.
 
 from __future__ import annotations
 
-from typing import Protocol, Mapping, Any
+from collections.abc import Mapping
+from typing import Any, Protocol
 
 
 class PrinterCloudReader(Protocol):

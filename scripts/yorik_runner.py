@@ -11,7 +11,6 @@ import io
 import ipaddress
 import json
 import os
-from pathlib import Path
 import re
 import socket
 import ssl
@@ -22,6 +21,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
+from pathlib import Path
 
 API = "https://api.github.com/repos/maksimp6/Chat"
 WORKFLOW = ".github/workflows/yorik-redmi9.yml"

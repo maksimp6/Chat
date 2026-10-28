@@ -4,9 +4,9 @@ This creates data ONLY in the supplied board file. It never calls GitHub or depl
 """
 
 from __future__ import annotations
-import os
 
 import argparse
+import os
 
 from .store import BoardStore
 

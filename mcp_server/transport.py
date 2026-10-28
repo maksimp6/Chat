@@ -1,6 +1,7 @@
 """HTTP transport of the MCP endpoint: OPTIONS, GET and POST on the MCP path."""
 
 from __future__ import annotations
+
 from flask import Blueprint, Response, request
 
 from mcp_server.auth import _auth_user_from_request

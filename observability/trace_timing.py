@@ -4,10 +4,10 @@ The helpers are pure with respect to the trace mapping and keep the public
 ExecutionTrace API unchanged.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 
-def request_timing_for_step(trace: dict[str, Any], step_index: int) -> Optional[float]:
+def request_timing_for_step(trace: dict[str, Any], step_index: int) -> float | None:
     """Start timestamp of one logical API step, or None when it was never recorded."""
     start = None
     api_requests = trace.get("api_requests", [])
@@ -32,7 +32,7 @@ def request_timing_for_step(trace: dict[str, Any], step_index: int) -> Optional[
 
 def infer_response_start(
     trace: dict[str, Any], step_index: int, end_timestamp: float
-) -> Optional[float]:
+) -> float | None:
     request_start = request_timing_for_step(trace, step_index)
     if request_start is not None:
         return request_start

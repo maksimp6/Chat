@@ -2,18 +2,18 @@
 
 from remote_input.core import (
     Command,
+    Cursor,
     MouseError,
     MouseModule,
     RecordingBackend,
     RootSocketBackend,
-    Cursor,
 )
 
 __all__ = [
     "Command",
+    "Cursor",
     "MouseError",
     "MouseModule",
     "RecordingBackend",
     "RootSocketBackend",
-    "Cursor",
 ]

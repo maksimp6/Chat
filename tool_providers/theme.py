@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 THEME_LABELS = {
     "light": "Светлая",
     "dark": "Тёмная",

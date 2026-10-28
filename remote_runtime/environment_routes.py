@@ -4,15 +4,15 @@ from flask import Blueprint, Response, current_app, jsonify, request
 
 from remote_runtime.environments import (
     GitUnavailable,
+    _get,
     create_environment,
     delete_environment,
+    dispatch_environment_http,
     list_environments,
+    register_runtime_operation,
     restart_environment,
     start_environment,
     stop_environment,
-    _get,
-    dispatch_environment_http,
-    register_runtime_operation,
 )
 from remote_runtime.host import get_current_owner_id
 
@@ -39,8 +39,7 @@ _DETAILS = {
         "Обновите список и проверьте статус окружения."
     ),
     "environment_operation_failed": (
-        "Операция с окружением не выполнена. "
-        "Проверьте статус окружения и повторите."
+        "Операция с окружением не выполнена. Проверьте статус окружения и повторите."
     ),
     "environment_not_running": "Окружение не запущено. Запустите его и откройте снова.",
     "environment_runtime_timeout": "Окружение не ответило вовремя. Повторите запрос.",

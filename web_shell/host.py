@@ -37,13 +37,13 @@ __all__ = [
     "bind",
     "bound",
     "current",
-    "provide",
     "current_runtime_base_path",
     "get_current_owner_id",
     "get_donation_url",
     "get_store",
     "memory_file_path",
     "problem",
+    "provide",
 ]
 
 

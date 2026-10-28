@@ -46,8 +46,8 @@ def render_turntable(
     if type(dpi) is not int or not 50 <= dpi <= 160:
         raise ValueError("dpi out of range")
     mesh = _load_mesh(stl_path)
-    import numpy as np
     import matplotlib
+    import numpy as np
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt

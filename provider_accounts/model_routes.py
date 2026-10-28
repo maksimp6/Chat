@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from flask import Flask, jsonify, request
 
+from provider_accounts.host import annotate_catalog
 from provider_accounts.model_discovery import (
     ModelDiscovery,
     ModelDiscoveryError,
     get_model_discovery,
     static_model_catalog,
 )
-from provider_accounts.host import annotate_catalog
 
 # The process model discovery, created when the routes are installed (at boot).
 MODEL_DISCOVERY: ModelDiscovery | None = None

@@ -6,7 +6,8 @@ made by changing the named contract first, then updating producers/consumers.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 
 class ContractViolation(ValueError):

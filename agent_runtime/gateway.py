@@ -1,18 +1,19 @@
 """Provider-agnostic gateway for Logos agents."""
 
 from __future__ import annotations
+
+import json
+import time
 from collections import deque
+from collections.abc import Callable, Mapping, MutableMapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from threading import Event, RLock, Thread
-from typing import Any, Callable, Mapping, MutableMapping, Optional
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 from uuid import uuid4
-import json
-import time
-
 
 _MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 
@@ -71,7 +72,7 @@ class A2AProtocolError(AgentGatewayError):
 
 
 AgentHandler = Callable[[Mapping[str, Any]], Any]
-TokenProvider = Callable[[], Optional[str]]
+TokenProvider = Callable[[], str | None]
 
 
 @dataclass(frozen=True)
@@ -94,7 +95,7 @@ class InvocationResult:
     agent_id: str
     status: str
     result: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     attempts: int = 0
     started_at: str = ""
     finished_at: str = ""
@@ -108,7 +109,7 @@ class A2AClientConfig:
 
 class A2AClient:
     def __init__(
-        self, config: A2AClientConfig, token_provider: Optional[TokenProvider] = None
+        self, config: A2AClientConfig, token_provider: TokenProvider | None = None
     ) -> None:
         if not config.endpoint.strip():
             raise ValueError("A2A endpoint must not be empty")
@@ -174,7 +175,7 @@ class RESTAgentClient:
     def __init__(
         self,
         endpoint: str,
-        token_provider: Optional[TokenProvider] = None,
+        token_provider: TokenProvider | None = None,
         timeout_seconds: float = 30.0,
     ) -> None:
         if not endpoint.strip():
@@ -290,7 +291,7 @@ class AgentGateway:
                 raise AgentNotFound(agent_id)
             return entry[0]
 
-    def list_agents(self, capability: Optional[str] = None) -> list[AgentDescriptor]:
+    def list_agents(self, capability: str | None = None) -> list[AgentDescriptor]:
         with self._lock:
             items = [descriptor for descriptor, _ in self._agents.values()]
         if capability is not None:
@@ -369,16 +370,16 @@ class AgentGateway:
         agent_id: str,
         payload: Mapping[str, Any],
         *,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         approved: bool = False,
         trace: Any = None,
-        timeout_seconds: Optional[float] = None,
-        max_retries: Optional[int] = None,
+        timeout_seconds: float | None = None,
+        max_retries: int | None = None,
     ) -> InvocationResult:
         if not isinstance(payload, Mapping):
             raise TypeError("payload must be an object")
         invocation_id = str(uuid4())
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
         timeout = (
             self.default_timeout_seconds
             if timeout_seconds is None
@@ -412,7 +413,7 @@ class AgentGateway:
                     error=str(exc),
                     attempts=0,
                     started_at=started_at.isoformat(),
-                    finished_at=datetime.now(timezone.utc).isoformat(),
+                    finished_at=datetime.now(UTC).isoformat(),
                 )
         self._trace_event(
             trace,
@@ -459,7 +460,7 @@ class AgentGateway:
                     result=result,
                     attempts=attempts,
                     started_at=started_at.isoformat(),
-                    finished_at=datetime.now(timezone.utc).isoformat(),
+                    finished_at=datetime.now(UTC).isoformat(),
                 )
             except Exception as exc:
                 last_error = f"{type(exc).__name__}: {exc}"
@@ -487,7 +488,7 @@ class AgentGateway:
             error=last_error,
             attempts=attempts,
             started_at=started_at.isoformat(),
-            finished_at=datetime.now(timezone.utc).isoformat(),
+            finished_at=datetime.now(UTC).isoformat(),
         )
 
     def route(
@@ -495,8 +496,8 @@ class AgentGateway:
         capability: str,
         payload: Mapping[str, Any],
         *,
-        preferred_agent_id: Optional[str] = None,
-        user_id: Optional[str] = None,
+        preferred_agent_id: str | None = None,
+        user_id: str | None = None,
         approved: bool = False,
         trace: Any = None,
     ) -> InvocationResult:
@@ -530,7 +531,6 @@ __all__ = [
     "A2AClient",
     "A2AClientConfig",
     "A2AProtocolError",
-    "RESTAgentClient",
     "AgentAlreadyRegistered",
     "AgentApprovalRequired",
     "AgentCircuitOpenError",
@@ -542,4 +542,5 @@ __all__ = [
     "AgentPermissionError",
     "AgentRateLimitError",
     "InvocationResult",
+    "RESTAgentClient",
 ]

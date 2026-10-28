@@ -5,16 +5,15 @@ import base64
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
-
 
 REPOSITORY = "maksimp6/Chat"
 REMOTE = "https://github.com/" + REPOSITORY + ".git"

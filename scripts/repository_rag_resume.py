@@ -8,9 +8,9 @@ archive contains sanitized provider copies, never reconstructed originals.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import re
 import tempfile
+from pathlib import Path
 
 MAX_RECEIPT_BYTES = 16 * 1024 * 1024
 MAX_RECEIPT_FILES = 2000

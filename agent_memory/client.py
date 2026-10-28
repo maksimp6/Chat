@@ -7,8 +7,8 @@ path, use transactions for concurrent mutations, and close at runtime shutdown.
 from pathlib import Path
 from threading import RLock
 from typing import Any
-from agent_memory.host import bound
 
+from agent_memory.host import bound
 
 _LOCK = RLock()
 _CLIENTS: dict[Path, Any] = {}

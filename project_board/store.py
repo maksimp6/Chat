@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from threading import RLock
 from typing import Any, Self
+
 from project_board.host import bound
 
 

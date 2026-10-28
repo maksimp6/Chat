@@ -14,8 +14,9 @@ import logging
 import re
 import shutil
 import threading
+from collections.abc import Mapping
 from importlib import import_module
-from typing import Any, Mapping, Optional
+from typing import Any
 
 from tool_providers.host import bound
 from tool_providers.universal_tool_platform import (
@@ -285,14 +286,14 @@ class ToolRegistry:
 
     def get_universal_definition(
         self, tool_name: str
-    ) -> Optional[UniversalToolDefinition]:
+    ) -> UniversalToolDefinition | None:
         cfg = self._tools.get(tool_name)
         if cfg is None:
             return None
         return UniversalToolDefinition.from_mapping(tool_name, cfg)
 
     def get_universal_definitions(
-        self, transport: Optional[str] = None
+        self, transport: str | None = None
     ) -> list[dict[str, Any]]:
         definitions = []
         which = self._which_per_listing()
@@ -310,7 +311,7 @@ class ToolRegistry:
         tool_name: str,
         arguments: dict,
         server_configs: list = None,
-        context: Optional[Mapping[str, Any]] = None,
+        context: Mapping[str, Any] | None = None,
     ) -> dict:
         if tool_name not in self._tools:
             return {"error": f"Инструмент '{tool_name}' не найден"}

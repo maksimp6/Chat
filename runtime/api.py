@@ -1,6 +1,7 @@
 """Small API helpers for session/invocation lifecycle endpoints."""
 
 from flask import Blueprint, jsonify, request
+
 from runtime.host import (
     bound,
     check_access,
@@ -16,7 +17,6 @@ from runtime.host import (
     session_profile,
     validate_api_contract,
 )
-
 
 runtime_bp = Blueprint("runtime", __name__, url_prefix="/api")
 

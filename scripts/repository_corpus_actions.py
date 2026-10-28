@@ -10,10 +10,10 @@ import hashlib
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from scripts.repository_corpus_github import CollectionError, MAX_PAGE_BYTES
+from scripts.repository_corpus_github import MAX_PAGE_BYTES, CollectionError
 
 FILTERED_LIMIT = 1000
 MAX_WINDOWS = 10000
@@ -46,7 +46,7 @@ def _second(value, *, floor=False):
 
 
 def _utc(second):
-    return datetime.fromtimestamp(second, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.fromtimestamp(second, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _write(path, raw):
@@ -341,7 +341,7 @@ class _Windows:
         ):
             record = {
                 **pending.pop(0),
-                "observed_at": datetime.now(timezone.utc).isoformat(),
+                "observed_at": datetime.now(UTC).isoformat(),
             }
             try:
                 children = self._visit(record)

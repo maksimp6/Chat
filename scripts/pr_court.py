@@ -9,18 +9,18 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 import re
 import urllib.error
 import urllib.request
 from pathlib import Path
 
+from scripts.pr_court_evidence import validate_judgment
 from scripts.pr_court_launch_hold import (
     NativeLogosLaunchBlocked,
     enforce_native_launch_hold,
     hold_receipt,
 )
-import os
-from scripts.pr_court_evidence import validate_judgment
 
 API = "https://api.github.com"
 PROVIDER = "https://ai.api.cloud.yandex.net/v1/responses"

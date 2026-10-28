@@ -5,17 +5,17 @@ This module uses the separate admin IAM identity and never logs or traces payloa
 """
 
 from __future__ import annotations
-import os
 
 import base64
+import os
 from typing import Any
 
 import requests
 
 from cloud.base import CloudProviderError
 from cloud.cloudru.client import CloudRuClient
-from cloud.cloudru.secret_management import SECRET_PATH, VERSIONS_PATH
 from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
+from cloud.cloudru.secret_management import SECRET_PATH, VERSIONS_PATH
 
 
 class CloudRuSecretManagementAdminClient:

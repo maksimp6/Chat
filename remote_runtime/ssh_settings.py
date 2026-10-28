@@ -6,19 +6,20 @@ reference to an existing key file.
 """
 
 from __future__ import annotations
-import os
 
 import copy
 import json
 import logging
+import os
 import re
 import subprocess
 import time
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from remote_runtime._vendor.restrictions import restrictions_lifted
-from remote_runtime.ssh import SSHRuntime, SSHRuntimeError
 from remote_runtime.host import get_config, get_current_trace, set_config
+from remote_runtime.ssh import SSHRuntime, SSHRuntimeError
 
 logger = logging.getLogger("logos.remote_runtime.ssh_settings")
 
@@ -434,10 +435,10 @@ def test_connection(target_name: str, identity_id: str | None) -> dict[str, Any]
 __all__ = [
     "SETTINGS_KEY",
     "assert_operation_allowed",
-    "command_matches_allowlist",
-    "is_privileged_command",
     "build_runtime",
+    "command_matches_allowlist",
     "get_settings",
+    "is_privileged_command",
     "public_settings",
     "runtime_for_operation",
     "save_settings",

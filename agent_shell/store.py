@@ -8,14 +8,14 @@ refused by the engine's writer lock. Legacy SQL files are never overwritten.
 from __future__ import annotations
 
 import builtins
-from copy import deepcopy
 import json
-from pathlib import Path
 import re
 import time
+from copy import deepcopy
+from pathlib import Path
 from typing import Any, TypedDict, cast
-from agent_shell.host import bound, get_memory_client
 
+from agent_shell.host import bound, get_memory_client
 
 ROLE_RE = re.compile(r"^[a-z][a-z0-9-]{1,40}$")
 KIND_RE = re.compile(r"^[a-z][a-z0-9_]{1,40}$")

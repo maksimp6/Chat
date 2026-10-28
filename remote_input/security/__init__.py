@@ -2,18 +2,18 @@
 
 from remote_input.security.grants import (
     AuthenticatedPrincipal,
-    SessionAuthority,
-    InputGrant,
     GrantError,
+    InputGrant,
     ProtectedVerifier,
+    SessionAuthority,
     TrustedSigner,
 )
 
 __all__ = [
     "AuthenticatedPrincipal",
-    "SessionAuthority",
-    "InputGrant",
     "GrantError",
+    "InputGrant",
     "ProtectedVerifier",
+    "SessionAuthority",
     "TrustedSigner",
 ]

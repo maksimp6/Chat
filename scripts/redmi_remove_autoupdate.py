@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Retire the old Termux updater once, from the existing runner's deploy job."""
 
-from datetime import datetime, timezone
 import fcntl
 import hashlib
 import json
 import os
-from pathlib import Path
 import signal
 import subprocess
 import time
+from datetime import UTC, datetime
+from pathlib import Path
 
 
 def acquire(stream, seconds):
@@ -61,7 +61,7 @@ def main():
     present = [source for source in sources if source.exists()]
     archive = None
     if present:
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S.%fZ")
         archive = state / "retired-autoupdate" / stamp
         archive.mkdir(parents=True, mode=0o700)
         # Preserve the status before the disabled marker can change it.
@@ -118,7 +118,7 @@ def main():
             after = pid_path.read_text().strip() if pid_path.exists() else None
             result = {
                 "result": "removed" if present else "already_removed",
-                "completed_at": datetime.now(timezone.utc).isoformat(),
+                "completed_at": datetime.now(UTC).isoformat(),
                 "supervisor_stopped_pid": stopped_pid,
                 "supervisor_lock_free_before_removal": True,
                 "retired": retired,

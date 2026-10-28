@@ -15,9 +15,9 @@ import os
 import re
 import stat
 import tempfile
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
 from urllib.parse import quote
 
 from scripts import semantic_pipeline as semantic

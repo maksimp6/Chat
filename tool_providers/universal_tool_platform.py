@@ -6,16 +6,17 @@ Adapters create a UniversalToolCall and hand it to UniversalToolExecutor.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
-from functools import lru_cache
-from typing import Any, Callable, Mapping, Optional
 import math
 import time
 import warnings
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field, replace
+from functools import lru_cache
+from typing import Any
 
 from tool_providers._vendor.restrictions import restrictions_lifted
-from tool_providers.read_only_policy import ReadOnlyToolPolicy
 from tool_providers.host import enqueue_local_tool_job, wait_for_local_tool_job
+from tool_providers.read_only_policy import ReadOnlyToolPolicy
 
 
 def _warn_deprecated_execution_hooks(hooks: Mapping[str, Any]) -> None:
@@ -49,7 +50,7 @@ class UniversalToolDefinition:
     requires_approval: bool = True
     supported_transports: tuple[str, ...] = ("responses_api", "local_agent")
     executor: Mapping[str, Any] = field(default_factory=lambda: {"type": "local"})
-    title: Optional[str] = None
+    title: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -108,11 +109,11 @@ class UniversalToolDefinition:
 class UniversalToolCall:
     tool_name: str
     arguments: Mapping[str, Any]
-    call_id: Optional[str] = None
+    call_id: str | None = None
     transport: str = "internal"
-    trace_id: Optional[str] = None
-    invocation_id: Optional[str] = None
-    user_id: Optional[str] = None
+    trace_id: str | None = None
+    invocation_id: str | None = None
+    user_id: str | None = None
     approved: bool = False
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
@@ -121,7 +122,7 @@ class UniversalToolCall:
 class UniversalToolResult:
     success: bool
     data: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def to_mapping(self) -> dict[str, Any]:
@@ -333,7 +334,7 @@ class UniversalToolExecutor:
         self,
         call: UniversalToolCall | Mapping[str, Any],
         *,
-        server_configs: Optional[list[dict[str, Any]]] = None,
+        server_configs: list[dict[str, Any]] | None = None,
         **legacy_hooks: Any,
     ) -> dict[str, Any]:
         _warn_deprecated_execution_hooks(legacy_hooks)
@@ -506,7 +507,7 @@ class UniversalToolExecutor:
         call: UniversalToolCall,
         trace,
         *,
-        server_configs: Optional[list[dict[str, Any]]] = None,
+        server_configs: list[dict[str, Any]] | None = None,
         **legacy_hooks: Any,
     ) -> dict[str, Any]:
         if trace is None:

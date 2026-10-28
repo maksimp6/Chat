@@ -6,9 +6,9 @@ import logging
 
 from flask import Flask, jsonify, request
 
+from remote_runtime.host import bound, get_current_owner_id
 from remote_runtime.ssh import SSHRuntimeError
 from remote_runtime.ssh_settings import public_settings, save_settings, test_connection
-from remote_runtime.host import bound, get_current_owner_id
 
 logger = logging.getLogger("logos.remote_runtime.ssh_routes")
 
@@ -143,9 +143,7 @@ def test_ssh_runtime_connection():
         # The cause code and its text go to the window; the SSH text is only logged.
         code = exc.code if exc.code in _DETAILS else "ssh_connection_failed"
         logger.warning("SSH Runtime connection test failed: %s: %s", code, exc)
-        return jsonify(
-            {"success": False, "error": code, "detail": _DETAILS[code]}
-        ), 400
+        return jsonify({"success": False, "error": code, "detail": _DETAILS[code]}), 400
     except Exception:
         logger.exception("SSH Runtime connection test failed")
         return jsonify(

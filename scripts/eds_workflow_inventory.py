@@ -1,9 +1,9 @@
 """Read all Workflow Studio applications with bounded, secret-safe reporting."""
 
 from __future__ import annotations
-import os
 
 import json
+import os
 import re
 import subprocess
 import time

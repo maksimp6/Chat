@@ -3,9 +3,8 @@
 The device owns PKCE and polling. This module never receives provider tokens.
 """
 
-import os
-
 import json
+import os
 import time
 from pathlib import Path
 from urllib.parse import urlsplit

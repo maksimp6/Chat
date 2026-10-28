@@ -1,6 +1,7 @@
 """Resolve and pin LAN destinations before opening any printer socket."""
 
 from __future__ import annotations
+
 import ipaddress
 import socket
 from pathlib import Path

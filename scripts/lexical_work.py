@@ -10,9 +10,9 @@ The script fails with a clear message when the parser is not in the checkout.
 """
 
 from __future__ import annotations
-import os
 
 import json
+import os
 import subprocess
 import sys
 import urllib.error

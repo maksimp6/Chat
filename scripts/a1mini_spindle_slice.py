@@ -1,24 +1,23 @@
 """Slice hash-pinned OEM spindle source plate for A1 mini PLA fit prototype only."""
 
-import os
-
 import argparse
 import hashlib
 import io
 import json
 import math
-from pathlib import Path
+import os
 import struct
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
 import zipfile
+from pathlib import Path
 
 from a1mini_pla_cube_slice import (
-    profiles,
     _read_sliced_archive,
-    _validate_profile,
     _validate_gcode,
+    _validate_profile,
+    profiles,
 )
 
 SOURCE_SHA = "21fe9c783b15d00421dfb39dd0c79666ac1fe6f8bb672eaec1c0e86decdbbf84"

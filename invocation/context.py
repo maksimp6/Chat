@@ -1,9 +1,10 @@
 """Immutable request-scoped execution context for Logos invocations."""
 
+import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any, Mapping, Optional
-import uuid
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -18,10 +19,10 @@ class InvocationContext:
     conversation_id: str
     invocation_id: str
     trace_id: str
-    user_id: Optional[str] = None
+    user_id: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
-    agent_id: Optional[str] = None
-    runtime_id: Optional[str] = None
+    agent_id: str | None = None
+    runtime_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.session_id or not self.conversation_id:
@@ -36,10 +37,10 @@ class InvocationContext:
         session_id: str,
         conversation_id: str,
         *,
-        user_id: Optional[str] = None,
-        agent_id: Optional[str] = None,
-        runtime_id: Optional[str] = None,
-        metadata: Optional[Mapping[str, Any]] = None,
+        user_id: str | None = None,
+        agent_id: str | None = None,
+        runtime_id: str | None = None,
+        metadata: Mapping[str, Any] | None = None,
     ) -> "InvocationContext":
         """Create a fresh invocation context with unique correlation IDs."""
         return cls(

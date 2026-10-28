@@ -1,6 +1,7 @@
 """Shared local identity for the unauthenticated MCP transport."""
 
 from __future__ import annotations
+
 from mcp_server.host import get_current_owner_id
 
 

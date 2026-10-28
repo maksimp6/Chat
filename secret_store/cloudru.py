@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from secret_store.core import (
     SecretErrorCode,
     SecretRef,
     SecretResolutionError,
     SecretValue,
 )
-from typing import Any
 from secret_store.host import bound
-
 
 _ERROR_MAP = {
     "not_found": SecretErrorCode.NOT_FOUND,

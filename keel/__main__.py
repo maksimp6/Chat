@@ -1,11 +1,10 @@
 """Keel Platform CLI."""
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
-from keel.config import load_config, ConfigError
+from keel.config import ConfigError, load_config
 from keel.health import generate_health_plan
 
 

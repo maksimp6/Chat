@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+import struct
+import threading
+import time
+import zlib
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Protocol
-import threading
-import struct
-import zlib
-import time
 
 
 class Backend(str, Enum):

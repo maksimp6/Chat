@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Mapping, Optional
+import time
+from collections.abc import Mapping
+from typing import Any
 from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
-import time
+
 from organization._vendor.schema import object_schema
 from organization.host import bound, get_current_owner_id, get_store
 
@@ -48,19 +50,19 @@ def prepare_government_records() -> None:
 init_government_tables = prepare_government_records
 
 
-def _current_owner() -> Optional[str]:
+def _current_owner() -> str | None:
     try:
         return get_current_owner_id(required=False)
     except bound.TreasuryIdentityError:
         return None
 
 
-def _case_owned_by_current_user(case: Optional[dict[str, Any]]) -> bool:
+def _case_owned_by_current_user(case: dict[str, Any] | None) -> bool:
     """Cases are shared across the local installation."""
     return case is not None
 
 
-def get_case(case_id: str) -> Optional[dict[str, Any]]:
+def get_case(case_id: str) -> dict[str, Any] | None:
     return get_store().get("government/case/" + str(case_id))
 
 
@@ -89,7 +91,7 @@ def _save(case: dict[str, Any]) -> dict[str, Any]:
 
 
 def create_case(
-    case_type: str = "IP_REGISTRATION", user_id: Optional[str] = None
+    case_type: str = "IP_REGISTRATION", user_id: str | None = None
 ) -> dict[str, Any]:
     case_type = str(case_type or "").strip().upper()
     if case_type not in CASE_TYPES:
@@ -325,7 +327,7 @@ def _tool(
 _CASE = {"case_id": {"type": "string", "minLength": 1, "maxLength": 128}}
 
 
-def _tool_approved(cfg: Optional[dict[str, Any]]) -> bool:
+def _tool_approved(cfg: dict[str, Any] | None) -> bool:
     call = ((cfg or {}).get("_universal_context") or {}).get("call")
     return bool(getattr(call, "approved", False))
 
@@ -564,17 +566,17 @@ def api_submit_case(case_id: str):
 
 __all__ = [
     "GOVERNMENT_TOOLS",
-    "archive_case",
     "approve_case",
+    "archive_case",
     "collect_data",
     "create_case",
     "ensure_government_department",
     "get_case",
     "government_bp",
-    "prepare_government_records",
     "init_government_tables",
     "prepare_application",
     "prepare_documents",
+    "prepare_government_records",
     "process_response",
     "request_approval",
     "requirements",

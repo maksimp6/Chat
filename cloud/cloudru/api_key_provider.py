@@ -9,11 +9,10 @@ old resource must not be revoked after a successful reissue.
 """
 
 from __future__ import annotations
-import os
 
+import os
 import time
 from datetime import datetime
-from typing import Optional
 
 import requests
 
@@ -25,8 +24,8 @@ class CloudRuApiKeyProvider:
     def __init__(
         self,
         *,
-        base_url: Optional[str] = None,
-        iam_client: Optional[CloudRuIamClient] = None,
+        base_url: str | None = None,
+        iam_client: CloudRuIamClient | None = None,
         timeout: float = 30.0,
     ) -> None:
         self.base_url = (
@@ -118,7 +117,7 @@ class CloudRuApiKeyProvider:
             )
         return client
 
-    def rotation_supported(self, provider_key_id: Optional[str]) -> bool:
+    def rotation_supported(self, provider_key_id: str | None) -> bool:
         """Return true only when reissue can actually be performed."""
         if not provider_key_id:
             return False

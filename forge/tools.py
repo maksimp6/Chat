@@ -6,14 +6,14 @@ import hashlib
 import os
 import re
 import stat
-from typing import Any, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any
 
-
+from forge._vendor.schema import object_schema
 from forge.binding import printing_store as _store
+from forge.host import get_current_owner_id
 from printing3d import finance, service
 from printing3d.plate import MAX_FILE_BYTES, inspect_archive
-from forge._vendor.schema import object_schema
-from forge.host import get_current_owner_id
 
 QUOTE_REQUIRED_FIELDS = ("material_grams", "material_cost_per_kg", "print_hours")
 QUOTE_OPTIONAL_FIELDS = (
@@ -28,7 +28,7 @@ QUOTE_OPTIONAL_FIELDS = (
 ORDER_CREATE_STATUSES = ("lead", "quote", "accepted")
 
 
-def _trusted_owner(cfg: Optional[dict[str, Any]] = None) -> str:
+def _trusted_owner(cfg: dict[str, Any] | None = None) -> str:
     return get_current_owner_id()
 
 
@@ -37,7 +37,7 @@ PRINT_ARTIFACT_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\.(?:gcode\.
 
 def plate_inspect(
     arguments: Mapping[str, Any],
-    cfg: Optional[dict[str, Any]] = None,
+    cfg: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Read one owner's staged 3MF without arbitrary filesystem access."""
     name = arguments.get("artifact_name")
@@ -80,7 +80,7 @@ def plate_inspect(
 
 def get_treasury_summary(
     _arguments: Mapping[str, Any],
-    cfg: Optional[dict[str, Any]] = None,
+    cfg: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Read the current owner's realized 3D-printing P&L."""
     return service.get_financial_summary(_store(), _trusted_owner(cfg))
@@ -88,7 +88,7 @@ def get_treasury_summary(
 
 def list_orders(
     arguments: Mapping[str, Any],
-    cfg: Optional[dict[str, Any]] = None,
+    cfg: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Read the current owner's 3D-printing order queue."""
     owner_id = _trusted_owner(cfg)
@@ -99,7 +99,7 @@ def list_orders(
 
 def get_finance_status(
     arguments: Mapping[str, Any],
-    cfg: Optional[dict[str, Any]] = None,
+    cfg: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Read financing and payback status for the current owner."""
     month = arguments.get("month")
@@ -110,7 +110,7 @@ def get_finance_status(
 
 def set_financing_plan(
     arguments: Mapping[str, Any],
-    cfg: Optional[dict[str, Any]] = None,
+    cfg: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Store financing terms after approval at the universal tool boundary."""
     return finance.set_financing_plan(_store(), _trusted_owner(cfg), dict(arguments))
@@ -118,7 +118,7 @@ def set_financing_plan(
 
 def assess_financing(
     arguments: Mapping[str, Any],
-    cfg: Optional[dict[str, Any]] = None,
+    cfg: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assess sparse AI-collected financing terms without persisting them."""
     return finance.assess_financing(_store(), _trusted_owner(cfg), dict(arguments))
@@ -131,7 +131,7 @@ def _quote_input(arguments: Mapping[str, Any]) -> dict[str, Any]:
 
 def quote(
     arguments: Mapping[str, Any],
-    cfg: Optional[dict[str, Any]] = None,
+    cfg: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Calculate an order quote without persisting it."""
     data = _quote_input(arguments)
@@ -148,7 +148,7 @@ def quote(
 
 def create_order_tool(
     arguments: Mapping[str, Any],
-    cfg: Optional[dict[str, Any]] = None,
+    cfg: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Persist an accepted order after approval at the universal tool boundary."""
     status = str(arguments.get("status") or "quote").strip()

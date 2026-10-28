@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Iterator
-
 
 _runtime_id: ContextVar[str | None] = ContextVar("logos_runtime_id", default=None)
 _runtime_base_path: ContextVar[str] = ContextVar("logos_runtime_base_path", default="")

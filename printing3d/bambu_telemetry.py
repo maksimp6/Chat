@@ -6,7 +6,7 @@ No printer commands or network writes are performed here.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from .downtime import DowntimeTracker
@@ -70,7 +70,7 @@ def period_summaries(
     """UTC daily buckets, including partial current day; no inferred telemetry."""
     if now.tzinfo is None or days < 1 or days > 366:
         raise ValueError("Aware clock and 1..366 days are required")
-    now = now.astimezone(timezone.utc)
+    now = now.astimezone(UTC)
     midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
     buckets: list[dict[str, Any]] = []
     for days_ago in range(days - 1, -1, -1):

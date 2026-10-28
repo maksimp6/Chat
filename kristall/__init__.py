@@ -5,9 +5,9 @@ from kristall.store import (
     DatabaseInfo,
     DatabaseInfoContract,
     Kristall,
-    Store,
     KristallError,
     KristallLimitError,
+    Store,
     Transaction,
 )
 
@@ -16,8 +16,8 @@ __all__ = [
     "DatabaseInfo",
     "DatabaseInfoContract",
     "Kristall",
-    "Store",
     "KristallError",
     "KristallLimitError",
+    "Store",
     "Transaction",
 ]

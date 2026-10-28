@@ -11,9 +11,9 @@ import re
 import uuid
 from typing import Any
 
+from model_editor.host import bound
 
 from .engine import export_stl, inspect_scene, new_scene, validate_scene
-from model_editor.host import bound
 
 _REVISION = re.compile(r"[0-9a-f]{64}\Z")
 

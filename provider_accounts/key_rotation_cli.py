@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import timedelta
+from datetime import UTC, timedelta
 
 from provider_accounts.credentials import (
     CLOUDRU,
@@ -20,8 +20,8 @@ from provider_accounts.credentials import (
     list_provider_credentials,
     rotation_needed,
 )
-from provider_accounts.key_rotation import rotate_active_key
 from provider_accounts.host import bound, get_store, traced_operation
+from provider_accounts.key_rotation import rotate_active_key
 
 logger = logging.getLogger("logos.provider_key_rotation")
 cloudru_logger = logging.getLogger("logos.cloudru_provider_key_rotation")
@@ -125,15 +125,15 @@ def rotate_cloudru_key() -> int:
             )
             return 2
         if management.get("expires_at"):
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             master_expires = datetime.fromisoformat(
                 management["expires_at"].replace("Z", "+00:00")
             )
             # A timestamp without an offset is read as UTC; comparing it with an aware time would raise.
             if master_expires.tzinfo is None:
-                master_expires = master_expires.replace(tzinfo=timezone.utc)
-            if master_expires <= datetime.now(timezone.utc):
+                master_expires = master_expires.replace(tzinfo=UTC)
+            if master_expires <= datetime.now(UTC):
                 cloudru_logger.error(
                     "Cloud.ru rotation blocked: IAM master key is expired"
                 )

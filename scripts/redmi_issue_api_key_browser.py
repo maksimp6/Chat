@@ -7,14 +7,14 @@ to the local import endpoint. Nothing secret is printed, logged or screenshotted
 
 import json
 import os
-from pathlib import Path
 import re
 import shlex
 import subprocess
 import sys
 import time
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -106,7 +106,7 @@ def main():
         raise RuntimeError(
             "Key id not unique on the page: %d candidates" % len(candidates)
         )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "project_id": folder,
         "provider_key_id": candidates[0],

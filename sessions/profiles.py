@@ -8,11 +8,10 @@ the built-in template or another clone.
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Any, Optional
+from typing import Any
 
 from sessions.manager import create_session, get_session
 from sessions.runtime import DEFAULT_SESSIONS, ReadyMadeSession
-
 
 _PROFILE_MAP = {profile.id: profile for profile in DEFAULT_SESSIONS}
 
@@ -27,12 +26,12 @@ def list_profiles() -> list[dict[str, Any]]:
     return [_serialize(profile) for profile in _PROFILE_MAP.values()]
 
 
-def get_profile(profile_id: str) -> Optional[dict[str, Any]]:
+def get_profile(profile_id: str) -> dict[str, Any] | None:
     profile = _PROFILE_MAP.get(profile_id)
     return _serialize(profile) if profile else None
 
 
-def clone_profile(profile_id: str, name: Optional[str] = None) -> dict[str, Any]:
+def clone_profile(profile_id: str, name: str | None = None) -> dict[str, Any]:
     profile = _PROFILE_MAP.get(profile_id)
     if profile is None:
         raise KeyError(profile_id)
@@ -51,7 +50,7 @@ def clone_profile(profile_id: str, name: Optional[str] = None) -> dict[str, Any]
     }
 
 
-def session_profile(session_id: str) -> Optional[dict[str, Any]]:
+def session_profile(session_id: str) -> dict[str, Any] | None:
     session = get_session(session_id)
     if not session:
         return None

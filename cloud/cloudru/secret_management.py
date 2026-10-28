@@ -44,10 +44,10 @@ Design constraints from issue #477, enforced here rather than left to callers:
 """
 
 from __future__ import annotations
-import os
 
 import base64
 import binascii
+import os
 import time
 from typing import Any
 
@@ -57,7 +57,6 @@ from cloud.base import CloudProviderError
 from cloud.cloudru.client import CloudRuClient
 from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
 from cloud.host import get_current_trace
-
 
 # Path shape follows the documented "secret has many immutable versions"
 # model; unconfirmed against a live tenant (see module docstring).

@@ -17,7 +17,8 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
+
 from remote_runtime.host import (
     bind_runtime_request,
     bound,
@@ -26,7 +27,6 @@ from remote_runtime.host import (
     get_store,
     init_runtime_db,
 )
-
 
 ENV_STATUSES = ("CREATING", "RUNNING", "STOPPED", "FAILED", "DELETING")
 
@@ -79,7 +79,7 @@ class GitUnavailable(RuntimeError):
     """git could not run on this server: it is missing, or it did not finish in time."""
 
 
-def _run_git(*args: str, cwd: Optional[Path] = None) -> str:
+def _run_git(*args: str, cwd: Path | None = None) -> str:
     try:
         result = subprocess.run(
             ["git", *args],
@@ -100,7 +100,7 @@ def _run_git(*args: str, cwd: Optional[Path] = None) -> str:
     return result.stdout.strip()
 
 
-def resolve_commit(branch: str, commit_sha: Optional[str] = None) -> str:
+def resolve_commit(branch: str, commit_sha: str | None = None) -> str:
     """Resolve a branch/ref to one immutable commit without shell evaluation."""
     branch_value = str(branch or "").strip()
     value = str(commit_sha or branch_value).strip()
@@ -168,7 +168,7 @@ def _transition(current: str, target: str) -> None:
         raise ValueError(f"invalid environment transition: {current} -> {target}")
 
 
-def _runtime_thread_id(environment_id: str) -> Optional[int]:
+def _runtime_thread_id(environment_id: str) -> int | None:
     with _RUNTIME_WORKERS_LOCK:
         worker = _RUNTIME_WORKERS.get(environment_id)
     return worker.thread_id if worker else None
@@ -180,12 +180,12 @@ def _row_to_dict(row) -> dict[str, Any]:
     return item
 
 
-def _get(environment_id: str) -> Optional[dict[str, Any]]:
+def _get(environment_id: str) -> dict[str, Any] | None:
     row = get_store().get("environment/record/" + environment_id)
     return _row_to_dict(row) if row is not None else None
 
 
-def _require(environment_id: str, owner_id: Optional[str] = None) -> dict[str, Any]:
+def _require(environment_id: str, owner_id: str | None = None) -> dict[str, Any]:
     del owner_id
     item = _get(environment_id)
     if not item:
@@ -209,9 +209,9 @@ def _record_trace(
     operation: str,
     status: str,
     *,
-    context: Optional[Any] = None,
-    error: Optional[str] = None,
-    extra: Optional[dict[str, Any]] = None,
+    context: Any | None = None,
+    error: str | None = None,
+    extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     trace = create_invocation_trace(context) if context else bound.ExecutionTrace()
     if not context:
@@ -343,7 +343,7 @@ class EnvironmentRuntime:
         self._active_streams: dict[threading.Event, queue.Queue] = {}
 
     @property
-    def thread_id(self) -> Optional[int]:
+    def thread_id(self) -> int | None:
         return self._thread.ident
 
     def _prepare(self) -> None:
@@ -409,7 +409,7 @@ class EnvironmentRuntime:
     def submit(
         self,
         operation: str,
-        payload: Optional[dict[str, Any]] = None,
+        payload: dict[str, Any] | None = None,
         *,
         timeout: float = 30.0,
     ) -> Any:
@@ -567,7 +567,7 @@ def register_runtime_operation(name: str, handler) -> None:
 
 def authorize_environment_runtime(
     environment_id: str,
-    owner_id: Optional[str],
+    owner_id: str | None,
 ) -> None:
     """Resolve an existing environment without an owner authorization gate."""
     item = _get(environment_id)
@@ -584,7 +584,7 @@ def authorize_environment_runtime(
 def dispatch_environment_operation(
     environment_id: str,
     operation: str,
-    payload: Optional[dict[str, Any]] = None,
+    payload: dict[str, Any] | None = None,
     *,
     timeout: float = 30.0,
 ) -> Any:
@@ -599,7 +599,7 @@ def dispatch_environment_operation(
 def dispatch_environment_revision(
     environment_id: str,
     operation: str,
-    payload: Optional[dict[str, Any]] = None,
+    payload: dict[str, Any] | None = None,
     *,
     timeout: float = 30.0,
 ) -> Any:
@@ -628,10 +628,10 @@ def dispatch_environment_http(
 
 def create_environment(
     branch: str,
-    commit_sha: Optional[str] = None,
-    owner_id: Optional[str] = None,
+    commit_sha: str | None = None,
+    owner_id: str | None = None,
     *,
-    context: Optional[Any] = None,
+    context: Any | None = None,
 ) -> dict[str, Any]:
     prepare_environment_records()
     resolved = resolve_commit(branch, commit_sha)
@@ -659,7 +659,7 @@ def create_environment(
     return item
 
 
-def list_environments(owner_id: Optional[str] = None) -> list[dict[str, Any]]:
+def list_environments(owner_id: str | None = None) -> list[dict[str, Any]]:
     del owner_id
     prepare_environment_records()
     rows = list(get_store().items(prefix="environment/record/").values())
@@ -690,7 +690,7 @@ def _serialize_by_environment(fn):
 
 @_serialize_by_environment
 def start_environment(
-    environment_id: str, owner_id: Optional[str] = None, *, context=None
+    environment_id: str, owner_id: str | None = None, *, context=None
 ) -> dict[str, Any]:
     item = _require(environment_id, owner_id)
     _transition(item["status"], "RUNNING")
@@ -736,7 +736,7 @@ def start_environment(
 
 @_serialize_by_environment
 def stop_environment(
-    environment_id: str, owner_id: Optional[str] = None, *, context=None
+    environment_id: str, owner_id: str | None = None, *, context=None
 ) -> dict[str, Any]:
     item = _require(environment_id, owner_id)
     _transition(item["status"], "STOPPED")
@@ -775,7 +775,7 @@ def stop_environment(
 
 
 def restart_environment(
-    environment_id: str, owner_id: Optional[str] = None, *, context=None
+    environment_id: str, owner_id: str | None = None, *, context=None
 ) -> dict[str, Any]:
     item = _require(environment_id, owner_id)
     if item["status"] == "RUNNING":
@@ -785,7 +785,7 @@ def restart_environment(
 
 @_serialize_by_environment
 def delete_environment(
-    environment_id: str, owner_id: Optional[str] = None, *, context=None
+    environment_id: str, owner_id: str | None = None, *, context=None
 ) -> dict[str, Any]:
     item = _require(environment_id, owner_id)
     with _RUNTIME_WORKERS_LOCK:

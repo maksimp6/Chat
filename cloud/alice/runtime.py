@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import re
 import subprocess
-from typing import Callable
+from collections.abc import Callable
+from dataclasses import dataclass
 
 from cloud.base import CloudProviderError
-
 
 _MANAGED_LABEL = "alice.cloud.managed"
 _SEGMENT = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,62}$")

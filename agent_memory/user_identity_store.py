@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Mapping, TypedDict
-from typing import Any
-
+from collections.abc import Mapping
+from typing import Any, TypedDict
 
 IDENTITY_KEY = "user_identity:v1"
 IDENTITY_SCHEMA = 1
@@ -180,9 +179,9 @@ class UserIdentityStore:
 
 
 __all__ = [
-    "GitHubAccountRecord",
     "IDENTITY_KEY",
     "IDENTITY_SCHEMA",
+    "GitHubAccountRecord",
     "IdentityState",
     "UserIdentityStore",
     "UserRecord",

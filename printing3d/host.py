@@ -30,8 +30,8 @@ __all__ = [
     "bind",
     "bound",
     "current",
-    "provide",
     "printing_store",
+    "provide",
 ]
 
 

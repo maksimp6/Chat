@@ -6,24 +6,25 @@ recomputed with a newer tariff.
 """
 
 import math
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from typing import Any, Iterable, Optional
+from typing import Any
 
 
 @dataclass(frozen=True)
 class PricingSnapshot:
     pricing_version: str
     effective_from: str
-    effective_to: Optional[str]
+    effective_to: str | None
     currency: str
     source: str
     source_updated: str
     provider: str
     service: str
     operation: str
-    model: Optional[str] = None
-    unit: Optional[str] = None
-    unit_price: Optional[float] = None
+    model: str | None = None
+    unit: str | None = None
+    unit_price: float | None = None
 
     def __post_init__(self) -> None:
         if self.unit_price is not None and (
@@ -47,7 +48,7 @@ def _windows_overlap(a: "PricingSnapshot", b: "PricingSnapshot") -> bool:
 class PricingRegistry:
     """Registry for immutable pricing snapshots selected by effective date."""
 
-    def __init__(self, snapshots: Optional[Iterable[PricingSnapshot]] = None):
+    def __init__(self, snapshots: Iterable[PricingSnapshot] | None = None):
         self._snapshots = list(snapshots or [])
 
     def register(self, snapshot: PricingSnapshot) -> None:
@@ -86,7 +87,7 @@ class PricingRegistry:
         service: str,
         operation: str,
         effective_date: str,
-        model: Optional[str] = None,
+        model: str | None = None,
     ) -> PricingSnapshot:
         candidates = [
             snapshot
@@ -109,7 +110,7 @@ class PricingRegistry:
 
 
 def attach_pricing_snapshot(
-    usage: dict[str, Any], snapshot: PricingSnapshot, *, cost: Optional[float] = None
+    usage: dict[str, Any], snapshot: PricingSnapshot, *, cost: float | None = None
 ) -> dict[str, Any]:
     """Return a usage record with an immutable pricing snapshot attached."""
     result = dict(usage)

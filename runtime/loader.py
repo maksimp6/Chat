@@ -6,13 +6,13 @@ import ast
 import builtins
 import hashlib
 import importlib.machinery
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any
 
 from runtime.dispatcher import RuntimeDispatcher
-
 
 # Builtins that give revision code the host: files, the terminal, and type introspection.
 _DENIED_BUILTINS = frozenset(

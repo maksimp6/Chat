@@ -1,17 +1,19 @@
 """Offline verified A1 mini sliced Generic PLA 3MF for a Redmi 9 stand."""
 
 from __future__ import annotations
-import os
+
 import argparse
-from collections import Counter
 import hashlib
 import json
 import math
-from pathlib import Path
+import os
 import struct
 import subprocess
 import sys
 import zipfile
+from collections import Counter
+from pathlib import Path
+
 from a1mini_pla_cube_slice import (
     _read_sliced_archive,
     _validate_gcode,

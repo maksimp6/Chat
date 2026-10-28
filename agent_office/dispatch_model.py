@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 CANONICAL_LIFECYCLE_STAGES = (
     "contract",
@@ -81,7 +80,7 @@ class SolutionReviewArtifact:
 
 
 def assert_solution_review_accepted_for_head(
-    artifact: Optional[SolutionReviewArtifact],
+    artifact: SolutionReviewArtifact | None,
     current_head: str,
 ) -> None:
     if artifact is None:
@@ -110,7 +109,7 @@ def assert_solution_review_accepted_for_head(
 @dataclass
 class AgentTaskPlan:
     stage: str
-    role: Optional[str]
+    role: str | None
     backend: str
     can_merge: bool = False
     can_bypass_approval: bool = False
@@ -122,8 +121,8 @@ class AgentTaskPlan:
 
 def resolve_task_plan(
     stage: str,
-    role: Optional[str] = None,
-    backend: Optional[str] = None,
+    role: str | None = None,
+    backend: str | None = None,
 ) -> AgentTaskPlan:
     if stage not in CANONICAL_LIFECYCLE_STAGES:
         raise AgentDispatchError(f"unknown lifecycle stage: {stage!r}")

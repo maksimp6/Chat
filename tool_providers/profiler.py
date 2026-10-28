@@ -1,13 +1,13 @@
 """Модуль профайлинга, инспекции и глубокого анализа приложения Logos."""
 
 import cProfile
-import pstats
-import io
-import sys
 import gc
+import io
 import logging
-from tool_providers.host import bound, memory_file_path
+import pstats
+import sys
 
+from tool_providers.host import bound, memory_file_path
 
 logger = logging.getLogger("logos.tool_providers.profiler")
 

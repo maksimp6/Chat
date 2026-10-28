@@ -6,7 +6,7 @@ import hashlib
 import os
 import re
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -68,5 +68,5 @@ def boot_version(root: str | Path) -> dict[str, Any]:
         "runtime_revision": _runtime_revision(root),
         "ui_version": static_asset_version,
         "process_id": os.getpid(),
-        "started_at": datetime.now(timezone.utc).isoformat(),
+        "started_at": datetime.now(UTC).isoformat(),
     }

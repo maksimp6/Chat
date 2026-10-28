@@ -34,13 +34,13 @@ bound = _binding.names()
 __all__ = [
     "Host",
     "HostNotBound",
+    "aggregate_billing",
     "bind",
     "bound",
-    "current",
-    "provide",
-    "aggregate_billing",
     "build_ai_billing_item",
     "build_compute_billing_item",
+    "current",
+    "provide",
 ]
 
 

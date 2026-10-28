@@ -15,10 +15,9 @@ import socket
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
-
 
 API = "https://api.github.com"
 MAX_PAGE_BYTES = 32 * 1024 * 1024
@@ -899,9 +898,7 @@ def collect_github(
         repository, reader, sink, max_pages, _Progress(Path(progress_dir), repository)
     )
     collector.epoch = (
-        epoch
-        or getattr(sink, "captured_at", None)
-        or datetime.now(timezone.utc).isoformat()
+        epoch or getattr(sink, "captured_at", None) or datetime.now(UTC).isoformat()
     )
     inventories = _collect_inventories(collector)
     # A denied GraphQL API is a visible gap, not an empty discussion set.

@@ -1,11 +1,11 @@
 """Cloud.ru IAM API-key wizard routes."""
 
 from __future__ import annotations
-import os
 
-from datetime import datetime, timedelta, timezone
 import ipaddress
 import logging
+import os
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from flask import Blueprint, jsonify, request
@@ -49,13 +49,13 @@ def _parse_expiry(value: Any) -> str | None:
     except ValueError as exc:
         raise ValueError("expires_at must be an ISO-8601 timestamp") from exc
     if expiry.tzinfo is None:
-        expiry = expiry.replace(tzinfo=timezone.utc)
-    now = datetime.now(timezone.utc)
+        expiry = expiry.replace(tzinfo=UTC)
+    now = datetime.now(UTC)
     if expiry < now + timedelta(days=1):
         raise ValueError("Cloud.ru API-key lifetime must be at least 1 day")
     if expiry > now + timedelta(days=365):
         raise ValueError("Cloud.ru API-key lifetime cannot exceed 1 year")
-    return expiry.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return expiry.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _validate_ips(values: list[str]) -> list[str]:

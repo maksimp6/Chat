@@ -8,8 +8,9 @@ and reports ``total_cost=None`` instead of guessing when nothing matches.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
-from typing import Any, Mapping
+from typing import Any
 
 _TOTAL_KEYS = ("total_cost", "total", "total_amount", "cost_total")
 _ROW_LIST_KEYS = ("items", "data", "consumption", "rows", "result")

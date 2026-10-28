@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import os
 import tempfile
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
 
 from secret_store.admin import SecretAdminBackend, SecretAdminResult
 from secret_store.core import SecretRef, SecretResolver, SecretValue

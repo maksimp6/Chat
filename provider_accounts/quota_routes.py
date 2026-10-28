@@ -1,16 +1,16 @@
 """HTTP API for inspecting and configuring per-user provider quotas."""
 
 from __future__ import annotations
+
 from flask import Blueprint, jsonify, request
 
+from provider_accounts.host import get_current_owner_id
 from provider_accounts.quotas import (
     assign_user_policy,
     get_usage,
     get_user_policy,
     upsert_policy,
 )
-from provider_accounts.host import get_current_owner_id
-
 
 provider_quota_bp = Blueprint(
     "provider_quota",

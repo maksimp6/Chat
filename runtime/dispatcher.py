@@ -6,12 +6,13 @@ import errno
 import os
 import stat
 import uuid
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import RLock, local
-from typing import Any, Callable, Mapping
-from runtime.host import bound
+from typing import Any
 
+from runtime.host import bound
 
 TOOL_EXECUTE_OPERATION = "tools.execute"
 

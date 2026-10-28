@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import threading
-from typing import Any, Callable, Optional
-
+from collections.abc import Callable
+from typing import Any
 
 from mcp_server.auth import _auth_mode
-from mcp_server.protocol import MCP_PATH, SUPPORTED_PROTOCOL_VERSIONS, _server_info
 from mcp_server.host import (
     bound,
     check_access,
@@ -23,6 +22,7 @@ from mcp_server.host import (
     read_file,
     tool_call_requires_approval,
 )
+from mcp_server.protocol import MCP_PATH, SUPPORTED_PROTOCOL_VERSIONS, _server_info
 
 
 def _tool(
@@ -30,8 +30,8 @@ def _tool(
     title: str,
     description: str,
     input_schema: dict[str, Any],
-    handler: Callable[[dict[str, Any], Optional[str]], dict[str, Any]],
-) -> tuple[dict[str, Any], Callable[[dict[str, Any], Optional[str]], dict[str, Any]]]:
+    handler: Callable[[dict[str, Any], str | None], dict[str, Any]],
+) -> tuple[dict[str, Any], Callable[[dict[str, Any], str | None], dict[str, Any]]]:
     meta = {
         "openai/toolInvocation/invoking": f"{title}…",
         "openai/toolInvocation/invoked": f"{title}: готово",
@@ -47,7 +47,7 @@ def _tool(
     return descriptor, handler
 
 
-def _system_status(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
+def _system_status(_arguments: dict[str, Any], _user: str | None) -> dict[str, Any]:
 
     categories = bound.registry.get_available_categories()
     return {
@@ -83,7 +83,7 @@ def agent_gateway() -> Any:
         return _agent_gateway
 
 
-def _agents(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
+def _agents(_arguments: dict[str, Any], _user: str | None) -> dict[str, Any]:
     gateway = agent_gateway()
     agents = []
     for agent in gateway.list_agents():
@@ -101,7 +101,7 @@ def _agents(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
     return {"agents": agents}
 
 
-def _session(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+def _session(arguments: dict[str, Any], user: str | None) -> dict[str, Any]:
     session_id = str(arguments.get("session_id") or "").strip()
     session = get_session(session_id) if session_id else None
     if not session:
@@ -117,7 +117,7 @@ def _session(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
     }
 
 
-def _invocation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+def _invocation(arguments: dict[str, Any], user: str | None) -> dict[str, Any]:
     invocation_id = str(arguments.get("invocation_id") or "").strip()
     status = get_invocation_status(invocation_id) if invocation_id else None
     if not status:
@@ -125,7 +125,7 @@ def _invocation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any
     return {"invocation": status}
 
 
-def _trace(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+def _trace(arguments: dict[str, Any], user: str | None) -> dict[str, Any]:
     invocation_id = str(arguments.get("invocation_id") or "").strip()
     status = get_invocation_status(invocation_id) if invocation_id else None
     if not status:
@@ -137,24 +137,24 @@ def _trace(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
 
 
 def _bridge_wrapper(handler):
-    def wrapped(arguments: dict[str, Any], cfg: Optional[dict[str, Any]] = None):
+    def wrapped(arguments: dict[str, Any], cfg: dict[str, Any] | None = None):
         context = (cfg or {}).get("_universal_context") or {}
         return handler(arguments, context.get("user_id"))
 
     return wrapped
 
 
-def _require_conversation_user(user: Optional[str]) -> str:
+def _require_conversation_user(user: str | None) -> str:
 
     return str(user or get_current_owner_id())
 
 
-def _conversations(_arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+def _conversations(_arguments: dict[str, Any], user: str | None) -> dict[str, Any]:
     owner = _require_conversation_user(user)
     return {"conversations": list_owned_conversations(owner)}
 
 
-def _conversation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+def _conversation(arguments: dict[str, Any], user: str | None) -> dict[str, Any]:
     owner = _require_conversation_user(user)
     conversation_id = str(arguments.get("conversation_id") or "").strip()
     if not conversation_id:
@@ -166,7 +166,7 @@ def _conversation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, A
 
 
 def _conversation_messages(
-    arguments: dict[str, Any], user: Optional[str]
+    arguments: dict[str, Any], user: str | None
 ) -> dict[str, Any]:
     owner = _require_conversation_user(user)
     conversation_id = str(arguments.get("conversation_id") or "").strip()
@@ -180,22 +180,22 @@ def _conversation_messages(
     }
 
 
-def _execution(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+def _execution(arguments: dict[str, Any], user: str | None) -> dict[str, Any]:
     owner = _require_conversation_user(user)
     result = _invocation(arguments, owner)
     return {"execution": result["invocation"]}
 
 
-def _execution_trace(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+def _execution_trace(arguments: dict[str, Any], user: str | None) -> dict[str, Any]:
     owner = _require_conversation_user(user)
     return _trace(arguments, owner)
 
 
-def _project_list(args: dict, _user: Optional[str] = None) -> dict:
+def _project_list(args: dict, _user: str | None = None) -> dict:
     return list_directory({"path": args.get("path") or "."})
 
 
-def _project_read(args: dict, _user: Optional[str] = None) -> dict:
+def _project_read(args: dict, _user: str | None = None) -> dict:
     path = str(args.get("path") or "").strip()
     if not path:
         raise ValueError("path is required")
@@ -211,7 +211,7 @@ def _project_read(args: dict, _user: Optional[str] = None) -> dict:
     return result
 
 
-def _project_search(args: dict, _user: Optional[str] = None) -> dict:
+def _project_search(args: dict, _user: str | None = None) -> dict:
     query = str(args.get("query") or "").strip()
     if not query:
         raise ValueError("query is required")

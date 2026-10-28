@@ -7,9 +7,10 @@ It does not expose or persist a model private chain-of-thought.
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
-from typing import Any, Iterable
+from typing import Any
 
 
 class PlanType(StrEnum):

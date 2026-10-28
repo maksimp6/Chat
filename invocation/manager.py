@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-import re
-import uuid
 import base64
 import hashlib
 import json
-from typing import Any, Optional
-
-import time
-from invocation.context import InvocationContext
-
 import logging
+import re
+import time
+import uuid
+from typing import Any
+
+from invocation.context import InvocationContext
 from invocation.host import (
     bound,
     create_session,
@@ -93,8 +92,8 @@ def _resolve_request_session_id(session_id: str, conversation_id: str) -> str:
 def create_invocation(
     session_id: str,
     conversation_id: str,
-    metadata: Optional[dict[str, Any]] = None,
-    user_id: Optional[str] = None,
+    metadata: dict[str, Any] | None = None,
+    user_id: str | None = None,
     *,
     create_missing_session: bool = True,
 ) -> InvocationContext:
@@ -170,7 +169,7 @@ def start_invocation(invocation_id: str) -> bool:
 
 def _prepare_value(
     invocation_id: str, field: str, value: Any, *, force_chunks: bool = False
-) -> tuple[Any, Optional[dict[str, Any]]]:
+) -> tuple[Any, dict[str, Any] | None]:
     sanitized = _sanitize_for_storage(value)
     try:
         encoded = json.dumps(
@@ -211,7 +210,7 @@ def _prepare_value(
 
 
 def _assign_value(
-    record: dict[str, Any], field: str, prepared: tuple[Any, Optional[dict[str, Any]]]
+    record: dict[str, Any], field: str, prepared: tuple[Any, dict[str, Any] | None]
 ) -> None:
     value, manifest = prepared
     record[field] = value
@@ -246,7 +245,7 @@ def _publish_invocation_values(
         return False
     force_chunks = False
     while True:
-        prepared: dict[str, tuple[Any, Optional[dict[str, Any]]]] = {}
+        prepared: dict[str, tuple[Any, dict[str, Any] | None]] = {}
         try:
             for field, value in values.items():
                 prepared[field] = _prepare_value(
@@ -284,14 +283,14 @@ def _publish_invocation_values(
 
 
 def _discard_values(
-    invocation_id: str, prepared: dict[str, tuple[Any, Optional[dict[str, Any]]]]
+    invocation_id: str, prepared: dict[str, tuple[Any, dict[str, Any] | None]]
 ) -> None:
     for field, (_value, manifest) in prepared.items():
         _discard_prepared_chunks(invocation_id, field, manifest)
 
 
 def _discard_prepared_chunks(
-    invocation_id: str, field: str, manifest: Optional[dict[str, Any]]
+    invocation_id: str, field: str, manifest: dict[str, Any] | None
 ) -> None:
     """Remove the chunks of a value that was never published, so a failed write leaves nothing behind."""
     if not manifest:
@@ -392,7 +391,7 @@ def _complete(
     )
 
 
-def get_invocation_owner(invocation_id: str) -> Optional[str]:
+def get_invocation_owner(invocation_id: str) -> str | None:
     """Return the owner an invocation was created for, without reading its trace or result."""
     value = get_memory_client(memory_file_path()).get(_key(invocation_id))
     if not isinstance(value, dict) or value.get("id") != str(invocation_id):
@@ -400,7 +399,7 @@ def get_invocation_owner(invocation_id: str) -> Optional[str]:
     return value.get("user_id")
 
 
-def get_invocation(invocation_id: str) -> Optional[dict[str, Any]]:
+def get_invocation(invocation_id: str) -> dict[str, Any] | None:
     value = get_memory_client(memory_file_path()).get(_key(invocation_id))
     if value is None:
         return None

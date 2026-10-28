@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from collections import Counter
-from dataclasses import dataclass
 import math
 import re
-from typing import Any, Iterable
+from collections import Counter
+from collections.abc import Iterable
+from dataclasses import dataclass
+from typing import Any
 
 from .legacy_models import (
     RetrievalDocument,
@@ -15,7 +16,6 @@ from .legacy_models import (
     RetrievalResult,
 )
 from .sources import RetrievalSource
-
 
 _TOKEN_RE = re.compile(r"[\w./:-]{2,}", re.UNICODE)
 
