@@ -1,0 +1,14 @@
+[Unit]
+Description=Logos pyproxy: HTTP proxy with multi-leg tunnel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/pyproxy/pyproxy.env
+ExecStart=/usr/bin/python3 /opt/pyproxy/pyproxy_server.py
+Restart=always
+RestartSec=2
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
