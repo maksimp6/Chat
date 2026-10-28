@@ -879,14 +879,20 @@ def _chat_error_response(
     error_message,
     is_temperature_error,
     user_message_id=None,
+    error_detail=None,
 ):
-    """Publish an error using only the invocation context established by this request."""
+    """Publish an error using only the invocation context established by this request.
+
+    ``error_message`` is what the person reads; ``error_detail``, when given, is the
+    technical cause kept for the trace and the failed invocation instead.
+    """
+    recorded_error = error_detail or error_message
     if trace.finalized:
         # The failure happened after the trace was frozen (e.g. while
         # persisting the reply); report it only in the returned copy.
         trace_data = trace.finalize()
         _append_post_final_error(
-            trace_data, "chat_pipeline", error_message, type(error).__name__
+            trace_data, "chat_pipeline", recorded_error, type(error).__name__
         )
     else:
         if is_temperature_error:
@@ -899,7 +905,7 @@ def _chat_error_response(
             )
         trace.record_error(
             "chat_pipeline",
-            error_message,
+            recorded_error,
             error_type=type(error).__name__,
         )
         record_yandex_mcp_activity(trace)
@@ -952,7 +958,7 @@ def _chat_error_response(
             source="error",
         )
     if invocation is not None:
-        fail_invocation(invocation.invocation_id, error={"message": error_message})
+        fail_invocation(invocation.invocation_id, error={"message": recorded_error})
 
     return jsonify(
         {
@@ -1160,12 +1166,20 @@ def chat():
             isinstance(e, ValueError)
             and "temperature" in internal_error_message.lower()
         )
+        turn_error_text = None if is_temperature_error else _turn_error_text(e)
+        # An unexpected failure keeps its class and text for the log, the trace («Детали»)
+        # and the failed invocation; the reply says what to do in Russian.
+        error_detail = (
+            None
+            if is_temperature_error or turn_error_text
+            else f"Внутренняя ошибка обработки запроса ({type(e).__name__}: {internal_error_message[:200]})"
+        )
         error_message = (
             "Некорректное значение temperature"
             if is_temperature_error
             else (
-                _turn_error_text(e)
-                or f"Внутренняя ошибка обработки запроса ({type(e).__name__}: {internal_error_message[:200]})"
+                turn_error_text
+                or "Сервер не смог обработать запрос. Повторите его; причина записана в трассе: откройте «Детали» под сообщением."
             )
         )
 
@@ -1198,6 +1212,7 @@ def chat():
                 error_message=error_message,
                 is_temperature_error=is_temperature_error,
                 user_message_id=user_message_id,
+                error_detail=error_detail,
             )
         except Exception:
             logger.exception("[CHAT] Не удалось сохранить ExecutionTrace")
