@@ -6,9 +6,8 @@ from decimal import ROUND_CEILING, Decimal
 import json
 import uuid
 from typing import Any
-from storage.db import get_store
 from economy._vendor.restrictions import restrictions_lifted
-from observability.trace_manager import get_current_trace
+from economy.host import get_current_trace, get_store
 
 
 class BudgetPersistenceError(RuntimeError):

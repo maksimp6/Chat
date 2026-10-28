@@ -3,14 +3,13 @@
 from typing import Any, Optional
 
 from invocation.manager import get_invocation
+from invocation.host import bound, get_messages
 
 
 def _sanitize_trace(value: Any) -> Any:
     """Apply the same trace-level secret filtering before API exposure."""
     try:
-        from observability.trace_manager import ExecutionTrace
-
-        return ExecutionTrace._sanitize_trace_value(value)
+        return bound.ExecutionTrace._sanitize_trace_value(value)
     except Exception:
         # Never expose unsanitized trace data when the sanitizer fails.
         return "[trace unavailable: sanitization failed]"
@@ -52,8 +51,6 @@ def get_invocation_trace(invocation_id: str) -> Optional[dict[str, Any]]:
     persisted = invocation.get("trace") or {}
     if persisted:
         return _sanitize_trace(persisted)
-
-    from storage.db import get_messages
 
     for message in reversed(get_messages(invocation["conversation_id"])):
         trace = message.get("trace") or {}

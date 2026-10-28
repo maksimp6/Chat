@@ -1,46 +1,45 @@
 from __future__ import annotations
 
+import threading
 import json
 import uuid
 from typing import Any, Mapping, Optional
-
-from invocation.manager import (
+from mcp_server.host import (
+    bind_current_trace,
+    bound,
     create_invocation,
+    create_invocation_trace,
     fail_invocation,
     finish_invocation,
     persist_invocation_trace,
+    reset_current_trace,
     start_invocation,
-)
-from invocation.trace import create_invocation_trace
-from observability.trace_manager import bind_current_trace, reset_current_trace
-from runtime import (
-    RuntimeDispatcher,
-    RuntimeNotFound,
-    RuntimeOperationNotFound,
-    RuntimeScopeViolation,
-)
-from tool_providers.registry import registry
-from tool_providers.universal_tool_platform import (
-    UniversalToolCall,
-    UniversalToolExecutor,
 )
 
 
 # Runtime-scoped MCP calls enter the same dispatcher boundary as preview code.
 # Deployment code registers available runtimes on this dispatcher; credentials
 # and the unrestricted registry are deliberately not exposed through MCP.
-mcp_runtime_dispatcher = RuntimeDispatcher()
+_dispatcher = None
+_dispatcher_lock = threading.Lock()
+
+
+def runtime_dispatcher() -> Any:
+    """The dispatcher for runtime-scoped MCP calls, created once on first use."""
+    global _dispatcher
+    with _dispatcher_lock:
+        if _dispatcher is None:
+            _dispatcher = bound.RuntimeDispatcher()
+            _dispatcher.register_operation("mcp.tool.call", _execute_mcp_tool)
+        return _dispatcher
 
 
 def _execute_mcp_tool(
     _runtime_context: Any, payload: Mapping[str, Any]
 ) -> dict[str, Any]:
-    return UniversalToolExecutor(registry).execute_with_trace(
+    return bound.UniversalToolExecutor(bound.registry).execute_with_trace(
         payload["call"], payload["trace"]
     )
-
-
-mcp_runtime_dispatcher.register_operation("mcp.tool.call", _execute_mcp_tool)
 
 
 def _handle_call(
@@ -79,7 +78,7 @@ def _handle_call(
         }
     )
 
-    call = UniversalToolCall(
+    call = bound.UniversalToolCall(
         tool_name=name,
         arguments=arguments,
         transport="mcp",
@@ -93,7 +92,7 @@ def _handle_call(
     trace_token = bind_current_trace(trace)
     try:
         if runtime_id:
-            result = mcp_runtime_dispatcher.dispatch(
+            result = runtime_dispatcher().dispatch(
                 runtime_id,
                 "mcp.tool.call",
                 {"call": call, "trace": trace},
@@ -101,7 +100,9 @@ def _handle_call(
                 caller_owner_id=user,
             )
         else:
-            result = UniversalToolExecutor(registry).execute_with_trace(call, trace)
+            result = bound.UniversalToolExecutor(bound.registry).execute_with_trace(
+                call, trace
+            )
         trace.add_event(
             "mcp_tool_call_completed",
             {
@@ -160,7 +161,11 @@ def _handle_call(
                 "invocation_id": context.invocation_id,
             },
         }
-    except (RuntimeScopeViolation, RuntimeNotFound, RuntimeOperationNotFound) as exc:
+    except (
+        bound.RuntimeScopeViolation,
+        bound.RuntimeNotFound,
+        bound.RuntimeOperationNotFound,
+    ) as exc:
         # Persist the violation for operators, but return a stable error that
         # cannot reveal runtime ids, owners, connector names, or credentials.
         trace.add_event("mcp_runtime_access_denied", {"reason": type(exc).__name__})
@@ -180,3 +185,10 @@ def _handle_call(
         raise
     finally:
         reset_current_trace(trace_token)
+
+
+def __getattr__(name: str) -> Any:
+    """Compatibility for ``mcp_runtime_dispatcher``, now created on first use."""
+    if name == "mcp_runtime_dispatcher":
+        return runtime_dispatcher()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -8,7 +8,7 @@ from yandex_client_modules.request_mixin import YandexRequestMixin
 from yandex_client_modules.polling_mixin import YandexPollingMixin
 from yandex_client_modules.mcp_mixin import YandexMcpMixin
 
-from workspace.files import YandexFileManagerMixin
+from yandex_client_modules.files import YandexFileManagerMixin
 
 
 class YandexResponsesClient(

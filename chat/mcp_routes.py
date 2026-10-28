@@ -1,87 +1,70 @@
 """Маршруты чата с сохранением полной цепочки выполнения в БД."""
 
 from flask import Blueprint, request, jsonify
+import threading
 import logging
 import re
 import uuid
 from typing import Any
 from dataclasses import dataclass
 import base64
-from yandex_client_modules.client import YandexResponsesClient
-from core.config import (
-    CLASSIFIER_MODELS,
-    EMBEDDING_MODELS,
-    IMAGE_MODELS,
-    TEXT_MODELS,
-    VOICE_MODELS,
-    Config,
-)
-from core.model_profiles import completion_model_keys
-from provider_accounts.model_discovery import ModelDiscoveryError, validate_dialog_model
-from yandex_client_modules.request_builder import validate_generation_params
-from yandex_client_modules.request_mixin import _transport_timeout
-from yandex_client_modules.tool_config import normalize_tools_config
-from observability.trace_manager import (
-    ExecutionTrace,
-    bind_current_trace,
-    reset_current_trace,
-)
-from invocation.manager import (
-    create_invocation,
-    start_invocation,
-    finish_invocation,
-    fail_invocation,
-    persist_invocation_trace,
-)
-from invocation.trace import create_invocation_trace
-from mcp_server.trace import record_yandex_mcp_activity
-import mcp_server.storage as mcp_storage
-from economy.treasury_identity import get_current_owner_id
-from tool_providers.registry import registry
-from storage.db import (
-    create_conversation,
-    get_yandex_conversation,
-    is_provider_pending,
-    set_yandex_conversation,
-    get_messages,
-    get_message,
-    add_message,
-    get_conv_settings,
-    save_conv_settings,
-    maybe_update_conversation_title,
-    get_conversation_title,
-    normalize_conversation_title,
-)
+import functools
 from chat._vendor.partial_output import (
     extract_last_response_text,
     format_partial_output_message,
 )
 from chat._vendor.provider_receipt import capture_provider_diagnostics
 from chat._vendor.responses_tool_loop import run_tool_loop, extract_function_calls
-from economy.billing import (
+from chat.host import (
+    add_message,
     aggregate_billing,
+    bind_current_trace,
+    bound,
     build_ai_billing_item,
-    settle_billing_to_treasury,
-)
-from provider_accounts.quotas import ProviderQuotaExceeded
-from agent_skills.registry import (
-    SkillRegistry,
-    SkillRegistryError,
-    compose_skill_instructions,
-)
-from tool_providers.universal_tool_platform import (
-    UniversalToolCall,
-    UniversalToolExecutor,
-)
-from conversations.ownership import (
-    set_owner,
     check_access,
+    completion_model_keys,
+    compose_skill_instructions,
+    create_conversation,
+    create_invocation,
+    create_invocation_trace,
+    fail_invocation,
+    finish_invocation,
+    get_conv_settings,
+    get_conversation_title,
+    get_current_owner_id,
+    get_message,
+    get_messages,
+    get_yandex_conversation,
+    is_provider_pending,
     list_owned_conversations,
+    maybe_update_conversation_title,
+    normalize_conversation_title,
+    normalize_tools_config,
+    persist_invocation_trace,
+    record_yandex_mcp_activity,
+    reset_current_trace,
+    save_conv_settings,
+    set_owner,
+    set_yandex_conversation,
+    settle_billing_to_treasury,
+    start_invocation,
+    validate_dialog_model,
+    validate_generation_params,
 )
 
 logger = logging.getLogger("logos.chat.mcp_routes")
 mcp_bp = Blueprint("mcp", __name__)
-skill_registry = SkillRegistry()
+_skill_registry = None
+_lazy_lock = threading.Lock()
+
+
+def skill_registry():
+    """The skill registry, created once on first use."""
+    global _skill_registry
+    with _lazy_lock:
+        if _skill_registry is None:
+            _skill_registry = bound.SkillRegistry()
+        return _skill_registry
 
 
 # Per-response polling budget; it is not a deadline for the whole tool loop.
@@ -109,7 +92,7 @@ def _normalize_requested_skills(data, params):
     if isinstance(raw, str):
         raw = [raw]
     if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
-        raise SkillRegistryError("skills must be a string or a list of strings")
+        raise bound.SkillRegistryError("skills must be a string or a list of strings")
     return [item.strip() for item in raw if item.strip()]
 
 
@@ -154,8 +137,10 @@ def _client_params(raw: dict[str, Any]) -> dict[str, Any]:
         )
     params["max_rounds"] = _tool_rounds(params.get("max_rounds"))
     # Validate transport settings before storing a message or starting provider work.
-    params["request_timeout"] = _transport_timeout(params, "request_timeout", 90, 900)
-    params["poll_timeout"] = _transport_timeout(
+    params["request_timeout"] = bound._transport_timeout(
+        params, "request_timeout", 90, 900
+    )
+    params["poll_timeout"] = bound._transport_timeout(
         params, "poll_timeout", CHAT_POLL_TIMEOUT_SECONDS, 7200
     )
     return params
@@ -163,7 +148,7 @@ def _client_params(raw: dict[str, Any]) -> dict[str, Any]:
 
 def _record_provider_output(trace, response):
     """What the provider returned for one request: the status, the output kinds and the calls it asked for."""
-    if not isinstance(trace, ExecutionTrace) or not isinstance(response, dict):
+    if not isinstance(trace, bound.ExecutionTrace) or not isinstance(response, dict):
         return
     output = response.get("output")
     if not isinstance(output, list):
@@ -185,11 +170,15 @@ def _record_provider_output(trace, response):
 
 # Models whose registry entry says they read images. A message with photos to any other
 # model is refused instead of being sent without them.
-IMAGE_INPUT_MODEL_KEYS: frozenset[str] = frozenset(
-    key
-    for key, model in TEXT_MODELS.items()
-    if (model.get("capabilities") or {}).get("multimodal") is True
-)
+@functools.cache
+def image_input_model_keys() -> frozenset[str]:
+    return frozenset(
+        key
+        for key, model in bound.TEXT_MODELS.items()
+        if (model.get("capabilities") or {}).get("multimodal") is True
+    )
+
+
 IMAGE_HISTORY_TURNS = 20
 IMAGE_HISTORY_TEXT_CHARS = 4000
 _MARKDOWN_PICTURE = re.compile(r"!\[[^\]]*\]\(data:image/[^)]*\)")
@@ -268,134 +257,163 @@ def _validated_images(raw: Any) -> list[str]:
     return data_urls
 
 
-class LogosClient(YandexResponsesClient):
-    def ask(
-        self,
-        message: Any,
-        model_key: Any,
-        conversation_id: Any = None,
-        params: Any = None,
-        execution_trace: Any = None,
-        trace_step: Any = None,
-    ) -> Any:
-        return super().ask(
+def _define_logos_client(base: type) -> type:
+    """The chat client class on top of the provider client (built once, on first use)."""
+
+    class LogosClient(base):
+        def ask(
+            self,
+            message: Any,
+            model_key: Any,
+            conversation_id: Any = None,
+            params: Any = None,
+            execution_trace: Any = None,
+            trace_step: Any = None,
+        ) -> Any:
+            return super().ask(
+                message,
+                model_key,
+                conversation_id,
+                params,
+                execution_trace=execution_trace,
+                trace_step=trace_step,
+            )
+
+        def _ask_provider(self, **kwargs: Any) -> Any:
+            return super().ask_with_mcp(**kwargs)
+
+        # Logos Pro shopping policy: never source recommendations from Yandex Market.
+        # Keep Yandex AI Studio and unrelated Yandex services available.
+        mandatory_blocked_web_domains = (
+            "market.yandex.ru",
+            "market.yandex.com",
+            "market.yandex.kz",
+            "market.yandex.by",
+        )
+
+        def ask_with_mcp(
+            self,
             message,
             model_key,
-            conversation_id,
-            params,
-            execution_trace=execution_trace,
-            trace_step=trace_step,
-        )
-
-    def _ask_provider(self, **kwargs: Any) -> Any:
-        return super().ask_with_mcp(**kwargs)
-
-    # Logos Pro shopping policy: never source recommendations from Yandex Market.
-    # Keep Yandex AI Studio and unrelated Yandex services available.
-    mandatory_blocked_web_domains = (
-        "market.yandex.ru",
-        "market.yandex.com",
-        "market.yandex.kz",
-        "market.yandex.by",
-    )
-
-    def ask_with_mcp(
-        self,
-        message,
-        model_key,
-        conversation_id=None,
-        params=None,
-        trace=None,
-        *,
-        execution_policy=None,
-        settings_conversation_id=None,
-    ):
-        policy_kwargs = (
-            {"execution_policy": execution_policy}
-            if execution_policy is not None
-            else {}
-        )
-
-        response = self._ask_provider(
-            message=message,
-            model_key=model_key,
-            conversation_id=conversation_id,
-            settings_conversation_id=settings_conversation_id,
-            params=params,
-            trace=trace,
-            **policy_kwargs,
-        )
-        _record_provider_output(trace, response)
-
-        if extract_function_calls(response):
-            tool_servers = mcp_storage.list_servers(owner_id=get_current_owner_id())
-            base_params = dict(params or {})
-
-            def execute_tool(call):
-                result = self._execute_single_tool(
-                    call, tool_servers, trace=trace, **policy_kwargs
-                )
-                if result.get("error") is not None:
-                    return {"error": result["error"], "tool": result.get("name")}
-                return result.get("result")
-
-            # Retain the original request and all tool rounds without a provider conversation.
-            from yandex_client_modules.request_builder import _response_input
-
-            initial_input = _response_input(base_params, message)
-            continuation_history = (
-                [{"role": "user", "content": initial_input}]
-                if isinstance(initial_input, str)
-                else list(initial_input)
+            conversation_id=None,
+            params=None,
+            trace=None,
+            *,
+            execution_policy=None,
+            settings_conversation_id=None,
+        ):
+            policy_kwargs = (
+                {"execution_policy": execution_policy}
+                if execution_policy is not None
+                else {}
             )
 
-            def continue_request(input_items, previous_response):
-                continuation_params = dict(base_params)
-                # The initial forced choice has been satisfied. Permit a final
-                # answer instead of forcing the same action again with a new id.
-                choice = continuation_params.get("tool_choice")
-                if choice == "required":
-                    continuation_params["tool_choice"] = "auto"
-                elif isinstance(choice, dict):
-                    continuation_params["tool_choice"] = (
-                        {**choice, "mode": "auto"}
-                        if choice.get("type") == "allowed_tools"
-                        else "auto"
+            response = self._ask_provider(
+                message=message,
+                model_key=model_key,
+                conversation_id=conversation_id,
+                settings_conversation_id=settings_conversation_id,
+                params=params,
+                trace=trace,
+                **policy_kwargs,
+            )
+            _record_provider_output(trace, response)
+
+            if extract_function_calls(response):
+                tool_servers = bound.mcp_storage.list_servers(
+                    owner_id=get_current_owner_id()
+                )
+                base_params = dict(params or {})
+
+                def execute_tool(call):
+                    result = self._execute_single_tool(
+                        call, tool_servers, trace=trace, **policy_kwargs
                     )
-                # The provider conversation already contains the answered calls.
-                if conversation_id:
-                    continuation_params["input"] = [
-                        item
-                        for item in input_items
-                        if isinstance(item, dict)
-                        and item.get("type") == "function_call_output"
-                    ]
-                else:
-                    continuation_history.extend(input_items)
-                    continuation_params["input"] = list(continuation_history)
-                continuation_params["background"] = base_params.get("background", True)
-                response = self._ask_provider(
-                    message="",
-                    model_key=model_key,
-                    conversation_id=conversation_id,
-                    settings_conversation_id=settings_conversation_id,
-                    params=continuation_params,
-                    trace=trace,
-                    **policy_kwargs,
+                    if result.get("error") is not None:
+                        return {"error": result["error"], "tool": result.get("name")}
+                    return result.get("result")
+
+                # Retain the original request and all tool rounds without a provider conversation.
+
+                initial_input = bound._response_input(base_params, message)
+                continuation_history = (
+                    [{"role": "user", "content": initial_input}]
+                    if isinstance(initial_input, str)
+                    else list(initial_input)
                 )
-                _record_provider_output(trace, response)
-                return response
 
-            response = run_tool_loop(
-                response,
-                execute_tool,
-                continue_request,
-                max_rounds=_tool_rounds(base_params.get("max_rounds")),
-            )
+                def continue_request(input_items, previous_response):
+                    continuation_params = dict(base_params)
+                    # The initial forced choice has been satisfied. Permit a final
+                    # answer instead of forcing the same action again with a new id.
+                    choice = continuation_params.get("tool_choice")
+                    if choice == "required":
+                        continuation_params["tool_choice"] = "auto"
+                    elif isinstance(choice, dict):
+                        continuation_params["tool_choice"] = (
+                            {**choice, "mode": "auto"}
+                            if choice.get("type") == "allowed_tools"
+                            else "auto"
+                        )
+                    # The provider conversation already contains the answered calls.
+                    if conversation_id:
+                        continuation_params["input"] = [
+                            item
+                            for item in input_items
+                            if isinstance(item, dict)
+                            and item.get("type") == "function_call_output"
+                        ]
+                    else:
+                        continuation_history.extend(input_items)
+                        continuation_params["input"] = list(continuation_history)
+                    continuation_params["background"] = base_params.get(
+                        "background", True
+                    )
+                    response = self._ask_provider(
+                        message="",
+                        model_key=model_key,
+                        conversation_id=conversation_id,
+                        settings_conversation_id=settings_conversation_id,
+                        params=continuation_params,
+                        trace=trace,
+                        **policy_kwargs,
+                    )
+                    _record_provider_output(trace, response)
+                    return response
 
-        if trace is not None:
-            record_yandex_mcp_activity(trace)
-        return response
+                response = run_tool_loop(
+                    response,
+                    execute_tool,
+                    continue_request,
+                    max_rounds=_tool_rounds(base_params.get("max_rounds")),
+                )
+
+            if trace is not None:
+                record_yandex_mcp_activity(trace)
+            return response
+
+    return LogosClient
+
+
+_logos_client_type = None
+
+
+def logos_client_type() -> type:
+    """The chat's provider client class."""
+    global _logos_client_type
+    with _lazy_lock:
+        if _logos_client_type is None:
+            _logos_client_type = _define_logos_client(bound.YandexResponsesClient)
+        return _logos_client_type
+
+
+def __getattr__(name: str) -> Any:
+    """Compatibility for ``from chat.mcp_routes import LogosClient`` / ``IMAGE_INPUT_MODEL_KEYS``."""
+    if name == "LogosClient":
+        return logos_client_type()
+    if name == "IMAGE_INPUT_MODEL_KEYS":
+        return image_input_model_keys()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _turn_cost(billing: dict[str, Any]) -> float | None:
@@ -455,17 +473,17 @@ def _validate_chat_payload(conv_id, model_key, message, attachments):
     # These technologies have their own transports; never substitute a text turn.
     endpoint = None
     if (
-        model_key in VOICE_MODELS
+        model_key in bound.VOICE_MODELS
         or model_key.startswith("speech-realtime-")
         or "/speech-realtime-" in model_key
     ):
         endpoint = "/api/voice/session"
-    elif model_key in IMAGE_MODELS or model_key.startswith("art://"):
+    elif model_key in bound.IMAGE_MODELS or model_key.startswith("art://"):
         endpoint = "/api/images/generate"
-    elif model_key in EMBEDDING_MODELS or model_key.startswith("emb://"):
+    elif model_key in bound.EMBEDDING_MODELS or model_key.startswith("emb://"):
         endpoint = "/api/embeddings"
     elif (
-        model_key in CLASSIFIER_MODELS
+        model_key in bound.CLASSIFIER_MODELS
         or model_key.startswith("cls://")
         or "/classifier-" in model_key
     ):
@@ -512,7 +530,7 @@ def _validate_chat_payload(conv_id, model_key, message, attachments):
             None,
             (jsonify({"error": "message or attachments are required"}), 400),
         )
-    if images and model_key not in IMAGE_INPUT_MODEL_KEYS:
+    if images and model_key not in image_input_model_keys():
         return None, None, (jsonify({"error": "model_does_not_accept_images"}), 400)
 
     return message, images, None
@@ -533,12 +551,12 @@ class _ChatReply:
 
 def _execute_chat_model(message, model_key, invocation, params, trace):
     """Run one provider/tool turn and collect its terminal response."""
-    client = LogosClient(Config)
+    client = logos_client_type()(bound.Config)
     provider_conversation_id = _provider_conversation_id(
         client, invocation.conversation_id, trace
     )
 
-    if isinstance(trace, ExecutionTrace):
+    if isinstance(trace, bound.ExecutionTrace):
         trace.add_event(
             "turn_limits",
             {
@@ -838,7 +856,7 @@ def _chat_error_response(
             error_type=type(error).__name__,
         )
         record_yandex_mcp_activity(trace)
-        if isinstance(error, ProviderQuotaExceeded):
+        if isinstance(error, bound.ProviderQuotaExceeded):
             trace.add_event(
                 "provider_quota_http_response",
                 {
@@ -848,7 +866,7 @@ def _chat_error_response(
                 },
             )
         trace_data = trace.finalize()
-    if isinstance(error, ProviderQuotaExceeded):
+    if isinstance(error, bound.ProviderQuotaExceeded):
         if invocation is not None:
             persist_invocation_trace(invocation.invocation_id, trace_data)
             fail_invocation(invocation.invocation_id, error=error.to_dict()["error"])
@@ -956,7 +974,7 @@ def chat():
             requested_skills = _normalize_requested_skills(data, params)
             params.pop("skills", None)
             params = _client_params(params)
-        except (ValueError, SkillRegistryError) as exc:
+        except (ValueError, bound.SkillRegistryError) as exc:
             return jsonify({"error": "invalid_params", "message": str(exc)}), 400
 
         message, images, invalid_payload = _validate_chat_payload(
@@ -1022,8 +1040,8 @@ def chat():
             params["input_images"] = images
 
         try:
-            selected_skills = skill_registry.load_many(requested_skills, role=role)
-        except SkillRegistryError as exc:
+            selected_skills = skill_registry().load_many(requested_skills, role=role)
+        except bound.SkillRegistryError as exc:
             trace.record_error(
                 "skills", "invalid skill selection", error_type=type(exc).__name__
             )
@@ -1120,7 +1138,7 @@ def chat():
                     trace_token = bind_current_trace(trace)
                     start_invocation(invocation.invocation_id)
                 else:
-                    trace = ExecutionTrace()
+                    trace = bound.ExecutionTrace()
             return _chat_error_response(
                 e,
                 trace=trace,
@@ -1151,8 +1169,8 @@ def chat():
 def list_skills():
     role = request.args.get("role")
     try:
-        return jsonify({"skills": skill_registry.catalog(role=role)})
-    except SkillRegistryError:
+        return jsonify({"skills": skill_registry().catalog(role=role)})
+    except bound.SkillRegistryError:
         return jsonify(
             {
                 "error": "invalid_role",
@@ -1163,14 +1181,14 @@ def list_skills():
 
 @mcp_bp.route("/api/tools/categories", methods=["GET"])
 def list_tool_categories():
-    return jsonify({"categories": registry.get_available_categories()})
+    return jsonify({"categories": bound.registry.get_available_categories()})
 
 
 def _tool_category_selection(value: Any) -> list[str] | None:
     """Registered category names only, so a saved selection always maps to real tools."""
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         return None
-    known = registry.get_available_categories()
+    known = bound.registry.get_available_categories()
     if any(item not in known for item in value):
         return None
     return list(dict.fromkeys(value))
@@ -1196,7 +1214,7 @@ def conv_tools(conv_id):
     settings = get_conv_settings(conv_id) or {}
     cats = settings.get("active_tool_categories")
     if cats is None:
-        cats = list(registry.get_available_categories().keys())
+        cats = list(bound.registry.get_available_categories().keys())
     return jsonify({"active_tool_categories": cats})
 
 
@@ -1230,11 +1248,11 @@ def handle_mcp_servers():
         if data is None:
             return jsonify({"error": "JSON object is required"}), 400
         try:
-            sid = mcp_storage.create_server(owner_id, data)
+            sid = bound.mcp_storage.create_server(owner_id, data)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         return jsonify({"status": "ok", "id": sid}), 201
-    servers = mcp_storage.list_servers(owner_id=owner_id)
+    servers = bound.mcp_storage.list_servers(owner_id=owner_id)
     return jsonify({"data": [_without_secrets(srv) for srv in servers]})
 
 
@@ -1242,21 +1260,21 @@ def handle_mcp_servers():
 def handle_mcp_server_item(server_id):
     owner_id = get_current_owner_id()
     if request.method == "DELETE":
-        mcp_storage.delete_server(server_id, owner_id)
+        bound.mcp_storage.delete_server(server_id, owner_id)
         return jsonify({"status": "deleted"})
     if request.method == "PUT":
         data = _update_payload()
         if data is None:
             return jsonify({"error": "JSON object is required"}), 400
         try:
-            updated = mcp_storage.update_server(server_id, owner_id, data)
+            updated = bound.mcp_storage.update_server(server_id, owner_id, data)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         if not updated:
             return jsonify({"error": "Сервер не найден"}), 404
         return jsonify({"status": "updated"})
 
-    srv = mcp_storage.get_server(server_id, owner_id=owner_id)
+    srv = bound.mcp_storage.get_server(server_id, owner_id=owner_id)
     if not srv:
         return jsonify({"error": "Сервер не найден"}), 404
     return jsonify(_without_secrets(srv))
@@ -1274,9 +1292,9 @@ def conversations():
             model = validate_dialog_model(data.get("model", "yandexgpt-5-pro"))
         except ValueError:
             return jsonify({"error": "model_not_available_for_dialog"}), 400
-        except ModelDiscoveryError:
+        except bound.ModelDiscoveryError:
             return jsonify({"error": "model_catalog_unavailable"}), 503
-        creation_trace = ExecutionTrace()
+        creation_trace = bound.ExecutionTrace()
         creation_trace.set_request(
             {
                 "operation": "create_conversation",
@@ -1325,7 +1343,7 @@ def execute_approved():
         arguments = data.get("arguments", {})
         model_key = data.get("model", "yandexgpt-5-pro")
 
-        tool_config = registry.get_tool_meta(func_name)
+        tool_config = bound.registry.get_tool_meta(func_name)
         if not tool_config:
             return jsonify({"error": f"Неизвестный инструмент: {func_name}"}), 400
 
@@ -1341,7 +1359,7 @@ def execute_approved():
                 and all(ch.isalnum() or ch in "-_" for ch in current_theme)
             ):
                 tool_arguments["current_theme"] = current_theme
-        call = UniversalToolCall(
+        call = bound.UniversalToolCall(
             tool_name=func_name,
             arguments=tool_arguments,
             transport="internal",
@@ -1349,7 +1367,7 @@ def execute_approved():
             approved=True,
             metadata={"source": "approved_action"},
         )
-        exec_res = UniversalToolExecutor(registry).execute(call)
+        exec_res = bound.UniversalToolExecutor(bound.registry).execute(call)
         if not exec_res.get("success"):
             return jsonify(
                 {
@@ -1362,7 +1380,7 @@ def execute_approved():
             } else 400
 
         execution_data = exec_res.get("data")
-        client = LogosClient(Config)
+        client = logos_client_type()(bound.Config)
         prompt = (
             f"Пользователь подтвердил действие '{func_name}' с параметрами {arguments}.\n"
             f"Результат: {execution_data}.\nДай краткий ответ о завершении."
@@ -1371,7 +1389,7 @@ def execute_approved():
             synth_response = client.ask(
                 prompt,
                 model_key,
-                _provider_conversation_id(client, conv_id, ExecutionTrace()),
+                _provider_conversation_id(client, conv_id, bound.ExecutionTrace()),
                 {"instructions": "Ты системный ассистент."},
             )
         except Exception:

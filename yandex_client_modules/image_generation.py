@@ -5,8 +5,8 @@ import binascii
 from typing import Any
 
 import requests
+from yandex_client_modules.host import bound, upstream_model_id
 
-from core.config import IMAGE_MODELS, upstream_model_id
 
 GENERATE_URL = "https://ai.api.cloud.yandex.net/v1/images/generations"
 MAX_PROMPT_CHARS = 500
@@ -25,7 +25,7 @@ def build_generation_payload(
 ) -> dict[str, Any]:
     if not isinstance(project_id, str) or not project_id.strip():
         raise ValueError("Yandex project_id is required")
-    if not isinstance(model_key, str) or model_key not in IMAGE_MODELS:
+    if not isinstance(model_key, str) or model_key not in bound.IMAGE_MODELS:
         raise ValueError("not_an_image_model")
     if not isinstance(prompt, str) or not prompt.strip():
         raise ValueError("message is required")

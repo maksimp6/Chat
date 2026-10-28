@@ -14,7 +14,7 @@ from remote_runtime.environments import (
     dispatch_environment_http,
     register_runtime_operation,
 )
-from economy.treasury_identity import get_current_owner_id
+from remote_runtime.host import get_current_owner_id
 
 environment_bp = Blueprint("environments", __name__, url_prefix="/api/environments")
 environment_gateway_bp = Blueprint("environment_gateway", __name__)

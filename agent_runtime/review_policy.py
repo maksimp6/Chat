@@ -6,12 +6,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import subprocess
 
-from runtime.request_context import current_runtime_data_root, current_runtime_id
-from tool_providers.universal_tool_platform import (
-    ReadOnlyToolPolicy,
-    UniversalToolCall,
-    UniversalToolDefinition,
-)
+from agent_runtime._vendor.read_only_policy import ReadOnlyToolPolicy
+from typing import Any
+from agent_runtime.host import bound, current_runtime_data_root, current_runtime_id
 
 ISSUE_READ_TOOLS = frozenset(
     {"read_file", "python_ast_outline", "calculate_hash", "file_stat", "list_directory"}
@@ -44,15 +41,12 @@ class RepositoryReviewPolicy(ReadOnlyToolPolicy):
         object.__setattr__(self, "root", self.root.resolve())
         object.__setattr__(self, "source_files", frozenset(self.source_files))
 
-    def __call__(
-        self, definition: UniversalToolDefinition, call: UniversalToolCall
-    ) -> bool:
+    def __call__(self, definition: Any, call: Any) -> bool:
         if not self.allows_tool(definition):
             return False
-        from tool_providers import filesystem
 
         # Do not silently authorize one root while the legacy provider reads another.
-        if Path(filesystem.BASE_DIR).resolve() != self.root:
+        if Path(bound.filesystem.BASE_DIR).resolve() != self.root:
             return False
         raw_path = call.arguments.get("path") or "."
         if not isinstance(raw_path, str) or Path(raw_path).is_absolute():

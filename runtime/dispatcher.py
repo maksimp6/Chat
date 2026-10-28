@@ -6,18 +6,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import RLock, local
 from typing import Any, Callable, Mapping
-
-from tool_providers.universal_tool_platform import (
-    UniversalToolCall,
-    UniversalToolExecutor,
-    _warn_deprecated_execution_hooks,
-)
-from storage.contracts import (
-    StorageCredentialsMissing,
-    StorageError,
-    StorageProvider,
-    StorageProviderUnavailable,
-)
+from runtime.host import bound
 
 
 TOOL_EXECUTE_OPERATION = "tools.execute"
@@ -53,7 +42,7 @@ class RuntimeContext:
 
 RuntimeHandler = Callable[[RuntimeContext, Mapping[str, Any]], Any]
 # Kept for consumers importing the former callback annotation.
-RuntimeToolPolicy = Callable[[RuntimeContext, Any, UniversalToolCall], Any]
+RuntimeToolPolicy = Callable[[RuntimeContext, Any, Any], Any]
 
 
 class RuntimeDispatcher:
@@ -67,8 +56,8 @@ class RuntimeDispatcher:
         self._lock = RLock()
         self._runtimes: dict[str, RuntimeContext] = {}
         self._operations: dict[str, RuntimeHandler] = {}
-        self._tool_boundaries: dict[str, UniversalToolExecutor] = {}
-        self._storage_providers: dict[tuple[str, str | None, str], StorageProvider] = {}
+        self._tool_boundaries: dict[str, Any] = {}
+        self._storage_providers: dict[tuple[str, str | None, str], Any] = {}
         self._storage_credentials: (
             Callable[[RuntimeContext, str], object | None] | None
         ) = None
@@ -149,7 +138,7 @@ class RuntimeDispatcher:
     def register_tool_executor(
         self,
         runtime_id: str,
-        executor: UniversalToolExecutor,
+        executor: Any,
         **legacy_hooks: Any,
     ) -> None:
         """Bind one tool executor to an existing runtime.
@@ -159,9 +148,9 @@ class RuntimeDispatcher:
         behind this boundary.
         """
         self.context(runtime_id)
-        if not isinstance(executor, UniversalToolExecutor):
+        if not isinstance(executor, bound.UniversalToolExecutor):
             raise TypeError("executor must be a UniversalToolExecutor")
-        _warn_deprecated_execution_hooks(legacy_hooks)
+        bound._warn_deprecated_execution_hooks(legacy_hooks)
         with self._lock:
             self._tool_boundaries[runtime_id] = executor
 
@@ -180,7 +169,7 @@ class RuntimeDispatcher:
         self._storage_credentials = resolver
 
     def register_storage_provider(
-        self, runtime_id: str, provider: StorageProvider, *, owner_id: str | None = None
+        self, runtime_id: str, provider: Any, *, owner_id: str | None = None
     ) -> None:
         context = self.context(runtime_id)
         scoped_owner = context.owner_id if owner_id is None else owner_id
@@ -210,14 +199,14 @@ class RuntimeDispatcher:
                 (runtime_id, context.owner_id, provider_name)
             )
         if provider is None:
-            raise StorageProviderUnavailable("Storage provider is not configured")
+            raise bound.StorageProviderUnavailable("Storage provider is not configured")
         credentials = (
             self._storage_credentials(context, provider_name)
             if self._storage_credentials
             else None
         )
         if provider.requires_credentials and credentials is None:
-            raise StorageCredentialsMissing(
+            raise bound.StorageCredentialsMissing(
                 "Storage provider credentials are not configured"
             )
         values = dict(payload or {})
@@ -230,11 +219,11 @@ class RuntimeDispatcher:
                 return provider.download(values["object_id"], credentials=credentials)
             if action == "list":
                 return provider.list(values.get("prefix", ""), credentials=credentials)
-            raise StorageError("Unsupported storage operation")
-        except StorageError:
+            raise bound.StorageError("Unsupported storage operation")
+        except bound.StorageError:
             raise
         except Exception as exc:
-            raise StorageError("Storage provider operation failed") from exc
+            raise bound.StorageError("Storage provider operation failed") from exc
 
     def context(self, runtime_id: str) -> RuntimeContext:
         with self._lock:
@@ -300,10 +289,10 @@ class RuntimeDispatcher:
             )
 
         raw_call = payload.get("call")
-        if isinstance(raw_call, UniversalToolCall):
+        if isinstance(raw_call, bound.UniversalToolCall):
             call = raw_call
         elif isinstance(raw_call, Mapping):
-            call = UniversalToolCall(
+            call = bound.UniversalToolCall(
                 tool_name=str(raw_call.get("tool_name") or raw_call.get("name") or ""),
                 arguments=dict(raw_call.get("arguments") or {}),
                 call_id=raw_call.get("call_id"),

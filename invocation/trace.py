@@ -1,12 +1,13 @@
 """Invocation-scoped ExecutionTrace ownership helpers."""
 
 from invocation.context import InvocationContext
-from observability.trace_manager import ExecutionTrace
+from typing import Any
+from invocation.host import bound
 
 
-def create_invocation_trace(context: InvocationContext) -> ExecutionTrace:
+def create_invocation_trace(context: InvocationContext) -> Any:
     """Create a trace bound to exactly one invocation context."""
-    trace = ExecutionTrace(trace_id=context.trace_id)
+    trace = bound.ExecutionTrace(trace_id=context.trace_id)
     trace.set_context(
         invocation_id=context.invocation_id,
         session_id=context.session_id,

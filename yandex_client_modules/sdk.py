@@ -5,8 +5,7 @@ sdk.py - Минимальный SDK для работы с Yandex AI Studio
 import os
 
 import requests
-
-from core.config import get_model_uri
+from yandex_client_modules.host import get_model_uri
 
 
 class LogosSDK:
@@ -58,6 +57,9 @@ class LogosSDK:
 
 # Пример использования
 if __name__ == "__main__":
+    from composition import wiring
+
+    wiring.register_all()
     sdk = LogosSDK(os.environ["YANDEX_API_KEY"], os.environ["YANDEX_PROJECT_ID"])
 
     # Создать диалог

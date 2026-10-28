@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from agent_shell.host import bound
 from agent_shell.runner import TaskFailed
 
 MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
@@ -37,9 +38,8 @@ def default_handlers(check_run=None, run_issue=None):
             raise TaskFailed("invalid_payload")
         run = run_issue
         if run is None:
-            from agent_runtime.issue_runner import DEFAULT_MODEL, run_issue_task as run
-
-            model = model or DEFAULT_MODEL
+            run = bound.run_issue_task
+            model = model or bound.DEFAULT_MODEL
         result = run(issue, title, body, model)
         if result.get("status") == "failed":
             raise TaskFailed("agent_failed", result)

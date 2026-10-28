@@ -1,8 +1,7 @@
 """Shared local identity for the unauthenticated MCP transport."""
 
 from __future__ import annotations
-
-from economy.treasury_identity import get_current_owner_id
+from mcp_server.host import get_current_owner_id
 
 
 def _auth_mode() -> str:

@@ -6,8 +6,6 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Mapping
 
-from invocation.context import InvocationContext
-from observability.trace_manager import ExecutionTrace
 
 from runtime.dispatcher import RuntimeDispatcher, RuntimeScopeViolation
 
@@ -54,9 +52,7 @@ class ConversationAgentRouter:
         key = (agent.runtime_id, agent.conversation_id, agent.agent_id)
         self._agents[key] = agent
 
-    def select(
-        self, context: InvocationContext, agent_id: str, trace: ExecutionTrace
-    ) -> ConversationAgent:
+    def select(self, context: Any, agent_id: str, trace: Any) -> ConversationAgent:
         self._validate_context(context)
         key = (context.runtime_id or "", context.conversation_id, str(agent_id))
         try:
@@ -77,10 +73,10 @@ class ConversationAgentRouter:
 
     def handoff(
         self,
-        context: InvocationContext,
+        context: Any,
         source_agent_id: str,
         target_agent_id: str,
-        trace: ExecutionTrace,
+        trace: Any,
     ) -> ConversationAgent:
         source = self.select(context, source_agent_id, trace)
         target = self.select(context, target_agent_id, trace)
@@ -97,11 +93,11 @@ class ConversationAgentRouter:
 
     def invoke_tool(
         self,
-        context: InvocationContext,
+        context: Any,
         agent: ConversationAgent,
         tool_name: str,
         arguments: Mapping[str, Any],
-        trace: ExecutionTrace,
+        trace: Any,
     ) -> Any:
         self._validate_context(context)
         if (agent.runtime_id, agent.conversation_id) != (
@@ -135,6 +131,6 @@ class ConversationAgentRouter:
         )
 
     @staticmethod
-    def _validate_context(context: InvocationContext) -> None:
+    def _validate_context(context: Any) -> None:
         if not context.runtime_id:
             raise ValueError("runtime_id is required for conversation-agent routing")

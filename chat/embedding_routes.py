@@ -10,13 +10,13 @@ from types import SimpleNamespace
 import requests
 from flask import Blueprint, jsonify, request
 
-from core.config import Config, EMBEDDING_MODELS
 import os
-from economy.knowledge_economics import KnowledgeCostConfig, calculate_knowledge_cost
-from observability.trace_manager import get_current_trace, traced_operation
-from yandex_client_modules.request_mixin import (
-    _resolve_global_provider_credential,
+from chat.host import (
+    bound,
+    calculate_knowledge_cost,
+    get_current_trace,
     provider_request_headers,
+    traced_operation,
 )
 
 embedding_bp = Blueprint("embeddings", __name__)
@@ -123,7 +123,7 @@ def _cost(tokens: int) -> dict:
         per_1k_tokens = None  # a bad price must not turn a paid request into a 500
     if per_1k_tokens is not None and not math.isfinite(per_1k_tokens):
         per_1k_tokens = None  # nan or inf would reach the JSON response unparseable
-    config = KnowledgeCostConfig(embedding_per_1k_tokens=per_1k_tokens)
+    config = bound.KnowledgeCostConfig(embedding_per_1k_tokens=per_1k_tokens)
     return calculate_knowledge_cost(embedding_tokens=tokens, config=config)
 
 
@@ -142,12 +142,12 @@ def create_embeddings():
         return jsonify({"error": "send model or mode, not both"}), 400
     if "model" in body:
         model_name = body["model"]
-        if not isinstance(model_name, str) or model_name not in EMBEDDING_MODELS:
+        if not isinstance(model_name, str) or model_name not in bound.EMBEDDING_MODELS:
             return (
                 jsonify(
                     {
                         "error": "unknown embedding model",
-                        "models": sorted(EMBEDDING_MODELS),
+                        "models": sorted(bound.EMBEDDING_MODELS),
                     }
                 ),
                 400,
@@ -171,8 +171,8 @@ def create_embeddings():
         return jsonify({"error": str(exc)}), 400
 
     try:
-        credential = _resolve_global_provider_credential(
-            SimpleNamespace(_config=Config), get_current_trace()
+        credential = bound._resolve_global_provider_credential(
+            SimpleNamespace(_config=bound.Config), get_current_trace()
         )
         headers = provider_request_headers(credential)
         headers["x-project"] = credential.project_id
@@ -181,7 +181,7 @@ def create_embeddings():
     if not credential.api_key or not str(credential.project_id or "").strip():
         return jsonify({"error": "embeddings_not_configured"}), 503
 
-    model_uri = f"emb://{credential.project_id.strip()}/{EMBEDDING_MODELS[model_name]['upstream']}"
+    model_uri = f"emb://{credential.project_id.strip()}/{bound.EMBEDDING_MODELS[model_name]['upstream']}"
     vectors, total_tokens = [], 0
     started = time.monotonic()
     for text in items:

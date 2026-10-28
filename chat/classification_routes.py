@@ -7,20 +7,16 @@ from types import SimpleNamespace
 
 import requests
 from flask import Blueprint, jsonify, request
-
-from core.config import CLASSIFIER_MODELS, Config
-from observability.trace_manager import get_current_trace, traced_operation
-from provider_accounts.quotas import (
-    ProviderQuotaExceeded,
+from chat.host import (
+    bound,
+    get_current_trace,
+    provider_request_headers,
     record_usage,
     release_request,
     reserve_request,
+    traced_operation,
 )
-from yandex_client_modules.request_mixin import (
-    _resolve_global_provider_credential,
-    _resolve_quota_user_id,
-    provider_request_headers,
-)
+
 
 classification_bp = Blueprint("classification", __name__)
 
@@ -48,7 +44,7 @@ def _classification_payload(body: dict) -> tuple[str, dict]:
     if unknown:
         raise _BadInput("unknown fields: " + ", ".join(unknown))
     model = body.get("model", DEFAULT_MODEL)
-    if not isinstance(model, str) or model not in CLASSIFIER_MODELS:
+    if not isinstance(model, str) or model not in bound.CLASSIFIER_MODELS:
         raise _BadInput("unknown classifier model")
     labels = body.get("labels")
     if not isinstance(labels, list) or not 1 <= len(labels) <= MAX_LABELS:
@@ -132,10 +128,10 @@ def classify_text():
         ), 400
 
     try:
-        credential = _resolve_global_provider_credential(
-            SimpleNamespace(_config=Config)
+        credential = bound._resolve_global_provider_credential(
+            SimpleNamespace(_config=bound.Config)
         )
-        upstream = CLASSIFIER_MODELS[model]["upstream"]
+        upstream = bound.CLASSIFIER_MODELS[model]["upstream"]
         payload["modelUri"] = f"cls://{credential.project_id}/{upstream}"
         headers = provider_request_headers(credential)
     except Exception:
@@ -143,8 +139,8 @@ def classify_text():
         return jsonify({"error": "classification_not_configured"}), 503
 
     try:
-        reservation = reserve_request(_resolve_quota_user_id())
-    except ProviderQuotaExceeded as exc:
+        reservation = reserve_request(bound._resolve_quota_user_id())
+    except bound.ProviderQuotaExceeded as exc:
         return jsonify(exc.to_dict()), 429
 
     try:

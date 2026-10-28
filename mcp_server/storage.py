@@ -6,13 +6,8 @@ import uuid
 import time
 from typing import Any
 from urllib.parse import urlsplit
+from mcp_server.host import bound, decrypt_secret, encrypt_secret, get_store
 
-from secret_store.credential_crypto import (
-    CredentialCryptoError,
-    decrypt_secret,
-    encrypt_secret,
-)
-from storage.db import get_store
 
 logger = logging.getLogger("logos.mcp_server.storage")
 
@@ -109,7 +104,7 @@ def list_servers(*, owner_id: str) -> list[dict[str, Any]]:
     ):
         try:
             servers.append(_public(_open_fields(row)))
-        except CredentialCryptoError as exc:
+        except bound.CredentialCryptoError as exc:
             # One unreadable record must not hide the other servers of the list.
             logger.warning("Skipping MCP server %s: %s", row.get("id"), exc)
     return servers

@@ -10,6 +10,11 @@ import traceback
 from contextvars import ContextVar
 from functools import wraps
 from typing import Any, Optional, Callable
+from observability.host import (
+    aggregate_billing,
+    build_ai_billing_item,
+    build_compute_billing_item,
+)
 
 _current_trace: ContextVar["ExecutionTrace | None"] = ContextVar(
     "logos_execution_trace", default=None
@@ -468,8 +473,6 @@ class ExecutionTrace:
         if not isinstance(clean_raw, dict):
             return
         try:
-            from economy.billing import build_ai_billing_item, aggregate_billing
-
             # The chat turn's internal model key is the billing key. The provider echoes its own
             # model id, which may not be a registry key (for example `name/latest`).
             model = (self.trace.get("request") or {}).get("model") or clean_raw.get(
@@ -797,8 +800,6 @@ class ExecutionTrace:
         cpu_ms = timings.get("billable_cpu_ms")
         wall_ms = timings.get("billable_wall_ms")
         try:
-            from economy.compute_resources import build_compute_billing_item
-
             return build_compute_billing_item(
                 None if cpu_ms is None else cpu_ms / 1000,
                 None if wall_ms is None else wall_ms / 1000,
@@ -871,8 +872,6 @@ class ExecutionTrace:
             snapshot.setdefault("timings", {})["total_duration_ms"] = round(
                 max(0.0, end_perf - self.start_perf) * 1000, 2
             )
-
-        from economy.billing import aggregate_billing
 
         billing = snapshot.get("billing") or {}
         # Billing items are source facts.  Never use a previously generated total

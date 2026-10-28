@@ -17,8 +17,8 @@ import threading
 import uuid
 from typing import Any, Callable, Optional, TYPE_CHECKING
 
-from cloud.base import CloudProviderError
 from economy._vendor.restrictions import restrictions_lifted
+from economy.host import bound
 
 if TYPE_CHECKING:
     from economy.budget_repository import BudgetRepository
@@ -621,7 +621,8 @@ class BudgetController:
 
 
 # Provider and transport failures that mean "billing unavailable", not a bug.
-_BILLING_OUTAGE_ERRORS: tuple[type[BaseException], ...] = (CloudProviderError, OSError)
+def _billing_outage_errors() -> tuple[type[BaseException], ...]:
+    return (bound.CloudProviderError, OSError)
 
 
 class CloudSpendStatus(str, Enum):
@@ -749,7 +750,7 @@ class CloudBudgetGuard:
             return evaluate_cloud_spend(None, self.limits)
         try:
             summary = self._provider.costs_summary(period=period, group_by=None)
-        except _BILLING_OUTAGE_ERRORS as exc:
+        except _billing_outage_errors() as exc:
             # Billing outages must not break cloud operations; anything else surfaces.
             result = evaluate_cloud_spend(None, self.limits)
             result["error"] = type(exc).__name__

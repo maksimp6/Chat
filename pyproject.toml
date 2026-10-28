@@ -41,6 +41,7 @@ exclude = ["^docs/mirrors/", "^datasets/"]
 roots = ["app.py", "composition/"]
 entry-blocks = [
     "agent_memory/extractor.py",
+    "yandex_client_modules/sdk.py",
     "project_board/seed.py",
     "project_board/server.py",
     "agent_runtime/issue_runner.py",
@@ -216,15 +217,33 @@ copies = [
 canonical = "core/host_binding.py"
 copies = [
     "agent_memory/_binding.py",
+    "agent_runtime/_binding.py",
+    "agent_shell/_binding.py",
+    "chat/_binding.py",
     "cloud/_binding.py",
     "conversations/_binding.py",
+    "economy/_binding.py",
     "forge/_binding.py",
+    "invocation/_binding.py",
+    "mcp_server/_binding.py",
     "model_editor/_binding.py",
+    "observability/_binding.py",
     "organization/_binding.py",
     "plugin_system/_binding.py",
     "project_board/_binding.py",
+    "provider_accounts/_binding.py",
+    "remote_runtime/_binding.py",
+    "runtime/_binding.py",
     "secret_store/_binding.py",
     "sessions/_binding.py",
     "storage/_binding.py",
+    "tool_providers/_binding.py",
     "workspace/_binding.py",
+    "yandex_client_modules/_binding.py",
+]
+
+[[tool.logos.vendored]]
+canonical = "tool_providers/read_only_policy.py"
+copies = [
+    "agent_runtime/_vendor/read_only_policy.py",
 ]

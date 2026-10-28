@@ -15,7 +15,7 @@
 | --- | --- |
 | Основной клиент | `request_mixin`, `conversations`, `polling_mixin`, `response_poller` |
 | SDK | `yandex_client_modules/sdk.py` |
-| Files / Vector Store | `workspace/files.py`, `scripts/semantic_pipeline.py` |
+| Files / Vector Store | `yandex_client_modules/files.py`, `scripts/semantic_pipeline.py` |
 | Каталог моделей | `provider_accounts/model_discovery.py` |
 | Управление API-ключами | `yandex_client_modules/api_key_provider.py` |
 | Извлечение памяти | `agent_memory/extractor.py` |

@@ -8,27 +8,20 @@ import time
 import requests
 from flask import Blueprint, jsonify, request, send_file
 
-from chat.mcp_routes import LogosClient
-from core.config import Config, IMAGE_MODELS
-from conversations.ownership import check_access
-from economy.treasury_identity import get_current_owner_id
-from storage.db import add_message, get_messages, get_store
-from storage.generated_images import (
+from chat.mcp_routes import logos_client_type
+from chat.host import (
+    add_message,
+    bound,
+    build_generation_payload,
+    check_access,
+    get_current_owner_id,
+    get_messages,
+    get_store,
     image_file_metadata,
     open_image_file,
-    save_image_file,
-)
-from yandex_client_modules.image_generation import (
-    IMAGE_SIZES,
-    MAX_PROMPT_CHARS,
-    REQUEST_TIMEOUT_SECONDS,
-    ImageGenerationError,
-    build_generation_payload,
-    generate_image as request_image,
-)
-from yandex_client_modules.request_mixin import (
-    _resolve_global_provider_credential,
     provider_request_headers,
+    request_image,
+    save_image_file,
 )
 
 image_bp = Blueprint("images", __name__)
@@ -37,7 +30,9 @@ CONVERSATION_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,128}")
 
 
 def _headers():
-    credential = _resolve_global_provider_credential(LogosClient(Config))
+    credential = bound._resolve_global_provider_credential(
+        logos_client_type()(bound.Config)
+    )
     return credential.project_id, provider_request_headers(credential)
 
 
@@ -125,7 +120,7 @@ def _request_response(conv_id, request_id, record):
     status = record.get("status")
     if (
         status == "pending"
-        and time.time() - record["created_at"] <= REQUEST_TIMEOUT_SECONDS + 30
+        and time.time() - record["created_at"] <= bound.REQUEST_TIMEOUT_SECONDS + 30
     ):
         return jsonify({"status": "pending", "request_id": request_id}), 202
     # A lost worker/response must never cause another paid request with the same id.
@@ -160,7 +155,7 @@ def generate_image():
     model_key = data.get("model")
     prompt = data.get("message")
     size = data.get("size")
-    if not isinstance(model_key, str) or model_key not in IMAGE_MODELS:
+    if not isinstance(model_key, str) or model_key not in bound.IMAGE_MODELS:
         return jsonify({"error": "not_an_image_model"}), 400
     if not isinstance(conv_id, str) or not CONVERSATION_ID_PATTERN.fullmatch(conv_id):
         return jsonify({"error": "invalid_conversation_id"}), 400
@@ -169,9 +164,13 @@ def generate_image():
     if not isinstance(prompt, str) or not prompt.strip():
         return jsonify({"error": "message is required"}), 400
     prompt = prompt.strip()
-    if len(prompt) > MAX_PROMPT_CHARS:
-        return jsonify({"error": "prompt_too_long", "limit": MAX_PROMPT_CHARS}), 400
-    if size is not None and (not isinstance(size, str) or size not in IMAGE_SIZES):
+    if len(prompt) > bound.MAX_PROMPT_CHARS:
+        return jsonify(
+            {"error": "prompt_too_long", "limit": bound.MAX_PROMPT_CHARS}
+        ), 400
+    if size is not None and (
+        not isinstance(size, str) or size not in bound.IMAGE_SIZES
+    ):
         return jsonify({"error": "invalid_image_size"}), 400
     if data.get("attachments"):
         return jsonify({"error": "image_model_does_not_take_photos"}), 400
@@ -251,7 +250,7 @@ def generate_image():
                 "request_id": request_id,
             }
         ), 502
-    except ImageGenerationError as exc:
+    except bound.ImageGenerationError as exc:
         message = str(exc)[:200]
         _fail_request(key, "image_generation_failed", message)
         return jsonify(

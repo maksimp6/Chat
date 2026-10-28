@@ -11,13 +11,14 @@ from types import SimpleNamespace
 
 import requests
 from flask import Blueprint, jsonify, request
-
-from core.config import Config, get_model_uri
-from observability.trace_manager import get_current_trace, traced_operation
-from yandex_client_modules.request_mixin import (
-    _resolve_global_provider_credential,
+from chat.host import (
+    bound,
+    get_current_trace,
+    get_model_uri,
     provider_request_headers,
+    traced_operation,
 )
+
 
 completion_bp = Blueprint("completion", __name__)
 
@@ -110,8 +111,8 @@ def create_completion():
         return jsonify({"error": str(exc)}), 400
 
     try:
-        credential = _resolve_global_provider_credential(
-            SimpleNamespace(_config=Config), get_current_trace()
+        credential = bound._resolve_global_provider_credential(
+            SimpleNamespace(_config=bound.Config), get_current_trace()
         )
         model_uri = get_model_uri(credential.project_id, MODEL_KEY)
         headers = provider_request_headers(credential)

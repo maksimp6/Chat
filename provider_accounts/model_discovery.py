@@ -13,17 +13,14 @@ from typing import Any, Callable
 from urllib.parse import urlsplit
 
 import requests
-
-from core.config import (
-    CLASSIFIER_MODELS,
-    EMBEDDING_MODELS,
-    IMAGE_MODELS,
-    TEXT_MODELS,
-    VOICE_MODELS,
+from provider_accounts.host import (
+    bound,
     canonical_model_key,
     get_model_uri,
+    provider_request_headers,
     registry_key_for_upstream,
 )
+
 
 logger = logging.getLogger("logos.provider_accounts.model_discovery")
 
@@ -38,10 +35,10 @@ class ModelDiscoveryError(RuntimeError):
 def _active_provider_credential():
     # The chat resolver is imported only when a request needs auth: importing it
     # while app/model discovery is being initialized would introduce a cycle.
-    from core.config import Config
-    from yandex_client_modules.request_mixin import _resolve_global_provider_credential
 
-    return _resolve_global_provider_credential(SimpleNamespace(_config=Config))
+    return bound._resolve_global_provider_credential(
+        SimpleNamespace(_config=bound.Config)
+    )
 
 
 class ModelDiscovery:
@@ -95,8 +92,6 @@ class ModelDiscovery:
 
     def _request_auth(self) -> tuple[dict[str, str], str | None, tuple[str, str, str]]:
         if self._credential_resolver is not None:
-            from yandex_client_modules.request_mixin import provider_request_headers
-
             credential = self._credential_resolver()
             api_key = credential.api_key
             project_id = credential.project_id
@@ -145,11 +140,11 @@ class ModelDiscovery:
             # (docs/models/yandex-models.md). Tuned, deprecated or duplicate URIs
             # returned by the Models API are not listed.
             documented = {
-                "text": TEXT_MODELS,
-                "voice": VOICE_MODELS,
-                "image": IMAGE_MODELS,
-                "embedding": EMBEDDING_MODELS,
-                "classifier": CLASSIFIER_MODELS,
+                "text": bound.TEXT_MODELS,
+                "voice": bound.VOICE_MODELS,
+                "image": bound.IMAGE_MODELS,
+                "embedding": bound.EMBEDDING_MODELS,
+                "classifier": bound.CLASSIFIER_MODELS,
             }
             if normalized["id"] not in documented[normalized["type"]]:
                 continue
@@ -233,11 +228,11 @@ class ModelDiscovery:
                     }.get(declared_type, declared_type)
 
         registries = {
-            "text": TEXT_MODELS,
-            "voice": VOICE_MODELS,
-            "image": IMAGE_MODELS,
-            "embedding": EMBEDDING_MODELS,
-            "classifier": CLASSIFIER_MODELS,
+            "text": bound.TEXT_MODELS,
+            "voice": bound.VOICE_MODELS,
+            "image": bound.IMAGE_MODELS,
+            "embedding": bound.EMBEDDING_MODELS,
+            "classifier": bound.CLASSIFIER_MODELS,
         }
         registry = registries[kind]
         registry_key = registry_key_for_upstream(model_id) if kind == "text" else None
@@ -336,11 +331,11 @@ def invalidate_model_discovery_cache() -> None:
 
 def static_model_catalog() -> dict[str, Any]:
     registries = {
-        "text": TEXT_MODELS,
-        "voice": VOICE_MODELS,
-        "image": IMAGE_MODELS,
-        "embedding": EMBEDDING_MODELS,
-        "classifier": CLASSIFIER_MODELS,
+        "text": bound.TEXT_MODELS,
+        "voice": bound.VOICE_MODELS,
+        "image": bound.IMAGE_MODELS,
+        "embedding": bound.EMBEDDING_MODELS,
+        "classifier": bound.CLASSIFIER_MODELS,
     }
     return {
         kind: {
@@ -365,9 +360,9 @@ def validate_dialog_model(model_key: str) -> str:
     if not isinstance(model_key, str) or not model_key.strip():
         raise ValueError("model is required")
     model_key = canonical_model_key(model_key.strip())
-    if model_key in EMBEDDING_MODELS or model_key in CLASSIFIER_MODELS:
+    if model_key in bound.EMBEDDING_MODELS or model_key in bound.CLASSIFIER_MODELS:
         raise ValueError("service models cannot be used for dialogs")
-    for registry in (TEXT_MODELS, VOICE_MODELS, IMAGE_MODELS):
+    for registry in (bound.TEXT_MODELS, bound.VOICE_MODELS, bound.IMAGE_MODELS):
         if model_key in registry:
             if registry[model_key].get("available") is False:
                 raise ValueError("model is unavailable for dialogs")

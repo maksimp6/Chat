@@ -9,14 +9,6 @@ import uuid
 
 from flask import Blueprint, jsonify, request
 
-from core.config import config
-from secret_store.credential_crypto import (
-    CredentialCryptoError,
-    decrypt_secret,
-    encrypt_secret,
-    encryption_configured,
-)
-from storage.db import get_store
 from provider_accounts.credentials import list_provider_credentials
 from provider_accounts.credentials import (
     CLOUDRU,
@@ -32,11 +24,13 @@ from provider_accounts.credentials import (
     record_health_check,
     save_cloudru_iam_credentials,
 )
-from cloud.cloudru.api_key_provider import CloudRuApiKeyProvider
-from cloud.cloudru.iam import CloudRuIamClient
-from observability.trace_manager import traced_operation
-from yandex_client_modules.api_key_provider import YandexApiKeyProvider
 from provider_accounts.model_discovery import invalidate_model_discovery_cache
+from provider_accounts.host import (
+    bound,
+    encryption_configured,
+    get_store,
+    traced_operation,
+)
 
 
 logger = logging.getLogger("logos.provider_credentials")
@@ -91,12 +85,12 @@ def _provider_client(provider: str, project_id: str | None = None):
     if provider == YANDEX:
         if not isinstance(project_id, str) or not project_id.strip():
             raise CredentialError("Yandex project_id is required for provider client")
-        return YandexApiKeyProvider(
+        return bound.YandexApiKeyProvider(
             project_id=project_id.strip(),
-            ai_endpoint=config.BASE_URL,
+            ai_endpoint=bound.config.BASE_URL,
         )
     if provider == CLOUDRU:
-        return CloudRuApiKeyProvider(base_url=config.CLOUDRU_BASE_URL)
+        return bound.CloudRuApiKeyProvider(base_url=bound.config.CLOUDRU_BASE_URL)
     raise ValueError(f"Unsupported provider: {provider}")
 
 
@@ -107,7 +101,7 @@ def _load_credential(
     try:
         return get_active_credential(
             conn,
-            decrypt_secret,
+            bound.decrypt_secret,
             provider=provider,
             allow_expired=allow_expired,
         )
@@ -259,7 +253,7 @@ def provider_credentials_status_check():
             if provider not in (YANDEX, CLOUDRU):
                 return jsonify({"error": "unsupported_provider"}), 400
             results[provider] = _perform_health_check(provider)
-    except CredentialCryptoError:
+    except bound.CredentialCryptoError:
         # Covers a missing key and a key that does not match the stored ciphertext.
         logger.warning(
             "Provider credential unreadable with the configured encryption key"
@@ -329,7 +323,7 @@ def cloudru_service_accounts():
             return jsonify({"error": "invalid_cloudru_iam_master_key_expiry"}), 400
 
     try:
-        accounts = CloudRuIamClient(
+        accounts = bound.CloudRuIamClient(
             key_id=key_id, key_secret=key_secret
         ).list_service_accounts()
         return jsonify(
@@ -466,7 +460,7 @@ def bootstrap_cloudru():
         # Do not enumerate or auto-create accounts here: the Cloud.ru API documents
         # API-key creation as a separate operation and requires the caller to have
         # the appropriate project role.
-        management = CloudRuIamClient(key_id=key_id, key_secret=key_secret)
+        management = bound.CloudRuIamClient(key_id=key_id, key_secret=key_secret)
         expires_at = datetime.now(timezone.utc) + _cloudru_ttl()
         key = management.create_api_key(
             service_account_id=service_account_id,
@@ -483,8 +477,8 @@ def bootstrap_cloudru():
             ), 502
 
         issued_id = api_key_id
-        provider = CloudRuApiKeyProvider(
-            base_url=config.CLOUDRU_BASE_URL, iam_client=management
+        provider = bound.CloudRuApiKeyProvider(
+            base_url=bound.config.CLOUDRU_BASE_URL, iam_client=management
         )
         provider.validate_key(api_secret)
 
@@ -495,13 +489,13 @@ def bootstrap_cloudru():
             key_secret=key_secret,
             project_id=project_id,
             service_account_id=service_account_id,
-            encrypt=encrypt_secret,
+            encrypt=bound.encrypt_secret,
         )
         replace_active_credential(
             conn,
             api_secret,
             project_id,
-            encrypt_secret,
+            bound.encrypt_secret,
             CLOUDRU,
             provider_key_id=api_key_id,
             ttl=_cloudru_ttl(),
@@ -646,7 +640,7 @@ def update_provider_credentials():
                 if YANDEX in supplied_keys
                 else None
             )
-        except CredentialCryptoError:
+        except bound.CredentialCryptoError:
             # Without decrypting the stored key its identity and revocation are unknown, so replacement is refused.
             logger.warning(
                 "Stored Yandex provider credential is unreadable with the configured encryption key"
@@ -669,7 +663,7 @@ def update_provider_credentials():
                 conn,
                 api_key,
                 str(yandex_project_id) if provider == YANDEX else "",
-                encrypt_secret,
+                bound.encrypt_secret,
                 provider,
                 provider_key_id=previous_yandex.provider_key_id
                 if keep_identity

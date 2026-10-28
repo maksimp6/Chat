@@ -1,6 +1,7 @@
 """Shared local identity for Logos data and accounting; no visitor authentication."""
 
 import os
+from economy.host import bound, get_store
 
 
 class TreasuryIdentityError(ValueError):
@@ -12,12 +13,10 @@ def get_current_owner_id(*, required: bool = True) -> str | None:
     configured = str(os.environ.get("LOGOS_OWNER_ID") or "").strip()
     if configured:
         return configured
-    from storage.db import get_store
-    from kristall import KristallError
 
     try:
         store = get_store()
-    except KristallError:
+    except bound.KristallError:
         if required:
             raise
         # Do not substitute the "default" owner for a store that failed to open.

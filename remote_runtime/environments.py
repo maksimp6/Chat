@@ -18,18 +18,20 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any, Optional
-
-from storage.db import get_store, init_db as init_runtime_db
-from invocation.context import InvocationContext
-from invocation.trace import create_invocation_trace
-from observability.trace_manager import ExecutionTrace
-from runtime import RuntimeDispatcher, RuntimeLoader, RuntimeNotFound
-from runtime.request_context import bind_runtime_request
+from remote_runtime.host import (
+    bind_runtime_request,
+    bound,
+    close_memory_clients,
+    create_invocation_trace,
+    get_store,
+    init_runtime_db,
+)
 
 
 ENV_STATUSES = ("CREATING", "RUNNING", "STOPPED", "FAILED", "DELETING")
 
-_RUNTIME_DISPATCHER = RuntimeDispatcher()
+_runtime_dispatcher_instance = None
+_runtime_dispatcher_lock = threading.Lock()
 _RUNTIME_WORKERS: dict[str, "EnvironmentRuntime"] = {}
 _RUNTIME_WORKERS_LOCK = threading.RLock()
 _RUNTIME_STOP = object()
@@ -54,7 +56,16 @@ def _invoke_revision_runtime(context, payload):
     )
 
 
-_RUNTIME_DISPATCHER.register_operation("revision.invoke", _invoke_revision_runtime)
+def _runtime_dispatcher() -> Any:
+    """The process dispatcher for preview runtimes, created on first use."""
+    global _runtime_dispatcher_instance
+    with _runtime_dispatcher_lock:
+        if _runtime_dispatcher_instance is None:
+            _runtime_dispatcher_instance = bound.RuntimeDispatcher()
+            _runtime_dispatcher_instance.register_operation(
+                "revision.invoke", _invoke_revision_runtime
+            )
+        return _runtime_dispatcher_instance
 
 
 def _repo_root() -> Path:
@@ -192,11 +203,11 @@ def _record_trace(
     operation: str,
     status: str,
     *,
-    context: Optional[InvocationContext] = None,
+    context: Optional[Any] = None,
     error: Optional[str] = None,
     extra: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
-    trace = create_invocation_trace(context) if context else ExecutionTrace()
+    trace = create_invocation_trace(context) if context else bound.ExecutionTrace()
     if not context:
         trace.set_context(
             invocation_id=f"environment:{environment['environment_id']}",
@@ -310,11 +321,11 @@ class EnvironmentRuntime:
         ).resolve()
         self.worktree = self.root / self.runtime_id / "source"
         self.data_dir = self.root / self.runtime_id / "data"
-        self.loader = RuntimeLoader(
+        self.loader = bound.RuntimeLoader(
             runtime_id=self.runtime_id,
             revision=environment["commit_sha"],
             source_root=self.worktree,
-            dispatcher=_RUNTIME_DISPATCHER,
+            dispatcher=_runtime_dispatcher(),
         )
         self._jobs: queue.Queue = queue.Queue()
         self._thread = threading.Thread(
@@ -369,7 +380,7 @@ class EnvironmentRuntime:
                 raise RuntimeError("environment runtime is already running")
             _RUNTIME_WORKERS[self.runtime_id] = self
         try:
-            _RUNTIME_DISPATCHER.register_runtime(
+            _runtime_dispatcher().register_runtime(
                 self.runtime_id,
                 owner_id=self.environment.get("owner_id"),
                 namespace=self.environment["data_namespace"],
@@ -384,8 +395,7 @@ class EnvironmentRuntime:
         except Exception:
             with _RUNTIME_WORKERS_LOCK:
                 _RUNTIME_WORKERS.pop(self.runtime_id, None)
-            _RUNTIME_DISPATCHER.unregister_runtime(self.runtime_id)
-            from agent_memory.client import close_memory_clients
+            _runtime_dispatcher().unregister_runtime(self.runtime_id)
 
             close_memory_clients(self.data_dir / "logos.memory")
             raise
@@ -464,8 +474,7 @@ class EnvironmentRuntime:
         with _RUNTIME_WORKERS_LOCK:
             if _RUNTIME_WORKERS.get(self.runtime_id) is self:
                 _RUNTIME_WORKERS.pop(self.runtime_id, None)
-        _RUNTIME_DISPATCHER.unregister_runtime(self.runtime_id)
-        from agent_memory.client import close_memory_clients
+        _runtime_dispatcher().unregister_runtime(self.runtime_id)
 
         close_memory_clients(self.data_dir / "logos.memory")
 
@@ -494,7 +503,7 @@ class EnvironmentRuntime:
                 base_path,
                 data_root=str(self.data_dir),
             ):
-                source = _RUNTIME_DISPATCHER.dispatch(
+                source = _runtime_dispatcher().dispatch(
                     self.runtime_id, "http.request", payload
                 )
                 status_code = int(source["status_code"])
@@ -536,7 +545,7 @@ class EnvironmentRuntime:
                         "",
                         data_root=str(self.data_dir),
                     ):
-                        value = _RUNTIME_DISPATCHER.dispatch(
+                        value = _runtime_dispatcher().dispatch(
                             self.runtime_id, operation, payload
                         )
                     result.put(("result", value))
@@ -547,7 +556,7 @@ class EnvironmentRuntime:
 
 def register_runtime_operation(name: str, handler) -> None:
     """Register a dispatcher operation available to managed runtime threads."""
-    _RUNTIME_DISPATCHER.register_operation(name, handler)
+    _runtime_dispatcher().register_operation(name, handler)
 
 
 def authorize_environment_runtime(
@@ -557,9 +566,9 @@ def authorize_environment_runtime(
     """Resolve an existing environment without an owner authorization gate."""
     item = _get(environment_id)
     try:
-        _RUNTIME_DISPATCHER.authorize(environment_id, owner_id)
+        _runtime_dispatcher().authorize(environment_id, owner_id)
         return
-    except RuntimeNotFound:
+    except bound.RuntimeNotFound:
         # Stopped environments intentionally have no dispatcher context. The
         # gateway distinguishes a stopped environment (503) from a missing one (404).
         if not item:
@@ -577,7 +586,7 @@ def dispatch_environment_operation(
         runtime = _RUNTIME_WORKERS.get(environment_id)
     if runtime is None:
         raise RuntimeError("environment runtime is not running")
-    _RUNTIME_DISPATCHER.context(environment_id)
+    _runtime_dispatcher().context(environment_id)
     return runtime.submit(operation, payload, timeout=timeout)
 
 
@@ -607,7 +616,7 @@ def dispatch_environment_http(
         runtime = _RUNTIME_WORKERS.get(environment_id)
     if runtime is None:
         raise RuntimeError("environment runtime is not running")
-    _RUNTIME_DISPATCHER.context(environment_id)
+    _runtime_dispatcher().context(environment_id)
     return runtime.submit_http(payload, timeout=timeout)
 
 
@@ -616,7 +625,7 @@ def create_environment(
     commit_sha: Optional[str] = None,
     owner_id: Optional[str] = None,
     *,
-    context: Optional[InvocationContext] = None,
+    context: Optional[Any] = None,
 ) -> dict[str, Any]:
     init_environment_tables()
     resolved = resolve_commit(branch, commit_sha)

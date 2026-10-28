@@ -19,6 +19,285 @@ def _agent_memory():
     )
 
 
+def _agent_runtime():
+    from agent_runtime import host
+    from core.config import Config as Config
+    from storage.memory_db import DatabaseError as DatabaseError
+    from chat.mcp_routes import LogosClient as LogosClient
+    from tool_providers.universal_tool_platform import (
+        UniversalToolCall as UniversalToolCall,
+    )
+    from tool_providers.universal_tool_platform import (
+        UniversalToolExecutor as UniversalToolExecutor,
+    )
+    from provider_accounts.credentials import (
+        bootstrap_credential as bootstrap_credential,
+    )
+    from invocation.manager import create_invocation as create_invocation
+    from invocation.trace import create_invocation_trace as create_invocation_trace
+    from runtime.request_context import (
+        current_runtime_data_root as current_runtime_data_root,
+    )
+    from runtime.request_context import current_runtime_id as current_runtime_id
+    from secret_store.credential_crypto import decrypt_secret as decrypt_secret
+    from secret_store.credential_crypto import encrypt_secret as encrypt_secret
+    from invocation.manager import fail_invocation as fail_invocation
+    import tool_providers.filesystem as filesystem
+    from invocation.manager import finish_invocation as finish_invocation
+    from storage.db import get_store as get_store
+    from invocation.manager import persist_invocation_trace as persist_invocation_trace
+    from tool_providers.registry import registry as registry
+    from invocation.manager import start_invocation as start_invocation
+
+    return host.Host(
+        Config=Config,
+        DatabaseError=DatabaseError,
+        LogosClient=LogosClient,
+        UniversalToolCall=UniversalToolCall,
+        UniversalToolExecutor=UniversalToolExecutor,
+        bootstrap_credential=bootstrap_credential,
+        create_invocation=create_invocation,
+        create_invocation_trace=create_invocation_trace,
+        current_runtime_data_root=current_runtime_data_root,
+        current_runtime_id=current_runtime_id,
+        decrypt_secret=decrypt_secret,
+        encrypt_secret=encrypt_secret,
+        fail_invocation=fail_invocation,
+        filesystem=filesystem,
+        finish_invocation=finish_invocation,
+        get_store=get_store,
+        persist_invocation_trace=persist_invocation_trace,
+        registry=registry,
+        start_invocation=start_invocation,
+    )
+
+
+def _agent_shell():
+    from agent_shell import host
+    from agent_runtime.issue_runner import DEFAULT_MODEL as DEFAULT_MODEL
+    from kristall import KristallError as KristallError
+    from agent_memory.client import get_memory_client as get_memory_client
+    from agent_runtime.issue_runner import run_issue_task as run_issue_task
+
+    return host.Host(
+        DEFAULT_MODEL=DEFAULT_MODEL,
+        KristallError=KristallError,
+        get_memory_client=get_memory_client,
+        run_issue_task=run_issue_task,
+    )
+
+
+def _chat():
+    from chat import host
+    from core.config import CLASSIFIER_MODELS as CLASSIFIER_MODELS
+    from core.config import Config as Config
+    from core.config import EMBEDDING_MODELS as EMBEDDING_MODELS
+    from observability.trace_manager import ExecutionTrace as ExecutionTrace
+    from core.config import IMAGE_MODELS as IMAGE_MODELS
+    from yandex_client_modules.image_generation import IMAGE_SIZES as IMAGE_SIZES
+    from yandex_client_modules.image_generation import (
+        ImageGenerationError as ImageGenerationError,
+    )
+    from economy.knowledge_economics import KnowledgeCostConfig as KnowledgeCostConfig
+    from yandex_client_modules.image_generation import (
+        MAX_PROMPT_CHARS as MAX_PROMPT_CHARS,
+    )
+    from yandex_client_modules.realtime import MODEL_UPSTREAMS as MODEL_UPSTREAMS
+    from provider_accounts.model_discovery import (
+        ModelDiscoveryError as ModelDiscoveryError,
+    )
+    from yandex_client_modules.realtime import OUTPUT_RATE as OUTPUT_RATE
+    from provider_accounts.quotas import ProviderQuotaExceeded as ProviderQuotaExceeded
+    from yandex_client_modules.image_generation import (
+        REQUEST_TIMEOUT_SECONDS as REQUEST_TIMEOUT_SECONDS,
+    )
+    from yandex_client_modules.realtime import RealtimeError as RealtimeError
+    from yandex_client_modules.realtime import RealtimeResult as RealtimeResult
+    from agent_skills.registry import SkillRegistry as SkillRegistry
+    from agent_skills.registry import SkillRegistryError as SkillRegistryError
+    from core.config import TEXT_MODELS as TEXT_MODELS
+    from yandex_client_modules.realtime import TTS_MODEL as TTS_MODEL
+    from tool_providers.universal_tool_platform import (
+        UniversalToolCall as UniversalToolCall,
+    )
+    from tool_providers.universal_tool_platform import (
+        UniversalToolExecutor as UniversalToolExecutor,
+    )
+    from core.config import VOICE_MODELS as VOICE_MODELS
+    from yandex_client_modules.client import (
+        YandexResponsesClient as YandexResponsesClient,
+    )
+    from yandex_client_modules.request_mixin import (
+        record_quota_usage as _record_quota_usage,
+    )
+    from yandex_client_modules.request_mixin import (
+        resolve_global_provider_credential as _resolve_global_provider_credential,
+    )
+    from yandex_client_modules.request_mixin import (
+        resolve_quota_user_id as _resolve_quota_user_id,
+    )
+    from yandex_client_modules.request_builder import response_input as _response_input
+    from yandex_client_modules.request_mixin import (
+        transport_timeout as _transport_timeout,
+    )
+    from storage.db import add_message as add_message
+    from economy.billing import aggregate_billing as aggregate_billing
+    from observability.trace_manager import bind_current_trace as bind_current_trace
+    from economy.billing import build_ai_billing_item as build_ai_billing_item
+    from yandex_client_modules.image_generation import (
+        build_generation_payload as build_generation_payload,
+    )
+    from economy.knowledge_economics import (
+        calculate_knowledge_cost as calculate_knowledge_cost,
+    )
+    from conversations.ownership import check_access as check_access
+    from core.model_profiles import completion_model_keys as completion_model_keys
+    from agent_skills.registry import (
+        compose_skill_instructions as compose_skill_instructions,
+    )
+    from storage.db import create_conversation as create_conversation
+    from invocation.manager import create_invocation as create_invocation
+    from invocation.trace import create_invocation_trace as create_invocation_trace
+    from invocation.manager import fail_invocation as fail_invocation
+    from invocation.manager import finish_invocation as finish_invocation
+    from yandex_client_modules.realtime import generate_realtime as generate_realtime
+    from storage.db import get_conv_settings as get_conv_settings
+    from storage.db import get_conversation_title as get_conversation_title
+    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
+    from observability.trace_manager import get_current_trace as get_current_trace
+    from storage.db import get_message as get_message
+    from storage.db import get_messages as get_messages
+    from provider_accounts.model_discovery import (
+        get_model_discovery as get_model_discovery,
+    )
+    from core.config import get_model_uri as get_model_uri
+    from storage.db import get_store as get_store
+    from storage.db import get_yandex_conversation as get_yandex_conversation
+    from storage.generated_images import image_file_metadata as image_file_metadata
+    from storage.db import is_provider_pending as is_provider_pending
+    from conversations.ownership import (
+        list_owned_conversations as list_owned_conversations,
+    )
+    from storage.db import (
+        maybe_update_conversation_title as maybe_update_conversation_title,
+    )
+    import mcp_server.storage as mcp_storage
+    from storage.db import normalize_conversation_title as normalize_conversation_title
+    from yandex_client_modules.tool_config import (
+        normalize_tools_config as normalize_tools_config,
+    )
+    from storage.generated_images import open_image_file as open_image_file
+    from invocation.manager import persist_invocation_trace as persist_invocation_trace
+    from yandex_client_modules.request_mixin import (
+        provider_request_headers as provider_request_headers,
+    )
+    from provider_accounts.quotas import record_usage as record_usage
+    from mcp_server.trace import (
+        record_yandex_mcp_activity as record_yandex_mcp_activity,
+    )
+    from tool_providers.registry import registry as registry
+    from provider_accounts.quotas import release_request as release_request
+    from yandex_client_modules.image_generation import generate_image as request_image
+    from provider_accounts.quotas import reserve_request as reserve_request
+    from observability.trace_manager import reset_current_trace as reset_current_trace
+    from storage.db import save_conv_settings as save_conv_settings
+    from storage.generated_images import save_image_file as save_image_file
+    from conversations.ownership import set_owner as set_owner
+    from storage.db import set_yandex_conversation as set_yandex_conversation
+    from economy.billing import settle_billing_to_treasury as settle_billing_to_treasury
+    from invocation.manager import start_invocation as start_invocation
+    from observability.trace_manager import traced_operation as traced_operation
+    from provider_accounts.model_discovery import (
+        validate_dialog_model as validate_dialog_model,
+    )
+    from yandex_client_modules.request_builder import (
+        validate_generation_params as validate_generation_params,
+    )
+
+    return host.Host(
+        CLASSIFIER_MODELS=CLASSIFIER_MODELS,
+        Config=Config,
+        EMBEDDING_MODELS=EMBEDDING_MODELS,
+        ExecutionTrace=ExecutionTrace,
+        IMAGE_MODELS=IMAGE_MODELS,
+        IMAGE_SIZES=IMAGE_SIZES,
+        ImageGenerationError=ImageGenerationError,
+        KnowledgeCostConfig=KnowledgeCostConfig,
+        MAX_PROMPT_CHARS=MAX_PROMPT_CHARS,
+        MODEL_UPSTREAMS=MODEL_UPSTREAMS,
+        ModelDiscoveryError=ModelDiscoveryError,
+        OUTPUT_RATE=OUTPUT_RATE,
+        ProviderQuotaExceeded=ProviderQuotaExceeded,
+        REQUEST_TIMEOUT_SECONDS=REQUEST_TIMEOUT_SECONDS,
+        RealtimeError=RealtimeError,
+        RealtimeResult=RealtimeResult,
+        SkillRegistry=SkillRegistry,
+        SkillRegistryError=SkillRegistryError,
+        TEXT_MODELS=TEXT_MODELS,
+        TTS_MODEL=TTS_MODEL,
+        UniversalToolCall=UniversalToolCall,
+        UniversalToolExecutor=UniversalToolExecutor,
+        VOICE_MODELS=VOICE_MODELS,
+        YandexResponsesClient=YandexResponsesClient,
+        _record_quota_usage=_record_quota_usage,
+        _resolve_global_provider_credential=_resolve_global_provider_credential,
+        _resolve_quota_user_id=_resolve_quota_user_id,
+        _response_input=_response_input,
+        _transport_timeout=_transport_timeout,
+        add_message=add_message,
+        aggregate_billing=aggregate_billing,
+        bind_current_trace=bind_current_trace,
+        build_ai_billing_item=build_ai_billing_item,
+        build_generation_payload=build_generation_payload,
+        calculate_knowledge_cost=calculate_knowledge_cost,
+        check_access=check_access,
+        completion_model_keys=completion_model_keys,
+        compose_skill_instructions=compose_skill_instructions,
+        create_conversation=create_conversation,
+        create_invocation=create_invocation,
+        create_invocation_trace=create_invocation_trace,
+        fail_invocation=fail_invocation,
+        finish_invocation=finish_invocation,
+        generate_realtime=generate_realtime,
+        get_conv_settings=get_conv_settings,
+        get_conversation_title=get_conversation_title,
+        get_current_owner_id=get_current_owner_id,
+        get_current_trace=get_current_trace,
+        get_message=get_message,
+        get_messages=get_messages,
+        get_model_discovery=get_model_discovery,
+        get_model_uri=get_model_uri,
+        get_store=get_store,
+        get_yandex_conversation=get_yandex_conversation,
+        image_file_metadata=image_file_metadata,
+        is_provider_pending=is_provider_pending,
+        list_owned_conversations=list_owned_conversations,
+        maybe_update_conversation_title=maybe_update_conversation_title,
+        mcp_storage=mcp_storage,
+        normalize_conversation_title=normalize_conversation_title,
+        normalize_tools_config=normalize_tools_config,
+        open_image_file=open_image_file,
+        persist_invocation_trace=persist_invocation_trace,
+        provider_request_headers=provider_request_headers,
+        record_usage=record_usage,
+        record_yandex_mcp_activity=record_yandex_mcp_activity,
+        registry=registry,
+        release_request=release_request,
+        request_image=request_image,
+        reserve_request=reserve_request,
+        reset_current_trace=reset_current_trace,
+        save_conv_settings=save_conv_settings,
+        save_image_file=save_image_file,
+        set_owner=set_owner,
+        set_yandex_conversation=set_yandex_conversation,
+        settle_billing_to_treasury=settle_billing_to_treasury,
+        start_invocation=start_invocation,
+        traced_operation=traced_operation,
+        validate_dialog_model=validate_dialog_model,
+        validate_generation_params=validate_generation_params,
+    )
+
+
 def _cloud():
     from cloud import host
     from economy.budget_controller import BudgetLimitExceeded as BudgetLimitExceeded
@@ -69,12 +348,143 @@ def _conversations():
     )
 
 
+def _economy():
+    from economy import host
+    from core.config import ALL_MODELS as ALL_MODELS
+    from core.config import AUDIO_STT_PRICE_PER_SEC as AUDIO_STT_PRICE_PER_SEC
+    from core.config import AUDIO_TTS_PRICE_PER_SEC as AUDIO_TTS_PRICE_PER_SEC
+    from cloud.base import CloudProviderError as CloudProviderError
+    from kristall import KristallError as KristallError
+    from core.config import canonical_model_key as canonical_model_key
+    from observability.trace_manager import get_current_trace as get_current_trace
+    from storage.db import get_store as get_store
+
+    return host.Host(
+        ALL_MODELS=ALL_MODELS,
+        AUDIO_STT_PRICE_PER_SEC=AUDIO_STT_PRICE_PER_SEC,
+        AUDIO_TTS_PRICE_PER_SEC=AUDIO_TTS_PRICE_PER_SEC,
+        CloudProviderError=CloudProviderError,
+        KristallError=KristallError,
+        canonical_model_key=canonical_model_key,
+        get_current_trace=get_current_trace,
+        get_store=get_store,
+    )
+
+
 def _forge():
     from forge import host
     from economy.treasury_identity import get_current_owner_id as get_current_owner_id
     from storage.db import get_store as get_store
 
     return host.Host(get_current_owner_id=get_current_owner_id, get_store=get_store)
+
+
+def _invocation():
+    from invocation import host
+    from observability.trace_manager import ExecutionTrace as ExecutionTrace
+    from kristall import KristallError as KristallError
+    from kristall import KristallLimitError as KristallLimitError
+    from kristall.store import MAX_JOURNAL_FRAME_BYTES as MAX_JOURNAL_FRAME_BYTES
+    from sessions.manager import create_session as create_session
+    from agent_memory.client import get_memory_client as get_memory_client
+    from storage.db import get_messages as get_messages
+    from storage.db import memory_file_path as memory_file_path
+    from sessions.manager import restore_session as restore_session
+
+    return host.Host(
+        ExecutionTrace=ExecutionTrace,
+        KristallError=KristallError,
+        KristallLimitError=KristallLimitError,
+        MAX_JOURNAL_FRAME_BYTES=MAX_JOURNAL_FRAME_BYTES,
+        create_session=create_session,
+        get_memory_client=get_memory_client,
+        get_messages=get_messages,
+        memory_file_path=memory_file_path,
+        restore_session=restore_session,
+    )
+
+
+def _mcp_server():
+    from mcp_server import host
+    from core.config import ALL_MODELS as ALL_MODELS
+    from agent_runtime.gateway import AgentGateway as AgentGateway
+    from secret_store.credential_crypto import (
+        CredentialCryptoError as CredentialCryptoError,
+    )
+    from runtime import RuntimeDispatcher as RuntimeDispatcher
+    from runtime import RuntimeNotFound as RuntimeNotFound
+    from runtime import RuntimeOperationNotFound as RuntimeOperationNotFound
+    from runtime import RuntimeScopeViolation as RuntimeScopeViolation
+    from tool_providers.universal_tool_platform import (
+        UniversalToolCall as UniversalToolCall,
+    )
+    from tool_providers.universal_tool_platform import (
+        UniversalToolExecutor as UniversalToolExecutor,
+    )
+    from observability.trace_manager import bind_current_trace as bind_current_trace
+    from conversations.ownership import check_access as check_access
+    from invocation.manager import create_invocation as create_invocation
+    from invocation.trace import create_invocation_trace as create_invocation_trace
+    from secret_store.credential_crypto import decrypt_secret as decrypt_secret
+    from secret_store.credential_crypto import encrypt_secret as encrypt_secret
+    from invocation.manager import fail_invocation as fail_invocation
+    from invocation.manager import finish_invocation as finish_invocation
+    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
+    from invocation.api import get_invocation_status as get_invocation_status
+    from invocation.api import get_invocation_trace as get_invocation_trace
+    from storage.db import get_messages as get_messages
+    from conversations.ownership import get_owned_conversation as get_owned_conversation
+    from sessions.manager import get_session as get_session
+    from storage.db import get_store as get_store
+    from tool_providers.filesystem import grep_search as grep_search
+    from tool_providers.filesystem import list_directory as list_directory
+    from conversations.ownership import (
+        list_owned_conversations as list_owned_conversations,
+    )
+    from invocation.manager import persist_invocation_trace as persist_invocation_trace
+    from tool_providers.filesystem import read_file as read_file
+    from tool_providers.registry import registry as registry
+    from observability.trace_manager import reset_current_trace as reset_current_trace
+    from invocation.manager import start_invocation as start_invocation
+    from tool_providers.universal_tool_platform import (
+        tool_call_requires_approval as tool_call_requires_approval,
+    )
+
+    return host.Host(
+        ALL_MODELS=ALL_MODELS,
+        AgentGateway=AgentGateway,
+        CredentialCryptoError=CredentialCryptoError,
+        RuntimeDispatcher=RuntimeDispatcher,
+        RuntimeNotFound=RuntimeNotFound,
+        RuntimeOperationNotFound=RuntimeOperationNotFound,
+        RuntimeScopeViolation=RuntimeScopeViolation,
+        UniversalToolCall=UniversalToolCall,
+        UniversalToolExecutor=UniversalToolExecutor,
+        bind_current_trace=bind_current_trace,
+        check_access=check_access,
+        create_invocation=create_invocation,
+        create_invocation_trace=create_invocation_trace,
+        decrypt_secret=decrypt_secret,
+        encrypt_secret=encrypt_secret,
+        fail_invocation=fail_invocation,
+        finish_invocation=finish_invocation,
+        get_current_owner_id=get_current_owner_id,
+        get_invocation_status=get_invocation_status,
+        get_invocation_trace=get_invocation_trace,
+        get_messages=get_messages,
+        get_owned_conversation=get_owned_conversation,
+        get_session=get_session,
+        get_store=get_store,
+        grep_search=grep_search,
+        list_directory=list_directory,
+        list_owned_conversations=list_owned_conversations,
+        persist_invocation_trace=persist_invocation_trace,
+        read_file=read_file,
+        registry=registry,
+        reset_current_trace=reset_current_trace,
+        start_invocation=start_invocation,
+        tool_call_requires_approval=tool_call_requires_approval,
+    )
 
 
 def _model_editor():
@@ -87,6 +497,21 @@ def _model_editor():
         StorageObjectNotFound=StorageObjectNotFound,
         get_current_owner_id=get_current_owner_id,
         storage_provider_from_env=storage_provider_from_env,
+    )
+
+
+def _observability():
+    from observability import host
+    from economy.billing import aggregate_billing as aggregate_billing
+    from economy.billing import build_ai_billing_item as build_ai_billing_item
+    from economy.compute_resources import (
+        build_compute_billing_item as build_compute_billing_item,
+    )
+
+    return host.Host(
+        aggregate_billing=aggregate_billing,
+        build_ai_billing_item=build_ai_billing_item,
+        build_compute_billing_item=build_compute_billing_item,
     )
 
 
@@ -133,6 +558,163 @@ def _project_board():
     return host.Host(MemoryStore=MemoryStore, StoreError=StoreError)
 
 
+def _provider_accounts():
+    from provider_accounts import host
+    from core.config import CLASSIFIER_MODELS as CLASSIFIER_MODELS
+    from cloud.cloudru.api_key_provider import (
+        CloudRuApiKeyProvider as CloudRuApiKeyProvider,
+    )
+    from cloud.cloudru.iam import CloudRuIamClient as CloudRuIamClient
+    from cloud.cloudru.secret_management import (
+        CloudRuSecretManagementClient as CloudRuSecretManagementClient,
+    )
+    from core.config import Config as Config
+    from secret_store.credential_crypto import (
+        CredentialCryptoError as CredentialCryptoError,
+    )
+    from core.config import EMBEDDING_MODELS as EMBEDDING_MODELS
+    from core.config import IMAGE_MODELS as IMAGE_MODELS
+    from core.config import TEXT_MODELS as TEXT_MODELS
+    from core.config import VOICE_MODELS as VOICE_MODELS
+    from yandex_client_modules.api_key_provider import (
+        YandexApiKeyProvider as YandexApiKeyProvider,
+    )
+    from yandex_client_modules.request_mixin import (
+        resolve_global_provider_credential as _resolve_global_provider_credential,
+    )
+    from core.config import canonical_model_key as canonical_model_key
+    from core.config import config as config
+    from secret_store.credential_crypto import decrypt_secret as decrypt_secret
+    from secret_store.credential_crypto import encrypt_secret as encrypt_secret
+    from secret_store.credential_crypto import (
+        encryption_configured as encryption_configured,
+    )
+    from secret_store.credential_crypto import fingerprint_key as fingerprint_key
+    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
+    from observability.trace_manager import get_current_trace as get_current_trace
+    from core.config import get_model_uri as get_model_uri
+    from storage.db import get_store as get_store
+    from yandex_client_modules.request_mixin import (
+        provider_request_headers as provider_request_headers,
+    )
+    from core.config import registry_key_for_upstream as registry_key_for_upstream
+    from observability.trace_manager import traced_operation as traced_operation
+
+    return host.Host(
+        CLASSIFIER_MODELS=CLASSIFIER_MODELS,
+        CloudRuApiKeyProvider=CloudRuApiKeyProvider,
+        CloudRuIamClient=CloudRuIamClient,
+        CloudRuSecretManagementClient=CloudRuSecretManagementClient,
+        Config=Config,
+        CredentialCryptoError=CredentialCryptoError,
+        EMBEDDING_MODELS=EMBEDDING_MODELS,
+        IMAGE_MODELS=IMAGE_MODELS,
+        TEXT_MODELS=TEXT_MODELS,
+        VOICE_MODELS=VOICE_MODELS,
+        YandexApiKeyProvider=YandexApiKeyProvider,
+        _resolve_global_provider_credential=_resolve_global_provider_credential,
+        canonical_model_key=canonical_model_key,
+        config=config,
+        decrypt_secret=decrypt_secret,
+        encrypt_secret=encrypt_secret,
+        encryption_configured=encryption_configured,
+        fingerprint_key=fingerprint_key,
+        get_current_owner_id=get_current_owner_id,
+        get_current_trace=get_current_trace,
+        get_model_uri=get_model_uri,
+        get_store=get_store,
+        provider_request_headers=provider_request_headers,
+        registry_key_for_upstream=registry_key_for_upstream,
+        traced_operation=traced_operation,
+    )
+
+
+def _remote_runtime():
+    from remote_runtime import host
+    from observability.trace_manager import ExecutionTrace as ExecutionTrace
+    from runtime import RuntimeDispatcher as RuntimeDispatcher
+    from runtime import RuntimeLoader as RuntimeLoader
+    from runtime import RuntimeNotFound as RuntimeNotFound
+    from runtime.request_context import bind_runtime_request as bind_runtime_request
+    from agent_memory.client import close_memory_clients as close_memory_clients
+    from invocation.trace import create_invocation_trace as create_invocation_trace
+    from storage.db import get_config as get_config
+    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
+    from observability.trace_manager import get_current_trace as get_current_trace
+    from storage.db import get_store as get_store
+    from storage.db import init_db as init_runtime_db
+    from storage.db import set_config as set_config
+
+    return host.Host(
+        ExecutionTrace=ExecutionTrace,
+        RuntimeDispatcher=RuntimeDispatcher,
+        RuntimeLoader=RuntimeLoader,
+        RuntimeNotFound=RuntimeNotFound,
+        bind_runtime_request=bind_runtime_request,
+        close_memory_clients=close_memory_clients,
+        create_invocation_trace=create_invocation_trace,
+        get_config=get_config,
+        get_current_owner_id=get_current_owner_id,
+        get_current_trace=get_current_trace,
+        get_store=get_store,
+        init_runtime_db=init_runtime_db,
+        set_config=set_config,
+    )
+
+
+def _runtime():
+    from runtime import host
+    from api.contracts import ContractViolation as ContractViolation
+    from storage.contracts import StorageCredentialsMissing as StorageCredentialsMissing
+    from storage.contracts import StorageError as StorageError
+    from storage.contracts import (
+        StorageProviderUnavailable as StorageProviderUnavailable,
+    )
+    from tool_providers.universal_tool_platform import (
+        UniversalToolCall as UniversalToolCall,
+    )
+    from tool_providers.universal_tool_platform import (
+        UniversalToolExecutor as UniversalToolExecutor,
+    )
+    from tool_providers.universal_tool_platform import (
+        warn_deprecated_execution_hooks as _warn_deprecated_execution_hooks,
+    )
+    from conversations.ownership import check_access as check_access
+    from sessions.profiles import clone_profile as clone_profile
+    from invocation.manager import create_invocation as create_invocation
+    from sessions.manager import create_session as create_session
+    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
+    from invocation.api import get_invocation_status as get_invocation_status
+    from invocation.api import get_invocation_trace as get_invocation_trace
+    from sessions.profiles import get_profile as get_profile
+    from sessions.manager import get_session as get_session
+    from sessions.profiles import list_profiles as list_profiles
+    from sessions.profiles import session_profile as session_profile
+    from api.contracts import validate_api_contract as validate_api_contract
+
+    return host.Host(
+        ContractViolation=ContractViolation,
+        StorageCredentialsMissing=StorageCredentialsMissing,
+        StorageError=StorageError,
+        StorageProviderUnavailable=StorageProviderUnavailable,
+        UniversalToolCall=UniversalToolCall,
+        UniversalToolExecutor=UniversalToolExecutor,
+        _warn_deprecated_execution_hooks=_warn_deprecated_execution_hooks,
+        check_access=check_access,
+        clone_profile=clone_profile,
+        create_invocation=create_invocation,
+        create_session=create_session,
+        get_current_owner_id=get_current_owner_id,
+        get_invocation_status=get_invocation_status,
+        get_invocation_trace=get_invocation_trace,
+        get_profile=get_profile,
+        get_session=get_session,
+        list_profiles=list_profiles,
+        session_profile=session_profile,
+        validate_api_contract=validate_api_contract,
+    )
+
+
 def _secret_store():
     from secret_store import host
     from cloud.base import CloudProviderError as CloudProviderError
@@ -177,6 +759,33 @@ def _storage():
     )
 
 
+def _tool_providers():
+    from tool_providers import host
+    from kristall import KristallError as KristallError
+    from remote_runtime.ssh import SSHRuntimeError as SSHRuntimeError
+    from remote_runtime.ssh_settings import (
+        assert_operation_allowed as assert_operation_allowed,
+    )
+    from remote_runtime.ssh_settings import build_runtime as build_runtime
+    from agent_runtime.local_gateway import (
+        enqueue_local_tool_job as enqueue_local_tool_job,
+    )
+    from storage.db import memory_file_path as memory_file_path
+    from agent_runtime.local_gateway import (
+        wait_for_local_tool_job as wait_for_local_tool_job,
+    )
+
+    return host.Host(
+        KristallError=KristallError,
+        SSHRuntimeError=SSHRuntimeError,
+        assert_operation_allowed=assert_operation_allowed,
+        build_runtime=build_runtime,
+        enqueue_local_tool_job=enqueue_local_tool_job,
+        memory_file_path=memory_file_path,
+        wait_for_local_tool_job=wait_for_local_tool_job,
+    )
+
+
 def _workspace():
     from workspace import host
     from core.config import Config as Config
@@ -184,19 +793,76 @@ def _workspace():
     from yandex_client_modules.client import (
         YandexResponsesClient as YandexResponsesClient,
     )
-    from yandex_client_modules.request_mixin import (
-        resolve_global_provider_credential as _resolve_global_provider_credential,
-    )
-    from yandex_client_modules.request_mixin import (
-        provider_request_headers as provider_request_headers,
-    )
 
     return host.Host(
         Config=Config,
         YandexClientError=YandexClientError,
         YandexResponsesClient=YandexResponsesClient,
-        _resolve_global_provider_credential=_resolve_global_provider_credential,
-        provider_request_headers=provider_request_headers,
+    )
+
+
+def _yandex_client_modules():
+    from yandex_client_modules import host
+    from secret_store.credential_crypto import (
+        CredentialCryptoError as CredentialCryptoError,
+    )
+    from observability.trace_manager import ExecutionTrace as ExecutionTrace
+    from core.config import IMAGE_MODELS as IMAGE_MODELS
+    from provider_accounts.quotas import ProviderQuotaExceeded as ProviderQuotaExceeded
+    from tool_providers.universal_tool_platform import (
+        UniversalToolCall as UniversalToolCall,
+    )
+    from tool_providers.universal_tool_platform import (
+        UniversalToolExecutor as UniversalToolExecutor,
+    )
+    from secret_store.credential_crypto import decrypt_secret as decrypt_secret
+    from secret_store.credential_crypto import encrypt_secret as encrypt_secret
+    from agent_memory.manager import (
+        get_controlled_memory_summary as get_controlled_memory_summary,
+    )
+    from storage.db import get_conv_settings as get_conv_settings
+    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
+    from core.config import get_model_uri as get_model_uri
+    from storage.db import get_store as get_store
+    import mcp_server.storage as mcp_storage
+    from provider_accounts.quotas import record_usage as record_usage
+    from tool_providers.registry import registry as registry
+    from provider_accounts.quotas import release_request as release_request
+    from provider_accounts.quotas import reserve_request as reserve_request
+    from provider_accounts.credentials import (
+        resolve_client_credential as resolve_client_credential,
+    )
+    from core.model_profiles import ultra_profiles as ultra_profiles
+    from core.model_profiles import (
+        ultra_reasoning_controllable as ultra_reasoning_controllable,
+    )
+    from core.model_profiles import ultra_request_defaults as ultra_request_defaults
+    from core.config import upstream_model_id as upstream_model_id
+
+    return host.Host(
+        CredentialCryptoError=CredentialCryptoError,
+        ExecutionTrace=ExecutionTrace,
+        IMAGE_MODELS=IMAGE_MODELS,
+        ProviderQuotaExceeded=ProviderQuotaExceeded,
+        UniversalToolCall=UniversalToolCall,
+        UniversalToolExecutor=UniversalToolExecutor,
+        decrypt_secret=decrypt_secret,
+        encrypt_secret=encrypt_secret,
+        get_controlled_memory_summary=get_controlled_memory_summary,
+        get_conv_settings=get_conv_settings,
+        get_current_owner_id=get_current_owner_id,
+        get_model_uri=get_model_uri,
+        get_store=get_store,
+        mcp_storage=mcp_storage,
+        record_usage=record_usage,
+        registry=registry,
+        release_request=release_request,
+        reserve_request=reserve_request,
+        resolve_client_credential=resolve_client_credential,
+        ultra_profiles=ultra_profiles,
+        ultra_reasoning_controllable=ultra_reasoning_controllable,
+        ultra_request_defaults=ultra_request_defaults,
+        upstream_model_id=upstream_model_id,
     )
 
 
@@ -205,18 +871,39 @@ def register_all() -> None:
     from agent_memory import host as agent_memory_host
 
     agent_memory_host.provide(_agent_memory)
+    from agent_runtime import host as agent_runtime_host
+
+    agent_runtime_host.provide(_agent_runtime)
+    from agent_shell import host as agent_shell_host
+
+    agent_shell_host.provide(_agent_shell)
+    from chat import host as chat_host
+
+    chat_host.provide(_chat)
     from cloud import host as cloud_host
 
     cloud_host.provide(_cloud)
     from conversations import host as conversations_host
 
     conversations_host.provide(_conversations)
+    from economy import host as economy_host
+
+    economy_host.provide(_economy)
     from forge import host as forge_host
 
     forge_host.provide(_forge)
+    from invocation import host as invocation_host
+
+    invocation_host.provide(_invocation)
+    from mcp_server import host as mcp_server_host
+
+    mcp_server_host.provide(_mcp_server)
     from model_editor import host as model_editor_host
 
     model_editor_host.provide(_model_editor)
+    from observability import host as observability_host
+
+    observability_host.provide(_observability)
     from organization import host as organization_host
 
     organization_host.provide(_organization)
@@ -226,6 +913,15 @@ def register_all() -> None:
     from project_board import host as project_board_host
 
     project_board_host.provide(_project_board)
+    from provider_accounts import host as provider_accounts_host
+
+    provider_accounts_host.provide(_provider_accounts)
+    from remote_runtime import host as remote_runtime_host
+
+    remote_runtime_host.provide(_remote_runtime)
+    from runtime import host as runtime_host
+
+    runtime_host.provide(_runtime)
     from secret_store import host as secret_store_host
 
     secret_store_host.provide(_secret_store)
@@ -235,6 +931,12 @@ def register_all() -> None:
     from storage import host as storage_host
 
     storage_host.provide(_storage)
+    from tool_providers import host as tool_providers_host
+
+    tool_providers_host.provide(_tool_providers)
     from workspace import host as workspace_host
 
     workspace_host.provide(_workspace)
+    from yandex_client_modules import host as yandex_client_modules_host
+
+    yandex_client_modules_host.provide(_yandex_client_modules)

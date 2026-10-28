@@ -1,14 +1,22 @@
 """Small API helpers for session/invocation lifecycle endpoints."""
 
 from flask import Blueprint, jsonify, request
+from runtime.host import (
+    bound,
+    check_access,
+    clone_profile,
+    create_invocation,
+    create_session,
+    get_current_owner_id,
+    get_invocation_status,
+    get_invocation_trace,
+    get_profile,
+    get_session,
+    list_profiles,
+    session_profile,
+    validate_api_contract,
+)
 
-from api.contracts import ContractViolation, validate_api_contract
-from invocation.api import get_invocation_status, get_invocation_trace
-from conversations.ownership import check_access
-from economy.treasury_identity import get_current_owner_id
-from invocation.manager import create_invocation
-from sessions.manager import create_session, get_session
-from sessions.profiles import clone_profile, get_profile, list_profiles, session_profile
 
 runtime_bp = Blueprint("runtime", __name__, url_prefix="/api")
 
@@ -56,7 +64,7 @@ def api_get_session_profile(profile_id):
 def api_clone_session_profile(profile_id):
     try:
         data = _request_payload("runtime.profile.clone.request")
-    except ContractViolation as exc:
+    except bound.ContractViolation as exc:
         return _invalid_request(exc)
 
     name = data.get("name")
@@ -73,7 +81,7 @@ def api_clone_session_profile(profile_id):
 def api_create_session():
     try:
         data = _request_payload("runtime.session.create.request")
-    except ContractViolation as exc:
+    except bound.ContractViolation as exc:
         return _invalid_request(exc)
     metadata = {**dict(data.get("metadata") or {}), "user_id": get_current_owner_id()}
     return _contract_response(
@@ -99,7 +107,7 @@ def api_get_session(session_id):
 def api_create_invocation(session_id):
     try:
         data = _request_payload("runtime.invocation.create.request")
-    except ContractViolation as exc:
+    except bound.ContractViolation as exc:
         return _invalid_request(exc)
 
     owner = get_current_owner_id()

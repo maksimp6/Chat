@@ -10,8 +10,8 @@ from typing import Any, Mapping, Optional
 from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
+from agent_runtime.host import get_store
 
-from storage.db import get_store
 
 local_agent_bp = Blueprint("local_agents", __name__, url_prefix="/api/local-agents")
 

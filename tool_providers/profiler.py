@@ -6,9 +6,8 @@ import io
 import sys
 import gc
 import logging
+from tool_providers.host import bound, memory_file_path
 
-from kristall import KristallError
-from storage.db import memory_file_path
 
 logger = logging.getLogger("logos.tool_providers.profiler")
 
@@ -45,7 +44,7 @@ def _native_journal_status() -> dict[str, object]:
     """Describe the native Kristall journal without opening, locking or repairing it."""
     try:
         path = memory_file_path()
-    except KristallError as exc:
+    except bound.KristallError as exc:
         return {"path": None, "exists": False, "size_bytes": 0, "error": str(exc)}
     exists = path.exists()
     return {

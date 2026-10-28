@@ -11,8 +11,7 @@ from provider_accounts.credentials import (
     record_health_check,
     replace_active_credential,
 )
-from secret_store.credential_crypto import encrypt_secret, decrypt_secret
-from storage.db import get_store
+from provider_accounts.host import bound, get_store
 
 
 class ImportRejected(ValueError):
@@ -25,8 +24,8 @@ def encryption_ready():
     # Works with both deployed and renamed configurations, without disclosing the key.
     probe = "logos-issued-key-encryption-probe"
     try:
-        encrypted = encrypt_secret(probe)
-        return encrypted != probe and decrypt_secret(encrypted) == probe
+        encrypted = bound.encrypt_secret(probe)
+        return encrypted != probe and bound.decrypt_secret(encrypted) == probe
     except Exception:
         return False
 
@@ -121,7 +120,7 @@ def import_yandex_key(payload):
                 db,
                 secret,
                 payload["project_id"],
-                encrypt_secret,
+                bound.encrypt_secret,
                 "yandex",
                 provider_key_id=payload["provider_key_id"],
                 now=issued,
@@ -133,16 +132,16 @@ def import_yandex_key(payload):
                 db,
                 secret,
                 payload["project_id"],
-                encrypt_secret,
+                bound.encrypt_secret,
                 now=issued,
-                decrypt=decrypt_secret,
+                decrypt=bound.decrypt_secret,
                 provider="yandex",
                 provider_key_id=payload["provider_key_id"],
                 ttl=expires - issued,
             )
     except Exception:
         raise ImportRejected("credential_storage_failed", 503) from None
-    stored = get_active_credential(db, decrypt_secret, provider="yandex")
+    stored = get_active_credential(db, bound.decrypt_secret, provider="yandex")
     if not hmac.compare_digest(stored.api_key, secret):
         raise ImportRejected("credential_readback_failed", 503)
     record_health_check(db, "yandex", status="configured", error=None)

@@ -39,6 +39,7 @@ from storage.db import (
 )
 from chat.mcp_routes import mcp_bp
 from mcp_server import chatgpt_mcp_bp
+from mcp_server.tools import register_mcp_tools
 from workspace.file_routes import file_bp
 from runtime.api import runtime_bp
 from runtime import current_runtime_base_path
@@ -82,6 +83,8 @@ from forge import init_printing_tables
 from forge.routes import printing3d_bp
 
 app = Flask(__name__)
+# The ChatGPT bridge tools join the shared registry once, after its own sources.
+register_mcp_tools()
 install_rdc_pairing(app)
 
 

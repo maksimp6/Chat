@@ -1,22 +1,26 @@
 from __future__ import annotations
 
+import threading
 from typing import Any, Callable, Optional
 
-from agent_runtime.gateway import AgentGateway
-from conversations.ownership import (
-    check_access,
-    get_owned_conversation,
-    list_owned_conversations,
-)
-from storage.db import get_messages
-from tool_providers.filesystem import grep_search, list_directory, read_file
-from invocation.api import get_invocation_status, get_invocation_trace
-from sessions.manager import get_session
-from tool_providers.registry import registry
-from tool_providers.universal_tool_platform import tool_call_requires_approval
 
 from mcp_server.auth import _auth_mode
 from mcp_server.protocol import MCP_PATH, SUPPORTED_PROTOCOL_VERSIONS, _server_info
+from mcp_server.host import (
+    bound,
+    check_access,
+    get_current_owner_id,
+    get_invocation_status,
+    get_invocation_trace,
+    get_messages,
+    get_owned_conversation,
+    get_session,
+    grep_search,
+    list_directory,
+    list_owned_conversations,
+    read_file,
+    tool_call_requires_approval,
+)
 
 
 def _tool(
@@ -42,9 +46,8 @@ def _tool(
 
 
 def _system_status(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
-    from core.config import ALL_MODELS
 
-    categories = registry.get_available_categories()
+    categories = bound.registry.get_available_categories()
     return {
         "status": "ok",
         "server": _server_info(),
@@ -55,8 +58,8 @@ def _system_status(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str
             "auth_mode": _auth_mode(),
         },
         "models": {
-            "count": len(ALL_MODELS),
-            "available": sorted(ALL_MODELS.keys()),
+            "count": len(bound.ALL_MODELS),
+            "available": sorted(bound.ALL_MODELS.keys()),
         },
         "local_tools": {
             "category_count": len(categories),
@@ -66,11 +69,20 @@ def _system_status(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str
 
 
 # One gateway for the process: a gateway built per call would list only its own, empty registry.
-_AGENT_GATEWAY = AgentGateway()
+_agent_gateway = None
+_agent_gateway_lock = threading.Lock()
+
+
+def agent_gateway() -> Any:
+    global _agent_gateway
+    with _agent_gateway_lock:
+        if _agent_gateway is None:
+            _agent_gateway = bound.AgentGateway()
+        return _agent_gateway
 
 
 def _agents(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
-    gateway = _AGENT_GATEWAY
+    gateway = agent_gateway()
     agents = []
     for agent in gateway.list_agents():
         agents.append(
@@ -131,7 +143,6 @@ def _bridge_wrapper(handler):
 
 
 def _require_conversation_user(user: Optional[str]) -> str:
-    from economy.treasury_identity import get_current_owner_id
 
     return str(user or get_current_owner_id())
 
@@ -259,7 +270,7 @@ def _register_project_read_tools() -> None:
         ),
     ]
     for name, title, description, input_schema, handler in tools:
-        registry.register(
+        bound.registry.register(
             "chatgpt_project",
             name,
             {
@@ -276,9 +287,6 @@ def _register_project_read_tools() -> None:
                 "func": _bridge_wrapper(handler),
             },
         )
-
-
-_register_project_read_tools()
 
 
 def _register_conversation_tools() -> None:
@@ -345,7 +353,7 @@ def _register_conversation_tools() -> None:
         ),
     ]
     for name, title, description, input_schema, handler in tools:
-        registry.register(
+        bound.registry.register(
             "chatgpt_conversation",
             name,
             {
@@ -362,9 +370,6 @@ def _register_conversation_tools() -> None:
                 "func": _bridge_wrapper(handler),
             },
         )
-
-
-_register_conversation_tools()
 
 
 def _register_bridge_tools() -> None:
@@ -431,7 +436,7 @@ def _register_bridge_tools() -> None:
         ),
     ]
     for name, title, description, input_schema, handler in bridge_tools:
-        registry.register(
+        bound.registry.register(
             "chatgpt_bridge",
             name,
             {
@@ -450,9 +455,6 @@ def _register_bridge_tools() -> None:
         )
 
 
-_register_bridge_tools()
-
-
 def _security_schemes() -> list[dict[str, Any]]:
     return [{"type": "noauth"}]
 
@@ -460,7 +462,7 @@ def _security_schemes() -> list[dict[str, Any]]:
 def _tools_list() -> list[dict[str, Any]]:
     schemes = _security_schemes()
     result = []
-    for definition in registry.get_universal_definitions("mcp"):
+    for definition in bound.registry.get_universal_definitions("mcp"):
         item = {
             "name": definition["name"],
             "title": definition.get("title") or definition["name"],
@@ -488,3 +490,14 @@ def _tools_list() -> list[dict[str, Any]]:
         item["_meta"] = meta
         result.append(item)
     return result
+
+
+def register_mcp_tools() -> None:
+    """Add the ChatGPT project, conversation and bridge tools to the shared registry.
+
+    A composition root calls this once, after the registry exists; the categories
+    follow the registry's own sources, as they did when this ran on import.
+    """
+    _register_project_read_tools()
+    _register_conversation_tools()
+    _register_bridge_tools()

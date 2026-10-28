@@ -15,12 +15,8 @@ from http.client import HTTPException
 from typing import Any, Mapping, Optional
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+from agent_runtime.host import bound
 
-from tool_providers.registry import registry
-from tool_providers.universal_tool_platform import (
-    UniversalToolCall,
-    UniversalToolExecutor,
-)
 
 logger = logging.getLogger("logos.agent_runtime.local_tool_agent")
 
@@ -338,7 +334,7 @@ class LocalToolAgent:
 
         started = time.monotonic()
         try:
-            call = UniversalToolCall(
+            call = bound.UniversalToolCall(
                 tool_name=tool_name,
                 arguments=dict(arguments),
                 transport="local_agent",
@@ -352,7 +348,7 @@ class LocalToolAgent:
                     **dict(job.get("metadata") or {}),
                 },
             )
-            result = UniversalToolExecutor(registry).execute(call)
+            result = bound.UniversalToolExecutor(bound.registry).execute(call)
             status = "completed" if result.get("success") else "failed"
         except Exception as exc:
             result = {

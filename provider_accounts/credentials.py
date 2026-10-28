@@ -11,9 +11,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import threading
 from typing import Any, Callable, Optional
+from provider_accounts.host import bound, fingerprint_key, get_current_trace
 
-from observability.trace_manager import get_current_trace
-from secret_store.credential_crypto import fingerprint_key
 
 KEY_TTL = timedelta(hours=12)
 ROTATE_BEFORE = timedelta(hours=1)
@@ -410,11 +409,7 @@ def _get_secret_management_client():
     if _SECRET_MANAGEMENT_CLIENT is None:
         with _SECRET_MANAGEMENT_CLIENT_LOCK:
             if _SECRET_MANAGEMENT_CLIENT is None:
-                from cloud.cloudru.secret_management import (
-                    CloudRuSecretManagementClient,
-                )
-
-                _SECRET_MANAGEMENT_CLIENT = CloudRuSecretManagementClient()
+                _SECRET_MANAGEMENT_CLIENT = bound.CloudRuSecretManagementClient()
     return _SECRET_MANAGEMENT_CLIENT
 
 

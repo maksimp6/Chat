@@ -9,22 +9,32 @@ import hashlib
 import json
 from typing import Any, Optional
 
-from agent_memory.client import get_memory_client
 import time
-from storage.db import memory_file_path
 from invocation.context import InvocationContext
-from sessions.manager import create_session, restore_session
-from kristall import KristallError, KristallLimitError
-from kristall.store import MAX_JOURNAL_FRAME_BYTES
 
 import logging
+from invocation.host import (
+    bound,
+    create_session,
+    get_memory_client,
+    memory_file_path,
+    restore_session,
+)
 
 logger = logging.getLogger("logos.invocation.manager")
 
 _INVOCATION_PREFIX = "runtime_invocation:"
 _VALUE_CHUNK_PREFIX = "runtime_invocation_value:"
-_VALUE_CHUNK_BYTES = MAX_JOURNAL_FRAME_BYTES // 4
-_INLINE_VALUE_BYTES = MAX_JOURNAL_FRAME_BYTES // 2
+
+
+def _value_chunk_bytes() -> int:
+    return bound.MAX_JOURNAL_FRAME_BYTES // 4
+
+
+def _inline_value_bytes() -> int:
+    return bound.MAX_JOURNAL_FRAME_BYTES // 2
+
+
 # "token" matches credential names such as access_token, but not usage counters such as
 # input_tokens, total_tokens or output_tokens, which the saved trace needs.
 _SENSITIVE_KEY_RE = re.compile(
@@ -53,9 +63,7 @@ def _sanitize_for_storage(value: Any) -> Any:
     """Remove credential-like keys and credential-like text before a value is persisted."""
     sanitized = _sanitize_metadata(value)
     try:
-        from observability.trace_manager import ExecutionTrace
-
-        return ExecutionTrace._sanitize_trace_value(sanitized)
+        return bound.ExecutionTrace._sanitize_trace_value(sanitized)
     except (ImportError, AttributeError):
         return sanitized
 
@@ -168,14 +176,14 @@ def _prepare_value(
             sanitized, ensure_ascii=False, separators=(",", ":"), allow_nan=False
         ).encode("utf-8")
     except (TypeError, ValueError, UnicodeEncodeError) as exc:
-        raise KristallError("unsupported JSON value") from exc
-    if len(encoded) <= _INLINE_VALUE_BYTES and not force_chunks:
+        raise bound.KristallError("unsupported JSON value") from exc
+    if len(encoded) <= _inline_value_bytes() and not force_chunks:
         return sanitized, None
 
     # Chunk transactions retain Kristall's native frame/validation limits.
     # The caller publishes the manifest last in its lifecycle transaction.
     generation = uuid.uuid4().hex
-    count = (len(encoded) + _VALUE_CHUNK_BYTES - 1) // _VALUE_CHUNK_BYTES
+    count = (len(encoded) + _value_chunk_bytes() - 1) // _value_chunk_bytes()
     prefix = f"{_VALUE_CHUNK_PREFIX}{invocation_id}:{field}:{generation}:"
     manifest = {
         "format": "kristall-invocation-value-v1",
@@ -188,7 +196,7 @@ def _prepare_value(
     try:
         for index in range(count):
             part = encoded[
-                index * _VALUE_CHUNK_BYTES : (index + 1) * _VALUE_CHUNK_BYTES
+                index * _value_chunk_bytes() : (index + 1) * _value_chunk_bytes()
             ]
             with store.transaction() as tx:
                 tx.set(
@@ -260,7 +268,7 @@ def _publish_invocation_values(
                         _assign_value(record, field, value)
                     tx.set(key, record)
                     published = True
-        except KristallLimitError:
+        except bound.KristallLimitError:
             _discard_values(invocation_id, prepared)
             if force_chunks:
                 raise
@@ -309,35 +317,35 @@ def _read_chunked_value(invocation_id: str, field: str, manifest: Any) -> Any:
         or type(manifest.get("bytes")) is not int
         or manifest["bytes"] < 1
         or manifest["chunks"]
-        != (manifest["bytes"] + _VALUE_CHUNK_BYTES - 1) // _VALUE_CHUNK_BYTES
+        != (manifest["bytes"] + _value_chunk_bytes() - 1) // _value_chunk_bytes()
         or not isinstance(manifest.get("sha256"), str)
         or not re.fullmatch(r"[0-9a-f]{64}", manifest["sha256"])
     ):
-        raise KristallError("invalid invocation value manifest")
+        raise bound.KristallError("invalid invocation value manifest")
     store = get_memory_client(memory_file_path())
     prefix = f"{_VALUE_CHUNK_PREFIX}{invocation_id}:{field}:{manifest['generation']}:"
     pieces = []
     for index in range(manifest["chunks"]):
         chunk = store.get(prefix + str(index))
         if not isinstance(chunk, dict) or not isinstance(chunk.get("data"), str):
-            raise KristallError("missing invocation value chunk")
+            raise bound.KristallError("missing invocation value chunk")
         try:
             part = base64.b64decode(chunk["data"], validate=True)
         except (ValueError, UnicodeEncodeError) as exc:
-            raise KristallError("invalid invocation value chunk") from exc
+            raise bound.KristallError("invalid invocation value chunk") from exc
         expected = min(
-            _VALUE_CHUNK_BYTES, manifest["bytes"] - index * _VALUE_CHUNK_BYTES
+            _value_chunk_bytes(), manifest["bytes"] - index * _value_chunk_bytes()
         )
         if len(part) != expected:
-            raise KristallError("invalid invocation value chunk size")
+            raise bound.KristallError("invalid invocation value chunk size")
         pieces.append(part)
     encoded = b"".join(pieces)
     if hashlib.sha256(encoded).hexdigest() != manifest["sha256"]:
-        raise KristallError("invocation value integrity mismatch")
+        raise bound.KristallError("invocation value integrity mismatch")
     try:
         return json.loads(encoded.decode("utf-8"))
     except (ValueError, UnicodeDecodeError) as exc:
-        raise KristallError("invalid invocation value encoding") from exc
+        raise bound.KristallError("invalid invocation value encoding") from exc
 
 
 def finish_invocation(invocation_id: str, result: Any = None) -> bool:

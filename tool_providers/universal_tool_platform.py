@@ -14,6 +14,8 @@ import time
 import warnings
 
 from tool_providers._vendor.restrictions import restrictions_lifted
+from tool_providers.read_only_policy import ReadOnlyToolPolicy
+from tool_providers.host import enqueue_local_tool_job, wait_for_local_tool_job
 
 
 def _warn_deprecated_execution_hooks(hooks: Mapping[str, Any]) -> None:
@@ -125,29 +127,6 @@ class UniversalToolResult:
             "error": self.error,
             "metadata": dict(self.metadata),
         }
-
-
-@dataclass(frozen=True)
-class ReadOnlyToolPolicy:
-    """Trusted per-invocation allowlist, supplied outside model-controlled data."""
-
-    allowed_tools: frozenset[str]
-    name: str = "read-only"
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "allowed_tools", frozenset(self.allowed_tools))
-
-    def allows_tool(self, definition: UniversalToolDefinition) -> bool:
-        return (
-            definition.name in self.allowed_tools
-            and definition.read_only
-            and str(definition.executor.get("type") or "local") == "local"
-        )
-
-    def __call__(
-        self, definition: UniversalToolDefinition, call: UniversalToolCall
-    ) -> bool:
-        return self.allows_tool(definition)
 
 
 def _contract_schema(
@@ -595,10 +574,6 @@ class UniversalToolExecutor:
         call: UniversalToolCall,
         target: Mapping[str, Any],
     ) -> Any:
-        from agent_runtime.local_gateway import (
-            enqueue_local_tool_job,
-            wait_for_local_tool_job,
-        )
 
         agent_id = str(
             target.get("agent_id") or target.get("target_agent") or ""

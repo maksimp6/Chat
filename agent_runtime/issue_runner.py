@@ -31,6 +31,17 @@ from agent_runtime.review_policy import (
     build_review_policy,
     require_external_review_store,
 )
+from agent_runtime.host import (
+    bootstrap_credential,
+    bound,
+    create_invocation,
+    create_invocation_trace,
+    fail_invocation,
+    finish_invocation,
+    get_store,
+    persist_invocation_trace,
+    start_invocation,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MODEL = "yandexgpt-5-pro"
@@ -131,13 +142,10 @@ def seed_provider_credential() -> None:
     project_id = os.environ.get("YANDEX_PROJECT_ID", "").strip()
     if not api_key or not project_id:
         raise RuntimeError("YANDEX_API_KEY and YANDEX_PROJECT_ID are required")
-    from secret_store.credential_crypto import decrypt_secret, encrypt_secret
-    from storage.db import get_store
-    from provider_accounts.credentials import bootstrap_credential
 
     conn = get_store()
     bootstrap_credential(
-        conn, api_key, project_id, encrypt_secret, decrypt=decrypt_secret
+        conn, api_key, project_id, bound.encrypt_secret, decrypt=bound.decrypt_secret
     )
 
 
@@ -182,12 +190,6 @@ def _billing_summary(billing: dict[str, Any]) -> dict[str, Any]:
 def _persist_result(
     invocation: Any, trace: Any, result: dict[str, Any], checkpoint_file: Path | None
 ) -> None:
-    from invocation.manager import (
-        fail_invocation,
-        finish_invocation,
-        persist_invocation_trace,
-    )
-    from storage.memory_db import DatabaseError
 
     try:
         finalized = trace.finalize()
@@ -252,7 +254,7 @@ def _persist_result(
         ValueError,
         TypeError,
         LookupError,
-        DatabaseError,
+        bound.DatabaseError,
     ) as exc:
         result.update(status="failed", error=type(exc).__name__)
         result["persistence"].update(status="failed", error_type=type(exc).__name__)
@@ -260,13 +262,11 @@ def _persist_result(
 
 
 def _default_client_factory(model_key: str = DEFAULT_MODEL) -> Callable[[], Any]:
-    from core.config import Config
-    from chat.mcp_routes import LogosClient
 
     seed_provider_credential()
 
     def client_factory() -> Any:
-        return LogosClient(Config)
+        return bound.LogosClient(bound.Config)
 
     return client_factory
 
@@ -297,11 +297,6 @@ def run_issue_task(
     require_external_review_store(repo_root)
     execution_policy = build_review_policy(repo_root)
     import app  # noqa: F401  -- initializes the database schema and blueprints
-    from invocation.manager import (
-        create_invocation,
-        start_invocation,
-    )
-    from invocation.trace import create_invocation_trace
     from agent_runtime.responses_tool_loop import extract_function_calls
 
     client_factory = client_factory or _default_client_factory(model_key)

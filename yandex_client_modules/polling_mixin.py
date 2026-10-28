@@ -2,9 +2,9 @@ import json
 import time
 import requests
 
-from observability.trace_manager import ExecutionTrace
 from yandex_client_modules.errors import YandexClientError
 from yandex_client_modules.response_poller import poll_delay_cap
+from yandex_client_modules.host import bound
 
 
 class YandexPollingMixin:
@@ -25,7 +25,9 @@ class YandexPollingMixin:
                     self.session.get(url, headers=headers, timeout=15)
                 )
                 if resp.status_code == 404:
-                    if execution_trace and isinstance(execution_trace, ExecutionTrace):
+                    if execution_trace and isinstance(
+                        execution_trace, bound.ExecutionTrace
+                    ):
                         execution_trace.add_event(
                             "api_poll_error",
                             {
@@ -54,7 +56,9 @@ class YandexPollingMixin:
                     if status_code is not None
                     else f"Provider polling transport error ({type(e).__name__})"
                 )
-                if execution_trace and isinstance(execution_trace, ExecutionTrace):
+                if execution_trace and isinstance(
+                    execution_trace, bound.ExecutionTrace
+                ):
                     execution_trace.add_event(
                         "api_poll_error",
                         {
@@ -116,7 +120,7 @@ class YandexPollingMixin:
             )
             if (
                 execution_trace
-                and isinstance(execution_trace, ExecutionTrace)
+                and isinstance(execution_trace, bound.ExecutionTrace)
                 and snapshot_key != last_snapshot
             ):
                 poll_timing_ms = round((poll_end - poll_start) * 1000, 2)
@@ -149,7 +153,9 @@ class YandexPollingMixin:
                 status in ("completed", "incomplete", "failed", "cancelled")
                 or response.get("error") is not None
             ):
-                if execution_trace and isinstance(execution_trace, ExecutionTrace):
+                if execution_trace and isinstance(
+                    execution_trace, bound.ExecutionTrace
+                ):
                     execution_trace.add_event(
                         "api_poll_completed",
                         {
@@ -168,7 +174,7 @@ class YandexPollingMixin:
                         step=trace_step,
                         error_type="ProviderTaskFailed",
                     ) if execution_trace and isinstance(
-                        execution_trace, ExecutionTrace
+                        execution_trace, bound.ExecutionTrace
                     ) else None
                 if status == "cancelled":
                     execution_trace.record_error(
@@ -177,7 +183,7 @@ class YandexPollingMixin:
                         step=trace_step,
                         error_type="ProviderTaskCancelled",
                     ) if execution_trace and isinstance(
-                        execution_trace, ExecutionTrace
+                        execution_trace, bound.ExecutionTrace
                     ) else None
                 # ask() delivers every terminal state to its checkpoint callback
                 # and caller; provider failures use the normal diagnostics path.
@@ -185,7 +191,7 @@ class YandexPollingMixin:
             time.sleep(delay)
             delay = min(delay * 1.5, poll_delay_cap(time.time() - start))
 
-        if execution_trace and isinstance(execution_trace, ExecutionTrace):
+        if execution_trace and isinstance(execution_trace, bound.ExecutionTrace):
             execution_trace.add_event(
                 "api_poll_timeout",
                 {
@@ -197,7 +203,7 @@ class YandexPollingMixin:
                     "timeout": timeout,
                 },
             )
-        if execution_trace and isinstance(execution_trace, ExecutionTrace):
+        if execution_trace and isinstance(execution_trace, bound.ExecutionTrace):
             execution_trace.record_error(
                 "yandex_poll",
                 f"Timeout ({timeout}s) waiting for task {task_id}",

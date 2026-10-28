@@ -14,9 +14,8 @@ from pathlib import Path
 import re
 import time
 from typing import Any, TypedDict, cast
+from agent_shell.host import bound, get_memory_client
 
-from agent_memory.client import get_memory_client
-from kristall import KristallError
 
 ROLE_RE = re.compile(r"^[a-z][a-z0-9-]{1,40}$")
 KIND_RE = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
@@ -62,7 +61,7 @@ def _state(value: Any) -> TaskState:
         or not isinstance(value.get("tasks"), dict)
         or not isinstance(value.get("events"), dict)
     ):
-        raise KristallError("invalid task repository state")
+        raise bound.KristallError("invalid task repository state")
     for key, task in value["tasks"].items():
         if (
             not isinstance(task, dict)
@@ -81,9 +80,9 @@ def _state(value: Any) -> TaskState:
             or not {"payload", "result", "error", "created_at", "updated_at"}
             <= task.keys()
         ):
-            raise KristallError("invalid task record")
+            raise bound.KristallError("invalid task record")
     if set(value["events"]) != set(value["tasks"]):
-        raise KristallError("invalid task event ownership")
+        raise bound.KristallError("invalid task event ownership")
     for events in value["events"].values():
         if not isinstance(events, list) or any(
             not isinstance(event, dict)
@@ -91,7 +90,7 @@ def _state(value: Any) -> TaskState:
             or type(event.get("at")) not in (int, float)
             for event in events
         ):
-            raise KristallError("invalid task events")
+            raise bound.KristallError("invalid task events")
     return cast(TaskState, value)
 
 

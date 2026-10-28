@@ -12,8 +12,7 @@ from provider_accounts._vendor.restrictions import restrictions_lifted
 
 from dataclasses import dataclass
 from typing import Any, Optional
-
-from storage.db import get_store
+from provider_accounts.host import get_store
 
 
 DEFAULT_POLICY = "default"

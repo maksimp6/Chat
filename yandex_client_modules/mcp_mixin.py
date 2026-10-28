@@ -1,12 +1,6 @@
 import json
 from typing import Any
 
-from economy.treasury_identity import get_current_owner_id
-from observability.trace_manager import ExecutionTrace
-from tool_providers.registry import registry
-import mcp_server.storage as mcp_storage
-from agent_memory.manager import get_controlled_memory_summary
-from storage.db import get_conv_settings
 
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_client_modules.api_logger import api_logger
@@ -14,10 +8,11 @@ from yandex_client_modules.tool_config import (
     file_search_max_results,
     normalize_tools_config,
 )
-from tool_providers.universal_tool_platform import (
-    ReadOnlyToolPolicy,
-    UniversalToolCall,
-    UniversalToolExecutor,
+from yandex_client_modules.host import (
+    bound,
+    get_controlled_memory_summary,
+    get_conv_settings,
+    get_current_owner_id,
 )
 
 
@@ -54,10 +49,10 @@ class YandexMcpMixin:
         start_timestamp = _t.time()
         t_start = _t.perf_counter()
 
-        trace_id = trace.trace_id if isinstance(trace, ExecutionTrace) else None
+        trace_id = trace.trace_id if isinstance(trace, bound.ExecutionTrace) else None
         user_id = None
         invocation_id = None
-        if isinstance(trace, ExecutionTrace):
+        if isinstance(trace, bound.ExecutionTrace):
             user_id = (trace.trace.get("context") or {}).get("user_id")
             invocation_id = (trace.trace.get("context") or {}).get("invocation_id")
 
@@ -78,14 +73,14 @@ class YandexMcpMixin:
                 if not isinstance(args, dict):
                     raise ValueError("Invalid tool arguments: expected a JSON object")
             except ValueError as exc:
-                if isinstance(trace, ExecutionTrace):
+                if isinstance(trace, bound.ExecutionTrace):
                     trace.add_event(
                         "tool_arguments_rejected",
                         {"tool": name, "call_id": call_id, "error": str(exc)},
                     )
                 raise
 
-            call = UniversalToolCall(
+            call = bound.UniversalToolCall(
                 tool_name=name,
                 arguments=args,
                 call_id=call_id,
@@ -98,8 +93,8 @@ class YandexMcpMixin:
                     "server_count": len(all_servers or []),
                 },
             )
-            executor = UniversalToolExecutor(registry)
-            if isinstance(trace, ExecutionTrace):
+            executor = bound.UniversalToolExecutor(bound.registry)
+            if isinstance(trace, bound.ExecutionTrace):
                 universal_result = executor.execute_with_trace(
                     call, trace, server_configs=all_servers
                 )
@@ -167,7 +162,7 @@ class YandexMcpMixin:
         params: Any = None,
         trace: Any = None,
         *,
-        execution_policy: ReadOnlyToolPolicy | None = None,
+        execution_policy: Any | None = None,
         settings_conversation_id: Any = None,
     ) -> Any:
         params = params or {}
@@ -182,7 +177,7 @@ class YandexMcpMixin:
         enabled_servers = []
         if settings_id:
             try:
-                enabled_servers = mcp_storage.get_enabled_servers_for_conv(
+                enabled_servers = bound.mcp_storage.get_enabled_servers_for_conv(
                     settings_id, owner_id=owner_id
                 )
             except Exception:
@@ -218,7 +213,7 @@ class YandexMcpMixin:
         if active_cats is None:
             # Same default as the tools panel: every registered category. The
             # registry offers only tools this transport and host can execute.
-            active_cats = list(registry.get_available_categories())
+            active_cats = list(bound.registry.get_available_categories())
 
         hosted_tools = []
         try:
@@ -301,7 +296,7 @@ class YandexMcpMixin:
         local_tools: list[dict[str, Any]] = []
         for category in active_cats:
             try:
-                category_tools = registry.get_tools_by_category(category)
+                category_tools = bound.registry.get_tools_by_category(category)
                 if category_tools:
                     local_tools.extend(
                         tool
@@ -309,7 +304,7 @@ class YandexMcpMixin:
                         if execution_policy is None
                         or (
                             (
-                                definition := registry.get_universal_definition(
+                                definition := bound.registry.get_universal_definition(
                                     tool["name"]
                                 )
                             )
@@ -345,7 +340,7 @@ class YandexMcpMixin:
         if tools or execution_policy is not None:
             ask_params["tools"] = tools
 
-        if trace is not None and isinstance(trace, ExecutionTrace):
+        if trace is not None and isinstance(trace, bound.ExecutionTrace):
             ask_params["execution_trace"] = trace
 
         return self.ask(

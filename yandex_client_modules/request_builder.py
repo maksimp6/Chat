@@ -6,13 +6,13 @@ It deliberately has no HTTP, database, tracing, or MCP side effects.
 
 import math
 
-from core.config import get_model_uri
-from core.model_profiles import (
+from yandex_client_modules.metadata_validator import validate_metadata
+from yandex_client_modules.host import (
+    get_model_uri,
     ultra_profiles,
     ultra_reasoning_controllable,
     ultra_request_defaults,
 )
-from yandex_client_modules.metadata_validator import validate_metadata
 
 
 TEMPERATURE_MIN = 0.0

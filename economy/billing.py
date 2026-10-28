@@ -5,13 +5,8 @@ models never become a confirmed zero-cost invocation.
 """
 
 from typing import Any, Optional
+from economy.host import bound, canonical_model_key
 
-from core.config import (
-    ALL_MODELS,
-    AUDIO_STT_PRICE_PER_SEC,
-    AUDIO_TTS_PRICE_PER_SEC,
-    canonical_model_key,
-)
 
 PRICING_CURRENCY = "RUB"
 PRICING_VERSION = "config-v1"
@@ -61,7 +56,10 @@ def build_ai_billing_item(
     }
     # A retired model keeps its own prices for accounting; only legacy keys resolve to a successor.
     pricing = (
-        (ALL_MODELS.get(model_key) or ALL_MODELS.get(canonical_model_key(model_key)))
+        (
+            bound.ALL_MODELS.get(model_key)
+            or bound.ALL_MODELS.get(canonical_model_key(model_key))
+        )
         if model_key
         else None
     )
@@ -86,7 +84,8 @@ def build_ai_billing_item(
     cached_input_cost = cached_tokens * pricing.get("cached", pricing["input"]) / 1000
     output_cost = output_tokens * pricing.get("output", pricing["input"]) / 1000
     audio_cost = (
-        audio_stt * AUDIO_STT_PRICE_PER_SEC + audio_tts * AUDIO_TTS_PRICE_PER_SEC
+        audio_stt * bound.AUDIO_STT_PRICE_PER_SEC
+        + audio_tts * bound.AUDIO_TTS_PRICE_PER_SEC
     )
     cache_savings = (
         cached_tokens

@@ -9,7 +9,7 @@ from provider_accounts.quotas import (
     get_user_policy,
     upsert_policy,
 )
-from economy.treasury_identity import get_current_owner_id
+from provider_accounts.host import get_current_owner_id
 
 
 provider_quota_bp = Blueprint(

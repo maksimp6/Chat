@@ -6,7 +6,7 @@ import json
 import threading
 from typing import Any
 from datetime import datetime, timezone
-from storage.db import get_store
+from economy.host import get_store
 
 
 def _money(value: Any) -> Decimal:

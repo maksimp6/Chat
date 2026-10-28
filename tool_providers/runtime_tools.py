@@ -8,9 +8,8 @@ import os
 import shutil
 import subprocess
 from typing import Any
+from tool_providers.host import assert_operation_allowed, bound, build_runtime
 
-from remote_runtime.ssh import SSHRuntime, SSHRuntimeError
-from remote_runtime.ssh_settings import assert_operation_allowed, build_runtime
 
 # Tests may inject a runtime instance. Production resolves the persisted
 # SSH Runtime settings for every operation so settings changes take effect
@@ -20,7 +19,7 @@ runtime = None
 
 def _runtime_for_operation(
     operation: str, *, command: str | None = None, approved: bool = False
-) -> SSHRuntime:
+) -> Any:
     if runtime is not None:
         return runtime
     assert_operation_allowed(operation, command=command, approved=approved)
@@ -210,7 +209,7 @@ def ssh_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
         result = _runtime_for_operation(
             "execute", command=command, approved=_approved(cfg)
         ).execute(command=command, **runtime_args)
-    except SSHRuntimeError as exc:
+    except bound.SSHRuntimeError as exc:
         _trace_event(
             cfg,
             "runtime_failed",
@@ -255,7 +254,7 @@ def ssh_runtime_read_file(args: dict, cfg: dict | None = None) -> dict[str, Any]
         result = _runtime_for_operation("read_file").read_file(
             path=str(args.get("path") or ""), **runtime_args
         )
-    except SSHRuntimeError as exc:
+    except bound.SSHRuntimeError as exc:
         _trace_event(
             cfg,
             "runtime_failed",
@@ -303,7 +302,7 @@ def ssh_runtime_write_file(args: dict, cfg: dict | None = None) -> dict[str, Any
             content=str(args.get("content") or ""),
             **runtime_args,
         )
-    except SSHRuntimeError as exc:
+    except bound.SSHRuntimeError as exc:
         _trace_event(
             cfg,
             "runtime_failed",

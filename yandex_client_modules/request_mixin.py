@@ -5,20 +5,7 @@ import math
 import requests
 from typing import Any, Callable
 
-from observability.trace_manager import ExecutionTrace
-from storage.db import get_store
-from provider_accounts.credentials import resolve_client_credential
 
-try:
-    from secret_store.credential_crypto import (
-        CredentialCryptoError,
-        decrypt_secret,
-        encrypt_secret,
-    )
-except ImportError:  # pragma: no cover
-    CredentialCryptoError = None
-    decrypt_secret = None
-    encrypt_secret = None
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_client_modules.request_builder import (
     build_response_payload,
@@ -27,11 +14,14 @@ from yandex_client_modules.request_builder import (
 )
 from yandex_client_modules.request_receipt import build_request_manifest
 from yandex_client_modules.errors import YandexClientError
-from provider_accounts.quotas import (
-    ProviderQuotaExceeded,
+from yandex_client_modules.host import (
+    bound,
+    get_current_owner_id,
+    get_store,
     record_usage,
     release_request,
     reserve_request,
+    resolve_client_credential,
 )
 
 
@@ -56,7 +46,7 @@ def _capture_request_input(
     step: int | None,
     callback: Callable[[dict[str, Any]], Any] | None,
 ) -> None:
-    traced = isinstance(execution_trace, ExecutionTrace)
+    traced = isinstance(execution_trace, bound.ExecutionTrace)
     if not traced and callback is None:
         return
     manifest = build_request_manifest(payload)
@@ -103,13 +93,11 @@ def _capture_request_input(
 
 
 def _resolve_quota_user_id(execution_trace=None):
-    if isinstance(execution_trace, ExecutionTrace):
+    if isinstance(execution_trace, bound.ExecutionTrace):
         user_id = (execution_trace.trace.get("context") or {}).get("user_id")
         if user_id:
             return str(user_id).strip()
     try:
-        from economy.treasury_identity import get_current_owner_id
-
         return get_current_owner_id(required=False)
     except Exception:
         return None
@@ -136,7 +124,7 @@ def _record_quota_usage(execution_trace, reservation, response):
     total_tokens = _usage_count(usage, "total_tokens", input_tokens + output_tokens)
     token_count = max(total_tokens, input_tokens + output_tokens)
     record_usage(reservation, token_count=token_count)
-    if isinstance(execution_trace, ExecutionTrace):
+    if isinstance(execution_trace, bound.ExecutionTrace):
         execution_trace.add_event(
             "provider_quota_usage_recorded",
             {
@@ -151,7 +139,7 @@ def _record_quota_usage(execution_trace, reservation, response):
 
 def _resolve_global_provider_credential(client, execution_trace=None):
     """Refresh auth from the deployment-wide credential store for each request."""
-    if decrypt_secret is None or encrypt_secret is None:
+    if bound.decrypt_secret is None or bound.encrypt_secret is None:
         raise YandexClientError("Provider credential encryption is unavailable")
 
     conn = get_store()
@@ -159,11 +147,11 @@ def _resolve_global_provider_credential(client, execution_trace=None):
         credential = resolve_client_credential(
             client._config,
             conn,
-            decrypt_secret,
-            encrypt_secret,
+            bound.decrypt_secret,
+            bound.encrypt_secret,
             provider="yandex",
         )
-    except CredentialCryptoError as exc:
+    except bound.CredentialCryptoError as exc:
         # The stored credential is encrypted and its key is not available here.
         raise YandexClientError(
             "Stored provider credential cannot be read on this deployment"
@@ -172,7 +160,7 @@ def _resolve_global_provider_credential(client, execution_trace=None):
     if not isinstance(credential.project_id, str) or not credential.project_id.strip():
         raise YandexClientError("Active Yandex credential has no project_id")
 
-    if execution_trace and isinstance(execution_trace, ExecutionTrace):
+    if execution_trace and isinstance(execution_trace, bound.ExecutionTrace):
         execution_trace.set_provider_key(
             credential.trace_key_id,
             fingerprint=credential.fingerprint,
@@ -238,7 +226,7 @@ class YandexRequestMixin:
 
         metadata = (
             execution_trace.get_metadata()
-            if execution_trace and isinstance(execution_trace, ExecutionTrace)
+            if execution_trace and isinstance(execution_trace, bound.ExecutionTrace)
             else None
         )
 
@@ -253,7 +241,7 @@ class YandexRequestMixin:
         )
         url = self.responses_url
         # Photos share Responses input and the existing conversation/tool loop.
-        if isinstance(execution_trace, ExecutionTrace):
+        if isinstance(execution_trace, bound.ExecutionTrace):
             execution_trace.add_event(
                 "ultra_profile_applied", ultra_applied_event(model_key, params, payload)
             )
@@ -262,8 +250,8 @@ class YandexRequestMixin:
         quota_reservation = None
         try:
             quota_reservation = reserve_request(quota_user_id)
-        except ProviderQuotaExceeded as exc:
-            if execution_trace and isinstance(execution_trace, ExecutionTrace):
+        except bound.ProviderQuotaExceeded as exc:
+            if execution_trace and isinstance(execution_trace, bound.ExecutionTrace):
                 execution_trace.add_event(
                     "provider_quota_denied", exc.to_dict()["error"]
                 )
@@ -273,7 +261,7 @@ class YandexRequestMixin:
             raise
         if (
             execution_trace
-            and isinstance(execution_trace, ExecutionTrace)
+            and isinstance(execution_trace, bound.ExecutionTrace)
             and quota_reservation is not None
         ):
             execution_trace.add_event(
@@ -287,7 +275,10 @@ class YandexRequestMixin:
             )
 
         trace_step_number = trace_step
-        if isinstance(execution_trace, ExecutionTrace) and trace_step_number is None:
+        if (
+            isinstance(execution_trace, bound.ExecutionTrace)
+            and trace_step_number is None
+        ):
             trace_step_number = len(execution_trace.trace.get("api_requests", [])) + 1
 
         self._log_request("POST", url, json=payload)
@@ -296,7 +287,7 @@ class YandexRequestMixin:
         )
         request_start_timestamp = time.time()
         request_start_perf = time.perf_counter()
-        if execution_trace and isinstance(execution_trace, ExecutionTrace):
+        if execution_trace and isinstance(execution_trace, bound.ExecutionTrace):
             execution_trace.add_api_request(
                 _sanitize_for_log(payload),
                 step_index=trace_step_number,
@@ -341,7 +332,7 @@ class YandexRequestMixin:
             if status_code is not None:
                 error_message = f"HTTP {status_code}: {error_message}"
 
-            if execution_trace and isinstance(execution_trace, ExecutionTrace):
+            if execution_trace and isinstance(execution_trace, bound.ExecutionTrace):
                 execution_trace.add_event(
                     "api_request_error",
                     {
@@ -375,7 +366,7 @@ class YandexRequestMixin:
         except ValueError as e:
             # A 200 answer without JSON is not a usable reply, so the reserved request is not charged.
             release_request(quota_reservation)
-            if execution_trace and isinstance(execution_trace, ExecutionTrace):
+            if execution_trace and isinstance(execution_trace, bound.ExecutionTrace):
                 execution_trace.add_event(
                     "api_response_invalid_json",
                     {
@@ -393,7 +384,7 @@ class YandexRequestMixin:
                 "Provider returned a response that is not valid JSON",
                 status_code=resp.status_code,
             ) from e
-        if execution_trace and isinstance(execution_trace, ExecutionTrace):
+        if execution_trace and isinstance(execution_trace, bound.ExecutionTrace):
             execution_trace.add_response(
                 data,
                 step_index=trace_step_number or 1,
