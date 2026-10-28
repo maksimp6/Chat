@@ -1217,6 +1217,12 @@ def route_table(rev: str | None) -> list[tuple[str, str, str]]:
                 for target in node.targets:
                     if isinstance(target, ast.Name):
                         blueprints[(path, target.id)] = (bp_name, prefix)
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "add_url_rule"
+            ):
+                decorated.append((path, *url_rule(node)))
             if isinstance(node, ast.Call) and call_name(node) == "register_blueprint":
                 for kw in node.keywords:
                     if (
@@ -1260,6 +1266,32 @@ def route_table(rev: str | None) -> list[tuple[str, str, str]]:
         prefix = registrations.get(owner, prefix)
         table.append((f"{prefix}{rule}", ",".join(methods), f"{bp_name}.{endpoint}"))
     return sorted(set(table))
+
+
+def url_rule(call: ast.Call) -> tuple[str, str, list[str], str]:
+    """(owner, rule, methods, endpoint) of ``owner.add_url_rule(rule, endpoint, view_func)``."""
+    keywords = {kw.arg: kw.value for kw in call.keywords if kw.arg}
+    args = list(call.args)
+    rule_node = args[0] if args else keywords.get("rule")
+    rule = "?"
+    if isinstance(rule_node, ast.Constant):
+        rule = rule_node.value
+    elif rule_node is not None and dotted(rule_node):
+        rule = "{" + dotted(rule_node) + "}"
+    endpoint_node = args[1] if len(args) > 1 else keywords.get("endpoint")
+    view = args[2] if len(args) > 2 else keywords.get("view_func")
+    endpoint = "?"
+    if isinstance(endpoint_node, ast.Constant) and endpoint_node.value:
+        endpoint = endpoint_node.value
+    elif view is not None and dotted(view):
+        endpoint = dotted(view).rsplit(".", 1)[-1]
+    methods = ["GET"]
+    if "methods" in keywords:
+        try:
+            methods = sorted(ast.literal_eval(keywords["methods"]))
+        except ValueError:
+            pass
+    return dotted(call.func.value), rule, methods, endpoint
 
 
 def tool_order(config: Config) -> list[str]:

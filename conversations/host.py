@@ -18,9 +18,25 @@ class Host:
     ConversationOwnershipStore: (
         Any  # agent_memory.conversation_ownership_store.ConversationOwnershipStore
     )
+    ModelDiscoveryError: Any  # provider_accounts.model_discovery.ModelDiscoveryError
+    delete_conversation: Any  # storage.db.delete_conversation
+    get_conv_settings: Any  # storage.db.get_conv_settings
     get_conversations: Any  # storage.db.get_conversations
+    get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_memory_client: Any  # agent_memory.client.get_memory_client
     memory_file_path: Any  # storage.db.memory_file_path
+    normalize_tools_config: (
+        Any  # yandex_client_modules.tool_config.normalize_tools_config
+    )
+    save_conv_settings: Any  # storage.db.save_conv_settings
+    update_conversation_model: Any  # storage.db.update_conversation_model
+    update_conversation_title: Any  # storage.db.update_conversation_title
+    validate_dialog_model: (
+        Any  # provider_accounts.model_discovery.validate_dialog_model
+    )
+    validate_generation_params: (
+        Any  # yandex_client_modules.request_builder.validate_generation_params
+    )
 
 
 _binding: Binding[Host] = Binding("conversations")
@@ -36,14 +52,35 @@ __all__ = [
     "bound",
     "current",
     "provide",
+    "delete_conversation",
+    "get_conv_settings",
     "get_conversations",
+    "get_current_owner_id",
     "get_memory_client",
     "memory_file_path",
+    "normalize_tools_config",
+    "save_conv_settings",
+    "update_conversation_model",
+    "update_conversation_title",
+    "validate_dialog_model",
+    "validate_generation_params",
 ]
+
+
+def delete_conversation(*args: Any, **kwargs: Any) -> Any:
+    return current().delete_conversation(*args, **kwargs)
+
+
+def get_conv_settings(*args: Any, **kwargs: Any) -> Any:
+    return current().get_conv_settings(*args, **kwargs)
 
 
 def get_conversations(*args: Any, **kwargs: Any) -> Any:
     return current().get_conversations(*args, **kwargs)
+
+
+def get_current_owner_id(*args: Any, **kwargs: Any) -> Any:
+    return current().get_current_owner_id(*args, **kwargs)
 
 
 def get_memory_client(*args: Any, **kwargs: Any) -> Any:
@@ -52,3 +89,27 @@ def get_memory_client(*args: Any, **kwargs: Any) -> Any:
 
 def memory_file_path(*args: Any, **kwargs: Any) -> Any:
     return current().memory_file_path(*args, **kwargs)
+
+
+def normalize_tools_config(*args: Any, **kwargs: Any) -> Any:
+    return current().normalize_tools_config(*args, **kwargs)
+
+
+def save_conv_settings(*args: Any, **kwargs: Any) -> Any:
+    return current().save_conv_settings(*args, **kwargs)
+
+
+def update_conversation_model(*args: Any, **kwargs: Any) -> Any:
+    return current().update_conversation_model(*args, **kwargs)
+
+
+def update_conversation_title(*args: Any, **kwargs: Any) -> Any:
+    return current().update_conversation_title(*args, **kwargs)
+
+
+def validate_dialog_model(*args: Any, **kwargs: Any) -> Any:
+    return current().validate_dialog_model(*args, **kwargs)
+
+
+def validate_generation_params(*args: Any, **kwargs: Any) -> Any:
+    return current().validate_generation_params(*args, **kwargs)

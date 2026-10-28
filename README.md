@@ -191,7 +191,8 @@ application on `develop` pushes. The independent native updater has been removed
 ## Project structure
 
 Top-level directories, grouped by area. Root entry points: `app.py` (Flask
-application), `start.sh`, `requirements*.txt` and `.env.example`.
+application; what it serves is assembled in `composition/web.py`), `start.sh`,
+`requirements*.txt` and `.env.example`.
 
 <details open>
 <summary><b>Application core</b></summary>

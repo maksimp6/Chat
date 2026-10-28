@@ -34,6 +34,7 @@ class Host:
     _resolve_global_provider_credential: (
         Any  # yandex_client_modules.request_mixin._resolve_global_provider_credential
     )
+    annotate_catalog: Any  # core.model_profiles.annotate_catalog
     canonical_model_key: Any  # core.config.canonical_model_key
     config: Any  # core.config.config
     decrypt_secret: Any  # secret_store.credential_crypto.decrypt_secret
@@ -64,6 +65,7 @@ __all__ = [
     "bound",
     "current",
     "provide",
+    "annotate_catalog",
     "canonical_model_key",
     "encryption_configured",
     "fingerprint_key",
@@ -75,6 +77,10 @@ __all__ = [
     "registry_key_for_upstream",
     "traced_operation",
 ]
+
+
+def annotate_catalog(*args: Any, **kwargs: Any) -> Any:
+    return current().annotate_catalog(*args, **kwargs)
 
 
 def canonical_model_key(*args: Any, **kwargs: Any) -> Any:

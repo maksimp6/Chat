@@ -340,15 +340,43 @@ def _conversations():
     from agent_memory.conversation_ownership_store import (
         ConversationOwnershipStore as ConversationOwnershipStore,
     )
+    from provider_accounts.model_discovery import (
+        ModelDiscoveryError as ModelDiscoveryError,
+    )
+    from storage.db import delete_conversation as delete_conversation
+    from storage.db import get_conv_settings as get_conv_settings
     from storage.db import get_conversations as get_conversations
+    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
     from agent_memory.client import get_memory_client as get_memory_client
     from storage.db import memory_file_path as memory_file_path
+    from yandex_client_modules.tool_config import (
+        normalize_tools_config as normalize_tools_config,
+    )
+    from storage.db import save_conv_settings as save_conv_settings
+    from storage.db import update_conversation_model as update_conversation_model
+    from storage.db import update_conversation_title as update_conversation_title
+    from provider_accounts.model_discovery import (
+        validate_dialog_model as validate_dialog_model,
+    )
+    from yandex_client_modules.request_builder import (
+        validate_generation_params as validate_generation_params,
+    )
 
     return host.Host(
         ConversationOwnershipStore=ConversationOwnershipStore,
+        ModelDiscoveryError=ModelDiscoveryError,
+        delete_conversation=delete_conversation,
+        get_conv_settings=get_conv_settings,
         get_conversations=get_conversations,
+        get_current_owner_id=get_current_owner_id,
         get_memory_client=get_memory_client,
         memory_file_path=memory_file_path,
+        normalize_tools_config=normalize_tools_config,
+        save_conv_settings=save_conv_settings,
+        update_conversation_model=update_conversation_model,
+        update_conversation_title=update_conversation_title,
+        validate_dialog_model=validate_dialog_model,
+        validate_generation_params=validate_generation_params,
     )
 
 
@@ -653,6 +681,7 @@ def _provider_accounts():
     from yandex_client_modules.request_mixin import (
         resolve_global_provider_credential as _resolve_global_provider_credential,
     )
+    from core.model_profiles import annotate_catalog as annotate_catalog
     from core.config import canonical_model_key as canonical_model_key
     from core.config import config as config
     from secret_store.credential_crypto import decrypt_secret as decrypt_secret
@@ -684,6 +713,7 @@ def _provider_accounts():
         VOICE_MODELS=VOICE_MODELS,
         YandexApiKeyProvider=YandexApiKeyProvider,
         _resolve_global_provider_credential=_resolve_global_provider_credential,
+        annotate_catalog=annotate_catalog,
         canonical_model_key=canonical_model_key,
         config=config,
         decrypt_secret=decrypt_secret,
@@ -706,6 +736,7 @@ def _remote_runtime():
     from runtime import RuntimeDispatcher as RuntimeDispatcher
     from runtime import RuntimeLoader as RuntimeLoader
     from runtime import RuntimeNotFound as RuntimeNotFound
+    from economy.treasury_identity import TreasuryIdentityError as TreasuryIdentityError
     from runtime.request_context import bind_runtime_request as bind_runtime_request
     from agent_memory.client import close_memory_clients as close_memory_clients
     from invocation.trace import create_invocation_trace as create_invocation_trace
@@ -721,6 +752,7 @@ def _remote_runtime():
         RuntimeDispatcher=RuntimeDispatcher,
         RuntimeLoader=RuntimeLoader,
         RuntimeNotFound=RuntimeNotFound,
+        TreasuryIdentityError=TreasuryIdentityError,
         bind_runtime_request=bind_runtime_request,
         close_memory_clients=close_memory_clients,
         create_invocation_trace=create_invocation_trace,
@@ -861,6 +893,29 @@ def _tool_providers():
     )
 
 
+def _web_shell():
+    from web_shell import host
+    from kristall import KristallError as KristallError
+    from runtime import current_runtime_base_path as current_runtime_base_path
+    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
+    from core.config import get_donation_url as get_donation_url
+    from storage.db import get_store as get_store
+    from storage.db import memory_file_path as memory_file_path
+    from invocation.problems import problem as problem
+    from composition.web import STORAGE_INITIALIZERS as storage_initializers
+
+    return host.Host(
+        KristallError=KristallError,
+        current_runtime_base_path=current_runtime_base_path,
+        get_current_owner_id=get_current_owner_id,
+        get_donation_url=get_donation_url,
+        get_store=get_store,
+        memory_file_path=memory_file_path,
+        problem=problem,
+        storage_initializers=storage_initializers,
+    )
+
+
 def _workspace():
     from workspace import host
     from core.config import Config as Config
@@ -968,6 +1023,7 @@ _HOSTS = {
     "sessions": ("sessions.host", _sessions),
     "storage": ("storage.host", _storage),
     "tool_providers": ("tool_providers.host", _tool_providers),
+    "web_shell": ("web_shell.host", _web_shell),
     "workspace": ("workspace.host", _workspace),
     "yandex_client_modules": ("yandex_client_modules.host", _yandex_client_modules),
 }

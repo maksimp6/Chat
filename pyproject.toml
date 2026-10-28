@@ -250,6 +250,7 @@ copies = [
     "sessions/_binding.py",
     "storage/_binding.py",
     "tool_providers/_binding.py",
+    "web_shell/_binding.py",
     "workspace/_binding.py",
     "yandex_client_modules/_binding.py",
 ]

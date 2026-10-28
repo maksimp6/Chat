@@ -19,6 +19,7 @@ class Host:
     RuntimeDispatcher: Any  # runtime.RuntimeDispatcher
     RuntimeLoader: Any  # runtime.RuntimeLoader
     RuntimeNotFound: Any  # runtime.RuntimeNotFound
+    TreasuryIdentityError: Any  # economy.treasury_identity.TreasuryIdentityError
     bind_runtime_request: Any  # runtime.request_context.bind_runtime_request
     close_memory_clients: Any  # agent_memory.client.close_memory_clients
     create_invocation_trace: Any  # invocation.trace.create_invocation_trace

@@ -83,6 +83,7 @@ flowchart LR
     steel[steel]
     storage[storage]
     tool_providers[tool_providers]
+    web_shell[web_shell]
     workspace[workspace]
     yandex_client_modules[yandex_client_modules]
 ```
