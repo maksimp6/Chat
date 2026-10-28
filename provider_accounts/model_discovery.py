@@ -51,7 +51,7 @@ class ModelDiscovery:
         project_id: str | None = None,
         credential_resolver: Callable[[], Any] | None = None,
         ttl_seconds: int = DEFAULT_TTL_SECONDS,
-        timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
+        timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         session: requests.Session | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
@@ -176,19 +176,20 @@ class ModelDiscovery:
                 parsed = urlsplit(raw_id)
             except ValueError:
                 return None
-            kind = {
+            scheme_kind = {
                 "gpt": "text",
                 "emb": "embedding",
                 "cls": "classifier",
                 "art": "image",
             }.get(parsed.scheme)
             if (
-                kind is None
+                scheme_kind is None
                 or not parsed.netloc
                 or "@" in parsed.netloc
                 or ":" in parsed.netloc
             ):
                 return None
+            kind = scheme_kind
             if project_id is not None and parsed.netloc != project_id:
                 return None
             model_id = parsed.path.removeprefix("/")

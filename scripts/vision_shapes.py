@@ -15,6 +15,7 @@ import math
 import os
 from collections import deque
 from pathlib import Path
+from typing import Any
 
 from PIL import Image
 
@@ -75,7 +76,7 @@ def _components(image_data: bytes) -> list[dict]:
     colors = list(image.get_flattened_data())  # bounded by MAX_EDGE^2
     flags = bytearray(1 if _foreground(rgb) else 0 for rgb in colors)
     min_area = max(24, int(width * height * MIN_COMPONENT_RATIO))
-    output = []
+    output: list[dict[str, Any]] = []
     for start in range(width * height):
         if flags[start] != 1:
             continue

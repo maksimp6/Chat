@@ -14,13 +14,13 @@ from datetime import datetime, timedelta
 from typing import Any, Protocol
 
 from provider_accounts.credentials import (
-    fingerprint_key,
     issue_window,
     promote_rotated_key,
     record_health_check,
     rotation_needed,
     should_revoke,
 )
+from provider_accounts.host import fingerprint_key
 
 logger = logging.getLogger("logos.provider_accounts.key_rotation")
 

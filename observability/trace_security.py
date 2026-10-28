@@ -144,10 +144,12 @@ def sanitize_trace_value(value: Any, depth: int = 0) -> Any:
         return result
     if isinstance(value, (list, tuple, set)):
         items = list(value)
-        result = [sanitize_trace_value(item, depth + 1) for item in items[:MAX_ITEMS]]
+        sanitized = [
+            sanitize_trace_value(item, depth + 1) for item in items[:MAX_ITEMS]
+        ]
         if len(items) > MAX_ITEMS:
-            result.append(f"<truncated: {len(items) - MAX_ITEMS} more items>")
-        return result
+            sanitized.append(f"<truncated: {len(items) - MAX_ITEMS} more items>")
+        return sanitized
     try:
         text = repr(value)
     except Exception:

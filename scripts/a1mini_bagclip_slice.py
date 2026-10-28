@@ -163,7 +163,7 @@ def merge_plate_stl(source: Path, destination: Path) -> int:
             a, b, c = [tuple(coords[n][i] + shift[i] for i in range(3)) for n in face]
             u = [b[i] - a[i] for i in range(3)]
             v = [c[i] - a[i] for i in range(3)]
-            normal = (
+            normal: tuple[float, ...] = (
                 u[1] * v[2] - u[2] * v[1],
                 u[2] * v[0] - u[0] * v[2],
                 u[0] * v[1] - u[1] * v[0],

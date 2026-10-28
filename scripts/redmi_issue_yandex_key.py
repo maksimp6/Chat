@@ -44,7 +44,7 @@ def request_json(method, url, headers=None, payload=None):
         method=method,
     )
     # Loopback delivery must not pass through an inherited proxy.
-    handlers = [NoRedirect()]
+    handlers: list[urllib.request.BaseHandler] = [NoRedirect()]
     if url.startswith(APP):
         handlers.append(urllib.request.ProxyHandler({}))
     try:

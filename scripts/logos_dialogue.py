@@ -329,7 +329,7 @@ def _api_failure_evidence(events: list[dict]) -> list[dict]:
 
 
 def _safe_validation_fields(error: dict) -> dict:
-    fields = {
+    fields: dict[str, Any] = {
         key: token
         for key in ("code", "type", "param")
         if (token := _provider_token(error.get(key))) is not None

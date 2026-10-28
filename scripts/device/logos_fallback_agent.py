@@ -177,7 +177,7 @@ class FallbackAgent:
             context = ssl.create_default_context(
                 cafile=str(self.config.ca_file) if self.config.ca_file else None
             )
-            conn = http.client.HTTPSConnection(
+            conn: http.client.HTTPConnection = http.client.HTTPSConnection(
                 parts.hostname, parts.port, timeout=timeout, context=context
             )
         else:
@@ -241,7 +241,8 @@ class FallbackAgent:
             # Outcome unknown after a crash: never run twice.
             self.journal.finished(command_id, "failed")
             return command_id, "failed"
-        handler = self.handlers.get(command.get("kind"))
+        kind = command.get("kind")
+        handler = self.handlers.get(kind) if isinstance(kind, str) else None
         payload = command.get("payload")
         if handler is None or not isinstance(payload, dict):
             self.journal.finished(command_id, "failed")

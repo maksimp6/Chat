@@ -85,7 +85,7 @@ def prepare_partner_relations_records() -> None:
 init_partner_relations_tables = prepare_partner_relations_records
 
 
-def _validate_status(value: str, allowed: tuple[str, ...], field: str) -> str:
+def _validate_status(value: object, allowed: tuple[str, ...], field: str) -> str:
     normalized = str(value or "").strip().lower()
     if normalized not in allowed:
         raise ValueError(f"invalid {field}")
@@ -624,7 +624,7 @@ def complete_followup(
     return get_followup(owner_id, followup_id) or {}
 
 
-PARTNER_TOOLS = {
+PARTNER_TOOLS: dict[str, dict[str, Any]] = {
     "partner.create": {
         "title": "Partner Create",
         "description": "Создать партнёра в личном реестре текущего пользователя.",

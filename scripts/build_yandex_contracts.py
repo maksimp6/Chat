@@ -88,7 +88,7 @@ def field_schema(field: dict[str, str], aliases: dict[str, str]) -> dict[str, An
         for part in re.split(r"\s*\\?\|\s*", token):
             ref = re.fullmatch(r"\[([^]]+)\]\(#([^)]+)\)", part)
             if ref and ref[2] in aliases:
-                spec = {"$ref": "#/definitions/" + aliases[ref[2]]}
+                spec: dict[str, Any] = {"$ref": "#/definitions/" + aliases[ref[2]]}
             elif part in primitive:
                 spec = {"type": primitive[part]}
             elif part == "enum":

@@ -8,7 +8,7 @@ import json
 import re
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = ROOT / "config/integrations/catalog.json"
@@ -108,7 +108,7 @@ def _validate_root(data: dict[str, Any]) -> tuple[list[str], date]:
         as_of = date.min
     stale_after = data.get("stale_after_days")
     valid_stale = isinstance(stale_after, int) and not isinstance(stale_after, bool)
-    if not valid_stale or stale_after < 1:
+    if not valid_stale or cast(int, stale_after) < 1:
         errors.append("stale_after_days must be a positive integer")
     return errors, as_of
 

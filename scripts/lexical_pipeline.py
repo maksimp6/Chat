@@ -25,6 +25,7 @@ import subprocess
 import sys
 import urllib.request
 from pathlib import Path
+from typing import cast
 
 API = "https://api.github.com"
 REPO = os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat")
@@ -113,8 +114,9 @@ def gh_paginated(path: str) -> list[dict[str, object]]:
     out: list[dict[str, object]] = []
     page = 1
     while True:
-        chunk = gh(
-            "GET", f"{path}{'&' if '?' in path else '?'}page={page}&per_page=100"
+        chunk = cast(
+            "list[dict[str, object]]",
+            gh("GET", f"{path}{'&' if '?' in path else '?'}page={page}&per_page=100"),
         )
         if not chunk:
             break
@@ -142,7 +144,7 @@ def chunk_texts(chunk_numbers: list[int]) -> list[str]:
     """Fetch chunk bodies in declared order; the payload starts after '---'."""
     texts = []
     for number in chunk_numbers:
-        issue = gh("GET", f"issues/{number}")
+        issue = cast("dict[str, object]", gh("GET", f"issues/{number}"))
         body = str(issue.get("body") or "")
         if "---" in body:
             body = body.split("---", 1)[1]
@@ -232,7 +234,7 @@ def main() -> int:
                     "body": (
                         "## Полный цикл — FAIL\n\n"
                         f"Конкатенация чанков не совпадает с исходником по sha256: "
-                        f"`{coverage['computed_sha256'][:16]}…` против `{declared[:16]}…`. "
+                        f"`{cast(str, coverage['computed_sha256'])[:16]}…` против `{declared[:16]}…`. "
                         "Отчёт не публикуется: полнота не доказана."
                     )
                 },

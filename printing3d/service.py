@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from printing3d.host import printing_store
@@ -149,7 +149,8 @@ def create_order(store: PrintStore, owner_id: str, data: dict) -> dict:
     }
     with store.transaction() as tx:
         tx.set("printing/order/" + order_id, record)
-    return get_order(store, owner_id, order_id)
+    # The order was committed just above, so the read finds it.
+    return cast(dict[Any, Any], get_order(store, owner_id, order_id))
 
 
 def get_order(store: PrintStore, owner_id: str, order_id: str) -> dict | None:

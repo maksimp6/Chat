@@ -121,11 +121,11 @@ def sign_v4(
             hashlib.sha256(canonical_request.encode("utf-8")).hexdigest(),
         ]
     )
-    key = _hmac(("AWS4" + credentials.secret_access_key).encode("utf-8"), date)
+    signing_key = _hmac(("AWS4" + credentials.secret_access_key).encode("utf-8"), date)
     for part in (region, service, "aws4_request"):
-        key = _hmac(key, part)
+        signing_key = _hmac(signing_key, part)
     signature = hmac.new(
-        key, string_to_sign.encode("utf-8"), hashlib.sha256
+        signing_key, string_to_sign.encode("utf-8"), hashlib.sha256
     ).hexdigest()
     result = dict(headers)
     result["x-amz-date"] = amz_date

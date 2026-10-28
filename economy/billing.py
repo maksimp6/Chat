@@ -36,7 +36,7 @@ def build_ai_billing_item(
     response_id: str | None = None,
 ) -> dict[str, Any]:
     usage_missing = not isinstance(usage, dict)
-    usage = {} if usage_missing else usage
+    usage = usage if isinstance(usage, dict) else {}
     input_tokens = int(usage.get("input_tokens", 0) or 0)
     output_tokens = int(usage.get("output_tokens", 0) or 0)
     total_tokens = int(usage.get("total_tokens", input_tokens + output_tokens) or 0)

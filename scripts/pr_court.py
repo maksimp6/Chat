@@ -376,7 +376,7 @@ def main() -> int:
     output = Path("pr-court-output")
     output.mkdir(exist_ok=True)
     report = {"model_call": "NOT_RUN", "merge_approval": False, "tests": "NOT_RUN"}
-    secrets = ()
+    secrets: tuple[str, ...] = ()
     pr, files, rules = None, [], ""
     snapshot_rechecked = diff_checked = False
     provider_pending = False

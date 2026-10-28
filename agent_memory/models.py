@@ -147,10 +147,10 @@ class MemoryRecord:
         )
 
         for name in ("created_at", "updated_at"):
-            value = int(getattr(self, name))
-            if value < 0:
+            stamp = int(getattr(self, name))
+            if stamp < 0:
                 raise ValueError(f"{name} must be non-negative")
-            object.__setattr__(self, name, value)
+            object.__setattr__(self, name, stamp)
 
         if self.expires_at is not None:
             expires_at = int(self.expires_at)

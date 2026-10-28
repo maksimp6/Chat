@@ -122,9 +122,9 @@ def _multipart(data: Any, files: Any, content_type: str) -> dict[str, Any]:
                 size = len(part.get_payload(decode=True) or b"")
             elif name != "file" and name not in metadata:
                 try:
-                    metadata[name] = (part.get_payload(decode=True) or b"").decode(
-                        "utf-8"
-                    )
+                    metadata[name] = (
+                        cast("bytes | None", part.get_payload(decode=True)) or b""
+                    ).decode("utf-8")
                 except UnicodeDecodeError:
                     raise YandexRequestBlocked(
                         "invalid multipart metadata encoding"
@@ -202,6 +202,9 @@ def _query_values(url: str, params: Any, properties: dict[str, Any]) -> dict[str
                 if not isinstance(params, (str, bytes))
                 else params
             )
+            if isinstance(encoded, bytes):
+                # requests and httpx send bytes params as ASCII text.
+                encoded = encoded.decode("ascii")
             pairs.extend(
                 parse_qsl(encoded, keep_blank_values=True, strict_parsing=True)
             )
@@ -210,7 +213,7 @@ def _query_values(url: str, params: Any, properties: dict[str, Any]) -> dict[str
     grouped: dict[str, list[str]] = {}
     for name, value in pairs:
         grouped.setdefault(name, []).append(value)
-    result = {}
+    result: dict[str, Any] = {}
     for name, values in grouped.items():
         spec = properties.get(name, {})
         if spec.get("type") == "array":

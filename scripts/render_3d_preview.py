@@ -13,6 +13,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path, PurePosixPath
+from typing import cast
 from xml.etree import ElementTree as ET
 from zipfile import BadZipFile, ZipFile
 
@@ -138,7 +139,7 @@ def _ascii_facet(facet: list[str]) -> Face:
         if len(fields) != 4 or fields[0] != "vertex":
             raise PreviewError("invalid ASCII STL vertex")
         points.append(_point(fields[1:]))
-    return tuple(points)
+    return cast(Face, tuple(points))
 
 
 def _stl(data: bytes) -> list[Face]:
@@ -282,7 +283,9 @@ def _object_faces(
         child = _object_faces(archive, path, child_id, cache, parents | {key})
         if len(result) + len(child) > MAX_TRIANGLES:
             raise PreviewError("3MF component mesh exceeds triangle limit")
-        result.extend(tuple(_apply(v, matrix) for v in face) for face in child)
+        result.extend(
+            cast(Face, tuple(_apply(v, matrix) for v in face)) for face in child
+        )
     return result
 
 
@@ -330,7 +333,12 @@ def _build_faces(
             raise PreviewError("3MF build exceeds triangle limit")
         scale = UNIT_SCALE_MM[unit]
         faces.extend(
-            tuple(_point(v * scale for v in _apply(vertex, matrix)) for vertex in face)
+            cast(
+                Face,
+                tuple(
+                    _point(v * scale for v in _apply(vertex, matrix)) for vertex in face
+                ),
+            )
             for face in child
         )
     return faces

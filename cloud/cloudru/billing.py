@@ -65,10 +65,10 @@ def parse_consumption_total(payload: Any) -> dict[str, Any]:
 
     summary = payload.get("summary")
     if isinstance(summary, dict):
-        nested = parse_consumption_total(summary)
-        if nested["total_cost"] is not None:
-            nested["currency"] = nested["currency"] or currency
-            return nested
+        summary_totals = parse_consumption_total(summary)
+        if summary_totals["total_cost"] is not None:
+            summary_totals["currency"] = summary_totals["currency"] or currency
+            return summary_totals
 
     for list_key in _ROW_LIST_KEYS:
         rows = payload.get(list_key)

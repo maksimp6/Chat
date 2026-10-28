@@ -49,7 +49,7 @@ import base64
 import binascii
 import os
 import time
-from typing import Any
+from typing import Any, cast
 
 import requests
 
@@ -306,7 +306,9 @@ class CloudRuSecretManagementClient:
                 http_status=response.status_code,
             )
         try:
-            secret_bytes = base64.b64decode(encoded_secret_value, validate=True)
+            secret_bytes: bytes | None = base64.b64decode(
+                encoded_secret_value, validate=True
+            )
         except (binascii.Error, ValueError) as exc:
             encoded_secret_value = None
             raise CloudProviderError(
@@ -316,7 +318,8 @@ class CloudRuSecretManagementClient:
             ) from exc
         encoded_secret_value = None
         try:
-            secret_value = secret_bytes.decode("utf-8")
+            # Still the decoded bytes here; it is set to None below only to drop the secret.
+            secret_value = cast(bytes, secret_bytes).decode("utf-8")
         except UnicodeDecodeError as exc:
             secret_bytes = None
             raise CloudProviderError(

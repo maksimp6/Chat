@@ -164,7 +164,9 @@ def main() -> None:
     try:
         args.output.mkdir(parents=True, exist_ok=True)
         _validate_output_plan(args.images, args.output)
-        result = {"images": [analyze(path, args.output) for path in args.images]}
+        result: dict[str, object] = {
+            "images": [analyze(path, args.output) for path in args.images]
+        }
         if len(args.images) == 2:
             result["comparison"] = compare(*args.images, args.output)
         report_path = args.output / "report.json"

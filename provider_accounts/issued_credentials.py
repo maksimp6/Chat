@@ -3,15 +3,15 @@
 import hmac
 import re
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 from provider_accounts.credentials import (
     bootstrap_credential,
-    fingerprint_key,
     get_active_credential,
     record_health_check,
     replace_active_credential,
 )
-from provider_accounts.host import bound, get_store
+from provider_accounts.host import bound, fingerprint_key, get_store
 
 
 class ImportRejected(ValueError):
@@ -152,5 +152,6 @@ def import_yandex_key(payload):
         "authorization_ok": False,
         "fingerprint": stored.fingerprint,
         "provider_key_id": stored.provider_key_id,
-        "expires_at": stored.expires_at.isoformat(),
+        # get_active_credential always fills expires_at from the stored row.
+        "expires_at": cast(datetime, stored.expires_at).isoformat(),
     }

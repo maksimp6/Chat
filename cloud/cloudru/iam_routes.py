@@ -6,7 +6,7 @@ import ipaddress
 import logging
 import os
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from flask import Blueprint, jsonify, request
 
@@ -78,8 +78,9 @@ def _validate_time_slots(values: list[dict[str, Any]]) -> list[dict[str, int]]:
         if not isinstance(slot, dict):
             raise ValueError("time_slots must contain objects")
         try:
-            start = int(slot.get("start"))
-            end = int(slot.get("end"))
+            # A missing hour is None here; int(None) raises the TypeError caught below.
+            start = int(cast(Any, slot.get("start")))
+            end = int(cast(Any, slot.get("end")))
         except (TypeError, ValueError) as exc:
             raise ValueError("time slot start and end must be whole hours") from exc
         if not 0 <= start <= 23 or not 0 <= end <= 23 or start == end:

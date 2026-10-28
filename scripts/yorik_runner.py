@@ -22,6 +22,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path
+from typing import cast
 
 API = "https://api.github.com/repos/maksimp6/Chat"
 WORKFLOW = ".github/workflows/yorik-redmi9.yml"
@@ -240,7 +241,9 @@ class PinnedContext(ssl.SSLContext):
     def wrap_socket(self, *args, **kwargs):
         connection = super().wrap_socket(*args, **kwargs)
         if (
-            hashlib.sha256(connection.getpeercert(binary_form=True)).hexdigest()
+            hashlib.sha256(
+                cast(bytes, connection.getpeercert(binary_form=True))
+            ).hexdigest()
             != self.pin
         ):
             connection.close()

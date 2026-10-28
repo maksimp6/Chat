@@ -7,6 +7,7 @@ import re
 import stat
 import zipfile
 from pathlib import Path
+from typing import Any
 
 SELF_CHECK_QUESTION = (
     "Логос, сначала выполни настоящие вызовы инструментов, затем дай краткий итог. "
@@ -234,7 +235,7 @@ def verify_file_effects(project_root, nonce, folder, extended=False):
     text_path, archive_path, content = _fixture_paths(nonce, folder)
     root = Path(project_root).resolve()
     expected = content.encode("utf-8")
-    report = {
+    report: dict[str, Any] = {
         "status": "FAIL",
         "scope": "nonce_bound_text_and_zip_effects_only",
         "expected_sha256": hashlib.sha256(expected).hexdigest(),
@@ -355,7 +356,7 @@ def _request_evidence(trace):
             or manifest.get("capture_stage") != "assembled_payload_before_post"
         ):
             continue
-        request = {
+        request: dict[str, Any] = {
             "capture_stage": "assembled_payload_before_post",
             "provider_effective": "UNKNOWN",
             "settings": {},
@@ -529,7 +530,7 @@ def _offered_evidence(trace):
         tools = payload.get("tools") if isinstance(payload, dict) else None
         if not isinstance(tools, list):
             continue
-        names = set()
+        function_names = set()
         malformed = False
         for tool in tools:
             if not isinstance(tool, dict):
@@ -546,12 +547,12 @@ def _offered_evidence(trace):
                 function.get("name") if isinstance(function, dict) else None
             )
             if _name(name):
-                names.add(name)
+                function_names.add(name)
             else:
                 malformed = True
         inventories.append(
             {
-                "names": names,
+                "names": function_names,
                 "complete": not malformed,
                 "source": "captured_api_request_payload",
             }
@@ -613,7 +614,7 @@ def evaluate_tool_evidence(
     envelope establishes one completed call only, not its real effect, every
     argument combination, or unlimited provider/adapter capabilities.
     """
-    report = {
+    report: dict[str, Any] = {
         "status": "NOT_RUN",
         "tools": [],
         "inactive_tools": [],
@@ -704,7 +705,8 @@ def evaluate_tool_evidence(
         trace = traces.get(invocation_id) if isinstance(traces, dict) else None
         context = trace.get("context") if isinstance(trace, dict) else None
         if (
-            not isinstance(context, dict)
+            not isinstance(trace, dict)
+            or not isinstance(context, dict)
             or context.get("invocation_id") != invocation_id
         ):
             missing_traces += 1

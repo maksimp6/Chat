@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from flask import Flask, jsonify, request
 
 from economy.host import get_store
@@ -24,7 +26,8 @@ def treasury_accounts():
 def treasury_top_up():
     data = request.get_json(silent=True) or {}
     try:
-        owner_id = get_current_owner_id()
+        # required=True (the default) returns an owner id or raises.
+        owner_id = cast(str, get_current_owner_id())
         account = demo_top_up(
             owner_id, data.get("amount"), data.get("description", "Demo top-up")
         )

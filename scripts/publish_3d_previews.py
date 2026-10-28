@@ -15,6 +15,7 @@ import re
 import sys
 import time
 from pathlib import PurePosixPath
+from typing import Any, cast
 from urllib import error, parse, request
 
 from scripts.render_3d_preview import PreviewError
@@ -283,7 +284,7 @@ def render_report(
         rf"PR head: `{_sha(sha)[:12]}` · *geometry only, not print approval*.",
     ]
     artifact_pngs = []
-    images = []
+    images: list[tuple[str, str | None, str, dict | None]] = []
     for model in models:
         path = model["filename"]
         filename = PurePosixPath(path).name
@@ -299,7 +300,7 @@ def render_report(
         artifact_pngs.append((destination, png))
         images.append((path, destination, mesh["sha256"], mesh))
     preview_sha = publish_images(api, artifact_pngs) if artifact_pngs else None
-    for path, rendered, digest_or_error, mesh in images:
+    for path, rendered, digest_or_error, rendered_mesh in images:
         source_url = (
             f"https://github.com/{api.repo}/blob/{sha}/{parse.quote(path, safe='/.-_')}"
         )
@@ -308,6 +309,7 @@ def render_report(
         if rendered is None:
             summary.append(rf"Preview unavailable: `{digest_or_error[:140]}`.")
             continue
+        mesh = cast(dict, rendered_mesh)
         dimensions = tuple(
             round(mesh["maximum"][index] - mesh["minimum"][index], 2)
             for index in range(3)
@@ -315,7 +317,7 @@ def render_report(
         summary.extend(
             [
                 rf"Mesh SHA-256: `{digest_or_error}` · {mesh['triangles']} triangles · {dimensions} {mesh['units']}",
-                f"![Three real mesh views: {source_name}]({_url(api.repo, preview_sha, rendered)})",
+                f"![Three real mesh views: {source_name}]({_url(api.repo, cast(str, preview_sha), rendered)})",
             ]
         )
     if omitted:
@@ -425,7 +427,9 @@ def _publish_current_report(
     models: list[dict],
     omitted: list[dict] | None = None,
 ) -> str:
-    current = api.json("GET", api.prefix + f"/pulls/{pr_number}")
+    current = cast(
+        "dict[str, Any]", api.json("GET", api.prefix + f"/pulls/{pr_number}")
+    )
     if current.get("state") != "open" or current.get("head", {}).get("sha") != head_sha:
         return "stale_head"
     report = (
@@ -433,7 +437,9 @@ def _publish_current_report(
         if omitted
         else render_report(api, pr_number, head_sha, models)
     )
-    current = api.json("GET", api.prefix + f"/pulls/{pr_number}")
+    current = cast(
+        "dict[str, Any]", api.json("GET", api.prefix + f"/pulls/{pr_number}")
+    )
     if current.get("state") != "open" or current.get("head", {}).get("sha") != head_sha:
         return "stale_head"
     return upsert_comment(api, pr_number, report)

@@ -12,6 +12,7 @@ import json
 import os
 import re
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlencode
 
 from scripts.narration_host import yandex_request
@@ -140,7 +141,7 @@ def narrate(
 ) -> dict:
     # A separate directory prevents reuse of old audio after a failed attempt.
     output.mkdir(parents=True, exist_ok=False)
-    receipt = {
+    receipt: dict[str, Any] = {
         "status": "failed",
         "audio_status": "not_requested",
         "parts": [],

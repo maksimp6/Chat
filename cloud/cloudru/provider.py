@@ -194,10 +194,10 @@ class CloudRuProvider:
                 elif isinstance(enabled_filter, bool):
                     enabled = enabled_filter
                 elif isinstance(enabled_filter, str):
-                    normalized = enabled_filter.strip().lower()
-                    if normalized in {"true", "1", "yes", "on"}:
+                    enabled_text = enabled_filter.strip().lower()
+                    if enabled_text in {"true", "1", "yes", "on"}:
                         enabled = True
-                    elif normalized in {"false", "0", "no", "off"}:
+                    elif enabled_text in {"false", "0", "no", "off"}:
                         enabled = False
                     else:
                         raise CloudProviderError(
@@ -564,4 +564,118 @@ class CloudRuProvider:
             "complete": totals["complete"],
             "currency": totals["currency"]
             or os.environ.get("CLOUDRU_BILLING_CURRENCY", "RUB").strip().upper(),
+        }
+
+    # Sandbox lifecycle used by cloud/cloudru/environment_adapter.py.
+    def _environment_path(self) -> str:
+        path = self._service_path("environment")
+        if not path:
+            raise CloudProviderError(
+                "Cloud.ru environment endpoint/path is not configured",
+                code="unsupported_capability",
+            )
+        return path.rstrip("/")
+
+    def environment_create(
+        self,
+        *,
+        name: str,
+        commit_sha: str,
+        branch: str | None = None,
+        ttl_seconds: int | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        path = self._environment_path()
+        payload = self.client.request(
+            "environment",
+            "POST",
+            path,
+            # The fields this operation sets come last, so caller extras cannot change them.
+            json_body={
+                **dict(extra or {}),
+                "name": name,
+                "commit_sha": commit_sha,
+                "branch": branch,
+                "ttl_seconds": ttl_seconds,
+            },
+        )
+        return {
+            "provider": self.name,
+            "operation": "create",
+            "resource": normalize_resource(
+                self.name, "environment", "sandbox", payload
+            ),
+        }
+
+    def environment_start(self, *, remote_id: str) -> dict[str, Any]:
+        if not remote_id:
+            raise CloudProviderError("remote_id is required", code="validation_error")
+        path = self._environment_path()
+        payload = self.client.request(
+            "environment",
+            "POST",
+            f"{path}/{quote(remote_id, safe='')}/start",
+            json_body={},
+        )
+        return {
+            "provider": self.name,
+            "operation": "start",
+            "remote_id": remote_id,
+            "result": payload,
+        }
+
+    def environment_exec(
+        self,
+        *,
+        remote_id: str,
+        command: str,
+        timeout_seconds: float | None = None,
+    ) -> dict[str, Any]:
+        if not remote_id:
+            raise CloudProviderError("remote_id is required", code="validation_error")
+        if not command:
+            raise CloudProviderError("command is required", code="validation_error")
+        path = self._environment_path()
+        payload = self.client.request(
+            "environment",
+            "POST",
+            f"{path}/{quote(remote_id, safe='')}/exec",
+            json_body={"command": command, "timeout_seconds": timeout_seconds},
+        )
+        return {
+            "provider": self.name,
+            "operation": "exec",
+            "remote_id": remote_id,
+            "result": payload,
+        }
+
+    def environment_stop(self, *, remote_id: str) -> dict[str, Any]:
+        if not remote_id:
+            raise CloudProviderError("remote_id is required", code="validation_error")
+        path = self._environment_path()
+        payload = self.client.request(
+            "environment",
+            "POST",
+            f"{path}/{quote(remote_id, safe='')}/stop",
+            json_body={},
+        )
+        return {
+            "provider": self.name,
+            "operation": "stop",
+            "remote_id": remote_id,
+            "result": payload,
+        }
+
+    def environment_delete(self, *, remote_id: str) -> dict[str, Any]:
+        if not remote_id:
+            raise CloudProviderError("remote_id is required", code="validation_error")
+        path = self._environment_path()
+        payload = self.client.request(
+            "environment", "DELETE", f"{path}/{quote(remote_id, safe='')}"
+        )
+        return {
+            "provider": self.name,
+            "operation": "delete",
+            "remote_id": remote_id,
+            "result": payload,
         }

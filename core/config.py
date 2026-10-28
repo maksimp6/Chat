@@ -2,6 +2,7 @@
 
 import logging
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
 from core.env import env_get
@@ -63,7 +64,7 @@ def get_donation_url():
 HOST = "127.0.0.1"
 PORT = 8080
 
-TEXT_MODELS = {
+TEXT_MODELS: dict[str, dict[str, Any]] = {
     "yandexgpt-5.1": {
         "upstream": "yandexgpt-5.1",
         "name": "YandexGPT Pro 5.1",
@@ -271,7 +272,7 @@ CLASSIFIER_MODELS = {
     },
 }
 
-ALL_MODELS = {**TEXT_MODELS, **VOICE_MODELS, **IMAGE_MODELS}
+ALL_MODELS: dict[str, dict[str, Any]] = {**TEXT_MODELS, **VOICE_MODELS, **IMAGE_MODELS}
 AUDIO_STT_PRICE_PER_SEC = 0.0264
 AUDIO_TTS_PRICE_PER_SEC = 0.0203
 

@@ -11,7 +11,7 @@ and is already paid for through provider token pricing.
 import logging
 import math
 import os
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger("logos.economy.compute_resources")
 
@@ -50,7 +50,8 @@ def build_compute_billing_item(
     pricing: dict[str, float | None] | None = None,
 ) -> dict[str, Any]:
     pricing = pricing or get_energy_pricing()
-    watts = float(pricing["watts_per_core"])
+    # get_energy_pricing always sets watts_per_core; only the price may be missing.
+    watts = float(cast(float, pricing["watts_per_core"]))
     price = pricing.get("price_per_kwh")
     item: dict[str, Any] = {
         "type": "compute",

@@ -15,6 +15,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 import zlib
 from pathlib import Path
+from typing import cast
 
 _MAIN = "Metadata/plate_1.png"
 _SMALL = "Metadata/plate_1_small.png"
@@ -34,7 +35,7 @@ def _stl_triangles(path: Path) -> list[tuple[tuple[float, float, float], ...]]:
     n = struct.unpack_from("<I", data, 80)[0]
     if not n or len(data) != 84 + n * 50:
         raise RuntimeError("preview must be a complete binary STL")
-    faces = []
+    faces: list[tuple[tuple[float, float, float], ...]] = []
     for i in range(n):
         values = struct.unpack_from("<12fH", data, 84 + i * 50)
         vertices = (
@@ -114,7 +115,10 @@ def _paint_triangle(
     )
     norm = math.sqrt(sum(k * k for k in n))
     light = abs((n[0] * -0.34 + n[1] * -0.42 + n[2] * 0.84) / norm)
-    color = tuple(int(value * (0.4 + 0.6 * light)) for value in (137, 192, 225))
+    color = cast(
+        "tuple[int, int, int]",
+        tuple(int(value * (0.4 + 0.6 * light)) for value in (137, 192, 225)),
+    )
     for yy in range(max(0, int(min(ay, by, cy))), min(width, int(max(ay, by, cy)) + 2)):
         for xx in range(
             max(0, int(min(ax, bx, cx))), min(width, int(max(ax, bx, cx)) + 2)

@@ -114,6 +114,8 @@ class Thread:
     )
     executable_dispatches: list[tuple[str, datetime]] = field(default_factory=list)
     maintainer_dispatches: list[tuple[str, datetime]] = field(default_factory=list)
+    closed_at: datetime | None = None
+    labels: list[str] = field(default_factory=list)
 
     @property
     def last_activity(self) -> datetime:
@@ -375,6 +377,8 @@ def build_thread(
         base_ref=str(((pull or {}).get("base") or {}).get("ref") or ""),
         head_sha=str(((pull or {}).get("head") or {}).get("sha") or ""),
         behind_by=behind_by,
+        closed_at=parse_time(item.get("closed_at")),
+        labels=[label.get("name", "") for label in item.get("labels") or []],
     )
     thread.events.append(
         Event(
@@ -636,7 +640,8 @@ def detect_findings(
             default=(None, None),
         )
         if (
-            maintainer_since is not None
+            maintainer_target is not None
+            and maintainer_since is not None
             and _observer_passes_since(
                 maintainer_since,
                 now,

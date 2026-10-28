@@ -20,6 +20,7 @@ import zipfile
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
 from scripts import semantic_pipeline as semantic
@@ -353,7 +354,7 @@ class CorpusArchive:
 
 
 def make_pack(repository: str, documents: list[bytes]) -> bytes:
-    manifest = {"repository": repository, "documents": []}
+    manifest: dict[str, Any] = {"repository": repository, "documents": []}
     offset = 0
     for document in documents:
         manifest["documents"].append(

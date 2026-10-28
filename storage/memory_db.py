@@ -10,7 +10,7 @@ from collections.abc import Callable, Iterable
 from copy import deepcopy
 from dataclasses import dataclass
 from threading import RLock
-from typing import Any
+from typing import Any, cast
 
 
 class DatabaseError(Exception):
@@ -219,7 +219,8 @@ class _Transaction:
 
     def _end(self) -> dict[str, Table]:
         """Drop this transaction's own snapshot and release the lock taken on enter."""
-        snapshot = self._snapshot
+        # Only an active transaction ends, and __enter__ set its snapshot.
+        snapshot = cast("dict[str, Table]", self._snapshot)
         self.db._snapshots[:] = [
             other for other in self.db._snapshots if other is not snapshot
         ]

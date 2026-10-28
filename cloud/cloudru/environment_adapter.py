@@ -9,7 +9,7 @@ provider-neutral environment shape (`environment_manager.py` records) to the
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from cloud.base import CloudProviderError
 from cloud.cloudru.provider import CloudRuProvider
@@ -30,7 +30,8 @@ class CloudRuEnvironmentAdapter:
     def _provider_instance(self) -> CloudRuProvider:
         if self._provider is not None:
             return self._provider
-        return ensure_default_providers().get("cloudru")
+        # ensure_default_providers() registers a CloudRuProvider under "cloudru".
+        return cast(CloudRuProvider, ensure_default_providers().get("cloudru"))
 
     def _remote_id(self) -> str:
         remote_id = self.environment.get("cloud_resource_id")
@@ -48,9 +49,8 @@ class CloudRuEnvironmentAdapter:
             branch=self.environment.get("branch_name"),
             ttl_seconds=self.environment.get("ttl_seconds"),
         )
-        resource = (
-            result.get("resource") if isinstance(result.get("resource"), dict) else {}
-        )
+        resource = result.get("resource")
+        resource = resource if isinstance(resource, dict) else {}
         remote_id = resource.get("id")
         if not remote_id:
             raise CloudProviderError(

@@ -11,7 +11,13 @@ import urllib.parse
 from agent_office.observer import AGENT_LABELS, AGENTS, GitHub, Thread, ensure_label
 
 PREFIX = "agent:"
-COLORS = {"claude": "d97757", "codex": "10a37f", "copilot": "6e40c9", "alice": "f9d0c4"}
+COLORS = {
+    "claude": "d97757",
+    "codex": "10a37f",
+    "copilot": "6e40c9",
+    "alice": "f9d0c4",
+    "logos": "f9d0c4",
+}
 
 
 def agent_label(agent: str) -> str:

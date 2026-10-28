@@ -10,6 +10,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 SOURCE_SUFFIXES = {
     ".py",
@@ -174,7 +175,7 @@ def analyze_repository(repo_root: Path, *, commits: int = 200) -> dict:
     )
     histories, commit_count = _parse_history(raw)
 
-    rows = []
+    rows: list[dict[str, Any]] = []
     for path, history in histories.items():
         absolute = repo_root / path
         if not absolute.is_file():

@@ -5,14 +5,14 @@ The platform must not treat an unavailable provider as an empty cloud or a succe
 mutation adapter are wired, every provider operation fails closed.
 """
 
-from typing import Any
+from typing import Any, NoReturn
 
 
 class CloudProviderUnavailable(RuntimeError):
     """Cloud.ru provider is not wired to authoritative observed/apply APIs."""
 
 
-def _unavailable(operation: str) -> None:
+def _unavailable(operation: str) -> NoReturn:
     raise CloudProviderUnavailable(
         f"Cloud.ru provider unavailable for {operation}; no authoritative provider is configured"
     )

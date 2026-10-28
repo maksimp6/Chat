@@ -11,7 +11,7 @@ import uuid
 from collections.abc import Callable
 from contextvars import ContextVar
 from functools import wraps
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from observability.host import (
     aggregate_billing,
@@ -959,7 +959,8 @@ class ExecutionTrace:
         """Freeze one validated terminal snapshot; repeated calls are idempotent."""
         with self._sensitive_values_lock:
             if self._finalized:
-                final = self._final_result
+                # _final_result is stored before _finalized is set, under this lock.
+                final = cast(dict[str, Any], self._final_result)
             else:
                 # Build before changing terminal state, so a failed rebuild leaves the
                 # live trace open for diagnosis or retry. The snapshot is already

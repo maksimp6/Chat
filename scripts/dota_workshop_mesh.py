@@ -219,7 +219,7 @@ def cap_loop(points: list, original_direction: list[int]) -> list:
         raise MeshError("Boundary loop has negligible projected area")
     sign = 1 if signed > 0 else -1
     remaining = list(range(len(loop)))
-    triangles = []
+    triangles: list[tuple[int, ...]] = []
     while len(remaining) > 3:
         ear_found = False
         for p in range(len(remaining)):

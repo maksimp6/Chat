@@ -211,11 +211,11 @@ def add_message(
     with get_store().transaction() as tx:
         record = tx.get(key)
         if source_key is not None and tx.get(source_key) is not None:
-            return
+            return None
         if record is None:
             # The conversation was deleted while the turn ran. A message written now would be
             # unreachable from any conversation, so it is dropped.
-            return
+            return None
         identity = int(tx.get("chat/next-message-id") or 0) + 1
         tx.set("chat/next-message-id", identity)
         tx.set(

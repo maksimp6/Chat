@@ -83,11 +83,11 @@ def probe(mode):
             actor, url = aistudio_actor(rdp)
             rdp.evaluate(actor, OPEN_FORM_JS)
             time.sleep(2)
-            report = {
+            form_report = {
                 "url_path": urlparse(url).path,
                 "form": rdp.evaluate(actor, FORM_JS),
             }
-            print(json.dumps(report, ensure_ascii=False, indent=1))
+            print(json.dumps(form_report, ensure_ascii=False, indent=1))
             return
         report = []
         for tab in rdp.request("root", "listTabs")["tabs"]:

@@ -18,6 +18,7 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
+from typing import Any, cast
 
 API = "https://api.github.com"
 REPO = os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat")
@@ -49,8 +50,9 @@ def gh_paginated(path: str) -> list[dict[str, object]]:
     out: list[dict[str, object]] = []
     page = 1
     while True:
-        chunk = gh(
-            "GET", f"{path}{'&' if '?' in path else '?'}page={page}&per_page=100"
+        chunk = cast(
+            "list[dict[str, object]]",
+            gh("GET", f"{path}{'&' if '?' in path else '?'}page={page}&per_page=100"),
         )
         if not chunk:
             break
@@ -64,7 +66,7 @@ def gh_paginated(path: str) -> list[dict[str, object]]:
 def find_issues(explicit: str) -> list[dict[str, object]]:
     """Return the issues to process: one explicit number or all labeled."""
     if explicit.strip():
-        issue = gh("GET", f"issues/{explicit.strip()}")
+        issue = cast("dict[str, object]", gh("GET", f"issues/{explicit.strip()}"))
         return [issue]
     return gh_paginated(f"issues?labels={LABEL}&state=open")
 
@@ -109,7 +111,9 @@ def comment_body(report: str, number: int, source: str) -> str:
 
 def already_processed(number: int) -> bool:
     """True when this runner already posted a report on the issue."""
-    comments = gh("GET", f"issues/{number}/comments?per_page=100")
+    comments = cast(
+        "list[dict[str, Any]]", gh("GET", f"issues/{number}/comments?per_page=100")
+    )
     return any(
         "Лексическая работа (runner)" in str(c.get("body", ""))
         for c in comments
@@ -128,7 +132,7 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     processed = 0
     for issue in find_issues(explicit):
-        number = issue["number"]
+        number = cast(int, issue["number"])
         if already_processed(number):
             print(f"skip #{number}: already processed")
             continue

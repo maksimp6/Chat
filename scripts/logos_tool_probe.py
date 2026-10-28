@@ -14,6 +14,7 @@ import tempfile
 import threading
 import zipfile
 from pathlib import Path
+from typing import Any
 
 from scripts.logos_knowledge_host import bound, validate_json_schema
 
@@ -48,7 +49,12 @@ def main() -> int:
     server = None
     backup_files = []
     extra_files = []
-    report = {"status": "running", "tools": {}, "defaults": {}, "null": {}}
+    report: dict[str, Any] = {
+        "status": "running",
+        "tools": {},
+        "defaults": {},
+        "null": {},
+    }
 
     def check(condition):
         if not condition:

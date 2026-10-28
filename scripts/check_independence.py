@@ -48,7 +48,7 @@ import tokenize
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeGuard, cast
 
 ROOT = Path(__file__).resolve().parents[1]
 COUNTERS = "ERSVILAWD"
@@ -197,11 +197,11 @@ def build_unit_map(config: Config) -> UnitMap:
     }
     declared: list[tuple[str, str, bool]] = []
     for name, spec in config.units.items():
-        flat = bool(spec.get("flat", False))
+        spec_flat = bool(spec.get("flat", False))
         for entry in (
             spec.get("files", []) + spec.get("dirs", []) + spec.get("packages", [])
         ):
-            declared.append((entry.rstrip("/"), name, flat))
+            declared.append((entry.rstrip("/"), name, spec_flat))
     unit_of: dict[str, str] = {}
     flat: dict[str, bool] = {}
     for f in files:
@@ -230,10 +230,10 @@ def build_unit_map(config: Config) -> UnitMap:
 # Parsing helpers
 
 
-_PARSE_CACHE: dict[str, ast.AST | None] = {}
+_PARSE_CACHE: dict[str, ast.Module | None] = {}
 
 
-def parse(path: str, text: str | None = None) -> ast.AST | None:
+def parse(path: str, text: str | None = None) -> ast.Module | None:
     if text is None and path in _PARSE_CACHE:
         return _PARSE_CACHE[path]
     try:
@@ -254,7 +254,7 @@ def parents(tree: ast.AST) -> dict[ast.AST, ast.AST]:
     return out
 
 
-def is_main_guard(node: ast.AST) -> bool:
+def is_main_guard(node: ast.AST) -> TypeGuard[ast.If]:
     return (
         isinstance(node, ast.If)
         and isinstance(node.test, ast.Compare)
@@ -479,11 +479,11 @@ def resolve(umap: UnitMap, src: str, ref: Ref) -> str | None:
     if ref.kind in {"import", "lazy", "call"} and parts[0] and flat_context:
         # Scripts run as files see their own directory on sys.path; packages do not.
         directory = Path(src).parent
-        for candidate in (
+        for candidate_file in (
             directory / f"{parts[0]}.py",
             directory / parts[0] / "__init__.py",
         ):
-            rel = str(candidate).replace(os.sep, "/")
+            rel = str(candidate_file).replace(os.sep, "/")
             if rel in umap.unit_of:
                 return rel
     return None
@@ -707,6 +707,7 @@ def check_standalone(
                 if path in cfg.entry_blocks and in_main_guard(node, up):
                     continue
                 optional = in_optional_import(node, up)
+                targets: list[tuple[str, list[str] | None]]
                 if isinstance(node, ast.Import):
                     targets = [(a.name, None) for a in node.names]
                 else:
@@ -958,7 +959,8 @@ def check_api(umap: UnitMap, violations: list[Violation]) -> None:
             )
             if any(isinstance(t, ast.Name) and t.id == "__all__" for t in targets):
                 try:
-                    exported = list(ast.literal_eval(stmt.value))
+                    value = cast("ast.Assign | ast.AnnAssign", stmt).value
+                    exported = list(ast.literal_eval(cast(ast.expr, value)))
                 except ValueError:
                     exported = []
         if exported is None:
@@ -1125,6 +1127,7 @@ def check_host_names(
 ) -> None:
     """Every ``bound.<name>`` and every name imported from the host exists in it."""
     fields: set[str] = set()
+    node: ast.AST
     for node in host_tree.body:
         if isinstance(node, ast.ClassDef) and node.name == "Host":
             fields = {
@@ -1393,12 +1396,14 @@ def route_table(rev: str | None) -> list[tuple[str, str, str]]:
             ):
                 args = node.value.args
                 bp_name = (
-                    args[0].value if args and isinstance(args[0], ast.Constant) else "?"
+                    cast(str, args[0].value)
+                    if args and isinstance(args[0], ast.Constant)
+                    else "?"
                 )
                 prefix = ""
                 for kw in node.value.keywords:
                     if kw.arg == "url_prefix" and isinstance(kw.value, ast.Constant):
-                        prefix = kw.value.value or ""
+                        prefix = cast(str, kw.value.value or "")
                 for target in node.targets:
                     if isinstance(target, ast.Name):
                         blueprints[(path, target.id)] = (bp_name, prefix)
@@ -1414,6 +1419,7 @@ def route_table(rev: str | None) -> list[tuple[str, str, str]]:
                         kw.arg == "url_prefix"
                         and node.args
                         and isinstance(kw.value, ast.Constant)
+                        and isinstance(kw.value.value, str)
                     ):
                         registrations[dotted(node.args[0])] = kw.value.value
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -1428,7 +1434,7 @@ def route_table(rev: str | None) -> list[tuple[str, str, str]]:
                     owner = dotted(deco.func.value)
                     rule = "?"
                     if deco.args and isinstance(deco.args[0], ast.Constant):
-                        rule = deco.args[0].value
+                        rule = cast(str, deco.args[0].value)
                     elif deco.args and dotted(deco.args[0]):
                         rule = "{" + dotted(deco.args[0]) + "}"
                     methods = [verb.upper()] if verb != "route" else ["GET"]
@@ -1439,7 +1445,11 @@ def route_table(rev: str | None) -> list[tuple[str, str, str]]:
                                 methods = sorted(ast.literal_eval(kw.value))
                             except ValueError:
                                 pass
-                        if kw.arg == "endpoint" and isinstance(kw.value, ast.Constant):
+                        if (
+                            kw.arg == "endpoint"
+                            and isinstance(kw.value, ast.Constant)
+                            and isinstance(kw.value.value, str)
+                        ):
                             endpoint = kw.value.value
                     decorated.append((path, owner, rule, methods, endpoint))
     table = []
@@ -1460,14 +1470,14 @@ def url_rule(call: ast.Call) -> tuple[str, str, list[str], str]:
     rule_node = args[0] if args else keywords.get("rule")
     rule = "?"
     if isinstance(rule_node, ast.Constant):
-        rule = rule_node.value
+        rule = cast(str, rule_node.value)
     elif rule_node is not None and dotted(rule_node):
         rule = "{" + dotted(rule_node) + "}"
     endpoint_node = args[1] if len(args) > 1 else keywords.get("endpoint")
     view = args[2] if len(args) > 2 else keywords.get("view_func")
     endpoint = "?"
     if isinstance(endpoint_node, ast.Constant) and endpoint_node.value:
-        endpoint = endpoint_node.value
+        endpoint = cast(str, endpoint_node.value)
     elif view is not None and dotted(view):
         endpoint = dotted(view).rsplit(".", 1)[-1]
     methods = ["GET"]
@@ -1476,7 +1486,7 @@ def url_rule(call: ast.Call) -> tuple[str, str, list[str], str]:
             methods = sorted(ast.literal_eval(keywords["methods"]))
         except ValueError:
             pass
-    return dotted(call.func.value), rule, methods, endpoint
+    return dotted(cast(ast.Attribute, call.func).value), rule, methods, endpoint
 
 
 def tool_order(config: Config) -> list[str]:
@@ -1494,10 +1504,11 @@ def tool_order(config: Config) -> list[str]:
             if any(
                 isinstance(t, ast.Name) and t.id == "_TOOL_SOURCES" for t in targets
             ):
-                for item in getattr(node.value, "elts", []):
+                value = cast("ast.Assign | ast.AnnAssign", node).value
+                for item in getattr(value, "elts", []):
                     first = item.elts[0] if isinstance(item, ast.Tuple) else None
                     if isinstance(first, ast.Constant) and first.value not in order:
-                        order.append(first.value)
+                        order.append(cast(str, first.value))
     sources = parse(config.tool_sources_file) if config.tool_sources_file else None
     if sources is not None:
         for node in ast.walk(sources):
@@ -1507,7 +1518,7 @@ def tool_order(config: Config) -> list[str]:
                 for item in getattr(node.value, "elts", []):
                     first = item.elts[0] if isinstance(item, ast.Tuple) else None
                     if isinstance(first, ast.Constant) and first.value not in order:
-                        order.append(first.value)
+                        order.append(cast(str, first.value))
     for path in sorted(Path(ROOT).glob("*/install.py")):
         tree = parse(str(path.relative_to(ROOT)))
         if tree is None:
@@ -1520,7 +1531,7 @@ def tool_order(config: Config) -> list[str]:
             ):
                 first = node.args[0]
                 if isinstance(first, ast.Constant) and first.value not in order:
-                    order.append(first.value)
+                    order.append(cast(str, first.value))
     tools = parse(config.mcp_tools_file)
     if tools is not None:
         for node in ast.walk(tools):
@@ -1531,7 +1542,7 @@ def tool_order(config: Config) -> list[str]:
             ):
                 first = node.args[0]
                 if isinstance(first, ast.Constant) and first.value not in order:
-                    order.append(first.value)
+                    order.append(cast(str, first.value))
     return order
 
 
@@ -1554,7 +1565,8 @@ def entrypoint_report(umap: UnitMap) -> list[str]:
                 sibling = (ROOT / Path(path).parent / f"{top}.py").is_file()
                 if top in std or top in umap.config.third_party or sibling:
                     continue
-                problems.append(f"{path}:{node.lineno}: imports {name}")
+                lineno = cast("ast.Import | ast.ImportFrom", node).lineno
+                problems.append(f"{path}:{lineno}: imports {name}")
     docs = [
         f
         for f in tracked_files((".md", ".yml", ".yaml", ".sh"))

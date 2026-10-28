@@ -190,9 +190,9 @@ def _scan_line(
     positive = int(extrusion is not None and float(extrusion.group(1)) > 0)
     read_temp = _parse_temperature(physical, material)
     if read_temp is not None:
-        code, value = read_temp
+        temp_code, value = read_temp
         if value:
-            temperatures[code] = value
+            temperatures[temp_code] = value
     return movement, positive
 
 

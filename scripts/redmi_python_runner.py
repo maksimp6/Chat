@@ -467,7 +467,7 @@ class Listener:
         self.config = json.loads((state / "config.json").read_text())
         self.api = API()
         self.token = ""
-        self.expires = 0
+        self.expires: float = 0
         self.broker = property_value(self.config, "ServerUrlV2")
         if not self.broker or not property_value(self.config, "UseV2Flow"):
             raise ValueError(

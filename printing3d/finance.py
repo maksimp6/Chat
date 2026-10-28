@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from printing3d.money import decimal_field, money_float
 from printing3d.store import PrintStore
@@ -370,7 +370,8 @@ def assess_financing(
         repayment = (
             decimal_field(credit_total_repayment, "credit_total_repayment")
             if credit_total_repayment is not None
-            else payment * Decimal(months)
+            # term_months is required in credit mode, so months is an int here.
+            else payment * Decimal(cast(int, months))
         )
         if repayment < principal:
             raise ValueError("credit_total_repayment must be >= credit_principal")

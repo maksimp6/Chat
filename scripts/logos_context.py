@@ -58,7 +58,7 @@ def _canonical_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-def _repository_name(value: str) -> str:
+def _repository_name(value: Any) -> str:
     if not isinstance(value, str) or not re.fullmatch(
         r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", value
     ):
@@ -220,7 +220,7 @@ def _remote_source(
             "GitHub source URL does not belong to the requested repository"
         )
     author = item.get("user") or {}
-    metadata = {
+    metadata: dict[str, Any] = {
         key: item[key]
         for key in (
             "state",

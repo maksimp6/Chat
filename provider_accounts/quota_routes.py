@@ -49,19 +49,24 @@ def quota_policy_update(policy_name: str):
 
     data = request.get_json(silent=True) or {}
     try:
+        name = str(policy_name).strip().lower()
+        period_seconds = int(data.get("period_seconds", 86400))
+        max_requests = int(data.get("max_requests", 100))
+        max_requests_per_minute = int(data.get("max_requests_per_minute", 20))
+        enabled = _flag(data.get("enabled", True))
         values = {
-            "name": str(policy_name).strip().lower(),
-            "period_seconds": int(data.get("period_seconds", 86400)),
-            "max_requests": int(data.get("max_requests", 100)),
-            "max_requests_per_minute": int(data.get("max_requests_per_minute", 20)),
-            "enabled": _flag(data.get("enabled", True)),
+            "name": name,
+            "period_seconds": period_seconds,
+            "max_requests": max_requests,
+            "max_requests_per_minute": max_requests_per_minute,
+            "enabled": enabled,
         }
         upsert_policy(
-            values["name"],
-            period_seconds=values["period_seconds"],
-            max_requests=values["max_requests"],
-            max_requests_per_minute=values["max_requests_per_minute"],
-            enabled=values["enabled"],
+            name,
+            period_seconds=period_seconds,
+            max_requests=max_requests,
+            max_requests_per_minute=max_requests_per_minute,
+            enabled=enabled,
         )
         return jsonify({"status": "ok", "policy": values})
     except (TypeError, ValueError) as exc:

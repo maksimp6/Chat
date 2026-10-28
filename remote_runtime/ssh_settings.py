@@ -14,8 +14,8 @@ import os
 import re
 import subprocess
 import time
-from collections.abc import Mapping
-from typing import Any
+from collections.abc import Mapping, MutableMapping
+from typing import Any, cast
 
 from remote_runtime._vendor.restrictions import restrictions_lifted
 from remote_runtime.host import get_config, get_current_trace, set_config
@@ -29,7 +29,7 @@ LAST_TEST_KEY = "ssh_runtime_last_test"
 # that chains a second one ("echo ok; sudo ...") would otherwise pass as the first.
 _SHELL_CONTROL_RE = re.compile(r"[;&`\n\r]|\$\(")
 
-_DEFAULTS = {
+_DEFAULTS: dict[str, Any] = {
     "enabled": False,
     "read_only": False,
     "allow_command_execution": True,
@@ -167,10 +167,10 @@ def validate_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(target, Mapping):
                 try:
                     for field in ("connect_timeout_seconds", "command_timeout_seconds"):
-                        value = float(
+                        seconds = float(
                             target.get(field, 30 if "command" in field else 10)
                         )
-                        if value <= 0 or value > 3600:
+                        if seconds <= 0 or seconds > 3600:
                             raise SSHRuntimeError(
                                 f"SSH target '{name}' has invalid {field}"
                             )
@@ -233,7 +233,9 @@ def _runtime_from_settings(settings: Mapping[str, Any]) -> SSHRuntime:
     targets = copy.deepcopy(settings["targets"])
     for target in targets.values():
         if isinstance(target, Mapping):
-            target.setdefault("max_output_bytes", settings["max_output_bytes"])
+            cast("MutableMapping[str, Any]", target).setdefault(
+                "max_output_bytes", settings["max_output_bytes"]
+            )
     return SSHRuntime(
         targets=targets,
         known_hosts=settings["known_hosts"],

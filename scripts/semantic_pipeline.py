@@ -40,6 +40,7 @@ import urllib.request
 import uuid
 from collections import Counter
 from datetime import UTC, datetime
+from typing import Any, cast
 from urllib.parse import quote, urlencode
 
 if __package__ in {None, ""}:
@@ -1330,7 +1331,7 @@ def list_yandex_objects(
     after = None
     seen_cursors: set[str] = set()
     for _ in range(100):
-        params = {"limit": 100}
+        params: dict[str, int | str] = {"limit": 100}
         if after:
             params["after"] = after
         data = yandex_json_request("GET", path + "?" + urlencode(params), project, key)
@@ -1379,7 +1380,7 @@ def _safe_chunking(value: object) -> dict | None:
     if not isinstance(value, dict):
         return None
     kind = value.get("type")
-    result = {"type": kind if isinstance(kind, str) else "unknown"}
+    result: dict[str, Any] = {"type": kind if isinstance(kind, str) else "unknown"}
     static = value.get("static")
     if isinstance(static, dict):
         result["static"] = {
@@ -1402,7 +1403,7 @@ def inspect_yandex_vector_stores() -> int:
         item.get("id"): item for item in files if isinstance(item.get("id"), str)
     }
 
-    report = []
+    report: list[dict[str, Any]] = []
     for store in stores:
         store_id = store.get("id")
         name = store.get("name")
@@ -1645,7 +1646,7 @@ def ensure_vector_store_files_attached(
         or any(not _chunking_strategy_matches(record) for record in confirmed)
     ):
         raise ValueError("vector_store_attachment_receipt_invalid")
-    return sorted(set(confirmed_ids))
+    return sorted(set(cast("list[str]", confirmed_ids)))
 
 
 def wait_for_vector_store_index(
@@ -1842,9 +1843,9 @@ def _repository_vector_match(item: dict, repository_files: list[dict]) -> dict:
         for path in sorted(paths):
             source = by_path[path]
             if source["kind"] == "text":
-                source_text = source.get("text")
+                source_text = source.get("text") or ""
                 match = _longest_exact_excerpt(
-                    snippet[:MAX_VECTOR_RESULT_CHARS], source_text or ""
+                    snippet[:MAX_VECTOR_RESULT_CHARS], source_text
                 )
                 if match is None:
                     continue
@@ -2296,7 +2297,7 @@ def _existing_vector_store_snapshot(store_id: str, project: str, key: str) -> di
         raise ValueError("vector_store_file_id_invalid")
     file_catalog = list_yandex_objects("/files", project, key, ("files",))
     file_by_id = {item.get("id"): item for item in file_catalog}
-    store_files = []
+    store_files: list[dict[str, Any]] = []
     for file_id in attached_file_ids:
         metadata = file_by_id.get(file_id)
         filename = metadata.get("filename") if metadata else None
@@ -2305,7 +2306,11 @@ def _existing_vector_store_snapshot(store_id: str, project: str, key: str) -> di
         ):
             raise ValueError("vector_store_unexpected_files")
         store_files.append(
-            {"file_id": file_id, "file_name": filename, "bytes": metadata.get("bytes")}
+            {
+                "file_id": file_id,
+                "file_name": filename,
+                "bytes": cast("dict[str, Any]", metadata).get("bytes"),
+            }
         )
     issue_files = [
         item
@@ -2498,7 +2503,7 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
         if include_repository:
             snapshot = _prepare_repository_vector_store(
                 corpus,
-                repository_files,
+                cast("list[dict]", repository_files),
                 excluded_sensitive_files,
                 existing_store_id,
                 project,
@@ -2662,7 +2667,7 @@ def _run_bm25(args: argparse.Namespace, query: str, token: str | None) -> int:
     if len(rendered) > MAX_REPORT_CHARS:
         raise ValueError("report_too_large")
     if args.publish_issue:
-        if not _publish(args.publish_issue, rendered, token):
+        if not _publish(args.publish_issue, rendered, cast(str, token)):
             return 4
     print(rendered)
     return 0

@@ -38,7 +38,8 @@ def _second(value, *, floor=False):
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         raise ValueError("actions_timestamp_invalid") from None
-    if parsed.utcoffset() is None or parsed.utcoffset().total_seconds() != 0:
+    offset = parsed.utcoffset()
+    if offset is None or offset.total_seconds() != 0:
         raise ValueError("actions_timestamp_invalid")
     if parsed.microsecond and not floor:
         raise ValueError("actions_timestamp_invalid")

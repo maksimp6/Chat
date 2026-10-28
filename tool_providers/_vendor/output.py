@@ -8,6 +8,7 @@ import os
 import selectors
 import subprocess
 import time
+from typing import IO, cast
 
 
 def limit_output(value: str | bytes | None, max_bytes: int = 1048576) -> str:
@@ -34,7 +35,7 @@ def newline_text(value: bytes) -> str:
 
 
 def read_output(
-    proc: subprocess.Popen, timeout: float, limit: int
+    proc: subprocess.Popen[bytes], timeout: float, limit: int
 ) -> tuple[bytes, bytes]:
     """Read stdout and stderr to the end and wait for the process, keeping the first ``limit`` bytes of each.
 
@@ -45,8 +46,11 @@ def read_output(
     """
     if os.name != "posix":
         return proc.communicate(timeout=timeout)
+    # Callers open both pipes; the contract above reads stdout and stderr.
+    stdout_pipe = cast("IO[bytes]", proc.stdout)
+    stderr_pipe = cast("IO[bytes]", proc.stderr)
     deadline = time.monotonic() + timeout
-    kept = {proc.stdout.fileno(): bytearray(), proc.stderr.fileno(): bytearray()}
+    kept = {stdout_pipe.fileno(): bytearray(), stderr_pipe.fileno(): bytearray()}
     with selectors.DefaultSelector() as selector:
         for fd in kept:
             selector.register(fd, selectors.EVENT_READ)
@@ -58,8 +62,8 @@ def read_output(
                 buffer = kept[key.fd]
                 buffer += chunk[: max(0, limit - len(buffer))]
         timed_out = bool(selector.get_map())
-    stdout = bytes(kept[proc.stdout.fileno()])
-    stderr = bytes(kept[proc.stderr.fileno()])
+    stdout = bytes(kept[stdout_pipe.fileno()])
+    stderr = bytes(kept[stderr_pipe.fileno()])
     if not timed_out:
         try:
             proc.wait(timeout=max(0.0, deadline - time.monotonic()))
