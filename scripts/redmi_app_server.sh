@@ -211,7 +211,7 @@ if [[ $action == deploy ]]; then
       echo 'Automatic deployment accepts only this repository develop branch' >&2; exit 2;
     }
   fi
-  [[ $(git -C "$app" config --get remote.origin.url) == https://github.com/maksimp6/Chat.git ]] || {
+  [[ $(git -C "$app" config --get remote.origin.url) =~ ^https://github\.com/maksimp6/Chat(\.git)?/?$ ]] || {
     echo 'Unexpected application repository remote' >&2; exit 1;
   }
   [[ -z $(git -C "$app" status --porcelain --untracked-files=no) ]] || {
