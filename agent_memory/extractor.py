@@ -41,11 +41,6 @@ MEMORY_SCHEMA = {
 }
 
 
-def init_global_memory() -> None:
-    """Open the native journal. There is no SQL schema to initialize."""
-    get_memory_client(memory_file_path())
-
-
 def list_global_memory_facts() -> list[dict[str, Any]]:
     """Return detached facts, most recent first, with stable tie ordering."""
     raw = get_memory_client(memory_file_path()).items(prefix=_FACT_PREFIX)

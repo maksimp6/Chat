@@ -127,10 +127,6 @@ class BrowserAction:
     target: str
     value: str | None = None
 
-    def to_arguments(self) -> dict[str, Any]:
-        return {"action": self.action, "target": self.target, "value": self.value}
-
-
 def validate_browser_action(action: BrowserAction) -> list[str]:
     contract = BROWSER_CAPABILITY_CONTRACTS.get(action.capability)
     if contract is None:

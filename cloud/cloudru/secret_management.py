@@ -131,11 +131,6 @@ class CloudRuSecretManagementClient:
                 code="auth_not_configured",
             )
 
-    def _sweep_cache(self, now_monotonic: float | None = None) -> None:
-        """Compatibility hook: plaintext caching is disabled, so only clear stale state."""
-        del now_monotonic
-        self._value_cache.clear()
-
     def invalidate_cache(self, secret_id: str | None = None) -> None:
         """Compatibility hook for callers from the former plaintext-cache implementation."""
         del secret_id

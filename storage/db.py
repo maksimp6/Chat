@@ -256,10 +256,6 @@ def is_provider_pending(conv_id: str) -> bool:
     return bool(record.get("provider_pending"))
 
 
-def init_config_table() -> None:
-    init_db()
-
-
 def get_config(key: str, default: Any = None) -> Any:
     record = get_store().get("config/" + key)
     if record is None:
