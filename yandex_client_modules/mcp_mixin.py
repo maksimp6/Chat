@@ -386,6 +386,10 @@ class YandexMcpMixin:
             )
         if tools or execution_policy is not None:
             ask_params["tools"] = tools
+        if not tools and ask_params.get("tool_choice") == "required":
+            # Nothing to call (every tool switched off): a required call cannot be met.
+            ask_params["tool_choice"] = "auto"
+            note("tool_choice", "tool_choice required released to auto: no tool in this turn")
 
         if trace is not None and isinstance(trace, bound.ExecutionTrace):
             ask_params["execution_trace"] = trace

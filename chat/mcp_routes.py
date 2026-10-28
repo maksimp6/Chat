@@ -388,12 +388,15 @@ def _define_logos_client(base: type) -> type:
                 else {}
             )
 
+            # Owner's rule: the first request of every turn requires a tool call
+            # (the provider gets "auto" when the turn has no tool at all); follow_up
+            # releases it, so the model can answer once it has used a tool.
             response = self._ask_provider(
                 message=message,
                 model_key=model_key,
                 conversation_id=conversation_id,
                 settings_conversation_id=settings_conversation_id,
-                params=params,
+                params={**(params or {}), "tool_choice": "required"},
                 trace=trace,
                 **policy_kwargs,
             )
