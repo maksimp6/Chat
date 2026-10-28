@@ -37,7 +37,8 @@
       '<h3 style="font-size:14px;margin:12px 0 8px;">Встроенные инструменты Yandex AI Studio</h3>',
       UI.chk(
         "tools-ws-en",
-        ws.enabled || false,
+        // An absent setting means on, as the server applies it.
+        ws.enabled !== false,
         "<strong>🌐 Web Search</strong> (поиск в интернете)",
       ),
       '<div style="margin-top:8px;">' +
@@ -48,10 +49,10 @@
             (ws.context_size === "low" ? " selected" : "") +
             ">Low</option>" +
             '<option value="medium"' +
-            (!ws.context_size || ws.context_size === "medium" ? " selected" : "") +
+            (ws.context_size === "medium" ? " selected" : "") +
             ">Medium</option>" +
             '<option value="high"' +
-            (ws.context_size === "high" ? " selected" : "") +
+            (!ws.context_size || ws.context_size === "high" ? " selected" : "") +
             ">High</option>",
         ) +
         "</div>",
@@ -69,15 +70,15 @@
         UI.inp("tools-ws-block", "text", ws.blocked_domains || "", {"placeholder": "example.org"}) +
         "</div>",
       '<hr style="margin:14px 0;border:none;border-top:1px solid var(--m-border,#ddd);">',
-      UI.chk("tools-ci-en", ci.enabled || false, "<strong>🧮 Code Interpreter</strong> (Python)"),
+      UI.chk("tools-ci-en", ci.enabled !== false, "<strong>🧮 Code Interpreter</strong> (Python)"),
       '<hr style="margin:14px 0;border:none;border-top:1px solid var(--m-border,#ddd);">',
       UI.chk(
         "tools-fs-en",
-        fs.enabled || false,
+        fs.enabled !== false,
         "<strong>📚 File Search</strong> (поиск по Vector Store)",
       ),
       '<div style="margin-top:8px;">' +
-        UI.lbl("Vector Store IDs") +
+        UI.lbl("Vector Store IDs (основное хранилище знаний подключено всегда)") +
         UI.inp(
           "tools-fs-vids",
           "text",
@@ -87,7 +88,7 @@
         "</div>",
       '<div style="margin-top:8px;">' +
         UI.lbl("Максимум результатов") +
-        UI.inp("tools-fs-max", "number", fs.max_results || 20, {"min": "1"}) +
+        UI.inp("tools-fs-max", "number", fs.max_results || 50, {"min": "1", "max": "50"}) +
         "</div>",
       '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">Эти инструменты выполняются на стороне Yandex AI Studio. Они независимы от MCP и локального Tool Registry.</div>',
       '<div id="tools-status" role="status" style="color:var(--m-danger,#c33);font-size:12px;min-height:16px;"></div>',
@@ -267,9 +268,9 @@
         file_search: {
           enabled: document.getElementById("tools-fs-en").checked,
           vector_store_ids: document.getElementById("tools-fs-vids").value.trim(),
-          max_results: Math.max(
-            1,
-            parseInt(document.getElementById("tools-fs-max").value, 10) || 20,
+          max_results: Math.min(
+            50,
+            Math.max(1, parseInt(document.getElementById("tools-fs-max").value, 10) || 50),
           ),
         },
       };
@@ -370,7 +371,7 @@
     },
     reasoning_effort: {
       id: "set-reasoning", label: "Глубина размышлений", type: "select",
-      displayFallback: "medium", ultraFixed: true,
+      displayFallback: "high", ultraFixed: true,
       choices: [["disabled", "Disabled"], ["low", "Low"], ["medium", "Medium"], ["high", "High"]],
     },
     store: { id: "set-store", label: "Сохранять ответы", type: "checkbox", enabledByDefault: true },
@@ -385,8 +386,9 @@
       choices: [["text", "Обычный текст (Text)"], ["json", "Строгий JSON (json_schema)"]],
     },
     text_verbosity: {
-      id: "set-verbosity", label: "Детализация (Verbosity)", type: "select",
-      choices: [["medium", "Medium"], ["concise", "Concise"], ["verbose", "Verbose"]],
+      id: "set-verbosity", label: "Детализация (Verbosity)", type: "select", displayFallback: "high",
+      // The provider accepts low, medium and high (request_builder validation).
+      choices: [["low", "Low"], ["medium", "Medium"], ["high", "High"]],
     },
     json_schema_name: {
       id: "set-js-name", label: "Название схемы", type: "text", read: "trim",

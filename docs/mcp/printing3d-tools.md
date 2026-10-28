@@ -89,11 +89,14 @@ Hosted Yandex `web_search` теперь opt-out:
 
 - если `tools_config.web_search` отсутствует, search tool доступен;
 - `tools_config.web_search.enabled=false` явно отключает его;
-- default `search_context_size` — `medium`;
+- default `search_context_size` — `high`;
 - `allowed_domains` и `blocked_domains` сохраняются;
 - `tool_choice=auto` не изменён, поэтому наличие search tool не означает поиск
   на каждом turn;
-- `file_search` и `code_interpreter` не становятся включёнными по умолчанию.
+- `file_search` и `code_interpreter` тоже opt-out: включены, пока диалог их явно
+  не отключил. File Search всегда ищет в основном хранилище знаний
+  (`LOGOS_VECTOR_STORE_IDS`, по умолчанию `fvtvp6t2su0g5q4ft2ev`) и в хранилищах,
+  указанных в диалоге, до 50 результатов.
 
 Это позволяет Logos сначала самому добывать публичные цены/условия, а затем
 передавать найденные значения в `printing3d.finance.assess`.

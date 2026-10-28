@@ -179,6 +179,7 @@ def _chat():
     from economy.billing import settle_billing_to_treasury
     from invocation.manager import start_invocation
     from observability.trace_manager import traced_operation
+    from yandex_client_modules.tool_config import upgrade_dialog_settings
     from provider_accounts.model_discovery import validate_dialog_model
     from yandex_client_modules.request_builder import validate_generation_params
 
@@ -263,6 +264,7 @@ def _chat():
         settle_billing_to_treasury=settle_billing_to_treasury,
         start_invocation=start_invocation,
         traced_operation=traced_operation,
+        upgrade_dialog_settings=upgrade_dialog_settings,
         validate_dialog_model=validate_dialog_model,
         validate_generation_params=validate_generation_params,
     )
@@ -313,6 +315,7 @@ def _conversations():
     from storage.records import save_conv_settings
     from storage.records import update_conversation_model
     from storage.records import update_conversation_title
+    from yandex_client_modules.tool_config import upgrade_dialog_settings
     from provider_accounts.model_discovery import validate_dialog_model
     from yandex_client_modules.request_builder import validate_generation_params
 
@@ -329,6 +332,7 @@ def _conversations():
         save_conv_settings=save_conv_settings,
         update_conversation_model=update_conversation_model,
         update_conversation_title=update_conversation_title,
+        upgrade_dialog_settings=upgrade_dialog_settings,
         validate_dialog_model=validate_dialog_model,
         validate_generation_params=validate_generation_params,
     )

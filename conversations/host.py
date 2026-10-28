@@ -31,6 +31,9 @@ class Host:
     save_conv_settings: Any  # storage.records.save_conv_settings
     update_conversation_model: Any  # storage.records.update_conversation_model
     update_conversation_title: Any  # storage.records.update_conversation_title
+    upgrade_dialog_settings: (
+        Any  # yandex_client_modules.tool_config.upgrade_dialog_settings
+    )
     validate_dialog_model: (
         Any  # provider_accounts.model_discovery.validate_dialog_model
     )
@@ -62,6 +65,7 @@ __all__ = [
     "save_conv_settings",
     "update_conversation_model",
     "update_conversation_title",
+    "upgrade_dialog_settings",
     "validate_dialog_model",
     "validate_generation_params",
 ]
@@ -105,6 +109,10 @@ def update_conversation_model(*args: Any, **kwargs: Any) -> Any:
 
 def update_conversation_title(*args: Any, **kwargs: Any) -> Any:
     return current().update_conversation_title(*args, **kwargs)
+
+
+def upgrade_dialog_settings(*args: Any, **kwargs: Any) -> Any:
+    return current().upgrade_dialog_settings(*args, **kwargs)
 
 
 def validate_dialog_model(*args: Any, **kwargs: Any) -> Any:

@@ -14,6 +14,7 @@ from conversations.host import (
     save_conv_settings,
     update_conversation_model,
     update_conversation_title,
+    upgrade_dialog_settings,
     validate_dialog_model,
     validate_generation_params,
 )
@@ -84,7 +85,8 @@ def get_dialog_settings(conv_id):
     owner_id = get_current_owner_id(required=False)
     if not owner_id or not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
-    return jsonify(get_conv_settings(conv_id) or {})
+    # Settings saved before the maximal defaults are shown as they are applied.
+    return jsonify(upgrade_dialog_settings(get_conv_settings(conv_id) or {}))
 
 
 def save_dialog_settings(conv_id):
@@ -115,7 +117,7 @@ def save_dialog_settings(conv_id):
             return jsonify({"error": str(exc)}), 400
     if "active_tool_categories" not in settings:
         # Tool selection is saved by PUT /tools; a settings save must not drop it.
-        stored = get_conv_settings(conv_id) or {}
+        stored = upgrade_dialog_settings(get_conv_settings(conv_id) or {})
         if "active_tool_categories" in stored:
             settings["active_tool_categories"] = stored["active_tool_categories"]
     save_conv_settings(conv_id, settings)

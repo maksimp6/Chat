@@ -51,6 +51,7 @@ from chat.host import (
     record_yandex_mcp_activity,
     reset_current_trace,
     save_conv_settings,
+    upgrade_dialog_settings,
     set_owner,
     set_yandex_conversation,
     settle_billing_to_treasury,
@@ -1271,12 +1272,13 @@ def conv_tools(conv_id):
         categories = _tool_category_selection(data.get("active_tool_categories", []))
         if categories is None:
             return jsonify(error_body("invalid_tool_categories")), 400
-        settings = get_conv_settings(conv_id) or {}
+        # The record is stored as it is applied, so this explicit choice outlives the upgrade.
+        settings = upgrade_dialog_settings(get_conv_settings(conv_id) or {})
         settings["active_tool_categories"] = categories
         save_conv_settings(conv_id, settings)
         return jsonify({"status": "ok", "active_tool_categories": categories})
 
-    settings = get_conv_settings(conv_id) or {}
+    settings = upgrade_dialog_settings(get_conv_settings(conv_id) or {})
     cats = settings.get("active_tool_categories")
     if cats is None:
         cats = list(bound.registry.get_available_categories().keys())

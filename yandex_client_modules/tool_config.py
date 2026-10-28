@@ -2,17 +2,89 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from yandex_client_modules._vendor.wikifunctions import clamp_integer
 
+# The provider returns at most 50 File Search results; settings stay at that maximum.
+FILE_SEARCH_MAX_RESULTS = 50
+
+# The owner's knowledge store: the chat's File Search, the repository RAG
+# (scripts/repository_rag.py, scripts/logos_knowledge.py) and the dialog-archive
+# ingest (.github/workflows/redmi9-rag-ingest.yml) all use this one store.
+DEFAULT_VECTOR_STORE_IDS = ("fvtvp6t2su0g5q4ft2ev",)
+
+# Dialog settings saved before this revision carry the old medium/off defaults; they
+# are read as the maximal ones. Later explicit choices carry the revision and stay.
+SETTINGS_REVISION = 2
+
 
 def file_search_max_results(value: Any) -> int:
-    """Keep the provider's 1..50 result range and the existing default of 20."""
+    """Keep the provider's 1..50 result range; no value means the maximum."""
     try:
-        return clamp_integer(1, int(20 if value is None else value), 50)
+        return clamp_integer(
+            1,
+            int(FILE_SEARCH_MAX_RESULTS if value is None else value),
+            FILE_SEARCH_MAX_RESULTS,
+        )
     except (TypeError, ValueError, OverflowError):
-        return 20
+        return FILE_SEARCH_MAX_RESULTS
+
+
+def knowledge_vector_store_ids() -> list[str]:
+    """The stores every dialog searches: LOGOS_VECTOR_STORE_IDS, else the owner's store."""
+    configured = [
+        part.strip()
+        for part in os.environ.get("LOGOS_VECTOR_STORE_IDS", "").split(",")
+        if part.strip()
+    ]
+    return configured or list(DEFAULT_VECTOR_STORE_IDS)
+
+
+def upgrade_dialog_settings(settings: Any) -> Any:
+    """Read settings saved before SETTINGS_REVISION at the maximal values.
+
+    Old records hold the former defaults (medium reasoning and verbosity, medium
+    search context, 20 File Search results, Code Interpreter off) that nobody chose.
+    Every hosted tool is switched on, every capacity is raised to its maximum, and
+    the record is stamped with the revision, so choices made after it are kept.
+    """
+    if not isinstance(settings, dict):
+        return settings
+    revision = settings.get("settings_revision")
+    if isinstance(revision, int) and not isinstance(revision, bool):
+        if revision >= SETTINGS_REVISION:
+            return settings
+    upgraded = dict(settings)
+    # An old tool selection would hide every category added since: all are on again.
+    upgraded.pop("active_tool_categories", None)
+    if upgraded.get("reasoning_effort") in (None, "low", "medium"):
+        upgraded["reasoning_effort"] = "high"
+    if upgraded.get("text_verbosity") in (None, "low", "medium", "concise", "verbose"):
+        upgraded["text_verbosity"] = "high"
+    if upgraded.get("truncation") == "auto":
+        upgraded["truncation"] = "disabled"
+    if "max_output_tokens" in upgraded:
+        upgraded["max_output_tokens"] = 0
+    if "max_tool_calls" in upgraded:
+        upgraded["max_tool_calls"] = None
+    if "parallel_tool_calls" in upgraded:
+        upgraded["parallel_tool_calls"] = True
+    tools = upgraded.get("tools_config")
+    tools = dict(tools) if isinstance(tools, dict) else {}
+    web = dict(tools.get("web_search") or {})
+    web["enabled"] = True
+    web["context_size"] = "high"
+    tools["web_search"] = web
+    tools["code_interpreter"] = {**dict(tools.get("code_interpreter") or {}), "enabled": True}
+    files = dict(tools.get("file_search") or {})
+    files["enabled"] = True
+    files["max_results"] = FILE_SEARCH_MAX_RESULTS
+    tools["file_search"] = files
+    upgraded["tools_config"] = tools
+    upgraded["settings_revision"] = SETTINGS_REVISION
+    return upgraded
 
 
 # WIKIFUNCTIONS-CANDIDATE WF-03: https://www.wikifunctions.org/wiki/Z10079 + Z10047.

@@ -118,6 +118,9 @@ class Host:
     settle_billing_to_treasury: Any  # economy.billing.settle_billing_to_treasury
     start_invocation: Any  # invocation.manager.start_invocation
     traced_operation: Any  # observability.trace_manager.traced_operation
+    upgrade_dialog_settings: (
+        Any  # yandex_client_modules.tool_config.upgrade_dialog_settings
+    )
     validate_dialog_model: (
         Any  # provider_accounts.model_discovery.validate_dialog_model
     )
@@ -186,6 +189,7 @@ __all__ = [
     "settle_billing_to_treasury",
     "start_invocation",
     "traced_operation",
+    "upgrade_dialog_settings",
     "validate_dialog_model",
     "validate_generation_params",
 ]
@@ -373,6 +377,10 @@ def settle_billing_to_treasury(*args: Any, **kwargs: Any) -> Any:
 
 def start_invocation(*args: Any, **kwargs: Any) -> Any:
     return current().start_invocation(*args, **kwargs)
+
+
+def upgrade_dialog_settings(*args: Any, **kwargs: Any) -> Any:
+    return current().upgrade_dialog_settings(*args, **kwargs)
 
 
 def validate_dialog_model(*args: Any, **kwargs: Any) -> Any:

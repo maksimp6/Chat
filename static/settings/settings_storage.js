@@ -17,9 +17,9 @@
     prompt_cache_key: "",
     service_tier: "auto",
     top_logprobs: 0,
-    reasoning_effort: "medium",
+    reasoning_effort: "high",
     text_format: "text",
-    text_verbosity: "medium",
+    text_verbosity: "high",
     json_schema_name: "response",
     json_schema:
       '{"type":"object","properties":{"result":{"type":"string"}},"required":["result"],"additionalProperties":false}',
@@ -33,13 +33,15 @@
     tools_config: {
       web_search: {
         enabled: true,
-        context_size: "medium",
+        context_size: "high",
         allowed_domains: "",
         blocked_domains: "",
       },
-      code_interpreter: { enabled: false },
-      file_search: { enabled: true, vector_store_ids: "fvtvp6t2su0g5q4ft2ev", max_results: 20 },
+      code_interpreter: { enabled: true },
+      file_search: { enabled: true, vector_store_ids: "fvtvp6t2su0g5q4ft2ev", max_results: 50 },
     },
+    // Matches yandex_client_modules.tool_config.SETTINGS_REVISION.
+    settings_revision: 2,
     conv_metadata: "",
     voice: "kirill",
     response_mode: "audio",
@@ -48,6 +50,35 @@
     vad_silence_duration_ms: 500,
     vad_prefix_padding_ms: 300,
   };
+
+  var SETTINGS_REVISION = 2;
+
+  // Copies saved before SETTINGS_REVISION hold the former medium/off defaults nobody chose:
+  // they are read at the maximal values, as the server reads them
+  // (yandex_client_modules.tool_config.upgrade_dialog_settings).
+  function upgradeLegacySettings(settings) {
+    if (!settings || typeof settings !== "object") return settings;
+    if (typeof settings.settings_revision === "number" && settings.settings_revision >= SETTINGS_REVISION) {
+      return settings;
+    }
+    if (settings.reasoning_effort === undefined || settings.reasoning_effort === "low" || settings.reasoning_effort === "medium") {
+      settings.reasoning_effort = "high";
+    }
+    if (["low", "medium", "concise", "verbose", undefined].indexOf(settings.text_verbosity) !== -1) {
+      settings.text_verbosity = "high";
+    }
+    if (settings.truncation === "auto") settings.truncation = "disabled";
+    if ("max_output_tokens" in settings) settings.max_output_tokens = 0;
+    if ("max_tool_calls" in settings) settings.max_tool_calls = null;
+    if ("parallel_tool_calls" in settings) settings.parallel_tool_calls = true;
+    var tools = settings.tools_config && typeof settings.tools_config === "object" ? settings.tools_config : {};
+    tools.web_search = Object.assign({}, tools.web_search || {}, { enabled: true, context_size: "high" });
+    tools.code_interpreter = Object.assign({}, tools.code_interpreter || {}, { enabled: true });
+    tools.file_search = Object.assign({}, tools.file_search || {}, { enabled: true, max_results: 50 });
+    settings.tools_config = tools;
+    settings.settings_revision = SETTINGS_REVISION;
+    return settings;
+  }
 
   var STORAGE_KEY = "logos_settings";
   var SKILLS_BACKUP_KEY = "logos_skills_backup";
@@ -107,12 +138,12 @@
         global = localStorage.getItem(STORAGE_KEY);
         globalSettingsCache = global || "";
       }
-      if (global) base = window.SettingsUI.deepMerge(base, JSON.parse(global));
+      if (global) base = window.SettingsUI.deepMerge(base, upgradeLegacySettings(JSON.parse(global)));
     } catch (e) {}
     if (convId) {
       try {
         var conv = localStorage.getItem(convKey(convId));
-        if (conv) base = window.SettingsUI.deepMerge(base, JSON.parse(conv));
+        if (conv) base = window.SettingsUI.deepMerge(base, upgradeLegacySettings(JSON.parse(conv)));
       } catch (e) {}
     }
     return applyUltraSettings(base);
@@ -171,10 +202,10 @@
         global = localStorage.getItem(STORAGE_KEY);
         globalSettingsCache = global || "";
       }
-      if (global) base = window.SettingsUI.deepMerge(base, JSON.parse(global));
+      if (global) base = window.SettingsUI.deepMerge(base, upgradeLegacySettings(JSON.parse(global)));
     } catch (e) {}
     if (data && Object.keys(data).length > 0) {
-      base = window.SettingsUI.deepMerge(base, data);
+      base = window.SettingsUI.deepMerge(base, upgradeLegacySettings(data));
     }
     return applyUltraSettings(base);
   }
@@ -235,6 +266,8 @@
     DEFAULTS: DEFAULTS,
     STORAGE_KEY: STORAGE_KEY,
     SKILLS_BACKUP_KEY: SKILLS_BACKUP_KEY,
+    SETTINGS_REVISION: SETTINGS_REVISION,
+    upgradeLegacySettings: upgradeLegacySettings,
     ultraProfileFor: ultraProfileFor,
     applyUltraSettings: applyUltraSettings,
     load: load,

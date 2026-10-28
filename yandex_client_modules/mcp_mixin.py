@@ -8,7 +8,9 @@ from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_fo
 from yandex_client_modules.api_logger import api_logger
 from yandex_client_modules.tool_config import (
     file_search_max_results,
+    knowledge_vector_store_ids,
     normalize_tools_config,
+    upgrade_dialog_settings,
 )
 from yandex_client_modules.host import (
     bound,
@@ -222,7 +224,7 @@ class YandexMcpMixin:
         active_cats = None
         if settings_id:
             try:
-                preferences = get_conv_settings(settings_id) or {}
+                preferences = upgrade_dialog_settings(get_conv_settings(settings_id) or {})
                 active_cats = preferences.get("active_tool_categories")
             except Exception:
                 active_cats = None
@@ -243,6 +245,8 @@ class YandexMcpMixin:
             conv_settings = {}
         if not isinstance(conv_settings, dict):
             raise ValueError("Conversation settings must be a JSON object")
+        if conv_settings:
+            conv_settings = upgrade_dialog_settings(conv_settings)
         raw_tools_config = conv_settings.get(
             "tools_config", params.get("tools_config", {})
         )
@@ -254,7 +258,7 @@ class YandexMcpMixin:
         if web_enabled:
             web_tool = {
                 "type": "web_search",
-                "search_context_size": web_cfg.get("context_size") or "medium",
+                "search_context_size": web_cfg.get("context_size") or "high",
             }
             allowed_domains = list(web_cfg.get("allowed_domains", []))
             blocked_domains = list(web_cfg.get("blocked_domains", []))
@@ -291,23 +295,31 @@ class YandexMcpMixin:
                     web_tool["filters"]["blocked_domains"] = blocked_domains
             hosted_tools.append(web_tool)
 
-        file_cfg = tools_config.get("file_search") or {}
-        if file_cfg.get("enabled"):
-            vector_store_ids = file_cfg.get("vector_store_ids", [])
-            if vector_store_ids:
-                hosted_tools.append(
-                    {
-                        "type": "file_search",
-                        "vector_store_ids": vector_store_ids,
-                        "max_num_results": _max_results(file_cfg.get("max_results")),
-                    }
-                )
-
-        file_search_active = bool(
-            file_cfg.get("enabled") and file_cfg.get("vector_store_ids")
+        # Hosted tools are on unless the dialog switched them off, like web search.
+        raw_file_cfg = tools_config.get("file_search")
+        file_cfg = raw_file_cfg or {}
+        file_enabled = True if raw_file_cfg is None else file_cfg.get("enabled", False)
+        # Every dialog searches the owner's knowledge store, plus any store it names.
+        vector_store_ids = list(
+            dict.fromkeys(
+                knowledge_vector_store_ids()
+                + list(file_cfg.get("vector_store_ids") or [])
+            )
         )
-        code_cfg = tools_config.get("code_interpreter") or {}
-        if code_cfg.get("enabled"):
+        if file_enabled:
+            hosted_tools.append(
+                {
+                    "type": "file_search",
+                    "vector_store_ids": vector_store_ids,
+                    "max_num_results": _max_results(file_cfg.get("max_results")),
+                }
+            )
+
+        file_search_active = bool(file_enabled and vector_store_ids)
+        raw_code_cfg = tools_config.get("code_interpreter")
+        code_cfg = raw_code_cfg or {}
+        code_enabled = True if raw_code_cfg is None else code_cfg.get("enabled", False)
+        if code_enabled:
             hosted_tools.append(
                 {"type": "code_interpreter", "container": {"type": "auto"}}
             )
