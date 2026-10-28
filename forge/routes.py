@@ -2,10 +2,10 @@
 
 from flask import Blueprint, jsonify, request
 
-from economy.treasury_identity import get_current_owner_id
 
 from forge.binding import printing_store as _store
 from printing3d import finance, service
+from forge.host import get_current_owner_id
 
 printing3d_bp = Blueprint("printing3d", __name__, url_prefix="/api/3d")
 

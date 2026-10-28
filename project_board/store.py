@@ -16,8 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from threading import RLock
 from typing import Any, Self
-
-from memory_engine import MemoryStore, StoreError
+from project_board.host import bound
 
 
 class BoardError(ValueError):
@@ -88,8 +87,8 @@ class _EventJournal:
     def __init__(self, path: Path) -> None:
         _drop_torn_tail(path)
         try:
-            self._store = MemoryStore(path)
-        except StoreError as exc:
+            self._store = bound.MemoryStore(path)
+        except bound.StoreError as exc:
             raise BoardUnavailable("event journal cannot be opened") from exc
 
     @property
@@ -106,7 +105,7 @@ class _EventJournal:
         try:
             with self._store.transaction() as tx:
                 tx.set(key, value)
-        except StoreError as exc:
+        except bound.StoreError as exc:
             raise FileMemoryError("event journal write failed") from exc
         return self.sequence
 

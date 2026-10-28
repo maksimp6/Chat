@@ -9,10 +9,14 @@ from __future__ import annotations
 from threading import RLock
 import time
 from typing import Optional, TypedDict
+from typing import Any
+from conversations.host import (
+    bound,
+    get_conversations,
+    get_memory_client,
+    memory_file_path,
+)
 
-from agent_memory.conversation_ownership_store import ConversationOwnershipStore
-from agent_memory.client import get_memory_client
-from storage.db import get_conversations, memory_file_path
 
 _OWNERSHIP_LOCK = RLock()
 
@@ -39,8 +43,8 @@ def _conversation_rows() -> list[ConversationView]:
     ]
 
 
-def _store() -> ConversationOwnershipStore:
-    return ConversationOwnershipStore(get_memory_client(memory_file_path()))
+def _store() -> Any:
+    return bound.ConversationOwnershipStore(get_memory_client(memory_file_path()))
 
 
 def init_conversation_ownership_table() -> None:

@@ -127,4 +127,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    from composition import wiring
+
+    wiring.register_all()
     raise SystemExit(main())

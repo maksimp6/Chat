@@ -18,7 +18,7 @@ from typing import Optional
 import requests
 
 from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
-from observability.trace_manager import get_current_trace
+from cloud.host import get_current_trace
 
 
 class CloudRuApiKeyProvider:

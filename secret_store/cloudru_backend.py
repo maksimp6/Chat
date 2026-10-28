@@ -8,8 +8,6 @@ preserved by delegation rather than reimplementation.
 
 from __future__ import annotations
 
-from cloud.base import CloudProviderError
-from cloud.cloudru.secret_management import CloudRuSecretManagementClient
 from secret_store.contract import (
     AUTH_FAILED,
     AUTH_NOT_CONFIGURED,
@@ -20,6 +18,8 @@ from secret_store.contract import (
     SecretReference,
     SecretResolverError,
 )
+from typing import Any
+from secret_store.host import bound
 
 # Map Cloud.ru-specific error codes to the canonical contract codes.
 # Keys are the ``code=`` values raised by CloudRuSecretManagementClient.
@@ -46,8 +46,8 @@ class CloudRuSecretBackend:
     exception hierarchy.
     """
 
-    def __init__(self, client: CloudRuSecretManagementClient | None = None) -> None:
-        self._client = client or CloudRuSecretManagementClient()
+    def __init__(self, client: Any | None = None) -> None:
+        self._client = client or bound.CloudRuSecretManagementClient()
 
     def resolve(self, reference: SecretReference) -> str:
         """Delegate to the Cloud.ru client; translate errors to the contract type."""
@@ -55,7 +55,7 @@ class CloudRuSecretBackend:
             return self._client.get_secret_value(
                 reference.secret_id, reference.version_id
             )
-        except CloudProviderError as exc:
+        except bound.CloudProviderError as exc:
             normalized = _CLOUDRU_CODE_MAP.get(exc.code, PROVIDER_UNAVAILABLE)
             raise SecretResolverError(
                 code=normalized,

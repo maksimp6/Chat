@@ -6,19 +6,20 @@ path, use transactions for concurrent mutations, and close at runtime shutdown.
 
 from pathlib import Path
 from threading import RLock
+from typing import Any
+from agent_memory.host import bound
 
-from kristall import Kristall
 
 _LOCK = RLock()
-_CLIENTS: dict[Path, Kristall] = {}
+_CLIENTS: dict[Path, Any] = {}
 
 
-def get_memory_client(path: str | Path) -> Kristall:
+def get_memory_client(path: str | Path) -> Any:
     resolved = Path(path).expanduser().resolve()
     with _LOCK:
         client = _CLIENTS.get(resolved)
         if client is None:
-            client = Kristall(resolved)
+            client = bound.kristall_Kristall(resolved)
             _CLIENTS[resolved] = client
         return client
 

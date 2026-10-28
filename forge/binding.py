@@ -1,7 +1,7 @@
 """Binds the 3D-printing domain to Logos storage and identity."""
 
 from printing3d.store import PrintStore
-from storage.db import get_store
+from forge.host import get_store
 
 
 def printing_store() -> PrintStore:

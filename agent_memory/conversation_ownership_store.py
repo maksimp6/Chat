@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from typing import TypedDict
+from typing import Any
 
-from kristall.store import Kristall
 
 OWNER_PREFIX = "conversation_owner:"
 
@@ -15,7 +15,7 @@ class OwnershipRecord(TypedDict):
 
 
 class ConversationOwnershipStore:
-    def __init__(self, db: Kristall) -> None:
+    def __init__(self, db: Any) -> None:
         self.db = db
 
     @staticmethod

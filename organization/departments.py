@@ -6,8 +6,7 @@ from typing import Any, Mapping, Optional
 from uuid import uuid4
 from flask import Blueprint, jsonify, request
 import time
-from storage.db import get_store
-from sessions.manager import create_session, get_session
+from organization.host import create_session, get_session, get_store
 
 departments_bp = Blueprint("departments", __name__, url_prefix="/api/departments")
 _DEPT_ID_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789-_"

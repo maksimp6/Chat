@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Mapping, Protocol
+from storage.host import bound
 
 
 class StorageError(RuntimeError):
@@ -64,6 +65,10 @@ def _safe_relative_path(value: str, *, allow_empty: bool = False) -> PurePosixPa
     ):
         raise StorageError("Invalid storage object name")
     return path
+
+
+# Public name for units that implement this contract (cloud object storage).
+safe_relative_path = _safe_relative_path
 
 
 class LocalDirectoryStorage:
@@ -142,7 +147,5 @@ def storage_provider_from_env(
         )
         return LocalDirectoryStorage(root)
     if name == "cloudru":
-        from cloud.cloudru.object_storage import CloudRuObjectStorage
-
-        return CloudRuObjectStorage.from_env(env)
+        return bound.CloudRuObjectStorage.from_env(env)
     raise StorageProviderUnavailable("Storage provider is not configured")

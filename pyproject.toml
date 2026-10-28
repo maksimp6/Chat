@@ -12,6 +12,10 @@ target-version = "py312"
 line-length = 88
 extend-exclude = ["docs/mirrors", "datasets"]
 
+[tool.ruff.lint.per-file-ignores]
+# The web root loads the environment and registers unit hosts before importing units.
+"app.py" = ["E402"]
+
 [tool.ruff.format]
 quote-style = "double"
 # Sources whose exact bytes are pinned elsewhere must never be reformatted:
@@ -36,11 +40,17 @@ exclude = ["^docs/mirrors/", "^datasets/"]
 [tool.logos.independence]
 roots = ["app.py", "composition/"]
 entry-blocks = [
+    "agent_memory/extractor.py",
+    "project_board/seed.py",
+    "project_board/server.py",
     "agent_runtime/issue_runner.py",
     "agent_shell/__main__.py",
     "scripts/logos_dialogue.py",
+    "scripts/logos_tool_probe.py",
+    "scripts/rotate_provider_key.py",
+    "scripts/rotate_cloudru_provider_key.py",
 ]
-embedded-programs = []
+embedded-programs = ["scripts/redmi_candidate_tools_check.py"]
 standalone-downloads = [
     "scripts/redmi_app_launcher.py",
     "scripts/redmi_wifi_probe.py",
@@ -200,4 +210,21 @@ copies = [
     "forge/_vendor/schema.py",
     "model_editor/_vendor/schema.py",
     "organization/_vendor/schema.py",
+]
+
+[[tool.logos.vendored]]
+canonical = "core/host_binding.py"
+copies = [
+    "agent_memory/_binding.py",
+    "cloud/_binding.py",
+    "conversations/_binding.py",
+    "forge/_binding.py",
+    "model_editor/_binding.py",
+    "organization/_binding.py",
+    "plugin_system/_binding.py",
+    "project_board/_binding.py",
+    "secret_store/_binding.py",
+    "sessions/_binding.py",
+    "storage/_binding.py",
+    "workspace/_binding.py",
 ]

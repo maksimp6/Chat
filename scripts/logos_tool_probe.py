@@ -29,6 +29,9 @@ PROBE_ERRORS = (
 )
 
 if __name__ == "__main__":
+    from composition import wiring
+
+    wiring.register_all()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--external",

@@ -6,10 +6,9 @@ import time
 from typing import Any
 
 from agent_memory.client import get_memory_client
-from storage.db import memory_file_path
-from kristall.store import Kristall
 
 from agent_memory.models import MemoryLookup, MemoryRecord
+from agent_memory.host import memory_file_path
 
 
 _MEMORY_PREFIX = "agent_memory:"
@@ -18,7 +17,7 @@ _MEMORY_PREFIX = "agent_memory:"
 class AgentMemoryStore:
     """Persist validated records as independent native Kristall journal keys."""
 
-    def __init__(self, store: Kristall | None = None) -> None:
+    def __init__(self, store: Any | None = None) -> None:
         self._store = (
             store if store is not None else get_memory_client(memory_file_path())
         )

@@ -18,15 +18,8 @@ from typing import Any, Callable, Mapping
 from urllib.parse import quote, urlsplit
 
 import requests
+from cloud.host import bound
 
-from storage.contracts import (
-    StorageCredentialsMissing,
-    StorageError,
-    StorageObject,
-    StorageObjectNotFound,
-    StorageProviderUnavailable,
-    _safe_relative_path,
-)
 
 DEFAULT_ENDPOINT = "https://s3.cloud.ru"
 DEFAULT_REGION = "ru-central-1"
@@ -70,7 +63,9 @@ def _coerce_credentials(credentials: object | None) -> S3Credentials:
         )
         if resolved is not None:
             return resolved
-    raise StorageCredentialsMissing("Storage provider credentials are not configured")
+    raise bound.StorageCredentialsMissing(
+        "Storage provider credentials are not configured"
+    )
 
 
 def _hmac(key: bytes, message: str) -> bytes:
@@ -171,11 +166,11 @@ class CloudRuObjectStorage:
     ) -> None:
         bucket = str(bucket or "").strip()
         if not bucket or "/" in bucket:
-            raise StorageProviderUnavailable("Storage provider is not configured")
+            raise bound.StorageProviderUnavailable("Storage provider is not configured")
         self._bucket = bucket
         self._endpoint = (str(endpoint or "").strip() or DEFAULT_ENDPOINT).rstrip("/")
         self._region = str(region or "").strip() or DEFAULT_REGION
-        base = _safe_relative_path(prefix, allow_empty=True)
+        base = bound._safe_relative_path(prefix, allow_empty=True)
         self._prefix = "" if base == PurePosixPath(".") else base.as_posix()
         self._session = session or requests.Session()
         self._timeout = timeout
@@ -195,7 +190,7 @@ class CloudRuObjectStorage:
         )
 
     def _key(self, object_id: str) -> tuple[PurePosixPath, str]:
-        relative = _safe_relative_path(object_id)
+        relative = bound._safe_relative_path(object_id)
         key = relative.as_posix()
         return relative, f"{self._prefix}/{key}" if self._prefix else key
 
@@ -233,24 +228,24 @@ class CloudRuObjectStorage:
             )
         except requests.RequestException:
             # ``from None``: request exceptions may echo URLs or headers into tracebacks.
-            raise StorageProviderUnavailable(
+            raise bound.StorageProviderUnavailable(
                 "Storage provider is unavailable"
             ) from None
         status = int(response.status_code)
         if status == 404:
-            raise StorageObjectNotFound("Storage object was not found")
+            raise bound.StorageObjectNotFound("Storage object was not found")
         if status in _CREDENTIAL_ERRORS:
-            raise StorageCredentialsMissing(
+            raise bound.StorageCredentialsMissing(
                 "Storage provider credentials were rejected"
             )
         if status >= 500:
-            raise StorageProviderUnavailable("Storage provider is unavailable")
+            raise bound.StorageProviderUnavailable("Storage provider is unavailable")
         if status >= 300:
-            raise StorageError("Storage provider operation failed")
+            raise bound.StorageError("Storage provider operation failed")
         return response
 
-    def _object(self, relative: PurePosixPath, key: str, size: int) -> StorageObject:
-        return StorageObject(
+    def _object(self, relative: PurePosixPath, key: str, size: int) -> Any:
+        return bound.StorageObject(
             provider=self.name,
             object_id=relative.as_posix(),
             name=relative.name,
@@ -260,7 +255,7 @@ class CloudRuObjectStorage:
 
     def upload(
         self, object_id: str, content: bytes, *, credentials: object | None
-    ) -> StorageObject:
+    ) -> Any:
         relative, key = self._key(object_id)
         data = bytes(content)
         self._request("PUT", key=key, body=data, credentials=credentials)
@@ -270,14 +265,12 @@ class CloudRuObjectStorage:
         _, key = self._key(object_id)
         return bytes(self._request("GET", key=key, credentials=credentials).content)
 
-    def list(
-        self, prefix: str = "", *, credentials: object | None
-    ) -> list[StorageObject]:
-        relative = _safe_relative_path(prefix, allow_empty=True)
+    def list(self, prefix: str = "", *, credentials: object | None) -> list[Any]:
+        relative = bound._safe_relative_path(prefix, allow_empty=True)
         wanted = "" if relative == PurePosixPath(".") else relative.as_posix()
         root = f"{self._prefix}/" if self._prefix else ""
         search = root + wanted
-        objects: list[StorageObject] = []
+        objects: list[Any] = []
         token = ""
         while True:
             query = {"list-type": "2", "prefix": search}
@@ -287,7 +280,7 @@ class CloudRuObjectStorage:
             try:
                 tree = ET.fromstring(response.content)
             except ET.ParseError:
-                raise StorageError("Storage provider operation failed") from None
+                raise bound.StorageError("Storage provider operation failed") from None
             for item in tree:
                 if _local_name(item.tag) != "Contents":
                     continue
@@ -302,22 +295,24 @@ class CloudRuObjectStorage:
                 ):
                     continue
                 try:
-                    relative = _safe_relative_path(object_id)
-                except StorageError:
+                    relative = bound._safe_relative_path(object_id)
+                except bound.StorageError:
                     continue  # keys like ``../x`` are not addressable through this contract
                 if relative.as_posix() != object_id:
                     continue
                 try:
                     size = int(_child_text(item, "Size") or 0)
                 except ValueError:
-                    raise StorageError("Storage provider operation failed") from None
+                    raise bound.StorageError(
+                        "Storage provider operation failed"
+                    ) from None
                 objects.append(self._object(relative, key, size))
             if _child_text(tree, "IsTruncated").lower() != "true":
                 break
             token = _child_text(tree, "NextContinuationToken")
             if not token:
                 # A truncated page without a token would silently drop objects.
-                raise StorageError("Storage provider operation failed")
+                raise bound.StorageError("Storage provider operation failed")
         return sorted(objects, key=lambda item: item.object_id)
 
 

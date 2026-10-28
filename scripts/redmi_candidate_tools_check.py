@@ -121,6 +121,8 @@ def isolated_state(repo, private, production, executable, env):
     # browser recording. Keep the existing credential and quota unchanged.
     program = r"""
 import os, pathlib, sys
+from composition import wiring
+wiring.register_all()
 from kristall import Kristall
 from provider_accounts.credentials import get_active_credential
 from secret_store.credential_crypto import decrypt_secret
@@ -361,6 +363,8 @@ def replay_previous_run(run_id, repo, private, executable, env):
     )
     program = r"""
 import hashlib, json, pathlib, re, sys
+from composition import wiring
+wiring.register_all()
 from agent_memory.client import close_memory_clients
 from storage.db import get_store, get_messages
 from invocation.manager import get_invocation

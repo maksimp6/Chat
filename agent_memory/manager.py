@@ -6,8 +6,8 @@ from copy import deepcopy
 from typing import Any
 
 from agent_memory.client import get_memory_client
-from storage.db import memory_file_path
 from agent_memory.extractor import list_global_memory_facts
+from agent_memory.host import memory_file_path
 
 _MEMORY_CONFIG_KEY = "global_memory_config"
 DEFAULT_CONFIG = {

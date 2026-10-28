@@ -5,9 +5,7 @@ import logging
 import re
 from urllib.parse import quote
 from flask import Blueprint, request, jsonify, Response
-from core.config import Config
-from yandex_client_modules.client import YandexResponsesClient
-from yandex_client_modules.errors import YandexClientError
+from workspace.host import bound
 
 logger = logging.getLogger("logos.workspace.file_routes")
 file_bp = Blueprint("file_manager", __name__)
@@ -28,7 +26,7 @@ MAX_FILE_SIZE = 128 * 1024 * 1024  # 128 MB
 
 def get_client():
     """Return a request-local Yandex client instead of a process-global Session."""
-    return YandexResponsesClient(Config)
+    return bound.YandexResponsesClient(bound.Config)
 
 
 def _err_response(e):
@@ -63,7 +61,7 @@ def list_files():
         client = get_client()
         data = client.list_files(limit=limit, after=after)
         return jsonify(data)
-    except YandexClientError as e:
+    except bound.YandexClientError as e:
         return _err_response(e)
 
 
@@ -100,7 +98,7 @@ def upload_file():
         result = client.upload_file(file_content, file.filename, purpose=purpose)
         logger.info(f"[FILES] Successfully uploaded: {result.get('id')}")
         return jsonify(result), 201
-    except YandexClientError as e:
+    except bound.YandexClientError as e:
         logger.error(f"[FILES] Yandex API error: {e}")
         return _err_response(e)
     except Exception as e:
@@ -114,7 +112,7 @@ def delete_file(file_id):
         client = get_client()
         result = client.delete_file(file_id)
         return jsonify(result)
-    except YandexClientError as e:
+    except bound.YandexClientError as e:
         return _err_response(e)
 
 
@@ -124,7 +122,7 @@ def get_file_info(file_id):
         client = get_client()
         result = client.retrieve_file(file_id)
         return jsonify(result)
-    except YandexClientError as e:
+    except bound.YandexClientError as e:
         return _err_response(e)
 
 
@@ -140,7 +138,7 @@ def download_file(file_id):
             mimetype="application/octet-stream",
             headers={"Content-Disposition": _content_disposition(filename)},
         )
-    except YandexClientError as e:
+    except bound.YandexClientError as e:
         return _err_response(e)
 
 
@@ -151,7 +149,7 @@ def list_vector_stores():
         client = get_client()
         data = client.list_vector_stores(limit=limit)
         return jsonify(data)
-    except YandexClientError as e:
+    except bound.YandexClientError as e:
         return _err_response(e)
 
 
@@ -175,7 +173,7 @@ def create_vector_store():
             expires_after=expires_after,
         )
         return jsonify(result), 201
-    except YandexClientError as e:
+    except bound.YandexClientError as e:
         return _err_response(e)
 
 
@@ -185,7 +183,7 @@ def delete_vector_store(vs_id):
         client = get_client()
         result = client.delete_vector_store(vs_id)
         return jsonify(result)
-    except YandexClientError as e:
+    except bound.YandexClientError as e:
         return _err_response(e)
 
 
@@ -195,7 +193,7 @@ def get_vector_store(vs_id):
         client = get_client()
         result = client.get_vector_store(vs_id)
         return jsonify(result)
-    except YandexClientError as e:
+    except bound.YandexClientError as e:
         return _err_response(e)
 
 
@@ -207,7 +205,7 @@ def list_vs_files(vs_id):
         client = get_client()
         data = client.list_vs_files(vs_id, limit=limit, filter_status=filter_status)
         return jsonify(data)
-    except YandexClientError as e:
+    except bound.YandexClientError as e:
         return _err_response(e)
 
 
@@ -226,7 +224,7 @@ def add_file_to_vs(vs_id):
             vs_id, file_id, chunking_strategy=chunking_strategy
         )
         return jsonify(result), 201
-    except YandexClientError as e:
+    except bound.YandexClientError as e:
         return _err_response(e)
 
 
@@ -236,7 +234,7 @@ def remove_file_from_vs(vs_id, file_id):
         client = get_client()
         result = client.remove_file_from_vs(vs_id, file_id)
         return jsonify(result)
-    except YandexClientError as e:
+    except bound.YandexClientError as e:
         return _err_response(e)
 
 

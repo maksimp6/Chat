@@ -11,7 +11,7 @@ from typing import Any
 import requests
 
 from agent_memory.client import get_memory_client
-from storage.db import memory_file_path
+from agent_memory.host import memory_file_path
 
 API_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 _FACT_PREFIX = "global_fact:"
@@ -147,5 +147,8 @@ def get_global_memory_summary() -> str:
 
 
 if __name__ == "__main__":
+    from composition import wiring
+
+    wiring.register_all()
     print("Текущая глобальная память:")
     print(get_global_memory_summary() or "Память пока пуста.")

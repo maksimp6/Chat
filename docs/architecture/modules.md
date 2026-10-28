@@ -85,11 +85,6 @@ flowchart LR
     tool_providers[tool_providers]
     workspace[workspace]
     yandex_client_modules[yandex_client_modules]
-    agent_memory -->|4| kristall
-    agent_memory -->|3| storage
-    agent_retrieval -->|1| agent_context
-    agent_retrieval -->|2| agent_memory
-    agent_rules -->|1| tool_providers
     agent_runtime -->|1| chat
     agent_runtime -->|1| core
     agent_runtime -->|3| invocation
@@ -112,13 +107,6 @@ flowchart LR
     chat -->|4| storage
     chat -->|2| tool_providers
     chat -->|12| yandex_client_modules
-    cloud -->|1| economy
-    cloud -->|5| observability
-    cloud -->|1| secret_store
-    cloud -->|1| storage
-    cloud -->|1| tool_providers
-    conversations -->|2| agent_memory
-    conversations -->|1| storage
     economy -->|1| cloud
     economy -->|1| core
     economy -->|1| kristall
@@ -140,19 +128,7 @@ flowchart LR
     mcp_server -->|1| sessions
     mcp_server -->|2| storage
     mcp_server -->|5| tool_providers
-    model_editor -->|1| economy
-    model_editor -->|2| storage
     observability -->|3| economy
-    organization -->|2| economy
-    organization -->|1| sessions
-    organization -->|3| storage
-    organization -->|1| tool_providers
-    plugin_system -->|1| invocation
-    plugin_system -->|1| runtime
-    plugin_system -->|1| tool_providers
-    printing3d -->|2| economy
-    printing3d -->|1| storage
-    project_board -->|1| memory_engine
     provider_accounts -->|3| cloud
     provider_accounts -->|3| core
     provider_accounts -->|1| economy
@@ -174,14 +150,6 @@ flowchart LR
     runtime -->|2| sessions
     runtime -->|1| storage
     runtime -->|1| tool_providers
-    secret_store -->|5| cloud
-    secret_store -->|1| storage
-    sessions -->|1| agent_memory
-    sessions -->|1| storage
-    storage -->|2| agent_memory
-    storage -->|1| cloud
-    storage -->|1| kristall
-    storage -->|1| runtime
     tool_providers -->|1| agent_runtime
     tool_providers -->|1| cloud
     tool_providers -->|1| kristall
@@ -190,8 +158,6 @@ flowchart LR
     tool_providers -->|1| printing3d
     tool_providers -->|2| remote_runtime
     tool_providers -->|1| storage
-    workspace -->|1| core
-    workspace -->|4| yandex_client_modules
     yandex_client_modules -->|1| agent_memory
     yandex_client_modules -->|4| core
     yandex_client_modules -->|2| economy

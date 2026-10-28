@@ -4,13 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from invocation.context import InvocationContext
 from plugin_system.manager import PluginError, PluginManager
-from runtime import RuntimeDispatcher
-from tool_providers.universal_tool_platform import (
-    UniversalToolCall,
-    UniversalToolExecutor,
-)
+from plugin_system.host import bound
 
 
 class PluginExecutionGateway:
@@ -23,11 +18,9 @@ class PluginExecutionGateway:
 
     OPERATION = "plugin.tool.execute"
 
-    def __init__(
-        self, manager: PluginManager, registry: Any, dispatcher: RuntimeDispatcher
-    ):
+    def __init__(self, manager: PluginManager, registry: Any, dispatcher: Any):
         self.manager = manager
-        self.executor = UniversalToolExecutor(registry)
+        self.executor = bound.UniversalToolExecutor(registry)
         self.dispatcher = dispatcher
         self.dispatcher.register_operation(self.OPERATION, self._execute_in_scope)
 
@@ -36,7 +29,7 @@ class PluginExecutionGateway:
         plugin_id: str,
         tool_name: str,
         arguments: Mapping[str, Any],
-        context: InvocationContext,
+        context: Any,
         *,
         trace: Any = None,
         approved: bool = False,
@@ -77,7 +70,7 @@ class PluginExecutionGateway:
         tool_name = str(payload["tool_name"])
         context = payload["context"]
 
-        call = UniversalToolCall(
+        call = bound.UniversalToolCall(
             tool_name=tool_name,
             arguments=dict(payload["arguments"]),
             transport="internal",

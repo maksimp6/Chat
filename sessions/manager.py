@@ -6,9 +6,8 @@ import re
 import uuid
 from typing import Any, Optional
 
-from agent_memory.client import get_memory_client
 import time
-from storage.db import memory_file_path
+from sessions.host import get_memory_client, memory_file_path
 
 _SESSION_PREFIX = "runtime_session:"
 _SENSITIVE_KEY_RE = re.compile(

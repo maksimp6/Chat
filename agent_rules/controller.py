@@ -17,11 +17,6 @@ from threading import RLock
 from types import MappingProxyType
 from typing import Callable, Mapping, Protocol, Any
 
-from tool_providers.universal_tool_platform import (
-    UniversalToolCall,
-    UniversalToolExecutor,
-)
-
 
 RULES = MappingProxyType(
     {
@@ -87,11 +82,11 @@ class GuardedTask:
     def __init__(
         self,
         scope: TaskScope,
-        executor: UniversalToolExecutor,
+        executor: Any,
         trace: EventTrace,
         *,
         observe_device: Callable[[], str],
-        observe_destination: Callable[[UniversalToolCall], str],
+        observe_destination: Callable[[Any], str],
         verify_result: Callable[[Mapping[str, Any]], bool],
     ) -> None:
         self.scope = scope
@@ -132,7 +127,7 @@ class GuardedTask:
             self._violated = True
         return {"success": False, "status": status, "rule_id": rule}
 
-    def execute(self, call: UniversalToolCall, **hooks: Any) -> dict[str, Any]:
+    def execute(self, call: Any, **hooks: Any) -> dict[str, Any]:
         with self._lock:
             if self._closed:
                 raise RuntimeError("Task is closed")
@@ -178,7 +173,7 @@ class GuardedTask:
         except Exception:  # noqa: BLE001 - untrusted host failure must stop admission; never leak errors
             return None
 
-    def _admit(self, call: UniversalToolCall) -> dict[str, Any] | None:
+    def _admit(self, call: Any) -> dict[str, Any] | None:
         if self._host_check(self.observe_device) != self.scope.device_id:
             return self._violation("AR-001", "before")
         if self._host_check(self.observe_destination, call) != self.scope.destination:
@@ -192,9 +187,7 @@ class GuardedTask:
             self._propose(method)
         return result
 
-    def _run(
-        self, call: UniversalToolCall, method: str, hooks: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _run(self, call: Any, method: str, hooks: dict[str, Any]) -> dict[str, Any]:
         self._attempts += 1
         result = self._host_check(self.executor.execute, call, **hooks)
         if not isinstance(result, Mapping) or result.get("success") is not True:

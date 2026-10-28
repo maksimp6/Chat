@@ -6,7 +6,6 @@ import json
 from dataclasses import dataclass
 from typing import Any, Iterable, Protocol
 
-from agent_memory import AgentMemoryStore
 
 from .legacy_models import RetrievalDocument, RetrievalQuery
 
@@ -35,7 +34,7 @@ def _compact_json(value: Any, *, max_chars: int = 2000) -> str:
 class MemorySource:
     source_type = "memory"
 
-    def __init__(self, store: AgentMemoryStore) -> None:
+    def __init__(self, store: Any) -> None:
         self._store = store
 
     def collect(self, query: RetrievalQuery) -> SourceBatch:

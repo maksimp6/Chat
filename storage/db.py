@@ -7,8 +7,7 @@ import json
 from pathlib import Path
 import time
 from typing import Any
-from runtime.request_context import current_runtime_data_root
-from kristall import Kristall, KristallError
+from storage.host import bound, current_runtime_data_root, get_memory_client
 
 DB_PATH = os.environ.get("LOGOS_DB_PATH", "").strip()
 
@@ -21,7 +20,7 @@ def memory_file_path() -> Path:
     if explicit:
         return Path(explicit).expanduser().resolve()
     if not DB_PATH:
-        raise KristallError(
+        raise bound.KristallError(
             "memory path is not configured: set LOGOS_MEMORY_PATH or LOGOS_DB_PATH"
         )
     configured = Path(DB_PATH).expanduser().resolve()
@@ -32,9 +31,8 @@ def memory_file_path() -> Path:
     )
 
 
-def get_store() -> Kristall:
+def get_store() -> Any:
     """Logos owns the shared writer; repositories never close it individually."""
-    from agent_memory.client import get_memory_client
 
     return get_memory_client(memory_file_path())
 

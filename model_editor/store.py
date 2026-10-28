@@ -11,9 +11,9 @@ import re
 import uuid
 from typing import Any
 
-from storage import StorageObjectNotFound, StorageProvider
 
 from .engine import export_stl, inspect_scene, new_scene, validate_scene
+from model_editor.host import bound
 
 _REVISION = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -31,9 +31,7 @@ def _canonical(state: dict[str, Any]) -> bytes:
 class ModelStore:
     """Content-addressed, immutable scene snapshots in an owner namespace."""
 
-    def __init__(
-        self, provider: StorageProvider, owner_id: str, runtime_id: str = "host"
-    ) -> None:
+    def __init__(self, provider: Any, owner_id: str, runtime_id: str = "host") -> None:
         if not isinstance(owner_id, str) or not owner_id.strip():
             raise ValueError("trusted owner identity is required")
         if not isinstance(runtime_id, str) or not runtime_id.strip():
@@ -82,7 +80,7 @@ class ModelStore:
         mid, rev = self._model_id(model_id), self._revision(revision)
         try:
             raw = self.provider.download(self._key(mid, rev), credentials=None)
-        except (StorageObjectNotFound, FileNotFoundError) as exc:
+        except (bound.StorageObjectNotFound, FileNotFoundError) as exc:
             raise ValueError("model or revision not found") from exc
         if hashlib.sha256(raw).hexdigest() != rev:
             raise ValueError("model revision checksum mismatch")

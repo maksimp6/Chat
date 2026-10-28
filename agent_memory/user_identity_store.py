@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from typing import Mapping, TypedDict
+from typing import Any
 
-from kristall.store import Kristall
 
 IDENTITY_KEY = "user_identity:v1"
 IDENTITY_SCHEMA = 1
@@ -33,7 +33,7 @@ class IdentityState(TypedDict):
 
 
 class UserIdentityStore:
-    def __init__(self, db: Kristall) -> None:
+    def __init__(self, db: Any) -> None:
         self.db = db
 
     @staticmethod

@@ -229,4 +229,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    from composition import wiring
+
+    wiring.register_all()
     main()

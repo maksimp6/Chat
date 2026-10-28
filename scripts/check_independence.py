@@ -953,7 +953,8 @@ def check_wiring(umap: UnitMap, violations: list[Violation]) -> None:
                                 "W", path, stmt.lineno, "Host field has a default"
                             )
                         )
-        if not re.search(rf"\b{re.escape(unit)}\b", root_text):
+        package = path.split("/")[0]
+        if not re.search(rf"\b{re.escape(package)}\b", root_text):
             violations.append(
                 Violation("W", path, 0, f"{unit} host is never bound by a root")
             )

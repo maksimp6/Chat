@@ -5,15 +5,15 @@ from __future__ import annotations
 import re
 import uuid
 
-from cloud.cloudru.secret_management_admin import CloudRuSecretManagementAdminClient
 from secret_store.admin import SecretAdminResult
 from secret_store.core import SecretRef, SecretValue
+from typing import Any
 
 _SAFE = re.compile(r"[^a-z0-9-]+")
 
 
 class CloudRuSecretAdminBackend:
-    def __init__(self, client: CloudRuSecretManagementAdminClient) -> None:
+    def __init__(self, client: Any) -> None:
         self._client = client
 
     def create(self, *, purpose: str, value: SecretValue) -> SecretAdminResult:

@@ -11,7 +11,7 @@ from typing import Any
 from flask import Blueprint, jsonify, request
 
 from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
-from secret_store.key_manager import secret_storage_ready, store_secret
+from cloud.host import secret_storage_ready, store_secret
 
 logger = logging.getLogger("logos.cloud.cloudru.iam_routes")
 cloudru_iam_bp = Blueprint("cloudru_iam", __name__, url_prefix="/api/cloudru/iam")

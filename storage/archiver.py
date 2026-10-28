@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import threading
-from agent_memory.client import get_memory_client
+from storage.host import get_memory_client
 
 
 class DatabaseArchiver:

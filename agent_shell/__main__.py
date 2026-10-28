@@ -77,7 +77,8 @@ def main(argv=None, handlers=None):
 
 
 if __name__ == "__main__":
-    from composition import process
+    from composition import process, wiring
 
     process.start()
+    wiring.register_all()
     sys.exit(main())

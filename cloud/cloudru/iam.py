@@ -14,8 +14,7 @@ from typing import Any, Optional
 from urllib.parse import quote
 
 import requests
-
-from observability.trace_manager import get_current_trace
+from cloud.host import get_current_trace
 
 
 API_KEYS_PATH = "/api/v1/service-accounts/credentials/api-keys"

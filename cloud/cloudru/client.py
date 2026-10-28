@@ -10,8 +10,8 @@ import requests
 
 from cloud.base import CloudProviderError
 from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
-from observability.trace_manager import get_current_trace
 from cloud._vendor.trace_security import sanitize_trace_value
+from cloud.host import get_current_trace
 
 
 DEFAULT_ENDPOINTS = {

@@ -8,14 +8,10 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.exceptions import MaxRetryError
 from urllib3.util import Retry
+from workspace.host import bound, provider_request_headers
 
 api_logger = logging.getLogger("logos.workspace.files")
 
-from yandex_client_modules.errors import YandexClientError
-from yandex_client_modules.request_mixin import (
-    _resolve_global_provider_credential,
-    provider_request_headers,
-)
 
 # The client waits up to 5 minutes for an upload, so the server must wait at least as long.
 UPLOAD_TIMEOUT_SECONDS = 300
@@ -27,7 +23,7 @@ class YandexFileManagerMixin:
     def _fm_request(self, method, url, timeout=30, **kwargs):
         """Запрос с retry + логирование через _log_request/_log_response.
         Для multipart убирает Content-Type из заголовков сессии."""
-        credential = _resolve_global_provider_credential(self)
+        credential = bound._resolve_global_provider_credential(self)
         headers = dict(kwargs.pop("headers", None) or {})
         headers.update(provider_request_headers(credential))
         if kwargs.get("files"):
@@ -90,7 +86,9 @@ class YandexFileManagerMixin:
                             if isinstance(exc, requests.exceptions.Timeout)
                             else None
                         )
-                        raise YandexClientError(message, status_code=status) from exc
+                        raise bound.YandexClientError(
+                            message, status_code=status
+                        ) from exc
                     retry.sleep()
         finally:
             session.close()
@@ -111,20 +109,22 @@ class YandexFileManagerMixin:
         # The status travels with the error, so the route answers with it instead of a generic 500.
         # A provider-side auth failure or server error is an upstream failure, reported as 502.
         if status == 404:
-            raise YandexClientError(f"{context}: Not found (404)", status_code=404)
+            raise bound.YandexClientError(
+                f"{context}: Not found (404)", status_code=404
+            )
         if status == 413:
-            raise YandexClientError(
+            raise bound.YandexClientError(
                 f"{context}: File too large (max 128 MB) (413)", status_code=413
             )
         if status in (401, 403):
-            raise YandexClientError(
+            raise bound.YandexClientError(
                 f"{context}: Auth failed ({status})", status_code=502
             )
         if status == 429:
-            raise YandexClientError(
+            raise bound.YandexClientError(
                 f"{context}: Rate limit (429): {err_msg}", status_code=429
             )
-        raise YandexClientError(
+        raise bound.YandexClientError(
             f"{context} failed (HTTP {status}): {err_msg}",
             status_code=502 if status >= 500 else 400,
         )

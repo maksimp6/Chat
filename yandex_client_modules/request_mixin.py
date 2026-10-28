@@ -185,6 +185,10 @@ def _resolve_global_provider_credential(client, execution_trace=None):
     return credential
 
 
+# Public name for other units; they reach it through their host ports.
+resolve_global_provider_credential = _resolve_global_provider_credential
+
+
 def _key_mask(api_key):
     """Show only the last four characters of a provider key, as ****abcd for reports.
     A short key gets a bare **** so the report still shows that a mask applies."""

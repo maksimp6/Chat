@@ -5,12 +5,10 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from economy.budget_controller import BudgetLimitExceeded, CloudBudgetGuard
 from cloud.base import CloudProviderError
 from cloud.registry import ensure_default_providers, resolve_provider_name
-from tool_providers.runtime_tools import ssh_runtime_exec
 from cloud._vendor.schema import object_schema
-from observability.trace_manager import get_current_trace
+from cloud.host import bound, get_current_trace, ssh_runtime_exec
 
 
 def _provider(args: dict[str, Any]):
@@ -40,7 +38,7 @@ def _result(fn):
 # stopped instance, and backup create or restore allocates billable storage or compute.
 BUDGET_GUARDED_COMPUTE_OPERATIONS = {"start", "reboot"}
 BUDGET_GUARDED_BACKUP_OPERATIONS = {"create", "restore"}
-_BUDGET_GUARDS: dict[str, CloudBudgetGuard] = {}
+_BUDGET_GUARDS: dict[str, Any] = {}
 _BUDGET_GUARDS_LOCK = threading.Lock()
 
 
@@ -51,11 +49,11 @@ def _trace_budget_event(event: dict[str, Any]) -> None:
         trace.add_event(str(payload.pop("event")), payload)
 
 
-def _budget_guard(provider) -> CloudBudgetGuard:
+def _budget_guard(provider) -> Any:
     with _BUDGET_GUARDS_LOCK:
         guard = _BUDGET_GUARDS.get(provider.name)
         if guard is None or guard._provider is not provider:  # noqa: SLF001
-            guard = CloudBudgetGuard(provider, trace_sink=_trace_budget_event)
+            guard = bound.CloudBudgetGuard(provider, trace_sink=_trace_budget_event)
             _BUDGET_GUARDS[provider.name] = guard
         return guard
 
@@ -102,7 +100,7 @@ def _budget_gate(
     """Return (refusal, budget): a refusal when blocked, else the budget status worth reporting."""
     try:
         status = _budget_guard(provider).enforce(operation)
-    except BudgetLimitExceeded as exc:
+    except bound.BudgetLimitExceeded as exc:
         return {
             "success": False,
             "error": str(exc),

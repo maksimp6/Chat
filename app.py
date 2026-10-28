@@ -1,3 +1,12 @@
+"""Logos web application: the composition root of the web process."""
+
+from composition import process, wiring
+
+# Before any unit is imported: load core/.env, configure the system log and register
+# every unit's host so ports resolve whenever a unit first needs them.
+process.start()
+wiring.register_all()
+
 from core.env import env_get
 from flask import Flask, request, jsonify, render_template
 from werkzeug.exceptions import HTTPException
@@ -54,7 +63,6 @@ from remote_runtime.environment_routes import environment_bp, environment_gatewa
 from remote_runtime.environments import init_environment_tables
 from rdc_connection.pairing import install_rdc_pairing
 from invocation.problems import problem
-from composition import process
 from observability import system_log
 from conversations.ownership import (
     init_conversation_ownership_table,
@@ -74,7 +82,6 @@ from forge import init_printing_tables
 from forge.routes import printing3d_bp
 
 app = Flask(__name__)
-process.start()
 install_rdc_pairing(app)
 
 

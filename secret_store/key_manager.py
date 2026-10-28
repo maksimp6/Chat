@@ -15,7 +15,7 @@ from typing import Any, Optional
 from cryptography.fernet import Fernet, InvalidToken
 
 from secret_store.credential_crypto import fingerprint_key
-from storage.db import get_store
+from secret_store.host import get_store
 
 DatabaseRow = dict[str, Any]
 

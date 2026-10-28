@@ -552,7 +552,8 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":  # pragma: no cover
-    from composition import process
+    from composition import process, wiring
 
     process.start()
+    wiring.register_all()
     raise SystemExit(main())

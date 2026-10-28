@@ -8,9 +8,8 @@ from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
 import time
-from storage.db import get_store
-from economy.treasury_identity import get_current_owner_id, TreasuryIdentityError
 from organization._vendor.schema import object_schema
+from organization.host import bound, get_current_owner_id, get_store
 
 government_bp = Blueprint("government", __name__, url_prefix="/api/government")
 
@@ -48,7 +47,7 @@ def init_government_tables() -> None:
 def _current_owner() -> Optional[str]:
     try:
         return get_current_owner_id(required=False)
-    except TreasuryIdentityError:
+    except bound.TreasuryIdentityError:
         return None
 
 

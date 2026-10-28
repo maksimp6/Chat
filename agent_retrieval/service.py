@@ -9,8 +9,6 @@ import math
 import re
 from typing import Any, Mapping
 
-from agent_context import CacheLookup
-from agent_memory import AgentMemoryStore, MemoryRecord
 from agent_retrieval._vendor.provenance import snapshot_revision
 
 from agent_retrieval.models import RetrievalBundle, RetrievalHit, RetrievalQuery
@@ -71,7 +69,7 @@ def _clip(text: str, limit: int) -> str:
     return value[: max(limit - 1, 1)].rstrip() + "…"
 
 
-def _memory_document(record: MemoryRecord) -> str:
+def _memory_document(record: Any) -> str:
     payload = record.as_dict()
     provenance = payload["provenance"]
     refs = " ".join(str(item) for item in provenance.get("refs") or [])
@@ -92,12 +90,12 @@ def _memory_document(record: MemoryRecord) -> str:
     )
 
 
-def _memory_ref(record: MemoryRecord) -> str:
+def _memory_ref(record: Any) -> str:
     refs = record.as_dict()["provenance"].get("refs") or []
     return str(refs[0]) if refs else f"memory:{record.memory_id}"
 
 
-def _eligible_memory(record: MemoryRecord, query: RetrievalQuery) -> bool:
+def _eligible_memory(record: Any, query: RetrievalQuery) -> bool:
     provenance = record.as_dict()["provenance"]
     # Only curated GitHub memory is retrieved. Other sources, such as conversations, have no owner
     # boundary here, so they are never offered to a query that could belong to another user.
@@ -134,7 +132,7 @@ def _eligible_memory(record: MemoryRecord, query: RetrievalQuery) -> bool:
 
 
 def _memory_hits(
-    store: AgentMemoryStore,
+    store: Any,
     query: RetrievalQuery,
     *,
     now: int | None,
@@ -273,7 +271,7 @@ def _code_hits(
     return hits
 
 
-def _cache_matches_query(lookup: CacheLookup, query: RetrievalQuery) -> bool:
+def _cache_matches_query(lookup: Any, query: RetrievalQuery) -> bool:
     if lookup.scope is None or lookup.evidence is None:
         return False
     scope = lookup.scope
@@ -287,9 +285,7 @@ def _cache_matches_query(lookup: CacheLookup, query: RetrievalQuery) -> bool:
     )
 
 
-def _cache_hits(
-    lookup: CacheLookup | None, query: RetrievalQuery
-) -> list[RetrievalHit]:
+def _cache_hits(lookup: Any | None, query: RetrievalQuery) -> list[RetrievalHit]:
     if (
         lookup is None
         or lookup.status not in {"hit", "partial"}
@@ -348,7 +344,7 @@ class HybridRetriever:
     def __init__(
         self,
         *,
-        memory_store: AgentMemoryStore,
+        memory_store: Any,
         repository_index: Mapping[str, Any] | None = None,
         repository_index_version: str | None = None,
         repository_index_repository: str | None = None,
@@ -362,7 +358,7 @@ class HybridRetriever:
         self,
         query: RetrievalQuery,
         *,
-        cache_lookup: CacheLookup | None = None,
+        cache_lookup: Any | None = None,
         now: int | None = None,
     ) -> RetrievalBundle:
         cache_status = cache_lookup.status if cache_lookup is not None else "miss"
@@ -400,7 +396,7 @@ class HybridRetriever:
         hits: tuple[RetrievalHit, ...],
         *,
         cache_status: str,
-        cache_lookup: CacheLookup | None,
+        cache_lookup: Any | None,
     ) -> RetrievalBundle:
         counts = Counter(hit.source_type for hit in hits)
         return RetrievalBundle(

@@ -56,7 +56,7 @@ import requests
 from cloud.base import CloudProviderError
 from cloud.cloudru.client import CloudRuClient
 from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
-from observability.trace_manager import get_current_trace
+from cloud.host import get_current_trace
 
 
 # Path shape follows the documented "secret has many immutable versions"
