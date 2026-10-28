@@ -24,6 +24,16 @@ def _max_results(value: Any) -> int:
     return file_search_max_results(value)
 
 
+# Without a vector store the model has no search tool and used to answer "no access" (#1651).
+FILE_SEARCH_OFF_NOTE = (
+    "\n\nПоиск по векторным хранилищам (RAG) и архиву репозитория в этом диалоге не подключён: "
+    "в настройках диалога не включён File Search или не выбран Vector Store ID. "
+    "Если пользователь просит поискать в RAG или архиве, так и скажи и укажи путь: "
+    "Инструменты → File Search (поиск по Vector Store) → Vector Store IDs. "
+    "Не предлагай поиск вручную вместо этого."
+)
+
+
 class YandexMcpMixin:
     def _execute_single_tool(self, tc, all_servers, trace=None, *, execution_policy=None):
         import time as _t
@@ -260,6 +270,7 @@ class YandexMcpMixin:
                     }
                 )
 
+        file_search_active = bool(file_cfg.get("enabled") and file_cfg.get("vector_store_ids"))
         code_cfg = tools_config.get("code_interpreter") or {}
         if code_cfg.get("enabled"):
             hosted_tools.append({"type": "code_interpreter", "container": {"type": "auto"}})
@@ -300,6 +311,8 @@ class YandexMcpMixin:
                 memory_summary = ""
             if memory_summary:
                 ask_params["instructions"] = (ask_params.get("instructions") or "") + memory_summary
+        if settings_id and execution_policy is None and not file_search_active:
+            ask_params["instructions"] = (ask_params.get("instructions") or "") + FILE_SEARCH_OFF_NOTE
         if tools or execution_policy is not None:
             ask_params["tools"] = tools
 
