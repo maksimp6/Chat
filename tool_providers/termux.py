@@ -1,3 +1,5 @@
+"""Termux:API tools: toasts, vibration, battery, torch, clipboard, speech, notifications, camera, app settings and file removal on the device."""
+
 import os
 
 """Local Termux:API integration tools for Android OS."""

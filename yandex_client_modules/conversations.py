@@ -1,3 +1,5 @@
+"""Conversation mixin of the Responses client: creates Yandex conversations."""
+
 import logging
 import uuid
 import requests

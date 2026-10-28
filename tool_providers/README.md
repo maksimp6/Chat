@@ -1,0 +1,48 @@
+# `tool_providers`
+
+The tool platform: provider-agnostic tool contracts and the execution pipeline, the shared tool registry, and the built-in tool sources (git, Termux, system, filesystem, Wikipedia, profiler, theme, SSH runtime) with JSON Schema helpers and the read-only policy.
+
+## Public API
+
+`from tool_providers import …`: `filesystem`, `registry`, `runtime_tools`, `universal_tool_platform`.
+
+| Module | Purpose |
+| --- | --- |
+| [`tool_providers.filesystem`](filesystem.py) | Инструменты стандартной библиотеки Python и файловой системы для Logos. Включает: |
+| [`tool_providers.registry`](registry.py) | Provider-agnostic registry for Logos tools. |
+| [`tool_providers.runtime_tools`](runtime_tools.py) | Universal tool definitions backed by the SSH Runtime. |
+| [`tool_providers.universal_tool_platform`](universal_tool_platform.py) | Provider-agnostic tool contracts and execution pipeline for Logos. |
+
+Other units reach it only through their own ports:
+
+| Provides | To |
+| --- | --- |
+| `tool_providers.filesystem` | `agent_runtime`, `tools.knowledge` |
+| `tool_providers.filesystem.grep_search` | `mcp_server` |
+| `tool_providers.filesystem.list_directory` | `mcp_server` |
+| `tool_providers.filesystem.read_file` | `mcp_server` |
+| `tool_providers.registry.registry` | `agent_runtime`, `chat`, `mcp_server`, `tools.knowledge`, `yandex_client_modules` |
+| `tool_providers.runtime_tools.ssh_runtime_exec` | `cloud` |
+| `tool_providers.universal_tool_platform.UniversalToolCall` | `agent_runtime`, `chat`, `mcp_server`, `plugin_system`, `runtime`, `tools.knowledge`, `yandex_client_modules` |
+| `tool_providers.universal_tool_platform.UniversalToolExecutor` | `agent_runtime`, `chat`, `mcp_server`, `plugin_system`, `runtime`, `tools.knowledge`, `yandex_client_modules` |
+| `tool_providers.universal_tool_platform.tool_call_requires_approval` | `mcp_server` |
+| `tool_providers.universal_tool_platform.validate_json_schema` | `organization`, `tools.knowledge` |
+| `tool_providers.universal_tool_platform.warn_deprecated_execution_hooks` | `runtime` |
+
+## Ports
+
+Everything `tool_providers` uses from other units is a field of `Host` in [`tool_providers/host.py`](host.py), read only when a function runs. Functions keep their names as call shims; other ports are `bound.<name>`.
+
+| Port | Provided by |
+| --- | --- |
+| `KristallError` | `kristall.KristallError` |
+| `SSHRuntimeError` | `remote_runtime.ssh.SSHRuntimeError` |
+| `build_runtime` | `remote_runtime.ssh_settings.build_runtime` |
+| `enqueue_local_tool_job` | `agent_runtime.local_gateway.enqueue_local_tool_job` |
+| `external_tool_sources` | `composition.tool_sources.SOURCES` |
+| `memory_file_path` | `storage.db.memory_file_path` |
+| `wait_for_local_tool_job` | `agent_runtime.local_gateway.wait_for_local_tool_job` |
+
+## Install
+
+- `composition/wiring.py` registers the `tool_providers` host factory (`register_all()`, or `register_units("tool_providers")` for this unit alone); the host is built on first use.

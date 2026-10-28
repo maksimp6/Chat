@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Reproduce the Redmi 9 ChatGPT app measurement over ADB (CPU ticks, frames, jank, window focus) into ~/.logos-rdc/redmi9-chatgpt-repro-20261011.csv."""
+
 import subprocess, time, re, csv, os
 
 serial = "192.168.31.29:35087"

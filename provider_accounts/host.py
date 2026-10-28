@@ -32,7 +32,7 @@ class Host:
         Any  # yandex_client_modules.api_key_provider.YandexApiKeyProvider
     )
     _resolve_global_provider_credential: (
-        Any  # yandex_client_modules.request_mixin._resolve_global_provider_credential
+        Any  # yandex_client_modules.request_mixin.resolve_global_provider_credential
     )
     annotate_catalog: Any  # core.model_profiles.annotate_catalog
     canonical_model_key: Any  # core.config.canonical_model_key

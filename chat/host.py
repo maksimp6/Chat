@@ -46,15 +46,15 @@ class Host:
     )
     VOICE_MODELS: Any  # core.config.VOICE_MODELS
     YandexResponsesClient: Any  # yandex_client_modules.client.YandexResponsesClient
-    _record_quota_usage: Any  # yandex_client_modules.request_mixin._record_quota_usage
+    _record_quota_usage: Any  # yandex_client_modules.request_mixin.record_quota_usage
     _resolve_global_provider_credential: (
-        Any  # yandex_client_modules.request_mixin._resolve_global_provider_credential
+        Any  # yandex_client_modules.request_mixin.resolve_global_provider_credential
     )
     _resolve_quota_user_id: (
-        Any  # yandex_client_modules.request_mixin._resolve_quota_user_id
+        Any  # yandex_client_modules.request_mixin.resolve_quota_user_id
     )
-    _response_input: Any  # yandex_client_modules.request_builder._response_input
-    _transport_timeout: Any  # yandex_client_modules.request_mixin._transport_timeout
+    _response_input: Any  # yandex_client_modules.request_builder.response_input
+    _transport_timeout: Any  # yandex_client_modules.request_mixin.transport_timeout
     add_message: Any  # storage.db.add_message
     aggregate_billing: Any  # economy.billing.aggregate_billing
     bind_current_trace: Any  # observability.trace_manager.bind_current_trace

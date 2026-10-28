@@ -921,9 +921,14 @@ def check_api(umap: UnitMap, violations: list[Violation]) -> None:
             continue
         exported = None
         for stmt in tree.body:
-            if isinstance(stmt, ast.Assign) and any(
-                isinstance(t, ast.Name) and t.id == "__all__" for t in stmt.targets
-            ):
+            targets = (
+                stmt.targets
+                if isinstance(stmt, ast.Assign)
+                else [stmt.target]
+                if isinstance(stmt, ast.AnnAssign) and stmt.value is not None
+                else []
+            )
+            if any(isinstance(t, ast.Name) and t.id == "__all__" for t in targets):
                 try:
                     exported = list(ast.literal_eval(stmt.value))
                 except ValueError:

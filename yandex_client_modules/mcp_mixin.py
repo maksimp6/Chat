@@ -1,3 +1,5 @@
+"""MCP mixin of the Responses client: requests with MCP and hosted tools (ask_with_mcp), including file search."""
+
 import json
 from typing import Any
 

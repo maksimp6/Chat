@@ -1,3 +1,5 @@
+"""Send the JSON logs in execution_logs/ to the Yandex AI Studio log endpoint, with credential-like values redacted."""
+
 import requests
 import json
 import os

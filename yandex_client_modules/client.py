@@ -1,3 +1,5 @@
+"""The Yandex AI Studio Responses API client, assembled from the request, polling, conversation, MCP and file mixins."""
+
 import json
 import requests
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log

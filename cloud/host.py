@@ -22,7 +22,7 @@ class Host:
     StorageObject: Any  # storage.contracts.StorageObject
     StorageObjectNotFound: Any  # storage.contracts.StorageObjectNotFound
     StorageProviderUnavailable: Any  # storage.contracts.StorageProviderUnavailable
-    _safe_relative_path: Any  # storage.contracts._safe_relative_path
+    _safe_relative_path: Any  # storage.contracts.safe_relative_path
     get_current_trace: Any  # observability.trace_manager.get_current_trace
     secret_storage_ready: Any  # secret_store.key_manager.secret_storage_ready
     ssh_runtime_exec: Any  # tool_providers.runtime_tools.ssh_runtime_exec

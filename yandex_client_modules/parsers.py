@@ -1,3 +1,5 @@
+"""Extraction of reasoning, text and token usage from Responses API results."""
+
 import math
 
 

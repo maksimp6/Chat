@@ -1,3 +1,5 @@
+"""MCP JSON-RPC protocol: supported versions, server identity, and sanitized result and error responses."""
+
 from __future__ import annotations
 import os
 

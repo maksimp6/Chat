@@ -1,3 +1,5 @@
+"""Git tools: read and write operations on allowed local repositories; names that could be read as options are refused."""
+
 import time
 import subprocess
 import os

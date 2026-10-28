@@ -122,6 +122,15 @@ and tool calls retain scoped correlation through `InvocationContext` and
 Logging and diagnostics are described in
 [Execution Trace and system log](docs/backend/logging.md).
 
+### Independent modules
+
+Every package, script and tool is an independent unit: no unit imports another one.
+What a unit needs from others is a port in its `host.py`, provided by the composition
+roots (`app.py` and `composition/`), and each unit's `README.md` lists its public API,
+ports and installation. The rules, the wiring and the static checker
+(`python3 scripts/check_independence.py --summary`, which prints `TOTAL=0`) are in
+[Modules and their independence](docs/architecture/modules.md).
+
 ## Quick start
 
 ### Prerequisites

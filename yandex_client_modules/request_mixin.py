@@ -1,3 +1,5 @@
+"""Request mixin of the Responses client: credentials, per-user quotas, transport timeouts, request capture and ask()."""
+
 import time
 import copy
 

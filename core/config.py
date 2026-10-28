@@ -6,12 +6,12 @@ import logging
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from dotenv import load_dotenv
-
 logger = logging.getLogger("logos.core.config")
 
+# core/.env is loaded by the composition roots (core.env.load_env_file, called by
+# composition.process.start and composition.wiring.register_all) before any unit
+# imports this module, so the values below already include it.
 _ENV_FILE = Path(__file__).resolve().with_name(".env")
-load_dotenv(_ENV_FILE)
 
 # Keep compatibility with the legacy YC_API_KEY name while preferring the
 # canonical YANDEX_API_KEY variable. Never put credentials in source code.

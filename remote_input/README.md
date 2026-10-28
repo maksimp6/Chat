@@ -60,3 +60,20 @@ python -m pytest -q tests/test_remote_input_module.py \
 ```
 
 C fault harness, BTN/SYN tests и teardown — отдельно в `tests/logos_mouse_stage`.
+
+## Public API
+
+`from remote_input import …`: `Command`, `MouseError`, `MouseModule`, `RecordingBackend`, `RootSocketBackend`, `Cursor`.
+
+| Module | Purpose |
+| --- | --- |
+| [`remote_input.core`](core.py) | Logos Mouse input orchestration with signed grants, safe release, and preview. |
+| [`remote_input.security`](security/__init__.py) | Logos Input security contract. Staging only; no root deployment. |
+
+## Ports
+
+None. The unit imports only the standard library, third-party packages and its own modules.
+
+## Install
+
+- Nothing to wire: import the modules you need.

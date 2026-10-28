@@ -1,3 +1,5 @@
+"""Sample the ChatGPT Android app over ADB (CPU ticks, frames, jank, window focus, memory) into ~/.logos-rdc/chatgpt279-focus-measure.csv."""
+
 import subprocess, time, re, csv, os
 
 SERIAL = "192.168.31.109:42125"

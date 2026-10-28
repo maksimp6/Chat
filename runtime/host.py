@@ -24,7 +24,7 @@ class Host:
         Any  # tool_providers.universal_tool_platform.UniversalToolExecutor
     )
     _warn_deprecated_execution_hooks: (
-        Any  # tool_providers.universal_tool_platform._warn_deprecated_execution_hooks
+        Any  # tool_providers.universal_tool_platform.warn_deprecated_execution_hooks
     )
     check_access: Any  # conversations.ownership.check_access
     clone_profile: Any  # sessions.profiles.clone_profile

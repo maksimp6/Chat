@@ -1,3 +1,5 @@
+"""Polling mixin of the Responses client: waits for background responses to finish."""
+
 import json
 import time
 import requests

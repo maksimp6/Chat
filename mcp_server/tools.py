@@ -1,3 +1,5 @@
+"""Tools of the Logos MCP server: system status, agents, sessions, invocations and traces, conversations, and the ChatGPT project, conversation and bridge tools."""
+
 from __future__ import annotations
 
 import threading

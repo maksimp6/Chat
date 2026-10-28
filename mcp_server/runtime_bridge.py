@@ -1,3 +1,5 @@
+"""Runtime-scoped MCP tool calls, executed through the preview runtime dispatcher boundary."""
+
 from __future__ import annotations
 
 import threading

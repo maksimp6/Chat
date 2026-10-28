@@ -24,7 +24,7 @@ class Host:
     )
     YandexClientError: Any  # yandex_client_modules.errors.YandexClientError
     _resolve_global_provider_credential: (
-        Any  # yandex_client_modules.request_mixin._resolve_global_provider_credential
+        Any  # yandex_client_modules.request_mixin.resolve_global_provider_credential
     )
     create_invocation: Any  # invocation.manager.create_invocation
     create_invocation_trace: Any  # invocation.trace.create_invocation_trace
