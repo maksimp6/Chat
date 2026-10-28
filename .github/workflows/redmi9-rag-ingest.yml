@@ -1,13 +1,24 @@
 name: redmi9-rag-ingest
 
+# Ingests the whole repository (source, every ref and its history, wiki, issues, pull
+# requests, discussions, commit comments, every Actions run with jobs, logs and
+# artifacts) into the chat RAG store through the app API. One step on the Redmi runner
+# may run at most 15 minutes, so each run ingests one slice and dispatches the next run
+# with a cursor until everything is in. Dispatch with an empty cursor to start over.
 on:
   workflow_dispatch:
+    inputs:
+      cursor:
+        description: "Where to continue (set by the previous slice; empty starts from the beginning)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
   issues: read
   pull-requests: read
-  actions: read
+  discussions: read
+  actions: write
 
 concurrency:
   group: redmi9-rag-ingest
@@ -16,13 +27,23 @@ concurrency:
 jobs:
   ingest:
     runs-on: redmi9
-    timeout-minutes: 360
+    timeout-minutes: 20
     steps:
-      - name: Ingest GitHub issues, pull requests and run metadata through the app API
+      - name: Ingest one slice of the repository through the app API
+        timeout-minutes: 15
         env:
           GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
+          CURSOR: ${{ inputs.cursor }}
           STORE_ID: fvtvp6t2su0g5q4ft2ev
+          WORKFLOW_FILE: redmi9-rag-ingest.yml
+          BUDGET_SECONDS: "780"
         run: |
-          set -eu
-          curl -fsSL --max-time 60 "https://raw.githubusercontent.com/${REPO}/${GITHUB_SHA}/scripts/rag_ingest_via_app.py" | python3 -
+          set -euo pipefail
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
+          # The git mirror lives only in the fixed-size RAM disk: never on flash, wiped on exit.
+          media_ram=$(bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" mount)
+          trap 'cd "$GITHUB_WORKSPACE"; bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" umount' EXIT
+          export TMPDIR="$media_ram" MIRROR_DIR="$media_ram/rag-mirror"
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 60 \
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/rag_ingest_via_app.py" | python3 -

@@ -206,8 +206,11 @@ def list_vs_files(vs_id):
     try:
         limit = request.args.get("limit", 100, type=int)
         filter_status = request.args.get("filter", None)
+        after = request.args.get("after", None)
         client = get_client()
-        data = client.list_vs_files(vs_id, limit=limit, filter_status=filter_status)
+        data = client.list_vs_files(
+            vs_id, limit=limit, filter_status=filter_status, after=after
+        )
         return jsonify(data)
     except YandexClientError as e:
         return _err_response(e)
