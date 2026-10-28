@@ -1,2 +1,32 @@
+# Tool configuration for the Logos application.
+#
+# Logos is an application with a flat multi-package layout, not an installable
+# library. Dependencies live in requirements*.txt, which deploy scripts and
+# Dependabot read; there is deliberately no [project] or [build-system] table.
+
 [tool.ruff]
+# The code uses PEP 695 generics (api/yandex_contracts.py, api/yandex_transport.py),
+# so Python 3.12 is the lowest valid target. py312 keeps scripts/format.sh
+# output identical to the previous configuration.
+target-version = "py312"
+line-length = 88
 extend-exclude = ["docs/mirrors", "datasets"]
+
+[tool.ruff.format]
+quote-style = "double"
+# Sources whose exact bytes are pinned elsewhere must never be reformatted:
+# tools/device/rdc/build_live_hardened.py checks SHA-256 digests of the RDC
+# sources and patches them by exact text, and scripts/q14_observer.py requires
+# the first q14 evidence files to match their git baseline byte for byte.
+exclude = [
+    "tools/device/rdc/*.py",
+    "scripts/q14_ai_review.py",
+    "scripts/q14_simulation.py",
+]
+
+[tool.mypy]
+# docs/development/reliability.md: `mypy --strict`, with `no_site_packages`
+# so results do not depend on installed packages.
+strict = true
+no_site_packages = true
+exclude = ["^docs/mirrors/", "^datasets/"]

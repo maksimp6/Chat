@@ -12,14 +12,16 @@
 
 ## Screenshots (safe for public repository)
 
+The screenshot files are not stored in this repository; each is identified by its file name and SHA-256.
+
 | Evidence | Shows | SHA-256 |
 |---|---|---|
-| [Gallery](evidence_gallery.jpg) | 12 labeled screen states including live browser outage | `8c98fe57c947f7857e31c7835b3c78e3ebc130b2288c4ce19f424e2824bccd4d` |
-| [System status](evidence_status.png) | `message: undefined`, `metadata: undefined` | `475aade24c556dd3ad407d16dfcc31d7927e3fb95e0374f25c831b6e0f651b2e` |
-| [File manager](evidence_files.png) | Vector Stores internal configuration error | `9c6b0c732e2028126a63067b076faba762227cfc63500116acef6d08be435646` |
-| [Outage](evidence_outage.png) | Browser `ERR_CONNECTION_REFUSED` on localhost | `4185415c50dadf398a556a08bc135d328357dd2472c14f662f3da0fd9f75910d` |
-| [Credential status redacted](evidence_credentials_redacted.png) | Cached `Подключён • авторизация OK` with past expiry | `a14c68d883f94d2bfeaa8f4922f4ea53689c400357024768070a0449458b53fb` |
-| [Keyboard overlap redacted](evidence_keyboard_redacted.png) | On-screen keyboard overlays bottom of provider form | `bd9767c611b15563b04a723395039ee789409ec31fab3d66acbc382be2a9213b` |
+| Gallery (`evidence_gallery.jpg`) | 12 labeled screen states including live browser outage | `8c98fe57c947f7857e31c7835b3c78e3ebc130b2288c4ce19f424e2824bccd4d` |
+| System status (`evidence_status.png`) | `message: undefined`, `metadata: undefined` | `475aade24c556dd3ad407d16dfcc31d7927e3fb95e0374f25c831b6e0f651b2e` |
+| File manager (`evidence_files.png`) | Vector Stores internal configuration error | `9c6b0c732e2028126a63067b076faba762227cfc63500116acef6d08be435646` |
+| Outage (`evidence_outage.png`) | Browser `ERR_CONNECTION_REFUSED` on localhost | `4185415c50dadf398a556a08bc135d328357dd2472c14f662f3da0fd9f75910d` |
+| Credential status redacted (`evidence_credentials_redacted.png`) | Cached `Подключён • авторизация OK` with past expiry | `a14c68d883f94d2bfeaa8f4922f4ea53689c400357024768070a0449458b53fb` |
+| Keyboard overlap redacted (`evidence_keyboard_redacted.png`) | On-screen keyboard overlays bottom of provider form | `bd9767c611b15563b04a723395039ee789409ec31fab3d66acbc382be2a9213b` |
 
 **Important:** redactions conceal credential fields and fingerprint text. Never upload unredacted secret/account screenshots to public GitHub.
 
@@ -46,7 +48,7 @@ The first capture run used positional taps; its original filenames are **not** a
 ## Findings and severity
 
 1. **P0 / availability: application inaccessible during audit.** Browser displayed `ERR_CONNECTION_REFUSED` for `127.0.0.1:5000` at approximately 18:33 device time. Separate TCP socket test returned `ConnectionRefusedError`. **Root cause not established:** do not assume browser refresh triggered server crash. Existing remote control remained online; we did not restart the backend.
-2. **P1 / frontend correctness: raw `undefined` fields in System Status.** Use localized meaningful fallback and populated stable data contract. See [status screenshot](evidence_status.png).
+2. **P1 / frontend correctness: raw `undefined` fields in System Status.** Use localized meaningful fallback and populated stable data contract. See status screenshot (`evidence_status.png`).
 3. **P1 / credential state correctness: expired Yandex credential appears connected.** Existing issue **#1296**. Status reported cached success despite expired credential; screenshot redacted.
 4. **P1 / file manager: raw internal environment variable in Vector Stores error.** `LOGOS_PROVIDER_CREDENTIAL_KEY is required for provider credentials` leaks implementation detail and gives no safe recovery UI. Display actionable local diagnostics and graceful degradation, never expose credentials.
 5. **P1/P2 / responsive: provider credential modal covered by IME in landscape.** Ensure focused field and save/status areas can be scrolled into view above on-screen keyboard; test narrow landscape.

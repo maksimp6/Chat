@@ -1,33 +1,47 @@
-logs/
+# Python
 __pycache__/
 *.pyc
+.venv/
+venv/
+
+# Environment files and secrets (.env.example is the tracked template)
+.env
+.env.*
+!.env.example
+iam_key.json
+
+# Runtime data: local databases, native journal, preview workers, backups
+*.db
+agent_shell.sqlite3
+logos.memory
+logos.memory.lock
+.logos-environments/
+.safe_backups/
+
+# Logs and debug dumps
+logs/
+execution_logs/
+app.log
+app_logs.jsonl
+api_debug.txt
+debug_response.json
+history_debug.json
+
+# Local project dumps and archives
 project_dump.txt
 project_files.txt
 analysis.txt
 logos_pro.zip
-*.db
-iam_key.json
-.env
-.env.*
-!.env.example
-api_debug.txt
-debug_response.json
-history_debug.json
-app.log
-
-# Runtime and local backup artifacts
-.safe_backups/
-execution_logs/
 logos_pro_files.tar.gz
 
-# Local tooling
-node_modules/
+# Dependencies and tooling caches
+# No trailing slash: also covers a root-level node_modules symlink.
+node_modules
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-app_logs.jsonl
 
-# Test coverage artifacts
+# Coverage reports
 .coverage
 .coverage.*
 coverage.xml
@@ -37,13 +51,11 @@ coverage.xml
 /infra-coverage.xml
 htmlcov/
 
-agent_shell.sqlite3
-
-# Native runtime database files and local preview workers
-logos.memory
-logos.memory.lock
-.logos-environments/
-node_modules/
-
-/node_modules
+# Build output
 build/
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/
+*.swp

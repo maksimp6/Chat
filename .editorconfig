@@ -1,0 +1,40 @@
+# EditorConfig: https://editorconfig.org
+# Matches the formatting the repository already uses. Python formatting itself
+# is done by Ruff (scripts/format.sh, settings in pyproject.toml).
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+# Two trailing spaces are a Markdown line break.
+[*.md]
+trim_trailing_whitespace = false
+
+[*.py]
+indent_size = 4
+
+[*.{js,mjs,cjs,css,html,json,yml,yaml,svg,xml}]
+indent_size = 2
+
+[*.sh]
+indent_size = 2
+
+# These older shell scripts indent with 4 spaces.
+[{start.sh,scripts/analyze_logs.sh,scripts/analyze_modules.sh,scripts/cache_cloud_cli.sh,scripts/file.sh,scripts/view_logs.sh,scripts/view_module_logs.sh,tools/device/root/99-logos-mouse.sh}]
+indent_size = 4
+
+[*.{c,h,scad}]
+indent_size = 4
+
+# Vendored upstream code stays exactly as published.
+[{static/vendor/**,browser/emulator/vendor/**,third_party/**}]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+indent_style = unset
+indent_size = unset

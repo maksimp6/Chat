@@ -35,4 +35,4 @@ Do not label successful HTTP reachability as successful OAuth/tools. Historical 
 
 ## Output
 Stage-by-stage evidence, failing boundary, negative tests and live checks still missing.
-Sources: [H06–H08](../../../docs/lessons/README.md), [MCP architecture](../../../docs/architecture/mcp.md).
+Sources: [H06–H08](../../../docs/lessons/README.md), [MCP architecture](../../../docs/mcp/architecture.md).

@@ -15,7 +15,7 @@ Memory — данные и их жизненный цикл. Чат остаёт
 выбирайте adapter. Повторный business service в MCP создаёт второй источник истины.
 
 Существующие [AI pipeline](../architecture/ai-execution-pipeline.md),
-[Universal Tool Platform](../architecture/universal_tool_platform.md) и
+[Universal Tool Platform](../mcp/tools.md) и
 `../../.agents/skills/logos-runtime-debugging/SKILL.md`
 остаются каноническими. Usage/cost считает детерминированный код; текст модели
 может объяснять результат, но не становится расчётным источником.

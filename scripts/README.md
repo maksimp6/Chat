@@ -15,7 +15,6 @@ There are no compatibility copies at the old root paths; update external shortcu
 | `bash scripts/view_logs.sh` | Interactive log viewer | Includes a separately confirmed log deletion menu; not exercised by relocation tests |
 | `bash scripts/view_module_logs.sh` | View module logs | Reads local logs; use `all` at the prompt for a snapshot |
 | `bash scripts/file.sh` | Create a project dump | Writes `project_dump.txt`; inspect content before sharing because tracked files/logs can contain private data |
-| `bash scripts/test_api.sh` | Historical manual API exercise | Creates a conversation and sends chat; external API semantics not validated here |
 | `bash scripts/crl.sh` | Historical manual Git-tool chat exercise | Calls local API, may create a conversation and invoke tools; not an offline test |
 | `bash scripts/install_protobuf_env.sh` | Historical Termux SDK setup | Installs/upgrades packages; never run as part of relocation checks |
 | `python scripts/send_logs.py` | Historical execution-log uploader | Reads checkout `execution_logs/`; upload endpoint and placeholder auth remain unverified |
@@ -26,10 +25,10 @@ There are no compatibility copies at the old root paths; update external shortcu
 | --- | --- |
 | `bash scripts/format.sh write` | Optional: apply the pinned Python formatter (ruff) |
 | `bash scripts/format.sh check` | Optional: verify Python formatting with ruff |
-| `python scripts/local_launch_smoke.py` | Local-launch smoke check |
 
-Other existing scripts retain their current paths. See [repository layout](../docs/architecture/repository-layout.md)
-and [root file inventory](../docs/architecture/root-file-inventory.md) for the ongoing cleanup.
+Other existing scripts retain their current paths. The repository layout and root
+file inventory documents that tracked the cleanup are no longer in the tree; see the
+[documentation index](../docs/README.md) for current documents.
 
 ## Termux device control
 

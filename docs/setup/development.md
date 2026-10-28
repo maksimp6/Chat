@@ -55,8 +55,8 @@ checkout и доступное Python-окружение. Путь workspace ф�
 
 ## Навигация и диагностика
 
-- [Структура репозитория](../architecture/repository-layout.md) — актуальные
-  пакеты и остающиеся модули в корне.
+- Структура репозитория — отдельного документа о пакетах и модулях в корне больше
+  нет; актуальные разделы документации собраны в [указателе](../README.md).
 - [Канонический AI pipeline](../architecture/ai-execution-pipeline.md) —
   invocation, инструменты, trace и billing.
 - [Логирование](../backend/logging.md) и

@@ -2,7 +2,7 @@
 
 История изменений проекта в формате: версия, дата, описание изменений, новые функции, исправления и критические изменения.
 
-Для общего понимания структуры проекта и его компонентов ознакомьтесь с [README](README.md) и [архитектурой системы](architecture/overview.md).
+Для общего понимания структуры проекта и его компонентов ознакомьтесь с [указателем документации](README.md) и его разделом [«Архитектура»](README.md#архитектура).
 
 
 ## 2026-10-10 — Cloud.ru acceptance deploy и persistent RDC
@@ -44,7 +44,7 @@
 ### CI и platform routing
 
 - Добавлен platform-aware CI routing: checks маршрутизируются по affected platform (backend, frontend, Android, CI changes) ([#935](https://github.com/maksimp6/Chat/pull/935)).
-- Добавлена документация: [`development/platform-ci-routing.md`](development/platform-ci-routing.md).
+- Добавлена документация: `development/platform-ci-routing.md` (позже удалена вместе с выведенными workflows).
 - Performance improvement: reuse registry build cache между Logos Dev deployments ([#934](https://github.com/maksimp6/Chat/pull/934)).
 
 Это shipped-функционал, но live Logos Dev deployment verification всё ещё в progress.

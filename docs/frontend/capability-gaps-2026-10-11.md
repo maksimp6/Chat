@@ -44,10 +44,10 @@ consent, устройства, принтеры и deployment не вызыва�
 | OAuth/browser | GitHub login link; service consent/takeover pages; `../../android/app/src/main/java/com/logospro/mobile/BrowserTakeoverActivity.kt` | `../../identity/github_oauth.py`, `../../deploy/chrome-worker/server.mjs`, `../../deploy/chrome-worker/oauth.mjs`, `../../deploy/remote-desktop-commander/oauth.mjs`. Browser status/control/takeover есть в отдельном сервисе; deployment не проверен |
 | Устройства/runtime | SSH settings/test modal; Android local-agent UI | `../../local_agent_gateway.py`: register/heartbeat/poll/result/health; [pairing.py](../../rdc_connection/pairing.py): `/rdc`. Health требует bootstrap authority; redirect может вернуть 401/503 |
 | Память | [memory_panel.js](../../static/memory_panel.js), server-rendered modal | [app.py](../../app.py): manage/config/clear. Facts, enable/limit/clear есть |
-| Backup/replay | Web controls не найдены | `../../agent_memory/backup.py`, `../../agent_memory/file_memory_db.py`, [backup tests](../../tests/test_memory_backup.py). Library capabilities, не operational HTTP restore API |
+| Backup/replay | Web controls не найдены | `../../agent_memory/backup.py`, `../../agent_memory/file_memory_db.py`, backup tests `../../tests/test_memory_backup.py`. Library capabilities, не operational HTTP restore API |
 | Бюджеты/ошибки | [treasury.js](../../static/treasury.js), execution summary, [system_status.js](../../static/system_status.js) | Treasury API, `../../provider_quota_routes.py`, [budget_controller.py](../../economy/budget_controller.py). Paper balance, provider quota и budget policy — разные сущности |
 | 3D business | Chat tools; dashboard отсутствует | `../../printing3d/routes.py`: quote/orders/status/settle/summary/finance; `../../printing3d/tools.py`. Это business slice, не printer controller |
-| Model Editor / slicing / transfer | В master/develop нет viewport/scene editor/print-job UI | #1098/#1101/#1109 только drafts; [printing3d.md](../printing3d.md). Production transport/queue не доказаны |
+| Model Editor / slicing / transfer | В master/develop нет viewport/scene editor/print-job UI | #1098/#1101/#1109 только drafts; `../printing3d.md`. Production transport/queue не доказаны |
 | Задачи/результаты | Chat Execution Surface есть; task workbench нет | [agent_shell CLI](../../agent_shell/__main__.py), [store.py](../../agent_shell/store.py), [task_state.py](../../agent_office/task_state.py). CLI и GitHub evidence lifecycle отдельны; общего web task API в проверенных routes нет |
 
 ## Gaps и критерии приёмки

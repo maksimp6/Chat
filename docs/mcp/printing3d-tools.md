@@ -114,8 +114,12 @@ Browser capability использует action-level approval:
 
 Связанные документы:
 
-- [3D Printing Business](../printing3d.md)
-- [3D HTTP API](../api/printing3d.md)
+- [Конвейер Bambu Lab A1 mini](../printing3d-a1mini-full-workflow.md)
+- [FDM shape capability protocol](../printing3d/shape-qa.md)
+- [3D-превью в комментариях GitHub](../printing3d-render-comments.md)
+
+Прежние документы 3D Printing Business (`docs/printing3d.md`) и 3D HTTP API
+(`docs/api/printing3d.md`) удалены из дерева и доступны в истории Git.
 
 ## CAD/editor local tools
 

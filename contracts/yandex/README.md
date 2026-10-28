@@ -10,7 +10,7 @@
 Источник: [yandex-cloud/docs, fddbac0226d030d57d089b730f92abd02e583df2](https://github.com/yandex-cloud/docs/tree/fddbac0226d030d57d089b730f92abd02e583df2/ru/ai-studio),
 **2 марта 2026 года**, получен 23 октября. Это контракт исторического снимка,
 не актуализированная спецификация сервиса. Оригиналы не менялись.
-Авторство: YANDEX LLC, 2018 и участники; [CC BY 4.0](../../docs/mirrors/yandex-ai-studio/source/LICENSE).
+Авторство: YANDEX LLC, 2018 и участники; [CC BY 4.0](https://github.com/yandex-cloud/docs/blob/fddbac0226d030d57d089b730f92abd02e583df2/LICENSE).
 Изменения Logos: выделение схем/привязок, именование, строгая политика неизвестных
 полей, пометки неполноты. Путь и SHA-256 исходника есть у каждого контракта.
 
@@ -77,9 +77,9 @@ REST `string (int64)` проверяется как десятичная стр�
 
 Auth, заголовки, глобальные квоты, транспортные ошибки, совместимость конкретной
 модели и реальный сервис этими payload-схемами не проверяются. Их источники:
-[authentication](../../docs/mirrors/yandex-ai-studio/source/ru/ai-studio/api-ref/authentication.md),
-[support headers](../../docs/mirrors/yandex-ai-studio/source/ru/ai-studio/api-ref/support-headers.md),
-[limits](../../docs/mirrors/yandex-ai-studio/source/ru/ai-studio/concepts/limits.md).
+[authentication](https://github.com/yandex-cloud/docs/blob/fddbac0226d030d57d089b730f92abd02e583df2/ru/ai-studio/api-ref/authentication.md),
+[support headers](https://github.com/yandex-cloud/docs/blob/fddbac0226d030d57d089b730f92abd02e583df2/ru/ai-studio/api-ref/support-headers.md),
+[limits](https://github.com/yandex-cloud/docs/blob/fddbac0226d030d57d089b730f92abd02e583df2/ru/ai-studio/concepts/limits.md).
 Псевдо-HTTP привязки realtime сохранены как описание событий с направлением;
 они не объявляются рабочими самостоятельными HTTP endpoints.
 
@@ -90,6 +90,10 @@ Auth, заголовки, глобальные квоты, транспортн�
 по документации, проверенной 24.10.2026. Неизвестные формы не допускаются в сеть.
 
 ## Воспроизведение и проверка
+
+Локального зеркала `docs/mirrors/yandex-ai-studio/` и каталога `tests/` в текущем
+дереве нет: команды ниже требуют их восстановления. Ссылки на источник в этом
+документе ведут на тот же снимок `yandex-cloud/docs` по SHA.
 
 ```bash
 git lfs pull --include="docs/mirrors/yandex-ai-studio/source/**" --exclude=""
