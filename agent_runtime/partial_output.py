@@ -17,20 +17,23 @@ def extract_response_text(data: dict[str, Any]) -> tuple[str, str]:
         if not isinstance(item, dict):
             continue
         content = item.get("content", [])
-        if item.get("type") == "output_text" and item.get("text"):
-            text_parts.append(str(item["text"]))
-        if not isinstance(content, list):
-            continue
-        for part in content:
-            if not isinstance(part, dict) or not part.get("text"):
-                continue
-            part_type = part.get("type")
-            if part_type == "reasoning_text":
-                reasoning_parts.append(str(part["text"]))
-            elif part_type in ("output_text", "text"):
-                text_parts.append(str(part["text"]))
+        # An output_text item that also repeats its text in content is counted once.
+        item_text = item.get("type") == "output_text" and item.get("text")
+        item_parts = [str(item["text"])] if item_text else []
+        if isinstance(content, list):
+            for part in content:
+                if not isinstance(part, dict) or not part.get("text"):
+                    continue
+                part_type = part.get("type")
+                if part_type == "reasoning_text":
+                    reasoning_parts.append(str(part["text"]))
+                elif part_type in ("output_text", "text") and not item_text:
+                    item_parts.append(str(part["text"]))
+        if item_parts:
+            text_parts.append("".join(item_parts))
 
-    text = "".join(text_parts).strip()
+    # Separate output items, so adjacent messages do not run together.
+    text = "\n\n".join(text_parts).strip()
     if not text:
         text = str(data.get("output_text") or data.get("text") or "").strip()
     return "\n\n".join(reasoning_parts), text

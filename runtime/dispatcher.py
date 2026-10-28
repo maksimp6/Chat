@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import errno
+import os
+import stat
+import uuid
 from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import RLock, local
@@ -100,7 +104,25 @@ class RuntimeDispatcher:
         if not isinstance(content, str):
             raise TypeError("runtime filesystem content must be text")
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
+        # A sibling file renamed into place: a failed write never leaves a partial file.
+        try:
+            mode = stat.S_IMODE(path.stat().st_mode)
+        except FileNotFoundError:
+            mode = None
+        # The error write_text raised for an existing file that is not writable.
+        if mode is not None and not os.access(path, os.W_OK):
+            raise PermissionError(errno.EACCES, os.strerror(errno.EACCES), str(path))
+        temporary = path.parent / f".{uuid.uuid4().hex}.tmp"
+        try:
+            with open(temporary, "x", encoding="utf-8") as stream:
+                if mode is not None:
+                    os.fchmod(stream.fileno(), mode)
+                stream.write(content)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
 
     def register_runtime(
         self,
@@ -134,6 +156,11 @@ class RuntimeDispatcher:
         with self._lock:
             self._runtimes.pop(runtime_id, None)
             self._tool_boundaries.pop(runtime_id, None)
+            self._storage_providers = {
+                key: provider
+                for key, provider in self._storage_providers.items()
+                if key[0] != runtime_id
+            }
 
     def register_tool_executor(
         self,
@@ -210,6 +237,13 @@ class RuntimeDispatcher:
                 "Storage provider credentials are not configured"
             )
         values = dict(payload or {})
+        # A missing field is the caller's error, not a provider failure.
+        for field_name in {
+            "upload": ("object_id", "content"),
+            "download": ("object_id",),
+        }.get(action, ()):
+            if field_name not in values:
+                raise bound.StorageError(f"Storage {action} requires {field_name}")
         try:
             if action == "upload":
                 return provider.upload(

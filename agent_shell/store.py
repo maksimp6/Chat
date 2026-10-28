@@ -120,7 +120,10 @@ class TaskStore:
             raise ValueError("invalid kind")
         if not isinstance(title, str) or not 1 <= len(title) <= MAX_TITLE:
             raise ValueError("invalid title")
-        body = json.dumps(payload or {}, sort_keys=True, allow_nan=False)
+        # Only the default None becomes {}; any other value is stored as given.
+        body = json.dumps(
+            {} if payload is None else payload, sort_keys=True, allow_nan=False
+        )
         if len(body.encode()) > MAX_PAYLOAD_BYTES:
             raise ValueError("payload too large")
         now = time.time()
@@ -222,6 +225,10 @@ class TaskStore:
             task = state["tasks"].get(str(task_id))
             if task is None:
                 raise ValueError("task not found")
+            # Only a running task gets its outcome: a done task never becomes failed, and a
+            # task failed as interrupted is not finished again.
+            if task["status"] != "running":
+                raise ValueError("task is not running")
             task["status"] = status
             task["result"] = result
             task["error"] = error

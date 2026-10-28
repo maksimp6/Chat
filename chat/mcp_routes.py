@@ -1,6 +1,7 @@
 """Маршруты чата с сохранением полной цепочки выполнения в БД."""
 
 from flask import Blueprint, request, jsonify
+import json as _json
 import threading
 import logging
 import re
@@ -78,6 +79,31 @@ def _tool_rounds(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise ValueError("max_rounds must be a positive integer or null")
     return value
+
+
+def _tool_call_parts(tool_call: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
+    function = tool_call.get("function")
+    if not isinstance(function, dict):
+        function = {}
+    name = tool_call.get("name") or function.get("name")
+    if name and "<|" in name:
+        name = name.split("<|", 1)[0].strip()
+
+    arguments = (
+        tool_call["arguments"]
+        if "arguments" in tool_call
+        else function.get("arguments", {})
+    )
+    if isinstance(arguments, str):
+        try:
+            arguments = _json.loads(arguments)
+        except ValueError:
+            raise ValueError(
+                "Invalid tool arguments: expected a valid JSON object"
+            ) from None
+    if not isinstance(arguments, dict):
+        raise ValueError("Invalid tool arguments: expected a JSON object")
+    return name, arguments
 
 
 # WIKIFUNCTIONS-CANDIDATE WF-05: https://www.wikifunctions.org/wiki/Z873 + Z872 + Z10079.

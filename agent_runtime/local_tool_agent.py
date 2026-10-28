@@ -351,10 +351,15 @@ class LocalToolAgent:
             result = bound.UniversalToolExecutor(bound.registry).execute(call)
             status = "completed" if result.get("success") else "failed"
         except Exception as exc:
+            # The message may name local paths or internals: it stays in the local log,
+            # only the exception type reaches the gateway and the model.
+            logger.exception(
+                "Local tool %s failed before returning a result", tool_name
+            )
             result = {
                 "success": False,
                 "data": None,
-                "error": f"{type(exc).__name__}: {exc}",
+                "error": type(exc).__name__,
             }
             status = "failed"
 

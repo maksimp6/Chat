@@ -138,10 +138,12 @@ def resolve_commit(branch: str, commit_sha: Optional[str] = None) -> str:
 
 
 def prepare_environment_records() -> None:
-    with _RUNTIME_WORKERS_LOCK:
-        active = set(_RUNTIME_WORKERS)
     store = get_store()
     with store.transaction() as tx:
+        # Read the workers under the store lock: a start registers its worker before it records
+        # RUNNING, so a running environment is never marked STOPPED from an older snapshot.
+        with _RUNTIME_WORKERS_LOCK:
+            active = set(_RUNTIME_WORKERS)
         for key, row in store.items(prefix="environment/record/").items():
             if row["status"] == "RUNNING" and row["environment_id"] not in active:
                 tx.set(
@@ -638,7 +640,7 @@ def create_environment(
         "environment_id": environment_id,
         "branch_name": branch.strip(),
         "commit_sha": resolved,
-        "status": "CREATING",
+        "status": "STOPPED",
         "url": _public_url(environment_id),
         "runtime_pid": None,
         "runtime_port": None,
@@ -651,11 +653,8 @@ def create_environment(
         "deleted_at": None,
         "error": None,
     }
-    item["status"] = "STOPPED"
     with get_store().transaction() as tx:
         tx.set("environment/record/" + environment_id, item)
-    _transition("CREATING", "STOPPED")
-    item["status"] = "STOPPED"
     _record_trace(item, "CREATE_ENVIRONMENT", "SUCCESS", context=context)
     return item
 

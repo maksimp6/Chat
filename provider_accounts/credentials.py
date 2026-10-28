@@ -24,6 +24,7 @@ DISABLED = "disabled"
 YANDEX = "yandex"
 CLOUDRU = "cloudru"
 SUPPORTED_PROVIDERS = (YANDEX, CLOUDRU)
+_HEALTH_STATUSES = {"configured", "connected", "invalid", "unavailable", "unknown"}
 
 
 class CredentialError(RuntimeError):
@@ -159,7 +160,9 @@ def bootstrap_credential(
                 fingerprint_key(api_key),
             )
     if existing is not None:
-        assert decrypt is not None
+        # An explicit check, not assert: python -O strips asserts.
+        if decrypt is None:
+            raise NoActiveCredentialError("provider credential already bootstrapped")
         return get_active_credential(db, decrypt, now, provider=provider)
     return get_active_credential(db, lambda _encrypted: api_key, now, provider=provider)
 
@@ -210,6 +213,53 @@ def replace_active_credential(
     )
 
 
+def replace_active_credentials(
+    db: Any,
+    replacements: list[tuple[str, str, str, Optional[str], str]],
+    encrypt: Callable[[str], str],
+    *,
+    now: Optional[datetime] = None,
+    ttl: timedelta = KEY_TTL,
+) -> None:
+    """Store several providers' new keys and their health status in one transaction.
+
+    Each replacement is ``(provider, api_key, project_id, provider_key_id, health_status)``.
+    A failure stores none of them, so no provider is left on its new key while another
+    keeps its old one.
+    """
+    for provider, api_key, _project_id, _key_id, status in replacements:
+        if provider not in SUPPORTED_PROVIDERS or not api_key:
+            raise ValueError("valid provider and nonempty api_key required")
+        if status not in _HEALTH_STATUSES:
+            raise ValueError("Unsupported health status")
+    issued, expires = issue_window(now, ttl=ttl)
+    encrypted = [encrypt(item[1]) for item in replacements]
+    with db.transaction() as tx:
+        for (provider, api_key, project_id, key_id, status), secret in zip(
+            replacements, encrypted
+        ):
+            identity = _publish_credential(
+                tx,
+                secret,
+                project_id,
+                provider,
+                key_id,
+                issued,
+                expires,
+                fingerprint_key(api_key),
+            )
+            key = "provider/credential/" + str(identity)
+            tx.set(
+                key,
+                {
+                    **tx.get(key),
+                    "last_checked_at": utcnow().isoformat(),
+                    "last_check_status": status,
+                    "last_check_error": None,
+                },
+            )
+
+
 def resolve_client_credential(
     config: Any,
     db: Any = None,
@@ -235,7 +285,8 @@ def list_provider_credentials(
     rows = [
         row
         for row in db.items(prefix="provider/credential/").values()
-        if provider is None or row["provider"] == provider
+        # .get: a record written without the field matches no provider instead of raising KeyError.
+        if provider is None or row.get("provider") == provider
     ]
     return [
         {key: value for key, value in row.items() if key != "api_key_encrypted"}
@@ -294,11 +345,12 @@ def record_health_check(
     status: str,
     error: Optional[str] = None,
     checked_at: Optional[datetime] = None,
+    # Kept for existing callers and ignored: every call is its own committed native transaction.
     commit: bool = True,
 ) -> None:
     if provider not in SUPPORTED_PROVIDERS:
         raise ValueError("Unsupported provider")
-    if status not in {"configured", "connected", "invalid", "unavailable", "unknown"}:
+    if status not in _HEALTH_STATUSES:
         raise ValueError("Unsupported health status")
     with db.transaction() as tx:
         identity = tx.get("provider/active/" + provider)

@@ -308,7 +308,6 @@ class YandexRequestMixin:
                     "correlation_id": execution_trace.get_step_correlation_id(
                         trace_step_number
                     ),
-                    "payload": _sanitize_for_log(payload),
                 },
             )
 
@@ -437,8 +436,14 @@ class YandexRequestMixin:
             or data.get("error") is not None
         ):
             _record_quota_usage(execution_trace, quota_reservation, data)
+            if status not in ("completed", "incomplete"):
+                # A failed or cancelled task produced no answer, so the reserved
+                # request is not charged; tokens the provider reported stay recorded.
+                release_request(quota_reservation)
             return data
         if not task_id:
+            # Nothing can be polled, so no answer comes for the reserved request.
+            release_request(quota_reservation)
             raise YandexClientError("Provider response has no task id to poll")
         wait_params = {"timeout": poll_timeout} if "poll_timeout" in params else {}
         result = self._wait(
@@ -451,4 +456,11 @@ class YandexRequestMixin:
         if on_provider_response is not None:
             on_provider_response(result)
         _record_quota_usage(execution_trace, quota_reservation, result)
+        if not isinstance(result, dict) or result.get("status") not in (
+            "completed",
+            "incomplete",
+        ):
+            # A failed or cancelled task produced no answer, so the reserved request is
+            # not charged; tokens the provider reported stay recorded.
+            release_request(quota_reservation)
         return result

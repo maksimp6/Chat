@@ -12,7 +12,7 @@ from mcp_server.protocol import (
     _request_protocol_version,
     _server_info,
 )
-from mcp_server.runtime_bridge import _handle_call
+from mcp_server.runtime_bridge import ToolOutputError, _handle_call
 from mcp_server.tools import _tools_list
 
 chatgpt_mcp_bp = Blueprint("chatgpt_mcp", __name__)
@@ -178,6 +178,15 @@ def mcp_post() -> Response:
                 request_id,
                 -32602,
                 _client_error_message(exc, "Tool input validation failed"),
+            )
+        except ToolOutputError as exc:
+            # The tool already ran; the ids point to its persisted result and trace.
+            return _error_response(
+                request_id,
+                -32603,
+                _client_error_message(exc, "Tool output serialization failed"),
+                {"invocation_id": exc.invocation_id, "trace_id": exc.trace_id},
+                status=500,
             )
         except Exception:
             return _error_response(

@@ -116,8 +116,6 @@ def validate_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
         if len(value) > 512:
             raise SSHRuntimeError("command_allowlist pattern is too long")
         try:
-            import re
-
             re.compile(value)
         except re.error as exc:
             raise SSHRuntimeError(
@@ -236,8 +234,6 @@ def build_runtime() -> SSHRuntime:
 
 
 def command_matches_allowlist(command: str, allowlist: list[str]) -> bool:
-    import re
-
     value = str(command or "").strip()
     return any(re.fullmatch(pattern, value) for pattern in allowlist)
 

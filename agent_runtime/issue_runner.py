@@ -168,14 +168,28 @@ def change_snapshot(repo_root: Path = ROOT) -> dict[str, str]:
 
 
 def changed_files(repo_root: Path = ROOT) -> list[str]:
+    # -z: paths arrive unquoted; a rename or copy entry is followed by its source.
     output = subprocess.run(
-        ["git", "status", "--porcelain", "--untracked-files=all"],
+        ["git", "status", "--porcelain", "-z", "--untracked-files=all"],
         cwd=repo_root,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="backslashreplace",
         check=True,
     ).stdout
-    return sorted(line[3:] for line in output.splitlines() if line.strip())
+    entries = iter(output.split("\0"))
+    names = []
+    for entry in entries:
+        if not entry.strip():
+            continue
+        names.append(entry[3:])
+        if "R" in entry[:2] or "C" in entry[:2]:
+            source = next(entries, "")
+            # A rename removes its source path; a copy leaves it unchanged.
+            if "R" in entry[:2] and source:
+                names.append(source)
+    return sorted(names)
 
 
 def _billing_summary(billing: dict[str, Any]) -> dict[str, Any]:
@@ -360,11 +374,13 @@ def run_issue_task(
         if pending:
             # LogosClient stops instead of running approval-gated tools; never auto-approve.
             result["status"] = "needs_approval"
+            # A call without a name stays listed as None; str() keeps the sort total.
             result["pending_tools"] = sorted(
                 {
                     call.get("name") or (call.get("function") or {}).get("name")
                     for call in pending
-                }
+                },
+                key=lambda name: (name is None, str(name)),
             )
         if result["provider_error_present"]:
             result.update(status="failed", error="ProviderResponseError")
@@ -388,7 +404,6 @@ def run_issue_task(
     result["changed_files"] = files
     if files:
         result.update(status="failed", error="ReadOnlyScopeViolation")
-    result.setdefault("status", "changed" if files else "no_changes")
     result["file_status"] = "changed" if files else "no_changes"
     if result["status"] == "running":
         result["status"] = result["file_status"]
@@ -408,21 +423,6 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
-
-    from agent_runtime.generation_gate import GENERATION_BLOCKED, generation_allowed
-
-    if not generation_allowed():
-        # Closed by default: no credential, client or model request without owner permission.
-        blocked = {
-            "status": "blocked",
-            "error": GENERATION_BLOCKED,
-            "changed_files": [],
-        }
-        args.out.write_text(
-            json.dumps(blocked, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-        print(json.dumps({"status": blocked["status"], "changed_files": []}))
-        return 1
 
     if _CALLER_MEMORY_PATH is None:
         # core/.env, loaded by the root above, must not satisfy the review-store check.

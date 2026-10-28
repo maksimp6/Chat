@@ -251,7 +251,8 @@ class SkillRegistry:
             )
         metadata = self._read_metadata(name)
         path = self._skill_path(name)
-        raw = path.read_bytes()
+        with path.open("rb") as handle:
+            raw = handle.read(MAX_SKILL_BYTES + 1)
         if len(raw) > MAX_SKILL_BYTES:
             raise SkillFormatError(f"{name}: SKILL.md exceeds {MAX_SKILL_BYTES} bytes")
         text = raw.decode("utf-8")

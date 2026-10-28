@@ -258,17 +258,24 @@ def list_local_files():
             inside_root = False
         if not inside_root:
             return jsonify({"error": "Недопустимый путь"}), 400
-        if not os.path.exists(target_dir):
+        if not os.path.isdir(target_dir):
             return jsonify({"error": f"Папка не найдена: /{subpath}"}), 404
         items = []
-        for entry in os.scandir(target_dir):
-            items.append(
-                {
-                    "name": entry.name,
-                    "is_dir": entry.is_dir(),
-                    "size": entry.stat().st_size if entry.is_file() else 0,
-                }
-            )
+        with os.scandir(target_dir) as entries:
+            for entry in entries:
+                # A link is listed as itself, a non-directory of size 0, so nothing about its
+                # target shows. An entry whose metadata cannot be read (a vanished file, no
+                # permission) is listed without its size instead of failing the whole listing.
+                try:
+                    is_dir = entry.is_dir(follow_symlinks=False)
+                    size = (
+                        entry.stat(follow_symlinks=False).st_size
+                        if entry.is_file(follow_symlinks=False)
+                        else 0
+                    )
+                except OSError:
+                    is_dir, size = False, 0
+                items.append({"name": entry.name, "is_dir": is_dir, "size": size})
         rel = os.path.relpath(target_dir, root_dir)
         shown = "/" if rel == "." else "/" + rel.replace(os.sep, "/")
         return jsonify({"success": True, "path": shown, "items": items})

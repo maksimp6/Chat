@@ -44,6 +44,15 @@ def _execute_mcp_tool(
     )
 
 
+class ToolOutputError(RuntimeError):
+    """The tool ran, but its result could not be serialized for the MCP client."""
+
+    def __init__(self, message: str, *, invocation_id: str, trace_id: str) -> None:
+        super().__init__(message)
+        self.invocation_id = invocation_id
+        self.trace_id = trace_id
+
+
 def _handle_call(
     name: str,
     arguments: Any,
@@ -92,6 +101,10 @@ def _handle_call(
     )
 
     trace_token = bind_current_trace(trace)
+    trace_data = None
+    # Set once the invocation outcome is being recorded: errors raised from there
+    # on propagate as they are, without a second failure record.
+    invocation_closed = False
     try:
         if runtime_id:
             result = runtime_dispatcher().dispatch(
@@ -117,6 +130,7 @@ def _handle_call(
         persist_invocation_trace(context.invocation_id, trace_data)
 
         if not result.get("success"):
+            invocation_closed = True
             fail_invocation(
                 context.invocation_id,
                 error={
@@ -144,6 +158,26 @@ def _handle_call(
                     raise LookupError(execution_error.split(":", 1)[1].strip())
             raise RuntimeError(result.get("error") or "Tool execution failed")
 
+        try:
+            text = json.dumps(result.get("data"), ensure_ascii=False)
+        except (TypeError, ValueError) as exc:
+            # The tool already ran: this is an output failure, not invalid input.
+            invocation_closed = True
+            fail_invocation(
+                context.invocation_id,
+                error={
+                    "tool": name,
+                    "error": f"Tool output is not JSON serializable: {exc}",
+                    "phase": "output",
+                },
+            )
+            raise ToolOutputError(
+                "Tool output serialization failed",
+                invocation_id=context.invocation_id,
+                trace_id=context.trace_id,
+            ) from exc
+
+        invocation_closed = True
         finish_invocation(
             context.invocation_id,
             result={"tool": name, "success": True, "trace_id": context.trace_id},
@@ -153,7 +187,7 @@ def _handle_call(
             "content": [
                 {
                     "type": "text",
-                    "text": json.dumps(result.get("data"), ensure_ascii=False),
+                    "text": text,
                 }
             ],
             "_meta": {
@@ -177,12 +211,15 @@ def _handle_call(
             context.invocation_id, error={"tool": name, "error": "runtime unavailable"}
         )
         raise PermissionError("Runtime scope is unavailable") from exc
-    except (LookupError, PermissionError, ValueError, RuntimeError):
-        raise
     except Exception as exc:
-        trace.record_error("mcp_tool_call", str(exc), exception=exc)
-        trace_data = trace.finalize()
-        persist_invocation_trace(context.invocation_id, trace_data)
+        if invocation_closed:
+            raise
+        if trace_data is None:
+            # A finalized trace cannot take the error; recording it would replace exc.
+            if not trace.finalized:
+                trace.record_error("mcp_tool_call", str(exc), exception=exc)
+            trace_data = trace.finalize()
+            persist_invocation_trace(context.invocation_id, trace_data)
         fail_invocation(context.invocation_id, error={"tool": name, "error": str(exc)})
         raise
     finally:

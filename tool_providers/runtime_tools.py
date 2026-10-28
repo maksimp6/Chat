@@ -6,6 +6,7 @@ from tool_providers._vendor.output import limit_output
 import math
 import os
 import shutil
+import signal
 import subprocess
 from typing import Any
 from tool_providers.host import assert_operation_allowed, bound, build_runtime
@@ -113,16 +114,36 @@ def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
     )
 
     try:
-        completed = subprocess.run(
+        with subprocess.Popen(
             [shutil.which("bash") or "sh", "-lc", command],
             shell=False,
-            check=False,
             stdin=subprocess.DEVNULL,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             cwd=cwd,
             env=_command_environment(),
-            timeout=timeout,
+            start_new_session=True,
+        ) as proc:
+            try:
+                stdout, stderr = proc.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired as exc:
+                # The shell leads its own session: kill its children too, or they outlive the timeout.
+                if os.name == "posix":
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass  # the group exited right at the deadline
+                    proc.wait()
+                else:
+                    proc.kill()
+                    exc.stdout, exc.stderr = proc.communicate()
+                raise
+            except BaseException:
+                proc.kill()
+                raise
+        completed = subprocess.CompletedProcess(
+            proc.args, proc.returncode, stdout, stderr
         )
     except subprocess.TimeoutExpired as exc:
         result = {

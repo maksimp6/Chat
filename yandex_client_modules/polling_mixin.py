@@ -13,11 +13,17 @@ class YandexPollingMixin:
     def _wait(
         self, task_id, timeout=180, execution_trace=None, trace_step=None, headers=None
     ):
-        start = time.time()
+        # The deadline runs on the monotonic clock: a wall-clock jump on the phone
+        # neither ends the wait early nor stretches it.
+        start = time.monotonic()
         url = self.responses_url + "/" + task_id
         delay = 0.5
         last_snapshot = None
-        while time.time() - start < timeout:
+        # Only a change of poll error is traced: an unreachable provider would otherwise
+        # add an event and an error for every attempt of the wait.
+        last_poll_error = None
+        failed_polls = 0
+        while time.monotonic() - start < timeout:
             try:
                 poll_start = time.time()
                 # Polls read a request that ask() already admitted and counted. Charging
@@ -27,8 +33,12 @@ class YandexPollingMixin:
                     self.session.get(url, headers=headers, timeout=15)
                 )
                 if resp.status_code == 404:
-                    if execution_trace and isinstance(
-                        execution_trace, bound.ExecutionTrace
+                    failed_polls += 1
+                    poll_error = ("HTTP 404 while polling response", "PollNotFound")
+                    if (
+                        execution_trace
+                        and isinstance(execution_trace, bound.ExecutionTrace)
+                        and poll_error != last_poll_error
                     ):
                         execution_trace.add_event(
                             "api_poll_error",
@@ -47,8 +57,9 @@ class YandexPollingMixin:
                             step=trace_step,
                             error_type="PollNotFound",
                         )
+                    last_poll_error = poll_error
                     time.sleep(delay)
-                    delay = min(delay * 1.5, poll_delay_cap(time.time() - start))
+                    delay = min(delay * 1.5, poll_delay_cap(time.monotonic() - start))
                     continue
                 resp.raise_for_status()
             except requests.RequestException as e:
@@ -58,8 +69,12 @@ class YandexPollingMixin:
                     if status_code is not None
                     else f"Provider polling transport error ({type(e).__name__})"
                 )
-                if execution_trace and isinstance(
-                    execution_trace, bound.ExecutionTrace
+                failed_polls += 1
+                poll_error = (error_message, type(e).__name__)
+                if (
+                    execution_trace
+                    and isinstance(execution_trace, bound.ExecutionTrace)
+                    and poll_error != last_poll_error
                 ):
                     execution_trace.add_event(
                         "api_poll_error",
@@ -79,6 +94,7 @@ class YandexPollingMixin:
                         step=trace_step,
                         error_type=type(e).__name__,
                     )
+                last_poll_error = poll_error
                 if (
                     isinstance(status_code, int)
                     and 400 <= status_code < 500
@@ -88,9 +104,10 @@ class YandexPollingMixin:
                         error_message, status_code=status_code
                     ) from e
                 time.sleep(delay)
-                delay = min(delay * 1.5, poll_delay_cap(time.time() - start))
+                delay = min(delay * 1.5, poll_delay_cap(time.monotonic() - start))
                 continue
 
+            last_poll_error = None
             invalid_json = False
             try:
                 data = resp.json()
@@ -191,7 +208,7 @@ class YandexPollingMixin:
                 # and caller; provider failures use the normal diagnostics path.
                 return response
             time.sleep(delay)
-            delay = min(delay * 1.5, poll_delay_cap(time.time() - start))
+            delay = min(delay * 1.5, poll_delay_cap(time.monotonic() - start))
 
         if execution_trace and isinstance(execution_trace, bound.ExecutionTrace):
             execution_trace.add_event(
@@ -203,6 +220,7 @@ class YandexPollingMixin:
                     ),
                     "response_id": task_id,
                     "timeout": timeout,
+                    "failed_polls": failed_polls,
                 },
             )
         if execution_trace and isinstance(execution_trace, bound.ExecutionTrace):

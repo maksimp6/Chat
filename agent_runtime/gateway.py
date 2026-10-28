@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from threading import RLock
+from threading import Event, RLock, Thread
 from typing import Any, Callable, Mapping, MutableMapping, Optional
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
@@ -341,18 +340,29 @@ class AgentGateway:
     def _invoke_once(
         handler: AgentHandler, payload: Mapping[str, Any], timeout_seconds: float
     ) -> Any:
-        # Not a `with` block: leaving one waits for the handler, which would make the timeout
-        # meaningless. An overrunning handler keeps running in its thread, but the caller returns.
-        pool = ThreadPoolExecutor(max_workers=1)
-        try:
-            future = pool.submit(handler, payload)
-            return future.result(timeout=timeout_seconds)
-        except FutureTimeoutError as exc:
+        # A daemon thread, not a ThreadPoolExecutor: the interpreter joins executor
+        # threads at exit, so a handler that overran its timeout would hold the process
+        # open. An overrunning handler keeps running in its thread, but the caller
+        # returns and exit does not wait for it.
+        outcome: dict[str, Any] = {}
+        finished = Event()
+
+        def run() -> None:
+            try:
+                outcome["result"] = handler(payload)
+            except BaseException as exc:  # re-raised in the calling thread below
+                outcome["error"] = exc
+            finally:
+                finished.set()
+
+        Thread(target=run, daemon=True).start()
+        if not finished.wait(timeout_seconds):
             raise AgentTimeoutError(
                 f"agent invocation timed out after {timeout_seconds:.2f}s"
-            ) from exc
-        finally:
-            pool.shutdown(wait=False, cancel_futures=True)
+            )
+        if "error" in outcome:
+            raise outcome["error"]
+        return outcome["result"]
 
     def invoke(
         self,
@@ -418,11 +428,14 @@ class AgentGateway:
         for attempt in range(1, retries + 2):
             attempts = attempt
             if attempt > 1:
-                # A circuit that opened during an earlier attempt stops the retries too.
+                # A circuit that opened during an earlier attempt stops the retries too,
+                # and a retry counts against the agent's rate limit like the first one.
                 with self._lock:
                     try:
-                        self._check_circuit(agent_id, time.monotonic())
-                    except AgentCircuitOpenError as exc:
+                        now = time.monotonic()
+                        self._check_circuit(agent_id, now)
+                        self._check_rate(agent_id, now)
+                    except (AgentCircuitOpenError, AgentRateLimitError) as exc:
                         last_error = str(exc)
                         break
             try:

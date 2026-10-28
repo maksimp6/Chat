@@ -498,7 +498,8 @@ window.fetchVectorStores = function () {
     // === Рендер файлов ===
     function renderFile(file) {
       var list = document.getElementById("file-list");
-      if (list.children.length === 1 && list.children[0].innerText.includes("Загрузка")) {
+      // Any single child that is not a file row is a placeholder; its text is not checked.
+      if (list.children.length === 1 && list.children[0].id.indexOf("file-row-") !== 0) {
         list.innerHTML = "";
       }
 
@@ -575,7 +576,7 @@ window.fetchVectorStores = function () {
               deleteBtn.innerText = "...";
               // The server waits up to 30 s for a DELETE and does not retry it, so wait a little longer.
               window.LogosDispatcher.request(
-                "/api/files/" + fileId,
+                "/api/files/" + encodeURIComponent(fileId),
                 { method: "DELETE" },
                 { timeoutMs: 35000 },
               )

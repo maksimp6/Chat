@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import threading
 import time
 from typing import Any, Mapping, Optional
 from uuid import uuid4
@@ -19,6 +20,10 @@ _AGENT_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _MAX_CAPABILITIES = 64
 _DEFAULT_LEASE_SECONDS = 30
 _PROTOCOL_VERSION = 2
+
+# A claimed job or a stored result wakes the waiters, so they do not poll the store.
+_job_changes = threading.Condition()
+_job_change_count = 0
 
 
 def _protocol_error():
@@ -152,6 +157,13 @@ def _require_agent(agent_id: str) -> dict[str, Any]:
     return row
 
 
+def _notify_job_change() -> None:
+    global _job_change_count
+    with _job_changes:
+        _job_change_count += 1
+        _job_changes.notify_all()
+
+
 def prepare_local_agent_records() -> None:
     get_store()
 
@@ -214,6 +226,9 @@ def wait_for_local_tool_job(job_id: str, *, timeout_seconds: float = 30.0) -> An
         raise ValueError("timeout_seconds must be between 0 and 3600")
     deadline = time.monotonic() + timeout
     while True:
+        # Read before the job, so a change made after this point cannot be missed below.
+        with _job_changes:
+            seen = _job_change_count
         key = "local-job/" + str(job_id)
         with get_store().transaction() as tx:
             row = tx.get(key)
@@ -239,7 +254,14 @@ def wait_for_local_tool_job(job_id: str, *, timeout_seconds: float = 30.0) -> An
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             continue
-        time.sleep(min(0.05, remaining))
+        # Sleep until the job is claimed or finished, its lease runs out or the
+        # deadline passes.
+        wait = remaining
+        if row.get("lease_until") is not None:
+            wait = min(wait, max(0.0, row["lease_until"] - time.time()))
+        with _job_changes:
+            if _job_change_count == seen:
+                _job_changes.wait(wait)
 
 
 def _recover_expired_jobs(conn, agent_id: str) -> None:
@@ -395,6 +417,8 @@ def local_agent_poll(agent_id: str):
             )
     except LookupError:
         return jsonify({"error": "agent_not_found"}), 404
+    # The waiter learns the claim's lease, so it wakes when that lease runs out.
+    _notify_job_change()
     return jsonify(
         {
             "protocol_version": _PROTOCOL_VERSION,
@@ -511,6 +535,7 @@ def local_agent_result(agent_id: str, job_id: str):
             )
     except LookupError:
         return jsonify({"error": "agent_not_found"}), 404
+    _notify_job_change()
 
     return jsonify(
         {

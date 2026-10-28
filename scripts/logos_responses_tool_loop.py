@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any, Callable, Iterable
 
 
@@ -42,7 +43,8 @@ def make_function_call_output(call: dict[str, Any], result: Any) -> dict[str, An
     if not call_id:
         raise ValueError("function_call is missing call_id/id")
     if isinstance(result, (dict, list)):
-        output = json.dumps(result, ensure_ascii=False)
+        # bytes, datetime or Decimal inside a tool result must not end the tool chain.
+        output = json.dumps(result, ensure_ascii=False, default=str)
     else:
         output = "" if result is None else str(result)
     return {"type": "function_call_output", "call_id": call_id, "output": output}
@@ -123,7 +125,14 @@ def run_tool_loop(
         tool_outputs = []
         for call in calls:
             call_id = call.get("call_id") or call.get("id")
-            result = execute_tool(call)
+            try:
+                result = execute_tool(call)
+            except Exception as exc:
+                logging.getLogger("logos." + __name__).exception(
+                    "tool call %s failed", call_id
+                )
+                # The model gets the failure as this call's output; the loop goes on.
+                result = {"error": str(exc) or type(exc).__name__}
             tool_outputs.append(make_function_call_output(call, result))
             executed.add(call_id)
         continuation_input = list(response.get("output", []) or []) + tool_outputs

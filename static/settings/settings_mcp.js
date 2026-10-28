@@ -117,7 +117,7 @@
         btn.addEventListener("click", function () {
           var sid = this.getAttribute("data-id");
           if (!confirm("Удалить MCP сервер?")) return;
-          window.LogosDispatcher.request("/api/mcp-servers/" + sid, { method: "DELETE" })
+          window.LogosDispatcher.request("/api/mcp-servers/" + encodeURIComponent(sid), { method: "DELETE" })
             .then(function (r) {
               if (!r.ok) throw new Error("HTTP " + r.status);
               refreshList();
@@ -276,7 +276,7 @@
           return;
         }
         var method = isNew ? "POST" : "PUT";
-        var url = isNew ? "/api/mcp-servers" : "/api/mcp-servers/" + srv.id;
+        var url = isNew ? "/api/mcp-servers" : "/api/mcp-servers/" + encodeURIComponent(srv.id);
         saveBtn.disabled = true;
         window.LogosDispatcher.request(url, {
           method: method,

@@ -11,6 +11,7 @@ import time
 from provider_accounts._vendor.restrictions import restrictions_lifted
 
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Optional
 from provider_accounts.host import get_store
 
@@ -102,24 +103,29 @@ def _default_policy_values() -> tuple[int, int, int]:
 
 
 def prepare_quota_records() -> None:
+    with get_store().transaction() as tx:
+        _seed_default_policy(tx)
+
+
+def _seed_default_policy(tx: Any) -> None:
+    """Write the default policy inside the caller's transaction when it is missing."""
     period, maximum, rate = _default_policy_values()
     now = int(time.time())
     key = "quota/policy/" + DEFAULT_POLICY
-    with get_store().transaction() as tx:
-        old = tx.get(key)
-        row = {
-            "name": DEFAULT_POLICY,
-            "period_seconds": period,
-            "max_requests": maximum,
-            "max_requests_per_minute": rate,
-            "enabled": True,
-            "created_at": old["created_at"] if old else now,
-            "updated_at": now,
-        }
-        # The environment only seeds the default policy. Re-applying it on every request reverted
-        # any administrator change the next time a quota was checked.
-        if old is None:
-            tx.set(key, row)
+    old = tx.get(key)
+    row = {
+        "name": DEFAULT_POLICY,
+        "period_seconds": period,
+        "max_requests": maximum,
+        "max_requests_per_minute": rate,
+        "enabled": True,
+        "created_at": old["created_at"] if old else now,
+        "updated_at": now,
+    }
+    # The environment only seeds the default policy. Re-applying it on every request reverted
+    # any administrator change the next time a quota was checked.
+    if old is None:
+        tx.set(key, row)
 
 
 # Former name, kept for existing callers.
@@ -176,9 +182,9 @@ def assign_user_policy(user_id: str, policy_name: str) -> None:
 
 
 def get_user_policy(user_id: str) -> dict[str, Any]:
-    prepare_quota_records()
     store = get_store()
     with store.transaction() as tx:
+        _seed_default_policy(tx)
         return _policy_for(tx, user_id)
 
 
@@ -244,18 +250,13 @@ def reserve_request(
         return None
 
     now_value = int(now if now is not None else int(time.time()))
-    policy = get_user_policy(trusted_user_id)
-    if not policy["enabled"]:
-        return None
-
-    period_seconds = policy["period_seconds"]
-    period_start = (now_value // period_seconds) * period_seconds
-    period_reset_at = period_start + period_seconds
     rate_window_start = (now_value // 60) * 60
     rate_reset_at = rate_window_start + 60
 
-    prepare_quota_records()
+    # One transaction per request: the default policy is seeded and the user's policy read under
+    # the same lock as the usage update.
     with get_store().transaction() as tx:
+        _seed_default_policy(tx)
         policy = _policy_for(tx, trusted_user_id)
         if not policy["enabled"]:
             return None
@@ -346,7 +347,10 @@ def record_usage(
                 {
                     **row,
                     "token_count": row["token_count"] + tokens,
-                    "cost": row["cost"] + numeric_cost,
+                    # Summed through Decimal to avoid float drift; stored as a float.
+                    "cost": float(
+                        Decimal(str(row["cost"])) + Decimal(str(numeric_cost))
+                    ),
                     "updated_at": int(time.time()),
                 },
             )

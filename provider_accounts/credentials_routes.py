@@ -19,6 +19,7 @@ from provider_accounts.credentials import (
     NoActiveCredentialError,
     get_active_credential,
     replace_active_credential,
+    replace_active_credentials,
     rotation_needed,
     should_revoke,
     record_health_check,
@@ -657,28 +658,27 @@ def update_provider_credentials():
             previous_yandex is not None
             and previous_yandex.api_key == supplied_keys[YANDEX]
         )
-        for provider, api_key in supplied:
-            keep_identity = provider == YANDEX and same_yandex_key
-            replace_active_credential(
-                conn,
-                api_key,
-                str(yandex_project_id) if provider == YANDEX else "",
-                bound.encrypt_secret,
-                provider,
-                provider_key_id=previous_yandex.provider_key_id
-                if keep_identity
-                else None,
-                ttl=timedelta(hours=12),
-            )
-            # Only a real provider request proves authorization. Yandex validation
-            # checks local presence only, so its stored key is "configured", not "connected".
-            record_health_check(
-                conn,
-                provider,
-                status="connected" if provider == CLOUDRU else "configured",
-                error=None,
-            )
-            stored_providers.append(provider)
+        # All supplied keys are stored in one transaction: a failure leaves every provider on its old key.
+        replace_active_credentials(
+            conn,
+            [
+                (
+                    provider,
+                    api_key,
+                    str(yandex_project_id) if provider == YANDEX else "",
+                    previous_yandex.provider_key_id
+                    if provider == YANDEX and same_yandex_key
+                    else None,
+                    # Only a real provider request proves authorization. Yandex validation
+                    # checks local presence only, so its stored key is "configured", not "connected".
+                    "connected" if provider == CLOUDRU else "configured",
+                )
+                for provider, api_key in supplied
+            ],
+            bound.encrypt_secret,
+            ttl=timedelta(hours=12),
+        )
+        stored_providers.extend(provider for provider, _ in supplied)
         if previous_yandex is not None and not same_yandex_key:
             _revoke_replaced_yandex_key(previous_yandex)
     except Exception as exc:
@@ -691,7 +691,8 @@ def update_provider_credentials():
             {
                 "error": "credential_storage_failed",
                 "detail": "Ключ проверен, но сервер не смог сохранить его. Подробности записаны в серверный лог.",
-                # Providers stored before the failure: their new keys are active.
+                # Providers whose new keys are active. Keys are stored together, so a failure
+                # while storing leaves this empty.
                 "stored_providers": stored_providers,
             }
         ), 503

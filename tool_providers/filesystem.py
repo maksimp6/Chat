@@ -19,6 +19,7 @@ import re
 import ast
 import sys
 import glob
+import fnmatch
 import shutil
 import signal
 import datetime
@@ -265,7 +266,11 @@ def write_file(args: dict) -> dict:
         return {
             "success": True,
             "path": path,
-            "message": f"Файл '{path}' успешно проверен и сохранен.",
+            "message": (
+                f"Файл '{path}' успешно проверен и сохранен."
+                if abs_path.endswith(".py")
+                else f"Файл '{path}' сохранен."
+            ),
             "diff": "\n".join(diff[:60]) if diff else "(файл создан заново)",
         }
     except Exception as e:
@@ -777,7 +782,7 @@ def grep_search(args: dict) -> dict:
                 if not d.startswith((".", "__pycache__", "node_modules"))
             ]
             for file in files:
-                if not glob.fnmatch.fnmatch(file, file_pattern):
+                if not fnmatch.fnmatch(file, file_pattern):
                     continue
                 file_path = os.path.join(root, file)
                 rel_path = os.path.relpath(file_path, BASE_DIR)
@@ -902,8 +907,11 @@ def run_command(args: dict) -> dict:
             "success": False,
             "error": f"Превышено время ожидания команды ({timeout} сек)",
         }
-    except Exception:
-        return {"success": False, "error": "Не удалось выполнить команду"}
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Не удалось выполнить команду: {type(e).__name__}: {e}",
+        }
 
 
 def get_system_info(args: dict) -> dict:
@@ -1207,3 +1215,10 @@ for _read_tool_name in READ_ONLY_TOOL_NAMES:
     TOOL_REGISTRY[_read_tool_name]["read_only"] = True
 
 FILESYSTEM_TOOLS = TOOL_REGISTRY
+
+
+def execute_fs_tool(tool_name: str, arguments: dict) -> dict:
+    """Точка входа для выполнения зарегистрированных инструментов файловой системы."""
+    if tool_name not in TOOL_REGISTRY:
+        return {"error": f"Неизвестный системный инструмент: {tool_name}"}
+    return TOOL_REGISTRY[tool_name]["func"](arguments)

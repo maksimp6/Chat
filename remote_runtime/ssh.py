@@ -207,17 +207,25 @@ class SSHRuntime:
         return normalized
 
     @staticmethod
-    def _wrap_remote_command(command: str, timeout: float, home: str) -> str:
-        """Run the command with a server-side timeout and minimal environment."""
+    def _wrap_remote_command(
+        command: str, timeout: float, home: Optional[str] = None
+    ) -> str:
+        """Run the command with a server-side timeout and minimal environment.
+
+        Without ``home`` the account keeps its own home: the remote login shell has $HOME from
+        the account's passwd entry and expands it before ``env -i`` clears the environment.
+        The timeout uses only the short options that GNU coreutils and BusyBox both accept.
+        """
         seconds = max(1, int(math.ceil(timeout)))
         safe_path = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         inner = shlex.quote(command)
+        home_value = shlex.quote(home) if home is not None else '"$HOME"'
         return (
             "env -i "
-            f"HOME={shlex.quote(home)} "
+            f"HOME={home_value} "
             f"PATH={shlex.quote(safe_path)} "
-            "timeout --foreground --signal=TERM --kill-after=5s "
-            f"{seconds}s sh -lc {inner}"
+            "timeout -s TERM -k 5 "
+            f"{seconds} sh -lc {inner}"
         )
 
     def _ssh_command(
@@ -265,15 +273,14 @@ class SSHRuntime:
             raise SSHRuntimeError("Command is required")
 
         resolved_target, user = self._resolve_target(target, identity_id)
-        timeout = float(timeout_seconds or resolved_target.command_timeout_seconds)
+        try:
+            timeout = float(timeout_seconds or resolved_target.command_timeout_seconds)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise SSHRuntimeError("timeout_seconds must be a number") from exc
         if not math.isfinite(timeout) or timeout <= 0 or timeout > 3600:
             raise SSHRuntimeError("timeout_seconds must be > 0 and <= 3600")
 
-        remote_command = self._wrap_remote_command(
-            command,
-            timeout,
-            home="/root" if user == "root" else f"/home/{user}",
-        )
+        remote_command = self._wrap_remote_command(command, timeout)
         argv = self._ssh_command(resolved_target, user, remote_command)
         try:
             completed = subprocess.run(
@@ -368,19 +375,23 @@ class SSHRuntime:
             f"tmp=$(mktemp -- {template}); "
             "trap 'rm -f -- \"$tmp\"' EXIT; "
             'cat > "$tmp"; '
+            # mktemp creates the file 0600; an existing target keeps its permission bits.
+            # The mode is read with GNU/BusyBox `stat -c %a` or BSD/macOS `stat -f %Lp`.
+            f"if [ -e {quoted_path} ]; then "
+            f"mode=$(stat -L -c %a -- {quoted_path} 2>/dev/null || stat -L -f %Lp -- {quoted_path}); "
+            'chmod "$(printf %o "$(( 0$mode & 511 ))")" "$tmp"; fi; '
             f'mv -f -- "$tmp" {quoted_path}; '
             "trap - EXIT"
         )
 
         resolved_target, user = self._resolve_target(target, identity_id)
-        timeout = float(timeout_seconds or resolved_target.command_timeout_seconds)
+        try:
+            timeout = float(timeout_seconds or resolved_target.command_timeout_seconds)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise SSHRuntimeError("timeout_seconds must be a number") from exc
         if not math.isfinite(timeout) or timeout <= 0 or timeout > 3600:
             raise SSHRuntimeError("timeout_seconds must be > 0 and <= 3600")
-        remote_command = self._wrap_remote_command(
-            script,
-            timeout,
-            home="/root" if user == "root" else f"/home/{user}",
-        )
+        remote_command = self._wrap_remote_command(script, timeout)
         argv = self._ssh_command(resolved_target, user, remote_command)
 
         try:

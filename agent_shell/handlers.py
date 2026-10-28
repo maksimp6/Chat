@@ -19,6 +19,8 @@ def default_handlers(check_run=None, run_issue=None):
         Logos never commits, pushes or runs commands, and stops at approval-gated tools
         instead of running them; this handler never approves anything on its behalf.
         """
+        if not isinstance(payload, dict):
+            raise TaskFailed("invalid_payload")
         issue = payload.get("issue")
         title = payload.get("title")
         body = payload.get("body")
@@ -39,7 +41,8 @@ def default_handlers(check_run=None, run_issue=None):
         run = run_issue
         if run is None:
             run = bound.run_issue_task
-            model = model or bound.DEFAULT_MODEL
+        # A supplied run_issue gets the default model too, never None.
+        model = model or bound.DEFAULT_MODEL
         result = run(issue, title, body, model)
         if result.get("status") == "failed":
             raise TaskFailed("agent_failed", result)

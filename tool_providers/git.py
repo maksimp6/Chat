@@ -12,6 +12,12 @@ logger = logging.getLogger("logos.tool_providers.git")
 
 _read_lock = threading.RLock()
 _write_lock = threading.RLock()
+# One read/write lock pair per repository (by real path): a long push in one
+# repository does not hold reads of another. An unresolved repository uses the pair above.
+_repo_locks: dict[str, tuple[threading.RLock, threading.RLock]] = {
+    "": (_read_lock, _write_lock)
+}
+_repo_locks_guard = threading.Lock()
 
 # Branch, remote and ref names reach git as arguments. A name that starts with "-" would be read
 # as an option (for example --output=... or --receive-pack=...), so only plain names are accepted.
@@ -25,10 +31,39 @@ def _name(value, label: str) -> str:
     return text
 
 
+def _locks_for(call_args: tuple, call_kwargs: dict) -> tuple:
+    """The (read, write) lock pair of the repository a tool call works on."""
+    tool_args = call_args[0] if call_args else call_kwargs.get("args")
+    cfg = call_args[1] if len(call_args) > 1 else call_kwargs.get("cfg")
+    tool_args = tool_args if hasattr(tool_args, "get") else {}
+    try:
+        repo_path = _resolve_repo_path(
+            tool_args.get("repo") or tool_args.get("repo_path"),
+            cfg if hasattr(cfg, "get") else None,
+        )
+    except (TypeError, ValueError):
+        repo_path = ""
+    key = ""
+    if repo_path:
+        # One repository, one lock pair, whatever case, symlink or alias names it
+        # (/sdcard is case-insensitive).
+        try:
+            st = os.stat(repo_path)
+            key = f"{st.st_dev}:{st.st_ino}"
+        except OSError:
+            key = os.path.realpath(repo_path)
+    with _repo_locks_guard:
+        locks = _repo_locks.get(key)
+        if locks is None:
+            locks = _repo_locks[key] = (threading.RLock(), threading.RLock())
+    return locks
+
+
 def read_op(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        with _read_lock:
+        read_lock, _ = _locks_for(args, kwargs)
+        with read_lock:
             return func(*args, **kwargs)
 
     return wrapper
@@ -37,8 +72,9 @@ def read_op(func):
 def write_op(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        with _write_lock:
-            with _read_lock:
+        read_lock, write_lock = _locks_for(args, kwargs)
+        with write_lock:
+            with read_lock:
                 return func(*args, **kwargs)
 
     return wrapper
@@ -112,6 +148,30 @@ def _is_bare_repo(repo_path: str) -> bool:
         return False
 
 
+def _git_process_in(repo_path: str) -> bool:
+    """True when a running git process works inside this repository (read from /proc).
+
+    Where /proc cannot be read, no process is seen.
+    """
+    root = os.path.realpath(repo_path)
+    try:
+        pids = [entry for entry in os.listdir("/proc") if entry.isdigit()]
+    except OSError:
+        return False
+    for pid in pids:
+        try:
+            with open(f"/proc/{pid}/comm", encoding="utf-8", errors="replace") as fh:
+                comm = fh.read().strip()
+            if comm != "git" and not comm.startswith("git-"):
+                continue
+            cwd = os.path.realpath(os.readlink(f"/proc/{pid}/cwd"))
+        except OSError:
+            continue
+        if cwd == root or cwd.startswith(root.rstrip(os.sep) + os.sep):
+            return True
+    return False
+
+
 def _run_git(
     args: list, cfg: dict = None, repo_name: str = None, is_read: bool = False
 ) -> dict:
@@ -140,7 +200,9 @@ def _run_git(
     )
     if not is_read and os.path.exists(lock_file):
         try:
-            if time.time() - os.path.getmtime(lock_file) > 2.0:
+            old = time.time() - os.path.getmtime(lock_file) > 2.0
+            # A lock held by a running git (a long add or commit) is not stale.
+            if old and not _git_process_in(repo_path):
                 os.remove(lock_file)
                 time.sleep(0.05)
         except Exception as exc:
@@ -218,6 +280,10 @@ def git_status(args: dict, cfg: dict) -> dict:
 def git_log(args: dict, cfg: dict) -> dict:
     limit = args.get("limit") or cfg.get("default_log_limit", 5)
     try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        return {"success": False, "error": f"limit должен быть целым числом: {limit!r}"}
+    try:
         branch = _name(args.get("branch") or "HEAD", "branch")
     except ValueError as exc:
         return {"success": False, "error": str(exc)}
@@ -250,9 +316,11 @@ def git_branches(args: dict, cfg: dict) -> dict:
 @write_op
 def git_add(args: dict, cfg: dict) -> dict:
     target = args.get("path") or args.get("files") or "."
+    # A list of paths is accepted here as in git_commit.
+    targets = list(target) if isinstance(target, (list, tuple)) else [target]
     # "--" ends the options, so a path can never be read as one.
     return _run_git(
-        ["add", "--", target],
+        ["add", "--"] + targets,
         cfg,
         args.get("repo") or args.get("repo_path"),
         is_read=False,

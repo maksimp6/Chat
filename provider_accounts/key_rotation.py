@@ -123,7 +123,6 @@ def rotate_active_key(
                 provider_name,
                 status="invalid",
                 error="reissued key failed validation",
-                commit=False,
             )
             raise
         record_health_check(
@@ -131,7 +130,6 @@ def rotate_active_key(
             provider_name,
             status="connected",
             error=None,
-            commit=False,
         )
         # Native promotion already passed the synchronous durability barrier.
         return provider_key_id, issued_at, expires_at
@@ -158,7 +156,6 @@ def rotate_active_key(
         provider_name,
         status="connected",
         error=None,
-        commit=False,
     )
     # Native promotion already passed the synchronous durability barrier.
     if old_provider_key_id:

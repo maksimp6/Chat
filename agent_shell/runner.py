@@ -47,6 +47,14 @@ def run_next(store, handlers):
     except Exception:  # fixed code only: the message may contain a secret
         store.fail(task_id, "task_failed")
         return store.get(task_id)
+    except BaseException as exc:
+        # An interrupted handler (KeyboardInterrupt, SystemExit) does not leave its task
+        # running: it is failed as `recover` would, and the interruption goes on.
+        try:
+            store.fail(task_id, "interrupted")
+        except Exception:
+            raise exc  # the interruption, not the store error
+        raise
     try:
         json.dumps(result, allow_nan=False)
     except (TypeError, ValueError):
@@ -54,8 +62,11 @@ def run_next(store, handlers):
         return store.get(task_id)
     try:
         store.finish(task_id, result)
-    except Exception:
+    except Exception as exc:
         # The result was not recorded, so the claimed task is failed instead of left without an outcome.
-        store.fail(task_id, "store_failed")
+        try:
+            store.fail(task_id, "store_failed")
+        except Exception:
+            raise exc  # the original store error, not this one
         raise
     return store.get(task_id)

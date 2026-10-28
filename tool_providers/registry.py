@@ -100,8 +100,11 @@ class ToolRegistry:
         # schema aliases and type/default normalization have a single owner.
         result = dict(cfg)
         result.setdefault("title", name.replace("_", " ").strip().title())
-        result.setdefault("capabilities", [category])
-        result.setdefault("requires_approval", not bool(result.get("read_only", False)))
+        # An empty or None value takes the default, as a missing key does.
+        if not result.get("capabilities"):
+            result["capabilities"] = [category]
+        if result.get("requires_approval") is None:
+            result["requires_approval"] = not bool(result.get("read_only", False))
         normalized = UniversalToolDefinition.from_mapping(name, result).to_mapping()
         normalized.pop("name")
         result.update(normalized)
@@ -117,9 +120,15 @@ class ToolRegistry:
 
     def _register(self, category: str, name: str, cfg: Mapping[str, Any]):
         normalized = self._normalize_cfg(category, name, cfg)
-        for names in self._categories.values():
+        for previous, names in self._categories.items():
             if name in names:
                 names.remove(name)
+                logger.warning(
+                    "[REGISTRY] Инструмент %s (%s) заменён определением из %s",
+                    name,
+                    previous,
+                    category,
+                )
         self._tools[name] = normalized
         self._categories.setdefault(category, []).append(name)
 
@@ -217,13 +226,24 @@ class ToolRegistry:
         return result
 
     @staticmethod
-    def is_offered(cfg: Mapping[str, Any], transport: str = "responses_api") -> bool:
+    def is_offered(
+        cfg: Mapping[str, Any], transport: str = "responses_api", which=None
+    ) -> bool:
         """Offer a tool only when the executor accepts this transport and the host can run it."""
         transports = cfg.get("supported_transports") or ("responses_api", "local_agent")
         if transport not in transports:
             return False
         required = (cfg.get("metadata") or {}).get("requires_executables") or ()
-        return all(shutil.which(str(executable)) for executable in required)
+        which = which or shutil.which
+        return all(which(str(executable)) for executable in required)
+
+    @staticmethod
+    def _which_per_listing():
+        """shutil.which for one listing: each executable is looked up once in it.
+
+        Nothing is kept between listings, so an executable installed later is seen.
+        """
+        return functools.lru_cache(maxsize=None)(shutil.which)
 
     def _function_definition(self, name: str, cfg: Mapping[str, Any]) -> dict[str, Any]:
         # Advertise the same schema the UniversalToolExecutor validates.
@@ -238,14 +258,17 @@ class ToolRegistry:
 
     def get_definitions(self, active_categories: set = None) -> list:
         tools_list = []
+        which = self._which_per_listing()
+        # Category of each tool in one pass; the first category that lists it wins.
+        category_of: dict[str, str] = {}
+        for cat, names in self._categories.items():
+            for tool_name in names:
+                category_of.setdefault(tool_name, cat)
         for name, cfg in self._tools.items():
-            category = next(
-                (cat for cat, names in self._categories.items() if name in names),
-                "general",
-            )
+            category = category_of.get(name, "general")
             if active_categories is not None and category not in active_categories:
                 continue
-            if self.is_offered(cfg):
+            if self.is_offered(cfg, which=which):
                 tools_list.append(self._function_definition(name, cfg))
         return tools_list
 
@@ -253,9 +276,10 @@ class ToolRegistry:
         """Return Responses API function definitions for one local category."""
         names = self._categories.get(category, [])
         tools_list = []
+        which = self._which_per_listing()
         for name in names:
             cfg = self._tools.get(name)
-            if cfg and self.is_offered(cfg):
+            if cfg and self.is_offered(cfg, which=which):
                 tools_list.append(self._function_definition(name, cfg))
         return tools_list
 
@@ -271,11 +295,12 @@ class ToolRegistry:
         self, transport: Optional[str] = None
     ) -> list[dict[str, Any]]:
         definitions = []
+        which = self._which_per_listing()
         for name in sorted(self._tools):
             definition = self.get_universal_definition(name)
             if definition is None:
                 continue
-            if transport and not self.is_offered(self._tools[name], transport):
+            if transport and not self.is_offered(self._tools[name], transport, which):
                 continue
             definitions.append(definition.to_mapping())
         return definitions
@@ -324,7 +349,14 @@ class ToolRegistry:
             return {"error": "Ошибка выполнения инструмента"}
 
     def get_tool_meta(self, tool_name: str):
-        return self._tools.get(tool_name)
+        # A copy, so a caller cannot change the registry; functions are shared.
+        cfg = self._tools.get(tool_name)
+        if cfg is None:
+            return None
+        return {
+            key: value if callable(value) else copy.deepcopy(value)
+            for key, value in cfg.items()
+        }
 
     def get_available_categories(self) -> dict:
         return {cat: list(names) for cat, names in self._categories.items()}
