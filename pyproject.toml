@@ -83,6 +83,9 @@ system-log-module = "observability.system_log"
 tool-registry-file = "tool_providers/registry.py"
 tool-sources-file = "composition/tool_sources.py"
 env-loader = "core.env.load_env_file"
+# The binding (core/host_binding.py and its _binding.py copies) imports this root by
+# name when a process uses a port before any root registered the hosts.
+default-root = "composition.wiring"
 dialog-file = "docs/architecture/dialog.toml"
 mcp-tools-file = "mcp_server/tools.py"
 

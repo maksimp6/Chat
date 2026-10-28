@@ -104,6 +104,7 @@ class Config:
     tool_sources_file: str = ""
     dialog_file: str = ""
     env_loader: str = ""
+    default_root: str = ""
     mcp_tools_file: str = ""
 
 
@@ -130,6 +131,7 @@ def load_config() -> Config:
         tool_sources_file=ind.get("tool-sources-file", ""),
         dialog_file=ind.get("dialog-file", ""),
         env_loader=ind.get("env-loader", ""),
+        default_root=ind.get("default-root", ""),
         mcp_tools_file=ind.get("mcp-tools-file", ""),
     )
 
@@ -513,6 +515,14 @@ def check_edges(
         if tree is None:
             continue
         unit = umap.unit_of[path]
+        # The host binding: the vendored helper whose copies are the units' _binding.py.
+        binding_files = {
+            copy
+            for item in cfg.vendored
+            if item.get("copies")
+            and all(c.endswith("_binding.py") for c in item["copies"])
+            for copy in [item["canonical"], *item["copies"]]
+        }
         for ref in references(path, tree):
             target = resolve(umap, path, ref)
             if target is None:
@@ -527,6 +537,13 @@ def check_edges(
             )
             if target_unit == "<root>":
                 if allowed_root_code or ref.kind == "path":
+                    continue
+                if (
+                    path in binding_files
+                    and module_name(target) == cfg.default_root
+                    and ref.kind != "import"
+                ):
+                    # The host binding finds the default root by name at first use.
                     continue
                 violations.append(
                     Violation("R", path, ref.line, f"unit {unit} imports root {target}")
@@ -1662,11 +1679,12 @@ def render_wiring(umap: UnitMap) -> str:
                 lines.append(f"    import {provider} as {port}")
                 continue
             source, attr = provider.rsplit(".", 1)
-            line = f"    from {source} import {attr} as {port}"
+            imported = attr if attr == port else f"{attr} as {port}"
+            line = f"    from {source} import {imported}"
             lines.append(
                 line
                 if fits(line)
-                else f"    from {source} import (\n        {attr} as {port},\n    )"
+                else f"    from {source} import (\n        {imported},\n    )"
             )
         args = [f"{port}={port}" for port, _ in host_providers(module)]
         call = f"    return host.Host({', '.join(args)})"

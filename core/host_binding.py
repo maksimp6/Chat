@@ -11,6 +11,7 @@ This file is vendored into each such unit as ``_binding.py`` (pyproject.toml
 
 from __future__ import annotations
 
+import importlib
 import threading
 from collections.abc import Callable
 from typing import Any, Generic, TypeVar
@@ -20,6 +21,24 @@ H = TypeVar("H")
 
 class HostNotBound(RuntimeError):
     """A unit function ran before a composition root provided the unit's host."""
+
+
+# The process root used when code imports a unit directly (a library user, a device
+# launcher, `python -c ...`) and nothing registered the hosts: importing a unit worked
+# on its own before units were wired through ports, and it still does.
+DEFAULT_ROOT = "composition.wiring"
+
+
+def _register_default_root() -> None:
+    """Register every host through the default root, outside any binding's lock."""
+    try:
+        root = importlib.import_module(DEFAULT_ROOT)
+    except ModuleNotFoundError as exc:
+        # A unit copied on its own has no root; any other missing module is a real error.
+        if exc.name is None or not DEFAULT_ROOT.startswith(exc.name):
+            raise
+        return
+    root.register_all()
 
 
 class Binding(Generic[H]):
@@ -45,6 +64,8 @@ class Binding(Generic[H]):
         host = self._host
         if host is not None:
             return host
+        if self._factory is None:
+            _register_default_root()
         with self._lock:
             if self._host is None:
                 if self._factory is None:

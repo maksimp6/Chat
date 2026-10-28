@@ -84,8 +84,11 @@ store = get_store()  # same call as before
 client = bound.Config  # classes, constants and modules are bound.<name>
 ```
 
-- The host is process-global and built lazily by a factory on first use; before a root
-  registers that factory a port raises `HostNotBound`.
+- The host is process-global and built lazily by a factory on first use. A process that
+  uses a unit without running a root (a library user, a device launcher, `python -c`)
+  gets the default root (`default-root` in `pyproject.toml`, `composition.wiring`)
+  registered on first use, so importing a unit and calling it works as it always did;
+  `HostNotBound` remains only for a unit copied without the composition roots.
 - Classes and exceptions are the original objects, so `except bound.KristallError`
   behaves exactly like `except KristallError` did.
 - A decorator from another unit (`@traced_operation(...)`) is a late-bound port: the

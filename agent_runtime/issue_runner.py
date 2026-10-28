@@ -45,6 +45,10 @@ from agent_runtime.host import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+# The caller's own LOGOS_MEMORY_PATH, read on import, before this runner's root loads
+# core/.env: the review store must be named by the caller (see
+# require_external_review_store), never only by core/.env.
+_CALLER_MEMORY_PATH = os.environ.get("LOGOS_MEMORY_PATH")
 DEFAULT_MODEL = "yandexgpt-5-pro"
 TOOL_CATEGORIES = ["filesystem"]
 MAX_SUMMARY_CHARS = 4000
@@ -420,6 +424,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(json.dumps({"status": blocked["status"], "changed_files": []}))
         return 1
 
+    if _CALLER_MEMORY_PATH is None:
+        # core/.env, loaded by the root above, must not satisfy the review-store check.
+        os.environ.pop("LOGOS_MEMORY_PATH", None)
     result = run_issue_task(
         args.issue,
         args.title_file.read_text(encoding="utf-8").strip(),

@@ -16,7 +16,7 @@ from core.env import load_env_file
 def _agent_memory():
     from agent_memory import host
     from kristall import Kristall as kristall_Kristall
-    from storage.records import memory_file_path as memory_file_path
+    from storage.records import memory_file_path
 
     return host.Host(
         kristall_Kristall=kristall_Kristall, memory_file_path=memory_file_path
@@ -25,35 +25,27 @@ def _agent_memory():
 
 def _agent_runtime():
     from agent_runtime import host
-    from core.config import Config as Config
-    from storage.memory_db import DatabaseError as DatabaseError
-    from kristall import KristallError as KristallError
-    from chat.mcp_routes import LogosClient as LogosClient
-    from tool_providers.universal_tool_platform import (
-        UniversalToolCall as UniversalToolCall,
-    )
-    from tool_providers.universal_tool_platform import (
-        UniversalToolExecutor as UniversalToolExecutor,
-    )
-    from provider_accounts.credentials import (
-        bootstrap_credential as bootstrap_credential,
-    )
-    from invocation.manager import create_invocation as create_invocation
-    from invocation.trace import create_invocation_trace as create_invocation_trace
-    from runtime.request_context import (
-        current_runtime_data_root as current_runtime_data_root,
-    )
-    from runtime.request_context import current_runtime_id as current_runtime_id
-    from secret_store.credential_crypto import decrypt_secret as decrypt_secret
-    from secret_store.credential_crypto import encrypt_secret as encrypt_secret
-    from invocation.manager import fail_invocation as fail_invocation
+    from core.config import Config
+    from storage.memory_db import DatabaseError
+    from kristall import KristallError
+    from chat.mcp_routes import LogosClient
+    from tool_providers.universal_tool_platform import UniversalToolCall
+    from tool_providers.universal_tool_platform import UniversalToolExecutor
+    from provider_accounts.credentials import bootstrap_credential
+    from invocation.manager import create_invocation
+    from invocation.trace import create_invocation_trace
+    from runtime.request_context import current_runtime_data_root
+    from runtime.request_context import current_runtime_id
+    from secret_store.credential_crypto import decrypt_secret
+    from secret_store.credential_crypto import encrypt_secret
+    from invocation.manager import fail_invocation
     import tool_providers.filesystem as filesystem
-    from invocation.manager import finish_invocation as finish_invocation
-    from storage.records import get_store as get_store
+    from invocation.manager import finish_invocation
+    from storage.records import get_store
     from composition.application import initialize as initialize_application
-    from invocation.manager import persist_invocation_trace as persist_invocation_trace
-    from tool_providers.registry import registry as registry
-    from invocation.manager import start_invocation as start_invocation
+    from invocation.manager import persist_invocation_trace
+    from tool_providers.registry import registry
+    from invocation.manager import start_invocation
 
     return host.Host(
         Config=Config,
@@ -82,10 +74,10 @@ def _agent_runtime():
 
 def _agent_shell():
     from agent_shell import host
-    from agent_runtime.issue_runner import DEFAULT_MODEL as DEFAULT_MODEL
-    from kristall import KristallError as KristallError
-    from agent_memory.client import get_memory_client as get_memory_client
-    from agent_runtime.issue_runner import run_issue_task as run_issue_task
+    from agent_runtime.issue_runner import DEFAULT_MODEL
+    from kristall import KristallError
+    from agent_memory.client import get_memory_client
+    from agent_runtime.issue_runner import run_issue_task
 
     return host.Host(
         DEFAULT_MODEL=DEFAULT_MODEL,
@@ -97,44 +89,30 @@ def _agent_shell():
 
 def _chat():
     from chat import host
-    from core.config import CLASSIFIER_MODELS as CLASSIFIER_MODELS
-    from core.config import Config as Config
-    from core.config import EMBEDDING_MODELS as EMBEDDING_MODELS
-    from observability.trace_manager import ExecutionTrace as ExecutionTrace
-    from core.config import IMAGE_MODELS as IMAGE_MODELS
-    from yandex_client_modules.image_generation import IMAGE_SIZES as IMAGE_SIZES
-    from yandex_client_modules.image_generation import (
-        ImageGenerationError as ImageGenerationError,
-    )
-    from economy.knowledge_economics import KnowledgeCostConfig as KnowledgeCostConfig
-    from yandex_client_modules.image_generation import (
-        MAX_PROMPT_CHARS as MAX_PROMPT_CHARS,
-    )
-    from yandex_client_modules.realtime import MODEL_UPSTREAMS as MODEL_UPSTREAMS
-    from provider_accounts.model_discovery import (
-        ModelDiscoveryError as ModelDiscoveryError,
-    )
-    from yandex_client_modules.realtime import OUTPUT_RATE as OUTPUT_RATE
-    from provider_accounts.quotas import ProviderQuotaExceeded as ProviderQuotaExceeded
-    from yandex_client_modules.image_generation import (
-        REQUEST_TIMEOUT_SECONDS as REQUEST_TIMEOUT_SECONDS,
-    )
-    from yandex_client_modules.realtime import RealtimeError as RealtimeError
-    from yandex_client_modules.realtime import RealtimeResult as RealtimeResult
-    from agent_skills.registry import SkillRegistry as SkillRegistry
-    from agent_skills.registry import SkillRegistryError as SkillRegistryError
-    from core.config import TEXT_MODELS as TEXT_MODELS
-    from yandex_client_modules.realtime import TTS_MODEL as TTS_MODEL
-    from tool_providers.universal_tool_platform import (
-        UniversalToolCall as UniversalToolCall,
-    )
-    from tool_providers.universal_tool_platform import (
-        UniversalToolExecutor as UniversalToolExecutor,
-    )
-    from core.config import VOICE_MODELS as VOICE_MODELS
-    from yandex_client_modules.client import (
-        YandexResponsesClient as YandexResponsesClient,
-    )
+    from core.config import CLASSIFIER_MODELS
+    from core.config import Config
+    from core.config import EMBEDDING_MODELS
+    from observability.trace_manager import ExecutionTrace
+    from core.config import IMAGE_MODELS
+    from yandex_client_modules.image_generation import IMAGE_SIZES
+    from yandex_client_modules.image_generation import ImageGenerationError
+    from economy.knowledge_economics import KnowledgeCostConfig
+    from yandex_client_modules.image_generation import MAX_PROMPT_CHARS
+    from yandex_client_modules.realtime import MODEL_UPSTREAMS
+    from provider_accounts.model_discovery import ModelDiscoveryError
+    from yandex_client_modules.realtime import OUTPUT_RATE
+    from provider_accounts.quotas import ProviderQuotaExceeded
+    from yandex_client_modules.image_generation import REQUEST_TIMEOUT_SECONDS
+    from yandex_client_modules.realtime import RealtimeError
+    from yandex_client_modules.realtime import RealtimeResult
+    from agent_skills.registry import SkillRegistry
+    from agent_skills.registry import SkillRegistryError
+    from core.config import TEXT_MODELS
+    from yandex_client_modules.realtime import TTS_MODEL
+    from tool_providers.universal_tool_platform import UniversalToolCall
+    from tool_providers.universal_tool_platform import UniversalToolExecutor
+    from core.config import VOICE_MODELS
+    from yandex_client_modules.client import YandexResponsesClient
     from yandex_client_modules.request_mixin import (
         record_quota_usage as _record_quota_usage,
     )
@@ -148,81 +126,57 @@ def _chat():
     from yandex_client_modules.request_mixin import (
         transport_timeout as _transport_timeout,
     )
-    from storage.records import add_message as add_message
-    from economy.billing import aggregate_billing as aggregate_billing
-    from observability.trace_manager import bind_current_trace as bind_current_trace
-    from economy.billing import build_ai_billing_item as build_ai_billing_item
-    from yandex_client_modules.image_generation import (
-        build_generation_payload as build_generation_payload,
-    )
-    from economy.knowledge_economics import (
-        calculate_knowledge_cost as calculate_knowledge_cost,
-    )
-    from conversations.ownership import check_access as check_access
-    from core.model_profiles import completion_model_keys as completion_model_keys
-    from agent_skills.registry import (
-        compose_skill_instructions as compose_skill_instructions,
-    )
-    from storage.records import create_conversation as create_conversation
-    from invocation.manager import create_invocation as create_invocation
-    from invocation.trace import create_invocation_trace as create_invocation_trace
-    from invocation.manager import fail_invocation as fail_invocation
-    from invocation.manager import finish_invocation as finish_invocation
-    from yandex_client_modules.realtime import generate_realtime as generate_realtime
-    from storage.records import get_conv_settings as get_conv_settings
-    from storage.records import get_conversation_title as get_conversation_title
-    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
-    from observability.trace_manager import get_current_trace as get_current_trace
-    from storage.records import get_message as get_message
-    from storage.records import get_messages as get_messages
-    from provider_accounts.model_discovery import (
-        get_model_discovery as get_model_discovery,
-    )
-    from core.config import get_model_uri as get_model_uri
-    from storage.records import get_store as get_store
-    from storage.records import get_yandex_conversation as get_yandex_conversation
-    from storage.generated_images import image_file_metadata as image_file_metadata
-    from storage.records import is_provider_pending as is_provider_pending
-    from conversations.ownership import (
-        list_owned_conversations as list_owned_conversations,
-    )
-    from storage.records import (
-        maybe_update_conversation_title as maybe_update_conversation_title,
-    )
+    from storage.records import add_message
+    from economy.billing import aggregate_billing
+    from observability.trace_manager import bind_current_trace
+    from economy.billing import build_ai_billing_item
+    from yandex_client_modules.image_generation import build_generation_payload
+    from economy.knowledge_economics import calculate_knowledge_cost
+    from conversations.ownership import check_access
+    from core.model_profiles import completion_model_keys
+    from agent_skills.registry import compose_skill_instructions
+    from storage.records import create_conversation
+    from invocation.manager import create_invocation
+    from invocation.trace import create_invocation_trace
+    from invocation.manager import fail_invocation
+    from invocation.manager import finish_invocation
+    from yandex_client_modules.realtime import generate_realtime
+    from storage.records import get_conv_settings
+    from storage.records import get_conversation_title
+    from economy.treasury_identity import get_current_owner_id
+    from observability.trace_manager import get_current_trace
+    from storage.records import get_message
+    from storage.records import get_messages
+    from provider_accounts.model_discovery import get_model_discovery
+    from core.config import get_model_uri
+    from storage.records import get_store
+    from storage.records import get_yandex_conversation
+    from storage.generated_images import image_file_metadata
+    from storage.records import is_provider_pending
+    from conversations.ownership import list_owned_conversations
+    from storage.records import maybe_update_conversation_title
     import mcp_server.storage as mcp_storage
-    from storage.records import (
-        normalize_conversation_title as normalize_conversation_title,
-    )
-    from yandex_client_modules.tool_config import (
-        normalize_tools_config as normalize_tools_config,
-    )
-    from storage.generated_images import open_image_file as open_image_file
-    from invocation.manager import persist_invocation_trace as persist_invocation_trace
-    from yandex_client_modules.request_mixin import (
-        provider_request_headers as provider_request_headers,
-    )
-    from provider_accounts.quotas import record_usage as record_usage
-    from mcp_server.trace import (
-        record_yandex_mcp_activity as record_yandex_mcp_activity,
-    )
-    from tool_providers.registry import registry as registry
-    from provider_accounts.quotas import release_request as release_request
+    from storage.records import normalize_conversation_title
+    from yandex_client_modules.tool_config import normalize_tools_config
+    from storage.generated_images import open_image_file
+    from invocation.manager import persist_invocation_trace
+    from yandex_client_modules.request_mixin import provider_request_headers
+    from provider_accounts.quotas import record_usage
+    from mcp_server.trace import record_yandex_mcp_activity
+    from tool_providers.registry import registry
+    from provider_accounts.quotas import release_request
     from yandex_client_modules.image_generation import generate_image as request_image
-    from provider_accounts.quotas import reserve_request as reserve_request
-    from observability.trace_manager import reset_current_trace as reset_current_trace
-    from storage.records import save_conv_settings as save_conv_settings
-    from storage.generated_images import save_image_file as save_image_file
-    from conversations.ownership import set_owner as set_owner
-    from storage.records import set_yandex_conversation as set_yandex_conversation
-    from economy.billing import settle_billing_to_treasury as settle_billing_to_treasury
-    from invocation.manager import start_invocation as start_invocation
-    from observability.trace_manager import traced_operation as traced_operation
-    from provider_accounts.model_discovery import (
-        validate_dialog_model as validate_dialog_model,
-    )
-    from yandex_client_modules.request_builder import (
-        validate_generation_params as validate_generation_params,
-    )
+    from provider_accounts.quotas import reserve_request
+    from observability.trace_manager import reset_current_trace
+    from storage.records import save_conv_settings
+    from storage.generated_images import save_image_file
+    from conversations.ownership import set_owner
+    from storage.records import set_yandex_conversation
+    from economy.billing import settle_billing_to_treasury
+    from invocation.manager import start_invocation
+    from observability.trace_manager import traced_operation
+    from provider_accounts.model_discovery import validate_dialog_model
+    from yandex_client_modules.request_builder import validate_generation_params
 
     return host.Host(
         CLASSIFIER_MODELS=CLASSIFIER_MODELS,
@@ -310,20 +264,18 @@ def _chat():
 
 def _cloud():
     from cloud import host
-    from economy.budget_controller import BudgetLimitExceeded as BudgetLimitExceeded
-    from economy.budget_controller import CloudBudgetGuard as CloudBudgetGuard
-    from storage.contracts import StorageCredentialsMissing as StorageCredentialsMissing
-    from storage.contracts import StorageError as StorageError
-    from storage.contracts import StorageObject as StorageObject
-    from storage.contracts import StorageObjectNotFound as StorageObjectNotFound
-    from storage.contracts import (
-        StorageProviderUnavailable as StorageProviderUnavailable,
-    )
+    from economy.budget_controller import BudgetLimitExceeded
+    from economy.budget_controller import CloudBudgetGuard
+    from storage.contracts import StorageCredentialsMissing
+    from storage.contracts import StorageError
+    from storage.contracts import StorageObject
+    from storage.contracts import StorageObjectNotFound
+    from storage.contracts import StorageProviderUnavailable
     from storage.contracts import safe_relative_path as _safe_relative_path
-    from observability.trace_manager import get_current_trace as get_current_trace
-    from secret_store.key_manager import secret_storage_ready as secret_storage_ready
-    from tool_providers.runtime_tools import ssh_runtime_exec as ssh_runtime_exec
-    from secret_store.key_manager import store_secret as store_secret
+    from observability.trace_manager import get_current_trace
+    from secret_store.key_manager import secret_storage_ready
+    from tool_providers.runtime_tools import ssh_runtime_exec
+    from secret_store.key_manager import store_secret
 
     return host.Host(
         BudgetLimitExceeded=BudgetLimitExceeded,
@@ -343,30 +295,20 @@ def _cloud():
 
 def _conversations():
     from conversations import host
-    from agent_memory.conversation_ownership_store import (
-        ConversationOwnershipStore as ConversationOwnershipStore,
-    )
-    from provider_accounts.model_discovery import (
-        ModelDiscoveryError as ModelDiscoveryError,
-    )
-    from storage.records import delete_conversation as delete_conversation
-    from storage.records import get_conv_settings as get_conv_settings
-    from storage.records import get_conversations as get_conversations
-    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
-    from agent_memory.client import get_memory_client as get_memory_client
-    from storage.records import memory_file_path as memory_file_path
-    from yandex_client_modules.tool_config import (
-        normalize_tools_config as normalize_tools_config,
-    )
-    from storage.records import save_conv_settings as save_conv_settings
-    from storage.records import update_conversation_model as update_conversation_model
-    from storage.records import update_conversation_title as update_conversation_title
-    from provider_accounts.model_discovery import (
-        validate_dialog_model as validate_dialog_model,
-    )
-    from yandex_client_modules.request_builder import (
-        validate_generation_params as validate_generation_params,
-    )
+    from agent_memory.conversation_ownership_store import ConversationOwnershipStore
+    from provider_accounts.model_discovery import ModelDiscoveryError
+    from storage.records import delete_conversation
+    from storage.records import get_conv_settings
+    from storage.records import get_conversations
+    from economy.treasury_identity import get_current_owner_id
+    from agent_memory.client import get_memory_client
+    from storage.records import memory_file_path
+    from yandex_client_modules.tool_config import normalize_tools_config
+    from storage.records import save_conv_settings
+    from storage.records import update_conversation_model
+    from storage.records import update_conversation_title
+    from provider_accounts.model_discovery import validate_dialog_model
+    from yandex_client_modules.request_builder import validate_generation_params
 
     return host.Host(
         ConversationOwnershipStore=ConversationOwnershipStore,
@@ -388,14 +330,14 @@ def _conversations():
 
 def _economy():
     from economy import host
-    from core.config import ALL_MODELS as ALL_MODELS
-    from core.config import AUDIO_STT_PRICE_PER_SEC as AUDIO_STT_PRICE_PER_SEC
-    from core.config import AUDIO_TTS_PRICE_PER_SEC as AUDIO_TTS_PRICE_PER_SEC
-    from cloud.base import CloudProviderError as CloudProviderError
-    from kristall import KristallError as KristallError
-    from core.config import canonical_model_key as canonical_model_key
-    from observability.trace_manager import get_current_trace as get_current_trace
-    from storage.records import get_store as get_store
+    from core.config import ALL_MODELS
+    from core.config import AUDIO_STT_PRICE_PER_SEC
+    from core.config import AUDIO_TTS_PRICE_PER_SEC
+    from cloud.base import CloudProviderError
+    from kristall import KristallError
+    from core.config import canonical_model_key
+    from observability.trace_manager import get_current_trace
+    from storage.records import get_store
 
     return host.Host(
         ALL_MODELS=ALL_MODELS,
@@ -411,23 +353,23 @@ def _economy():
 
 def _forge():
     from forge import host
-    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
-    from storage.records import get_store as get_store
+    from economy.treasury_identity import get_current_owner_id
+    from storage.records import get_store
 
     return host.Host(get_current_owner_id=get_current_owner_id, get_store=get_store)
 
 
 def _invocation():
     from invocation import host
-    from observability.trace_manager import ExecutionTrace as ExecutionTrace
-    from kristall import KristallError as KristallError
-    from kristall import KristallLimitError as KristallLimitError
-    from kristall.store import MAX_JOURNAL_FRAME_BYTES as MAX_JOURNAL_FRAME_BYTES
-    from sessions.manager import create_session as create_session
-    from agent_memory.client import get_memory_client as get_memory_client
-    from storage.records import get_messages as get_messages
-    from storage.records import memory_file_path as memory_file_path
-    from sessions.manager import restore_session as restore_session
+    from observability.trace_manager import ExecutionTrace
+    from kristall import KristallError
+    from kristall import KristallLimitError
+    from kristall.store import MAX_JOURNAL_FRAME_BYTES
+    from sessions.manager import create_session
+    from agent_memory.client import get_memory_client
+    from storage.records import get_messages
+    from storage.records import memory_file_path
+    from sessions.manager import restore_session
 
     return host.Host(
         ExecutionTrace=ExecutionTrace,
@@ -444,35 +386,27 @@ def _invocation():
 
 def _logos_knowledge():
     from scripts import logos_knowledge_host as host
-    from core.config import Config as Config
-    from storage.memory_db import DatabaseError as DatabaseError
-    from kristall import KristallError as KristallError
-    from chat.mcp_routes import LogosClient as LogosClient
-    from tool_providers.universal_tool_platform import (
-        UniversalToolCall as UniversalToolCall,
-    )
-    from tool_providers.universal_tool_platform import (
-        UniversalToolExecutor as UniversalToolExecutor,
-    )
-    from yandex_client_modules.errors import YandexClientError as YandexClientError
+    from core.config import Config
+    from storage.memory_db import DatabaseError
+    from kristall import KristallError
+    from chat.mcp_routes import LogosClient
+    from tool_providers.universal_tool_platform import UniversalToolCall
+    from tool_providers.universal_tool_platform import UniversalToolExecutor
+    from yandex_client_modules.errors import YandexClientError
     from yandex_client_modules.request_mixin import (
         resolve_global_provider_credential as _resolve_global_provider_credential,
     )
-    from invocation.manager import create_invocation as create_invocation
-    from invocation.trace import create_invocation_trace as create_invocation_trace
-    from invocation.manager import fail_invocation as fail_invocation
+    from invocation.manager import create_invocation
+    from invocation.trace import create_invocation_trace
+    from invocation.manager import fail_invocation
     import tool_providers.filesystem as filesystem
-    from invocation.manager import finish_invocation as finish_invocation
+    from invocation.manager import finish_invocation
     from composition.application import initialize as initialize_application
-    from invocation.manager import persist_invocation_trace as persist_invocation_trace
-    from tool_providers.registry import registry as registry
-    from agent_runtime.issue_runner import (
-        seed_provider_credential as seed_provider_credential,
-    )
-    from invocation.manager import start_invocation as start_invocation
-    from tool_providers.universal_tool_platform import (
-        validate_json_schema as validate_json_schema,
-    )
+    from invocation.manager import persist_invocation_trace
+    from tool_providers.registry import registry
+    from agent_runtime.issue_runner import seed_provider_credential
+    from invocation.manager import start_invocation
+    from tool_providers.universal_tool_platform import validate_json_schema
 
     return host.Host(
         Config=Config,
@@ -499,49 +433,39 @@ def _logos_knowledge():
 
 def _mcp_server():
     from mcp_server import host
-    from core.config import ALL_MODELS as ALL_MODELS
-    from agent_runtime.gateway import AgentGateway as AgentGateway
-    from secret_store.credential_crypto import (
-        CredentialCryptoError as CredentialCryptoError,
-    )
-    from runtime import RuntimeDispatcher as RuntimeDispatcher
-    from runtime import RuntimeNotFound as RuntimeNotFound
-    from runtime import RuntimeOperationNotFound as RuntimeOperationNotFound
-    from runtime import RuntimeScopeViolation as RuntimeScopeViolation
-    from tool_providers.universal_tool_platform import (
-        UniversalToolCall as UniversalToolCall,
-    )
-    from tool_providers.universal_tool_platform import (
-        UniversalToolExecutor as UniversalToolExecutor,
-    )
-    from observability.trace_manager import bind_current_trace as bind_current_trace
-    from conversations.ownership import check_access as check_access
-    from invocation.manager import create_invocation as create_invocation
-    from invocation.trace import create_invocation_trace as create_invocation_trace
-    from secret_store.credential_crypto import decrypt_secret as decrypt_secret
-    from secret_store.credential_crypto import encrypt_secret as encrypt_secret
-    from invocation.manager import fail_invocation as fail_invocation
-    from invocation.manager import finish_invocation as finish_invocation
-    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
-    from invocation.api import get_invocation_status as get_invocation_status
-    from invocation.api import get_invocation_trace as get_invocation_trace
-    from storage.records import get_messages as get_messages
-    from conversations.ownership import get_owned_conversation as get_owned_conversation
-    from sessions.manager import get_session as get_session
-    from storage.records import get_store as get_store
-    from tool_providers.filesystem import grep_search as grep_search
-    from tool_providers.filesystem import list_directory as list_directory
-    from conversations.ownership import (
-        list_owned_conversations as list_owned_conversations,
-    )
-    from invocation.manager import persist_invocation_trace as persist_invocation_trace
-    from tool_providers.filesystem import read_file as read_file
-    from tool_providers.registry import registry as registry
-    from observability.trace_manager import reset_current_trace as reset_current_trace
-    from invocation.manager import start_invocation as start_invocation
-    from tool_providers.universal_tool_platform import (
-        tool_call_requires_approval as tool_call_requires_approval,
-    )
+    from core.config import ALL_MODELS
+    from agent_runtime.gateway import AgentGateway
+    from secret_store.credential_crypto import CredentialCryptoError
+    from runtime import RuntimeDispatcher
+    from runtime import RuntimeNotFound
+    from runtime import RuntimeOperationNotFound
+    from runtime import RuntimeScopeViolation
+    from tool_providers.universal_tool_platform import UniversalToolCall
+    from tool_providers.universal_tool_platform import UniversalToolExecutor
+    from observability.trace_manager import bind_current_trace
+    from conversations.ownership import check_access
+    from invocation.manager import create_invocation
+    from invocation.trace import create_invocation_trace
+    from secret_store.credential_crypto import decrypt_secret
+    from secret_store.credential_crypto import encrypt_secret
+    from invocation.manager import fail_invocation
+    from invocation.manager import finish_invocation
+    from economy.treasury_identity import get_current_owner_id
+    from invocation.api import get_invocation_status
+    from invocation.api import get_invocation_trace
+    from storage.records import get_messages
+    from conversations.ownership import get_owned_conversation
+    from sessions.manager import get_session
+    from storage.records import get_store
+    from tool_providers.filesystem import grep_search
+    from tool_providers.filesystem import list_directory
+    from conversations.ownership import list_owned_conversations
+    from invocation.manager import persist_invocation_trace
+    from tool_providers.filesystem import read_file
+    from tool_providers.registry import registry
+    from observability.trace_manager import reset_current_trace
+    from invocation.manager import start_invocation
+    from tool_providers.universal_tool_platform import tool_call_requires_approval
 
     return host.Host(
         ALL_MODELS=ALL_MODELS,
@@ -582,9 +506,9 @@ def _mcp_server():
 
 def _model_editor():
     from model_editor import host
-    from storage import StorageObjectNotFound as StorageObjectNotFound
-    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
-    from storage.contracts import storage_provider_from_env as storage_provider_from_env
+    from storage import StorageObjectNotFound
+    from economy.treasury_identity import get_current_owner_id
+    from storage.contracts import storage_provider_from_env
 
     return host.Host(
         StorageObjectNotFound=StorageObjectNotFound,
@@ -595,18 +519,16 @@ def _model_editor():
 
 def _narration():
     from scripts import narration_host as host
-    from api.yandex_transport import yandex_request as yandex_request
+    from api.yandex_transport import yandex_request
 
     return host.Host(yandex_request=yandex_request)
 
 
 def _observability():
     from observability import host
-    from economy.billing import aggregate_billing as aggregate_billing
-    from economy.billing import build_ai_billing_item as build_ai_billing_item
-    from economy.compute_resources import (
-        build_compute_billing_item as build_compute_billing_item,
-    )
+    from economy.billing import aggregate_billing
+    from economy.billing import build_ai_billing_item
+    from economy.compute_resources import build_compute_billing_item
 
     return host.Host(
         aggregate_billing=aggregate_billing,
@@ -617,14 +539,12 @@ def _observability():
 
 def _organization():
     from organization import host
-    from economy.treasury_identity import TreasuryIdentityError as TreasuryIdentityError
-    from sessions.manager import create_session as create_session
-    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
-    from sessions.manager import get_session as get_session
-    from storage.records import get_store as get_store
-    from tool_providers.universal_tool_platform import (
-        validate_json_schema as validate_json_schema,
-    )
+    from economy.treasury_identity import TreasuryIdentityError
+    from sessions.manager import create_session
+    from economy.treasury_identity import get_current_owner_id
+    from sessions.manager import get_session
+    from storage.records import get_store
+    from tool_providers.universal_tool_platform import validate_json_schema
 
     return host.Host(
         TreasuryIdentityError=TreasuryIdentityError,
@@ -638,12 +558,8 @@ def _organization():
 
 def _plugin_system():
     from plugin_system import host
-    from tool_providers.universal_tool_platform import (
-        UniversalToolCall as UniversalToolCall,
-    )
-    from tool_providers.universal_tool_platform import (
-        UniversalToolExecutor as UniversalToolExecutor,
-    )
+    from tool_providers.universal_tool_platform import UniversalToolCall
+    from tool_providers.universal_tool_platform import UniversalToolExecutor
 
     return host.Host(
         UniversalToolCall=UniversalToolCall, UniversalToolExecutor=UniversalToolExecutor
@@ -652,61 +568,49 @@ def _plugin_system():
 
 def _printing3d():
     from printing3d import host
-    from forge.binding import printing_store as printing_store
+    from forge.binding import printing_store
 
     return host.Host(printing_store=printing_store)
 
 
 def _project_board():
     from project_board import host
-    from memory_engine import MemoryStore as MemoryStore
-    from memory_engine import StoreError as StoreError
+    from memory_engine import MemoryStore
+    from memory_engine import StoreError
 
     return host.Host(MemoryStore=MemoryStore, StoreError=StoreError)
 
 
 def _provider_accounts():
     from provider_accounts import host
-    from core.config import CLASSIFIER_MODELS as CLASSIFIER_MODELS
-    from cloud.cloudru.api_key_provider import (
-        CloudRuApiKeyProvider as CloudRuApiKeyProvider,
-    )
-    from cloud.cloudru.iam import CloudRuIamClient as CloudRuIamClient
-    from cloud.cloudru.secret_management import (
-        CloudRuSecretManagementClient as CloudRuSecretManagementClient,
-    )
-    from core.config import Config as Config
-    from secret_store.credential_crypto import (
-        CredentialCryptoError as CredentialCryptoError,
-    )
-    from core.config import EMBEDDING_MODELS as EMBEDDING_MODELS
-    from core.config import IMAGE_MODELS as IMAGE_MODELS
-    from core.config import TEXT_MODELS as TEXT_MODELS
-    from core.config import VOICE_MODELS as VOICE_MODELS
-    from yandex_client_modules.api_key_provider import (
-        YandexApiKeyProvider as YandexApiKeyProvider,
-    )
+    from core.config import CLASSIFIER_MODELS
+    from cloud.cloudru.api_key_provider import CloudRuApiKeyProvider
+    from cloud.cloudru.iam import CloudRuIamClient
+    from cloud.cloudru.secret_management import CloudRuSecretManagementClient
+    from core.config import Config
+    from secret_store.credential_crypto import CredentialCryptoError
+    from core.config import EMBEDDING_MODELS
+    from core.config import IMAGE_MODELS
+    from core.config import TEXT_MODELS
+    from core.config import VOICE_MODELS
+    from yandex_client_modules.api_key_provider import YandexApiKeyProvider
     from yandex_client_modules.request_mixin import (
         resolve_global_provider_credential as _resolve_global_provider_credential,
     )
-    from core.model_profiles import annotate_catalog as annotate_catalog
-    from core.config import canonical_model_key as canonical_model_key
-    from core.config import config as config
-    from secret_store.credential_crypto import decrypt_secret as decrypt_secret
-    from secret_store.credential_crypto import encrypt_secret as encrypt_secret
-    from secret_store.credential_crypto import (
-        encryption_configured as encryption_configured,
-    )
-    from secret_store.credential_crypto import fingerprint_key as fingerprint_key
-    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
-    from observability.trace_manager import get_current_trace as get_current_trace
-    from core.config import get_model_uri as get_model_uri
-    from storage.records import get_store as get_store
-    from yandex_client_modules.request_mixin import (
-        provider_request_headers as provider_request_headers,
-    )
-    from core.config import registry_key_for_upstream as registry_key_for_upstream
-    from observability.trace_manager import traced_operation as traced_operation
+    from core.model_profiles import annotate_catalog
+    from core.config import canonical_model_key
+    from core.config import config
+    from secret_store.credential_crypto import decrypt_secret
+    from secret_store.credential_crypto import encrypt_secret
+    from secret_store.credential_crypto import encryption_configured
+    from secret_store.credential_crypto import fingerprint_key
+    from economy.treasury_identity import get_current_owner_id
+    from observability.trace_manager import get_current_trace
+    from core.config import get_model_uri
+    from storage.records import get_store
+    from yandex_client_modules.request_mixin import provider_request_headers
+    from core.config import registry_key_for_upstream
+    from observability.trace_manager import traced_operation
 
     return host.Host(
         CLASSIFIER_MODELS=CLASSIFIER_MODELS,
@@ -740,20 +644,20 @@ def _provider_accounts():
 
 def _remote_runtime():
     from remote_runtime import host
-    from observability.trace_manager import ExecutionTrace as ExecutionTrace
-    from runtime import RuntimeDispatcher as RuntimeDispatcher
-    from runtime import RuntimeLoader as RuntimeLoader
-    from runtime import RuntimeNotFound as RuntimeNotFound
-    from economy.treasury_identity import TreasuryIdentityError as TreasuryIdentityError
-    from runtime.request_context import bind_runtime_request as bind_runtime_request
-    from agent_memory.client import close_memory_clients as close_memory_clients
-    from invocation.trace import create_invocation_trace as create_invocation_trace
-    from storage.records import get_config as get_config
-    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
-    from observability.trace_manager import get_current_trace as get_current_trace
-    from storage.records import get_store as get_store
+    from observability.trace_manager import ExecutionTrace
+    from runtime import RuntimeDispatcher
+    from runtime import RuntimeLoader
+    from runtime import RuntimeNotFound
+    from economy.treasury_identity import TreasuryIdentityError
+    from runtime.request_context import bind_runtime_request
+    from agent_memory.client import close_memory_clients
+    from invocation.trace import create_invocation_trace
+    from storage.records import get_config
+    from economy.treasury_identity import get_current_owner_id
+    from observability.trace_manager import get_current_trace
+    from storage.records import get_store
     from storage.records import open_journal_store as init_runtime_db
-    from storage.records import set_config as set_config
+    from storage.records import set_config
 
     return host.Host(
         ExecutionTrace=ExecutionTrace,
@@ -775,33 +679,27 @@ def _remote_runtime():
 
 def _runtime():
     from runtime import host
-    from api.contracts import ContractViolation as ContractViolation
-    from storage.contracts import StorageCredentialsMissing as StorageCredentialsMissing
-    from storage.contracts import StorageError as StorageError
-    from storage.contracts import (
-        StorageProviderUnavailable as StorageProviderUnavailable,
-    )
-    from tool_providers.universal_tool_platform import (
-        UniversalToolCall as UniversalToolCall,
-    )
-    from tool_providers.universal_tool_platform import (
-        UniversalToolExecutor as UniversalToolExecutor,
-    )
+    from api.contracts import ContractViolation
+    from storage.contracts import StorageCredentialsMissing
+    from storage.contracts import StorageError
+    from storage.contracts import StorageProviderUnavailable
+    from tool_providers.universal_tool_platform import UniversalToolCall
+    from tool_providers.universal_tool_platform import UniversalToolExecutor
     from tool_providers.universal_tool_platform import (
         warn_deprecated_execution_hooks as _warn_deprecated_execution_hooks,
     )
-    from conversations.ownership import check_access as check_access
-    from sessions.profiles import clone_profile as clone_profile
-    from invocation.manager import create_invocation as create_invocation
-    from sessions.manager import create_session as create_session
-    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
-    from invocation.api import get_invocation_status as get_invocation_status
-    from invocation.api import get_invocation_trace as get_invocation_trace
-    from sessions.profiles import get_profile as get_profile
-    from sessions.manager import get_session as get_session
-    from sessions.profiles import list_profiles as list_profiles
-    from sessions.profiles import session_profile as session_profile
-    from api.contracts import validate_api_contract as validate_api_contract
+    from conversations.ownership import check_access
+    from sessions.profiles import clone_profile
+    from invocation.manager import create_invocation
+    from sessions.manager import create_session
+    from economy.treasury_identity import get_current_owner_id
+    from invocation.api import get_invocation_status
+    from invocation.api import get_invocation_trace
+    from sessions.profiles import get_profile
+    from sessions.manager import get_session
+    from sessions.profiles import list_profiles
+    from sessions.profiles import session_profile
+    from api.contracts import validate_api_contract
 
     return host.Host(
         ContractViolation=ContractViolation,
@@ -828,12 +726,10 @@ def _runtime():
 
 def _secret_store():
     from secret_store import host
-    from cloud.base import CloudProviderError as CloudProviderError
-    from cloud.cloudru.secret_management import (
-        CloudRuSecretManagementClient as CloudRuSecretManagementClient,
-    )
-    from observability.trace_manager import get_current_trace as get_current_trace
-    from storage.records import get_store as get_store
+    from cloud.base import CloudProviderError
+    from cloud.cloudru.secret_management import CloudRuSecretManagementClient
+    from observability.trace_manager import get_current_trace
+    from storage.records import get_store
 
     return host.Host(
         CloudProviderError=CloudProviderError,
@@ -845,8 +741,8 @@ def _secret_store():
 
 def _sessions():
     from sessions import host
-    from agent_memory.client import get_memory_client as get_memory_client
-    from storage.records import memory_file_path as memory_file_path
+    from agent_memory.client import get_memory_client
+    from storage.records import memory_file_path
 
     return host.Host(
         get_memory_client=get_memory_client, memory_file_path=memory_file_path
@@ -855,14 +751,10 @@ def _sessions():
 
 def _storage():
     from storage import host
-    from cloud.cloudru.object_storage import (
-        CloudRuObjectStorage as CloudRuObjectStorage,
-    )
-    from kristall import KristallError as KristallError
-    from runtime.request_context import (
-        current_runtime_data_root as current_runtime_data_root,
-    )
-    from agent_memory.client import get_memory_client as get_memory_client
+    from cloud.cloudru.object_storage import CloudRuObjectStorage
+    from kristall import KristallError
+    from runtime.request_context import current_runtime_data_root
+    from agent_memory.client import get_memory_client
 
     return host.Host(
         CloudRuObjectStorage=CloudRuObjectStorage,
@@ -874,20 +766,14 @@ def _storage():
 
 def _tool_providers():
     from tool_providers import host
-    from kristall import KristallError as KristallError
-    from remote_runtime.ssh import SSHRuntimeError as SSHRuntimeError
-    from remote_runtime.ssh_settings import (
-        assert_operation_allowed as assert_operation_allowed,
-    )
-    from remote_runtime.ssh_settings import build_runtime as build_runtime
-    from agent_runtime.local_gateway import (
-        enqueue_local_tool_job as enqueue_local_tool_job,
-    )
+    from kristall import KristallError
+    from remote_runtime.ssh import SSHRuntimeError
+    from remote_runtime.ssh_settings import assert_operation_allowed
+    from remote_runtime.ssh_settings import build_runtime
+    from agent_runtime.local_gateway import enqueue_local_tool_job
     from composition.tool_sources import SOURCES as external_tool_sources
-    from storage.records import memory_file_path as memory_file_path
-    from agent_runtime.local_gateway import (
-        wait_for_local_tool_job as wait_for_local_tool_job,
-    )
+    from storage.records import memory_file_path
+    from agent_runtime.local_gateway import wait_for_local_tool_job
 
     return host.Host(
         KristallError=KristallError,
@@ -903,13 +789,13 @@ def _tool_providers():
 
 def _web_shell():
     from web_shell import host
-    from kristall import KristallError as KristallError
-    from runtime import current_runtime_base_path as current_runtime_base_path
-    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
-    from core.config import get_donation_url as get_donation_url
-    from storage.records import get_store as get_store
-    from storage.records import memory_file_path as memory_file_path
-    from invocation.problems import problem as problem
+    from kristall import KristallError
+    from runtime import current_runtime_base_path
+    from economy.treasury_identity import get_current_owner_id
+    from core.config import get_donation_url
+    from storage.records import get_store
+    from storage.records import memory_file_path
+    from invocation.problems import problem
     from composition.web import STORAGE_INITIALIZERS as storage_initializers
 
     return host.Host(
@@ -926,11 +812,9 @@ def _web_shell():
 
 def _workspace():
     from workspace import host
-    from core.config import Config as Config
-    from yandex_client_modules.errors import YandexClientError as YandexClientError
-    from yandex_client_modules.client import (
-        YandexResponsesClient as YandexResponsesClient,
-    )
+    from core.config import Config
+    from yandex_client_modules.errors import YandexClientError
+    from yandex_client_modules.client import YandexResponsesClient
 
     return host.Host(
         Config=Config,
@@ -941,41 +825,29 @@ def _workspace():
 
 def _yandex_client_modules():
     from yandex_client_modules import host
-    from secret_store.credential_crypto import (
-        CredentialCryptoError as CredentialCryptoError,
-    )
-    from observability.trace_manager import ExecutionTrace as ExecutionTrace
-    from core.config import IMAGE_MODELS as IMAGE_MODELS
-    from provider_accounts.quotas import ProviderQuotaExceeded as ProviderQuotaExceeded
-    from tool_providers.universal_tool_platform import (
-        UniversalToolCall as UniversalToolCall,
-    )
-    from tool_providers.universal_tool_platform import (
-        UniversalToolExecutor as UniversalToolExecutor,
-    )
-    from secret_store.credential_crypto import decrypt_secret as decrypt_secret
-    from secret_store.credential_crypto import encrypt_secret as encrypt_secret
-    from agent_memory.manager import (
-        get_controlled_memory_summary as get_controlled_memory_summary,
-    )
-    from storage.records import get_conv_settings as get_conv_settings
-    from economy.treasury_identity import get_current_owner_id as get_current_owner_id
-    from core.config import get_model_uri as get_model_uri
-    from storage.records import get_store as get_store
+    from secret_store.credential_crypto import CredentialCryptoError
+    from observability.trace_manager import ExecutionTrace
+    from core.config import IMAGE_MODELS
+    from provider_accounts.quotas import ProviderQuotaExceeded
+    from tool_providers.universal_tool_platform import UniversalToolCall
+    from tool_providers.universal_tool_platform import UniversalToolExecutor
+    from secret_store.credential_crypto import decrypt_secret
+    from secret_store.credential_crypto import encrypt_secret
+    from agent_memory.manager import get_controlled_memory_summary
+    from storage.records import get_conv_settings
+    from economy.treasury_identity import get_current_owner_id
+    from core.config import get_model_uri
+    from storage.records import get_store
     import mcp_server.storage as mcp_storage
-    from provider_accounts.quotas import record_usage as record_usage
-    from tool_providers.registry import registry as registry
-    from provider_accounts.quotas import release_request as release_request
-    from provider_accounts.quotas import reserve_request as reserve_request
-    from provider_accounts.credentials import (
-        resolve_client_credential as resolve_client_credential,
-    )
-    from core.model_profiles import ultra_profiles as ultra_profiles
-    from core.model_profiles import (
-        ultra_reasoning_controllable as ultra_reasoning_controllable,
-    )
-    from core.model_profiles import ultra_request_defaults as ultra_request_defaults
-    from core.config import upstream_model_id as upstream_model_id
+    from provider_accounts.quotas import record_usage
+    from tool_providers.registry import registry
+    from provider_accounts.quotas import release_request
+    from provider_accounts.quotas import reserve_request
+    from provider_accounts.credentials import resolve_client_credential
+    from core.model_profiles import ultra_profiles
+    from core.model_profiles import ultra_reasoning_controllable
+    from core.model_profiles import ultra_request_defaults
+    from core.config import upstream_model_id
 
     return host.Host(
         CredentialCryptoError=CredentialCryptoError,
