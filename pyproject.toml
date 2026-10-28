@@ -82,6 +82,7 @@ effect-calls = ["ToolRegistry"]
 system-log-module = "observability.system_log"
 tool-registry-file = "tool_providers/registry.py"
 tool-sources-file = "composition/tool_sources.py"
+env-loader = "core.env.load_env_file"
 mcp-tools-file = "mcp_server/tools.py"
 
 [tool.logos.units]

@@ -36,9 +36,11 @@ from __future__ import annotations
 import argparse
 import ast
 import collections
+import io
 import json
 import os
 import re
+import tokenize
 import subprocess
 import sys
 import tomllib
@@ -95,6 +97,7 @@ class Config:
     system_log_module: str = ""
     tool_registry_file: str = ""
     tool_sources_file: str = ""
+    env_loader: str = ""
     mcp_tools_file: str = ""
 
 
@@ -119,6 +122,7 @@ def load_config() -> Config:
         system_log_module=ind.get("system-log-module", ""),
         tool_registry_file=ind.get("tool-registry-file", ""),
         tool_sources_file=ind.get("tool-sources-file", ""),
+        env_loader=ind.get("env-loader", ""),
         mcp_tools_file=ind.get("mcp-tools-file", ""),
     )
 
@@ -963,6 +967,9 @@ def check_api(umap: UnitMap, violations: list[Violation]) -> None:
 
 
 def check_wiring(umap: UnitMap, violations: list[Violation]) -> None:
+    wiring = ROOT / WIRING_FILE
+    if wiring.is_file() and wiring.read_text(encoding="utf-8") != render_wiring(umap):
+        violations.append(Violation("W", WIRING_FILE, 0, "stale: run --write-wiring"))
     root_text = "\n".join(
         (ROOT / f).read_text(encoding="utf-8") for f in sorted(umap.root_files)
     )
@@ -1425,6 +1432,119 @@ def sync_vendored(umap: UnitMap) -> list[str]:
     return written
 
 
+WIRING_FILE = "composition/wiring.py"
+WIRING_HEADER = '''"""Which unit provides each port: the one place where units meet.
+
+Generated from the units' ``host.py`` files by
+``python3 scripts/check_independence.py --write-wiring``: each ``Host`` field's
+comment names its provider. ``register_all`` loads ``core/.env`` and registers a
+factory per unit; a factory imports its providers and builds the host the first
+time the unit needs it."""
+
+from __future__ import annotations
+
+from importlib import import_module
+
+from {module} import {name}
+'''
+
+
+def host_files(umap: UnitMap) -> list[tuple[str, str]]:
+    """(factory key, host module) of every unit host, sorted by key."""
+    hosts = []
+    for path in umap.files:
+        name = Path(path).name
+        if umap.unit_of[path] == "<root>":
+            continue
+        if name == "host.py" and path.count("/") == 1:
+            hosts.append((path.split("/")[0], module_name(path)))
+        elif name.endswith("_host.py") and path.startswith("scripts/"):
+            hosts.append((Path(path).stem.removesuffix("_host"), module_name(path)))
+    return sorted(hosts)
+
+
+def host_providers(host_module: str) -> list[tuple[str, str]]:
+    """(port, provider) of a host, in field order, from the ``Host`` field comments."""
+    path = repo_module_file(host_module)
+    if path is None:
+        return []
+    text = (ROOT / path).read_text(encoding="utf-8")
+    comments = {
+        token.start[0]: token.string.lstrip("#").strip()
+        for token in tokenize.generate_tokens(io.StringIO(text).readline)
+        if token.type == tokenize.COMMENT
+    }
+    ports = []
+    for node in ast.parse(text).body:
+        if not (isinstance(node, ast.ClassDef) and node.name == "Host"):
+            continue
+        for field_node in node.body:
+            if isinstance(field_node, ast.AnnAssign) and isinstance(
+                field_node.target, ast.Name
+            ):
+                lines = range(field_node.lineno, (field_node.end_lineno or 0) + 2)
+                provider = next((comments[n] for n in lines if n in comments), "")
+                ports.append((field_node.target.id, provider))
+    return ports
+
+
+def render_wiring(umap: UnitMap) -> str:
+    def fits(line: str) -> bool:
+        return len(line) <= 88
+
+    module, name = umap.config.env_loader.rsplit(".", 1)
+    parts = [WIRING_HEADER.format(module=module, name=name)]
+    hosts = host_files(umap)
+    for key, module in hosts:
+        parent, leaf = module.rsplit(".", 1)
+        lines = [
+            f"def _{key}():",
+            f"    from {parent} import {leaf}" + ("" if leaf == "host" else " as host"),
+        ]
+        for port, provider in host_providers(module):
+            if repo_module_file(provider) is not None:
+                lines.append(f"    import {provider} as {port}")
+                continue
+            source, name = provider.rsplit(".", 1)
+            line = f"    from {source} import {name} as {port}"
+            lines.append(
+                line
+                if fits(line)
+                else f"    from {source} import (\n        {name} as {port},\n    )"
+            )
+        args = [f"{port}={port}" for port, _ in host_providers(module)]
+        call = f"    return host.Host({', '.join(args)})"
+        if not fits(call):
+            inner = "        " + ", ".join(args)
+            call = (
+                f"    return host.Host(\n{inner}\n    )"
+                if fits(inner)
+                else "    return host.Host(\n"
+                + "".join(f"        {a},\n" for a in args)
+                + "    )"
+            )
+        lines += ["", call]
+        parts.append("\n\n" + "\n".join(lines) + "\n")
+    parts.append(
+        "\n\n# Each unit's host module and factory, in registration order.\n_HOSTS = {\n"
+    )
+    parts += [f'    "{key}": ("{module}", _{key}),\n' for key, module in hosts]
+    parts.append(
+        "}\n\n\n"
+        "def register_units(*units: str) -> None:\n"
+        '    """Register the factories of these units only; ``core/.env`` is not loaded."""\n'
+        "    for unit in units:\n"
+        "        module, factory = _HOSTS[unit]\n"
+        "        import_module(module).provide(factory)\n"
+        "\n\n"
+        "def register_all() -> None:\n"
+        '    """Load ``core/.env`` and register every unit\'s factory."""\n'
+        f"    {name}()\n"
+        "    register_units(*_HOSTS)\n"
+    )
+    return "".join(parts)
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 
@@ -1472,6 +1592,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="rewrite vendored copies from their canonical sources",
     )
+    parser.add_argument(
+        "--write-wiring",
+        action="store_true",
+        help=f"regenerate {WIRING_FILE} from the units' host files",
+    )
     args = parser.parse_args(argv)
 
     if args.routes is not None:
@@ -1486,6 +1611,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.sync_vendored:
         for path in sync_vendored(umap):
             print(f"wrote {path}")
+        return 0
+    if args.write_wiring:
+        (ROOT / WIRING_FILE).write_text(render_wiring(umap), encoding="utf-8")
+        print(f"wrote {WIRING_FILE}")
         return 0
     if args.entrypoints:
         problems = entrypoint_report(umap)

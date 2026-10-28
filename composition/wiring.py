@@ -1,8 +1,10 @@
 """Which unit provides each port: the one place where units meet.
 
-Generated from the units' ``host.py`` files. ``register_all`` loads ``core/.env``
-and registers a factory per unit; a factory imports its providers and builds the
-host the first time the unit needs it."""
+Generated from the units' ``host.py`` files by
+``python3 scripts/check_independence.py --write-wiring``: each ``Host`` field's
+comment names its provider. ``register_all`` loads ``core/.env`` and registers a
+factory per unit; a factory imports its providers and builds the host the first
+time the unit needs it."""
 
 from __future__ import annotations
 
@@ -1044,5 +1046,5 @@ def register_units(*units: str) -> None:
 
 def register_all() -> None:
     """Load ``core/.env`` and register every unit's factory."""
-    load_env_file()
+    upstream_model_id()
     register_units(*_HOSTS)

@@ -67,7 +67,7 @@ The binding mechanism is `core/host_binding.py`, vendored into each such unit as
 | Root | Role |
 | --- | --- |
 | `composition/process.py` | `start()`: loads `core/.env` and configures the system log. |
-| `composition/wiring.py` | Generated. One factory per unit maps every port to the object it replaces; `register_all()` loads `core/.env` and registers all of them, `register_units(*names)` registers some units without loading the environment. |
+| `composition/wiring.py` | Generated from the `Host` field comments (`--write-wiring`). One factory per unit maps every port to the object it replaces; `register_all()` loads `core/.env` and registers all of them, `register_units(*names)` registers some units without loading the environment. |
 | `composition/web.py` | What the web process serves, in order: the ChatGPT bridge tools, the RDC pairing route, the blueprints, the web shell and the units' own routes; the durable tables storage start-up creates. |
 | `composition/tool_sources.py` | Tool categories other units contribute to the shared tool registry, after its own. |
 | `composition/application.py` | `initialize()`: the web application as a library, for command-line roots that need its state. |
@@ -80,8 +80,11 @@ The binding mechanism is `core/host_binding.py`, vendored into each such unit as
    `from <unit>.host import bound, <function>`.
 2. Add the field to `Host` with a comment naming its provider (`# storage.records.get_store`),
    plus a call shim for a function.
-3. Import the provider in your unit's factory in `composition/wiring.py`.
+3. Regenerate the wiring: `python3 scripts/check_independence.py --write-wiring`.
 4. Run `python3 scripts/check_independence.py --summary` and expect `TOTAL=0`.
+
+A new unit host also needs its `_binding.py` copy: add it to the
+`core/host_binding.py` entry of `[[tool.logos.vendored]]` and run `--sync-vendored`.
 
 ## Checking
 
@@ -93,6 +96,7 @@ python3 scripts/check_independence.py --routes     # static route table (rule, m
 python3 scripts/check_independence.py --tool-order # tool categories in registry order
 python3 scripts/check_independence.py --entrypoints
 python3 scripts/check_independence.py --sync-vendored
+python3 scripts/check_independence.py --write-wiring
 ```
 
 | Counter | Zero means |
