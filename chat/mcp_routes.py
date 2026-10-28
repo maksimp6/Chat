@@ -179,6 +179,52 @@ def _client_params(raw: dict[str, Any]) -> dict[str, Any]:
     return params
 
 
+# Sent when the provider stops a reply at its output limit: the answer goes on, not restarts.
+OUTPUT_LIMIT_CONTINUE_PROMPT = (
+    "Твой предыдущий ответ оборвался из-за ограничения длины вывода. Продолжи его "
+    "ровно с того места, где он прервался: без повторов, без вступления и без пояснений."
+)
+
+
+def _cut_by_output_limit(response) -> bool:
+    """True when the provider stopped this response at its output-token limit."""
+    if not isinstance(response, dict) or response.get("status") != "incomplete":
+        return False
+    details = response.get("incomplete_details")
+    return isinstance(details, dict) and details.get("reason") == "max_output_tokens"
+
+
+def _join_continued_parts(parts, last):
+    """One response whose output is every part in order, so the reply text is whole.
+
+    Earlier parts were cut mid-way: their unfinished function calls are dropped, so
+    only the last part can still ask for a tool.
+    """
+    output = []
+    for part in parts:
+        for item in part.get("output") or []:
+            if not isinstance(item, dict) or item.get("type") == "function_call":
+                continue
+            content = item.get("content")
+            if item.get("type") == "message" and isinstance(content, list):
+                item = {
+                    **item,
+                    "content": [
+                        piece
+                        for piece in content
+                        if not (
+                            isinstance(piece, dict)
+                            and piece.get("type") == "function_call"
+                        )
+                    ],
+                }
+            output.append(item)
+    joined = dict(last) if isinstance(last, dict) else {}
+    joined["output"] = output + list(joined.get("output") or [])
+    joined["continued_response_ids"] = [part.get("id") for part in parts]
+    return joined
+
+
 def _record_provider_output(trace, response):
     """What the provider returned for one request: the status, the output kinds and the calls it asked for."""
     if not isinstance(trace, bound.ExecutionTrace) or not isinstance(response, dict):
@@ -352,74 +398,108 @@ def _define_logos_client(base: type) -> type:
             )
             _record_provider_output(trace, response)
 
-            if extract_function_calls(response):
-                tool_servers = bound.mcp_storage.list_servers(
-                    owner_id=get_current_owner_id()
-                )
-                base_params = dict(params or {})
+            base_params = dict(params or {})
+            tool_servers = None
 
-                def execute_tool(call):
-                    result = self._execute_single_tool(
-                        call, tool_servers, trace=trace, **policy_kwargs
+            def execute_tool(call):
+                nonlocal tool_servers
+                if tool_servers is None:
+                    tool_servers = bound.mcp_storage.list_servers(
+                        owner_id=get_current_owner_id()
                     )
-                    if result.get("error") is not None:
-                        return {"error": result["error"], "tool": result.get("name")}
-                    return result.get("result")
-
-                # Retain the original request and all tool rounds without a provider conversation.
-
-                initial_input = bound._response_input(base_params, message)
-                continuation_history = (
-                    [{"role": "user", "content": initial_input}]
-                    if isinstance(initial_input, str)
-                    else list(initial_input)
+                result = self._execute_single_tool(
+                    call, tool_servers, trace=trace, **policy_kwargs
                 )
+                if result.get("error") is not None:
+                    return {"error": result["error"], "tool": result.get("name")}
+                return result.get("result")
 
-                def continue_request(input_items, previous_response):
-                    continuation_params = dict(base_params)
-                    # The initial forced choice has been satisfied. Permit a final
-                    # answer instead of forcing the same action again with a new id.
-                    choice = continuation_params.get("tool_choice")
-                    if choice == "required":
-                        continuation_params["tool_choice"] = "auto"
-                    elif isinstance(choice, dict):
-                        continuation_params["tool_choice"] = (
-                            {**choice, "mode": "auto"}
-                            if choice.get("type") == "allowed_tools"
-                            else "auto"
-                        )
-                    # The provider conversation already contains the answered calls.
-                    if conversation_id:
-                        continuation_params["input"] = [
+            # Retain the original request and all tool rounds without a provider conversation.
+            initial_input = bound._response_input(base_params, message)
+            continuation_history = (
+                [{"role": "user", "content": initial_input}]
+                if isinstance(initial_input, str)
+                else list(initial_input)
+            )
+
+            def follow_up(input_items):
+                """One more request of this turn, with the forced tool choice released."""
+                continuation_params = dict(base_params)
+                # The initial forced choice has been satisfied. Permit a final
+                # answer instead of forcing the same action again with a new id.
+                choice = continuation_params.get("tool_choice")
+                if choice == "required":
+                    continuation_params["tool_choice"] = "auto"
+                elif isinstance(choice, dict):
+                    continuation_params["tool_choice"] = (
+                        {**choice, "mode": "auto"}
+                        if choice.get("type") == "allowed_tools"
+                        else "auto"
+                    )
+                continuation_params["input"] = input_items
+                continuation_params["background"] = base_params.get(
+                    "background", True
+                )
+                response = self._ask_provider(
+                    message="",
+                    model_key=model_key,
+                    conversation_id=conversation_id,
+                    settings_conversation_id=settings_conversation_id,
+                    params=continuation_params,
+                    trace=trace,
+                    **policy_kwargs,
+                )
+                _record_provider_output(trace, response)
+                return response
+
+            def continue_request(input_items, previous_response):
+                # The provider conversation already contains the answered calls.
+                if conversation_id:
+                    return follow_up(
+                        [
                             item
                             for item in input_items
                             if isinstance(item, dict)
                             and item.get("type") == "function_call_output"
                         ]
-                    else:
-                        continuation_history.extend(input_items)
-                        continuation_params["input"] = list(continuation_history)
-                    continuation_params["background"] = base_params.get(
-                        "background", True
                     )
-                    response = self._ask_provider(
-                        message="",
-                        model_key=model_key,
-                        conversation_id=conversation_id,
-                        settings_conversation_id=settings_conversation_id,
-                        params=continuation_params,
-                        trace=trace,
-                        **policy_kwargs,
-                    )
-                    _record_provider_output(trace, response)
-                    return response
+                continuation_history.extend(input_items)
+                return follow_up(list(continuation_history))
 
-                response = run_tool_loop(
+            def continue_after_output_limit(previous_response):
+                # The provider conversation holds the cut answer; otherwise it joins the history.
+                request = {"role": "user", "content": OUTPUT_LIMIT_CONTINUE_PROMPT}
+                if conversation_id:
+                    return follow_up([request])
+                continuation_history.extend(
+                    list(previous_response.get("output") or []) + [request]
+                )
+                return follow_up(list(continuation_history))
+
+            def run_tools(response):
+                if not extract_function_calls(response):
+                    return response
+                return run_tool_loop(
                     response,
                     execute_tool,
                     continue_request,
                     max_rounds=_tool_rounds(base_params.get("max_rounds")),
                 )
+
+            response = run_tools(response)
+            # A reply cut by the provider's output limit goes on where it stopped, part by
+            # part, until it is complete; only a part that adds no output ends the chain.
+            parts = []
+            while _cut_by_output_limit(response) and response.get("output"):
+                parts.append(response)
+                if trace is not None:
+                    trace.add_event(
+                        "provider_output_limit_continued",
+                        {"part": len(parts), "response_id": response.get("id")},
+                    )
+                response = run_tools(continue_after_output_limit(response))
+            if parts:
+                response = _join_continued_parts(parts, response)
 
             if trace is not None:
                 record_yandex_mcp_activity(trace)
