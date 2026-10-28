@@ -34,9 +34,13 @@ def extract_reasoning_and_text(data):
         elif item.get("type") == "output_text" and item.get("text"):
             text_parts.append(str(item["text"]))
 
-    final_text = (
-        "".join(text_parts) or data.get("output_text") or data.get("text") or ""
+    # Top-level "text" in a Responses result is the text config
+    # ({"format": ..., "verbosity": ...}), not an answer: only strings count.
+    fallback = next(
+        (v for v in (data.get("output_text"), data.get("text")) if isinstance(v, str) and v),
+        "",
     )
+    final_text = "".join(text_parts) or fallback
     final_reasoning = "\n\n".join(reasoning_parts)
     return final_reasoning, str(final_text)
 

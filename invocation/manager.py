@@ -16,6 +16,7 @@ import logging
 from invocation.host import (
     bound,
     create_session,
+    file_court_case,
     get_memory_client,
     memory_file_path,
     restore_session,
@@ -353,7 +354,30 @@ def finish_invocation(invocation_id: str, result: Any = None) -> bool:
 
 
 def fail_invocation(invocation_id: str, error: Any = None) -> bool:
-    return _complete(invocation_id, "failed", error=error)
+    published = _complete(invocation_id, "failed", error=error)
+    _file_court_case(invocation_id, error)
+    return published
+
+
+def _file_court_case(invocation_id: str, error: Any) -> None:
+    """Every failed invocation is a Court case (AGENTS.md, «Ошибки и дела Суда»).
+
+    Filing must never change how the failure itself is published."""
+    try:
+        record = get_memory_client(memory_file_path()).get(_key(invocation_id))
+        record = record if isinstance(record, dict) else {}
+        file_court_case(
+            {
+                "invocation_id": str(invocation_id),
+                "conversation_id": record.get("conversation_id"),
+                "session_id": record.get("session_id"),
+                "trace_id": record.get("trace_id"),
+                "created_at": record.get("created_at"),
+                "error": _sanitize_for_storage(error),
+            }
+        )
+    except Exception:
+        logger.exception("court case for invocation %s was not filed", invocation_id)
 
 
 def cancel_invocation(invocation_id: str, reason: Any = None) -> bool:

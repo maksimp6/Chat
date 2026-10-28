@@ -20,6 +20,7 @@ class Host:
     KristallLimitError: Any  # kristall.KristallLimitError
     MAX_JOURNAL_FRAME_BYTES: Any  # kristall.store.MAX_JOURNAL_FRAME_BYTES
     create_session: Any  # sessions.manager.create_session
+    file_court_case: Any  # court.filing.file_case
     get_memory_client: Any  # agent_memory.client.get_memory_client
     get_messages: Any  # storage.records.get_messages
     memory_file_path: Any  # storage.records.memory_file_path
@@ -40,6 +41,7 @@ __all__ = [
     "current",
     "provide",
     "create_session",
+    "file_court_case",
     "get_memory_client",
     "get_messages",
     "memory_file_path",
@@ -49,6 +51,10 @@ __all__ = [
 
 def create_session(*args: Any, **kwargs: Any) -> Any:
     return current().create_session(*args, **kwargs)
+
+
+def file_court_case(*args: Any, **kwargs: Any) -> Any:
+    return current().file_court_case(*args, **kwargs)
 
 
 def get_memory_client(*args: Any, **kwargs: Any) -> Any:

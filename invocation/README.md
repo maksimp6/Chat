@@ -46,6 +46,7 @@ Everything `invocation` uses from other units is a field of `Host` in [`invocati
 | `KristallLimitError` | `kristall.KristallLimitError` |
 | `MAX_JOURNAL_FRAME_BYTES` | `kristall.store.MAX_JOURNAL_FRAME_BYTES` |
 | `create_session` | `sessions.manager.create_session` |
+| `file_court_case` | `court.filing.file_case` |
 | `get_memory_client` | `agent_memory.client.get_memory_client` |
 | `get_messages` | `storage.records.get_messages` |
 | `memory_file_path` | `storage.records.memory_file_path` |

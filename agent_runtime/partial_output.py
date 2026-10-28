@@ -35,7 +35,12 @@ def extract_response_text(data: dict[str, Any]) -> tuple[str, str]:
     # Separate output items, so adjacent messages do not run together.
     text = "\n\n".join(text_parts).strip()
     if not text:
-        text = str(data.get("output_text") or data.get("text") or "").strip()
+        # Top-level "text" is the text config ({"format": ..., "verbosity": ...}),
+        # not an answer: only strings count.
+        text = next(
+            (v for v in (data.get("output_text"), data.get("text")) if isinstance(v, str) and v),
+            "",
+        ).strip()
     return "\n\n".join(reasoning_parts), text
 
 
