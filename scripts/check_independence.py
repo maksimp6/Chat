@@ -1492,8 +1492,8 @@ def render_wiring(umap: UnitMap) -> str:
     def fits(line: str) -> bool:
         return len(line) <= 88
 
-    module, name = umap.config.env_loader.rsplit(".", 1)
-    parts = [WIRING_HEADER.format(module=module, name=name)]
+    loader_module, loader = umap.config.env_loader.rsplit(".", 1)
+    parts = [WIRING_HEADER.format(module=loader_module, name=loader)]
     hosts = host_files(umap)
     for key, module in hosts:
         parent, leaf = module.rsplit(".", 1)
@@ -1539,7 +1539,7 @@ def render_wiring(umap: UnitMap) -> str:
         "\n\n"
         "def register_all() -> None:\n"
         '    """Load ``core/.env`` and register every unit\'s factory."""\n'
-        f"    {name}()\n"
+        f"    {loader}()\n"
         "    register_units(*_HOSTS)\n"
     )
     return "".join(parts)
