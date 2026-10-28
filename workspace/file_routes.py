@@ -7,7 +7,8 @@ import re
 from urllib.parse import quote
 from flask import Blueprint, request, jsonify, Response
 from core.config import Config
-from yandex_client_modules.client import YandexResponsesClient, YandexClientError
+from yandex_client_modules.client import YandexResponsesClient
+from yandex_client_modules.errors import YandexClientError
 
 logger = logging.getLogger(__name__)
 file_bp = Blueprint("file_manager", __name__)

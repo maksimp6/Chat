@@ -3,14 +3,12 @@ from flask import Flask, request, jsonify, render_template
 from werkzeug.exceptions import HTTPException
 from kristall import KristallError
 import os
-import logging
-import json
 import hashlib
 import re
 import subprocess
 from pathlib import Path
 from datetime import datetime, timezone
-from core.config import TEXT_MODELS, VOICE_MODELS, get_donation_url
+from core.config import get_donation_url
 from core.model_profiles import annotate_catalog
 from yandex_client_modules.tool_config import normalize_tools_config
 from yandex_client_modules.request_builder import validate_generation_params
@@ -23,12 +21,9 @@ from provider_accounts.model_discovery import (
 from storage.db import (
     init_db,
     memory_file_path,
-    create_conversation,
     update_conversation_title,
     update_conversation_model,
     delete_conversation,
-    get_messages,
-    add_message,
     save_conv_settings,
     get_conv_settings,
     get_store,
@@ -64,7 +59,6 @@ from conversations.ownership import (
     init_conversation_ownership_table,
     check_access,
     delete_owner,
-    get_owned_conversation,
 )
 from remote_runtime.ssh import SSHRuntimeError
 from remote_runtime.ssh_settings import public_settings, save_settings, test_connection

@@ -1,6 +1,5 @@
 """Infer conservative spatial and semantic relationships from OCR lines."""
 
-import re
 
 
 def build_tree(nodes):

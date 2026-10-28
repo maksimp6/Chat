@@ -3,7 +3,6 @@
 from flask import Blueprint, request, jsonify
 import logging
 import re
-import json as _json
 import uuid
 from typing import Any
 from dataclasses import dataclass
@@ -81,25 +80,6 @@ def _tool_rounds(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise ValueError("max_rounds must be a positive integer or null")
     return value
-
-
-def _tool_call_parts(tool_call: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
-    function = tool_call.get("function")
-    if not isinstance(function, dict):
-        function = {}
-    name = tool_call.get("name") or function.get("name")
-    if name and "<|" in name:
-        name = name.split("<|", 1)[0].strip()
-
-    arguments = tool_call["arguments"] if "arguments" in tool_call else function.get("arguments", {})
-    if isinstance(arguments, str):
-        try:
-            arguments = _json.loads(arguments)
-        except ValueError:
-            raise ValueError("Invalid tool arguments: expected a valid JSON object") from None
-    if not isinstance(arguments, dict):
-        raise ValueError("Invalid tool arguments: expected a JSON object")
-    return name, arguments
 
 
 # WIKIFUNCTIONS-CANDIDATE WF-05: https://www.wikifunctions.org/wiki/Z873 + Z872 + Z10079.
@@ -187,19 +167,6 @@ IMAGE_INPUT_MODEL_KEYS: frozenset[str] = frozenset(
 IMAGE_HISTORY_TURNS = 20
 IMAGE_HISTORY_TEXT_CHARS = 4000
 _MARKDOWN_PICTURE = re.compile(r"!\[[^\]]*\]\(data:image/[^)]*\)")
-
-
-def _image_turn_history(conv_id):
-    """Earlier turns for a Chat Completions request: text only, pictures replaced by a marker."""
-    turns = [m for m in get_messages(conv_id) if m.get("role") in ("user", "assistant")]
-    if turns and turns[-1]["role"] == "user":
-        turns = turns[:-1]  # the current message is sent separately
-    history = []
-    for turn in turns[-IMAGE_HISTORY_TURNS:]:
-        text = _MARKDOWN_PICTURE.sub("[картинка]", str(turn.get("text") or ""))[:IMAGE_HISTORY_TEXT_CHARS]
-        if text.strip():
-            history.append({"role": turn["role"], "text": text})
-    return history
 
 
 MAX_IMAGES_PER_MESSAGE = 4

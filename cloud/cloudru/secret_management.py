@@ -131,16 +131,6 @@ class CloudRuSecretManagementClient:
                 code="auth_not_configured",
             )
 
-    def _sweep_cache(self, now_monotonic: float | None = None) -> None:
-        """Compatibility hook: plaintext caching is disabled, so only clear stale state."""
-        del now_monotonic
-        self._value_cache.clear()
-
-    def invalidate_cache(self, secret_id: str | None = None) -> None:
-        """Compatibility hook for callers from the former plaintext-cache implementation."""
-        del secret_id
-        self._value_cache.clear()
-
     def get_secret_value(self, secret_id: str, version_id: str) -> str:
         """Return the plaintext payload for one pinned, immutable secret version."""
         secret_id = (secret_id or "").strip()
@@ -173,19 +163,6 @@ class CloudRuSecretManagementClient:
                 code="invalid_response",
             )
         return [dict(version) for version in versions]
-
-    def get_version_status(self, secret_id: str, version_id: str) -> str:
-        """Return one version's lifecycle status, never its value."""
-        version_id = (version_id or "").strip()
-        for version in self.list_versions(secret_id):
-            candidate_id = str(version.get("id") or version.get("version_id") or "")
-            if candidate_id == version_id:
-                return str(version.get("status") or version.get("state") or "unknown")
-        raise CloudProviderError(
-            f"Cloud.ru secret version '{version_id}' not found",
-            code="not_found",
-            http_status=404,
-        )
 
     def _fetch_value(self, secret_id: str, version_id: str) -> str:
         try:

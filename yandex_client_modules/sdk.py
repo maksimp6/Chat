@@ -4,7 +4,6 @@ sdk.py - Минимальный SDK для работы с Yandex AI Studio
 from core.env import env_require
 
 import requests
-import json
 
 from core.config import get_model_uri
 

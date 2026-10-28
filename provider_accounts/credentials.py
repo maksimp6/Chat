@@ -109,15 +109,6 @@ def get_active_credential(
     )
 
 
-def get_active_key(
-    db: Any,
-    decrypt: Callable[[str], str],
-    now: Optional[datetime] = None,
-    provider: str = YANDEX,
-) -> str:
-    return get_active_credential(db, decrypt, now, provider=provider).api_key
-
-
 def bootstrap_credential(
     db: Any,
     api_key: str,
@@ -329,63 +320,9 @@ class SecretManagementRef:
     updated_at: datetime
 
 
-def set_secret_management_ref(
-    db: Any,
-    purpose: str,
-    secret_id: str,
-    version_id: str,
-    *,
-    now: Optional[datetime] = None,
-) -> SecretManagementRef:
-    purpose, secret_id, version_id = purpose.strip(), secret_id.strip(), version_id.strip()
-    if not purpose or not secret_id or not version_id:
-        raise ValueError("purpose, secret_id and version_id are required")
-    key = "secret/ref/" + purpose
-    with db.transaction() as tx:
-        old = tx.get(key)
-        previous = None
-        if old and old["secret_id"] == secret_id:
-            previous = (
-                old["pinned_version_id"]
-                if old["pinned_version_id"] != version_id
-                else old["previous_version_id"]
-            )
-        row = {
-            "purpose": purpose,
-            "secret_id": secret_id,
-            "pinned_version_id": version_id,
-            "previous_version_id": previous,
-            "updated_at": _as_utc(now or utcnow()).isoformat(),
-        }
-        tx.set(key, row)
-    return _ref_from_record(row)
-
-
 def get_secret_management_ref(db: Any, purpose: str) -> Optional[SecretManagementRef]:
     row = db.get("secret/ref/" + purpose)
     return _ref_from_record(row) if row else None
-
-
-def rollback_secret_management_ref(
-    db: Any,
-    purpose: str,
-    *,
-    now: Optional[datetime] = None,
-) -> SecretManagementRef:
-    key = "secret/ref/" + purpose
-    with db.transaction() as tx:
-        row = tx.get(key)
-        if row is None:
-            raise NoActiveCredentialError("No secret management ref configured")
-        if not row["previous_version_id"]:
-            raise CredentialError("No previous secret version")
-        row.update(
-            pinned_version_id=row["previous_version_id"],
-            previous_version_id=row["pinned_version_id"],
-            updated_at=_as_utc(now or utcnow()).isoformat(),
-        )
-        tx.set(key, row)
-    return _ref_from_record(row)
 
 
 _SECRET_MANAGEMENT_CLIENT: Any = None

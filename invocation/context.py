@@ -53,11 +53,6 @@ class InvocationContext:
             metadata=metadata or {},
         )
 
-    def child_metadata(self, **updates: Any) -> dict[str, Any]:
-        result = dict(self.metadata)
-        result.update(updates)
-        return result
-
     def as_dict(self) -> dict[str, Any]:
         result = {
             "session_id": self.session_id,

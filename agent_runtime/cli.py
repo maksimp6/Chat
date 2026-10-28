@@ -22,7 +22,6 @@ class CliClient:
         self,
         *,
         base_url: str | None = None,
-        short_token: str | None = None,
         model: str | None = None,
         timeout: float = DEFAULT_TIMEOUT,
         session: requests.Session | None = None,

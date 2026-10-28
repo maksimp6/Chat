@@ -1,5 +1,4 @@
 import json
-import time
 from typing import Any
 
 from economy.treasury_identity import get_current_owner_id
@@ -164,7 +163,6 @@ class YandexMcpMixin:
         settings_conversation_id: Any = None,
     ) -> Any:
         params = params or {}
-        import time as _t
 
         mcp_tools = []
         # The chat's own id keys its settings and enabled servers. The provider conversation is

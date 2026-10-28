@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
 from browser.orchestration import BrowserDagResult, BrowserRoleDag, BrowserRoleTask

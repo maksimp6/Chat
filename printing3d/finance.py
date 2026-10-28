@@ -29,24 +29,6 @@ def _optional_int(value: Any, name: str) -> int | None:
     return number
 
 
-def _plan_row(row) -> dict[str, Any]:
-    return {
-        "owner_id": row["owner_id"],
-        "printer_model": row["printer_model"],
-        "equipment_price": row["equipment_price"],
-        "setup_cost": row["setup_cost"],
-        "down_payment": row["down_payment"],
-        "credit_principal": row["credit_principal"],
-        "credit_total_repayment": row["credit_total_repayment"],
-        "monthly_payment": row["monthly_payment"],
-        "term_months": row["term_months"],
-        "psk_percent": row["psk_percent"],
-        "currency": row["currency"],
-        "started_at": row["started_at"],
-        "updated_at": row["updated_at"],
-    }
-
-
 def set_financing_plan(store: PrintStore, owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("finance plan must be an object")

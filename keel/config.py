@@ -152,26 +152,6 @@ def _validate_schema(data: dict[str, Any]) -> None:
         _validate_scaling(service_name, service_config)
 
 
-def validate_no_cycles(services: dict[str, dict[str, Any]]) -> None:
-    """Exported function for testing."""
-    _validate_no_cycles(services)
-
-
-def validate_no_plaintext_secrets(data: dict[str, Any]) -> None:
-    """Exported function for testing."""
-    _validate_no_plaintext_secrets(data)
-
-
-def validate_schema(data: dict[str, Any]) -> None:
-    """Exported function for testing."""
-    _validate_schema(data)
-
-
-def validate_no_http_in_production(domains: dict[str, Any], lanes: dict[str, Any]) -> None:
-    """Exported function for testing."""
-    validate_http_in_production(domains, lanes)
-
-
 def validate_service_references(
     domains: dict[str, Any], services: dict[str, Any], lanes: dict[str, Any]
 ) -> None:

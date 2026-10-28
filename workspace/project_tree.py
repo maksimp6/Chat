@@ -2,7 +2,7 @@
 from core.env import env_get
 
 import os
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 
 project_tree_bp = Blueprint("project_tree", __name__)
 PROJECT_ROOT = os.path.realpath(

@@ -4,7 +4,6 @@ from __future__ import annotations
 from core.env import env_get
 
 from datetime import datetime, timedelta, timezone
-import json
 import logging
 import uuid
 
@@ -30,9 +29,7 @@ from provider_accounts.credentials import (
     replace_active_credential,
     rotation_needed,
     should_revoke,
-    fingerprint_key,
     record_health_check,
-    get_cloudru_iam_credentials,
     save_cloudru_iam_credentials,
 )
 from cloud.cloudru.api_key_provider import CloudRuApiKeyProvider

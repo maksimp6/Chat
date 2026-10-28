@@ -3,7 +3,6 @@ from flask import Blueprint, Response, request
 
 from mcp_server.auth import _auth_user_from_request
 from mcp_server.protocol import (
-    DEFAULT_PROTOCOL_VERSION,
     MCP_PATH,
     SUPPORTED_PROTOCOL_VERSIONS,
     _error_response,

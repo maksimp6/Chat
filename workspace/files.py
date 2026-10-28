@@ -11,7 +11,7 @@ from urllib3.util import Retry
 
 api_logger = logging.getLogger("yandex_api_debug")
 
-from yandex_client_modules.client import YandexClientError, _sanitize_for_log
+from yandex_client_modules.errors import YandexClientError
 from yandex_client_modules.request_mixin import (
     _resolve_global_provider_credential,
     provider_request_headers,

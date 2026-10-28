@@ -1109,9 +1109,3 @@ for _read_tool_name in READ_ONLY_TOOL_NAMES:
 
 FILESYSTEM_TOOLS = TOOL_REGISTRY
 
-
-def execute_fs_tool(tool_name: str, arguments: dict) -> dict:
-    """Точка входа для выполнения зарегистрированных инструментов файловой системы."""
-    if tool_name not in TOOL_REGISTRY:
-        return {"error": f"Неизвестный системный инструмент: {tool_name}"}
-    return TOOL_REGISTRY[tool_name]["func"](arguments)

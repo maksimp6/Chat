@@ -106,7 +106,6 @@ def main() -> int:
             # A reissue keeps the key's project; an empty id would overwrite the saved one.
             project_id=str(row["project_id"] or ""),
             old_provider_key_id=row["provider_key_id"],
-            commit_before_revoke=True,
             provider_name=CLOUDRU,
             reissue_existing=True,
             ttl=_ttl(),

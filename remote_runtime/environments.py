@@ -25,7 +25,7 @@ from storage.db import get_store, init_db as init_runtime_db
 from invocation.context import InvocationContext
 from invocation.trace import create_invocation_trace
 from observability.trace_manager import ExecutionTrace
-from runtime import RuntimeDispatcher, RuntimeLoader, RuntimeNotFound
+from runtime import RuntimeDispatcher, RuntimeLoader
 from runtime.request_context import bind_runtime_request
 
 
@@ -535,53 +535,6 @@ class EnvironmentRuntime:
 def register_runtime_operation(name: str, handler) -> None:
     """Register a dispatcher operation available to managed runtime threads."""
     _RUNTIME_DISPATCHER.register_operation(name, handler)
-
-
-def authorize_environment_runtime(
-    environment_id: str,
-    owner_id: Optional[str],
-) -> None:
-    """Resolve an existing environment without an owner authorization gate."""
-    item = _get(environment_id)
-    try:
-        _RUNTIME_DISPATCHER.authorize(environment_id, owner_id)
-        return
-    except RuntimeNotFound:
-        # Stopped environments intentionally have no dispatcher context. The
-        # gateway distinguishes a stopped environment (503) from a missing one (404).
-        if not item:
-            raise
-
-
-def dispatch_environment_operation(
-    environment_id: str,
-    operation: str,
-    payload: Optional[dict[str, Any]] = None,
-    *,
-    timeout: float = 30.0,
-) -> Any:
-    with _RUNTIME_WORKERS_LOCK:
-        runtime = _RUNTIME_WORKERS.get(environment_id)
-    if runtime is None:
-        raise RuntimeError("environment runtime is not running")
-    _RUNTIME_DISPATCHER.context(environment_id)
-    return runtime.submit(operation, payload, timeout=timeout)
-
-
-def dispatch_environment_revision(
-    environment_id: str,
-    operation: str,
-    payload: Optional[dict[str, Any]] = None,
-    *,
-    timeout: float = 30.0,
-) -> Any:
-    """Invoke the constrained revision application through its dispatcher scope."""
-    return dispatch_environment_operation(
-        environment_id,
-        "revision.invoke",
-        {"operation": operation, "payload": dict(payload or {})},
-        timeout=timeout,
-    )
 
 
 def dispatch_environment_http(

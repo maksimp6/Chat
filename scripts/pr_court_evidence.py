@@ -60,11 +60,6 @@ def changed_lines(patch: str) -> dict[str, dict[int, str]]:
     return result
 
 
-def added_lines(patch: str) -> dict[int, str]:
-    """Compatibility helper for callers citing the new-file side."""
-    return changed_lines(patch)["RIGHT"]
-
-
 def validate_judgment(text: str, rules: str, files: list) -> dict:
     """Check line citations only; this function cannot establish a violation."""
     # Accept one complete Markdown code fence, never surrounding prose or partial JSON.

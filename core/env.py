@@ -19,10 +19,6 @@ def env_require(name: str) -> str:
     return os.environ[name]
 
 
-def env_setdefault(name: str, *default: Any) -> str:
-    return os.environ.setdefault(name, *default)
-
-
 def env_pop(name: str, *default: Any) -> Any:
     return os.environ.pop(name, *default)
 

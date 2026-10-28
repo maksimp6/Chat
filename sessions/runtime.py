@@ -141,31 +141,10 @@ class VirtualLowConsumptionServer:
                 self.state = "failed"
                 raise
 
-    def suspend(self) -> None:
-        with self._lock:
-            if self.state in {"running", "idle"}:
-                self.state = "suspended"
-
     def stop(self) -> None:
         with self._lock:
             self.state = "stopping"
             self.state = "stopped"
-
-    def mark_idle(self) -> None:
-        with self._lock:
-            if self.state == "running":
-                self.state = "idle"
-
-    def reap_if_idle(self, now: Optional[float] = None) -> bool:
-        now = time.time() if now is None else now
-        with self._lock:
-            if (
-                self.state in {"running", "idle"}
-                and now - self._last_used >= self.config.idle_timeout_seconds
-            ):
-                self.suspend()
-                return True
-            return False
 
     def snapshot(self) -> dict[str, Any]:
         return {

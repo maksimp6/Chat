@@ -287,27 +287,6 @@ def inspect_binary_stl(
     }
 
 
-def assess_dimension(
-    nominal_mm: float,
-    measured_mm: float | None,
-    tolerance_mm: float | None,
-    uncertainty_mm: float | None,
-) -> dict[str, Any]:
-    """Project guard-band acceptance. Not a claim of ISO-mandated thresholds."""
-    if not math.isfinite(nominal_mm) or nominal_mm <= 0:
-        raise ValueError("invalid nominal dimension")
-    for value in (measured_mm, tolerance_mm, uncertainty_mm):
-        if value is not None and (not math.isfinite(value) or value < 0):
-            raise ValueError("invalid measurement")
-    if measured_mm is None:
-        return {"verdict": "UNVERIFIED", "error_mm": None}
-    if tolerance_mm is None or uncertainty_mm is None:
-        return {"verdict": "MEASURED_UNRATED", "error_mm": None}
-    error = measured_mm - nominal_mm
-    accepted = abs(error) + uncertainty_mm <= tolerance_mm + 1e-12
-    return {"verdict": "PASS" if accepted else "FAIL", "error_mm": round(error, 6)}
-
-
 def build_coupons(out_dir: Path) -> dict[str, Any]:
     out_dir.mkdir(parents=True, exist_ok=True)
     models = []

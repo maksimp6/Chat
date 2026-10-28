@@ -5,8 +5,6 @@ from __future__ import annotations
 import argparse
 import ast
 import json
-from copy import deepcopy
-from datetime import date
 from pathlib import Path
 
 
@@ -131,20 +129,6 @@ def validate_catalog(catalog, registry, root):
                 _require(profile["reasoning"]["depth_control"] is False, key)
                 _require("reasoning_enable_wire_unverified" in profile["blockers"], key)
     return profiles
-
-
-def require_executable_profile(catalog, model_key, as_of=None):
-    """A visibility guard for future consumers, not a wired runtime admission gate."""
-    if model_key not in catalog["profiles"]:
-        raise ProfileError(f"unknown model key: {model_key}; no fallback")
-    profile = catalog["profiles"][model_key]
-    boundary = profile["lifecycle"]["stop_and_recheck_on"]
-    today = as_of or date.today()
-    if boundary and today >= date.fromisoformat(boundary):
-        raise ProfileError(f"{model_key}: lifecycle boundary reached; stop and recheck")
-    if profile["status"] != "active" or profile["blockers"]:
-        raise ProfileError(f"{model_key}: prepared only: {', '.join(profile['blockers'])}")
-    return deepcopy(profile)
 
 
 def main():

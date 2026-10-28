@@ -78,30 +78,3 @@ def restore_session(session_id: str) -> Optional[dict[str, Any]]:
             tx.set(key, record)
         return record
 
-
-def update_session(
-    session_id: str, metadata: Optional[dict[str, Any]] = None, status: Optional[str] = None
-) -> Optional[dict[str, Any]]:
-    if status is not None and status not in {"active", "completed", "failed", "cancelled"}:
-        raise ValueError(f"Unsupported session status: {status}")
-    key = _key(session_id)
-    with get_memory_client(memory_file_path()).transaction() as tx:
-        record = tx.get(key)
-        if record is None:
-            return None
-        if not isinstance(record, dict) or record.get("id") != str(session_id):
-            raise ValueError("invalid runtime session record")
-        record["updated_at"] = unix_seconds()
-        if metadata is not None:
-            replaced = _sanitize_metadata(metadata)
-            # Replacing metadata must not drop the owner recorded at creation.
-            owner = (record.get("metadata") or {}).get("user_id")
-            if owner is not None and "user_id" not in replaced:
-                replaced["user_id"] = owner
-            record["metadata"] = replaced
-        if status is not None:
-            record["status"] = status
-            if status in {"completed", "failed", "cancelled"}:
-                record["completed_at"] = unix_seconds()
-        tx.set(key, record)
-        return record

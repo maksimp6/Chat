@@ -603,29 +603,6 @@ class Kristall:
         """Return the last acknowledged durable journal position."""
         return self._engine.last_commit
 
-    def confirm_durable(self) -> Commit:
-        """Reconfirm recovered bytes before returning a retried durable receipt."""
-        with self._engine._lock:
-            self._engine._ensure_open()
-            if self._engine._failed or not self._engine._ram_valid:
-                raise KristallError("recovery required")
-            commit = self._engine.last_commit
-            if commit.sequence == 0:
-                return commit
-            try:
-                with self._engine.path.open("rb") as stream:
-                    os.fsync(stream.fileno())
-                _fsync_directory(self._engine.path.parent)
-            except OSError as exc:
-                self._engine._failed = True
-                raise KristallError("durability confirmation failed; recovery required") from exc
-            except BaseException:
-                # Cancellation leaves the recovered durability barrier uncertain.
-                # Fence the writer while preserving the original exception.
-                self._engine._failed = True
-                raise
-            return commit
-
     def info(self) -> DatabaseInfo:
         """Expose acknowledged sequence only, without values or filesystem access."""
         return self._engine.info()

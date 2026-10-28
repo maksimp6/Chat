@@ -7,7 +7,6 @@ It deliberately has no HTTP, database, tracing, or MCP side effects.
 import math
 
 from core.config import get_model_uri
-from yandex_client_modules.errors import YandexClientError
 from core.model_profiles import ultra_profiles, ultra_reasoning_controllable, ultra_request_defaults
 from yandex_client_modules.metadata_validator import validate_metadata
 
@@ -245,83 +244,6 @@ def ultra_applied_event(model_key, params, payload):
         "truncation": payload.get("truncation"),
         "max_output_tokens": payload.get("max_output_tokens"),
         "parameters": explicit_parameters(model_key, payload),
-    }
-
-
-def build_chat_image_payload(
-    project_id,
-    model_key,
-    message,
-    images,
-    instructions=None,
-    temperature=None,
-    top_p=None,
-    max_tokens=None,
-    history=None,
-):
-    """Chat Completions body for a message with photos, in the shape the Yandex docs show for image input.
-
-    ``history`` is the earlier turns of the conversation as {"role", "text"} items; Chat Completions
-    keeps no server-side state, so the earlier turns must travel with every request.
-    """
-    content = [{"type": "text", "text": message}]
-    content += [{"type": "image_url", "image_url": {"url": url}} for url in images]
-    messages = []
-    if instructions:
-        messages.append({"role": "system", "content": instructions})
-    for turn in history or []:
-        messages.append({"role": turn["role"], "content": turn["text"]})
-    messages.append({"role": "user", "content": content})
-    payload = {
-        "model": get_model_uri(project_id, model_key),
-        "messages": messages,
-        # The answer is read as one JSON body, never as a stream.
-        "stream": False,
-    }
-    if temperature is not None:
-        payload["temperature"] = float(temperature)
-    if top_p is not None:
-        payload["top_p"] = float(top_p)
-    if max_tokens:
-        payload["max_tokens"] = int(max_tokens)
-    return payload
-
-
-def chat_completion_to_response(data):
-    """Reshape a Chat Completions answer into the Responses shape the rest of the client reads.
-
-    The finish reason decides the status: a truncated answer is "incomplete" with its reason kept,
-    a filtered or empty answer is an error, so a partial text never passes as a finished one.
-    """
-    choices = data.get("choices") if isinstance(data, dict) else None
-    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
-        raise YandexClientError("chat completion has no choices")
-    first = choices[0]
-    finish_reason = first.get("finish_reason")
-    text = (first.get("message") or {}).get("content")
-    if finish_reason == "content_filter":
-        raise YandexClientError("answer was withheld by the content filter")
-    if not isinstance(text, str) or not text.strip():
-        raise YandexClientError("chat completion returned no text")
-    usage = data.get("usage") or {}
-    incomplete = finish_reason == "length"
-    return {
-        "id": data.get("id"),
-        "status": "incomplete" if incomplete else "completed",
-        "incomplete_details": {"reason": finish_reason} if incomplete else None,
-        "finish_reason": finish_reason,
-        "output": [
-            {
-                "type": "message",
-                "role": "assistant",
-                "content": [{"type": "output_text", "text": text}],
-            }
-        ],
-        "usage": {
-            "input_tokens": usage.get("prompt_tokens", 0),
-            "output_tokens": usage.get("completion_tokens", 0),
-            "total_tokens": usage.get("total_tokens", 0),
-        },
     }
 
 

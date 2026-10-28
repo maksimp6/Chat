@@ -14,9 +14,9 @@ from collections.abc import Callable
 from email import policy
 from email.parser import BytesParser
 from functools import lru_cache
-from typing import Any, BinaryIO, cast
+from typing import Any
 from urllib.parse import parse_qsl, unquote, urlencode, urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler
 
 from api.contracts import ContractViolation
 from api.yandex_contracts import (
@@ -307,24 +307,3 @@ class _NoRedirect(HTTPRedirectHandler):
     ) -> None:
         raise YandexRequestBlocked("Yandex API redirects require a separate validated request")
 
-
-def yandex_urlopen(request: Request, *, timeout: float) -> BinaryIO:
-    """urllib adapter with explicit redirect denial; no global monkey-patching."""
-    validate_yandex_request(
-        request.get_method(),
-        request.full_url,
-        data=request.data,
-        headers=dict(request.header_items()),
-    )
-    return cast(BinaryIO, build_opener(_NoRedirect()).open(request, timeout=timeout))
-
-
-def yandex_connection_request(
-    connection: Any, host: str, method: str, path: str, *, body: Any = None, headers: Any = None
-) -> None:
-    """http.client adapter: validation runs before connection.request can open a socket."""
-    actual_host = getattr(connection, "host", host)
-    if isinstance(actual_host, str) and actual_host != host:
-        raise YandexRequestBlocked("connection host differs from validated API target")
-    validate_yandex_request(method, "https://" + host + path, data=body, headers=headers)
-    connection.request(method, path, body=body, headers=headers or {})

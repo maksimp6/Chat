@@ -59,7 +59,6 @@ def main() -> int:
             old_id=int(row["id"]),
             project_id=str(row["project_id"]),
             old_provider_key_id=row["provider_key_id"] or row["yandex_key_id"],
-            commit_before_revoke=True,
             provider_name="yandex",
         )
         logger.info(

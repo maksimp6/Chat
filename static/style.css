@@ -1498,62 +1498,6 @@ body {
   margin-top: 14px;
 }
 
-.logos-pro-app .cloudru-iam-modal {
-  z-index: 100001;
-  background: rgba(0, 0, 0, 0.7);
-}
-.logos-pro-app .cloudru-iam-modal.visible {
-  display: flex;
-}
-.logos-pro-app .cloudru-iam-box {
-  background: var(--bg-sidebar);
-  color: var(--text-main);
-  padding: 20px;
-  border-radius: 10px;
-}
-.logos-pro-app .cloudru-iam-close {
-  position: absolute;
-  right: 12px;
-  top: 8px;
-  font-size: 24px;
-  background: none;
-  border: 0;
-  color: inherit;
-  cursor: pointer;
-}
-.logos-pro-app .cloudru-iam-field {
-  display: block;
-  margin: 10px 0;
-}
-.logos-pro-app .cloudru-iam-label {
-  display: block;
-  margin-bottom: 4px;
-}
-.logos-pro-app .cloudru-iam-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 8px;
-  background: var(--bg-input);
-  color: var(--text-main);
-  border: 1px solid var(--control-border);
-}
-.logos-pro-app .cloudru-iam-confirm {
-  display: block;
-  margin: 14px 0;
-}
-.logos-pro-app .cloudru-iam-output {
-  display: none;
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: #222;
-  padding: 12px;
-  border-radius: 6px;
-  margin-top: 12px;
-}
-.logos-pro-app .cloudru-iam-output.visible {
-  display: block;
-}
-
 .logos-pro-app .file-manager-modal,
 .logos-pro-app .file-manager-add-modal {
   background: var(--m-overlay, rgba(0, 0, 0, 0.6));
