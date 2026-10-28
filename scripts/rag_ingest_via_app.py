@@ -16,7 +16,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-REPO = os.environ["REPO"]
+# The Redmi 9 runner resolves only github.token in env, so the repository comes from GITHUB_REPOSITORY.
+REPO = os.environ.get("REPO") or os.environ["GITHUB_REPOSITORY"]
 GH_TOKEN = os.environ["GH_TOKEN"]
 STORE_ID = os.environ["STORE_ID"]
 APP = "http://127.0.0.1:8080"
