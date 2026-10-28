@@ -93,8 +93,15 @@ def wait_for_response(
                 )
             if status == "failed":
                 err = data.get("error")
-                err_msg = err.get("message", "unknown") if isinstance(err, dict) else str(err)
-                raise error_cls(f"Task failed: {err_msg}")
+                if isinstance(err, dict):
+                    err_msg = err.get("message", "unknown")
+                    err_code = err.get("code")
+                else:
+                    err_msg = str(err)
+                    err_code = None
+                # The code is what tells providers' failures apart (#1650); the raw response is in the trace.
+                suffix = f" (код: {err_code})" if err_code else ""
+                raise error_cls(f"Task failed: {err_msg}{suffix}")
             if status == "cancelled":
                 raise error_cls("Task cancelled")
             return data
