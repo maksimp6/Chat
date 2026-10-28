@@ -1,4 +1,4 @@
-"""Ingest GitHub issues, pull requests and Actions run metadata into the chat RAG store.
+"""Ingest GitHub issues, pull requests, Actions run metadata and the exports/ dialog archives into the chat RAG store.
 
 Runs on the Redmi 9 runner, piped from the repository into python3 so that no copy of
 the script or of the data is written to disk. Packs are built in memory and sent to the
@@ -21,6 +21,7 @@ GH_TOKEN = os.environ["GH_TOKEN"]
 STORE_ID = os.environ["STORE_ID"]
 APP = "http://127.0.0.1:8080"
 GITHUB = "https://api.github.com"
+REF = os.environ.get("GITHUB_SHA", "develop")
 PACK_LIMIT = 4 * 1024 * 1024
 OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
@@ -194,6 +195,17 @@ def collect_runs():
         )
 
 
+def collect_exports():
+    # Dialog archives (GigaChat exports, Logos memory module) live as files in exports/.
+    listing, _ = github(f"{GITHUB}/repos/{REPO}/contents/exports?ref={REF}")
+    for entry in listing or []:
+        if entry.get("type") != "file" or not entry["name"].endswith(".md"):
+            continue
+        with OPENER.open(entry["download_url"], timeout=300) as response:
+            text = response.read().decode()
+        yield "exports", f"# File exports/{entry['name']}\nurl: {entry['html_url']}\n\n" + text
+
+
 def make_pack(kind, window, part, parts):
     body = ("\n\n---\n\n".join(parts) + "\n").encode()
     digest = hashlib.sha256(body).hexdigest()[:12]
@@ -239,7 +251,12 @@ def main():
     stored = {row["filename"]: row["id"] for row in app("GET", "/api/files").get("data", [])}
     attached = {row["id"] for row in app("GET", f"/api/vector-stores/{STORE_ID}/files").get("data", [])}
     totals = {"packs": 0, "uploaded": 0, "attached": 0, "failed": 0, "chunks": 0}
-    for kind, collector in (("issue", collect_issues), ("pull", collect_pulls), ("run", collect_runs)):
+    for kind, collector in (
+        ("issue", collect_issues),
+        ("pull", collect_pulls),
+        ("run", collect_runs),
+        ("export", collect_exports),
+    ):
         windows = {}
         for window, text in collector():
             windows.setdefault(window, []).append(text)
