@@ -595,7 +595,7 @@ class RDP:
             settingsTab:document.querySelector('#settings-modal-custom .llm-tab-btn.active')?.getAttribute('data-tab')||null,
             settingsPanels:[...document.querySelectorAll('#settings-modal-custom .llm-tab-content')].filter(visible).map(e=>e.id),
             unsafeModal:[...document.querySelectorAll('input[type=password]')].some(visible),
-            unexpectedModal:[...document.querySelectorAll('.modal.visible')].some(e=>e.id!=='model-modal'&&visible(e))||
+            unexpectedModal:[...document.querySelectorAll('.modal.visible')].some(e=>!['model-modal','settings-modal-custom'].includes(e.id)&&visible(e))||
               [...document.querySelectorAll('.logos-trace-window')].some(visible),
             modalOpen:[...document.querySelectorAll('.modal.visible,#settings-modal-custom,.logos-trace-window,#logos-system-status:not([hidden])')].some(visible),
             visibleModals:[...document.querySelectorAll('.modal.visible,.logos-trace-window')].filter(visible).map(e=>
