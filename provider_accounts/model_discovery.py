@@ -133,8 +133,14 @@ class ModelDiscovery:
         catalog["text"] = {}
         for item in models:
             normalized = self._normalize_model(item, project_id=project_id)
-            if normalized is not None:
-                catalog[normalized["type"]][normalized["id"]] = normalized
+            if normalized is None:
+                continue
+            # Dialog text models are the base models documented by Yandex AI Studio
+            # (docs/models/yandex-models.md). Tuned or deprecated variants returned by
+            # the Models API are not listed.
+            if normalized["type"] == "text" and normalized["id"] not in TEXT_MODELS:
+                continue
+            catalog[normalized["type"]][normalized["id"]] = normalized
 
         return catalog
 
