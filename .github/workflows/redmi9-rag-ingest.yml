@@ -1,0 +1,28 @@
+name: redmi9-rag-ingest
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  actions: read
+
+concurrency:
+  group: redmi9-rag-ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: redmi9
+    timeout-minutes: 360
+    steps:
+      - name: Ingest GitHub issues, pull requests and run metadata through the app API
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          STORE_ID: fvtvp6t2su0g5q4ft2ev
+        run: |
+          set -eu
+          curl -fsSL --max-time 60 "https://raw.githubusercontent.com/${REPO}/${GITHUB_SHA}/scripts/rag_ingest_via_app.py" | python3 -
