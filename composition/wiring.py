@@ -38,6 +38,7 @@ def _agent_runtime():
     from runtime.request_context import current_runtime_id
     from secret_store.credential_crypto import decrypt_secret
     from secret_store.credential_crypto import encrypt_secret
+    from core.env import env_file_only
     from invocation.manager import fail_invocation
     import tool_providers.filesystem as filesystem
     from invocation.manager import finish_invocation
@@ -61,6 +62,7 @@ def _agent_runtime():
         current_runtime_id=current_runtime_id,
         decrypt_secret=decrypt_secret,
         encrypt_secret=encrypt_secret,
+        env_file_only=env_file_only,
         fail_invocation=fail_invocation,
         filesystem=filesystem,
         finish_invocation=finish_invocation,

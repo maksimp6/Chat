@@ -36,8 +36,19 @@ def env_snapshot() -> dict[str, str]:
     return dict(os.environ)
 
 
+# Names that only core/.env provided: the process's caller did not set them.
+_FILE_ONLY: set[str] = set()
+
+
 def load_env_file() -> None:
     """Load ``core/.env`` into the environment; variables that are already set win."""
     from dotenv import load_dotenv
 
+    before = set(os.environ)
     load_dotenv(Path(__file__).resolve().with_name(".env"))
+    _FILE_ONLY.update(set(os.environ) - before)
+
+
+def env_file_only(name: str) -> bool:
+    """Whether ``name`` came only from core/.env, not from the process's caller."""
+    return name in _FILE_ONLY

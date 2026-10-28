@@ -8,7 +8,12 @@ import subprocess
 
 from agent_runtime._vendor.read_only_policy import ReadOnlyToolPolicy
 from typing import Any
-from agent_runtime.host import bound, current_runtime_data_root, current_runtime_id
+from agent_runtime.host import (
+    bound,
+    current_runtime_data_root,
+    current_runtime_id,
+    env_file_only,
+)
 
 ISSUE_READ_TOOLS = frozenset(
     {"read_file", "python_ast_outline", "calculate_hash", "file_stat", "list_directory"}
@@ -71,6 +76,9 @@ def require_external_review_store(repo_root: Path) -> None:
     if current_runtime_id() is not None or current_runtime_data_root() is not None:
         raise PermissionError("Issue review cannot inherit an active runtime context")
     configured = os.environ.get("LOGOS_MEMORY_PATH", "").strip()
+    if env_file_only("LOGOS_MEMORY_PATH"):
+        # The caller must name the store; core/.env (loaded by a root) does not count.
+        configured = ""
     if not configured:
         raise PermissionError(
             "Issue review requires an explicit external LOGOS_MEMORY_PATH"

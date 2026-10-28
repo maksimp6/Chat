@@ -30,6 +30,7 @@ class Host:
     current_runtime_id: Any  # runtime.request_context.current_runtime_id
     decrypt_secret: Any  # secret_store.credential_crypto.decrypt_secret
     encrypt_secret: Any  # secret_store.credential_crypto.encrypt_secret
+    env_file_only: Any  # core.env.env_file_only
     fail_invocation: Any  # invocation.manager.fail_invocation
     filesystem: Any  # tool_providers.filesystem
     finish_invocation: Any  # invocation.manager.finish_invocation
@@ -85,6 +86,10 @@ def current_runtime_data_root(*args: Any, **kwargs: Any) -> Any:
 
 def current_runtime_id(*args: Any, **kwargs: Any) -> Any:
     return current().current_runtime_id(*args, **kwargs)
+
+
+def env_file_only(*args: Any, **kwargs: Any) -> Any:
+    return current().env_file_only(*args, **kwargs)
 
 
 def fail_invocation(*args: Any, **kwargs: Any) -> Any:
