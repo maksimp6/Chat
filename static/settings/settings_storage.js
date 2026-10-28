@@ -38,7 +38,7 @@
         blocked_domains: "",
       },
       code_interpreter: { enabled: false },
-      file_search: { enabled: false, vector_store_ids: "", max_results: 20 },
+      file_search: { enabled: true, vector_store_ids: "fvtvp6t2su0g5q4ft2ev", max_results: 5 },
     },
     conv_metadata: "",
     voice: "kirill",
