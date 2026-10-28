@@ -91,7 +91,12 @@ jobs:
             rm -rf -- "$leftover" 2>/dev/null || timeout 30 su -c "rm -rf -- '$leftover'" || echo "::warning::could not remove $leftover"
           done
           df -k "$cleanup_root"
-          capture_job_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-screenshots-", dir=".")).resolve())')
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
+            "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
+          # Media goes only to a fixed-size RAM disk: never to flash, wiped on exit.
+          media_ram=$(bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" mount)
+          trap 'cd "$GITHUB_WORKSPACE"; bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" umount' EXIT
+          capture_job_temp=$(mktemp -d "$media_ram/screenshots.XXXXXX")
           export RUNNER_TEMP="$capture_job_temp"
           export TMPDIR="$capture_job_temp"
           scripts_dir=$(mktemp -d "$RUNNER_TEMP/logos-screenshot-scripts.XXXXXX")
@@ -153,7 +158,12 @@ jobs:
             rm -rf -- "$leftover" 2>/dev/null || timeout 30 su -c "rm -rf -- '$leftover'" || echo "::warning::could not remove $leftover"
           done
           df -k "$cleanup_root"
-          check_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-tools-check-", dir=".")).resolve())')
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
+            "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
+          # Media goes only to a fixed-size RAM disk: never to flash, wiped on exit.
+          media_ram=$(bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" mount)
+          trap 'cd "$GITHUB_WORKSPACE"; bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" umount' EXIT
+          check_temp=$(mktemp -d "$media_ram/tools-check.XXXXXX")
           export RUNNER_TEMP="$check_temp"
           export TMPDIR="$check_temp"
           mkdir -m 700 "$check_temp/scripts"
@@ -205,7 +215,12 @@ jobs:
             rm -rf -- "$leftover" 2>/dev/null || timeout 30 su -c "rm -rf -- '$leftover'" || echo "::warning::could not remove $leftover"
           done
           df -k "$cleanup_root"
-          verification_job_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-screenshot-verification-", dir=".")).resolve())')
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
+            "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
+          # Media goes only to a fixed-size RAM disk: never to flash, wiped on exit.
+          media_ram=$(bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" mount)
+          trap 'cd "$GITHUB_WORKSPACE"; bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" umount' EXIT
+          verification_job_temp=$(mktemp -d "$media_ram/verification.XXXXXX")
           export RUNNER_TEMP="$verification_job_temp"
           export TMPDIR="$verification_job_temp"
           curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
@@ -235,7 +250,12 @@ jobs:
             rm -rf -- "$leftover" 2>/dev/null || timeout 30 su -c "rm -rf -- '$leftover'" || echo "::warning::could not remove $leftover"
           done
           df -k "$cleanup_root"
-          native_job_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-rootagent-", dir=".")).resolve())')
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
+            "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
+          # Media goes only to a fixed-size RAM disk: never to flash, wiped on exit.
+          media_ram=$(bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" mount)
+          trap 'cd "$GITHUB_WORKSPACE"; bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" umount' EXIT
+          native_job_temp=$(mktemp -d "$media_ram/rootagent.XXXXXX")
           export RUNNER_TEMP="$native_job_temp"
           export TMPDIR="$native_job_temp"
           mkdir -m 700 "$RUNNER_TEMP/scripts" "$RUNNER_TEMP/evidence"
@@ -269,8 +289,16 @@ jobs:
             rm -rf -- "$leftover" 2>/dev/null || timeout 30 su -c "rm -rf -- '$leftover'" || echo "::warning::could not remove $leftover"
           done
           df -k "$cleanup_root"
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
+            "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
+          # Media goes only to a fixed-size RAM disk: never to flash, wiped on exit.
+          media_ram=$(bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" mount)
+          trap 'cd "$GITHUB_WORKSPACE"; bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" umount' EXIT
+          export MEDIA_DIR="$media_ram"
+          # Only the small pending/report state stays on flash; the picture itself stays in RAM.
           export OUT_DIR="$HOME/logos-art-real"
           mkdir -p "$OUT_DIR"
+          rm -f "$OUT_DIR"/art.jpg "$OUT_DIR"/art.png
           python - <<'PY'
           import base64
           import hashlib
@@ -359,7 +387,7 @@ jobs:
                   finish(1)
               raw = base64.b64decode(match.group(2), validate=True)
               extension = "jpg" if match.group(1) == "jpeg" else "png"
-              with open(os.path.join(OUT, "art." + extension), "wb") as handle:
+              with open(os.path.join(os.environ["MEDIA_DIR"], "art." + extension), "wb") as handle:
                   handle.write(raw)
               report["result"] = {"image_bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),
                                   "mime": "image/" + match.group(1)}
@@ -372,6 +400,6 @@ jobs:
           report["result"] = "pending: run art_generate again to poll it"
           finish(2)
           PY
-          if [ -f "$OUT_DIR/art.jpg" ]; then
-            echo "picture bytes: $(wc -c < "$OUT_DIR/art.jpg")"
+          if [ -f "$MEDIA_DIR/art.jpg" ]; then
+            echo "picture bytes: $(wc -c < "$MEDIA_DIR/art.jpg")"
           fi

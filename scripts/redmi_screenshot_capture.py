@@ -35,6 +35,23 @@ MIN_CAPTURE_FREE_BYTES = 512 * 1024 * 1024
 MAX_VIDEO_BYTES = 20 * 1024 * 1024
 
 
+def require_ram_disk(path):
+    """Refuse to capture unless `path` is on a tmpfs mount: media must never reach flash."""
+    path = Path(path).resolve()
+    best_target, best_type = "", ""
+    with open("/proc/self/mounts", encoding="utf-8") as mounts:
+        for line in mounts:
+            fields = line.split()
+            if len(fields) < 3:
+                continue
+            target = fields[1].replace("\\040", " ")
+            if (path == Path(target) or Path(target) in path.parents) and len(target) >= len(best_target):
+                best_target, best_type = target, fields[2]
+    if best_type != "tmpfs":
+        raise CaptureSafetyError("Capture refused: " + str(path) + " is on " + (best_type or "unknown")
+                                 + ", media may only be written to the RAM disk (scripts/redmi_media_ram.sh)")
+
+
 def capture_storage_guard():
     if CAPTURE_STORAGE_ROOT is None:
         return
@@ -1575,13 +1592,9 @@ def main():
     else:
         capture_output = None
     if capture_output is not None:
-        workspace = next((path.parent for path in capture_output.parents
-                          if path.name.startswith((".logos-screenshots-", ".logos-tools-check-",
-                                                   ".logos-candidate-tools-"))), None)
-        runner_work = next((path for path in capture_output.parents
-                            if path.name == "work" and path.parent.name == "github-python-runner"), None)
-        CAPTURE_STORAGE_ROOT = runner_work or workspace or capture_output.parent
-        capture_storage_guard()
+        # Media is written only to the fixed-size RAM disk (scripts/redmi_media_ram.sh), never to flash.
+        # Its size is the hard storage limit, so the free-space and budget walk is not needed there.
+        require_ram_disk(capture_output)
     if len(sys.argv) == 6 and sys.argv[1] == "_capture":
         metadata = json.loads(sys.argv[5])
         LOGOS_URL = capture_url(metadata.get("capture_url", LOGOS_URL))
