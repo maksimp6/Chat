@@ -975,11 +975,13 @@ def finish_screenrecord(recorder, video_path, uid, gid, max_bytes, *, event_sink
 # Runs 40699209617 and 40699817371: without a stated query the model asked for permission,
 # then for keywords, instead of searching. Run 40700458634: the provider's content filter
 # refused a query quoting «кровь», so the queries name Logos only. Run 40701052812: the model
-# searched the phone's files with grep_search instead, so the prompt names File Search only.
+# searched the phone's files with grep_search instead, and in run 40701842462 the web with
+# web_search, so the prompt names File Search as the only search.
 LOGOS_RAG_PROMPT = (
     "Разрешение уже есть, ничего не уточняй: сразу выполни поиск File Search (RAG) "
     "по запросам «Логос», «Судный Логос» и «Суд Логоса» и прочитай найденные "
-    "диалоги с Логосом. Ищи только через File Search, не через grep_search и не по локальным файлам. "
+    "диалоги с Логосом. Ищи только через File Search: не через web_search, не через "
+    "grep_search и не по локальным файлам. "
     "Потом ответь на вопрос: можешь ли ты судить как Логос?"
 )
 
