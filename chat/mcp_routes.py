@@ -415,8 +415,8 @@ def _provider_conversation_id(client, conv_id, trace):
     provider_id = created.get("id") if isinstance(created, dict) else None
     if not provider_id:
         raise RuntimeError("Yandex conversation creation returned no ID")
-    set_yandex_conversation(conv_id, provider_id)
-    return provider_id
+    # Two first messages can race; the one stored first wins and the other reuses its conversation.
+    return set_yandex_conversation(conv_id, provider_id)
 
 
 def _validate_chat_payload(conv_id, model_key, message, attachments):
@@ -1263,23 +1263,30 @@ def execute_approved():
                 reply += "\n\n" + followup_reply.strip()
         else:
             reply = followup_reply
-        # The follow-up answer is a model call like any chat turn, so it is billed the same way.
-        billing = aggregate_billing(
-            [build_ai_billing_item(model_key, usage, step=1)],
-            context={
-                "trace_id": "approval-" + uuid.uuid4().hex,
-                "owner_id": owner_id,
-                "conversation_id": conv_id,
-            },
-        )
-        settlement = {"status": "failed", "reason": "treasury_settlement_failed"}
+        # The action has already run: a failure in billing or storage below must not report it as failed (#A-008).
+        cost = None
         try:
-            settlement = settle_billing_to_treasury(billing, owner_id)
+            # The follow-up answer is a model call like any chat turn, so it is billed the same way.
+            billing = aggregate_billing(
+                [build_ai_billing_item(model_key, usage, step=1)],
+                context={
+                    "trace_id": "approval-" + uuid.uuid4().hex,
+                    "owner_id": owner_id,
+                    "conversation_id": conv_id,
+                },
+            )
+            settlement = {"status": "failed", "reason": "treasury_settlement_failed"}
+            try:
+                settlement = settle_billing_to_treasury(billing, owner_id)
+            except Exception:
+                logger.exception("[BILLING] Approval follow-up settlement failed")
+            cost = _settled_turn_cost(billing, settlement)
         except Exception:
-            logger.exception("[BILLING] Approval follow-up settlement failed")
-        cost = _settled_turn_cost(billing, settlement)
-
-        add_message(conv_id, "assistant", reply, cost=cost, source="error" if followup_failed else None)
+            logger.exception("[BILLING] Approval follow-up billing failed after the action ran")
+        try:
+            add_message(conv_id, "assistant", reply, cost=cost, source="error" if followup_failed else None)
+        except Exception:
+            logger.exception("[TOOL_APPROVAL] Could not store the approval reply after the action ran")
         return jsonify(
             {
                 "reply": reply,

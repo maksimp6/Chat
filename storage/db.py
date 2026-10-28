@@ -240,9 +240,15 @@ def get_yandex_conversation(conv_id: str) -> str | None:
     return get_store().get("chat/yandex/" + conv_id)
 
 
-def set_yandex_conversation(conv_id: str, yandex_id: str) -> None:
+def set_yandex_conversation(conv_id: str, yandex_id: str) -> str:
+    """Map a chat to its provider conversation once; a concurrent first message keeps the first id (#A-005)."""
+    key = "chat/yandex/" + conv_id
     with get_store().transaction() as tx:
-        tx.set("chat/yandex/" + conv_id, yandex_id)
+        stored = tx.get(key)
+        if stored:
+            return stored
+        tx.set(key, yandex_id)
+        return yandex_id
 
 
 def is_provider_pending(conv_id: str) -> bool:
