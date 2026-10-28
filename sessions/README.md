@@ -2,6 +2,12 @@
 
 Durable runtime sessions stored as Kristall journal records, built-in reusable AI session profiles and the managed lightweight runtimes behind them.
 
+## Role in a dialog
+
+Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
+
+- **Send a message (the turn)**: `POST /api/chat`
+
 ## Public API
 
 `from sessions import …`: `manager`, `profiles`.

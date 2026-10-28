@@ -2,6 +2,14 @@
 
 Observability: the Execution Trace (the primary per-invocation record of agent steps, API calls, tools, errors and timing) and the small process-level system log for start-up and failures that happen before a trace exists.
 
+## Role in a dialog
+
+Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
+
+- **Create a dialog**: `POST /api/conversations`
+- **Send a message (the turn)**: `POST /api/chat`
+- **Trace, cost and treasury of a reply**: `GET /api/invocations/<invocation_id>/trace`, `GET /api/treasury/account`
+
 ## Public API
 
 `from observability import …`: `system_log`, `trace_manager`.

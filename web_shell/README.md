@@ -2,6 +2,12 @@
 
 The web shell: the page, health, readiness and version endpoints, the Cache-Control and unexpected-error policy, and storage start-up.
 
+## Role in a dialog
+
+Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
+
+- **Open Logos**: `GET /`, `GET /api/version`
+
 ## Public API
 
 `from web_shell import …`: `install`.

@@ -2,6 +2,13 @@
 
 Shared memory for Logos agents on native Kristall: the Kristall client lifecycle, source-linked memory records, fact extraction, the memory panel's controls and HTTP API, and durable conversation-ownership and user-identity records.
 
+## Role in a dialog
+
+Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
+
+- **Tools during the turn**: `POST /api/chat`, `GET /api/mcp-servers`, `POST /api/mcp-servers`
+- **Global memory used by every dialog**: `GET /api/memory/manage`, `PUT /api/memory/config`, `POST /api/memory/clear`
+
 ## Public API
 
 `from agent_memory import …`: `AgentMemoryStore`, `MemoryLookup`, `MemoryRecord`.

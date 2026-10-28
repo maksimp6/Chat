@@ -45,6 +45,7 @@ import subprocess
 import sys
 import tomllib
 from dataclasses import dataclass, field
+from typing import Any
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,6 +55,8 @@ MAP_BEGIN = (
     "<!-- BEGIN GENERATED: unit map (scripts/check_independence.py --mermaid) -->"
 )
 MAP_END = "<!-- END GENERATED: unit map -->"
+DIALOG_BEGIN = "<!-- BEGIN GENERATED: life of a dialog (scripts/check_independence.py --write-docs) -->"
+DIALOG_END = "<!-- END GENERATED: life of a dialog -->"
 VENDOR_HEADER = (
     "# Vendored from {canonical}. Do not edit this copy: change the canonical file\n"
     "# and run `python3 scripts/check_independence.py --sync-vendored`.\n"
@@ -97,6 +100,7 @@ class Config:
     system_log_module: str = ""
     tool_registry_file: str = ""
     tool_sources_file: str = ""
+    dialog_file: str = ""
     env_loader: str = ""
     mcp_tools_file: str = ""
 
@@ -122,6 +126,7 @@ def load_config() -> Config:
         system_log_module=ind.get("system-log-module", ""),
         tool_registry_file=ind.get("tool-registry-file", ""),
         tool_sources_file=ind.get("tool-sources-file", ""),
+        dialog_file=ind.get("dialog-file", ""),
         env_loader=ind.get("env-loader", ""),
         mcp_tools_file=ind.get("mcp-tools-file", ""),
     )
@@ -1106,6 +1111,94 @@ def check_host_names(
                 )
 
 
+def load_dialog(config: Config) -> dict[str, Any]:
+    if not config.dialog_file or not (ROOT / config.dialog_file).is_file():
+        return {}
+    return tomllib.loads((ROOT / config.dialog_file).read_text(encoding="utf-8"))
+
+
+def render_dialog(dialog: dict[str, Any]) -> str:
+    """The life of a dialog: the main turn as a flow, then every operation."""
+
+    def unit_link(unit: str) -> str:
+        if (ROOT / unit / "README.md").is_file():
+            return f"[`{unit}`](../../{unit}/README.md)"
+        return f"`{unit}`"
+
+    def prose(text: str) -> str:
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    lines = [
+        " ".join(dialog.get("intro", "").split()),
+        "",
+        "```mermaid",
+        "flowchart LR",
+    ]
+    turn = dialog.get("turn", [])
+    lines.append("    " + " --> ".join(f't{i}["{s}"]' for i, s in enumerate(turn)))
+    lines += [
+        "```",
+        "",
+        "| # | Operation | UI | HTTP | Backend | Units on the path | Kristall records |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for n, op in enumerate(dialog.get("operation", []), 1):
+        routes = "<br>".join(f"`{r}`" for r in op["routes"])
+        backend = "<br>".join(f"`{b}`" for b in op["backend"])
+        units = " → ".join(unit_link(u) for u in op["units"])
+        lines.append(
+            f"| {n} | {prose(op['name'])} | {prose(op['ui'])} | {routes} | {backend} | "
+            f"{units} | {prose(op['kristall'])} |"
+        )
+    return "\n".join(lines)
+
+
+def dialog_problems(umap: UnitMap, dialog: dict[str, Any]) -> list[str]:
+    """Every route, backend function and unit the dialog map names must exist."""
+    problems = []
+    routes = route_table(None)
+    units = set(umap.units())
+    for step in dialog.get("turn", []):
+        if "/" in step:
+            if not (ROOT / step).is_file():
+                problems.append(f"turn step {step} does not exist")
+        elif step not in units:
+            problems.append(f"turn step {step} is not a unit")
+    for op in dialog.get("operation", []):
+        for route in op["routes"]:
+            method, rule = route.split(" ", 1)
+            if not any(r == rule and method in m.split(",") for r, m, _ in routes):
+                problems.append(f"{op['name']}: no route {route}")
+        for target in op["backend"]:
+            module, _, qualname = target.partition(":")
+            path = repo_module_file(module)
+            tree = parse(path) if path else None
+            found = tree is not None
+            scope = tree.body if tree is not None else []
+            for part in qualname.split("."):
+                node = next(
+                    (
+                        n
+                        for n in scope
+                        if isinstance(
+                            n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+                        )
+                        and n.name == part
+                    ),
+                    None,
+                )
+                if node is None:
+                    found = False
+                    break
+                scope = node.body
+            if not found:
+                problems.append(f"{op['name']}: no backend {target}")
+        for unit in op["units"]:
+            if unit not in units:
+                problems.append(f"{op['name']}: {unit} is not a unit")
+    return problems
+
+
 def check_docs(umap: UnitMap, violations: list[Violation], mermaid: str) -> None:
     for unit, init in package_units(umap):
         readme = ROOT / unit / "README.md"
@@ -1150,6 +1243,31 @@ def check_docs(umap: UnitMap, violations: list[Violation], mermaid: str) -> None
         violations.append(
             Violation("D", MODULES_DOC, 0, "generated map block is stale")
         )
+    dialog = load_dialog(umap.config)
+    if not dialog:
+        return
+    for problem in dialog_problems(umap, dialog):
+        violations.append(Violation("D", umap.config.dialog_file, 0, problem))
+    if DIALOG_BEGIN not in text or DIALOG_END not in text:
+        violations.append(Violation("D", MODULES_DOC, 0, "life of a dialog missing"))
+    elif (
+        text.split(DIALOG_BEGIN, 1)[1].split(DIALOG_END, 1)[0].strip()
+        != render_dialog(dialog).strip()
+    ):
+        violations.append(
+            Violation("D", MODULES_DOC, 0, "life of a dialog is stale: --write-docs")
+        )
+    on_path = {u for op in dialog.get("operation", []) for u in op["units"]}
+    for unit in sorted(on_path):
+        readme = ROOT / unit / "README.md"
+        if readme.is_file() and not re.search(
+            r"^#+\s*role in a dialog", readme.read_text(encoding="utf-8"), re.I | re.M
+        ):
+            violations.append(
+                Violation(
+                    "D", f"{unit}/README.md", 0, "missing section 'role in a dialog'"
+                )
+            )
 
 
 def render_mermaid(umap: UnitMap, edges: collections.Counter) -> str:
@@ -1593,6 +1711,11 @@ def main(argv: list[str] | None = None) -> int:
         help="rewrite vendored copies from their canonical sources",
     )
     parser.add_argument(
+        "--write-docs",
+        action="store_true",
+        help=f"regenerate the unit map and the life of a dialog in {MODULES_DOC}",
+    )
+    parser.add_argument(
         "--write-wiring",
         action="store_true",
         help=f"regenerate {WIRING_FILE} from the units' host files",
@@ -1611,6 +1734,29 @@ def main(argv: list[str] | None = None) -> int:
     if args.sync_vendored:
         for path in sync_vendored(umap):
             print(f"wrote {path}")
+        return 0
+    if args.write_docs:
+        _, edges, _ = run_checks(umap)
+        doc = ROOT / MODULES_DOC
+        text = doc.read_text(encoding="utf-8")
+        blocks = [(MAP_BEGIN, MAP_END, render_mermaid(umap, edges))]
+        dialog = load_dialog(umap.config)
+        if dialog:
+            blocks.append((DIALOG_BEGIN, DIALOG_END, render_dialog(dialog)))
+        for begin, end, body in blocks:
+            if begin in text and end in text:
+                head, rest = text.split(begin, 1)
+                text = (
+                    head
+                    + begin
+                    + "\n"
+                    + body.strip()
+                    + "\n"
+                    + end
+                    + rest.split(end, 1)[1]
+                )
+        doc.write_text(text, encoding="utf-8")
+        print(f"wrote {MODULES_DOC}")
         return 0
     if args.write_wiring:
         (ROOT / WIRING_FILE).write_text(render_wiring(umap), encoding="utf-8")

@@ -2,6 +2,26 @@
 
 Logos chat and configuration records in the native durable Kristall journal (`storage.records`; `storage.db` is its former name and still works), provider-neutral storage contracts, generated image artifacts, journal maintenance and the process-local engine used in development.
 
+## Role in a dialog
+
+Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
+
+- **Open Logos**: `GET /`, `GET /api/version`
+- **List dialogs**: `GET /api/conversations`
+- **Choose a model**: `GET /api/models`
+- **Create a dialog**: `POST /api/conversations`
+- **Open a dialog and read its history**: `GET /api/conversations/<conv_id>/messages`
+- **Dialog settings and tools**: `GET /api/conversations/<conv_id>/settings`, `PUT /api/conversations/<conv_id>/settings`, `GET /api/tools/categories`, `PUT /api/conversations/<conv_id>/tools`
+- **Rename a dialog or change its model**: `PATCH /api/conversations/<conv_id>`
+- **Send a message (the turn)**: `POST /api/chat`
+- **Tools during the turn**: `POST /api/chat`, `GET /api/mcp-servers`, `POST /api/mcp-servers`
+- **Approve a tool action**: `POST /api/mcp/execute-approved`
+- **Photos, pictures and voice**: `POST /api/images/generate`, `GET /api/images/requests/<request_id>`, `POST /api/voice/session`, `GET /api/voice/events`, `POST /api/voice/text`, `POST /api/voice/audio`
+- **Trace, cost and treasury of a reply**: `GET /api/invocations/<invocation_id>/trace`, `GET /api/treasury/account`
+- **Global memory used by every dialog**: `GET /api/memory/manage`, `PUT /api/memory/config`, `POST /api/memory/clear`
+- **Delete a dialog**: `DELETE /api/conversations/<conv_id>`
+- **Read dialogs from outside (MCP)**: `POST {MCP_PATH}`
+
 ## Public API
 
 `from storage import …`: `LocalDirectoryStorage`, `StorageObjectNotFound`, `StorageProvider`, `storage_provider_from_env`.

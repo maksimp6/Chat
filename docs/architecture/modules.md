@@ -10,6 +10,41 @@ the **composition roots**: `app.py`, the `composition/` package and the declared
 Every unit has a `README.md` with its **Public API**, its **Ports** and how it is
 **installed**.
 
+## Life of a dialog
+
+What Logos is reads best through one dialog («диалог», a conversation): what the
+person does in the browser, which route serves it, which units it passes and what
+lands in the Kristall journal. The map below is generated from
+[`dialog.toml`](dialog.toml) and checked against the code (every route and backend
+function must exist).
+
+<!-- BEGIN GENERATED: life of a dialog (scripts/check_independence.py --write-docs) -->
+Logos is a dialog assistant. A person opens the page, picks a model and talks; the model answers through Yandex AI Studio and may call tools (local tools, MCP servers, web and file search) during the turn. Every turn is an invocation with an execution trace and a cost, and everything is stored in the native Kristall journal. Following one dialog through the operations below touches almost every unit.
+
+```mermaid
+flowchart LR
+    t0["static/chat.js"] --> t1["chat"] --> t2["conversations"] --> t3["invocation"] --> t4["agent_skills"] --> t5["yandex_client_modules"] --> t6["tool_providers"] --> t7["mcp_server"] --> t8["observability"] --> t9["economy"] --> t10["storage"] --> t11["kristall"]
+```
+
+| # | Operation | UI | HTTP | Backend | Units on the path | Kristall records |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Open Logos | templates/index.html, static/boot.js | `GET /`<br>`GET /api/version` | `web_shell.shell:index`<br>`web_shell.shell:loaded_version` | [`web_shell`](../../web_shell/README.md) → [`storage`](../../storage/README.md) → [`kristall`](../../kristall/README.md) | the dialog tables are prepared at boot (STORAGE_INITIALIZERS) |
+| 2 | List dialogs | static/core.js enhanceCore, static/sidebar.js | `GET /api/conversations` | `chat.mcp_routes:conversations` | [`chat`](../../chat/README.md) → [`economy`](../../economy/README.md) → [`conversations`](../../conversations/README.md) → [`storage`](../../storage/README.md) → [`kristall`](../../kristall/README.md) | chat/conversation/*, installation/shared-owner-id |
+| 3 | Choose a model | static/core.js loadModels, static/models.js | `GET /api/models` | `provider_accounts.model_routes:list_models` | [`provider_accounts`](../../provider_accounts/README.md) → [`yandex_client_modules`](../../yandex_client_modules/README.md) → [`secret_store`](../../secret_store/README.md) → [`core`](../../core/README.md) → [`storage`](../../storage/README.md) | the stored provider credential |
+| 4 | Create a dialog | static/sidebar.js new chat, static/models.js createConversation | `POST /api/conversations` | `chat.mcp_routes:conversations` | [`chat`](../../chat/README.md) → [`economy`](../../economy/README.md) → [`provider_accounts`](../../provider_accounts/README.md) → [`observability`](../../observability/README.md) → [`conversations`](../../conversations/README.md) → [`storage`](../../storage/README.md) → [`kristall`](../../kristall/README.md) | chat/conversation/&lt;id&gt;, conversation_owner:&lt;id&gt; |
+| 5 | Open a dialog and read its history | static/sidebar.js selectConv, static/chat.js loadHistory | `GET /api/conversations/<conv_id>/messages` | `chat.mcp_routes:get_conv_messages` | [`chat`](../../chat/README.md) → [`conversations`](../../conversations/README.md) → [`storage`](../../storage/README.md) → [`kristall`](../../kristall/README.md) | chat/message/&lt;n&gt; |
+| 6 | Dialog settings and tools | static/settings/settings_storage.js, static/settings/settings_modal.js | `GET /api/conversations/<conv_id>/settings`<br>`PUT /api/conversations/<conv_id>/settings`<br>`GET /api/tools/categories`<br>`PUT /api/conversations/<conv_id>/tools` | `conversations.routes:get_dialog_settings`<br>`conversations.routes:save_dialog_settings`<br>`chat.mcp_routes:list_tool_categories`<br>`chat.mcp_routes:conv_tools` | [`conversations`](../../conversations/README.md) → [`chat`](../../chat/README.md) → [`yandex_client_modules`](../../yandex_client_modules/README.md) → [`tool_providers`](../../tool_providers/README.md) → [`storage`](../../storage/README.md) → [`kristall`](../../kristall/README.md) | chat/settings/&lt;id&gt; |
+| 7 | Rename a dialog or change its model | static/sidebar.js saveTitle, static/core.js changeModel | `PATCH /api/conversations/<conv_id>` | `conversations.routes:patch_conversation` | [`conversations`](../../conversations/README.md) → [`provider_accounts`](../../provider_accounts/README.md) → [`storage`](../../storage/README.md) → [`kristall`](../../kristall/README.md) | chat/conversation/&lt;id&gt; |
+| 8 | Send a message (the turn) | static/chat.js sendMessage, sendTurn | `POST /api/chat` | `chat.mcp_routes:chat` | [`chat`](../../chat/README.md) → [`conversations`](../../conversations/README.md) → [`invocation`](../../invocation/README.md) → [`sessions`](../../sessions/README.md) → [`observability`](../../observability/README.md) → [`agent_skills`](../../agent_skills/README.md) → [`yandex_client_modules`](../../yandex_client_modules/README.md) → [`provider_accounts`](../../provider_accounts/README.md) → [`secret_store`](../../secret_store/README.md) → [`storage`](../../storage/README.md) → [`kristall`](../../kristall/README.md) | chat/message/&lt;n&gt;, chat/yandex/&lt;id&gt;, runtime_session:&lt;sid&gt;, runtime_invocation:&lt;iid&gt;, quota/* |
+| 9 | Tools during the turn | results appear in the reply; MCP servers in static/settings/settings_modal.js | `POST /api/chat`<br>`GET /api/mcp-servers`<br>`POST /api/mcp-servers` | `yandex_client_modules.mcp_mixin:YandexMcpMixin.ask_with_mcp`<br>`chat.mcp_routes:handle_mcp_servers` | [`yandex_client_modules`](../../yandex_client_modules/README.md) → [`tool_providers`](../../tool_providers/README.md) → [`mcp_server`](../../mcp_server/README.md) → [`agent_memory`](../../agent_memory/README.md) → [`workspace`](../../workspace/README.md) → [`storage`](../../storage/README.md) → [`kristall`](../../kristall/README.md) | mcp/server/*, mcp/conversation/&lt;id&gt;, global_fact:* |
+| 10 | Approve a tool action | static/chat.js renderApprovalCard | `POST /api/mcp/execute-approved` | `chat.mcp_routes:execute_approved` | [`chat`](../../chat/README.md) → [`tool_providers`](../../tool_providers/README.md) → [`economy`](../../economy/README.md) → [`storage`](../../storage/README.md) → [`kristall`](../../kristall/README.md) | chat/message/&lt;n&gt;, treasury/* |
+| 11 | Photos, pictures and voice | static/chat.js runImageTurn, static/voice.js | `POST /api/images/generate`<br>`GET /api/images/requests/<request_id>`<br>`POST /api/voice/session`<br>`GET /api/voice/events`<br>`POST /api/voice/text`<br>`POST /api/voice/audio` | `chat.image_routes:generate_image`<br>`chat.voice_routes:create_voice_session` | [`chat`](../../chat/README.md) → [`yandex_client_modules`](../../yandex_client_modules/README.md) → [`provider_accounts`](../../provider_accounts/README.md) → [`storage`](../../storage/README.md) → [`kristall`](../../kristall/README.md) | chat/image_request/&lt;id&gt;/&lt;request&gt;, chat/message/&lt;n&gt; |
+| 12 | Trace, cost and treasury of a reply | static/execution_surface.js, static/trace_summary.js, static/treasury.js | `GET /api/invocations/<invocation_id>/trace`<br>`GET /api/treasury/account` | `runtime.api:api_get_invocation_trace`<br>`economy.treasury_routes:treasury_account` | [`runtime`](../../runtime/README.md) → [`invocation`](../../invocation/README.md) → [`observability`](../../observability/README.md) → [`economy`](../../economy/README.md) → [`api`](../../api/README.md) → [`storage`](../../storage/README.md) → [`kristall`](../../kristall/README.md) | runtime_invocation:&lt;iid&gt;, treasury/account/&lt;owner&gt;, treasury/ledger/&lt;n&gt; |
+| 13 | Global memory used by every dialog | static/memory_panel.js | `GET /api/memory/manage`<br>`PUT /api/memory/config`<br>`POST /api/memory/clear` | `agent_memory.routes:api_memory_panel_data`<br>`agent_memory.routes:api_update_memory_config`<br>`agent_memory.routes:api_clear_memory` | [`agent_memory`](../../agent_memory/README.md) → [`storage`](../../storage/README.md) → [`kristall`](../../kristall/README.md) | global_memory_config, global_fact:* |
+| 14 | Delete a dialog | static/sidebar.js delete | `DELETE /api/conversations/<conv_id>` | `conversations.routes:remove_conv` | [`conversations`](../../conversations/README.md) → [`storage`](../../storage/README.md) → [`kristall`](../../kristall/README.md) | removes the dialog's chat/* records and conversation_owner:&lt;id&gt; |
+| 15 | Read dialogs from outside (MCP) | an MCP client such as ChatGPT: logos_list_conversations, logos_get_conversation_messages | `POST {MCP_PATH}` | `mcp_server.transport:mcp_post`<br>`mcp_server.tools:_conversations`<br>`mcp_server.tools:_conversation_messages` | [`mcp_server`](../../mcp_server/README.md) → [`tool_providers`](../../tool_providers/README.md) → [`economy`](../../economy/README.md) → [`conversations`](../../conversations/README.md) → [`invocation`](../../invocation/README.md) → [`storage`](../../storage/README.md) → [`kristall`](../../kristall/README.md) | chat/conversation/*, chat/message/&lt;n&gt;, runtime_invocation:&lt;iid&gt; |
+<!-- END GENERATED: life of a dialog -->
+
 ## Rules
 
 1. A unit imports only the standard library, third-party packages (`requirements*.txt`,
@@ -91,7 +126,8 @@ A new unit host also needs its `_binding.py` copy: add it to the
 ```bash
 python3 scripts/check_independence.py --summary    # counters E R S V I L A W D
 python3 scripts/check_independence.py --only E     # list one counter's findings
-python3 scripts/check_independence.py --mermaid    # regenerate the map below
+python3 scripts/check_independence.py --mermaid    # print the unit map
+python3 scripts/check_independence.py --write-docs # regenerate the map and the life of a dialog
 python3 scripts/check_independence.py --routes     # static route table (rule, methods, endpoint)
 python3 scripts/check_independence.py --tool-order # tool categories in registry order
 python3 scripts/check_independence.py --entrypoints
@@ -109,7 +145,7 @@ python3 scripts/check_independence.py --write-wiring
 | **L** logging | units log only through `logos.<unit>` loggers |
 | **A** API | every package has `__all__`; nobody uses another unit's private names |
 | **W** wiring | hosts have no defaults and are registered by a root; every provider exists; every `bound.<name>` is a port |
-| **D** docs | every unit has a README (Public API, Ports, Install) and this map is current |
+| **D** docs | every unit has a README (Public API, Ports, Install; Role in a dialog for units on a dialog path), the life of a dialog matches the code and this map is current |
 
 The check is static and manual; it is not a CI gate. It prints `TOTAL=0`.
 

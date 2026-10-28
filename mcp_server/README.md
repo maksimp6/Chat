@@ -2,6 +2,13 @@
 
 The Logos MCP server: protocol and transport, the shared local identity, records of MCP servers and their per-conversation selection, the ChatGPT bridge tools and the bridge to the runtime dispatcher.
 
+## Role in a dialog
+
+Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
+
+- **Tools during the turn**: `POST /api/chat`, `GET /api/mcp-servers`, `POST /api/mcp-servers`
+- **Read dialogs from outside (MCP)**: `POST {MCP_PATH}`
+
 ## Public API
 
 `from mcp_server import …`: `MCP_PATH`, `SUPPORTED_PROTOCOL_VERSIONS`, `DEFAULT_PROTOCOL_VERSION`, `SERVER_NAME`, `SERVER_VERSION`, `OAUTH_SCOPE`, `PUBLIC_BASE_URL`, `registry`, `mcp_runtime_dispatcher`, `chatgpt_mcp_bp`, `mcp_options`, `mcp_get`, `mcp_post`.

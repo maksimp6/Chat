@@ -2,6 +2,18 @@
 
 The chat: conversation routes that record the full execution chain, and the voice (Yandex Realtime), image generation (Alice AI ART), embeddings, prompt classification and synchronous completion endpoints.
 
+## Role in a dialog
+
+Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
+
+- **List dialogs**: `GET /api/conversations`
+- **Create a dialog**: `POST /api/conversations`
+- **Open a dialog and read its history**: `GET /api/conversations/<conv_id>/messages`
+- **Dialog settings and tools**: `GET /api/conversations/<conv_id>/settings`, `PUT /api/conversations/<conv_id>/settings`, `GET /api/tools/categories`, `PUT /api/conversations/<conv_id>/tools`
+- **Send a message (the turn)**: `POST /api/chat`
+- **Approve a tool action**: `POST /api/mcp/execute-approved`
+- **Photos, pictures and voice**: `POST /api/images/generate`, `GET /api/images/requests/<request_id>`, `POST /api/voice/session`, `GET /api/voice/events`, `POST /api/voice/text`, `POST /api/voice/audio`
+
 ## Public API
 
 `from chat import …`: `classification_routes`, `completion_routes`, `embedding_routes`, `image_routes`, `mcp_routes`, `voice_routes`.

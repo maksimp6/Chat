@@ -2,6 +2,12 @@
 
 Repository Agent Skills: discovery, policy and lazy loading.
 
+## Role in a dialog
+
+Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
+
+- **Send a message (the turn)**: `POST /api/chat`
+
 ## Public API
 
 `from agent_skills import …`: `Skill`, `SkillFormatError`, `SkillNotFoundError`, `SkillPolicyError`, `SkillRegistry`, `SkillRegistryError`, `compose_skill_instructions`.

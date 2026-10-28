@@ -2,6 +2,16 @@
 
 The economy of Logos: a paper treasury ledger with a demo top-up and its HTTP API, the shared local identity used for accounting, billing and energy-based compute pricing of execution traces, department budgets, provider pricing snapshots and knowledge economics.
 
+## Role in a dialog
+
+Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
+
+- **List dialogs**: `GET /api/conversations`
+- **Create a dialog**: `POST /api/conversations`
+- **Approve a tool action**: `POST /api/mcp/execute-approved`
+- **Trace, cost and treasury of a reply**: `GET /api/invocations/<invocation_id>/trace`, `GET /api/treasury/account`
+- **Read dialogs from outside (MCP)**: `POST {MCP_PATH}`
+
 ## Public API
 
 `from economy import …`: `billing`, `budget_controller`, `compute_resources`, `knowledge_economics`, `treasury`, `treasury_identity`, `treasury_routes`.

@@ -2,6 +2,12 @@
 
 API contracts: strict contracts shared by routes, offline validation against the pinned Yandex documentation snapshot, reviewed outbound request profiles and the single outbound admission boundary for Yandex API callers.
 
+## Role in a dialog
+
+Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
+
+- **Trace, cost and treasury of a reply**: `GET /api/invocations/<invocation_id>/trace`, `GET /api/treasury/account`
+
 ## Public API
 
 `from api import …`: `contracts`, `yandex_transport`.

@@ -2,6 +2,19 @@
 
 Conversations: ownership records of shared local conversations, helpers for creating Yandex conversations, and the HTTP API of one conversation (title, model, deletion and dialog settings).
 
+## Role in a dialog
+
+Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
+
+- **List dialogs**: `GET /api/conversations`
+- **Create a dialog**: `POST /api/conversations`
+- **Open a dialog and read its history**: `GET /api/conversations/<conv_id>/messages`
+- **Dialog settings and tools**: `GET /api/conversations/<conv_id>/settings`, `PUT /api/conversations/<conv_id>/settings`, `GET /api/tools/categories`, `PUT /api/conversations/<conv_id>/tools`
+- **Rename a dialog or change its model**: `PATCH /api/conversations/<conv_id>`
+- **Send a message (the turn)**: `POST /api/chat`
+- **Delete a dialog**: `DELETE /api/conversations/<conv_id>`
+- **Read dialogs from outside (MCP)**: `POST {MCP_PATH}`
+
 ## Public API
 
 `from conversations import …`: `ownership`, `routes`.

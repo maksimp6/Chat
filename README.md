@@ -122,6 +122,18 @@ and tool calls retain scoped correlation through `InvocationContext` and
 Logging and diagnostics are described in
 [Execution Trace and system log](docs/backend/logging.md).
 
+### Life of a dialog
+
+Logos is easiest to understand by following one dialog («диалог», a conversation):
+
+1. The page lists the person's dialogs and the available models (`GET /api/conversations`, `GET /api/models`).
+2. A new dialog is created for the chosen model (`POST /api/conversations`); opening one reads its history (`GET /api/conversations/<conv_id>/messages`).
+3. Each message is one turn (`POST /api/chat`): an invocation with an execution trace, a Yandex AI Studio request, tool calls (local tools, MCP servers, web and file search) when the model asks for them, and a cost posted to the treasury.
+4. Everything (messages, settings, traces, costs, memory) is stored in the native Kristall journal.
+
+The full map, with every operation, route, unit and Kristall record, is
+[Life of a dialog](docs/architecture/modules.md#life-of-a-dialog).
+
 ### Independent modules
 
 Every package, script and tool is an independent unit: no unit imports another one.

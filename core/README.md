@@ -2,6 +2,12 @@
 
 Process-wide configuration: the model catalog and pricing, the runtime view of the prepared model profiles, the process environment and small shared helpers.
 
+## Role in a dialog
+
+Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
+
+- **Choose a model**: `GET /api/models`
+
 ## Public API
 
 `from core import …`: `config`, `env`, `model_profiles`.

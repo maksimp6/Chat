@@ -2,6 +2,13 @@
 
 Provider-neutral secret resolution: typed references with redacted values, resolver and backend contracts, the Cloud.ru Secret Management backend, aliases, policy and audit, capability-only delivery to agents, encrypted storage of provider credentials, and deterministic fakes.
 
+## Role in a dialog
+
+Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
+
+- **Choose a model**: `GET /api/models`
+- **Send a message (the turn)**: `POST /api/chat`
+
 ## Public API
 
 `from secret_store import …`: `FakeSecretResolver`, `SecretErrorCode`, `SecretRef`, `SecretResolutionError`, `SecretResolver`, `SecretValue`.

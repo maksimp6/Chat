@@ -2,6 +2,16 @@
 
 The Yandex AI Studio client: the Responses API client with its request, polling, parsing, MCP, conversation and file mixins, the Realtime WebSocket and image-generation transports, hosted-tool settings, the API-key provider and a minimal SDK.
 
+## Role in a dialog
+
+Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
+
+- **Choose a model**: `GET /api/models`
+- **Dialog settings and tools**: `GET /api/conversations/<conv_id>/settings`, `PUT /api/conversations/<conv_id>/settings`, `GET /api/tools/categories`, `PUT /api/conversations/<conv_id>/tools`
+- **Send a message (the turn)**: `POST /api/chat`
+- **Tools during the turn**: `POST /api/chat`, `GET /api/mcp-servers`, `POST /api/mcp-servers`
+- **Photos, pictures and voice**: `POST /api/images/generate`, `GET /api/images/requests/<request_id>`, `POST /api/voice/session`, `GET /api/voice/events`, `POST /api/voice/text`, `POST /api/voice/audio`
+
 ## Public API
 
 `from yandex_client_modules import …`: `api_key_provider`, `client`, `errors`, `image_generation`, `realtime`, `request_builder`, `request_mixin`, `sdk`, `tool_config`.

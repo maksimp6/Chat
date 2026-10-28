@@ -1,0 +1,182 @@
+# The life of a dialog («диалог», a conversation): what Logos does, operation by
+# operation, from the browser to the Kristall journal.
+#
+# scripts/check_independence.py checks this file against the code (every route
+# exists, every backend function exists, every unit is a unit) and renders it into
+# docs/architecture/modules.md (`--write-docs`). Edit it when a dialog path changes.
+
+intro = """
+Logos is a dialog assistant. A person opens the page, picks a model and talks;
+the model answers through Yandex AI Studio and may call tools (local tools, MCP
+servers, web and file search) during the turn. Every turn is an invocation with an
+execution trace and a cost, and everything is stored in the native Kristall journal.
+Following one dialog through the operations below touches almost every unit."""
+
+# The units one message passes through, in order (the main turn).
+turn = [
+    "static/chat.js",
+    "chat",
+    "conversations",
+    "invocation",
+    "agent_skills",
+    "yandex_client_modules",
+    "tool_providers",
+    "mcp_server",
+    "observability",
+    "economy",
+    "storage",
+    "kristall",
+]
+
+[[operation]]
+name = "Open Logos"
+ui = "templates/index.html, static/boot.js"
+routes = ["GET /", "GET /api/version"]
+backend = ["web_shell.shell:index", "web_shell.shell:loaded_version"]
+units = ["web_shell", "storage", "kristall"]
+kristall = "the dialog tables are prepared at boot (STORAGE_INITIALIZERS)"
+
+[[operation]]
+name = "List dialogs"
+ui = "static/core.js enhanceCore, static/sidebar.js"
+routes = ["GET /api/conversations"]
+backend = ["chat.mcp_routes:conversations"]
+units = ["chat", "economy", "conversations", "storage", "kristall"]
+kristall = "chat/conversation/*, installation/shared-owner-id"
+
+[[operation]]
+name = "Choose a model"
+ui = "static/core.js loadModels, static/models.js"
+routes = ["GET /api/models"]
+backend = ["provider_accounts.model_routes:list_models"]
+units = ["provider_accounts", "yandex_client_modules", "secret_store", "core", "storage"]
+kristall = "the stored provider credential"
+
+[[operation]]
+name = "Create a dialog"
+ui = "static/sidebar.js new chat, static/models.js createConversation"
+routes = ["POST /api/conversations"]
+backend = ["chat.mcp_routes:conversations"]
+units = ["chat", "economy", "provider_accounts", "observability", "conversations", "storage", "kristall"]
+kristall = "chat/conversation/<id>, conversation_owner:<id>"
+
+[[operation]]
+name = "Open a dialog and read its history"
+ui = "static/sidebar.js selectConv, static/chat.js loadHistory"
+routes = ["GET /api/conversations/<conv_id>/messages"]
+backend = ["chat.mcp_routes:get_conv_messages"]
+units = ["chat", "conversations", "storage", "kristall"]
+kristall = "chat/message/<n>"
+
+[[operation]]
+name = "Dialog settings and tools"
+ui = "static/settings/settings_storage.js, static/settings/settings_modal.js"
+routes = [
+    "GET /api/conversations/<conv_id>/settings",
+    "PUT /api/conversations/<conv_id>/settings",
+    "GET /api/tools/categories",
+    "PUT /api/conversations/<conv_id>/tools",
+]
+backend = [
+    "conversations.routes:get_dialog_settings",
+    "conversations.routes:save_dialog_settings",
+    "chat.mcp_routes:list_tool_categories",
+    "chat.mcp_routes:conv_tools",
+]
+units = ["conversations", "chat", "yandex_client_modules", "tool_providers", "storage", "kristall"]
+kristall = "chat/settings/<id>"
+
+[[operation]]
+name = "Rename a dialog or change its model"
+ui = "static/sidebar.js saveTitle, static/core.js changeModel"
+routes = ["PATCH /api/conversations/<conv_id>"]
+backend = ["conversations.routes:patch_conversation"]
+units = ["conversations", "provider_accounts", "storage", "kristall"]
+kristall = "chat/conversation/<id>"
+
+[[operation]]
+name = "Send a message (the turn)"
+ui = "static/chat.js sendMessage, sendTurn"
+routes = ["POST /api/chat"]
+backend = ["chat.mcp_routes:chat"]
+units = [
+    "chat",
+    "conversations",
+    "invocation",
+    "sessions",
+    "observability",
+    "agent_skills",
+    "yandex_client_modules",
+    "provider_accounts",
+    "secret_store",
+    "storage",
+    "kristall",
+]
+kristall = "chat/message/<n>, chat/yandex/<id>, runtime_session:<sid>, runtime_invocation:<iid>, quota/*"
+
+[[operation]]
+name = "Tools during the turn"
+ui = "results appear in the reply; MCP servers in static/settings/settings_modal.js"
+routes = ["POST /api/chat", "GET /api/mcp-servers", "POST /api/mcp-servers"]
+backend = ["yandex_client_modules.mcp_mixin:YandexMcpMixin.ask_with_mcp", "chat.mcp_routes:handle_mcp_servers"]
+units = ["yandex_client_modules", "tool_providers", "mcp_server", "agent_memory", "workspace", "storage", "kristall"]
+kristall = "mcp/server/*, mcp/conversation/<id>, global_fact:*"
+
+[[operation]]
+name = "Approve a tool action"
+ui = "static/chat.js renderApprovalCard"
+routes = ["POST /api/mcp/execute-approved"]
+backend = ["chat.mcp_routes:execute_approved"]
+units = ["chat", "tool_providers", "economy", "storage", "kristall"]
+kristall = "chat/message/<n>, treasury/*"
+
+[[operation]]
+name = "Photos, pictures and voice"
+ui = "static/chat.js runImageTurn, static/voice.js"
+routes = [
+    "POST /api/images/generate",
+    "GET /api/images/requests/<request_id>",
+    "POST /api/voice/session",
+    "GET /api/voice/events",
+    "POST /api/voice/text",
+    "POST /api/voice/audio",
+]
+backend = ["chat.image_routes:generate_image", "chat.voice_routes:create_voice_session"]
+units = ["chat", "yandex_client_modules", "provider_accounts", "storage", "kristall"]
+kristall = "chat/image_request/<id>/<request>, chat/message/<n>"
+
+[[operation]]
+name = "Trace, cost and treasury of a reply"
+ui = "static/execution_surface.js, static/trace_summary.js, static/treasury.js"
+routes = ["GET /api/invocations/<invocation_id>/trace", "GET /api/treasury/account"]
+backend = ["runtime.api:api_get_invocation_trace", "economy.treasury_routes:treasury_account"]
+units = ["runtime", "invocation", "observability", "economy", "api", "storage", "kristall"]
+kristall = "runtime_invocation:<iid>, treasury/account/<owner>, treasury/ledger/<n>"
+
+[[operation]]
+name = "Global memory used by every dialog"
+ui = "static/memory_panel.js"
+routes = ["GET /api/memory/manage", "PUT /api/memory/config", "POST /api/memory/clear"]
+backend = [
+    "agent_memory.routes:api_memory_panel_data",
+    "agent_memory.routes:api_update_memory_config",
+    "agent_memory.routes:api_clear_memory",
+]
+units = ["agent_memory", "storage", "kristall"]
+kristall = "global_memory_config, global_fact:*"
+
+[[operation]]
+name = "Delete a dialog"
+ui = "static/sidebar.js delete"
+routes = ["DELETE /api/conversations/<conv_id>"]
+backend = ["conversations.routes:remove_conv"]
+units = ["conversations", "storage", "kristall"]
+kristall = "removes the dialog's chat/* records and conversation_owner:<id>"
+
+[[operation]]
+name = "Read dialogs from outside (MCP)"
+ui = "an MCP client such as ChatGPT: logos_list_conversations, logos_get_conversation_messages"
+routes = ["POST {MCP_PATH}"]
+backend = ["mcp_server.transport:mcp_post", "mcp_server.tools:_conversations", "mcp_server.tools:_conversation_messages"]
+units = ["mcp_server", "tool_providers", "economy", "conversations", "invocation", "storage", "kristall"]
+kristall = "chat/conversation/*, chat/message/<n>, runtime_invocation:<iid>"

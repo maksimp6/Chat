@@ -2,6 +2,14 @@
 
 The invocation lifecycle on native Kristall (create, start, finish and fail, with execution traces), the immutable request-scoped execution context and RFC 9457 Problem Details responses.
 
+## Role in a dialog
+
+Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
+
+- **Send a message (the turn)**: `POST /api/chat`
+- **Trace, cost and treasury of a reply**: `GET /api/invocations/<invocation_id>/trace`, `GET /api/treasury/account`
+- **Read dialogs from outside (MCP)**: `POST {MCP_PATH}`
+
 ## Public API
 
 `from invocation import …`: `InvocationContext`.

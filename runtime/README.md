@@ -2,6 +2,12 @@
 
 Scoped preview runtimes: the execution boundary (dispatcher), request-scoped runtime metadata, the runtime storage capability, a small extension loader, conversation-scoped agent selection and session/invocation API helpers.
 
+## Role in a dialog
+
+Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
+
+- **Trace, cost and treasury of a reply**: `GET /api/invocations/<invocation_id>/trace`, `GET /api/treasury/account`
+
 ## Public API
 
 `from runtime import …`: `FILESYSTEM_READ_TEXT`, `FILESYSTEM_WRITE_TEXT`, `TOOL_EXECUTE_OPERATION`, `RuntimeContext`, `RuntimeDispatcher`, `RuntimeNotFound`, `RuntimeOperationNotFound`, `RuntimeOwnerViolation`, `RuntimeScopeViolation`, `RuntimeHostAPI`, `RuntimeLoadError`, `RuntimeLoader`, `ConversationAgent`, `ConversationAgentRouter`, `RuntimeStorage`, `bind_runtime_request`, `current_runtime_base_path`, `current_runtime_data_root`, `current_runtime_id`.
