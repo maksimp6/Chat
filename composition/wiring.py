@@ -1046,5 +1046,5 @@ def register_units(*units: str) -> None:
 
 def register_all() -> None:
     """Load ``core/.env`` and register every unit's factory."""
-    upstream_model_id()
+    load_env_file()
     register_units(*_HOSTS)
