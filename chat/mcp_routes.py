@@ -1253,11 +1253,16 @@ def execute_approved():
             followup_reply = ""
             followup_failed = True
             usage = None
-        reply = (
-            f"Действие {func_name} выполнено. Итоговый ответ модели не завершён. "
-            "Повторять действие не нужно."
-            if followup_failed else followup_reply
-        )
+        if followup_failed:
+            # Keep the partial answer the provider did return; dropping it hid the outcome of the action.
+            reply = (
+                f"Действие {func_name} выполнено. Итоговый ответ модели не завершён. "
+                "Повторять действие не нужно."
+            )
+            if followup_reply.strip():
+                reply += "\n\n" + followup_reply.strip()
+        else:
+            reply = followup_reply
         # The follow-up answer is a model call like any chat turn, so it is billed the same way.
         billing = aggregate_billing(
             [build_ai_billing_item(model_key, usage, step=1)],
