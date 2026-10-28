@@ -106,7 +106,7 @@ start_app() {
   if timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/"$1"' _ "$port" 2>/dev/null; then
     echo 'Port belongs to an untracked listener; refusing duplicate startup' >&2; return 1
   fi
-  local revision launcher launcher_tmp
+  local revision launcher launcher_tmp launcher_backup
   revision=$(git -C "$app" rev-parse HEAD 2>/dev/null || printf unknown)
   # The app checkout changes on both deploy and rollback. A workflow-local
   # launcher stays at the event SHA and must not override the selected revision.
@@ -122,6 +122,15 @@ start_app() {
         return 1
       fi
       cp -- "$state/start-logos.py" "$state/start-logos.py.before-wifi" || return 1
+    elif [[ -f $state/start-logos.py ]] && ! cmp -s "$state/start-logos.py" "$state/start-logos.py.before-wifi" \
+        && ! git -C "$app" cat-file -e "$(git -C "$app" hash-object --no-filters -- "$state/start-logos.py" 2>/dev/null)" 2>/dev/null; then
+      # The before-wifi copy is made once. A launcher edited after it is no
+      # repository version, so it is saved under its own name before replacement.
+      launcher_backup=$(mktemp "$state/start-logos.py.before-deploy.XXXXXX") || return 1
+      if ! cp -- "$state/start-logos.py" "$launcher_backup"; then
+        rm -f -- "$launcher_backup"
+        return 1
+      fi
     fi
     launcher_tmp=$(mktemp "$state/start-logos.py.XXXXXX") || return 1
     if ! cp -- "$launcher" "$launcher_tmp" \

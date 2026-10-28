@@ -47,18 +47,35 @@ jobs:
           for file in scripts/redmi_app_server.sh scripts/redmi_app_launcher.py scripts/redmi_wifi_probe.py scripts/redmi_remove_autoupdate.py .github/workflows/redmi9-app-server.yml; do
             mkdir -p "$(dirname "$file")"
             curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
-              "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/$file" -o "$file"
+              "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/$file" -o "$file"
           done
           # The runner is the only updater. Retire the former independent loop
           # after its in-flight controller finishes, preserving its evidence.
           python scripts/redmi_remove_autoupdate.py
           # The phone runs out of space when old deploy backups and screenshot folders pile up.
           # The concurrency group runs one workflow at a time, so no capture is active during this step.
-          # Keep only the newest backup of the app memory, and only when that backup is non-empty.
+          # Keep only the newest backup of the app memory, and only when that backup is non-empty
+          # and its whole journal verifies as Kristall replays it: complete frames, unbroken digest chain.
+          # Otherwise every backup is kept, so a damaged newest copy never removes the intact older ones.
           backups=/data/data/com.termux/files/home/logos-local-state/deploy-backups
           if [ -d "$backups" ]; then
             newest=$(ls -1t "$backups"/*.memory 2>/dev/null | head -n 1 || true)
-            if [ -n "$newest" ] && [ -s "$newest" ]; then
+            if [ -n "$newest" ] && [ -s "$newest" ] && python - "$newest" <<'PY'
+          import hashlib
+          import json
+          import sys
+          digest = "0" * 64
+          with open(sys.argv[1], "rb") as journal:
+              for frame in journal:
+                  if not frame.endswith(b"\n"):
+                      raise SystemExit("Newest memory backup has an incomplete tail; all backups are kept")
+                  record = json.loads(frame)
+                  encoded = json.dumps(record["payload"], sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+                  digest = hashlib.sha256(bytes.fromhex(digest) + encoded).hexdigest()
+                  if record["digest"] != digest:
+                      raise SystemExit("Newest memory backup breaks the commit chain; all backups are kept")
+          PY
+            then
               ls -1t "$backups"/*.memory 2>/dev/null | tail -n +2 | xargs -r rm -f
             fi
           fi
@@ -92,7 +109,7 @@ jobs:
           done
           df -k "$cleanup_root"
           curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
-            "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
           # Media goes only to a fixed-size RAM disk: never to flash, wiped on exit.
           media_ram=$(bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" mount)
           trap 'cd "$GITHUB_WORKSPACE"; bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" umount' EXIT
@@ -102,7 +119,7 @@ jobs:
           scripts_dir=$(mktemp -d "$RUNNER_TEMP/logos-screenshot-scripts.XXXXXX")
           for script in redmi_screenshot_capture.py publish_redmi_screenshots.py; do
             curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
-              "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/$script" -o "$scripts_dir/$script"
+              "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/$script" -o "$scripts_dir/$script"
           done
           capture_dir="$RUNNER_TEMP/logos-screenshots-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           python "$scripts_dir/redmi_screenshot_capture.py" "$capture_dir"
@@ -159,7 +176,7 @@ jobs:
           done
           df -k "$cleanup_root"
           curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
-            "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
           # Media goes only to a fixed-size RAM disk: never to flash, wiped on exit.
           media_ram=$(bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" mount)
           trap 'cd "$GITHUB_WORKSPACE"; bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" umount' EXIT
@@ -169,7 +186,7 @@ jobs:
           mkdir -m 700 "$check_temp/scripts"
           for file in scripts/redmi_screenshot_capture.py scripts/publish_redmi_screenshots.py scripts/logos_tools_self_check.py; do
             curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
-              "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/$file" -o "$check_temp/$file"
+              "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/$file" -o "$check_temp/$file"
           done
           cd "$check_temp"
           capture_dir="$check_temp/logos-screenshots-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
@@ -216,7 +233,7 @@ jobs:
           done
           df -k "$cleanup_root"
           curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
-            "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
           # Media goes only to a fixed-size RAM disk: never to flash, wiped on exit.
           media_ram=$(bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" mount)
           trap 'cd "$GITHUB_WORKSPACE"; bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" umount' EXIT
@@ -224,7 +241,7 @@ jobs:
           export RUNNER_TEMP="$verification_job_temp"
           export TMPDIR="$verification_job_temp"
           curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
-            "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/publish_redmi_screenshots.py" -o "$verification_job_temp/publish_redmi_screenshots.py"
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/publish_redmi_screenshots.py" -o "$verification_job_temp/publish_redmi_screenshots.py"
           python "$verification_job_temp/publish_redmi_screenshots.py" --verify-latest
 
   rootagent_native_check:
@@ -251,7 +268,7 @@ jobs:
           done
           df -k "$cleanup_root"
           curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
-            "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
           # Media goes only to a fixed-size RAM disk: never to flash, wiped on exit.
           media_ram=$(bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" mount)
           trap 'cd "$GITHUB_WORKSPACE"; bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" umount' EXIT
@@ -261,7 +278,7 @@ jobs:
           mkdir -m 700 "$RUNNER_TEMP/scripts" "$RUNNER_TEMP/evidence"
           for file in scripts/redmi_root_agent.py scripts/redmi_root_agent_e2e.py; do
             curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
-              "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/$file" -o "$RUNNER_TEMP/$file"
+              "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/$file" -o "$RUNNER_TEMP/$file"
           done
           cd "$RUNNER_TEMP"
           python scripts/redmi_root_agent_e2e.py --helper scripts/redmi_root_agent.py --output "$RUNNER_TEMP/evidence"
@@ -290,7 +307,7 @@ jobs:
           done
           df -k "$cleanup_root"
           curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
-            "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
           # Media goes only to a fixed-size RAM disk: never to flash, wiped on exit.
           media_ram=$(bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" mount)
           trap 'cd "$GITHUB_WORKSPACE"; bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" umount' EXIT
