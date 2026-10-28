@@ -76,6 +76,7 @@ class Host:
     create_invocation: Any  # invocation.manager.create_invocation
     create_invocation_trace: Any  # invocation.trace.create_invocation_trace
     fail_invocation: Any  # invocation.manager.fail_invocation
+    file_court_case: Any  # court.filing.file_case
     finish_invocation: Any  # invocation.manager.finish_invocation
     generate_realtime: Any  # yandex_client_modules.realtime.generate_realtime
     get_conv_settings: Any  # storage.records.get_conv_settings
@@ -155,6 +156,7 @@ __all__ = [
     "create_invocation",
     "create_invocation_trace",
     "fail_invocation",
+    "file_court_case",
     "finish_invocation",
     "generate_realtime",
     "get_conv_settings",
@@ -245,6 +247,10 @@ def create_invocation_trace(*args: Any, **kwargs: Any) -> Any:
 
 def fail_invocation(*args: Any, **kwargs: Any) -> Any:
     return current().fail_invocation(*args, **kwargs)
+
+
+def file_court_case(*args: Any, **kwargs: Any) -> Any:
+    return current().file_court_case(*args, **kwargs)
 
 
 def finish_invocation(*args: Any, **kwargs: Any) -> Any:

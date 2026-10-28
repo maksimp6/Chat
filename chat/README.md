@@ -77,6 +77,7 @@ Everything `chat` uses from other units is a field of `Host` in [`chat/host.py`]
 | `create_invocation` | `invocation.manager.create_invocation` |
 | `create_invocation_trace` | `invocation.trace.create_invocation_trace` |
 | `fail_invocation` | `invocation.manager.fail_invocation` |
+| `file_court_case` | `court.filing.file_case` |
 | `finish_invocation` | `invocation.manager.finish_invocation` |
 | `generate_realtime` | `yandex_client_modules.realtime.generate_realtime` |
 | `get_conv_settings` | `storage.records.get_conv_settings` |

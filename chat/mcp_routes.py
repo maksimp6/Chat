@@ -35,6 +35,7 @@ from chat.host import (
     create_invocation,
     create_invocation_trace,
     fail_invocation,
+    file_court_case,
     finish_invocation,
     get_conv_settings,
     get_conversation_title,
@@ -540,11 +541,12 @@ def _turn_cost(billing: dict[str, Any]) -> float | None:
 def _settled_turn_cost(
     billing: dict[str, Any], settlement: dict[str, Any]
 ) -> float | None:
-    """Show a cost only when the treasury charged it; a failed or skipped posting charged nothing."""
-    cost = _turn_cost(billing)
-    if cost and settlement.get("status") not in {"posted", "already_posted"}:
-        return None
-    return cost
+    """The turn's cost, whether or not the treasury could charge it.
+
+    The provider has already billed the tokens, so the price is a fact of the
+    turn; a failed posting is reported separately as ``settlement`` and must not
+    hide the price (#1664)."""
+    return _turn_cost(billing)
 
 
 def _append_post_final_error(trace_data, source, message, error_type):
@@ -852,14 +854,36 @@ def _finalize_chat_turn(
             if str(settlement_error) == "insufficient balance"
             else None
         )
+        settlement_message = "treasury settlement failed" + (
+            f": {failure_code}" if failure_code else ""
+        )
         _append_post_final_error(
             trace_data,
             "treasury_settlement",
-            "treasury settlement failed"
-            + (f": {failure_code}" if failure_code else ""),
+            settlement_message,
             type(settlement_error).__name__,
         )
-        settlement = {"status": "failed", "reason": "treasury_settlement_failed"}
+        settlement = {
+            "status": "failed",
+            "reason": failure_code or "treasury_settlement_failed",
+        }
+        # The reply itself succeeded, so fail_invocation never runs: the Court
+        # case for this error is filed here (AGENTS.md, «Ошибки и дела Суда»).
+        try:
+            file_court_case(
+                {
+                    "invocation_id": invocation.invocation_id,
+                    "conversation_id": invocation.conversation_id,
+                    "session_id": invocation.session_id,
+                    "trace_id": invocation.trace_id,
+                    "error": {
+                        "code": "treasury_settlement_failed",
+                        "message": settlement_message,
+                    },
+                }
+            )
+        except Exception:
+            logger.exception("[COURT] Settlement case was not filed")
 
     trace_data.setdefault("billing", {})["settlement"] = settlement
     billing = trace_data.get("billing") or {}
@@ -917,6 +941,7 @@ def _finalize_chat_turn(
             "user_message_id": user_message_id,
             "usage": usage,
             "cost": cost,
+            "settlement": settlement,
             "timings": timings,
             "total_duration_ms": total_ms,
             "reasoning": reasoning,

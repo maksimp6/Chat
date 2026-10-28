@@ -16,7 +16,7 @@ Other units reach it only through their own ports:
 
 | Provides | To |
 | --- | --- |
-| `court.filing.file_case` | `invocation` |
+| `court.filing.file_case` | `chat`, `invocation` |
 
 ## Ports
 

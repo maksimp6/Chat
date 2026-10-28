@@ -143,6 +143,7 @@ def _chat():
     from invocation.manager import create_invocation
     from invocation.trace import create_invocation_trace
     from invocation.manager import fail_invocation
+    from court.filing import file_case as file_court_case
     from invocation.manager import finish_invocation
     from yandex_client_modules.realtime import generate_realtime
     from storage.records import get_conv_settings
@@ -228,6 +229,7 @@ def _chat():
         create_invocation=create_invocation,
         create_invocation_trace=create_invocation_trace,
         fail_invocation=fail_invocation,
+        file_court_case=file_court_case,
         finish_invocation=finish_invocation,
         generate_realtime=generate_realtime,
         get_conv_settings=get_conv_settings,
