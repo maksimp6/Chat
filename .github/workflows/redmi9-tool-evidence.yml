@@ -30,7 +30,12 @@ jobs:
         run: |
           set -euo pipefail
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
-          candidate_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-candidate-tools-", dir=".")).resolve())')
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
+            "https://raw.githubusercontent.com/maksimp6/Chat/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$GITHUB_WORKSPACE/redmi_media_ram.sh"
+          # Media goes only to a fixed-size RAM disk: never to flash, wiped on exit.
+          media_ram=$(bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" mount)
+          trap 'cd "$GITHUB_WORKSPACE"; bash "$GITHUB_WORKSPACE/redmi_media_ram.sh" umount' EXIT
+          candidate_temp=$(mktemp -d "$media_ram/candidate-tools.XXXXXX")
           export RUNNER_TEMP="$candidate_temp"
           export TMPDIR="$candidate_temp"
           curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \

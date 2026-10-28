@@ -35,6 +35,23 @@ MIN_CAPTURE_FREE_BYTES = 512 * 1024 * 1024
 MAX_VIDEO_BYTES = 20 * 1024 * 1024
 
 
+def require_ram_disk(path):
+    """Refuse to capture unless `path` is on a tmpfs mount: media must never reach flash."""
+    path = Path(path).resolve()
+    best_target, best_type = "", ""
+    with open("/proc/self/mounts", encoding="utf-8") as mounts:
+        for line in mounts:
+            fields = line.split()
+            if len(fields) < 3:
+                continue
+            target = fields[1].replace("\\040", " ")
+            if (path == Path(target) or Path(target) in path.parents) and len(target) >= len(best_target):
+                best_target, best_type = target, fields[2]
+    if best_type != "tmpfs":
+        raise CaptureSafetyError("Capture refused: " + str(path) + " is on " + (best_type or "unknown")
+                                 + ", media may only be written to the RAM disk (scripts/redmi_media_ram.sh)")
+
+
 def capture_storage_guard():
     if CAPTURE_STORAGE_ROOT is None:
         return
@@ -1575,13 +1592,9 @@ def main():
     else:
         capture_output = None
     if capture_output is not None:
-        workspace = next((path.parent for path in capture_output.parents
-                          if path.name.startswith((".logos-screenshots-", ".logos-tools-check-",
-                                                   ".logos-candidate-tools-"))), None)
-        runner_work = next((path for path in capture_output.parents
-                            if path.name == "work" and path.parent.name == "github-python-runner"), None)
-        CAPTURE_STORAGE_ROOT = runner_work or workspace or capture_output.parent
-        capture_storage_guard()
+        # Media is written only to the fixed-size RAM disk (scripts/redmi_media_ram.sh), never to flash.
+        # Its size is the hard storage limit, so the free-space and budget walk is not needed there.
+        require_ram_disk(capture_output)
     if len(sys.argv) == 6 and sys.argv[1] == "_capture":
         metadata = json.loads(sys.argv[5])
         LOGOS_URL = capture_url(metadata.get("capture_url", LOGOS_URL))
@@ -1605,9 +1618,10 @@ def main():
                 "github_run_url": "https://github.com/maksimp6/Chat/actions/runs/" + os.environ["GITHUB_RUN_ID"]}
     metadata["tools_self_check"] = os.environ.get("LOGOS_TOOLS_SELF_CHECK") == "1"
     metadata["capture_url"] = capture_url(os.environ.get("LOGOS_CAPTURE_URL", LOGOS_URL))
-    argv = [sys.executable, str(Path(__file__).resolve()), "_capture", str(output),
+    # -B: the root child must not write root-owned __pycache__ that the runner user cannot delete.
+    argv = [sys.executable, "-B", str(Path(__file__).resolve()), "_capture", str(output),
             str(os.getuid()), str(os.getgid()), json.dumps(metadata)]
-    safe_env = {"PATH": os.environ.get("PATH", "/system/bin"), "TMPDIR": os.environ.get("TMPDIR", str(runner_temp))}
+    safe_env = {"PATH": os.environ.get("PATH", "/system/bin"), "TMPDIR": os.environ.get("TMPDIR", str(runner_temp)), "PYTHONDONTWRITEBYTECODE": "1"}
     result = subprocess.run(["su", "-c", shlex.join(argv)], env=safe_env, capture_output=True, timeout=300)
     if result.returncode:
         # No job token is in the capture child's environment or argv.
