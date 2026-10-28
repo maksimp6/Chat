@@ -843,6 +843,81 @@ def _build_chat_reply(client, response, trace) -> _ChatReply:
     )
 
 
+# Global memory: after a completed turn the dialog is read once more for stable facts.
+MEMORY_EXTRACTION_PROMPT = (
+    "Извлеки из диалога устойчивые факты о проектах, путях, конфигурации и "
+    "предпочтениях владельца, которые полезно помнить в других диалогах. Не записывай "
+    "пароли, ключи, токены и личные данные. Верни только JSON-объект с полем facts: "
+    "список объектов {category, fact}. Если устойчивых фактов нет, верни пустой список."
+)
+MEMORY_FACTS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "facts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string"},
+                    "fact": {"type": "string"},
+                },
+                "required": ["category", "fact"],
+            },
+        }
+    },
+    "required": ["facts"],
+}
+
+
+def _remember_turn_facts(owner_id, conv_id, model_key):
+    """Save the facts a completed turn's dialog states, off the request thread.
+
+    The extraction is a normal model request: the chat client's credential, quota
+    and trace, settled to the owner's treasury like a turn. A failure is logged by
+    type only and never changes the reply that was already sent.
+    """
+    try:
+        config = bound.load_memory_config()
+        if not owner_id or not config.get("enabled") or not config.get("auto_extraction"):
+            return
+        lines = [
+            f"{message['role']}: {message['text']}"
+            for message in bound.get_messages(conv_id)
+            if message.get("text")
+        ]
+        if not lines:
+            return
+        client = logos_client_type()(bound.Config)
+        trace = bound.ExecutionTrace()
+        trace.trace.setdefault("context", {})["user_id"] = owner_id
+        response = client.ask(
+            MEMORY_EXTRACTION_PROMPT + "\n\n" + "\n".join(lines),
+            model_key,
+            conversation_id=None,
+            params={
+                "background": False,
+                "store": False,
+                "text": {
+                    "format": {
+                        "type": "json_schema",
+                        "name": "memory_facts",
+                        "schema": MEMORY_FACTS_SCHEMA,
+                    }
+                },
+            },
+            execution_trace=trace,
+        )
+        parsed = _json.loads(client.extract_text(response) or "{}")
+        facts = parsed.get("facts") if isinstance(parsed, dict) else None
+        if isinstance(facts, list):
+            bound.save_global_memory_facts(facts)
+        billing = trace.finalize().get("billing") or {}
+        billing["trace_id"] = "memory-" + uuid.uuid4().hex
+        bound.settle_billing_to_treasury(billing, owner_id)
+    except Exception as exc:
+        logger.warning("[MEMORY] fact extraction failed: %s", type(exc).__name__)
+
+
 def _finalize_chat_turn(
     invocation,
     trace,
@@ -852,6 +927,7 @@ def _finalize_chat_turn(
     selected_skill_metadata,
     conversation_title,
     user_message_id=None,
+    model_key=None,
 ):
     """Freeze the trace, settle billing, persist the reply, then finish its invocation."""
     reply = result.reply
@@ -949,6 +1025,12 @@ def _finalize_chat_turn(
         )
     else:
         finish_invocation(invocation.invocation_id, result=outcome)
+        if reply and model_key:
+            threading.Thread(
+                target=_remember_turn_facts,
+                args=(invocation.user_id, invocation.conversation_id, model_key),
+                daemon=True,
+            ).start()
 
     return jsonify(
         {
@@ -1306,6 +1388,7 @@ def chat():
             selected_skill_metadata=selected_skill_metadata,
             conversation_title=conversation_title,
             user_message_id=user_message_id,
+            model_key=model_key,
         )
     except Exception as e:
         logger.exception("[CHAT] Ошибка")

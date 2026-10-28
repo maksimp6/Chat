@@ -92,6 +92,7 @@ class Host:
     image_file_metadata: Any  # storage.generated_images.image_file_metadata
     is_provider_pending: Any  # storage.records.is_provider_pending
     list_owned_conversations: Any  # conversations.ownership.list_owned_conversations
+    load_memory_config: Any  # agent_memory.manager.load_memory_config
     maybe_update_conversation_title: (
         Any  # storage.records.maybe_update_conversation_title
     )
@@ -113,6 +114,7 @@ class Host:
     reserve_request: Any  # provider_accounts.quotas.reserve_request
     reset_current_trace: Any  # observability.trace_manager.reset_current_trace
     save_conv_settings: Any  # storage.records.save_conv_settings
+    save_global_memory_facts: Any  # agent_memory.extractor.save_global_memory_facts
     save_image_file: Any  # storage.generated_images.save_image_file
     set_owner: Any  # conversations.ownership.set_owner
     set_yandex_conversation: Any  # storage.records.set_yandex_conversation
@@ -172,6 +174,7 @@ __all__ = [
     "image_file_metadata",
     "is_provider_pending",
     "list_owned_conversations",
+    "load_memory_config",
     "maybe_update_conversation_title",
     "normalize_conversation_title",
     "normalize_tools_config",
@@ -185,6 +188,7 @@ __all__ = [
     "reserve_request",
     "reset_current_trace",
     "save_conv_settings",
+    "save_global_memory_facts",
     "save_image_file",
     "set_owner",
     "set_yandex_conversation",
@@ -313,6 +317,10 @@ def list_owned_conversations(*args: Any, **kwargs: Any) -> Any:
     return current().list_owned_conversations(*args, **kwargs)
 
 
+def load_memory_config(*args: Any, **kwargs: Any) -> Any:
+    return current().load_memory_config(*args, **kwargs)
+
+
 def maybe_update_conversation_title(*args: Any, **kwargs: Any) -> Any:
     return current().maybe_update_conversation_title(*args, **kwargs)
 
@@ -359,6 +367,10 @@ def reserve_request(*args: Any, **kwargs: Any) -> Any:
 
 def reset_current_trace(*args: Any, **kwargs: Any) -> Any:
     return current().reset_current_trace(*args, **kwargs)
+
+
+def save_global_memory_facts(*args: Any, **kwargs: Any) -> Any:
+    return current().save_global_memory_facts(*args, **kwargs)
 
 
 def save_conv_settings(*args: Any, **kwargs: Any) -> Any:

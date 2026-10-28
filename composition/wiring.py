@@ -159,6 +159,7 @@ def _chat():
     from storage.generated_images import image_file_metadata
     from storage.records import is_provider_pending
     from conversations.ownership import list_owned_conversations
+    from agent_memory.manager import load_memory_config
     from storage.records import maybe_update_conversation_title
     import mcp_server.storage as mcp_storage
     from storage.records import normalize_conversation_title
@@ -174,6 +175,7 @@ def _chat():
     from provider_accounts.quotas import reserve_request
     from observability.trace_manager import reset_current_trace
     from storage.records import save_conv_settings
+    from agent_memory.extractor import save_global_memory_facts
     from storage.generated_images import save_image_file
     from conversations.ownership import set_owner
     from storage.records import set_yandex_conversation
@@ -245,6 +247,7 @@ def _chat():
         image_file_metadata=image_file_metadata,
         is_provider_pending=is_provider_pending,
         list_owned_conversations=list_owned_conversations,
+        load_memory_config=load_memory_config,
         maybe_update_conversation_title=maybe_update_conversation_title,
         mcp_storage=mcp_storage,
         normalize_conversation_title=normalize_conversation_title,
@@ -260,6 +263,7 @@ def _chat():
         reserve_request=reserve_request,
         reset_current_trace=reset_current_trace,
         save_conv_settings=save_conv_settings,
+        save_global_memory_facts=save_global_memory_facts,
         save_image_file=save_image_file,
         set_owner=set_owner,
         set_yandex_conversation=set_yandex_conversation,

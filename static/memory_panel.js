@@ -45,7 +45,7 @@
       // A stored 0 is a real limit (no facts in context), so only a missing value falls back.
       if (limit) {
         limit.value = String(
-          Number.isInteger(config.max_context_facts) ? config.max_context_facts : 15,
+          Number.isInteger(config.max_context_facts) ? config.max_context_facts : 100,
         );
       }
       setConfigControlsReady(true);

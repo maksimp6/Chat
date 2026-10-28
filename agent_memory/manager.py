@@ -12,11 +12,15 @@ from agent_memory.host import memory_file_path
 
 _MEMORY_CONFIG_KEY = "global_memory_config"
 logger = logging.getLogger("logos.agent_memory.manager")
+# Settings at maximum: the most facts the validator accepts, every category (an absent
+# categories_allowed key means all), facts extracted after every completed turn.
+# settings_revision marks records written with these defaults; older ones are upgraded.
+MEMORY_SETTINGS_REVISION = 2
 DEFAULT_CONFIG = {
     "enabled": True,
-    "max_context_facts": 15,
+    "max_context_facts": 100,
     "auto_extraction": True,
-    "categories_allowed": ["git", "paths", "architecture", "tools", "general"],
+    "settings_revision": MEMORY_SETTINGS_REVISION,
 }
 
 
@@ -29,6 +33,20 @@ def load_memory_config() -> dict[str, Any]:
             tx.set(_MEMORY_CONFIG_KEY, value)
         if not isinstance(value, dict):
             raise ValueError("invalid native memory configuration")
+        revision = value.get("settings_revision")
+        if not (isinstance(revision, int) and not isinstance(revision, bool)) or (
+            revision < MEMORY_SETTINGS_REVISION
+        ):
+            # Records saved before the maximal defaults held 15 facts, a category
+            # list and extraction that never ran. They move to the maximum once.
+            value = {
+                **value,
+                "max_context_facts": MAX_CONTEXT_FACTS_LIMIT,
+                "auto_extraction": True,
+                "settings_revision": MEMORY_SETTINGS_REVISION,
+            }
+            value.pop("categories_allowed", None)
+            tx.set(_MEMORY_CONFIG_KEY, value)
         return value
 
 
@@ -79,7 +97,7 @@ def get_controlled_memory_summary() -> str:
     cfg = load_memory_config()
     if not cfg.get("enabled", True):
         return ""
-    limit = cfg.get("max_context_facts", 15)
+    limit = cfg.get("max_context_facts", MAX_CONTEXT_FACTS_LIMIT)
     if type(limit) is not int or limit < 0:
         raise ValueError("max_context_facts must be a nonnegative integer")
     # An absent key keeps every category; an empty list allows none.
