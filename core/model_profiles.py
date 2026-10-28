@@ -92,8 +92,8 @@ def profile_summary(profile: dict[str, Any]) -> dict[str, Any]:
 def ultra_request_defaults(model_key: str) -> dict[str, Any]:
     """Canonical local Ultra settings for an active Yandex Responses model.
 
-    Zero means the default output ceiling (DEFAULT_MAX_OUTPUT_TOKENS in
-    yandex_client_modules/request_builder.py), not an unbounded reply. Only reasoning effort present in this model's wire profile
+    Zero omits an application output cap; it is not a claim about the provider's
+    output ceiling. Only reasoning effort present in this model's wire profile
     is selected. Unknown or unsupported reasoning is omitted from the request.
     """
     model_key = canonical_model_key(model_key)

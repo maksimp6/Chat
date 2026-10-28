@@ -15,9 +15,6 @@ from yandex_client_modules.metadata_validator import validate_metadata
 TEMPERATURE_MIN = 0.0
 TEMPERATURE_MAX = 2.0
 _REASONING_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh"}
-# Zero or unset output cap means this ceiling, not an unbounded reply: a reasoning loop cost 2.27M tokens (#1645).
-DEFAULT_MAX_OUTPUT_TOKENS = 4096
-DEFAULT_MAX_TOOL_CALLS = 20
 
 
 def validate_generation_params(params):
@@ -375,7 +372,8 @@ def build_response_payload(
         payload["top_p"] = float(params["top_p"])
     if "top_logprobs" in params:
         payload["top_logprobs"] = params["top_logprobs"]
-    payload["max_output_tokens"] = int(params.get("max_output_tokens") or DEFAULT_MAX_OUTPUT_TOKENS)
+    if params.get("max_output_tokens"):
+        payload["max_output_tokens"] = int(params["max_output_tokens"])
     if params.get("prompt"):
         payload["prompt"] = params["prompt"]
     if params.get("text"):
@@ -413,8 +411,10 @@ def build_response_payload(
         payload["tools"] = cleaned_tools
         payload["tool_choice"] = tool_choice
         max_tool_calls = params.get("max_tool_calls")
-        # An unset limit gets the default ceiling, so a tool loop cannot run unbounded (#1645).
-        payload["max_tool_calls"] = DEFAULT_MAX_TOOL_CALLS if max_tool_calls is None else max_tool_calls
+        # The input schema documents an integer. Omit an unset limit rather
+        # than relying on nullable response fields to prove POST support.
+        if max_tool_calls is not None:
+            payload["max_tool_calls"] = max_tool_calls
 
         ptc = params.get("parallel_tool_calls")
         if ptc is not None:

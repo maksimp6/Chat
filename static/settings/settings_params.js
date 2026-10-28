@@ -43,7 +43,7 @@
     var params = {
       temperature: numericSetting(s.temperature, 0.7, "temperature"),
       top_p: numericSetting(s.top_p, 1.0, "top_p"),
-      max_output_tokens: numericSetting(s.max_output_tokens, 4096, "max_output_tokens"),
+      max_output_tokens: numericSetting(s.max_output_tokens, 0, "max_output_tokens"),
       truncation: s.truncation || "disabled",
       store: booleanSetting(s.store, true, "store"),
       background: booleanSetting(s.background, true, "background"),

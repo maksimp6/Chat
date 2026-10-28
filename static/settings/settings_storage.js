@@ -4,8 +4,8 @@
   var DEFAULTS = {
     temperature: 0.7,
     top_p: 1.0,
-    // 0 means the default ceiling (4096), so a reasoning loop cannot run unbounded (#1645).
-    max_output_tokens: 4096,
+    // 0 omits the application output cap; the provider's own limit still applies.
+    max_output_tokens: 0,
     max_tool_calls: null,
     truncation: "disabled",
     store: true,
