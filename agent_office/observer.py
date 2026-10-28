@@ -18,7 +18,7 @@ The scheduled workflow ``.github/workflows/agent-observer.yml`` runs it hourly.
 """
 
 from __future__ import annotations
-from core.env import env_get
+import os
 
 import argparse
 import json
@@ -1007,6 +1007,19 @@ def collect_threads(
         return list(pool.map(load, items))
 
 
+def ensure_label(gh: GitHub, name: str, color: str, description: str) -> None:
+    """Create a label; an existing one (422) is fine."""
+    try:
+        gh.request(
+            "POST",
+            gh.repo_path("/labels"),
+            {"name": name, "color": color, "description": description},
+        )
+    except urllib.error.HTTPError as error:
+        if error.code != 422:  # 422: the label already exists
+            raise
+
+
 def ensure_tracking_label(gh: GitHub) -> None:
     """Create the tracking label so the next run can find the issue by it."""
     try:
@@ -1118,7 +1131,9 @@ def run(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--repo", default=env_get("GITHUB_REPOSITORY", "maksimp6/Chat"))
+    parser.add_argument(
+        "--repo", default=os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat")
+    )
     parser.add_argument(
         "--publish", action="store_true", help="update the tracking issue"
     )
@@ -1132,7 +1147,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    token = env_get("GITHUB_TOKEN") or env_get("GH_TOKEN") or ""
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or ""
     gh = GitHub(token, args.repo)
     try:
         result = run(gh, publish=args.publish)
@@ -1142,7 +1157,7 @@ def main(argv: list[str] | None = None) -> int:
 
     digest = result["digest"]
     print(digest)
-    summary = env_get("GITHUB_STEP_SUMMARY")
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with open(summary, "a", encoding="utf-8") as handle:
             handle.write(digest)

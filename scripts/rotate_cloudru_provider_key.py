@@ -7,7 +7,7 @@ against Foundation Models before the local credential is promoted.
 """
 
 from __future__ import annotations
-from core.env import env_get
+import os
 
 import logging
 from datetime import timedelta
@@ -32,7 +32,7 @@ logger = logging.getLogger("logos_cloudru_provider_key_rotation")
 
 def _ttl() -> timedelta:
     try:
-        days = int(env_get("CLOUDRU_KEY_TTL_DAYS", "1"))
+        days = int(os.environ.get("CLOUDRU_KEY_TTL_DAYS", "1"))
     except ValueError as exc:
         raise RuntimeError("CLOUDRU_KEY_TTL_DAYS must be an integer") from exc
     if not 1 <= days <= 365:

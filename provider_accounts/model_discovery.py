@@ -1,7 +1,7 @@
 """Provider-backed model discovery with a bounded in-process cache."""
 
 from __future__ import annotations
-from core.env import env_get
+import os
 
 import hashlib
 import logging
@@ -300,12 +300,14 @@ class ModelDiscovery:
 
 
 def build_model_discovery() -> ModelDiscovery:
-    ttl = int(env_get("MODEL_DISCOVERY_TTL_SECONDS", str(DEFAULT_TTL_SECONDS)))
+    ttl = int(os.environ.get("MODEL_DISCOVERY_TTL_SECONDS", str(DEFAULT_TTL_SECONDS)))
     timeout = float(
-        env_get("MODEL_DISCOVERY_TIMEOUT_SECONDS", str(DEFAULT_TIMEOUT_SECONDS))
+        os.environ.get("MODEL_DISCOVERY_TIMEOUT_SECONDS", str(DEFAULT_TIMEOUT_SECONDS))
     )
     return ModelDiscovery(
-        base_url=env_get("YANDEX_BASE_URL", "https://ai.api.cloud.yandex.net/v1"),
+        base_url=os.environ.get(
+            "YANDEX_BASE_URL", "https://ai.api.cloud.yandex.net/v1"
+        ),
         credential_resolver=_active_provider_credential,
         ttl_seconds=ttl,
         timeout_seconds=timeout,

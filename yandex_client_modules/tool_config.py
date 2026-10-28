@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.wikifunctions import clamp_integer
+from yandex_client_modules._vendor.wikifunctions import clamp_integer
 
 
 def file_search_max_results(value: Any) -> int:

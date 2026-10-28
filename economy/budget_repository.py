@@ -7,7 +7,7 @@ import json
 import uuid
 from typing import Any
 from storage.db import get_store
-from core.restrictions import restrictions_lifted
+from economy._vendor.restrictions import restrictions_lifted
 from observability.trace_manager import get_current_trace
 
 

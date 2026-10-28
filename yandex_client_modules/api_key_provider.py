@@ -1,7 +1,7 @@
 """Concrete Yandex Cloud API-key provider used by the rotation worker."""
 
 from __future__ import annotations
-from core.env import env_get
+import os
 
 from datetime import datetime
 from typing import Iterable, Optional
@@ -30,8 +30,8 @@ class YandexApiKeyProvider:
         project_id: Optional[str] = None,
         timeout: float = 30.0,
     ) -> None:
-        self.iam_token = iam_token or env_get("YANDEX_IAM_TOKEN")
-        self.service_account_id = service_account_id or env_get(
+        self.iam_token = iam_token or os.environ.get("YANDEX_IAM_TOKEN")
+        self.service_account_id = service_account_id or os.environ.get(
             "YANDEX_SERVICE_ACCOUNT_ID"
         )
         raw_scopes = (
@@ -39,7 +39,7 @@ class YandexApiKeyProvider:
             if scopes is not None
             else [
                 item.strip()
-                for item in env_get(
+                for item in os.environ.get(
                     "YANDEX_API_KEY_SCOPES",
                     "yc.ai.languageModels.execute,"
                     "yc.ai.speechkitStt.execute,"
@@ -51,16 +51,12 @@ class YandexApiKeyProvider:
         self.scopes = raw_scopes
         self.endpoint = (
             endpoint
-            or env_get(
-                "YANDEX_IAM_ENDPOINT",
-                "https://iam.api.cloud.yandex.net",
-            )
+            or os.environ.get("YANDEX_IAM_ENDPOINT", "https://iam.api.cloud.yandex.net")
         ).rstrip("/")
         self.ai_endpoint = (
             ai_endpoint
-            or env_get(
-                "YANDEX_AI_ENDPOINT",
-                "https://ai.api.cloud.yandex.net/v1",
+            or os.environ.get(
+                "YANDEX_AI_ENDPOINT", "https://ai.api.cloud.yandex.net/v1"
             )
         ).rstrip("/")
         self.project_id = project_id.strip() if isinstance(project_id, str) else ""

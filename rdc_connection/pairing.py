@@ -3,7 +3,7 @@
 The device owns PKCE and polling. This module never receives provider tokens.
 """
 
-from core.env import env_get
+import os
 
 import json
 import time
@@ -48,7 +48,7 @@ def verification_url(path, now=None):
 def install_rdc_pairing(app):
     @app.get("/rdc")
     def rdc_pairing_redirect():
-        path = env_get("LOGOS_RDC_PAIRING_FILE", "")
+        path = os.environ.get("LOGOS_RDC_PAIRING_FILE", "")
         try:
             if not path:
                 raise ValueError("handoff not configured")

@@ -1,7 +1,7 @@
 """Thin CLI/Termux adapter for the canonical Logos runtime."""
 
 from __future__ import annotations
-from core.env import env_get
+import os
 
 from typing import Any
 
@@ -28,10 +28,10 @@ class CliClient:
         session: requests.Session | None = None,
     ) -> None:
         self.base_url = (
-            base_url or env_get("LOGOS_BASE_URL") or DEFAULT_BASE_URL
+            base_url or os.environ.get("LOGOS_BASE_URL") or DEFAULT_BASE_URL
         ).rstrip("/")
         self.model = (
-            model or env_get("LOGOS_MODEL") or DEFAULT_MODEL
+            model or os.environ.get("LOGOS_MODEL") or DEFAULT_MODEL
         ).strip() or DEFAULT_MODEL
         self.timeout = float(timeout)
         self.http = session or requests.Session()
@@ -162,18 +162,19 @@ def _handle_approval(
 
 def main() -> None:
     client = CliClient()
-    conversation_id = env_get("LOGOS_CONVERSATION_ID", "").strip()
+    conversation_id = os.environ.get("LOGOS_CONVERSATION_ID", "").strip()
 
     try:
         if not conversation_id:
             conversation_id = client.create_conversation(
-                title=env_get("LOGOS_CLI_TITLE", "Logos CLI").strip() or "Logos CLI"
+                title=os.environ.get("LOGOS_CLI_TITLE", "Logos CLI").strip()
+                or "Logos CLI"
             )
     except CliError as exc:
         print(f"Logos CLI startup failed: {exc}")
         return
 
-    session_id = env_get("LOGOS_SESSION_ID", "").strip() or conversation_id
+    session_id = os.environ.get("LOGOS_SESSION_ID", "").strip() or conversation_id
     print(
         "🚀 Logos CLI подключён к каноническому runtime. Введите запрос (или 'exit' для выхода):\n"
     )

@@ -7,8 +7,7 @@ backend.
 """
 
 from __future__ import annotations
-from core.env import env_require, env_snapshot
-from core.wikifunctions import clamp_integer
+from sessions._vendor.wikifunctions import clamp_integer
 
 import json
 import os
@@ -109,9 +108,9 @@ class VirtualLowConsumptionServer:
             self.start()
             # Only what a shell needs: the backend's own environment holds provider and deployment secrets.
             env = {
-                name: env_require(name)
+                name: os.environ[name]
                 for name in _COMMAND_ENV_NAMES
-                if name in env_snapshot()
+                if name in dict(os.environ)
             }
             env.update({str(k): str(v) for k, v in self.config.env.items()})
             try:

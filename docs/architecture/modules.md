@@ -85,19 +85,13 @@ flowchart LR
     tool_providers[tool_providers]
     workspace[workspace]
     yandex_client_modules[yandex_client_modules]
-    agent_context -->|1| observability
-    agent_memory -->|1| core
     agent_memory -->|4| kristall
-    agent_memory -->|1| observability
     agent_memory -->|3| storage
-    agent_office -->|1| core
     agent_retrieval -->|1| agent_context
     agent_retrieval -->|2| agent_memory
-    agent_retrieval -->|1| observability
-    agent_retrieval -->|1| repository_index
     agent_rules -->|1| tool_providers
     agent_runtime -->|1| chat
-    agent_runtime -->|5| core
+    agent_runtime -->|1| core
     agent_runtime -->|3| invocation
     agent_runtime -->|1| provider_accounts
     agent_runtime -->|1| runtime
@@ -106,13 +100,10 @@ flowchart LR
     agent_runtime -->|4| tool_providers
     agent_shell -->|1| agent_memory
     agent_shell -->|1| agent_runtime
-    agent_shell -->|1| core
     agent_shell -->|1| kristall
-    agent_skills -->|1| core
-    chat -->|3| agent_runtime
     chat -->|1| agent_skills
     chat -->|3| conversations
-    chat -->|9| core
+    chat -->|7| core
     chat -->|5| economy
     chat -->|2| invocation
     chat -->|2| mcp_server
@@ -121,28 +112,26 @@ flowchart LR
     chat -->|4| storage
     chat -->|2| tool_providers
     chat -->|12| yandex_client_modules
-    cloud -->|10| core
     cloud -->|1| economy
-    cloud -->|6| observability
+    cloud -->|5| observability
     cloud -->|1| secret_store
     cloud -->|1| storage
-    cloud -->|2| tool_providers
+    cloud -->|1| tool_providers
     conversations -->|2| agent_memory
     conversations -->|1| storage
     economy -->|1| cloud
-    economy -->|7| core
+    economy -->|1| core
     economy -->|1| kristall
     economy -->|1| observability
     economy -->|3| storage
     invocation -->|1| agent_memory
-    invocation -->|1| core
     invocation -->|2| kristall
     invocation -->|3| observability
     invocation -->|1| sessions
     invocation -->|2| storage
     mcp_server -->|1| agent_runtime
     mcp_server -->|1| conversations
-    mcp_server -->|2| core
+    mcp_server -->|1| core
     mcp_server -->|2| economy
     mcp_server -->|3| invocation
     mcp_server -->|1| observability
@@ -151,38 +140,27 @@ flowchart LR
     mcp_server -->|1| sessions
     mcp_server -->|2| storage
     mcp_server -->|5| tool_providers
-    memory_engine -->|2| core
-    memory_engine -->|1| kristall
     model_editor -->|1| economy
     model_editor -->|2| storage
-    model_editor -->|1| tool_providers
-    observability -->|1| core
     observability -->|3| economy
-    organization -->|3| core
     organization -->|2| economy
     organization -->|1| sessions
     organization -->|3| storage
-    organization -->|3| tool_providers
-    plugin_system -->|1| core
+    organization -->|1| tool_providers
     plugin_system -->|1| invocation
     plugin_system -->|1| runtime
     plugin_system -->|1| tool_providers
-    printing3d -->|1| core
     printing3d -->|2| economy
     printing3d -->|1| storage
-    printing3d -->|1| tool_providers
-    project_board -->|2| core
     project_board -->|1| memory_engine
     provider_accounts -->|3| cloud
-    provider_accounts -->|8| core
+    provider_accounts -->|3| core
     provider_accounts -->|1| economy
     provider_accounts -->|2| observability
     provider_accounts -->|3| secret_store
     provider_accounts -->|3| storage
     provider_accounts -->|3| yandex_client_modules
-    rdc_connection -->|1| core
     remote_runtime -->|2| agent_memory
-    remote_runtime -->|6| core
     remote_runtime -->|1| economy
     remote_runtime -->|2| invocation
     remote_runtime -->|2| observability
@@ -197,29 +175,25 @@ flowchart LR
     runtime -->|1| storage
     runtime -->|1| tool_providers
     secret_store -->|5| cloud
-    secret_store -->|3| core
     secret_store -->|1| storage
     sessions -->|1| agent_memory
-    sessions -->|3| core
     sessions -->|1| storage
     storage -->|2| agent_memory
     storage -->|1| cloud
-    storage -->|2| core
     storage -->|1| kristall
     storage -->|1| runtime
     tool_providers -->|1| agent_runtime
     tool_providers -->|1| cloud
-    tool_providers -->|6| core
     tool_providers -->|1| kristall
     tool_providers -->|1| model_editor
     tool_providers -->|2| organization
     tool_providers -->|1| printing3d
     tool_providers -->|2| remote_runtime
     tool_providers -->|1| storage
-    workspace -->|3| core
+    workspace -->|1| core
     workspace -->|4| yandex_client_modules
     yandex_client_modules -->|1| agent_memory
-    yandex_client_modules -->|7| core
+    yandex_client_modules -->|4| core
     yandex_client_modules -->|2| economy
     yandex_client_modules -->|1| mcp_server
     yandex_client_modules -->|5| observability

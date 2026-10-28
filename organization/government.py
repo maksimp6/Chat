@@ -7,10 +7,10 @@ from typing import Any, Mapping, Optional
 from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
-from core.clock import unix_seconds
+import time
 from storage.db import get_store
 from economy.treasury_identity import get_current_owner_id, TreasuryIdentityError
-from tool_providers.schema import object_schema
+from organization._vendor.schema import object_schema
 
 government_bp = Blueprint("government", __name__, url_prefix="/api/government")
 
@@ -80,7 +80,7 @@ def _save(case: dict[str, Any]) -> dict[str, Any]:
         if int(current.get("revision") or 0) != read_revision:
             raise ValueError("government case was changed concurrently; retry")
         tx.set(
-            key, {**case, "revision": read_revision + 1, "updated_at": unix_seconds()}
+            key, {**case, "revision": read_revision + 1, "updated_at": int(time.time())}
         )
     return _require_case(case["case_id"])
 
@@ -92,7 +92,7 @@ def create_case(
     if case_type not in CASE_TYPES:
         raise ValueError("unsupported government case type")
     case_id = "gov-" + uuid4().hex[:16]
-    now = unix_seconds()
+    now = int(time.time())
     with get_store().transaction() as tx:
         tx.set(
             "government/case/" + case_id,
@@ -236,7 +236,7 @@ def approve_case(case_id: str) -> dict[str, Any]:
     if case["status"] != "READY_FOR_APPROVAL" or not case["documents"]:
         raise ValueError("case is not ready for approval")
     case["user_approved"] = True
-    case["approval_at"] = unix_seconds()
+    case["approval_at"] = int(time.time())
     return _save(case)
 
 
@@ -247,7 +247,7 @@ def submit_case(case_id: str) -> dict[str, Any]:
     if not case.get("user_approved"):
         raise PermissionError("explicit user approval is required before submission")
     case["status"] = "SUBMITTED"
-    case["submitted_at"] = unix_seconds()
+    case["submitted_at"] = int(time.time())
     return _save(case)
 
 
@@ -272,7 +272,7 @@ def process_response(case_id: str, response: Mapping[str, Any]) -> dict[str, Any
     case["responses"].append(
         {
             "response_id": "response-" + uuid4().hex[:12],
-            "received_at": unix_seconds(),
+            "received_at": int(time.time()),
             "data": dict(response),
         }
     )

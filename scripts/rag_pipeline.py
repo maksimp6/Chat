@@ -29,12 +29,11 @@ import urllib.request
 if __package__ in {None, ""}:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.env import env_get
 from scripts.retrieval_core import BM25Index as _BM25Index
 from scripts.retrieval_core import split_sentences as _split_sentences
 from scripts.retrieval_core import tokenize as _tokenize
 
-REPO = env_get("GITHUB_REPOSITORY", "maksimp6/Chat")
+REPO = os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat")
 API = f"https://api.github.com/repos/{REPO}"
 LABEL_SOURCE = "rag-source"
 LABEL_QUERY = "rag-query"
@@ -193,8 +192,8 @@ class BM25Index(_BM25Index):
 
 
 def yandex_embeddings(texts: list[str]) -> list[list[float]] | None:
-    key = env_get("YANDEX_API_KEY")
-    project = env_get("YANDEX_PROJECT_ID")
+    key = os.environ.get("YANDEX_API_KEY")
+    project = os.environ.get("YANDEX_PROJECT_ID")
     if not key or not project:
         return None
     out = []
@@ -278,7 +277,7 @@ def main() -> int:
     ap.add_argument("--dump-index")
     args = ap.parse_args()
 
-    token = env_get("GITHUB_TOKEN")
+    token = os.environ.get("GITHUB_TOKEN")
     corpus = fetch_corpus(token)
     units = build_units(corpus)
     idx = BM25Index(units)

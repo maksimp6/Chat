@@ -1,5 +1,5 @@
 from __future__ import annotations
-from core.env import env_get
+import os
 
 import json
 from typing import Any, Mapping, Optional
@@ -14,9 +14,9 @@ SUPPORTED_PROTOCOL_VERSIONS = {
 }
 DEFAULT_PROTOCOL_VERSION = "2026-07-28"
 SERVER_NAME = "Logos Pro"
-SERVER_VERSION = env_get("LOGOS_VERSION", "dev")
-OAUTH_SCOPE = env_get("LOGOS_MCP_OAUTH_SCOPE", "logos.read")
-PUBLIC_BASE_URL = env_get("LOGOS_MCP_PUBLIC_URL", "").rstrip("/")
+SERVER_VERSION = os.environ.get("LOGOS_VERSION", "dev")
+OAUTH_SCOPE = os.environ.get("LOGOS_MCP_OAUTH_SCOPE", "logos.read")
+PUBLIC_BASE_URL = os.environ.get("LOGOS_MCP_PUBLIC_URL", "").rstrip("/")
 
 
 def _sanitize_error_string(value: Any) -> str:

@@ -2,7 +2,6 @@
 """Build a compact deterministic Python AST index for AI agents."""
 
 from __future__ import annotations
-from core.env import env_snapshot
 
 import argparse
 import ast
@@ -25,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from repository_index.provenance import (
+from scripts.ai_index_provenance import (
     SCHEMA_VERSION,
     SNAPSHOT_SCHEMA_VERSION,
     snapshot_revision,
@@ -243,7 +242,7 @@ def _assemble_index(files: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _git(root: Path, *args: str, stdin: bytes | None = None) -> bytes:
-    env = env_snapshot()
+    env = dict(os.environ)
     for key in (
         "GIT_DIR",
         "GIT_WORK_TREE",

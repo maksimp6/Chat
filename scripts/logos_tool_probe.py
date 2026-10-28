@@ -1,6 +1,6 @@
 """Audit a filesystem subset; inventory the full native profile without invoking it."""
 
-from core.env import env_set
+import os
 
 import argparse
 import hashlib
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     ROOT = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(ROOT))
     fixture = Path(tempfile.mkdtemp(prefix="logos_probe_", dir=ROOT))
-    env_set("LOGOS_MEMORY_PATH", str(fixture / "audit.memory"))
+    os.environ["LOGOS_MEMORY_PATH"] = str(fixture / "audit.memory")
     backup_dir = ROOT / ".safe_backups"
     backup_existed = backup_dir.exists()
     server = None

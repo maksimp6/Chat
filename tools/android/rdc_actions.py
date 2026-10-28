@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Minimal Android control via an existing, authorized ADB connection."""
 
-from core.env import env_snapshot
+import os
 import argparse
 import json
 from pathlib import Path
@@ -24,7 +24,7 @@ ADB_ENV_NAMES = frozenset(
     }
 )
 ADB_ENV = {
-    name: value for name, value in env_snapshot().items() if name in ADB_ENV_NAMES
+    name: value for name, value in dict(os.environ).items() if name in ADB_ENV_NAMES
 }
 ADB_ENV.setdefault("TMPDIR", str(Path.home() / ".cache" / "tmp"))
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"

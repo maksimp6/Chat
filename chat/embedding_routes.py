@@ -10,7 +10,7 @@ import requests
 from flask import Blueprint, jsonify, request
 
 from core.config import Config, EMBEDDING_MODELS
-from core.env import env_get
+import os
 from economy.knowledge_economics import KnowledgeCostConfig, calculate_knowledge_cost
 from observability import system_log
 from observability.trace_manager import get_current_trace, traced_operation
@@ -116,7 +116,7 @@ def _embed_one(
 
 
 def _cost(tokens: int) -> dict:
-    price = env_get("EMBEDDING_PRICE_PER_1K_TOKENS")
+    price = os.environ.get("EMBEDDING_PRICE_PER_1K_TOKENS")
     try:
         per_1k_tokens = float(price) if price not in (None, "") else None
     except ValueError:

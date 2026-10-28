@@ -11,7 +11,6 @@ from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
 
-from core.clock import unix_time
 from storage.db import get_store
 
 local_agent_bp = Blueprint("local_agents", __name__, url_prefix="/api/local-agents")
@@ -116,7 +115,7 @@ def _timeout_job(tx, key: str, row):
             "status": "cancelled",
             "claim_token": None,
             "lease_until": None,
-            "completed_at": unix_time(),
+            "completed_at": time.time(),
             "result_json": _json(result),
             "error_json": _json(result["error"]),
         }
@@ -191,7 +190,7 @@ def enqueue_local_tool_job(
                 "trace_id": trace_id,
                 "invocation_id": invocation_id,
                 "status": "queued",
-                "created_at": unix_time(),
+                "created_at": time.time(),
                 "claimed_at": None,
                 "claim_token": None,
                 "attempt": 0,
@@ -216,7 +215,7 @@ def wait_for_local_tool_job(job_id: str, *, timeout_seconds: float = 30.0) -> An
             row = tx.get(key)
             if row is None:
                 raise LookupError("local_tool_job_not_found")
-            row = _expire_job(tx, key, row, unix_time())
+            row = _expire_job(tx, key, row, time.time())
             if time.monotonic() >= deadline:
                 row = _timeout_job(tx, key, row)
         if row["status"] in {"completed", "failed", "cancelled", "in_doubt"}:
@@ -240,7 +239,7 @@ def wait_for_local_tool_job(job_id: str, *, timeout_seconds: float = 30.0) -> An
 
 
 def _recover_expired_jobs(conn, agent_id: str) -> None:
-    now = unix_time()
+    now = time.time()
     for key in get_store().items(prefix="local-job/"):
         row = conn.get(key)
         if row is not None and row["agent_id"] == agent_id:
@@ -263,7 +262,7 @@ def register_local_agent():
         return jsonify({"error": "invalid_capabilities"}), 400
     capabilities = [str(item).strip() for item in capabilities if str(item).strip()]
 
-    now = unix_time()
+    now = time.time()
 
     key = "local-agent/" + agent_id
     with get_store().transaction() as tx:
@@ -308,7 +307,7 @@ def local_agent_heartbeat(agent_id: str):
         or not data.get("claim_token")
     ):
         return jsonify({"error": "job_id_and_claim_token_required"}), 400
-    now = unix_time()
+    now = time.time()
     key = "local-agent/" + agent_id
     try:
         with get_store().transaction() as tx:
@@ -352,7 +351,7 @@ def local_agent_poll(agent_id: str):
         with store.transaction() as tx:
             agent = _require_agent(agent_id)
             _recover_expired_jobs(tx, agent_id)
-            now = unix_time()
+            now = time.time()
             queued = []
             for key in store.items(prefix="local-job/"):
                 item = tx.get(key)
@@ -426,14 +425,14 @@ def local_agent_start(agent_id: str, job_id: str):
             row = tx.get(key)
             if row is None or row["agent_id"] != agent_id:
                 return jsonify({"error": "job_not_found"}), 404
-            row = _expire_job(tx, key, row, unix_time())
+            row = _expire_job(tx, key, row, time.time())
             if row.get("claim_token") != data["claim_token"] or row["status"] not in {
                 "claimed",
                 "running",
             }:
                 return jsonify({"error": "claim_not_active"}), 409
             if row["status"] == "claimed":
-                row = {**row, "status": "running", "started_at": unix_time()}
+                row = {**row, "status": "running", "started_at": time.time()}
                 tx.set(key, row)
     except LookupError:
         return jsonify({"error": "agent_not_found"}), 404
@@ -502,7 +501,7 @@ def local_agent_result(agent_id: str, job_id: str):
                     "status": status,
                     "result_json": _json(result),
                     "error_json": _json(result.get("error")),
-                    "completed_at": unix_time(),
+                    "completed_at": time.time(),
                     "lease_until": None,
                 },
             )
@@ -521,7 +520,7 @@ def local_agent_result(agent_id: str, job_id: str):
 
 @local_agent_bp.get("/health")
 def local_agent_health():
-    cutoff = unix_time() - 90
+    cutoff = time.time() - 90
     rows = sorted(
         get_store().items(prefix="local-agent/").values(), key=lambda row: row["id"]
     )

@@ -8,7 +8,7 @@ are mirrored into that trace as ``system_log`` events.
 """
 
 from __future__ import annotations
-from core.env import env_get
+import os
 
 import json
 import logging
@@ -30,7 +30,7 @@ _mirroring = threading.local()
 
 
 def log_dir() -> Path:
-    return Path(env_get("LOGOS_LOG_DIR", "logs"))
+    return Path(os.environ.get("LOGOS_LOG_DIR", "logs"))
 
 
 class TraceContextFilter(logging.Filter):
@@ -101,7 +101,7 @@ def configure(
     with _lock:
         if getattr(root, "_logos_configured", False):
             return root
-        resolved = level or env_get("LOGOS_LOG_LEVEL", "INFO")
+        resolved = level or os.environ.get("LOGOS_LOG_LEVEL", "INFO")
         root.setLevel(resolved)
         root.propagate = False
         formatter = JsonFormatter()

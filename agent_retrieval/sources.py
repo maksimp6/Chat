@@ -8,7 +8,7 @@ from typing import Any, Iterable, Protocol
 
 from agent_memory import AgentMemoryStore
 
-from .models import RetrievalDocument, RetrievalQuery
+from .legacy_models import RetrievalDocument, RetrievalQuery
 
 
 @dataclass(frozen=True)

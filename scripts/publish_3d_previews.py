@@ -5,7 +5,7 @@ Only same-repository changed 3D blobs under printing3d/models/ are eligible.
 """
 
 from __future__ import annotations
-from core.env import env_get
+import os
 
 import argparse
 import base64
@@ -519,7 +519,7 @@ def main() -> int:
     )
     options = parser.parse_args()
     try:
-        api = Github(options.repo, env_get("GH_TOKEN", ""))
+        api = Github(options.repo, os.environ.get("GH_TOKEN", ""))
         if options.scan_open:
             result = scan_open_prs(api)
         else:

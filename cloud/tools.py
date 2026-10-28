@@ -9,7 +9,7 @@ from economy.budget_controller import BudgetLimitExceeded, CloudBudgetGuard
 from cloud.base import CloudProviderError
 from cloud.registry import ensure_default_providers, resolve_provider_name
 from tool_providers.runtime_tools import ssh_runtime_exec
-from tool_providers.schema import object_schema
+from cloud._vendor.schema import object_schema
 from observability.trace_manager import get_current_trace
 
 

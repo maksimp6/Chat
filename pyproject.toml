@@ -76,7 +76,9 @@ printing3d = { packages = ["printing3d", "forge"], forbid = [["printing3d", "for
     "scripts/repository_corpus_git.py", "scripts/repository_corpus_github.py",
     "scripts/repository_rag.py", "scripts/repository_rag_resume.py",
     "scripts/repository_rag_verify.py", "scripts/logos_dialogue.py", "scripts/logos_quality.py",
-    "scripts/logos_tool_probe.py", "scripts/logos_once.py",
+    "scripts/logos_tool_probe.py", "scripts/logos_once.py", "scripts/logos_launch_hold.py",
+    "scripts/logos_generation_gate.py", "scripts/logos_provider_receipt.py",
+    "scripts/logos_responses_tool_loop.py",
 ] }
 "tools.redmi-evidence" = { flat = true, files = [
     "scripts/logos_tools_self_check.py", "scripts/recheck_logos_tools_self_check.py",
@@ -90,12 +92,108 @@ printing3d = { packages = ["printing3d", "forge"], forbid = [["printing3d", "for
     "scripts/logos_redmi9_stand_slice.py", "scripts/yorik_slice.py",
 ] }
 "tools.lexical" = { files = ["scripts/lexical_pipeline.py", "scripts/lexical_work.py", "scripts/idea_parser.py"] }
-"tools.pr-court" = { files = ["scripts/pr_court.py", "scripts/pr_court_evidence.py"] }
+"tools.pr-court" = { files = ["scripts/pr_court.py", "scripts/pr_court_evidence.py", "scripts/pr_court_launch_hold.py"] }
 "tools.render-3d" = { files = ["scripts/render_3d_preview.py", "scripts/render_3d_worker.py", "scripts/publish_3d_previews.py"] }
 "tools.q14" = { files = ["scripts/q14_ai_review.py", "scripts/q14_simulation.py", "scripts/q14_observer.py"] }
 "tools.vision" = { files = [
     "scripts/vision_loopback.py", "scripts/vision_perturbations.py", "scripts/vision_shapes.py",
     "scripts/visual_object_benchmark.py", "scripts/visual_object_contract.py",
 ] }
+"tools.narration" = { files = ["scripts/logos_narration.py", "scripts/narration_trace_security.py"] }
+"tools.ai-index" = { files = ["scripts/build_ai_index.py", "scripts/ai_index_provenance.py"] }
 "tools.device-rdc" = { flat = true, dirs = ["tools/device/rdc"] }
 "tools.android" = { flat = true, dirs = ["tools/android"] }
+
+# Pure, stateless helpers copied into the units that use them, so no unit imports
+# another. scripts/check_independence.py --sync-vendored regenerates the copies and
+# the V counter fails if a copy differs from its canonical file.
+[[tool.logos.vendored]]
+canonical = "core/restrictions.py"
+copies = [
+    "economy/_vendor/restrictions.py",
+    "tool_providers/_vendor/restrictions.py",
+    "provider_accounts/_vendor/restrictions.py",
+    "remote_runtime/_vendor/restrictions.py",
+]
+
+[[tool.logos.vendored]]
+canonical = "core/wikifunctions.py"
+copies = [
+    "agent_skills/_vendor/wikifunctions.py",
+    "cloud/_vendor/wikifunctions.py",
+    "sessions/_vendor/wikifunctions.py",
+    "tool_providers/_vendor/wikifunctions.py",
+    "yandex_client_modules/_vendor/wikifunctions.py",
+]
+
+[[tool.logos.vendored]]
+canonical = "core/output.py"
+copies = [
+    "remote_runtime/_vendor/output.py",
+    "tool_providers/_vendor/output.py",
+]
+
+[[tool.logos.vendored]]
+canonical = "observability/trace_security.py"
+copies = [
+    "agent_context/_vendor/trace_security.py",
+    "agent_memory/_vendor/trace_security.py",
+    "agent_retrieval/_vendor/trace_security.py",
+    "cloud/_vendor/trace_security.py",
+    "scripts/narration_trace_security.py",
+]
+
+[[tool.logos.vendored]]
+canonical = "kristall/value_validation.py"
+copies = [
+    "memory_engine/_vendor/value_validation.py",
+]
+
+[[tool.logos.vendored]]
+canonical = "repository_index/provenance.py"
+copies = [
+    "agent_retrieval/_vendor/provenance.py",
+    "scripts/ai_index_provenance.py",
+]
+
+[[tool.logos.vendored]]
+canonical = "agent_runtime/logos_launch_hold.py"
+copies = [
+    "scripts/logos_launch_hold.py",
+    "scripts/pr_court_launch_hold.py",
+]
+
+[[tool.logos.vendored]]
+canonical = "agent_runtime/generation_gate.py"
+copies = [
+    "scripts/logos_generation_gate.py",
+]
+
+[[tool.logos.vendored]]
+canonical = "agent_runtime/provider_receipt.py"
+copies = [
+    "chat/_vendor/provider_receipt.py",
+    "scripts/logos_provider_receipt.py",
+]
+
+[[tool.logos.vendored]]
+canonical = "agent_runtime/responses_tool_loop.py"
+copies = [
+    "chat/_vendor/responses_tool_loop.py",
+    "scripts/logos_responses_tool_loop.py",
+]
+
+[[tool.logos.vendored]]
+canonical = "agent_runtime/partial_output.py"
+copies = [
+    "chat/_vendor/partial_output.py",
+]
+
+[[tool.logos.vendored]]
+canonical = "tool_providers/schema.py"
+copies = [
+    "cloud/_vendor/schema.py",
+    "forge/_vendor/schema.py",
+    "model_editor/_vendor/schema.py",
+    "organization/_vendor/schema.py",
+]

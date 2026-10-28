@@ -11,7 +11,7 @@ from typing import Any, Mapping
 
 from agent_context import CacheLookup
 from agent_memory import AgentMemoryStore, MemoryRecord
-from repository_index.provenance import snapshot_revision
+from agent_retrieval._vendor.provenance import snapshot_revision
 
 from agent_retrieval.models import RetrievalBundle, RetrievalHit, RetrievalQuery
 

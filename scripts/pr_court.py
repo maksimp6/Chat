@@ -14,12 +14,12 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from agent_runtime.logos_launch_hold import (
+from scripts.pr_court_launch_hold import (
     NativeLogosLaunchBlocked,
     enforce_native_launch_hold,
     hold_receipt,
 )
-from core.env import env_get, env_require
+import os
 from scripts.pr_court_evidence import validate_judgment
 
 API = "https://api.github.com"
@@ -382,11 +382,11 @@ def main() -> int:
     provider_pending = False
     exit_code = 1
     try:
-        event = json.loads(Path(env_require("GITHUB_EVENT_PATH")).read_text())
-        repo = env_require("GITHUB_REPOSITORY")
+        event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
+        repo = os.environ["GITHUB_REPOSITORY"]
         sha = event["pull_request"]["head"]["sha"]
         number = event["number"]
-        token = env_require("GH_TOKEN")
+        token = os.environ["GH_TOKEN"]
         secrets = (token,)
         endpoint = f"{API}/repos/{repo}"
         pr_url = f"{endpoint}/pulls/{number}"
@@ -426,8 +426,8 @@ def main() -> int:
         # Offline collection remains useful. Neither old rules nor an existing
         # PR/credential are a new authorization to bypass the unconditional D0.
         enforce_native_launch_hold()
-        key = env_require("YANDEX_API_KEY").strip()
-        project = env_require("YANDEX_PROJECT_ID").strip()
+        key = os.environ["YANDEX_API_KEY"].strip()
+        project = os.environ["YANDEX_PROJECT_ID"].strip()
         secrets += (key, project)
         if not key or not project:
             raise ValueError("YANDEX_API_KEY or YANDEX_PROJECT_ID is missing")
@@ -504,7 +504,7 @@ def main() -> int:
                 "pr": number,
                 "head": sha,
                 "develop_head": base,
-                "run_id": env_require("GITHUB_RUN_ID"),
+                "run_id": os.environ["GITHUB_RUN_ID"],
                 "response_id": response["id"],
                 "model": "yandexgpt-lite/latest",
                 "evidence_sha256": hashlib.sha256(evidence.encode()).hexdigest(),
@@ -526,7 +526,7 @@ def main() -> int:
             "Пустой findings не является доказательством отсутствия ошибок.\n"
         )
         (output / "report.md").write_text(markdown, encoding="utf-8")
-        summary_path = env_get("GITHUB_STEP_SUMMARY")
+        summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
         if summary_path:
             with open(summary_path, "a", encoding="utf-8") as summary:
                 summary.write(markdown)

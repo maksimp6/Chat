@@ -7,7 +7,6 @@ contract through its deployment workflow.
 """
 
 from __future__ import annotations
-from core.env import env_get
 
 import functools
 import logging
@@ -20,7 +19,6 @@ import uuid
 from pathlib import Path
 from typing import Any, Optional
 
-from core.clock import unix_seconds
 from storage.db import get_store, init_db as init_runtime_db
 from invocation.context import InvocationContext
 from invocation.trace import create_invocation_trace
@@ -60,7 +58,7 @@ _RUNTIME_DISPATCHER.register_operation("revision.invoke", _invoke_revision_runti
 
 
 def _repo_root() -> Path:
-    return Path(env_get("LOGOS_ENV_REPO_ROOT") or os.getcwd()).resolve()
+    return Path(os.environ.get("LOGOS_ENV_REPO_ROOT") or os.getcwd()).resolve()
 
 
 logger = logging.getLogger("remote_runtime.environments")
@@ -142,8 +140,8 @@ def init_environment_tables() -> None:
                         "status": "STOPPED",
                         "runtime_pid": None,
                         "runtime_port": None,
-                        "updated_at": unix_seconds(),
-                        "stopped_at": row["stopped_at"] or unix_seconds(),
+                        "updated_at": int(time.time()),
+                        "stopped_at": row["stopped_at"] or int(time.time()),
                     },
                 )
 
@@ -179,7 +177,7 @@ def _require(environment_id: str, owner_id: Optional[str] = None) -> dict[str, A
 
 
 def _public_url(environment_id: str) -> str:
-    base = env_get("LOGOS_ENV_PUBLIC_BASE_URL", "").rstrip("/")
+    base = os.environ.get("LOGOS_ENV_PUBLIC_BASE_URL", "").rstrip("/")
     if base:
         return f"{base}/environments/{environment_id}/"
     return f"/environments/{environment_id}/"
@@ -239,7 +237,7 @@ def _record_trace(
                 "status": status,
                 "trace_id": trace.trace_id,
                 "trace_json": trace_json,
-                "created_at": unix_seconds(),
+                "created_at": int(time.time()),
             },
         )
     return trace_json
@@ -308,7 +306,7 @@ class EnvironmentRuntime:
         self.environment = environment
         self.runtime_id = environment["environment_id"]
         self.root = Path(
-            env_get("LOGOS_ENV_RUNTIME_ROOT") or ".logos-environments"
+            os.environ.get("LOGOS_ENV_RUNTIME_ROOT") or ".logos-environments"
         ).resolve()
         self.worktree = self.root / self.runtime_id / "source"
         self.data_dir = self.root / self.runtime_id / "data"
@@ -633,8 +631,8 @@ def create_environment(
         "runtime_port": None,
         "data_namespace": _namespace(environment_id),
         "owner_id": owner_id,
-        "created_at": unix_seconds(),
-        "updated_at": unix_seconds(),
+        "created_at": int(time.time()),
+        "updated_at": int(time.time()),
         "started_at": None,
         "stopped_at": None,
         "deleted_at": None,
@@ -693,7 +691,7 @@ def start_environment(
                 "status": "RUNNING",
                 "runtime_pid": None,
                 "runtime_port": None,
-                "started_at": unix_seconds(),
+                "started_at": int(time.time()),
                 "error": None,
             },
         )
@@ -703,7 +701,7 @@ def start_environment(
                 "runtime_pid": None,
                 "runtime_port": None,
                 "runtime_thread_id": thread_id,
-                "started_at": unix_seconds(),
+                "started_at": int(time.time()),
                 "error": None,
             }
         )
@@ -748,7 +746,7 @@ def stop_environment(
             "status": "STOPPED",
             "runtime_pid": None,
             "runtime_port": None,
-            "stopped_at": unix_seconds(),
+            "stopped_at": int(time.time()),
         },
     )
     item.update(
@@ -757,7 +755,7 @@ def stop_environment(
             "runtime_pid": None,
             "runtime_port": None,
             "runtime_thread_id": None,
-            "stopped_at": unix_seconds(),
+            "stopped_at": int(time.time()),
         }
     )
     _record_trace(item, "STOP_ENVIRONMENT", "SUCCESS", context=context)
@@ -789,7 +787,7 @@ def delete_environment(
     elif runtime is not None:
         runtime.stop()
     _transition(item["status"], "DELETING")
-    item.update({"status": "DELETING", "deleted_at": unix_seconds()})
+    item.update({"status": "DELETING", "deleted_at": int(time.time())})
     _record_trace(item, "DELETE_ENVIRONMENT", "SUCCESS", context=context)
     # The record goes first: if the files were removed and the record then survived, the record
     # would claim an environment whose source and data are gone.
@@ -805,4 +803,4 @@ def _persist_environment(environment_id: str, changes: dict[str, Any]) -> None:
         old = tx.get(key)
         if old is None:
             raise KeyError("environment_not_found")
-        tx.set(key, {**old, **changes, "updated_at": unix_seconds()})
+        tx.set(key, {**old, **changes, "updated_at": int(time.time())})

@@ -6,7 +6,6 @@ a store, deletes an old snapshot, or starts a model generation.
 """
 
 from __future__ import annotations
-from core.env import env_get
 
 import argparse
 import fcntl
@@ -208,8 +207,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         result = prepare_knowledge(
             args.context_file,
-            project=env_get("YANDEX_PROJECT_ID", ""),
-            key=env_get("YANDEX_API_KEY", ""),
+            project=os.environ.get("YANDEX_PROJECT_ID", ""),
+            key=os.environ.get("YANDEX_API_KEY", ""),
             store_id=args.store_id,
             cache_owner=args.cache_owner,
             cache_access_scope=args.cache_access_scope,

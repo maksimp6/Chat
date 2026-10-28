@@ -52,12 +52,12 @@ from storage.db import (
     get_conversation_title,
     normalize_conversation_title,
 )
-from agent_runtime.partial_output import (
+from chat._vendor.partial_output import (
     extract_last_response_text,
     format_partial_output_message,
 )
-from agent_runtime.provider_receipt import capture_provider_diagnostics
-from agent_runtime.responses_tool_loop import run_tool_loop, extract_function_calls
+from chat._vendor.provider_receipt import capture_provider_diagnostics
+from chat._vendor.responses_tool_loop import run_tool_loop, extract_function_calls
 from economy.billing import (
     aggregate_billing,
     build_ai_billing_item,

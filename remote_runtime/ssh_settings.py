@@ -6,7 +6,7 @@ reference to an existing key file.
 """
 
 from __future__ import annotations
-from core.env import env_get
+import os
 
 import copy
 import json
@@ -17,7 +17,7 @@ import time
 from typing import Any, Mapping
 
 from storage.db import get_config, set_config
-from core.restrictions import restrictions_lifted
+from remote_runtime._vendor.restrictions import restrictions_lifted
 from remote_runtime.ssh import SSHRuntime, SSHRuntimeError
 from observability.trace_manager import get_current_trace
 
@@ -45,7 +45,7 @@ _DEFAULTS = {
 
 
 def _env_bootstrap() -> dict[str, Any]:
-    raw = env_get("LOGOS_SSH_TARGETS_JSON", "").strip()
+    raw = os.environ.get("LOGOS_SSH_TARGETS_JSON", "").strip()
     targets: dict[str, Any] = {}
     if raw:
         try:
@@ -62,7 +62,7 @@ def _env_bootstrap() -> dict[str, Any]:
         # The environment carries no command allowlist, so command execution stays off until one
         # is configured. Without this, the settings could never be read.
         "allow_command_execution": False,
-        "known_hosts": env_get("LOGOS_SSH_KNOWN_HOSTS") or None,
+        "known_hosts": os.environ.get("LOGOS_SSH_KNOWN_HOSTS") or None,
         "targets": targets,
     }
 

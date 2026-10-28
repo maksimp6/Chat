@@ -10,7 +10,7 @@ The script fails with a clear message when the parser is not in the checkout.
 """
 
 from __future__ import annotations
-from core.env import env_get, env_require
+import os
 
 import json
 import subprocess
@@ -20,14 +20,14 @@ import urllib.request
 from pathlib import Path
 
 API = "https://api.github.com"
-REPO = env_get("GITHUB_REPOSITORY", "maksimp6/Chat")
+REPO = os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat")
 LABEL = "lexical-input"
 PARSER = Path("scripts/idea_parser.py")
 
 
 def gh(method: str, path: str, body: object | None = None) -> object:
     """Call the GitHub API with the workflow token."""
-    token = env_require("GH_TOKEN")
+    token = os.environ["GH_TOKEN"]
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(
         f"{API}/repos/{REPO}/{path}",
@@ -119,8 +119,8 @@ def already_processed(number: int) -> bool:
 
 def main() -> int:
     """Entry point: iterate labeled issues, parse, comment, upload artifacts."""
-    explicit = env_get("ISSUE_INPUT", "")
-    source = env_get("SOURCE_URL", "")
+    explicit = os.environ.get("ISSUE_INPUT", "")
+    source = os.environ.get("SOURCE_URL", "")
     if not PARSER.exists():
         print(f"BLOCKER: {PARSER} not in checkout; merge PR #1406 first.")
         return 2

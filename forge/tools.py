@@ -1,7 +1,6 @@
 """Universal local tools for the Logos 3D-printing business domain."""
 
 from __future__ import annotations
-from core.env import env_get
 
 import hashlib
 import os
@@ -14,7 +13,7 @@ from economy.treasury_identity import get_current_owner_id
 from forge.binding import printing_store as _store
 from printing3d import finance, service
 from printing3d.plate import MAX_FILE_BYTES, inspect_archive
-from tool_providers.schema import object_schema
+from forge._vendor.schema import object_schema
 
 QUOTE_REQUIRED_FIELDS = ("material_grams", "material_cost_per_kg", "print_hours")
 QUOTE_OPTIONAL_FIELDS = (
@@ -44,7 +43,7 @@ def plate_inspect(
     name = arguments.get("artifact_name")
     if type(name) is not str or not PRINT_ARTIFACT_NAME.fullmatch(name):
         raise ValueError("artifact_name must be one plain .3mf or .gcode.3mf filename")
-    root = env_get("LOGOS_3D_ARTIFACT_ROOT")
+    root = os.environ.get("LOGOS_3D_ARTIFACT_ROOT")
     if not root:
         return {
             "status": "needs_configuration",

@@ -1,7 +1,7 @@
 """Provider credential configuration and health-check API."""
 
 from __future__ import annotations
-from core.env import env_get
+import os
 
 from datetime import datetime, timedelta, timezone
 import logging
@@ -79,7 +79,7 @@ CLOUDRU_DEFAULT_TTL = timedelta(days=1)
 
 def _cloudru_ttl() -> timedelta:
     try:
-        days = int(env_get("CLOUDRU_KEY_TTL_DAYS", "1"))
+        days = int(os.environ.get("CLOUDRU_KEY_TTL_DAYS", "1"))
     except ValueError as exc:
         raise ValueError("CLOUDRU_KEY_TTL_DAYS must be an integer") from exc
     if not 1 <= days <= 365:

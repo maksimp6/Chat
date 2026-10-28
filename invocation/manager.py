@@ -10,7 +10,7 @@ import json
 from typing import Any, Optional
 
 from agent_memory.client import get_memory_client
-from core.clock import unix_seconds
+import time
 from storage.db import memory_file_path
 from invocation.context import InvocationContext
 from sessions.manager import create_session, restore_session
@@ -113,7 +113,7 @@ def create_invocation(
 
     invocation_id = str(uuid.uuid4())
     trace_id = str(uuid.uuid4())
-    now = unix_seconds()
+    now = int(time.time())
     persisted_metadata = _sanitize_metadata(metadata or {})
     resolved_user_id = (
         str(user_id).strip() if user_id is not None and str(user_id).strip() else None
@@ -154,7 +154,7 @@ def start_invocation(invocation_id: str) -> bool:
         if record is None or record["status"] != "created":
             return False
         record["status"] = "running"
-        record["started_at"] = unix_seconds()
+        record["started_at"] = int(time.time())
         tx.set(key, record)
         return True
 
@@ -255,7 +255,7 @@ def _publish_invocation_values(
                 ):
                     if status is not None:
                         record["status"] = status
-                        record["completed_at"] = unix_seconds()
+                        record["completed_at"] = int(time.time())
                     for field, value in prepared.items():
                         _assign_value(record, field, value)
                     tx.set(key, record)

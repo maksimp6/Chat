@@ -1,8 +1,7 @@
 """Universal tool definitions backed by the SSH Runtime."""
 
 from __future__ import annotations
-from core.env import env_require, env_snapshot
-from core.output import limit_output
+from tool_providers._vendor.output import limit_output
 
 import math
 import os
@@ -82,7 +81,9 @@ _COMMAND_ENV_NAMES = (
 def _command_environment() -> dict[str, str]:
     """Only what a shell needs. The backend's own environment holds provider and deployment secrets."""
     return {
-        name: env_require(name) for name in _COMMAND_ENV_NAMES if name in env_snapshot()
+        name: os.environ[name]
+        for name in _COMMAND_ENV_NAMES
+        if name in dict(os.environ)
     }
 
 

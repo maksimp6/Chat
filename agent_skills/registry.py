@@ -10,7 +10,7 @@ from typing import Any, Iterable, Optional
 
 import yaml
 
-from core.wikifunctions import unique_strings
+from agent_skills._vendor.wikifunctions import unique_strings
 
 
 DEFAULT_SKILL_ROOT = Path(__file__).resolve().parents[1] / ".agents" / "skills"

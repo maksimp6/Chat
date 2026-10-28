@@ -5,7 +5,7 @@ It reuses the pinned Bambu Studio profiles from the already proven cube lane.
 """
 
 from __future__ import annotations
-from core.env import env_snapshot
+import os
 
 import argparse
 import hashlib
@@ -234,7 +234,7 @@ def main() -> int:
     process.write_text(json.dumps(proc, indent=2) + "\n", encoding="utf-8")
     mesh_stl = out / "Logos_BagClip_PR1113_three_print_islands.stl"
     face_count = merge_plate_stl(source, mesh_stl)
-    env = dict(env_snapshot())
+    env = dict(os.environ)
     env.update(LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))
     command = [
         str(executable),

@@ -7,7 +7,7 @@ cloud/cloudru/api_key_provider.py.
 """
 
 from __future__ import annotations
-from core.env import env_get
+import os
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
@@ -37,10 +37,11 @@ class CloudRuIamClient:
         timeout: float = 20.0,
     ) -> None:
         self.endpoint = (
-            endpoint or env_get("CLOUDRU_IAM_ENDPOINT", "https://iam.api.cloud.ru")
+            endpoint
+            or os.environ.get("CLOUDRU_IAM_ENDPOINT", "https://iam.api.cloud.ru")
         ).rstrip("/")
-        self.key_id = key_id or env_get("CLOUDRU_IAM_KEY_ID")
-        self.key_secret = key_secret or env_get("CLOUDRU_IAM_KEY_SECRET")
+        self.key_id = key_id or os.environ.get("CLOUDRU_IAM_KEY_ID")
+        self.key_secret = key_secret or os.environ.get("CLOUDRU_IAM_KEY_SECRET")
         self.timeout = timeout
         self._access_token: Optional[str] = None
         self._access_token_expires_at: Optional[datetime] = None

@@ -9,7 +9,7 @@ old resource must not be revoked after a successful reissue.
 """
 
 from __future__ import annotations
-from core.env import env_get
+import os
 
 import time
 from datetime import datetime
@@ -31,9 +31,8 @@ class CloudRuApiKeyProvider:
     ) -> None:
         self.base_url = (
             base_url
-            or env_get(
-                "CLOUDRU_BASE_URL",
-                "https://foundation-models.api.cloud.ru/v1",
+            or os.environ.get(
+                "CLOUDRU_BASE_URL", "https://foundation-models.api.cloud.ru/v1"
             )
         ).rstrip("/")
         self.iam_client = iam_client

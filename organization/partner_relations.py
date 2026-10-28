@@ -15,10 +15,10 @@ from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
 
-from core.clock import unix_seconds
+import time
 from storage.db import get_store
 from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
-from tool_providers.schema import object_schema
+from organization._vendor.schema import object_schema
 
 
 partner_relations_bp = Blueprint(
@@ -118,7 +118,7 @@ def create_partner(
     metadata = dict(arguments.get("metadata") or {})
     if len(_json(metadata)) > _MAX_METADATA_CHARS:
         raise ValueError("metadata is too large")
-    now = unix_seconds()
+    now = int(time.time())
 
     init_partner_relations_tables()
     _insert_owned(
@@ -205,7 +205,7 @@ def delete_partner(
         raise ValueError("partner_id is required")
     if not _get_partner(owner_id, partner_id):
         raise ValueError("partner not found")
-    now = unix_seconds()
+    now = int(time.time())
     _update_owned(
         "partner", partner_id, owner_id, {"status": "archived", "updated_at": now}
     )
@@ -248,7 +248,7 @@ def update_partner(
             arguments["status"], PARTNER_STATUSES, "partner status"
         )
     status = changes.get("status", existing["status"])
-    now = unix_seconds()
+    now = int(time.time())
     _update_owned("partner", partner_id, owner_id, {**changes, "updated_at": now})
     _trace_event(
         cfg,
@@ -274,7 +274,7 @@ def add_contact(
     if not _get_partner(owner_id, partner_id):
         raise ValueError("partner not found")
     contact_id = str(arguments.get("id") or uuid4())
-    now = unix_seconds()
+    now = int(time.time())
     _insert_owned(
         "contact",
         contact_id,
@@ -334,7 +334,7 @@ def update_contact(
     existing = _contact_for_owner(owner_id, contact_id)
     if not existing:
         raise ValueError("contact not found")
-    now = unix_seconds()
+    now = int(time.time())
     # A partial update changes only the fields it names; an empty value clears that field.
     changes = {
         field: str(arguments[field] or "").strip()
@@ -410,7 +410,7 @@ def prepare_message(
     )
     message_id = str(arguments.get("message_id") or uuid4())
     status = "prepared" if direction == "outgoing" else "recorded"
-    now = unix_seconds()
+    now = int(time.time())
     _insert_owned(
         "message",
         message_id,
@@ -463,7 +463,7 @@ def queue_message(
         raise ValueError("message not found")
     if message["direction"] != "outgoing":
         raise ValueError("only outgoing messages can be queued")
-    now = unix_seconds()
+    now = int(time.time())
     changed = _update_owned(
         "message",
         message_id,
@@ -522,7 +522,7 @@ def update_status(
         "partner",
         partner_id,
         owner_id,
-        {"status": status, "updated_at": unix_seconds()},
+        {"status": status, "updated_at": int(time.time())},
     )
     _trace_event(
         cfg,
@@ -550,7 +550,7 @@ def create_followup(
     followup_id = str(arguments.get("id") or uuid4())
     due_at = arguments.get("due_at")
     due_value = int(due_at) if due_at not in (None, "") else None
-    now = unix_seconds()
+    now = int(time.time())
     _insert_owned(
         "followup",
         followup_id,
@@ -598,7 +598,7 @@ def complete_followup(
     status = _validate_status(
         arguments.get("status") or "completed", FOLLOWUP_STATUSES, "follow-up status"
     )
-    now = unix_seconds()
+    now = int(time.time())
     _update_owned(
         "followup", followup_id, owner_id, {"status": status, "updated_at": now}
     )

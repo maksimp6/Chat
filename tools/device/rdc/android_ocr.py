@@ -1,17 +1,17 @@
 #!/data/data/com.termux/files/usr/bin/python
 """Read-only local OCR for RDC Android screenshots. No automated taps."""
-from core.env import env_snapshot
 
 import argparse
 import csv
 import io
 import json
+import os
 from pathlib import Path
 import re
 import struct
 import subprocess
 
-ENV = dict(env_snapshot(), TMPDIR="/data/data/com.termux/files/usr/tmp")
+ENV = dict(os.environ, TMPDIR="/data/data/com.termux/files/usr/tmp")
 DEFAULT_IMAGE = Path.home() / ".logos-rdc/screenshots/latest.jpg"
 
 

@@ -1,13 +1,11 @@
 """Functional project tree API with safe, bounded filesystem traversal."""
 
-from core.env import env_get
-
 import os
 from flask import Blueprint, jsonify
 
 project_tree_bp = Blueprint("project_tree", __name__)
 PROJECT_ROOT = os.path.realpath(
-    env_get(
+    os.environ.get(
         "LOGOS_PROJECT_ROOT",
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     )

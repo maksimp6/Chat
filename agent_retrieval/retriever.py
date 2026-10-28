@@ -8,7 +8,12 @@ import math
 import re
 from typing import Any, Iterable
 
-from .models import RetrievalDocument, RetrievalHit, RetrievalQuery, RetrievalResult
+from .legacy_models import (
+    RetrievalDocument,
+    RetrievalHit,
+    RetrievalQuery,
+    RetrievalResult,
+)
 from .sources import RetrievalSource
 
 

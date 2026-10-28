@@ -1,7 +1,7 @@
 """Local HTTP API for Logos Board without a sign-in requirement."""
 
 from __future__ import annotations
-from core.env import env_get
+import os
 
 import json
 import re
@@ -215,10 +215,10 @@ def create_server(
 
 def main() -> None:
     """Start the local board using its configured persistent data root."""
-    path = env_get("PROJECT_BOARD_DB", "")
+    path = os.environ.get("PROJECT_BOARD_DB", "")
     if not path:
         raise SystemExit("PROJECT_BOARD_DB is required")
-    port = int(env_get("PROJECT_BOARD_PORT", "8787"))
+    port = int(os.environ.get("PROJECT_BOARD_PORT", "8787"))
     with BoardStore(path) as store:
         server = create_server(store, port=port)
         try:

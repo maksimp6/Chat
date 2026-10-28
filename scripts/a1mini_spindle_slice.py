@@ -1,6 +1,6 @@
 """Slice hash-pinned OEM spindle source plate for A1 mini PLA fit prototype only."""
 
-from core.env import env_snapshot
+import os
 
 import argparse
 import hashlib
@@ -162,7 +162,7 @@ def main():
         support_on_build_plate_only="0",
     )
     process.write_text(json.dumps(p, indent=2) + "\n")
-    env = dict(env_snapshot(), LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))
+    env = dict(os.environ, LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))
     command = [
         str(binary),
         "--slice",

@@ -6,7 +6,6 @@ never returned by metadata/list operations.
 """
 
 from __future__ import annotations
-from core.env import env_get
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -16,7 +15,6 @@ from typing import Any, Optional
 from cryptography.fernet import Fernet, InvalidToken
 
 from secret_store.credential_crypto import fingerprint_key
-from core.clock import utc_now
 from storage.db import get_store
 
 DatabaseRow = dict[str, Any]
@@ -59,8 +57,8 @@ def _iso(value: datetime) -> str:
 
 def _manager_key() -> bytes:
     raw = (
-        env_get("LOGOS_KEY_MANAGER_KEY")
-        or env_get("LOGOS_PROVIDER_CREDENTIAL_KEY")
+        os.environ.get("LOGOS_KEY_MANAGER_KEY")
+        or os.environ.get("LOGOS_PROVIDER_CREDENTIAL_KEY")
         or ""
     ).strip()
     if not raw:
@@ -115,7 +113,7 @@ def _check_active(row: DatabaseRow) -> None:
     expires_at = row["expires_at"]
     if expires_at:
         expires = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
-        if utc_now() >= expires:
+        if datetime.now(timezone.utc) >= expires:
             raise KeyExpiredError(f"Key '{row['key_ref']}' is expired")
 
 
@@ -144,7 +142,7 @@ def store_secret(
 
     _ensure_schema()
     ref = key_ref or f"key_{os.urandom(16).hex()}"
-    created_at = _iso(utc_now())
+    created_at = _iso(datetime.now(timezone.utc))
     expires_value = _iso(expires_at) if expires_at else None
     encrypted = _fernet().encrypt(secret.encode("utf-8")).decode("ascii")
 
@@ -215,7 +213,14 @@ def revoke_key(key_ref: str) -> None:
         if row is None:
             raise KeyNotFoundError("Managed key not found")
         if row["status"] != "revoked":
-            tx.set(key, {**row, "status": "revoked", "revoked_at": _iso(utc_now())})
+            tx.set(
+                key,
+                {
+                    **row,
+                    "status": "revoked",
+                    "revoked_at": _iso(datetime.now(timezone.utc)),
+                },
+            )
 
 
 def delete_key(key_ref: str) -> None:

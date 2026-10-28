@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 from urllib.parse import urlencode
 
-from observability.trace_security import sanitize_trace_value
+from scripts.narration_trace_security import sanitize_trace_value
 
 TTS_URL = "https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize"
 MAX_CHARS = 2500

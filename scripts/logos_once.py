@@ -5,7 +5,7 @@ change a model profile, or retry a failed command or provider request.
 """
 
 from __future__ import annotations
-from core.env import env_get, env_require, env_snapshot
+import os
 
 import base64
 import hashlib
@@ -73,8 +73,8 @@ def run_native(
             raise ValueError("A question and positive case IDs are required")
 
         phase = "admission"
-        from agent_runtime.generation_gate import generation_allowed
-        from agent_runtime.logos_launch_hold import (
+        from scripts.logos_generation_gate import generation_allowed
+        from scripts.logos_launch_hold import (
             NativeLogosLaunchBlocked,
             enforce_native_launch_hold,
             hold_receipt,
@@ -271,9 +271,9 @@ def emit_result(
 def main() -> int:
     # Direct script invocation must import the checked-out repository, not the scripts directory.
     sys.path.insert(0, str(ROOT))
-    temporary = Path(env_require("RUNNER_TEMP")) / "logos-once"
-    result, exit_code = run_native(ROOT, temporary, dict(env_snapshot()))
-    summary = env_get("GITHUB_STEP_SUMMARY")
+    temporary = Path(os.environ["RUNNER_TEMP"]) / "logos-once"
+    result, exit_code = run_native(ROOT, temporary, dict(os.environ))
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
     emit_result(result, Path(summary) if summary else None)
     return exit_code
 

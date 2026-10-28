@@ -1,7 +1,7 @@
 """Bounded read-only model inspection of immutable PR evidence, not a verdict oracle."""
 
 from __future__ import annotations
-from core.env import env_require
+import os
 
 import hashlib
 import http.client
@@ -84,8 +84,8 @@ def request(host: str, path: str, token: str, body: Json | None = None) -> Json:
     scheme = "Bearer " if host == "api.github.com" else "Api-Key "
     headers["Authorization"] = scheme + token
     if host == "ai.api.cloud.yandex.net":
-        headers["OpenAI-Project"] = env_require("YANDEX_PROJECT_ID")
-        headers["x-yc-project-id"] = env_require("YANDEX_PROJECT_ID")
+        headers["OpenAI-Project"] = os.environ["YANDEX_PROJECT_ID"]
+        headers["x-yc-project-id"] = os.environ["YANDEX_PROJECT_ID"]
     connection = http.client.HTTPSConnection(host, timeout=90)
     started = time.monotonic()
     try:
@@ -113,7 +113,7 @@ def request(host: str, path: str, token: str, body: Json | None = None) -> Json:
 
 def github(path: str) -> Json:
     return request(
-        "api.github.com", f"/repos/{REPO}/{path}", env_require("GITHUB_TOKEN")
+        "api.github.com", f"/repos/{REPO}/{path}", os.environ["GITHUB_TOKEN"]
     )["data"]
 
 
@@ -316,13 +316,13 @@ def inspect(sources, send, read, output: Path, secrets: tuple[str, ...]) -> Json
 def main() -> int:
     output = Path("q14-observer")
     output.mkdir(exist_ok=False)
-    key, project = env_require("YANDEX_API_KEY"), env_require("YANDEX_PROJECT_ID")
-    secrets = (key, project, env_require("GITHUB_TOKEN"))
+    key, project = os.environ["YANDEX_API_KEY"], os.environ["YANDEX_PROJECT_ID"]
+    secrets = (key, project, os.environ["GITHUB_TOKEN"])
     manifest = {
         "baseline_head": BASELINE,
-        "checkout_head": env_require("OBSERVER_HEAD"),
-        "run_id": env_require("GITHUB_RUN_ID"),
-        "run_attempt": env_require("GITHUB_RUN_ATTEMPT"),
+        "checkout_head": os.environ["OBSERVER_HEAD"],
+        "run_id": os.environ["GITHUB_RUN_ID"],
+        "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
         "approval": "https://github.com/maksimp6/Chat/pull/1425#issuecomment-6286666035",
         "max_calls": MAX_CALLS,
         "max_output_tokens": MAX_OUTPUT,

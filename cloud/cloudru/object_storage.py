@@ -6,7 +6,7 @@ client-visible errors: failures are mapped to the safe errors from ``storage``.
 """
 
 from __future__ import annotations
-from core.env import env_snapshot
+import os
 
 import hashlib
 import hmac
@@ -185,7 +185,7 @@ class CloudRuObjectStorage:
     def from_env(
         cls, env: Mapping[str, str] | None = None, **kwargs: Any
     ) -> "CloudRuObjectStorage":
-        env = env_snapshot() if env is None else env
+        env = dict(os.environ) if env is None else env
         return cls(
             env.get("CLOUDRU_STORAGE_BUCKET", ""),
             endpoint=env.get("CLOUDRU_STORAGE_S3_ENDPOINT", ""),
@@ -338,7 +338,7 @@ def cloudru_storage_credential_resolver(
     def resolve(_context: object, provider: str) -> S3Credentials | None:
         if provider != CloudRuObjectStorage.name:
             return None
-        values = env_snapshot() if env is None else env
+        values = dict(os.environ) if env is None else env
         tenant_id = values.get("CLOUDRU_STORAGE_TENANT_ID", "")
         dedicated = cloudru_s3_credentials(
             values.get("CLOUDRU_STORAGE_KEY_ID", ""),

@@ -45,8 +45,7 @@ from urllib.parse import quote, urlencode
 if __package__ in {None, ""}:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.env import env_get
-from agent_runtime.logos_launch_hold import (
+from scripts.logos_launch_hold import (
     NativeLogosLaunchBlocked,
     enforce_native_launch_hold,
 )
@@ -54,7 +53,7 @@ from scripts.retrieval_core import BM25Index as _BM25Index
 from scripts.retrieval_core import split_sentences as _split_sentences
 from scripts.retrieval_core import tokenize as _tokenize
 
-REPO = env_get("GITHUB_REPOSITORY", "maksimp6/Chat")
+REPO = os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat")
 API = f"https://api.github.com/repos/{REPO}"
 LABEL_SOURCE = "rag-source"
 TOP_K = 30
@@ -664,7 +663,7 @@ def report(
         },
         "query": query,
         "evidence": outcome["citations"],
-        "code_sha": env_get("GITHUB_SHA", "unknown"),
+        "code_sha": os.environ.get("GITHUB_SHA", "unknown"),
         "corpus_sha256": fingerprint,
         "corpus_sources": sources,
         "corpus_sources_total": len(corpus),
@@ -1393,8 +1392,8 @@ def _safe_chunking(value: object) -> dict | None:
 
 def inspect_yandex_vector_stores() -> int:
     """Print safe metadata for existing stores and files without making writes."""
-    key = env_get("YANDEX_API_KEY", "")
-    project = env_get("YANDEX_PROJECT_ID", "")
+    key = os.environ.get("YANDEX_API_KEY", "")
+    project = os.environ.get("YANDEX_PROJECT_ID", "")
     if not key or not project:
         raise ValueError("missing_yandex_credentials")
     stores = list_yandex_objects("/vector_stores", project, key, ("vector_stores",))
@@ -2463,7 +2462,7 @@ def _write_vector_store_demo_report(rendered: str, model_result: dict | None) ->
         else "Yandex AI Studio Vector Store demo (direct retrieval; no model call):"
     )
     print(rendered)
-    summary_path = env_get("GITHUB_STEP_SUMMARY")
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_path:
         with open(summary_path, "a", encoding="utf-8") as summary_file:
             summary_file.write("## Yandex AI Studio Vector Store demo\n\n")
@@ -2483,13 +2482,13 @@ def run_vector_store_demo(args: argparse.Namespace, query: str) -> int:
     if getattr(args, "allow_model_call", False):
         enforce_native_launch_hold()
     existing_store_id = _validate_vector_store_demo_args(args)
-    key = env_get("YANDEX_API_KEY", "")
-    project = env_get("YANDEX_PROJECT_ID", "")
+    key = os.environ.get("YANDEX_API_KEY", "")
+    project = os.environ.get("YANDEX_PROJECT_ID", "")
     if not key or not project:
         raise ValueError("missing_yandex_credentials")
     progress = {"stage": "read_github_issues"}
     try:
-        corpus = fetch_corpus(env_get("GITHUB_TOKEN"), "tasks")
+        corpus = fetch_corpus(os.environ.get("GITHUB_TOKEN"), "tasks")
         corpus, _issue_redactions = sanitize_vector_store_corpus(corpus)
         include_repository = bool(getattr(args, "include_repository", False))
         repository_files, excluded_sensitive_files = (
@@ -2603,7 +2602,7 @@ def _model_result(args: argparse.Namespace, query: str, candidates: list[dict]) 
     """Require explicit allowance and bounded input for the single model call."""
     if not args.allow_model_call:
         raise ValueError("model_call_not_authorized")
-    key, project = env_get("YANDEX_API_KEY"), env_get("YANDEX_PROJECT_ID")
+    key, project = os.environ.get("YANDEX_API_KEY"), os.environ.get("YANDEX_PROJECT_ID")
     if not key or not project:
         raise ValueError("missing_model_credentials")
     result = yandex_call(project, key, build_prompt(query, candidates))
@@ -2627,7 +2626,7 @@ def _run(args: argparse.Namespace) -> int:
             raise ValueError("vector_store_inspection_must_be_read_only")
         return inspect_yandex_vector_stores()
     query = _query(args)
-    token = env_get("GITHUB_TOKEN")
+    token = os.environ.get("GITHUB_TOKEN")
     if args.mode == "vector-store":
         if args.publish_issue is not None:
             raise ValueError("vector_store_mode_side_effect_conflict")

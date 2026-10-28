@@ -5,7 +5,7 @@ import json
 from typing import Any, Mapping, Optional
 from uuid import uuid4
 from flask import Blueprint, jsonify, request
-from core.clock import unix_seconds
+import time
 from storage.db import get_store
 from sessions.manager import create_session, get_session
 
@@ -88,7 +88,7 @@ def upsert_department(
             "agent_id": str(given("agent_id") or "").strip() or None,
             "system_prompt": str(given("system_prompt") or ""),
             "status": str(given("status") or "active"),
-            "updated_at": unix_seconds(),
+            "updated_at": int(time.time()),
         }
         for field in (
             "model_config",
@@ -160,7 +160,9 @@ def departments_delete(department_id: str):
     with get_store().transaction() as tx:
         record = tx.get(key)
         if record is not None:
-            tx.set(key, {**record, "status": "archived", "updated_at": unix_seconds()})
+            tx.set(
+                key, {**record, "status": "archived", "updated_at": int(time.time())}
+            )
     return jsonify({"status": "archived", "department_id": department_id})
 
 

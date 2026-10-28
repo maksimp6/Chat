@@ -5,7 +5,7 @@ from decimal import Decimal, InvalidOperation
 import json
 import threading
 from typing import Any
-from core.clock import utc_iso
+from datetime import datetime, timezone
 from storage.db import get_store
 
 
@@ -30,7 +30,7 @@ def _empty_account(owner_id: str) -> dict[str, Any]:
         "owner_id": owner_id,
         "balance": "0",
         "currency": "RUB",
-        "updated_at": utc_iso(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -76,7 +76,7 @@ def _record(
         current = _money(account["balance"])
         if kind == "debit" and current < value:
             raise ValueError("insufficient balance")
-        now = utc_iso()
+        now = datetime.now(timezone.utc).isoformat()
         identity = int(tx.get("treasury/next-ledger-id") or 0) + 1
         balance = current + value if kind == "credit" else current - value
         tx.set(account_key, {**account, "balance": str(balance), "updated_at": now})

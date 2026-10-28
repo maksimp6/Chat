@@ -1,6 +1,6 @@
 """Trusted source-file scope for the headless read-only Issue worker."""
 
-from core.env import env_get
+import os
 
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -76,7 +76,7 @@ def require_external_review_store(repo_root: Path) -> None:
     # standalone worker must not inherit another runtime's storage authority.
     if current_runtime_id() is not None or current_runtime_data_root() is not None:
         raise PermissionError("Issue review cannot inherit an active runtime context")
-    configured = env_get("LOGOS_MEMORY_PATH", "").strip()
+    configured = os.environ.get("LOGOS_MEMORY_PATH", "").strip()
     if not configured:
         raise PermissionError(
             "Issue review requires an explicit external LOGOS_MEMORY_PATH"

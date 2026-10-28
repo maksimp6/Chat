@@ -1,7 +1,7 @@
 """Encrypted storage boundary for deployment-wide provider credentials."""
 
 from __future__ import annotations
-from core.env import env_get
+import os
 
 import base64
 import hashlib
@@ -19,7 +19,7 @@ def _fernet():
             "cryptography is required for encrypted provider credentials"
         ) from exc
 
-    key = env_get("LOGOS_PROVIDER_CREDENTIAL_KEY", "").strip()
+    key = os.environ.get("LOGOS_PROVIDER_CREDENTIAL_KEY", "").strip()
     if not key:
         return None, InvalidToken
 
@@ -34,7 +34,7 @@ def fingerprint_key(api_key: str) -> str:
 
 
 def encryption_configured() -> bool:
-    return bool(env_get("LOGOS_PROVIDER_CREDENTIAL_KEY", "").strip())
+    return bool(os.environ.get("LOGOS_PROVIDER_CREDENTIAL_KEY", "").strip())
 
 
 def encrypt_secret(value: str) -> str:

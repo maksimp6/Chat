@@ -11,9 +11,8 @@
 - Запуск команд через shell текущей ОС (subprocess) и сбор сведений о системе
 """
 
-from core.env import env_require, env_snapshot
-from core.restrictions import restrictions_lifted
-from core.wikifunctions import clamp_integer
+from tool_providers._vendor.restrictions import restrictions_lifted
+from tool_providers._vendor.wikifunctions import clamp_integer
 
 import os
 import re
@@ -873,9 +872,9 @@ def run_command(args: dict) -> dict:
                 "LANG": "C.UTF-8",
                 "LC_ALL": "C.UTF-8",
                 **{
-                    key: env_require(key)
+                    key: os.environ[key]
                     for key in ("SystemRoot", "WINDIR")
-                    if key in env_snapshot()
+                    if key in dict(os.environ)
                 },
             },
         ) as proc:

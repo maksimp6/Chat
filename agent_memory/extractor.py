@@ -1,7 +1,7 @@
 """Extract facts and persist individual records directly in native Kristall."""
 
 from __future__ import annotations
-from core.env import env_require
+import os
 
 import hashlib
 import json
@@ -95,7 +95,7 @@ def extract_and_save_facts(dialog_messages: list) -> int:
         f"{msg['role']}: {msg['text']}" for msg in dialog_messages[-12:]
     )
     payload = {
-        "modelUri": f"gpt://{env_require('YANDEX_PROJECT_ID')}/yandexgpt/latest",
+        "modelUri": f"gpt://{os.environ['YANDEX_PROJECT_ID']}/yandexgpt/latest",
         "completionOptions": {
             "temperature": 0.1,
             "maxTokens": "1000",
@@ -113,7 +113,7 @@ def extract_and_save_facts(dialog_messages: list) -> int:
         response = requests.post(
             API_URL,
             headers={
-                "Authorization": f"Api-Key {env_require('YANDEX_API_KEY')}",
+                "Authorization": f"Api-Key {os.environ['YANDEX_API_KEY']}",
                 "Content-Type": "application/json",
             },
             json=payload,

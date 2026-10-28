@@ -1,8 +1,8 @@
 """Cloud.ru provider implementation for the provider-neutral cloud surface."""
 
 from __future__ import annotations
-from core.env import env_get
-from core.wikifunctions import clamp_integer
+import os
+from cloud._vendor.wikifunctions import clamp_integer
 
 import re
 from typing import Any
@@ -51,17 +51,17 @@ class CloudRuProvider:
 
     @staticmethod
     def _service_path(name: str) -> str | None:
-        value = env_get(f"CLOUDRU_{name.upper()}_PATH", "").strip()
+        value = os.environ.get(f"CLOUDRU_{name.upper()}_PATH", "").strip()
         return value if value.startswith("/") else None
 
     @staticmethod
     def _service_enabled(endpoint_env: str, path_env: str | None = None) -> bool:
-        endpoint = env_get(endpoint_env, "").strip()
+        endpoint = os.environ.get(endpoint_env, "").strip()
         if not endpoint:
             return False
         if path_env is None:
             return True
-        return bool(env_get(path_env, "").strip())
+        return bool(os.environ.get(path_env, "").strip())
 
     @staticmethod
     def _path_enabled(service: str, path_env: str) -> bool:
@@ -144,10 +144,10 @@ class CloudRuProvider:
             "provider": self.name,
             "services": services,
             "auth": {
-                "api_key": bool(env_get("CLOUDRU_API_KEY", "").strip()),
+                "api_key": bool(os.environ.get("CLOUDRU_API_KEY", "").strip()),
                 "iam_key_pair": bool(
-                    env_get("CLOUDRU_IAM_KEY_ID", "").strip()
-                    and env_get("CLOUDRU_IAM_KEY_SECRET", "").strip()
+                    os.environ.get("CLOUDRU_IAM_KEY_ID", "").strip()
+                    and os.environ.get("CLOUDRU_IAM_KEY_SECRET", "").strip()
                 ),
             },
         }
@@ -381,7 +381,7 @@ class CloudRuProvider:
                     "instance_id is required", code="validation_error"
                 )
             instance_id = _resource_id(instance_id)
-            action_template = env_get("CLOUDRU_COMPUTE_ACTION_PATH", "").strip()
+            action_template = os.environ.get("CLOUDRU_COMPUTE_ACTION_PATH", "").strip()
             if action_template:
                 try:
                     action_path = action_template.format(
@@ -424,7 +424,7 @@ class CloudRuProvider:
     def query_logs(
         self, *, query: str, service: str | None = None, limit: int = 100
     ) -> dict[str, Any]:
-        path = env_get("CLOUDRU_OBSERVABILITY_LOGS_PATH", "").strip()
+        path = os.environ.get("CLOUDRU_OBSERVABILITY_LOGS_PATH", "").strip()
         if not path.startswith("/") or not self._path_enabled(
             "observability", "CLOUDRU_OBSERVABILITY_LOGS_PATH"
         ):
@@ -458,7 +458,7 @@ class CloudRuProvider:
         window: str | None = None,
         limit: int = 100,
     ) -> dict[str, Any]:
-        path = env_get("CLOUDRU_OBSERVABILITY_METRICS_PATH", "").strip()
+        path = os.environ.get("CLOUDRU_OBSERVABILITY_METRICS_PATH", "").strip()
         if not path.startswith("/") or not self._path_enabled(
             "observability", "CLOUDRU_OBSERVABILITY_METRICS_PATH"
         ):
@@ -493,7 +493,7 @@ class CloudRuProvider:
         resource_id: str | None = None,
         options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        path = env_get("CLOUDRU_BACKUP_PATH", "").strip()
+        path = os.environ.get("CLOUDRU_BACKUP_PATH", "").strip()
         if not path.startswith("/") or not self._path_enabled(
             "backup", "CLOUDRU_BACKUP_PATH"
         ):
@@ -535,7 +535,7 @@ class CloudRuProvider:
     def costs_summary(
         self, *, period: str | None = None, group_by: str | None = None
     ) -> dict[str, Any]:
-        path = env_get("CLOUDRU_BILLING_SUMMARY_PATH", "").strip()
+        path = os.environ.get("CLOUDRU_BILLING_SUMMARY_PATH", "").strip()
         if not path.startswith("/") or not self._path_enabled(
             "billing", "CLOUDRU_BILLING_SUMMARY_PATH"
         ):
@@ -563,5 +563,5 @@ class CloudRuProvider:
             "total_cost": str(total_cost) if total_cost is not None else None,
             "complete": totals["complete"],
             "currency": totals["currency"]
-            or env_get("CLOUDRU_BILLING_CURRENCY", "RUB").strip().upper(),
+            or os.environ.get("CLOUDRU_BILLING_CURRENCY", "RUB").strip().upper(),
         }

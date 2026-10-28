@@ -1,7 +1,7 @@
 """Offline verified A1 mini sliced Generic PLA 3MF for a Redmi 9 stand."""
 
 from __future__ import annotations
-from core.env import env_snapshot
+import os
 import argparse
 from collections import Counter
 import hashlib
@@ -128,7 +128,7 @@ def main() -> int:
     out.mkdir(exist_ok=True, parents=True)
     machine, process, filament = profiles(root / "resources" / "profiles" / "BBL", out)
     output_name = SMALL_OUTPUT if args.variant == "compact" else OUTPUT
-    env = dict(env_snapshot(), LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))
+    env = dict(os.environ, LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))
     cmd = [
         str(exe),
         "--slice",

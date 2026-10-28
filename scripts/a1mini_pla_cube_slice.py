@@ -5,7 +5,7 @@ All physical printer actions are separate from this artifact-generation stage.
 """
 
 from __future__ import annotations
-from core.env import env_snapshot
+import os
 
 import argparse
 import hashlib
@@ -261,7 +261,7 @@ def main() -> int:
 
     profile_root = root / "resources" / "profiles" / "BBL"
     machine, process, filament = profiles(profile_root, out)
-    env = dict(env_snapshot())
+    env = dict(os.environ)
     env.update(LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))
     command = [
         str(executable),

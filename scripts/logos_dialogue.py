@@ -1,7 +1,6 @@
 """Run one owner-requested dialogue through Logos's native runtime in CI."""
 
 from __future__ import annotations
-from core.env import env_pop
 
 import argparse
 import hashlib
@@ -12,14 +11,14 @@ import re
 from typing import Any, Callable
 import uuid
 
-from agent_runtime.provider_receipt import (
+from scripts.logos_provider_receipt import (
     assistant_text,
     capture_provider_diagnostics as _provider_diagnostics,
     provider_echo,
     provider_token as _provider_token,
 )
-from agent_runtime.responses_tool_loop import extract_function_calls
-from agent_runtime.logos_launch_hold import (
+from scripts.logos_responses_tool_loop import extract_function_calls
+from scripts.logos_launch_hold import (
     NativeLogosLaunchBlocked,
     enforce_native_launch_hold,
     hold_receipt,
@@ -366,7 +365,7 @@ def run_dialogue(
 
         # The read token belongs to the scoped read transport, never to shell env,
         # function arguments, instructions, or exported receipts.
-        project_token = env_pop("GITHUB_TOKEN", "")
+        project_token = os.environ.pop("GITHUB_TOKEN", "")
         register_project_reader(project_token, context_packet["repository"])
 
         if knowledge_receipt.get("status") != "indexed":
@@ -518,7 +517,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--context-file", type=Path)
     parser.add_argument("--knowledge-file", type=Path)
     args = parser.parse_args(argv)
-    from agent_runtime.generation_gate import GENERATION_BLOCKED, generation_allowed
+    from scripts.logos_generation_gate import GENERATION_BLOCKED, generation_allowed
 
     try:
         if args.response_id is not None:

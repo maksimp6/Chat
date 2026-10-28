@@ -9,7 +9,7 @@ import re
 import time
 import uuid
 
-from observability.trace_security import sanitize_trace_value
+from agent_memory._vendor.trace_security import sanitize_trace_value
 
 
 MEMORY_KINDS = frozenset({"task", "project", "role", "process", "user_status"})

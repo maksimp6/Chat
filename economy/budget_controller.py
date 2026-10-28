@@ -7,7 +7,7 @@ returning from DEMO to REAL.
 """
 
 from __future__ import annotations
-from core.env import env_snapshot
+import os
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -18,7 +18,7 @@ import uuid
 from typing import Any, Callable, Optional, TYPE_CHECKING
 
 from cloud.base import CloudProviderError
-from core.restrictions import restrictions_lifted
+from economy._vendor.restrictions import restrictions_lifted
 
 if TYPE_CHECKING:
     from economy.budget_repository import BudgetRepository
@@ -652,7 +652,7 @@ class CloudBudgetLimits:
     @classmethod
     def from_env(cls, env: Optional[dict[str, str]] = None) -> "CloudBudgetLimits":
 
-        source = env_snapshot() if env is None else env
+        source = dict(os.environ) if env is None else env
         raw_limit = str(source.get("CLOUDRU_MONTHLY_BUDGET", "")).strip()
         raw_ratio = str(source.get("CLOUDRU_BUDGET_WARN_RATIO", "")).strip() or "0.80"
         currency = str(source.get("CLOUDRU_BILLING_CURRENCY", "")).strip() or "RUB"

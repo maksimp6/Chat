@@ -13,7 +13,7 @@ import math
 import time
 import warnings
 
-from core.restrictions import restrictions_lifted
+from tool_providers._vendor.restrictions import restrictions_lifted
 
 
 def _warn_deprecated_execution_hooks(hooks: Mapping[str, Any]) -> None:

@@ -4,7 +4,7 @@ This creates data ONLY in the supplied board file. It never calls GitHub or depl
 """
 
 from __future__ import annotations
-from core.env import env_get
+import os
 
 import argparse
 
@@ -47,7 +47,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Seed one confirmed Logos Board incident"
     )
-    parser.add_argument("--db", default=env_get("PROJECT_BOARD_DB"))
+    parser.add_argument("--db", default=os.environ.get("PROJECT_BOARD_DB"))
     arguments = parser.parse_args()
     if not arguments.db:
         parser.error("--db or PROJECT_BOARD_DB is required")

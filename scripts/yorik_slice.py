@@ -1,6 +1,6 @@
 """Slice the reviewed Yorik mesh using the pinned PR1101 Bambu profiles."""
 
-from core.env import env_require, env_snapshot
+import os
 
 import argparse
 import hashlib
@@ -114,7 +114,7 @@ def slice_model(root, mesh, out):
         detect_thin_wall="0",
     )
     process.write_text(json.dumps(settings))
-    env = dict(env_snapshot(), LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))
+    env = dict(os.environ, LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))
     command = [
         str(root / "bin/bambu-studio"),
         "--arrange",
@@ -151,7 +151,7 @@ def slice_model(root, mesh, out):
         "filename": OUTPUT,
         "sha256": hashlib.sha256(destination.read_bytes()).hexdigest(),
         "source_sha256": hashlib.sha256(mesh.read_bytes()).hexdigest(),
-        "head_sha": env_require("SOURCE_HEAD"),
+        "head_sha": os.environ["SOURCE_HEAD"],
         "size_bytes": destination.stat().st_size,
         "printer": "Bambu Lab A1 mini",
         "material": "PLA",

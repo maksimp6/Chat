@@ -6,7 +6,7 @@ evidence; comments do not acquire permission to override the owner or approvals.
 """
 
 from __future__ import annotations
-from core.env import env_get
+import os
 
 import argparse
 import hashlib
@@ -373,7 +373,9 @@ def build_context(
     )
     files = tuple(dict.fromkeys((*optional_files, *REQUIRED_FILES, *include_files)))
     sources = [_local_source(repo_root, repository, sha, name) for name in files]
-    reader = get_json or github_reader(env_get("GITHUB_TOKEN") or env_get("GH_TOKEN"))
+    reader = get_json or github_reader(
+        os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    )
     remote, case = _github_sources(repository, issue_number, pr_number, reader)
     if require_pr_head and case["head_sha"] != sha:
         raise ContextError(

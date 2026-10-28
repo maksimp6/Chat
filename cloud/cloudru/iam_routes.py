@@ -1,7 +1,7 @@
 """Cloud.ru IAM API-key wizard routes."""
 
 from __future__ import annotations
-from core.env import env_get
+import os
 
 from datetime import datetime, timedelta, timezone
 import ipaddress
@@ -18,7 +18,9 @@ cloudru_iam_bp = Blueprint("cloudru_iam", __name__, url_prefix="/api/cloudru/iam
 
 
 def _enabled() -> bool:
-    return env_get("CLOUDRU_IAM_WIZARD_ENABLED", "false").strip().lower() == "true"
+    return (
+        os.environ.get("CLOUDRU_IAM_WIZARD_ENABLED", "false").strip().lower() == "true"
+    )
 
 
 def _revoke_unstored_key(client: CloudRuIamClient, key_id: str) -> None:

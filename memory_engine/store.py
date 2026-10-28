@@ -5,7 +5,6 @@ No SQL, background flush, or unsafe pickle deserialization.
 """
 
 from __future__ import annotations
-from core.env import env_get
 
 from contextlib import contextmanager
 from copy import deepcopy
@@ -18,7 +17,7 @@ from pathlib import Path
 from threading import RLock, get_ident
 from typing import Any, Iterator, Protocol, TypeVar
 
-from kristall.value_validation import (
+from memory_engine._vendor.value_validation import (
     walk_value,
     validate_json_values,
     validate_journal_changes,
@@ -137,7 +136,7 @@ def _open_directory_nofollow(directory: Path, *, trusted: bool | None = None) ->
     absolute = Path(os.path.abspath(directory))
     fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
     if trusted is None:
-        trusted = env_get("LOGOS_MEMORY_TRUSTED_ROOT") == "1"
+        trusted = os.environ.get("LOGOS_MEMORY_TRUSTED_ROOT") == "1"
     try:
         if trusted:
             _verify_trusted_ancestor(fd)
@@ -223,7 +222,7 @@ def _open_journal_nofollow(
         if not stat.S_ISREG(os.fstat(fd).st_mode):
             raise StoreError("journal must be a regular file")
         if trusted is None:
-            trusted = env_get("LOGOS_MEMORY_TRUSTED_ROOT") == "1"
+            trusted = os.environ.get("LOGOS_MEMORY_TRUSTED_ROOT") == "1"
         if trusted:
             _verify_private_file(fd)
         return fd
@@ -244,7 +243,7 @@ class _JournalStore:
 
     def __init__(self, path: str | Path, *, trusted: bool | None = None) -> None:
         self._trusted = (
-            (env_get("LOGOS_MEMORY_TRUSTED_ROOT") == "1")
+            (os.environ.get("LOGOS_MEMORY_TRUSTED_ROOT") == "1")
             if trusted is None
             else trusted
         )

@@ -1,7 +1,6 @@
 """Pictures too large for a stored message are kept as files and referenced by id."""
 
 from __future__ import annotations
-from core.env import env_get
 
 import base64
 import hashlib
@@ -19,7 +18,7 @@ _SUBTYPE_PATTERN = re.compile(r"[a-z0-9]{2,5}")
 
 
 def image_dir() -> Path:
-    return Path(env_get("LOGOS_IMAGE_DIR", "data/images"))
+    return Path(os.environ.get("LOGOS_IMAGE_DIR", "data/images"))
 
 
 def _conversation_dir(conversation_id: str) -> Path:
