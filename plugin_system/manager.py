@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
-logger = logging.getLogger("plugin_manager")
+logger = logging.getLogger("logos.plugin_system.manager")
 
 MANIFEST_NAME = "plugin.json"
 SUPPORTED_MANIFEST_VERSION = 1

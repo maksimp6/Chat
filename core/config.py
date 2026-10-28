@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("logos.core.config")
 
 _ENV_FILE = Path(__file__).resolve().with_name(".env")
 load_dotenv(_ENV_FILE)

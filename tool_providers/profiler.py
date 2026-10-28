@@ -10,7 +10,7 @@ import logging
 from kristall import KristallError
 from storage.db import memory_file_path
 
-logger = logging.getLogger("logos_profiler")
+logger = logging.getLogger("logos.tool_providers.profiler")
 
 SORT_KEYS = ("cumulative", "time", "calls")
 

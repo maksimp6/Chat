@@ -77,4 +77,7 @@ def main(argv=None, handlers=None):
 
 
 if __name__ == "__main__":
+    from composition import process
+
+    process.start()
     sys.exit(main())

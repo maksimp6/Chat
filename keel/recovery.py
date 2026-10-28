@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("logos.keel.recovery")
 
 
 @dataclass

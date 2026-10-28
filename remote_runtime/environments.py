@@ -61,7 +61,7 @@ def _repo_root() -> Path:
     return Path(os.environ.get("LOGOS_ENV_REPO_ROOT") or os.getcwd()).resolve()
 
 
-logger = logging.getLogger("remote_runtime.environments")
+logger = logging.getLogger("logos.remote_runtime.environments")
 
 
 class GitUnavailable(RuntimeError):

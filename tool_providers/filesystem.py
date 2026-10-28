@@ -36,7 +36,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-logger = logging.getLogger("filesystem_mcp")
+logger = logging.getLogger("logos.tool_providers.filesystem")
 
 BASE_DIR = os.path.realpath(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BACKUP_DIR = os.path.join(BASE_DIR, ".safe_backups")

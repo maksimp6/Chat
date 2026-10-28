@@ -34,8 +34,12 @@ exclude = ["^docs/mirrors/", "^datasets/"]
 # Unit map for scripts/check_independence.py: which files form one unit and
 # which files are composition roots. See docs/architecture/modules.md.
 [tool.logos.independence]
-roots = ["app.py"]
-entry-blocks = []
+roots = ["app.py", "composition/"]
+entry-blocks = [
+    "agent_runtime/issue_runner.py",
+    "agent_shell/__main__.py",
+    "scripts/logos_dialogue.py",
+]
 embedded-programs = []
 standalone-downloads = [
     "scripts/redmi_app_launcher.py",

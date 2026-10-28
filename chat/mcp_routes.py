@@ -79,7 +79,7 @@ from conversations.ownership import (
     list_owned_conversations,
 )
 
-logger = logging.getLogger("mcp_routes")
+logger = logging.getLogger("logos.chat.mcp_routes")
 mcp_bp = Blueprint("mcp", __name__)
 skill_registry = SkillRegistry()
 

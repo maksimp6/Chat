@@ -11,7 +11,7 @@ import logging
 import shutil
 import os
 
-logger = logging.getLogger("termux_mcp")
+logger = logging.getLogger("logos.tool_providers.termux_system")
 
 
 def _run_termux_cmd(cmd: list, timeout: int = 15) -> dict:

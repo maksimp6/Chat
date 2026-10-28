@@ -107,7 +107,7 @@ flowchart LR
     chat -->|5| economy
     chat -->|2| invocation
     chat -->|2| mcp_server
-    chat -->|5| observability
+    chat -->|4| observability
     chat -->|5| provider_accounts
     chat -->|4| storage
     chat -->|2| tool_providers
@@ -196,7 +196,7 @@ flowchart LR
     yandex_client_modules -->|4| core
     yandex_client_modules -->|2| economy
     yandex_client_modules -->|1| mcp_server
-    yandex_client_modules -->|5| observability
+    yandex_client_modules -->|3| observability
     yandex_client_modules -->|2| provider_accounts
     yandex_client_modules -->|1| secret_store
     yandex_client_modules -->|2| storage

@@ -9,7 +9,7 @@ from core.config import Config
 from yandex_client_modules.client import YandexResponsesClient
 from yandex_client_modules.errors import YandexClientError
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("logos.workspace.file_routes")
 file_bp = Blueprint("file_manager", __name__)
 
 ALLOWED_EXTENSIONS = {

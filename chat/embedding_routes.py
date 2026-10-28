@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 import time
 from types import SimpleNamespace
@@ -12,7 +13,6 @@ from flask import Blueprint, jsonify, request
 from core.config import Config, EMBEDDING_MODELS
 import os
 from economy.knowledge_economics import KnowledgeCostConfig, calculate_knowledge_cost
-from observability import system_log
 from observability.trace_manager import get_current_trace, traced_operation
 from yandex_client_modules.request_mixin import (
     _resolve_global_provider_credential,
@@ -20,7 +20,7 @@ from yandex_client_modules.request_mixin import (
 )
 
 embedding_bp = Blueprint("embeddings", __name__)
-logger = system_log.get_logger("embeddings")
+logger = logging.getLogger("logos.embeddings")
 
 UPSTREAM_URL = "https://ai.api.cloud.yandex.net/v1/embeddings"
 MAX_BATCH = (

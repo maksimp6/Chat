@@ -6,7 +6,7 @@ import json
 import logging
 import shutil
 
-logger = logging.getLogger("termux_mcp")
+logger = logging.getLogger("logos.tool_providers.termux")
 
 
 def _run_termux_cmd(cmd: list, timeout: int = 10) -> dict:

@@ -1,10 +1,10 @@
-from observability.system_log import get_logger
+import logging
 import uuid
 import requests
 
 from yandex_client_modules.errors import YandexClientError
 
-api_logger = get_logger("yandex_api")
+api_logger = logging.getLogger("logos.yandex_api")
 
 
 class YandexConversationMixin:

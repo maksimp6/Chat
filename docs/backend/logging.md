@@ -17,13 +17,18 @@
 * Если в контексте привязан Trace, записи WARNING и выше дополнительно попадают в него
   событием `system_log`.
 
-Использование:
+Использование в модуле (только стандартная библиотека, без импорта `observability`):
 
 ```python
-from observability.system_log import get_logger
+import logging
 
-log = get_logger("component")
+logger = logging.getLogger("logos.<модуль>")
 ```
+
+Обработчики настраивает только корень сборки: `composition.process.start()` загружает
+`core/.env` и вызывает `observability.system_log.configure()` (`app.py` и точки входа CLI
+делают это первым действием). Записи любого логгера с именем `logos` или `logos.*` попадают
+в системный лог; логгеры вне этого дерева в него не попадают.
 
 ## Поиск ошибок
 

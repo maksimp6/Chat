@@ -10,7 +10,7 @@ from keel.providers.cloudru import (
     delete_container,
 )
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("logos.keel.reconciler")
 
 
 def reconcile(

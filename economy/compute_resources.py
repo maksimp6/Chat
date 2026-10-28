@@ -14,7 +14,7 @@ import logging
 import math
 from typing import Any, Optional
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("logos.economy.compute_resources")
 
 PRICING_CURRENCY = "RUB"
 PRICING_VERSION = "energy-v1"

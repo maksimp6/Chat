@@ -22,7 +22,7 @@ from tool_providers.universal_tool_platform import (
     UniversalToolExecutor,
 )
 
-logger = logging.getLogger("local_tool_agent")
+logger = logging.getLogger("logos.agent_runtime.local_tool_agent")
 
 # Renew well inside the gateway's 30 s job lease so a slow tool is not requeued and run twice.
 _LEASE_RENEW_SECONDS = 10.0

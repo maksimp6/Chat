@@ -18,7 +18,7 @@ from typing import Any
 
 from core.config import ALL_MODELS, canonical_model_key
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("logos.core.model_profiles")
 
 CATALOG_PATH = (
     Path(__file__).resolve().parents[1]

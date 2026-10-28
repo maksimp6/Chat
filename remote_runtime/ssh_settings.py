@@ -21,7 +21,7 @@ from remote_runtime._vendor.restrictions import restrictions_lifted
 from remote_runtime.ssh import SSHRuntime, SSHRuntimeError
 from observability.trace_manager import get_current_trace
 
-logger = logging.getLogger("ssh_runtime_settings")
+logger = logging.getLogger("logos.remote_runtime.ssh_settings")
 
 SETTINGS_KEY = "ssh_runtime_settings"
 LAST_TEST_KEY = "ssh_runtime_last_test"

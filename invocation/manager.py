@@ -19,7 +19,7 @@ from kristall.store import MAX_JOURNAL_FRAME_BYTES
 
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("logos.invocation.manager")
 
 _INVOCATION_PREFIX = "runtime_invocation:"
 _VALUE_CHUNK_PREFIX = "runtime_invocation_value:"

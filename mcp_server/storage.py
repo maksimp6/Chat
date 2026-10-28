@@ -14,7 +14,7 @@ from secret_store.credential_crypto import (
 )
 from storage.db import get_store
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("logos.mcp_server.storage")
 
 # Credentials of an MCP server. Stored encrypted when a provider credential key is configured,
 # the same rule that protects provider keys.

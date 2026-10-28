@@ -25,7 +25,7 @@ from core.config import (
     registry_key_for_upstream,
 )
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("logos.provider_accounts.model_discovery")
 
 DEFAULT_TTL_SECONDS = 300
 DEFAULT_TIMEOUT_SECONDS = 5

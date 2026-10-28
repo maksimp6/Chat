@@ -6,7 +6,7 @@ import re
 import threading
 from functools import wraps
 
-logger = logging.getLogger("git_mcp")
+logger = logging.getLogger("logos.tool_providers.git")
 
 _read_lock = threading.RLock()
 _write_lock = threading.RLock()

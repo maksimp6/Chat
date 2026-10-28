@@ -9,7 +9,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.exceptions import MaxRetryError
 from urllib3.util import Retry
 
-api_logger = logging.getLogger("yandex_api_debug")
+api_logger = logging.getLogger("logos.workspace.files")
 
 from yandex_client_modules.errors import YandexClientError
 from yandex_client_modules.request_mixin import (

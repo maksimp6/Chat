@@ -54,6 +54,7 @@ from remote_runtime.environment_routes import environment_bp, environment_gatewa
 from remote_runtime.environments import init_environment_tables
 from rdc_connection.pairing import install_rdc_pairing
 from invocation.problems import problem
+from composition import process
 from observability import system_log
 from conversations.ownership import (
     init_conversation_ownership_table,
@@ -73,7 +74,7 @@ from forge import init_printing_tables
 from forge.routes import printing3d_bp
 
 app = Flask(__name__)
-system_log.configure()
+process.start()
 install_rdc_pairing(app)
 
 

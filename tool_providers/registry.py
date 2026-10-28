@@ -20,7 +20,7 @@ from tool_providers.universal_tool_platform import (
     validate_json_schema,
 )
 
-logger = logging.getLogger("tool_registry")
+logger = logging.getLogger("logos.tool_providers.registry")
 
 _GIT_READ_TOOLS = frozenset({"git_status", "git_log", "git_diff", "git_branches"})
 _GIT_WRITE_TOOLS = frozenset(

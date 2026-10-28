@@ -7,7 +7,7 @@ from typing import Any
 import requests
 import logging
 
-logger = logging.getLogger("wikipedia_mcp")
+logger = logging.getLogger("logos.tool_providers.wikipedia")
 
 # Wikimedia rate-limits generic agents; its policy asks for a descriptive User-Agent.
 USER_AGENT = (

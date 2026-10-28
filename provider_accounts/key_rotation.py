@@ -21,7 +21,7 @@ from provider_accounts.credentials import (
     record_health_check,
 )
 
-logger = logging.getLogger("provider_key_rotation")
+logger = logging.getLogger("logos.provider_accounts.key_rotation")
 
 
 class ProviderKeyProvider(Protocol):
