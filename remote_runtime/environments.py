@@ -137,7 +137,7 @@ def resolve_commit(branch: str, commit_sha: Optional[str] = None) -> str:
     return resolved
 
 
-def init_environment_tables() -> None:
+def prepare_environment_records() -> None:
     with _RUNTIME_WORKERS_LOCK:
         active = set(_RUNTIME_WORKERS)
     store = get_store()
@@ -155,6 +155,10 @@ def init_environment_tables() -> None:
                         "stopped_at": row["stopped_at"] or int(time.time()),
                     },
                 )
+
+
+# Former name, kept for existing callers.
+init_environment_tables = prepare_environment_records
 
 
 def _transition(current: str, target: str) -> None:
@@ -627,7 +631,7 @@ def create_environment(
     *,
     context: Optional[Any] = None,
 ) -> dict[str, Any]:
-    init_environment_tables()
+    prepare_environment_records()
     resolved = resolve_commit(branch, commit_sha)
     environment_id = str(uuid.uuid4())
     item = {
@@ -658,7 +662,7 @@ def create_environment(
 
 def list_environments(owner_id: Optional[str] = None) -> list[dict[str, Any]]:
     del owner_id
-    init_environment_tables()
+    prepare_environment_records()
     rows = list(get_store().items(prefix="environment/record/").values())
     # Owner ids remain internal metadata rather than part of the listing.
     return [

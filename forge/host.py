@@ -16,7 +16,7 @@ from forge._binding import Binding, HostNotBound
 @dataclass(frozen=True, kw_only=True)
 class Host:
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
-    get_store: Any  # storage.db.get_store
+    get_store: Any  # storage.records.get_store
 
 
 _binding: Binding[Host] = Binding("forge")

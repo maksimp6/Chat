@@ -10,7 +10,7 @@ _SAFE_REQUEST = re.compile(r"[A-Za-z0-9_-]{16,128}")
 
 
 def _directory(conv_id, create=False):
-    from storage.db import memory_file_path
+    from storage.records import memory_file_path
 
     if not isinstance(conv_id, str) or not _SAFE_CONVERSATION.fullmatch(conv_id):
         raise ValueError("invalid image conversation")

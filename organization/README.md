@@ -22,12 +22,12 @@ Everything `organization` uses from other units is a field of `Host` in [`organi
 | `create_session` | `sessions.manager.create_session` |
 | `get_current_owner_id` | `economy.treasury_identity.get_current_owner_id` |
 | `get_session` | `sessions.manager.get_session` |
-| `get_store` | `storage.db.get_store` |
+| `get_store` | `storage.records.get_store` |
 
 ## Install
 
 - `composition/wiring.py` registers the `organization` host factory (`register_all()`, or `register_units("organization")` for this unit alone); the host is built on first use.
 - `composition/web.py` registers the blueprints `partner_relations_bp` (`organization.partner_relations`), `departments_bp` (`organization.departments`), `government_bp` (`organization.government`).
-- Storage start-up (`web_shell`) runs `organization.departments.init_department_tables`, `organization.partner_relations.init_partner_relations_tables`, `organization.partner_relations.ensure_partner_department`, `organization.government.init_government_tables`, `organization.government.ensure_government_department`.
+- Storage start-up (`web_shell`) runs `organization.departments.prepare_department_records`, `organization.partner_relations.prepare_partner_relations_records`, `organization.partner_relations.ensure_partner_department`, `organization.government.prepare_government_records`, `organization.government.ensure_government_department`.
 - `composition/tool_sources.py` adds the `government` tool category from `organization.government`.
 - `composition/tool_sources.py` adds the `partner` tool category from `organization.partner_relations`.

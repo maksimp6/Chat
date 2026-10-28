@@ -23,12 +23,12 @@ class Host:
     bind_runtime_request: Any  # runtime.request_context.bind_runtime_request
     close_memory_clients: Any  # agent_memory.client.close_memory_clients
     create_invocation_trace: Any  # invocation.trace.create_invocation_trace
-    get_config: Any  # storage.db.get_config
+    get_config: Any  # storage.records.get_config
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_current_trace: Any  # observability.trace_manager.get_current_trace
-    get_store: Any  # storage.db.get_store
-    init_runtime_db: Any  # storage.db.init_db
-    set_config: Any  # storage.db.set_config
+    get_store: Any  # storage.records.get_store
+    init_runtime_db: Any  # storage.records.open_journal_store
+    set_config: Any  # storage.records.set_config
 
 
 _binding: Binding[Host] = Binding("remote_runtime")

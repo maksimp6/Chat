@@ -28,10 +28,10 @@ class Host:
     get_controlled_memory_summary: (
         Any  # agent_memory.manager.get_controlled_memory_summary
     )
-    get_conv_settings: Any  # storage.db.get_conv_settings
+    get_conv_settings: Any  # storage.records.get_conv_settings
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_model_uri: Any  # core.config.get_model_uri
-    get_store: Any  # storage.db.get_store
+    get_store: Any  # storage.records.get_store
     mcp_storage: Any  # mcp_server.storage
     record_usage: Any  # provider_accounts.quotas.record_usage
     registry: Any  # tool_providers.registry.registry

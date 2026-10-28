@@ -23,8 +23,12 @@ def _parse(value: Any, default: Any) -> Any:
         return default
 
 
-def init_department_tables() -> None:
+def prepare_department_records() -> None:
     get_store()
+
+
+# Former name, kept for existing callers.
+init_department_tables = prepare_department_records
 
 
 def _validate_id(value: str) -> str:

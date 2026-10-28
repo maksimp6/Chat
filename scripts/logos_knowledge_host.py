@@ -17,6 +17,7 @@ from scripts._logos_knowledge_binding import Binding, HostNotBound
 class Host:
     Config: Any  # core.config.Config
     DatabaseError: Any  # storage.memory_db.DatabaseError
+    KristallError: Any  # kristall.KristallError
     LogosClient: Any  # chat.mcp_routes.LogosClient
     UniversalToolCall: Any  # tool_providers.universal_tool_platform.UniversalToolCall
     UniversalToolExecutor: (

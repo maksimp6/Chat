@@ -73,12 +73,16 @@ def _trace_event(
         trace.add_event(event_type, payload)
 
 
-def init_partner_relations_tables() -> None:
+def prepare_partner_relations_records() -> None:
     global _owner_keys_migrated
     get_store()
     if not _owner_keys_migrated:
         _migrate_owner_keys()
         _owner_keys_migrated = True
+
+
+# Former name, kept for existing callers.
+init_partner_relations_tables = prepare_partner_relations_records
 
 
 def _validate_status(value: str, allowed: tuple[str, ...], field: str) -> str:
@@ -124,7 +128,7 @@ def create_partner(
         raise ValueError("metadata is too large")
     now = int(time.time())
 
-    init_partner_relations_tables()
+    prepare_partner_relations_records()
     _insert_owned(
         "partner",
         partner_id,
@@ -161,7 +165,7 @@ def list_partners(
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     status = str(arguments.get("status") or "").strip().lower()
-    init_partner_relations_tables()
+    prepare_partner_relations_records()
     if status:
         _validate_status(status, PARTNER_STATUSES, "partner status")
     rows = [
@@ -183,7 +187,7 @@ def get_partner(
     partner = _get_partner(owner_id, partner_id)
     if not partner:
         raise ValueError("partner not found")
-    init_partner_relations_tables()
+    prepare_partner_relations_records()
     contacts = _owned_rows("contact", owner_id, partner_id)
     contacts.sort(key=lambda row: (-row["updated_at"], row["name"]))
     messages = sorted(
@@ -1187,6 +1191,7 @@ def ensure_partner_department() -> None:
 __all__ = [
     "PARTNER_TOOLS",
     "ensure_partner_department",
+    "prepare_partner_relations_records",
     "init_partner_relations_tables",
     "partner_relations_bp",
 ]

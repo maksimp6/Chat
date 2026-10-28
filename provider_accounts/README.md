@@ -58,7 +58,7 @@ Everything `provider_accounts` uses from other units is a field of `Host` in [`p
 | `get_current_owner_id` | `economy.treasury_identity.get_current_owner_id` |
 | `get_current_trace` | `observability.trace_manager.get_current_trace` |
 | `get_model_uri` | `core.config.get_model_uri` |
-| `get_store` | `storage.db.get_store` |
+| `get_store` | `storage.records.get_store` |
 | `registry_key_for_upstream` | `core.config.registry_key_for_upstream` |
 | `traced_operation` | `observability.trace_manager.traced_operation` |
 
@@ -69,4 +69,4 @@ Everything `provider_accounts` uses from other units is a field of `Host` in [`p
 - `composition/wiring.py` registers the `provider_accounts` host factory (`register_all()`, or `register_units("provider_accounts")` for this unit alone); the host is built on first use.
 - `composition/web.py` registers the blueprints `provider_credentials_bp` (`provider_accounts.credentials_routes`), `provider_quota_bp` (`provider_accounts.quota_routes`).
 - `composition/web.py` calls `provider_accounts.model_routes.install(app)`.
-- Storage start-up (`web_shell`) runs `provider_accounts.quotas.init_quota_tables`.
+- Storage start-up (`web_shell`) runs `provider_accounts.quotas.prepare_quota_records`.

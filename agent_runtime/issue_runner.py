@@ -256,6 +256,7 @@ def _persist_result(
         TypeError,
         LookupError,
         bound.DatabaseError,
+        bound.KristallError,
     ) as exc:
         result.update(status="failed", error=type(exc).__name__)
         result["persistence"].update(status="failed", error_type=type(exc).__name__)

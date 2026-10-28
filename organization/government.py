@@ -40,8 +40,12 @@ def _parse(value: Any, default: Any) -> Any:
         return default
 
 
-def init_government_tables() -> None:
+def prepare_government_records() -> None:
     get_store()
+
+
+# Former name, kept for existing callers.
+init_government_tables = prepare_government_records
 
 
 def _current_owner() -> Optional[str]:
@@ -567,6 +571,7 @@ __all__ = [
     "ensure_government_department",
     "get_case",
     "government_bp",
+    "prepare_government_records",
     "init_government_tables",
     "prepare_application",
     "prepare_documents",

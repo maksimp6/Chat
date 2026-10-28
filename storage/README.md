@@ -1,6 +1,6 @@
 # `storage`
 
-Logos chat and configuration records on the native durable Kristall (`storage.db` is the facade the application uses), provider-neutral storage contracts, generated image artifacts, journal maintenance and the process-local engine used in development.
+Logos chat and configuration records in the native durable Kristall journal (`storage.records`; `storage.db` is its former name and still works), provider-neutral storage contracts, generated image artifacts, journal maintenance and the process-local engine used in development.
 
 ## Public API
 
@@ -9,9 +9,9 @@ Logos chat and configuration records on the native durable Kristall (`storage.db
 | Module | Purpose |
 | --- | --- |
 | [`storage.contracts`](contracts.py) | Provider-neutral storage contracts and the repository-local adapter. |
-| [`storage.db`](db.py) | Logos chat/config repositories backed by the native durable Kristall. |
 | [`storage.generated_images`](generated_images.py) | Private generated image artifacts, kept outside Kristall's bounded text values. |
 | [`storage.memory_db`](memory_db.py) | Small process-local database engine used for deterministic tests and local development. |
+| [`storage.records`](records.py) | Logos chat and configuration records in the native durable Kristall journal. |
 
 Other units reach it only through their own ports:
 
@@ -25,31 +25,31 @@ Other units reach it only through their own ports:
 | `storage.contracts.StorageProviderUnavailable` | `cloud`, `runtime` |
 | `storage.contracts.safe_relative_path` | `cloud` |
 | `storage.contracts.storage_provider_from_env` | `model_editor` |
-| `storage.db.add_message` | `chat` |
-| `storage.db.create_conversation` | `chat` |
-| `storage.db.delete_conversation` | `conversations` |
-| `storage.db.get_config` | `remote_runtime` |
-| `storage.db.get_conv_settings` | `chat`, `conversations`, `yandex_client_modules` |
-| `storage.db.get_conversation_title` | `chat` |
-| `storage.db.get_conversations` | `conversations` |
-| `storage.db.get_message` | `chat` |
-| `storage.db.get_messages` | `chat`, `invocation`, `mcp_server` |
-| `storage.db.get_store` | `agent_runtime`, `chat`, `economy`, `forge`, `mcp_server`, `organization`, `provider_accounts`, `remote_runtime`, `secret_store`, `web_shell`, `yandex_client_modules` |
-| `storage.db.get_yandex_conversation` | `chat` |
-| `storage.db.init_db` | `remote_runtime` |
-| `storage.db.is_provider_pending` | `chat` |
-| `storage.db.maybe_update_conversation_title` | `chat` |
-| `storage.db.memory_file_path` | `agent_memory`, `conversations`, `invocation`, `sessions`, `tool_providers`, `web_shell` |
-| `storage.db.normalize_conversation_title` | `chat` |
-| `storage.db.save_conv_settings` | `chat`, `conversations` |
-| `storage.db.set_config` | `remote_runtime` |
-| `storage.db.set_yandex_conversation` | `chat` |
-| `storage.db.update_conversation_model` | `conversations` |
-| `storage.db.update_conversation_title` | `conversations` |
 | `storage.generated_images.image_file_metadata` | `chat` |
 | `storage.generated_images.open_image_file` | `chat` |
 | `storage.generated_images.save_image_file` | `chat` |
 | `storage.memory_db.DatabaseError` | `agent_runtime`, `tools.knowledge` |
+| `storage.records.add_message` | `chat` |
+| `storage.records.create_conversation` | `chat` |
+| `storage.records.delete_conversation` | `conversations` |
+| `storage.records.get_config` | `remote_runtime` |
+| `storage.records.get_conv_settings` | `chat`, `conversations`, `yandex_client_modules` |
+| `storage.records.get_conversation_title` | `chat` |
+| `storage.records.get_conversations` | `conversations` |
+| `storage.records.get_message` | `chat` |
+| `storage.records.get_messages` | `chat`, `invocation`, `mcp_server` |
+| `storage.records.get_store` | `agent_runtime`, `chat`, `economy`, `forge`, `mcp_server`, `organization`, `provider_accounts`, `remote_runtime`, `secret_store`, `web_shell`, `yandex_client_modules` |
+| `storage.records.get_yandex_conversation` | `chat` |
+| `storage.records.is_provider_pending` | `chat` |
+| `storage.records.maybe_update_conversation_title` | `chat` |
+| `storage.records.memory_file_path` | `agent_memory`, `conversations`, `invocation`, `sessions`, `tool_providers`, `web_shell` |
+| `storage.records.normalize_conversation_title` | `chat` |
+| `storage.records.open_journal_store` | `remote_runtime` |
+| `storage.records.save_conv_settings` | `chat`, `conversations` |
+| `storage.records.set_config` | `remote_runtime` |
+| `storage.records.set_yandex_conversation` | `chat` |
+| `storage.records.update_conversation_model` | `conversations` |
+| `storage.records.update_conversation_title` | `conversations` |
 
 ## Ports
 
@@ -65,4 +65,4 @@ Everything `storage` uses from other units is a field of `Host` in [`storage/hos
 ## Install
 
 - `composition/wiring.py` registers the `storage` host factory (`register_all()`, or `register_units("storage")` for this unit alone); the host is built on first use.
-- Storage start-up (`web_shell`) runs `storage.db.init_db`.
+- Storage start-up (`web_shell`) runs `storage.records.open_journal_store`.

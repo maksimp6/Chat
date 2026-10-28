@@ -66,10 +66,10 @@ Everything `yandex_client_modules` uses from other units is a field of `Host` in
 | `UniversalToolCall` | `tool_providers.universal_tool_platform.UniversalToolCall` |
 | `decrypt_secret` | `secret_store.credential_crypto.decrypt_secret` |
 | `encrypt_secret` | `secret_store.credential_crypto.encrypt_secret` |
-| `get_conv_settings` | `storage.db.get_conv_settings` |
+| `get_conv_settings` | `storage.records.get_conv_settings` |
 | `get_current_owner_id` | `economy.treasury_identity.get_current_owner_id` |
 | `get_model_uri` | `core.config.get_model_uri` |
-| `get_store` | `storage.db.get_store` |
+| `get_store` | `storage.records.get_store` |
 | `mcp_storage` | `mcp_server.storage` |
 | `record_usage` | `provider_accounts.quotas.record_usage` |
 | `registry` | `tool_providers.registry.registry` |

@@ -30,7 +30,7 @@ Everything `sessions` uses from other units is a field of `Host` in [`sessions/h
 | Port | Provided by |
 | --- | --- |
 | `get_memory_client` | `agent_memory.client.get_memory_client` |
-| `memory_file_path` | `storage.db.memory_file_path` |
+| `memory_file_path` | `storage.records.memory_file_path` |
 
 ## Install
 

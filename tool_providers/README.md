@@ -40,7 +40,7 @@ Everything `tool_providers` uses from other units is a field of `Host` in [`tool
 | `build_runtime` | `remote_runtime.ssh_settings.build_runtime` |
 | `enqueue_local_tool_job` | `agent_runtime.local_gateway.enqueue_local_tool_job` |
 | `external_tool_sources` | `composition.tool_sources.SOURCES` |
-| `memory_file_path` | `storage.db.memory_file_path` |
+| `memory_file_path` | `storage.records.memory_file_path` |
 | `wait_for_local_tool_job` | `agent_runtime.local_gateway.wait_for_local_tool_job` |
 
 ## Install

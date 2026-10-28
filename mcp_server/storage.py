@@ -45,8 +45,12 @@ DEFAULT_CONFIGS = {
 }
 
 
-def init_db() -> None:
+def open_journal_store() -> None:
     get_store()
+
+
+# Former name, kept for existing callers.
+init_db = open_journal_store
 
 
 def _seal_fields(data: dict[str, Any]) -> dict[str, Any]:

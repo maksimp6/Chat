@@ -34,7 +34,7 @@ Everything `agent_memory` uses from other units is a field of `Host` in [`agent_
 | Port | Provided by |
 | --- | --- |
 | `kristall_Kristall` | `kristall.Kristall` |
-| `memory_file_path` | `storage.db.memory_file_path` |
+| `memory_file_path` | `storage.records.memory_file_path` |
 
 ## Install
 

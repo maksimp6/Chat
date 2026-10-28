@@ -39,12 +39,12 @@ Everything `remote_runtime` uses from other units is a field of `Host` in [`remo
 | `bind_runtime_request` | `runtime.request_context.bind_runtime_request` |
 | `close_memory_clients` | `agent_memory.client.close_memory_clients` |
 | `create_invocation_trace` | `invocation.trace.create_invocation_trace` |
-| `get_config` | `storage.db.get_config` |
+| `get_config` | `storage.records.get_config` |
 | `get_current_owner_id` | `economy.treasury_identity.get_current_owner_id` |
 | `get_current_trace` | `observability.trace_manager.get_current_trace` |
-| `get_store` | `storage.db.get_store` |
-| `init_runtime_db` | `storage.db.init_db` |
-| `set_config` | `storage.db.set_config` |
+| `get_store` | `storage.records.get_store` |
+| `init_runtime_db` | `storage.records.open_journal_store` |
+| `set_config` | `storage.records.set_config` |
 
 </details>
 
@@ -53,4 +53,4 @@ Everything `remote_runtime` uses from other units is a field of `Host` in [`remo
 - `composition/wiring.py` registers the `remote_runtime` host factory (`register_all()`, or `register_units("remote_runtime")` for this unit alone); the host is built on first use.
 - `composition/web.py` registers the blueprints `environment_bp` (`remote_runtime.environment_routes`), `environment_gateway_bp` (`remote_runtime.environment_routes`).
 - `composition/web.py` calls `remote_runtime.ssh_routes.install(app)`.
-- Storage start-up (`web_shell`) runs `remote_runtime.environments.init_environment_tables`.
+- Storage start-up (`web_shell`) runs `remote_runtime.environments.prepare_environment_records`.

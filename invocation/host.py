@@ -21,8 +21,8 @@ class Host:
     MAX_JOURNAL_FRAME_BYTES: Any  # kristall.store.MAX_JOURNAL_FRAME_BYTES
     create_session: Any  # sessions.manager.create_session
     get_memory_client: Any  # agent_memory.client.get_memory_client
-    get_messages: Any  # storage.db.get_messages
-    memory_file_path: Any  # storage.db.memory_file_path
+    get_messages: Any  # storage.records.get_messages
+    memory_file_path: Any  # storage.records.memory_file_path
     restore_session: Any  # sessions.manager.restore_session
 
 

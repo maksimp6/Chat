@@ -17,6 +17,7 @@ from agent_runtime._binding import Binding, HostNotBound
 class Host:
     Config: Any  # core.config.Config
     DatabaseError: Any  # storage.memory_db.DatabaseError
+    KristallError: Any  # kristall.KristallError
     LogosClient: Any  # chat.mcp_routes.LogosClient
     UniversalToolCall: Any  # tool_providers.universal_tool_platform.UniversalToolCall
     UniversalToolExecutor: (
@@ -32,7 +33,7 @@ class Host:
     fail_invocation: Any  # invocation.manager.fail_invocation
     filesystem: Any  # tool_providers.filesystem
     finish_invocation: Any  # invocation.manager.finish_invocation
-    get_store: Any  # storage.db.get_store
+    get_store: Any  # storage.records.get_store
     initialize_application: Any  # composition.application.initialize
     persist_invocation_trace: Any  # invocation.manager.persist_invocation_trace
     registry: Any  # tool_providers.registry.registry

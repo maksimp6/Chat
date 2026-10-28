@@ -15,7 +15,7 @@ Other units reach it only through their own ports:
 | Provides | To |
 | --- | --- |
 | `kristall.Kristall` | `agent_memory` |
-| `kristall.KristallError` | `agent_shell`, `economy`, `invocation`, `storage`, `tool_providers`, `web_shell` |
+| `kristall.KristallError` | `agent_runtime`, `agent_shell`, `economy`, `invocation`, `storage`, `tool_providers`, `tools.knowledge`, `web_shell` |
 | `kristall.KristallLimitError` | `invocation` |
 | `kristall.store.MAX_JOURNAL_FRAME_BYTES` | `invocation` |
 

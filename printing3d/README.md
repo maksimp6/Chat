@@ -4,7 +4,7 @@ The 3D-printing business domain, independent of the host app (quotes and finance
 
 ## Public API
 
-`from forge import …`: `init_printing_tables`, `printing_store`.
+`from forge import …`: `init_printing_tables`, `prepare_printing_records`, `printing_store`.
 
 | Module | Purpose |
 | --- | --- |
@@ -41,7 +41,7 @@ Everything `forge` uses from other units is a field of `Host` in [`forge/host.py
 | Port | Provided by |
 | --- | --- |
 | `get_current_owner_id` | `economy.treasury_identity.get_current_owner_id` |
-| `get_store` | `storage.db.get_store` |
+| `get_store` | `storage.records.get_store` |
 
 Everything `printing3d` uses from other units is a field of `Host` in [`printing3d/host.py`](host.py), read only when a function runs. Functions keep their names as call shims; other ports are `bound.<name>`.
 
@@ -54,5 +54,5 @@ Everything `printing3d` uses from other units is a field of `Host` in [`printing
 - `composition/wiring.py` registers the `forge` host factory (`register_all()`, or `register_units("forge")` for this unit alone); the host is built on first use.
 - `composition/wiring.py` registers the `printing3d` host factory (`register_all()`, or `register_units("printing3d")` for this unit alone); the host is built on first use.
 - `composition/web.py` registers the blueprint `printing3d_bp` (`forge.routes`).
-- Storage start-up (`web_shell`) runs `forge.init_printing_tables`.
+- Storage start-up (`web_shell`) runs `forge.prepare_printing_records`.
 - `composition/tool_sources.py` adds the `3d` tool category from `forge.tools`.

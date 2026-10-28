@@ -19,7 +19,7 @@ class Host:
     create_session: Any  # sessions.manager.create_session
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_session: Any  # sessions.manager.get_session
-    get_store: Any  # storage.db.get_store
+    get_store: Any  # storage.records.get_store
     validate_json_schema: (
         Any  # tool_providers.universal_tool_platform.validate_json_schema
     )

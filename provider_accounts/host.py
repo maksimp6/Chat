@@ -44,7 +44,7 @@ class Host:
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_current_trace: Any  # observability.trace_manager.get_current_trace
     get_model_uri: Any  # core.config.get_model_uri
-    get_store: Any  # storage.db.get_store
+    get_store: Any  # storage.records.get_store
     provider_request_headers: (
         Any  # yandex_client_modules.request_mixin.provider_request_headers
     )

@@ -36,12 +36,13 @@ Other units reach it only through their own ports:
 Everything `agent_runtime` uses from other units is a field of `Host` in [`agent_runtime/host.py`](host.py), read only when a function runs. Functions keep their names as call shims; other ports are `bound.<name>`.
 
 <details>
-<summary>19 ports</summary>
+<summary>20 ports</summary>
 
 | Port | Provided by |
 | --- | --- |
 | `Config` | `core.config.Config` |
 | `DatabaseError` | `storage.memory_db.DatabaseError` |
+| `KristallError` | `kristall.KristallError` |
 | `LogosClient` | `chat.mcp_routes.LogosClient` |
 | `UniversalToolCall` | `tool_providers.universal_tool_platform.UniversalToolCall` |
 | `bootstrap_credential` | `provider_accounts.credentials.bootstrap_credential` |
@@ -54,7 +55,7 @@ Everything `agent_runtime` uses from other units is a field of `Host` in [`agent
 | `fail_invocation` | `invocation.manager.fail_invocation` |
 | `filesystem` | `tool_providers.filesystem` |
 | `finish_invocation` | `invocation.manager.finish_invocation` |
-| `get_store` | `storage.db.get_store` |
+| `get_store` | `storage.records.get_store` |
 | `initialize_application` | `composition.application.initialize` |
 | `persist_invocation_trace` | `invocation.manager.persist_invocation_trace` |
 | `registry` | `tool_providers.registry.registry` |
@@ -66,4 +67,4 @@ Everything `agent_runtime` uses from other units is a field of `Host` in [`agent
 
 - `composition/wiring.py` registers the `agent_runtime` host factory (`register_all()`, or `register_units("agent_runtime")` for this unit alone); the host is built on first use.
 - `composition/web.py` registers the blueprint `local_agent_bp` (`agent_runtime.local_gateway`).
-- Storage start-up (`web_shell`) runs `agent_runtime.local_gateway.init_local_agent_tables`.
+- Storage start-up (`web_shell`) runs `agent_runtime.local_gateway.prepare_local_agent_records`.

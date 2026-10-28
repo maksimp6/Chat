@@ -22,7 +22,7 @@ class Host:
     KristallError: Any  # kristall.KristallError
     canonical_model_key: Any  # core.config.canonical_model_key
     get_current_trace: Any  # observability.trace_manager.get_current_trace
-    get_store: Any  # storage.db.get_store
+    get_store: Any  # storage.records.get_store
 
 
 _binding: Binding[Host] = Binding("economy")

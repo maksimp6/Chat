@@ -31,7 +31,7 @@ Everything `secret_store` uses from other units is a field of `Host` in [`secret
 | --- | --- |
 | `CloudProviderError` | `cloud.base.CloudProviderError` |
 | `get_current_trace` | `observability.trace_manager.get_current_trace` |
-| `get_store` | `storage.db.get_store` |
+| `get_store` | `storage.records.get_store` |
 
 ## Install
 

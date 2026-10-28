@@ -65,6 +65,7 @@ def _runtime_errors() -> tuple[type[BaseException], ...]:
         LookupError,
         ImportError,
         bound.DatabaseError,
+        bound.KristallError,
         bound.YandexClientError,
     )
 

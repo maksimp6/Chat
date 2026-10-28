@@ -101,7 +101,7 @@ def _default_policy_values() -> tuple[int, int, int]:
     )
 
 
-def init_quota_tables() -> None:
+def prepare_quota_records() -> None:
     period, maximum, rate = _default_policy_values()
     now = int(time.time())
     key = "quota/policy/" + DEFAULT_POLICY
@@ -122,6 +122,10 @@ def init_quota_tables() -> None:
             tx.set(key, row)
 
 
+# Former name, kept for existing callers.
+init_quota_tables = prepare_quota_records
+
+
 def upsert_policy(
     name: str,
     *,
@@ -138,7 +142,7 @@ def upsert_policy(
         or max_requests_per_minute < 0
     ):
         raise ValueError("invalid quota policy")
-    init_quota_tables()
+    prepare_quota_records()
     key = "quota/policy/" + name
     now = int(time.time())
     with get_store().transaction() as tx:
@@ -164,7 +168,7 @@ def assign_user_policy(user_id: str, policy_name: str) -> None:
     )
     if not user_id or not policy_name:
         raise ValueError("user and policy are required")
-    init_quota_tables()
+    prepare_quota_records()
     with get_store().transaction() as tx:
         if tx.get("quota/policy/" + policy_name) is None:
             raise ValueError("quota policy not found")
@@ -172,7 +176,7 @@ def assign_user_policy(user_id: str, policy_name: str) -> None:
 
 
 def get_user_policy(user_id: str) -> dict[str, Any]:
-    init_quota_tables()
+    prepare_quota_records()
     store = get_store()
     with store.transaction() as tx:
         return _policy_for(tx, user_id)
@@ -186,7 +190,7 @@ def release_request(reservation: Optional[QuotaReservation]) -> None:
     """
     if reservation is None:
         return
-    init_quota_tables()
+    prepare_quota_records()
     key = "quota/usage/" + reservation.user_id
     with get_store().transaction() as tx:
         usage = tx.get(key)
@@ -250,7 +254,7 @@ def reserve_request(
     rate_window_start = (now_value // 60) * 60
     rate_reset_at = rate_window_start + 60
 
-    init_quota_tables()
+    prepare_quota_records()
     with get_store().transaction() as tx:
         policy = _policy_for(tx, trusted_user_id)
         if not policy["enabled"]:
@@ -358,7 +362,7 @@ def get_usage(user_id: str, *, now: Optional[int] = None) -> dict[str, Any]:
     period_start = (now_value // policy["period_seconds"]) * policy["period_seconds"]
     rate_window_start = (now_value // 60) * 60
 
-    init_quota_tables()
+    prepare_quota_records()
     row = get_store().get("quota/usage/" + user_id)
 
     if row is None:
@@ -399,6 +403,7 @@ __all__ = [
     "assign_user_policy",
     "get_usage",
     "get_user_policy",
+    "prepare_quota_records",
     "init_quota_tables",
     "record_usage",
     "reserve_request",

@@ -16,7 +16,7 @@ from sessions._binding import Binding, HostNotBound
 @dataclass(frozen=True, kw_only=True)
 class Host:
     get_memory_client: Any  # agent_memory.client.get_memory_client
-    memory_file_path: Any  # storage.db.memory_file_path
+    memory_file_path: Any  # storage.records.memory_file_path
 
 
 _binding: Binding[Host] = Binding("sessions")

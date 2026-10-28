@@ -16,7 +16,7 @@ from agent_memory._binding import Binding, HostNotBound
 @dataclass(frozen=True, kw_only=True)
 class Host:
     kristall_Kristall: Any  # kristall.Kristall
-    memory_file_path: Any  # storage.db.memory_file_path
+    memory_file_path: Any  # storage.records.memory_file_path
 
 
 _binding: Binding[Host] = Binding("agent_memory")

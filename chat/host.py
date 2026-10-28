@@ -55,7 +55,7 @@ class Host:
     )
     _response_input: Any  # yandex_client_modules.request_builder.response_input
     _transport_timeout: Any  # yandex_client_modules.request_mixin.transport_timeout
-    add_message: Any  # storage.db.add_message
+    add_message: Any  # storage.records.add_message
     aggregate_billing: Any  # economy.billing.aggregate_billing
     bind_current_trace: Any  # observability.trace_manager.bind_current_trace
     build_ai_billing_item: Any  # economy.billing.build_ai_billing_item
@@ -68,28 +68,30 @@ class Host:
     check_access: Any  # conversations.ownership.check_access
     completion_model_keys: Any  # core.model_profiles.completion_model_keys
     compose_skill_instructions: Any  # agent_skills.registry.compose_skill_instructions
-    create_conversation: Any  # storage.db.create_conversation
+    create_conversation: Any  # storage.records.create_conversation
     create_invocation: Any  # invocation.manager.create_invocation
     create_invocation_trace: Any  # invocation.trace.create_invocation_trace
     fail_invocation: Any  # invocation.manager.fail_invocation
     finish_invocation: Any  # invocation.manager.finish_invocation
     generate_realtime: Any  # yandex_client_modules.realtime.generate_realtime
-    get_conv_settings: Any  # storage.db.get_conv_settings
-    get_conversation_title: Any  # storage.db.get_conversation_title
+    get_conv_settings: Any  # storage.records.get_conv_settings
+    get_conversation_title: Any  # storage.records.get_conversation_title
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_current_trace: Any  # observability.trace_manager.get_current_trace
-    get_message: Any  # storage.db.get_message
-    get_messages: Any  # storage.db.get_messages
+    get_message: Any  # storage.records.get_message
+    get_messages: Any  # storage.records.get_messages
     get_model_discovery: Any  # provider_accounts.model_discovery.get_model_discovery
     get_model_uri: Any  # core.config.get_model_uri
-    get_store: Any  # storage.db.get_store
-    get_yandex_conversation: Any  # storage.db.get_yandex_conversation
+    get_store: Any  # storage.records.get_store
+    get_yandex_conversation: Any  # storage.records.get_yandex_conversation
     image_file_metadata: Any  # storage.generated_images.image_file_metadata
-    is_provider_pending: Any  # storage.db.is_provider_pending
+    is_provider_pending: Any  # storage.records.is_provider_pending
     list_owned_conversations: Any  # conversations.ownership.list_owned_conversations
-    maybe_update_conversation_title: Any  # storage.db.maybe_update_conversation_title
+    maybe_update_conversation_title: (
+        Any  # storage.records.maybe_update_conversation_title
+    )
     mcp_storage: Any  # mcp_server.storage
-    normalize_conversation_title: Any  # storage.db.normalize_conversation_title
+    normalize_conversation_title: Any  # storage.records.normalize_conversation_title
     normalize_tools_config: (
         Any  # yandex_client_modules.tool_config.normalize_tools_config
     )
@@ -105,10 +107,10 @@ class Host:
     request_image: Any  # yandex_client_modules.image_generation.generate_image
     reserve_request: Any  # provider_accounts.quotas.reserve_request
     reset_current_trace: Any  # observability.trace_manager.reset_current_trace
-    save_conv_settings: Any  # storage.db.save_conv_settings
+    save_conv_settings: Any  # storage.records.save_conv_settings
     save_image_file: Any  # storage.generated_images.save_image_file
     set_owner: Any  # conversations.ownership.set_owner
-    set_yandex_conversation: Any  # storage.db.set_yandex_conversation
+    set_yandex_conversation: Any  # storage.records.set_yandex_conversation
     settle_billing_to_treasury: Any  # economy.billing.settle_billing_to_treasury
     start_invocation: Any  # invocation.manager.start_invocation
     traced_operation: Any  # observability.trace_manager.traced_operation

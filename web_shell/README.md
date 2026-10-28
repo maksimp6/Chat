@@ -21,8 +21,8 @@ Everything `web_shell` uses from other units is a field of `Host` in [`web_shell
 | `current_runtime_base_path` | `runtime.current_runtime_base_path` |
 | `get_current_owner_id` | `economy.treasury_identity.get_current_owner_id` |
 | `get_donation_url` | `core.config.get_donation_url` |
-| `get_store` | `storage.db.get_store` |
-| `memory_file_path` | `storage.db.memory_file_path` |
+| `get_store` | `storage.records.get_store` |
+| `memory_file_path` | `storage.records.memory_file_path` |
 | `problem` | `invocation.problems.problem` |
 | `storage_initializers` | `composition.web.STORAGE_INITIALIZERS` |
 

@@ -9,6 +9,10 @@ def printing_store() -> PrintStore:
     return get_store()
 
 
-def init_printing_tables() -> None:
+def prepare_printing_records() -> None:
     """Open the native store once at startup so a missing journal fails fast."""
     printing_store()
+
+
+# Former name, kept for existing callers.
+init_printing_tables = prepare_printing_records

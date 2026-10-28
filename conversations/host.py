@@ -19,18 +19,18 @@ class Host:
         Any  # agent_memory.conversation_ownership_store.ConversationOwnershipStore
     )
     ModelDiscoveryError: Any  # provider_accounts.model_discovery.ModelDiscoveryError
-    delete_conversation: Any  # storage.db.delete_conversation
-    get_conv_settings: Any  # storage.db.get_conv_settings
-    get_conversations: Any  # storage.db.get_conversations
+    delete_conversation: Any  # storage.records.delete_conversation
+    get_conv_settings: Any  # storage.records.get_conv_settings
+    get_conversations: Any  # storage.records.get_conversations
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_memory_client: Any  # agent_memory.client.get_memory_client
-    memory_file_path: Any  # storage.db.memory_file_path
+    memory_file_path: Any  # storage.records.memory_file_path
     normalize_tools_config: (
         Any  # yandex_client_modules.tool_config.normalize_tools_config
     )
-    save_conv_settings: Any  # storage.db.save_conv_settings
-    update_conversation_model: Any  # storage.db.update_conversation_model
-    update_conversation_title: Any  # storage.db.update_conversation_title
+    save_conv_settings: Any  # storage.records.save_conv_settings
+    update_conversation_model: Any  # storage.records.update_conversation_model
+    update_conversation_title: Any  # storage.records.update_conversation_title
     validate_dialog_model: (
         Any  # provider_accounts.model_discovery.validate_dialog_model
     )

@@ -21,8 +21,12 @@ def _money(value: Any) -> Decimal:
     return result
 
 
-def init_treasury_tables() -> None:
+def prepare_treasury_records() -> None:
     get_store()
+
+
+# Former name, kept for existing callers.
+init_treasury_tables = prepare_treasury_records
 
 
 def _empty_account(owner_id: str) -> dict[str, Any]:

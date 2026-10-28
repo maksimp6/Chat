@@ -43,7 +43,7 @@ Durability and integrity:
 
 ## Journal location
 
-`storage/db.py` (`memory_file_path`) chooses the journal in this order:
+`storage/records.py` (`memory_file_path`) chooses the journal in this order:
 
 1. Inside a preview runtime, `<runtime data root>/logos.memory`.
 2. `LOGOS_MEMORY_PATH`, when set, is used as the journal path.

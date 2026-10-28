@@ -36,7 +36,7 @@ policy in `runtime-dispatcher-policy.md`.
 ### Database scope
 
 The runtime data root is carried with the worker through request-local
-`ContextVar` state. `storage.db.memory_file_path()` detects that scope and resolves it to
+`ContextVar` state. `storage.records.memory_file_path()` detects that scope and resolves it to
 `<runtime-data-root>/logos.memory` instead of the process journal.
 
 A preview runtime does not silently inherit the process journal. Its native Kristall

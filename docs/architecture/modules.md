@@ -35,7 +35,7 @@ Every unit has a `README.md` with its **Public API**, its **Ports** and how it i
 # chat/host.py (generated) -- the ports of the chat unit
 @dataclass(frozen=True, kw_only=True)
 class Host:
-    get_store: Any  # storage.db.get_store
+    get_store: Any  # storage.records.get_store
     Config: Any  # core.config.Config
     ...
 
@@ -78,7 +78,7 @@ The binding mechanism is `core/host_binding.py`, vendored into each such unit as
 
 1. Use the name in your unit as if it were local, through your host:
    `from <unit>.host import bound, <function>`.
-2. Add the field to `Host` with a comment naming its provider (`# storage.db.get_store`),
+2. Add the field to `Host` with a comment naming its provider (`# storage.records.get_store`),
    plus a call shim for a function.
 3. Import the provider in your unit's factory in `composition/wiring.py`.
 4. Run `python3 scripts/check_independence.py --summary` and expect `TOTAL=0`.

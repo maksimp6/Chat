@@ -37,10 +37,10 @@ class Host:
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_invocation_status: Any  # invocation.api.get_invocation_status
     get_invocation_trace: Any  # invocation.api.get_invocation_trace
-    get_messages: Any  # storage.db.get_messages
+    get_messages: Any  # storage.records.get_messages
     get_owned_conversation: Any  # conversations.ownership.get_owned_conversation
     get_session: Any  # sessions.manager.get_session
-    get_store: Any  # storage.db.get_store
+    get_store: Any  # storage.records.get_store
     grep_search: Any  # tool_providers.filesystem.grep_search
     list_directory: Any  # tool_providers.filesystem.list_directory
     list_owned_conversations: Any  # conversations.ownership.list_owned_conversations

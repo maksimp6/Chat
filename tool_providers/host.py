@@ -23,7 +23,7 @@ class Host:
     build_runtime: Any  # remote_runtime.ssh_settings.build_runtime
     enqueue_local_tool_job: Any  # agent_runtime.local_gateway.enqueue_local_tool_job
     external_tool_sources: Any  # composition.tool_sources.SOURCES
-    memory_file_path: Any  # storage.db.memory_file_path
+    memory_file_path: Any  # storage.records.memory_file_path
     wait_for_local_tool_job: Any  # agent_runtime.local_gateway.wait_for_local_tool_job
 
 

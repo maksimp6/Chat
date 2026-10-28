@@ -44,10 +44,10 @@ Everything `economy` uses from other units is a field of `Host` in [`economy/hos
 | `KristallError` | `kristall.KristallError` |
 | `canonical_model_key` | `core.config.canonical_model_key` |
 | `get_current_trace` | `observability.trace_manager.get_current_trace` |
-| `get_store` | `storage.db.get_store` |
+| `get_store` | `storage.records.get_store` |
 
 ## Install
 
 - `composition/wiring.py` registers the `economy` host factory (`register_all()`, or `register_units("economy")` for this unit alone); the host is built on first use.
 - `composition/web.py` calls `economy.treasury_routes.install(app)`.
-- Storage start-up (`web_shell`) runs `economy.treasury.init_treasury_tables`.
+- Storage start-up (`web_shell`) runs `economy.treasury.prepare_treasury_records`.

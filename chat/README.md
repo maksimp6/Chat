@@ -26,7 +26,7 @@ Other units reach it only through their own ports:
 Everything `chat` uses from other units is a field of `Host` in [`chat/host.py`](host.py), read only when a function runs. Functions keep their names as call shims; other ports are `bound.<name>`.
 
 <details>
-<summary>69 ports</summary>
+<summary>68 ports</summary>
 
 | Port | Provided by |
 | --- | --- |
@@ -54,35 +54,34 @@ Everything `chat` uses from other units is a field of `Host` in [`chat/host.py`]
 | `_record_quota_usage` | `yandex_client_modules.request_mixin.record_quota_usage` |
 | `_response_input` | `yandex_client_modules.request_builder.response_input` |
 | `_transport_timeout` | `yandex_client_modules.request_mixin.transport_timeout` |
-| `add_message` | `storage.db.add_message` |
+| `add_message` | `storage.records.add_message` |
 | `aggregate_billing` | `economy.billing.aggregate_billing` |
 | `bind_current_trace` | `observability.trace_manager.bind_current_trace` |
 | `build_ai_billing_item` | `economy.billing.build_ai_billing_item` |
 | `check_access` | `conversations.ownership.check_access` |
 | `completion_model_keys` | `core.model_profiles.completion_model_keys` |
 | `compose_skill_instructions` | `agent_skills.registry.compose_skill_instructions` |
-| `create_conversation` | `storage.db.create_conversation` |
+| `create_conversation` | `storage.records.create_conversation` |
 | `create_invocation` | `invocation.manager.create_invocation` |
 | `create_invocation_trace` | `invocation.trace.create_invocation_trace` |
 | `fail_invocation` | `invocation.manager.fail_invocation` |
 | `finish_invocation` | `invocation.manager.finish_invocation` |
 | `generate_realtime` | `yandex_client_modules.realtime.generate_realtime` |
-| `get_conv_settings` | `storage.db.get_conv_settings` |
-| `get_conversation_title` | `storage.db.get_conversation_title` |
+| `get_conv_settings` | `storage.records.get_conv_settings` |
+| `get_conversation_title` | `storage.records.get_conversation_title` |
 | `get_current_owner_id` | `economy.treasury_identity.get_current_owner_id` |
 | `get_current_trace` | `observability.trace_manager.get_current_trace` |
-| `get_message` | `storage.db.get_message` |
-| `get_messages` | `storage.db.get_messages` |
+| `get_message` | `storage.records.get_message` |
+| `get_messages` | `storage.records.get_messages` |
 | `get_model_discovery` | `provider_accounts.model_discovery.get_model_discovery` |
 | `get_model_uri` | `core.config.get_model_uri` |
-| `get_store` | `storage.db.get_store` |
-| `get_yandex_conversation` | `storage.db.get_yandex_conversation` |
+| `get_store` | `storage.records.get_store` |
+| `get_yandex_conversation` | `storage.records.get_yandex_conversation` |
 | `image_file_metadata` | `storage.generated_images.image_file_metadata` |
-| `is_provider_pending` | `storage.db.is_provider_pending` |
+| `is_provider_pending` | `storage.records.is_provider_pending` |
 | `list_owned_conversations` | `conversations.ownership.list_owned_conversations` |
-| `maybe_update_conversation_title` | `storage.db.maybe_update_conversation_title` |
 | `mcp_storage` | `mcp_server.storage` |
-| `normalize_conversation_title` | `storage.db.normalize_conversation_title` |
+| `normalize_conversation_title` | `storage.records.normalize_conversation_title` |
 | `open_image_file` | `storage.generated_images.open_image_file` |
 | `persist_invocation_trace` | `invocation.manager.persist_invocation_trace` |
 | `record_usage` | `provider_accounts.quotas.record_usage` |
@@ -92,10 +91,10 @@ Everything `chat` uses from other units is a field of `Host` in [`chat/host.py`]
 | `request_image` | `yandex_client_modules.image_generation.generate_image` |
 | `reserve_request` | `provider_accounts.quotas.reserve_request` |
 | `reset_current_trace` | `observability.trace_manager.reset_current_trace` |
-| `save_conv_settings` | `storage.db.save_conv_settings` |
+| `save_conv_settings` | `storage.records.save_conv_settings` |
 | `save_image_file` | `storage.generated_images.save_image_file` |
 | `set_owner` | `conversations.ownership.set_owner` |
-| `set_yandex_conversation` | `storage.db.set_yandex_conversation` |
+| `set_yandex_conversation` | `storage.records.set_yandex_conversation` |
 | `settle_billing_to_treasury` | `economy.billing.settle_billing_to_treasury` |
 | `start_invocation` | `invocation.manager.start_invocation` |
 | `traced_operation` | `observability.trace_manager.traced_operation` |

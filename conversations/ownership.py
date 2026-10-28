@@ -47,10 +47,14 @@ def _store() -> Any:
     return bound.ConversationOwnershipStore(get_memory_client(memory_file_path()))
 
 
-def init_conversation_ownership_table() -> None:
+def prepare_conversation_ownership_records() -> None:
     """Ensure the native ownership store is available."""
     with _OWNERSHIP_LOCK:
         _store()
+
+
+# Former name, kept for existing callers.
+init_conversation_ownership_table = prepare_conversation_ownership_records
 
 
 def get_owner(conversation_id: str) -> Optional[str]:

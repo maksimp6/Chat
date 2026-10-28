@@ -47,10 +47,10 @@ Everything `mcp_server` uses from other units is a field of `Host` in [`mcp_serv
 | `get_current_owner_id` | `economy.treasury_identity.get_current_owner_id` |
 | `get_invocation_status` | `invocation.api.get_invocation_status` |
 | `get_invocation_trace` | `invocation.api.get_invocation_trace` |
-| `get_messages` | `storage.db.get_messages` |
+| `get_messages` | `storage.records.get_messages` |
 | `get_owned_conversation` | `conversations.ownership.get_owned_conversation` |
 | `get_session` | `sessions.manager.get_session` |
-| `get_store` | `storage.db.get_store` |
+| `get_store` | `storage.records.get_store` |
 | `grep_search` | `tool_providers.filesystem.grep_search` |
 | `list_directory` | `tool_providers.filesystem.list_directory` |
 | `list_owned_conversations` | `conversations.ownership.list_owned_conversations` |

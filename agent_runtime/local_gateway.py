@@ -152,8 +152,12 @@ def _require_agent(agent_id: str) -> dict[str, Any]:
     return row
 
 
-def init_local_agent_tables() -> None:
+def prepare_local_agent_records() -> None:
     get_store()
+
+
+# Former name, kept for existing callers.
+init_local_agent_tables = prepare_local_agent_records
 
 
 def enqueue_local_tool_job(
@@ -545,6 +549,7 @@ def local_agent_health():
 __all__ = [
     "enqueue_local_tool_job",
     "wait_for_local_tool_job",
+    "prepare_local_agent_records",
     "init_local_agent_tables",
     "local_agent_bp",
 ]

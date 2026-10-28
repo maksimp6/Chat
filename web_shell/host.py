@@ -19,8 +19,8 @@ class Host:
     current_runtime_base_path: Any  # runtime.current_runtime_base_path
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_donation_url: Any  # core.config.get_donation_url
-    get_store: Any  # storage.db.get_store
-    memory_file_path: Any  # storage.db.memory_file_path
+    get_store: Any  # storage.records.get_store
+    memory_file_path: Any  # storage.records.memory_file_path
     problem: Any  # invocation.problems.problem
     storage_initializers: Any  # composition.web.STORAGE_INITIALIZERS
 

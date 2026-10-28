@@ -12,7 +12,7 @@ from __future__ import annotations
 from flask import Flask
 
 from agent_memory.routes import install as install_memory_routes
-from agent_runtime.local_gateway import init_local_agent_tables, local_agent_bp
+from agent_runtime.local_gateway import prepare_local_agent_records, local_agent_bp
 from chat.classification_routes import classification_bp
 from chat.completion_routes import completion_bp
 from chat.embedding_routes import embedding_bp
@@ -20,36 +20,36 @@ from chat.image_routes import image_bp
 from chat.mcp_routes import mcp_bp
 from chat.voice_routes import voice_bp
 from cloud.cloudru.iam_routes import cloudru_iam_bp
-from conversations.ownership import init_conversation_ownership_table
+from conversations.ownership import prepare_conversation_ownership_records
 from conversations.routes import install as install_conversation_routes
-from economy.treasury import init_treasury_tables
+from economy.treasury import prepare_treasury_records
 from economy.treasury_routes import install as install_treasury_routes
-from forge import init_printing_tables
+from forge import prepare_printing_records
 from forge.routes import printing3d_bp
 from mcp_server import chatgpt_mcp_bp
 from mcp_server.tools import register_mcp_tools
-from organization.departments import departments_bp, init_department_tables
+from organization.departments import departments_bp, prepare_department_records
 from organization.government import (
     ensure_government_department,
     government_bp,
-    init_government_tables,
+    prepare_government_records,
 )
 from organization.partner_relations import (
     ensure_partner_department,
-    init_partner_relations_tables,
+    prepare_partner_relations_records,
     partner_relations_bp,
 )
 from plugin_system.routes import plugin_bp
 from provider_accounts.credentials_routes import provider_credentials_bp
 from provider_accounts.model_routes import install as install_model_routes
 from provider_accounts.quota_routes import provider_quota_bp
-from provider_accounts.quotas import init_quota_tables
+from provider_accounts.quotas import prepare_quota_records
 from rdc_connection.pairing import install_rdc_pairing
 from remote_runtime.environment_routes import environment_bp, environment_gateway_bp
-from remote_runtime.environments import init_environment_tables
+from remote_runtime.environments import prepare_environment_records
 from remote_runtime.ssh_routes import install as install_ssh_routes
 from runtime.api import runtime_bp
-from storage.db import init_db
+from storage.records import open_journal_store
 from web_shell import install as install_web_shell
 from workspace.file_routes import file_bp
 from workspace.project_tree import project_tree_bp
@@ -79,18 +79,18 @@ BLUEPRINTS = (
 )
 
 STORAGE_INITIALIZERS = (
-    init_db,
-    init_local_agent_tables,
-    init_treasury_tables,
-    init_printing_tables,
-    init_conversation_ownership_table,
-    init_department_tables,
-    init_quota_tables,
-    init_partner_relations_tables,
+    open_journal_store,
+    prepare_local_agent_records,
+    prepare_treasury_records,
+    prepare_printing_records,
+    prepare_conversation_ownership_records,
+    prepare_department_records,
+    prepare_quota_records,
+    prepare_partner_relations_records,
     ensure_partner_department,
-    init_government_tables,
+    prepare_government_records,
     ensure_government_department,
-    init_environment_tables,
+    prepare_environment_records,
 )
 
 
