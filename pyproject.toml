@@ -30,3 +30,72 @@ exclude = [
 strict = true
 no_site_packages = true
 exclude = ["^docs/mirrors/", "^datasets/"]
+
+# Unit map for scripts/check_independence.py: which files form one unit and
+# which files are composition roots. See docs/architecture/modules.md.
+[tool.logos.independence]
+roots = ["app.py"]
+entry-blocks = []
+embedded-programs = []
+standalone-downloads = [
+    "scripts/redmi_app_launcher.py",
+    "scripts/redmi_wifi_probe.py",
+    "scripts/redmi_remove_autoupdate.py",
+    "scripts/redmi_screenshot_capture.py",
+    "scripts/publish_redmi_screenshots.py",
+    "scripts/logos_tools_self_check.py",
+    "scripts/redmi_root_agent.py",
+    "scripts/redmi_root_agent_e2e.py",
+    "scripts/redmi_candidate_tools_check.py",
+    "scripts/rag_ingest_via_app.py",
+]
+data-reads = ["scripts/validate_ultra_profiles.py -> core/config.py"]
+third-party = [
+    "flask", "werkzeug", "requests", "urllib3", "websockets", "dotenv", "PIL",
+    "cryptography", "yaml", "jsonschema", "referencing", "razdel", "unidiff",
+    "numpy", "matplotlib", "mpl_toolkits", "trimesh",
+]
+optional-third-party = ["cadquery", "paho"]
+per-file-dirs = ["scripts", "tools"]
+tool-dirs = ["scripts", "tools"]
+exclude = ["docs/", "datasets/"]
+effect-calls = ["ToolRegistry"]
+system-log-module = "observability.system_log"
+tool-registry-file = "tool_providers/registry.py"
+mcp-tools-file = "mcp_server/tools.py"
+
+[tool.logos.units]
+# One unit per top-level package or module unless listed here; one unit per
+# file under scripts/ and tools/ unless the file belongs to a cluster below.
+cloud = { packages = ["cloud"] }
+printing3d = { packages = ["printing3d", "forge"], forbid = [["printing3d", "forge"]] }
+"tools.knowledge" = { files = [
+    "scripts/retrieval_core.py", "scripts/semantic_pipeline.py", "scripts/rag_pipeline.py",
+    "scripts/logos_context.py", "scripts/logos_knowledge.py", "scripts/logos_project_tools.py",
+    "scripts/repository_corpus_actions.py", "scripts/repository_corpus_binary.py",
+    "scripts/repository_corpus_git.py", "scripts/repository_corpus_github.py",
+    "scripts/repository_rag.py", "scripts/repository_rag_resume.py",
+    "scripts/repository_rag_verify.py", "scripts/logos_dialogue.py", "scripts/logos_quality.py",
+    "scripts/logos_tool_probe.py", "scripts/logos_once.py",
+] }
+"tools.redmi-evidence" = { flat = true, files = [
+    "scripts/logos_tools_self_check.py", "scripts/recheck_logos_tools_self_check.py",
+    "scripts/redmi_screenshot_capture.py", "scripts/publish_redmi_screenshots.py",
+    "scripts/redmi_browser_probe.py", "scripts/redmi_issue_api_key_browser.py",
+    "scripts/redmi_candidate_tools_check.py",
+] }
+"tools.slicing" = { flat = true, files = [
+    "scripts/a1mini_preview.py", "scripts/a1mini_pla_cube_slice.py",
+    "scripts/a1mini_bagclip_slice.py", "scripts/a1mini_spindle_slice.py",
+    "scripts/logos_redmi9_stand_slice.py", "scripts/yorik_slice.py",
+] }
+"tools.lexical" = { files = ["scripts/lexical_pipeline.py", "scripts/lexical_work.py", "scripts/idea_parser.py"] }
+"tools.pr-court" = { files = ["scripts/pr_court.py", "scripts/pr_court_evidence.py"] }
+"tools.render-3d" = { files = ["scripts/render_3d_preview.py", "scripts/render_3d_worker.py", "scripts/publish_3d_previews.py"] }
+"tools.q14" = { files = ["scripts/q14_ai_review.py", "scripts/q14_simulation.py", "scripts/q14_observer.py"] }
+"tools.vision" = { files = [
+    "scripts/vision_loopback.py", "scripts/vision_perturbations.py", "scripts/vision_shapes.py",
+    "scripts/visual_object_benchmark.py", "scripts/visual_object_contract.py",
+] }
+"tools.device-rdc" = { flat = true, dirs = ["tools/device/rdc"] }
+"tools.android" = { flat = true, dirs = ["tools/android"] }
