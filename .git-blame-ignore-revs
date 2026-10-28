@@ -1,0 +1,6 @@
+# Bulk formatting commits that `git blame` should skip:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub applies this file automatically.
+
+# style: format Python sources with Ruff
+24ff026017ba3479cd205b663e432327fe26b006
