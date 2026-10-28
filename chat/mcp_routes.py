@@ -531,11 +531,35 @@ def __getattr__(name: str) -> Any:
 
 
 def _turn_cost(billing: dict[str, Any]) -> float | None:
-    """The cost recorded on a reply: the calculated total only. A turn with any unpriced item is
-    not posted to the treasury (see settle_billing_to_treasury), so it records no cost either."""
-    if billing.get("cost_status") != "calculated":
+    """The cost recorded on a reply: the priced part of the turn.
+
+    With an unpriced item the total is the known part (``cost_status`` partial);
+    it is not posted to the treasury, and that is filed for the owner by
+    ``_file_unsettled``. Only a turn with no priced model call has no cost."""
+    total = billing.get("total_cost")
+    if total is None:
         return None
-    return float(billing.get("total_cost") or 0)
+    return float(total)
+
+
+def _file_unsettled(settlement: dict[str, Any], **ids: Any) -> None:
+    """Every turn the treasury did not charge, except at a zero price, is a Court
+    case for the owner (AGENTS.md, «Ошибки и дела Суда»); the user is not told."""
+    status = settlement.get("status")
+    if status not in {"failed", "skipped"} or settlement.get("reason") == "zero_cost":
+        return
+    try:
+        file_court_case(
+            {
+                **{key: value for key, value in ids.items() if value is not None},
+                "error": {
+                    "code": f"treasury_settlement_{status}",
+                    "message": f"treasury settlement {status}: {settlement.get('reason')}",
+                },
+            }
+        )
+    except Exception:
+        logger.exception("[COURT] Settlement case was not filed")
 
 
 def _settled_turn_cost(
@@ -867,23 +891,14 @@ def _finalize_chat_turn(
             "status": "failed",
             "reason": failure_code or "treasury_settlement_failed",
         }
-        # The reply itself succeeded, so fail_invocation never runs: the Court
-        # case for this error is filed here (AGENTS.md, «Ошибки и дела Суда»).
-        try:
-            file_court_case(
-                {
-                    "invocation_id": invocation.invocation_id,
-                    "conversation_id": invocation.conversation_id,
-                    "session_id": invocation.session_id,
-                    "trace_id": invocation.trace_id,
-                    "error": {
-                        "code": "treasury_settlement_failed",
-                        "message": settlement_message,
-                    },
-                }
-            )
-        except Exception:
-            logger.exception("[COURT] Settlement case was not filed")
+    # The reply itself succeeded, so fail_invocation never runs for this.
+    _file_unsettled(
+        settlement,
+        invocation_id=invocation.invocation_id,
+        conversation_id=invocation.conversation_id,
+        session_id=invocation.session_id,
+        trace_id=invocation.trace_id,
+    )
 
     trace_data.setdefault("billing", {})["settlement"] = settlement
     billing = trace_data.get("billing") or {}
@@ -899,7 +914,7 @@ def _finalize_chat_turn(
         }
 
     persist_invocation_trace(invocation.invocation_id, trace_data)
-    add_message(
+    reply_message_id = add_message(
         invocation.conversation_id,
         "assistant",
         str(reply),
@@ -939,6 +954,8 @@ def _finalize_chat_turn(
         {
             "reply": reply,
             "user_message_id": user_message_id,
+            # The UI keys the reply bubble by its stored id.
+            "message_id": reply_message_id,
             "usage": usage,
             "cost": cost,
             "settlement": settlement,
@@ -1047,6 +1064,29 @@ def _chat_error_response(
     partial_output, _ = extract_last_response_text(responses)
     reply = format_partial_output_message(partial_output, error_message)
 
+    # Tokens the provider billed before the failure are a cost of this turn: it is
+    # settled like a reply (posting is idempotent, so a failure after an earlier
+    # posting finds it already_posted) and stored with the error message.
+    cost = None
+    if invocation is not None:
+        billing = trace_data.get("billing") or {}
+        settlement = {"status": "failed", "reason": "treasury_settlement_failed"}
+        try:
+            settlement = settle_billing_to_treasury(billing, invocation.user_id)
+        except Exception as settlement_error:
+            logger.exception("[BILLING] Treasury settlement of a failed turn failed")
+            if str(settlement_error) == "insufficient balance":
+                settlement["reason"] = "insufficient_balance"
+        trace_data.setdefault("billing", {})["settlement"] = settlement
+        cost = _settled_turn_cost(billing, settlement)
+        _file_unsettled(
+            settlement,
+            invocation_id=invocation.invocation_id,
+            conversation_id=invocation.conversation_id,
+            session_id=invocation.session_id,
+            trace_id=invocation.trace_id,
+        )
+
     if invocation is not None:
         persist_invocation_trace(invocation.invocation_id, trace_data)
     if can_write:
@@ -1054,6 +1094,7 @@ def _chat_error_response(
             conv_id,
             "assistant",
             reply,
+            cost=cost,
             trace={
                 "trace_id": invocation.trace_id,
                 "invocation_id": invocation.invocation_id,
@@ -1070,6 +1111,7 @@ def _chat_error_response(
         {
             "error": error_message,
             "reply": reply,
+            "cost": cost,
             "user_message_id": user_message_id,
             "partial_output": partial_output if partial_output else None,
             "invocation_id": invocation.invocation_id if invocation else None,
@@ -1611,7 +1653,13 @@ def execute_approved():
                 or bool(extract_function_calls(synth_response))
                 or not followup_reply.strip()
             )
-            usage = client.extract_usage(synth_response)
+            # No usage block (e.g. the follow-up request itself failed) is an unknown
+            # cost, not a free turn: extract_usage would report zeros.
+            usage = (
+                client.extract_usage(synth_response)
+                if isinstance(synth_response.get("usage"), dict)
+                else None
+            )
         except Exception:
             logger.exception("[TOOL_APPROVAL] Invalid follow-up model response")
             provider_diagnostics = {
@@ -1634,6 +1682,7 @@ def execute_approved():
             reply = followup_reply
         # The action has already run: a failure in billing or storage below must not report it as failed (#A-008).
         cost = None
+        settlement = {"status": "failed", "reason": "approval_billing_failed"}
         try:
             # The follow-up answer is a model call like any chat turn, so it is billed the same way.
             billing = aggregate_billing(
@@ -1644,16 +1693,19 @@ def execute_approved():
                     "conversation_id": conv_id,
                 },
             )
+            cost = _settled_turn_cost(billing, settlement)
             settlement = {"status": "failed", "reason": "treasury_settlement_failed"}
             try:
                 settlement = settle_billing_to_treasury(billing, owner_id)
-            except Exception:
+            except Exception as settlement_error:
                 logger.exception("[BILLING] Approval follow-up settlement failed")
-            cost = _settled_turn_cost(billing, settlement)
+                if str(settlement_error) == "insufficient balance":
+                    settlement["reason"] = "insufficient_balance"
         except Exception:
             logger.exception(
                 "[BILLING] Approval follow-up billing failed after the action ran"
             )
+        _file_unsettled(settlement, conversation_id=conv_id)
         try:
             add_message(
                 conv_id,

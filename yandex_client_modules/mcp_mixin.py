@@ -192,20 +192,27 @@ class YandexMcpMixin:
         # Shared conversations use the installation's MCP configuration, including
         # conversations created before ownership metadata existed.
         owner_id = get_current_owner_id()
+        def note(source: str, message: str) -> None:
+            """A part of the turn left out on purpose is recorded, not dropped silently."""
+            if trace is not None and isinstance(trace, bound.ExecutionTrace):
+                trace.record_error(source, message)
+
         enabled_servers = []
         if settings_id:
-            try:
-                enabled_servers = bound.mcp_storage.get_enabled_servers_for_conv(
-                    settings_id, owner_id=owner_id
-                )
-            except Exception:
-                enabled_servers = []
+            # A failed read must not turn into "no MCP servers": the turn fails with the cause.
+            enabled_servers = bound.mcp_storage.get_enabled_servers_for_conv(
+                settings_id, owner_id=owner_id
+            )
 
         for s in enabled_servers if execution_policy is None else []:
             if (s.get("config") or {}).get("requires_authorization") and not s.get(
                 "authorization"
             ):
                 # No token yet (e.g. the seeded RDC record): every call would be refused.
+                note(
+                    "mcp_servers",
+                    f"MCP server {s.get('server_label') or s.get('name')} left out: no token",
+                )
                 continue
             if s.get("server_url") or (s.get("connector_id") or "").startswith(
                 "connector_"
@@ -223,11 +230,10 @@ class YandexMcpMixin:
 
         active_cats = None
         if settings_id:
-            try:
-                preferences = upgrade_dialog_settings(get_conv_settings(settings_id) or {})
-                active_cats = preferences.get("active_tool_categories")
-            except Exception:
-                active_cats = None
+            # A failed read must not enable every category, including the ones the
+            # user turned off: the turn fails with the cause instead.
+            preferences = upgrade_dialog_settings(get_conv_settings(settings_id) or {})
+            active_cats = preferences.get("active_tool_categories")
 
         if active_cats is None:
             active_cats = params.get("active_tool_categories")
@@ -239,10 +245,8 @@ class YandexMcpMixin:
             active_cats = list(bound.registry.get_available_categories())
 
         hosted_tools = []
-        try:
-            conv_settings = get_conv_settings(settings_id) or {} if settings_id else {}
-        except Exception:
-            conv_settings = {}
+        # A failed read must not turn a disabled web search back on.
+        conv_settings = get_conv_settings(settings_id) or {} if settings_id else {}
         if not isinstance(conv_settings, dict):
             raise ValueError("Conversation settings must be a JSON object")
         if conv_settings:
@@ -347,6 +351,7 @@ class YandexMcpMixin:
                     )
             except Exception as e:
                 api_logger.error(f"[TOOLS] Ошибка категории {category}: {e}")
+                note("tool_category", f"tool category {category} left out: {e}")
 
         if local_tools:
             tools.extend(local_tools)
@@ -359,8 +364,9 @@ class YandexMcpMixin:
         if settings_id and execution_policy is None:
             try:
                 memory_summary = get_controlled_memory_summary()
-            except Exception:
+            except Exception as e:
                 api_logger.exception("[MEMORY] Память не подключена к ответу")
+                note("memory", f"memory left out of the reply: {type(e).__name__}: {e}")
                 memory_summary = ""
             if memory_summary:
                 ask_params["instructions"] = (
