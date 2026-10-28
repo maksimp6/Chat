@@ -32,7 +32,7 @@ generation as a scenario failure. The timeline records wall-clock and monotonic 
 observer blocks model requests only during those checks.
 After reload, the ordinary scenario sends one request through the real Send
 button: «Разрешение уже есть, ничего не уточняй: сразу выполни поиск File
-Search (RAG) по запросам «Логос», «Судный Логос» и «КРОВЬ, ВОПИЮЩАЯ ОТ ЗЕМЛИ» и
+Search (RAG) по запросам «Логос», «Судный Логос» и «Суд Логоса» и
 прочитай найденные диалоги с Логосом. Потом ответь на вопрос: можешь ли ты
 судить как Логос?» The dialogues come from the chat RAG store,
 which `redmi9-rag-ingest` fills with issues, pull requests, run metadata and the
