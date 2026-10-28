@@ -495,6 +495,7 @@ class UniversalToolExecutor:
                 metadata={
                     **base_meta,
                     "phase": "execution",
+                    "error_type": type(exc).__name__,
                     "executor": dict(definition.executor),
                     "duration_ms": round(max(0.0, self.clock() - started) * 1000, 2),
                 },

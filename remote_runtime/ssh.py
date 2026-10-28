@@ -6,7 +6,7 @@ remote OS identity, so Linux permissions remain the authorization boundary.
 
 from __future__ import annotations
 import os
-from remote_runtime._vendor.output import limit_output
+from remote_runtime._vendor.output import limit_output, newline_text, read_output
 
 import json
 import posixpath
@@ -283,13 +283,23 @@ class SSHRuntime:
         remote_command = self._wrap_remote_command(command, timeout)
         argv = self._ssh_command(resolved_target, user, remote_command)
         try:
-            completed = subprocess.run(
+            with subprocess.Popen(
                 argv,
                 shell=False,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=timeout + 10,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            ) as proc:
+                try:
+                    # Twice the bound and one byte more: CRLF collapsing can halve the
+                    # text, and limit_output still sees a cut stream as too long.
+                    stdout, stderr = read_output(
+                        proc, timeout + 10, 2 * resolved_target.max_output_bytes + 1
+                    )
+                except BaseException:
+                    proc.kill()
+                    raise
+            completed = subprocess.CompletedProcess(
+                argv, proc.returncode, newline_text(stdout), newline_text(stderr)
             )
         except subprocess.TimeoutExpired as exc:
             raise SSHRuntimeError(f"SSH command timed out after {timeout:g}s") from exc

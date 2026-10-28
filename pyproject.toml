@@ -159,6 +159,7 @@ copies = [
 canonical = "core/output.py"
 copies = [
     "remote_runtime/_vendor/output.py",
+    "sessions/_vendor/output.py",
     "tool_providers/_vendor/output.py",
 ]
 

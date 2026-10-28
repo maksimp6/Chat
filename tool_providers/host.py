@@ -24,6 +24,7 @@ class Host:
     enqueue_local_tool_job: Any  # agent_runtime.local_gateway.enqueue_local_tool_job
     external_tool_sources: Any  # composition.tool_sources.SOURCES
     memory_file_path: Any  # storage.records.memory_file_path
+    runtime_for_operation: Any  # remote_runtime.ssh_settings.runtime_for_operation
     wait_for_local_tool_job: Any  # agent_runtime.local_gateway.wait_for_local_tool_job
 
 
@@ -44,6 +45,7 @@ __all__ = [
     "build_runtime",
     "enqueue_local_tool_job",
     "memory_file_path",
+    "runtime_for_operation",
     "wait_for_local_tool_job",
 ]
 
@@ -62,6 +64,10 @@ def enqueue_local_tool_job(*args: Any, **kwargs: Any) -> Any:
 
 def memory_file_path(*args: Any, **kwargs: Any) -> Any:
     return current().memory_file_path(*args, **kwargs)
+
+
+def runtime_for_operation(*args: Any, **kwargs: Any) -> Any:
+    return current().runtime_for_operation(*args, **kwargs)
 
 
 def wait_for_local_tool_job(*args: Any, **kwargs: Any) -> Any:

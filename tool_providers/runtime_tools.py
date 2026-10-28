@@ -1,7 +1,7 @@
 """Universal tool definitions backed by the SSH Runtime."""
 
 from __future__ import annotations
-from tool_providers._vendor.output import limit_output
+from tool_providers._vendor.output import limit_output, newline_text, read_output
 
 import math
 import os
@@ -9,7 +9,7 @@ import shutil
 import signal
 import subprocess
 from typing import Any
-from tool_providers.host import assert_operation_allowed, bound, build_runtime
+from tool_providers.host import bound, runtime_for_operation
 
 
 # Tests may inject a runtime instance. Production resolves the persisted
@@ -23,8 +23,7 @@ def _runtime_for_operation(
 ) -> Any:
     if runtime is not None:
         return runtime
-    assert_operation_allowed(operation, command=command, approved=approved)
-    return build_runtime()
+    return runtime_for_operation(operation, command=command, approved=approved)
 
 
 def _trace_event(cfg: dict | None, event_type: str, payload: dict) -> None:
@@ -87,6 +86,10 @@ def _command_environment() -> dict[str, str]:
     }
 
 
+# limit_output's bound for local command output (its default). Bytes past it are read and dropped.
+_MAX_OUTPUT_BYTES = 1048576
+
+
 def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
     """Execute a shell command on the host running the Logos backend."""
     command = str(args.get("command") or "").strip()
@@ -120,13 +123,14 @@ def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
             cwd=cwd,
             env=_command_environment(),
             start_new_session=True,
         ) as proc:
             try:
-                stdout, stderr = proc.communicate(timeout=timeout)
+                # Twice the bound and one byte more: CRLF collapsing can halve the
+                # text, and limit_output still sees a cut stream as too long.
+                stdout, stderr = read_output(proc, timeout, 2 * _MAX_OUTPUT_BYTES + 1)
             except subprocess.TimeoutExpired as exc:
                 # The shell leads its own session: kill its children too, or they outlive the timeout.
                 if os.name == "posix":
@@ -137,20 +141,22 @@ def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
                     proc.wait()
                 else:
                     proc.kill()
-                    exc.stdout, exc.stderr = proc.communicate()
+                    out, err = proc.communicate()
+                    # Text mode used to translate newlines here too.
+                    exc.stdout, exc.stderr = newline_text(out or b""), newline_text(err or b"")
                 raise
             except BaseException:
                 proc.kill()
                 raise
         completed = subprocess.CompletedProcess(
-            proc.args, proc.returncode, stdout, stderr
+            proc.args, proc.returncode, newline_text(stdout), newline_text(stderr)
         )
     except subprocess.TimeoutExpired as exc:
         result = {
             "success": False,
             "error": f"Local command timed out after {timeout:g}s",
-            "stdout": limit_output(exc.stdout),
-            "stderr": limit_output(exc.stderr),
+            "stdout": limit_output(exc.stdout, _MAX_OUTPUT_BYTES),
+            "stderr": limit_output(exc.stderr, _MAX_OUTPUT_BYTES),
             "exit_code": None,
             "cwd": cwd,
             "timeout_seconds": timeout,
@@ -190,8 +196,8 @@ def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
 
     result = {
         "success": completed.returncode == 0,
-        "stdout": limit_output(completed.stdout),
-        "stderr": limit_output(completed.stderr),
+        "stdout": limit_output(completed.stdout, _MAX_OUTPUT_BYTES),
+        "stderr": limit_output(completed.stderr, _MAX_OUTPUT_BYTES),
         "exit_code": completed.returncode,
         "cwd": cwd,
         "timeout_seconds": timeout,

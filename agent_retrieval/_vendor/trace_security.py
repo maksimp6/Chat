@@ -6,6 +6,7 @@ Kept independent from ExecutionTrace so request/response capture code can be
 split out incrementally without changing the existing public class API.
 """
 
+import math
 import re
 from typing import Any
 
@@ -124,6 +125,9 @@ def sanitize_trace_value(value: Any, depth: int = 0) -> Any:
     if depth > MAX_DEPTH:
         return "<max-depth>"
     if value is None or isinstance(value, (bool, int, float, str)):
+        if isinstance(value, float) and not math.isfinite(value):
+            # NaN and infinities are not JSON; trace storage writes with allow_nan=False.
+            return repr(value)
         if isinstance(value, str):
             value = _sanitize_string(value)
             if len(value) > MAX_REPR:
