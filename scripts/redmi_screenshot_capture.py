@@ -597,7 +597,9 @@ class RDP:
             unsafeModal:[...document.querySelectorAll('input[type=password]')].some(visible),
             unexpectedModal:[...document.querySelectorAll('.modal.visible')].some(e=>e.id!=='model-modal'&&visible(e))||
               [...document.querySelectorAll('.logos-trace-window')].some(visible),
-            modalOpen:[...document.querySelectorAll('.modal.visible,#settings-modal-custom,.logos-trace-window,#logos-system-status:not([hidden])')].some(visible)};
+            modalOpen:[...document.querySelectorAll('.modal.visible,#settings-modal-custom,.logos-trace-window,#logos-system-status:not([hidden])')].some(visible),
+            visibleModals:[...document.querySelectorAll('.modal.visible,.logos-trace-window')].filter(visible).map(e=>
+              ((e.id||e.className)+': '+(e.querySelector('.modal-title,h2,h3')?.textContent||'')).trim().slice(0,120))};
         })())""",
         )
 
@@ -1847,7 +1849,19 @@ def capture(out, uid, gid, metadata):
             or state["unexpectedModal"]
             or state["surfaces"] != ([surface] if surface else [])
         ):
-            raise CaptureSafetyError("An unexpected dialog appeared")
+            # Name what is on screen; a password field is reported only by its presence.
+            raise CaptureSafetyError(
+                "An unexpected dialog appeared: "
+                + json.dumps(
+                    {
+                        "modals": state.get("visibleModals"),
+                        "surfaces": state["surfaces"],
+                        "expected": [surface] if surface else [],
+                        "password_field": state["unsafeModal"],
+                    },
+                    ensure_ascii=False,
+                )
+            )
         native_focus_is_logos()
         if sidebar is not None:
             if (
