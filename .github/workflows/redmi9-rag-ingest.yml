@@ -18,10 +18,39 @@ jobs:
     runs-on: redmi9
     timeout-minutes: 360
     steps:
-      - name: Ingest GitHub issues, pull requests and run metadata through the app API
+      - name: Ingest the exports/ dialog archives through the app API
+        timeout-minutes: 15
         env:
           GH_TOKEN: ${{ github.token }}
           STORE_ID: fvtvp6t2su0g5q4ft2ev
+          KINDS: export
+        run: |
+          set -eu
+          curl -fsSL --max-time 60 "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/scripts/rag_ingest_via_app.py" | python3 -
+      - name: Ingest GitHub issues through the app API
+        timeout-minutes: 15
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STORE_ID: fvtvp6t2su0g5q4ft2ev
+          KINDS: issue
+        run: |
+          set -eu
+          curl -fsSL --max-time 60 "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/scripts/rag_ingest_via_app.py" | python3 -
+      - name: Ingest pull requests through the app API
+        timeout-minutes: 15
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STORE_ID: fvtvp6t2su0g5q4ft2ev
+          KINDS: pull
+        run: |
+          set -eu
+          curl -fsSL --max-time 60 "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/scripts/rag_ingest_via_app.py" | python3 -
+      - name: Ingest Actions run metadata through the app API
+        timeout-minutes: 15
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STORE_ID: fvtvp6t2su0g5q4ft2ev
+          KINDS: run
         run: |
           set -eu
           curl -fsSL --max-time 60 "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/scripts/rag_ingest_via_app.py" | python3 -

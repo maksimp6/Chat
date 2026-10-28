@@ -252,12 +252,15 @@ def main():
     stored = {row["filename"]: row["id"] for row in app("GET", "/api/files").get("data", [])}
     attached = {row["id"] for row in app("GET", f"/api/vector-stores/{STORE_ID}/files").get("data", [])}
     totals = {"packs": 0, "uploaded": 0, "attached": 0, "failed": 0, "chunks": 0}
-    for kind, collector in (
-        ("issue", collect_issues),
-        ("pull", collect_pulls),
-        ("run", collect_runs),
-        ("export", collect_exports),
-    ):
+    collectors = {
+        "export": collect_exports,
+        "issue": collect_issues,
+        "pull": collect_pulls,
+        "run": collect_runs,
+    }
+    # Each workflow step ingests some kinds: the Redmi 9 runner stops a step after 15 minutes.
+    kinds = os.environ.get("KINDS", ",".join(collectors)).split(",")
+    for kind, collector in ((kind, collectors[kind]) for kind in kinds):
         windows = {}
         for window, text in collector():
             windows.setdefault(window, []).append(text)
