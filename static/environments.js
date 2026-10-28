@@ -26,16 +26,55 @@
   // Environment operations run git and runtime start-up on the server, so they outlast the 10 s default.
   const OPERATION_OPTIONS = { timeoutMs: 120000 };
 
+  // The server's error codes in plain Russian: what happened and what to do. The code itself goes to the console.
   const ERROR_TEXT = {
-    environment_operation_failed: "Не удалось выполнить операцию.",
+    "branch is required": "Укажите ветку и нажмите «Создать».",
+    "commit is required": "Укажите коммит и повторите.",
+    "invalid git ref": "Имя ветки или коммита записано неверно. Исправьте его и повторите.",
+    "git command failed": "Git на сервере не смог прочитать репозиторий. Проверьте имя ветки и повторите.",
+    "commit is not reachable from branch": "Этого коммита нет в указанной ветке. Проверьте ветку и коммит.",
+    "git did not return a commit SHA": "Git на сервере не нашёл коммит ветки. Проверьте имя ветки и повторите.",
+    "git is unavailable on this server":
+      "На сервере Logos нет git, поэтому окружение не создать. Установите git на сервере Logos.",
+    environment_ref_invalid: "Окружение не создано: ветка или коммит не найдены. Проверьте их имена и повторите.",
+    environment_not_found: "Окружение не найдено: его уже удалили. Проверьте список окружений.",
+    environment_not_running: "Окружение не запущено. Нажмите «Старт» и повторите.",
+    environment_runtime_timeout: "Окружение не ответило вовремя. Повторите запрос.",
+    environment_runtime_unreachable: "Окружение не отвечает. Нажмите «Перезапуск» и повторите.",
+    environment_state_conflict:
+      "Сейчас это действие недоступно для окружения. Проверьте его статус в списке и повторите.",
+    environment_operation_failed: "Операция с окружением не выполнена. Проверьте статус окружения и повторите.",
   };
+  // Codes that carry a value after a fixed beginning, such as the branch name or the two states.
+  const ERROR_PREFIX_TEXT = [
+    ["git ref is not available:", "Ветка или коммит не найдены в репозитории. Проверьте имя и повторите."],
+    ["invalid environment transition:", ERROR_TEXT.environment_state_conflict],
+  ];
+
+  function isRussianText(value) {
+    return typeof value === "string" && /[А-Яа-яЁё]/.test(value);
+  }
 
   // A timed-out request may still finish on the server, so the message says that instead of the browser text.
+  // A server answer is named by its code or HTTP status; only a request without an answer is a connection problem.
   function errorText(error) {
     if (error && (error.name === "TimeoutError" || error.name === "AbortError")) {
       return "Сервер не ответил вовремя: операция могла продолжиться. Проверьте статус окружения.";
     }
-    return ERROR_TEXT[error.message] || error.message;
+    const status = error && error.status;
+    const code = (error && error.code) || "";
+    if (!status) {
+      console.warn("[ENVIRONMENTS] No answer from the server:", error);
+      return "Нет связи с сервером. Проверьте соединение и нажмите «Обновить».";
+    }
+    console.warn("[ENVIRONMENTS] Request failed:", status, code, error.detail || "");
+    if (Object.prototype.hasOwnProperty.call(ERROR_TEXT, code)) return ERROR_TEXT[code];
+    const prefixed = ERROR_PREFIX_TEXT.find((entry) => code.startsWith(entry[0]));
+    if (prefixed) return prefixed[1];
+    if (isRussianText(error.detail)) return error.detail;
+    return status >= 500
+      ? "Ошибка на сервере (код " + status + "). Проверьте статус окружения и повторите позже."
+      : "Сервер отклонил запрос (код " + status + "). Нажмите «Обновить» и повторите.";
   }
 
   async function request(path, options = {}, dispatchOptions) {
@@ -48,7 +87,13 @@
       dispatchOptions,
     );
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || "HTTP " + response.status);
+    if (!response.ok) {
+      const error = new Error(data.error || "HTTP " + response.status);
+      error.status = response.status;
+      error.code = typeof data.error === "string" ? data.error : "";
+      error.detail = typeof data.detail === "string" ? data.detail : "";
+      throw error;
+    }
     return data;
   }
 
@@ -139,8 +184,12 @@
               " · ",
               esc(env.data_namespace),
               "</div>",
+              // The server's own text is technical, so it sits under «Подробности» below the Russian explanation.
               env.status === "FAILED" && env.error
-                ? '<div class="environment-card-meta">Ошибка: ' + esc(env.error) + "</div>"
+                ? '<div class="environment-card-meta">Окружение не работает из-за ошибки. Нажмите «Стоп», затем «Старт».' +
+                  '<details class="msg-details"><summary class="msg-details-summary">Подробности</summary>' +
+                  esc(env.error) +
+                  "</details></div>"
                 : "",
               '<div class="environment-card-actions">',
               '<a href="',
@@ -171,7 +220,12 @@
       button.onclick = async () => {
         const op = button.dataset.op;
         const id = button.dataset.id;
-        if (op === "delete" && !window.confirm("Удалить окружение?")) return;
+        if (
+          op === "delete" &&
+          !(await window.LogosDialog.confirm("Удалить окружение?", { confirmText: "Удалить", danger: true }))
+        ) {
+          return;
+        }
         // A second click while the operation runs would repeat it; the list re-renders on success.
         button.disabled = true;
         try {

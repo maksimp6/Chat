@@ -95,6 +95,7 @@ def _chat():
     from core.config import Config
     from core.config import EMBEDDING_MODELS
     from observability.trace_manager import ExecutionTrace
+    from provider_accounts.credentials import ExpiredCredentialError
     from core.config import IMAGE_MODELS
     from yandex_client_modules.image_generation import IMAGE_SIZES
     from yandex_client_modules.image_generation import ImageGenerationError
@@ -102,6 +103,7 @@ def _chat():
     from yandex_client_modules.image_generation import MAX_PROMPT_CHARS
     from yandex_client_modules.realtime import MODEL_UPSTREAMS
     from provider_accounts.model_discovery import ModelDiscoveryError
+    from provider_accounts.credentials import NoActiveCredentialError
     from yandex_client_modules.realtime import OUTPUT_RATE
     from provider_accounts.quotas import ProviderQuotaExceeded
     from yandex_client_modules.image_generation import REQUEST_TIMEOUT_SECONDS
@@ -185,6 +187,7 @@ def _chat():
         Config=Config,
         EMBEDDING_MODELS=EMBEDDING_MODELS,
         ExecutionTrace=ExecutionTrace,
+        ExpiredCredentialError=ExpiredCredentialError,
         IMAGE_MODELS=IMAGE_MODELS,
         IMAGE_SIZES=IMAGE_SIZES,
         ImageGenerationError=ImageGenerationError,
@@ -192,6 +195,7 @@ def _chat():
         MAX_PROMPT_CHARS=MAX_PROMPT_CHARS,
         MODEL_UPSTREAMS=MODEL_UPSTREAMS,
         ModelDiscoveryError=ModelDiscoveryError,
+        NoActiveCredentialError=NoActiveCredentialError,
         OUTPUT_RATE=OUTPUT_RATE,
         ProviderQuotaExceeded=ProviderQuotaExceeded,
         REQUEST_TIMEOUT_SECONDS=REQUEST_TIMEOUT_SECONDS,

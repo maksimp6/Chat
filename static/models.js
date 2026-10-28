@@ -141,6 +141,7 @@ function createConversation(modelKey, options) {
       if (!r.ok || data.error) {
         var failure = new Error(data.error || data.detail || data.title || "HTTP " + r.status);
         failure.serverResponse = true;
+        failure.detail = typeof data.detail === "string" ? data.detail : "";
         throw failure;
       }
       if (typeof data.id !== "string" || !data.id.trim()) {
@@ -175,7 +176,7 @@ function createConversation(modelKey, options) {
           model_not_available_for_dialog: "Эта модель недоступна для диалога. Выберите другую модель.",
           model_catalog_unavailable: "Каталог моделей временно недоступен. Повторите попытку позже.",
         };
-        LogosToast.error(Object.prototype.hasOwnProperty.call(reasons, e.message) ? reasons[e.message] : e.message);
+        LogosToast.error(Object.prototype.hasOwnProperty.call(reasons, e.message) ? reasons[e.message] : e.detail || e.message);
       } else {
         LogosToast.error("Ошибка сети. Проверьте соединение.");
       }

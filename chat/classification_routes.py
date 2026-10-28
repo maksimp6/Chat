@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import requests
 from flask import Blueprint, jsonify, request
+from chat._error_details import DETAILS, error_body
 from chat.host import (
     bound,
     get_current_trace,
@@ -119,12 +120,12 @@ def _classification_result(data, labels: list[str]) -> dict:
 def classify_text():
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
-        return jsonify({"error": "json_body_required"}), 400
+        return jsonify(error_body("json_body_required")), 400
     try:
         model, payload = _classification_payload(body)
     except _BadInput as exc:
         return jsonify(
-            {"error": "invalid_classification_request", "detail": str(exc)}
+            error_body("invalid_classification_request", message=str(exc))
         ), 400
 
     try:
@@ -136,12 +137,14 @@ def classify_text():
         headers = provider_request_headers(credential)
     except Exception:
         # Neither raw exceptions nor upstream bodies are safe credential diagnostics.
-        return jsonify({"error": "classification_not_configured"}), 503
+        return jsonify(error_body("classification_not_configured")), 503
 
     try:
         reservation = reserve_request(bound._resolve_quota_user_id())
     except bound.ProviderQuotaExceeded as exc:
-        return jsonify(exc.to_dict()), 429
+        return jsonify(
+            {**exc.to_dict(), "detail": DETAILS["provider_quota_exceeded"]}
+        ), 429
 
     try:
         response = requests.post(
@@ -154,21 +157,25 @@ def classify_text():
         # A timed-out POST can still complete at the provider. Do not retry it or
         # return its admission reservation as though non-execution were proven.
         return jsonify(
-            {"error": "classification_upstream_failed", "outcome": "unknown"}
+            error_body(
+                "classification_upstream_failed",
+                detail_of="classification_upstream_unknown",
+                outcome="unknown",
+            )
         ), 502
     if not 200 <= response.status_code < 300:
         if response.status_code in {400, 401, 403, 404, 429}:
             release_request(reservation)
         return jsonify(
-            {
-                "error": "classification_upstream_failed",
-                "upstream_status": response.status_code,
-            }
+            error_body(
+                "classification_upstream_failed",
+                upstream_status=response.status_code,
+            )
         ), 502
     try:
         result = _classification_result(response.json(), payload["labels"])
     except (ValueError, TypeError, OverflowError):
-        return jsonify({"error": "classification_upstream_invalid"}), 502
+        return jsonify(error_body("classification_upstream_invalid")), 502
     if "inputTokens" in result:
         record_usage(reservation, token_count=result["inputTokens"])
     trace = get_current_trace()

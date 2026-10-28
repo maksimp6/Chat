@@ -11,6 +11,7 @@ import requests
 from flask import Blueprint, jsonify, request
 
 import os
+from chat._error_details import DETAILS, error_body
 from chat.host import (
     bound,
     calculate_knowledge_cost,
@@ -132,43 +133,45 @@ def _cost(tokens: int) -> dict:
 def create_embeddings():
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
-        return jsonify({"error": "json_body_required"}), 400
+        return jsonify(error_body("json_body_required")), 400
     unknown = set(body) - ALLOWED_FIELDS
     if unknown:
         return jsonify(
-            {"error": "unknown_parameters", "parameters": sorted(unknown)}
+            error_body("unknown_parameters", parameters=sorted(unknown))
         ), 400
     if "model" in body and "mode" in body:
-        return jsonify({"error": "send model or mode, not both"}), 400
+        return jsonify(error_body("send model or mode, not both")), 400
     if "model" in body:
         model_name = body["model"]
         if not isinstance(model_name, str) or model_name not in bound.EMBEDDING_MODELS:
             return (
                 jsonify(
-                    {
-                        "error": "unknown embedding model",
-                        "models": sorted(bound.EMBEDDING_MODELS),
-                    }
+                    error_body(
+                        "unknown embedding model",
+                        models=sorted(bound.EMBEDDING_MODELS),
+                    )
                 ),
                 400,
             )
     else:
         mode = body.get("mode", "doc")
         if not isinstance(mode, str) or mode not in MODES:
-            return jsonify({"error": "mode must be doc or query"}), 400
+            return jsonify(error_body("mode must be doc or query")), 400
         model_name = MODES[mode]
     dimensions = body.get("dimensions")
     if "dimensions" in body:
         if not model_name.startswith("text-embeddings-v2-"):
-            return jsonify({"error": "dimensions requires an embedding v2 model"}), 400
+            return jsonify(
+                error_body("dimensions requires an embedding v2 model")
+            ), 400
         if type(dimensions) is not int or dimensions not in V2_DIMENSIONS:
             return jsonify(
-                {"error": "invalid_dimensions", "dimensions": sorted(V2_DIMENSIONS)}
+                error_body("invalid_dimensions", dimensions=sorted(V2_DIMENSIONS))
             ), 400
     try:
         items, single = _texts_from_body(body)
     except _BadInput as exc:
-        return jsonify({"error": str(exc)}), 400
+        return jsonify(error_body(str(exc), detail_of="invalid_embedding_request")), 400
 
     try:
         credential = bound._resolve_global_provider_credential(
@@ -177,9 +180,9 @@ def create_embeddings():
         headers = provider_request_headers(credential)
         headers["x-project"] = credential.project_id
     except Exception:
-        return jsonify({"error": "embeddings_not_configured"}), 503
+        return jsonify(error_body("embeddings_not_configured")), 503
     if not credential.api_key or not str(credential.project_id or "").strip():
-        return jsonify({"error": "embeddings_not_configured"}), 503
+        return jsonify(error_body("embeddings_not_configured")), 503
 
     model_uri = f"emb://{credential.project_id.strip()}/{bound.EMBEDDING_MODELS[model_name]['upstream']}"
     vectors, total_tokens = [], 0
@@ -189,11 +192,11 @@ def create_embeddings():
         if remaining <= 0:
             return (
                 jsonify(
-                    {
-                        "error": "embedding_deadline_exceeded",
-                        "completed": len(vectors),
-                        "tokens_spent": total_tokens,
-                    }
+                    error_body(
+                        "embedding_deadline_exceeded",
+                        completed=len(vectors),
+                        tokens_spent=total_tokens,
+                    )
                 ),
                 504,
             )
@@ -211,7 +214,7 @@ def create_embeddings():
                 jsonify(
                     {
                         "error": "embedding_upstream_failed",
-                        "detail": "Embedding provider request failed or returned invalid data",
+                        "detail": DETAILS["embedding_upstream_failed"],
                         "completed": len(vectors),
                         "tokens_spent": total_tokens + getattr(exc, "tokens", 0),
                     }
@@ -222,7 +225,7 @@ def create_embeddings():
             return jsonify(
                 {
                     "error": "embedding_upstream_failed",
-                    "detail": "Embedding provider returned inconsistent vector dimensions",
+                    "detail": DETAILS["embedding_dimensions_mismatch"],
                     "completed": len(vectors),
                     "tokens_spent": total_tokens + tokens,
                 }

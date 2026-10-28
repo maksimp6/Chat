@@ -19,6 +19,41 @@ from remote_runtime.host import get_current_owner_id
 environment_bp = Blueprint("environments", __name__, url_prefix="/api/environments")
 environment_gateway_bp = Blueprint("environment_gateway", __name__)
 
+# What the person sees for each error: what happened and what to do. The machine
+# ``error`` code and the HTTP status stay as they were.
+_DETAILS = {
+    "branch is required": "Укажите ветку и повторите.",
+    "environment_ref_invalid": (
+        "Окружение не создано: ветка или коммит не найдены. "
+        "Проверьте их имена и повторите."
+    ),
+    "git is unavailable on this server": (
+        "На сервере Logos нет git, поэтому окружение не создать. "
+        "Установите git на сервере Logos."
+    ),
+    "environment_not_found": (
+        "Окружение не найдено: его удалили. Обновите список окружений."
+    ),
+    "environment_state_conflict": (
+        "Сейчас это действие недоступно для окружения. "
+        "Обновите список и проверьте статус окружения."
+    ),
+    "environment_operation_failed": (
+        "Операция с окружением не выполнена. "
+        "Проверьте статус окружения и повторите."
+    ),
+    "environment_not_running": "Окружение не запущено. Запустите его и откройте снова.",
+    "environment_runtime_timeout": "Окружение не ответило вовремя. Повторите запрос.",
+    "environment_runtime_unreachable": (
+        "Окружение не отвечает. Перезапустите его и откройте снова."
+    ),
+}
+
+
+def _error(error, detail_of=None):
+    """An error body: the machine ``error`` as given and its Russian ``detail``."""
+    return {"error": error, "detail": _DETAILS[detail_of or error]}
+
 
 @environment_bp.get("")
 def environments_list():
@@ -31,22 +66,22 @@ def environments_create():
     branch = str(data.get("branch") or "").strip()
     commit_sha = data.get("commit_sha")
     if not branch:
-        return jsonify({"error": "branch is required"}), 400
+        return jsonify(_error("branch is required")), 400
     try:
         return jsonify(
             create_environment(branch, commit_sha, get_current_owner_id())
         ), 201
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+        return jsonify(_error(str(exc), "environment_ref_invalid")), 400
     except GitUnavailable:
-        return jsonify({"error": "git is unavailable on this server"}), 503
+        return jsonify(_error("git is unavailable on this server")), 503
 
 
 @environment_bp.get("/<environment_id>")
 def environments_get(environment_id):
     item = _get(environment_id)
     if not item:
-        return jsonify({"error": "environment_not_found"}), 404
+        return jsonify(_error("environment_not_found")), 404
     return jsonify(item)
 
 
@@ -55,11 +90,11 @@ def environments_start(environment_id):
     try:
         return jsonify(start_environment(environment_id))
     except KeyError:
-        return jsonify({"error": "environment_not_found"}), 404
+        return jsonify(_error("environment_not_found")), 404
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 409
+        return jsonify(_error(str(exc), "environment_state_conflict")), 409
     except Exception:
-        return jsonify({"error": "environment_operation_failed"}), 500
+        return jsonify(_error("environment_operation_failed")), 500
 
 
 @environment_bp.post("/<environment_id>/stop")
@@ -67,9 +102,9 @@ def environments_stop(environment_id):
     try:
         return jsonify(stop_environment(environment_id))
     except KeyError:
-        return jsonify({"error": "environment_not_found"}), 404
+        return jsonify(_error("environment_not_found")), 404
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 409
+        return jsonify(_error(str(exc), "environment_state_conflict")), 409
 
 
 @environment_bp.post("/<environment_id>/restart")
@@ -77,11 +112,11 @@ def environments_restart(environment_id):
     try:
         return jsonify(restart_environment(environment_id))
     except KeyError:
-        return jsonify({"error": "environment_not_found"}), 404
+        return jsonify(_error("environment_not_found")), 404
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 409
+        return jsonify(_error(str(exc), "environment_state_conflict")), 409
     except Exception:
-        return jsonify({"error": "environment_operation_failed"}), 500
+        return jsonify(_error("environment_operation_failed")), 500
 
 
 @environment_bp.delete("/<environment_id>")
@@ -89,11 +124,11 @@ def environments_delete(environment_id):
     try:
         return jsonify(delete_environment(environment_id))
     except KeyError:
-        return jsonify({"error": "environment_not_found"}), 404
+        return jsonify(_error("environment_not_found")), 404
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 409
+        return jsonify(_error(str(exc), "environment_state_conflict")), 409
     except Exception:
-        return jsonify({"error": "environment_operation_failed"}), 500
+        return jsonify(_error("environment_operation_failed")), 500
 
 
 def _runtime_http_request(context, payload):
@@ -132,9 +167,9 @@ register_runtime_operation("http.request", _runtime_http_request)
 def _proxy(environment_id, subpath=""):
     item = _get(environment_id)
     if not item:
-        return jsonify({"error": "environment_not_found"}), 404
+        return jsonify(_error("environment_not_found")), 404
     if item.get("status") != "RUNNING" or not item.get("runtime_thread_id"):
-        return jsonify({"error": "environment_not_running"}), 503
+        return jsonify(_error("environment_not_running")), 503
 
     headers = [
         (key, value)
@@ -156,11 +191,11 @@ def _proxy(environment_id, subpath=""):
             timeout=30,
         )
     except TimeoutError:
-        return jsonify({"error": "environment_runtime_timeout"}), 504
+        return jsonify(_error("environment_runtime_timeout")), 504
     except RuntimeError:
-        return jsonify({"error": "environment_not_running"}), 503
+        return jsonify(_error("environment_not_running")), 503
     except Exception:
-        return jsonify({"error": "environment_runtime_unreachable"}), 502
+        return jsonify(_error("environment_runtime_unreachable")), 502
 
     return Response(
         upstream,

@@ -125,11 +125,47 @@
     };
 
     // fetch resolves for HTTP errors too, so a non-OK status must be turned into a failure here.
+    // The failure keeps the HTTP status and the server's error code, so the message names the real cause.
     function readOk(r) {
-      if (!r.ok) throw new Error("HTTP " + r.status);
+      if (!r.ok) {
+        return r
+          .json()
+          .catch(function () {
+            return {};
+          })
+          .then(function (body) {
+            var error = new Error("HTTP " + r.status);
+            error.status = r.status;
+            error.code = body && typeof body.error === "string" ? body.error : "";
+            throw error;
+          });
+      }
       return r.json();
     }
+    // Why the list did not load: the server's answer (with its HTTP status) or no answer at all.
+    function categoriesErrorText(error) {
+      var status = error && error.status;
+      if (status === 404 && error.code === "conversation_not_found") {
+        return "Диалог не найден на сервере: его удалили. Закройте окно и выберите другой диалог.";
+      }
+      if (status >= 500) {
+        return "Ошибка на сервере (код " + status + "): список инструментов не получен. Нажмите «Повторить» позже.";
+      }
+      if (status) {
+        return "Сервер отклонил запрос (код " + status + "): список инструментов не получен. Нажмите «Повторить».";
+      }
+      if (error && error.name === "TimeoutError") {
+        return "Сервер не ответил вовремя: список инструментов не получен. Нажмите «Повторить».";
+      }
+      if (error && error.name === "SyntaxError") {
+        return "Ответ сервера не удалось прочитать: список инструментов не получен. Нажмите «Повторить».";
+      }
+      return "Нет связи с сервером: список инструментов не получен. Проверьте соединение и нажмите «Повторить».";
+    }
     function loadCategories() {
+    var loadingEl = document.getElementById("tools-category-list");
+    // «Повторить» replaces the error with the loading line, so a repeated tap cannot start a second load.
+    if (loadingEl) loadingEl.textContent = "Загрузка инструментов...";
     Promise.all([
       window.LogosDispatcher.request("/api/tools/categories").then(readOk),
       currentConvId
@@ -171,18 +207,26 @@
           .join("");
         toolsSaveBtn.disabled = false;
       })
-      .catch(function () {
+      .catch(function (error) {
+        console.error("[SETTINGS] Tool categories load failed:", error);
         toolsSaveBtn.disabled = true;
         var listEl = document.getElementById("tools-category-list");
         if (!listEl) return;
         listEl.replaceChildren();
         var message = document.createElement("p");
-        message.textContent = "Не удалось загрузить список инструментов. Проверьте соединение.";
+        // role="alert" makes TalkBack read out why the list did not load.
+        message.setAttribute("role", "alert");
+        message.textContent = categoriesErrorText(error);
         var retry = document.createElement("button");
         retry.type = "button";
         retry.className = "logos-btn";
         retry.textContent = "Повторить";
-        retry.addEventListener("click", loadCategories);
+        retry.addEventListener("click", function () {
+          // The tapped button is removed by the reload, so focus stays inside the window on the list.
+          listEl.setAttribute("tabindex", "-1");
+          listEl.focus();
+          loadCategories();
+        });
         listEl.append(message, retry);
       });
     }
@@ -625,15 +669,19 @@
     });
 
     md.querySelector("#set-reset-btn").addEventListener("click", function () {
-      if (!confirm("Сбросить параметры генерации к значениям по умолчанию?")) return;
-      if (currentConvId !== convId) return leftConversation();
-      var defs = window.resetSettings();
-      // Only the generation fields are reset; tools and the other saved settings stay as stored.
-      var resetChanges = {};
-      Object.keys(SETTINGS_FIELDS).forEach(function (key) {
-        resetChanges[key] = defs[key];
+      window.LogosDialog.confirm("Сбросить параметры генерации к значениям по умолчанию?", {
+        confirmText: "Сбросить",
+      }).then(function (confirmed) {
+        if (!confirmed) return;
+        if (currentConvId !== convId) return leftConversation();
+        var defs = window.resetSettings();
+        // Only the generation fields are reset; tools and the other saved settings stay as stored.
+        var resetChanges = {};
+        Object.keys(SETTINGS_FIELDS).forEach(function (key) {
+          resetChanges[key] = defs[key];
+        });
+        Storage.saveChanges(resetChanges, convId).then(closeModal, showSaveError);
       });
-      Storage.saveChanges(resetChanges, convId).then(closeModal, showSaveError);
     });
 
     md.querySelector("#set-save-btn").addEventListener("click", function () {

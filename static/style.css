@@ -440,6 +440,11 @@ body {
 .logos-pro-app .msg-retry-btn {
   margin-top: 6px;
   font-size: 13px;
+  min-height: 44px;
+  padding: 0 12px;
+}
+.logos-pro-app .msg-retry-btn + .msg-edit-btn {
+  margin-left: 8px;
 }
 .logos-pro-app .msg-details {
   margin-top: 6px;
@@ -2301,4 +2306,43 @@ body {
 /* A failed stage is marked in colour as well as by its glyph. */
 .logos-pro-app .execution-surface-stages li[data-status="error"] {
   color: var(--danger);
+}
+/* In-page confirm and prompt (window.LogosDialog in settings/ui_helpers.js) instead of the native dialogs,
+   which an Android WebView may not show. Buttons keep the 44px touch target. */
+.logos-pro-app .logos-dialog-content {
+  width: min(420px, calc(100vw - 32px));
+}
+.logos-pro-app .logos-dialog-message {
+  margin: 0 0 16px;
+  color: var(--text-main);
+  font-size: 15px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.logos-pro-app .logos-dialog-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  margin: 0 0 16px;
+  padding: 8px 10px;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 16px;
+}
+.logos-pro-app .logos-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.logos-pro-app .logos-dialog-actions .logos-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-size: 15px;
 }

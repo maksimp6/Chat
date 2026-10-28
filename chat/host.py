@@ -20,6 +20,7 @@ class Host:
     Config: Any  # core.config.Config
     EMBEDDING_MODELS: Any  # core.config.EMBEDDING_MODELS
     ExecutionTrace: Any  # observability.trace_manager.ExecutionTrace
+    ExpiredCredentialError: Any  # provider_accounts.credentials.ExpiredCredentialError
     IMAGE_MODELS: Any  # core.config.IMAGE_MODELS
     IMAGE_SIZES: Any  # yandex_client_modules.image_generation.IMAGE_SIZES
     ImageGenerationError: (
@@ -29,6 +30,9 @@ class Host:
     MAX_PROMPT_CHARS: Any  # yandex_client_modules.image_generation.MAX_PROMPT_CHARS
     MODEL_UPSTREAMS: Any  # yandex_client_modules.realtime.MODEL_UPSTREAMS
     ModelDiscoveryError: Any  # provider_accounts.model_discovery.ModelDiscoveryError
+    NoActiveCredentialError: (
+        Any  # provider_accounts.credentials.NoActiveCredentialError
+    )
     OUTPUT_RATE: Any  # yandex_client_modules.realtime.OUTPUT_RATE
     ProviderQuotaExceeded: Any  # provider_accounts.quotas.ProviderQuotaExceeded
     REQUEST_TIMEOUT_SECONDS: (

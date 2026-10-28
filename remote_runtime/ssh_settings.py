@@ -160,7 +160,8 @@ def validate_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
             )
             if not (result["known_hosts"] or target_known_hosts):
                 raise SSHRuntimeError(
-                    f"SSH target '{name}' requires known_hosts for strict host-key verification"
+                    f"SSH target '{name}' requires known_hosts for strict host-key verification",
+                    code="ssh_known_hosts_missing",
                 )
             if isinstance(target, Mapping):
                 try:
@@ -225,7 +226,9 @@ def build_runtime() -> SSHRuntime:
 
 def _runtime_from_settings(settings: Mapping[str, Any]) -> SSHRuntime:
     if not settings["enabled"]:
-        raise SSHRuntimeError("SSH Runtime is disabled in settings")
+        raise SSHRuntimeError(
+            "SSH Runtime is disabled in settings", code="ssh_runtime_disabled"
+        )
     targets = copy.deepcopy(settings["targets"])
     for target in targets.values():
         if isinstance(target, Mapping):
@@ -273,7 +276,9 @@ def _check_operation(
     approved: bool = False,
 ) -> None:
     if not settings["enabled"]:
-        raise SSHRuntimeError("SSH Runtime is disabled in settings")
+        raise SSHRuntimeError(
+            "SSH Runtime is disabled in settings", code="ssh_runtime_disabled"
+        )
 
     if operation == "execute":
         if not settings["allow_command_execution"]:
@@ -315,8 +320,40 @@ def record_test_result(result: Mapping[str, Any]) -> None:
     set_config(LAST_TEST_KEY, dict(result))
 
 
+# OpenSSH client messages and the cause each names, checked in this order: a missing or
+# unreadable key file is reported before the "Permission denied" that follows it.
+_SSH_FAILURE_CODES = (
+    ("Host key verification failed", "ssh_host_key_rejected"),
+    ("REMOTE HOST IDENTIFICATION HAS CHANGED", "ssh_host_key_rejected"),
+    ("Could not resolve hostname", "ssh_host_not_found"),
+    ("Connection refused", "ssh_connection_refused"),
+    ("Connection timed out", "ssh_connection_timeout"),
+    ("Operation timed out", "ssh_connection_timeout"),
+    ("No route to host", "ssh_host_unreachable"),
+    ("Network is unreachable", "ssh_host_unreachable"),
+    ("not accessible", "ssh_identity_file_unavailable"),
+    ("UNPROTECTED PRIVATE KEY FILE", "ssh_identity_file_unavailable"),
+    ("Load key", "ssh_identity_file_unavailable"),
+    ("Permission denied", "ssh_authentication_failed"),
+)
+
+
+def _ssh_failure_code(stderr: str) -> str:
+    """The cause code of a failed ssh run, read from the client's stderr."""
+    for marker, code in _SSH_FAILURE_CODES:
+        if marker in stderr:
+            return code
+    return "ssh_connection_failed"
+
+
 def test_connection(target_name: str, identity_id: str | None) -> dict[str, Any]:
-    runtime = build_runtime()
+    try:
+        runtime = build_runtime()
+    except SSHRuntimeError as exc:
+        if exc.code:
+            raise
+        # The saved settings failed validation; the message names the field in the log.
+        raise SSHRuntimeError(str(exc), code="ssh_settings_invalid") from exc
     target, user = runtime._resolve_target(target_name, identity_id)
     known_hosts = target.known_hosts or runtime._default_known_hosts
     started = time.perf_counter()
@@ -341,7 +378,7 @@ def test_connection(target_name: str, identity_id: str | None) -> dict[str, Any]
             "duration_ms": round((time.perf_counter() - started) * 1000, 2),
         }
         record_test_result(result)
-        raise SSHRuntimeError(result["error"]) from exc
+        raise SSHRuntimeError(result["error"], code="ssh_connection_timeout") from exc
     except OSError as exc:
         result = {
             "success": False,
@@ -353,7 +390,7 @@ def test_connection(target_name: str, identity_id: str | None) -> dict[str, Any]
             "duration_ms": round((time.perf_counter() - started) * 1000, 2),
         }
         record_test_result(result)
-        raise SSHRuntimeError(result["error"]) from exc
+        raise SSHRuntimeError(result["error"], code="ssh_client_unavailable") from exc
 
     result = {
         "success": completed.returncode == 0,
@@ -387,7 +424,10 @@ def test_connection(target_name: str, identity_id: str | None) -> dict[str, Any]
         completed.returncode,
     )
     if completed.returncode != 0:
-        raise SSHRuntimeError(result["error"] or "SSH connection test failed")
+        raise SSHRuntimeError(
+            result["error"] or "SSH connection test failed",
+            code=_ssh_failure_code(completed.stderr or ""),
+        )
     return result
 
 

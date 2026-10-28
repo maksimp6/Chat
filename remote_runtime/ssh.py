@@ -22,7 +22,16 @@ _MAX_WRITE_BYTES = 10 * 1024 * 1024
 
 
 class SSHRuntimeError(RuntimeError):
-    """Raised when an SSH runtime operation cannot be completed."""
+    """Raised when an SSH runtime operation cannot be completed.
+
+    ``code`` names the cause for an API answer, for example
+    ``ssh_known_hosts_missing``; the message stays the technical text for the log
+    and the tools.
+    """
+
+    def __init__(self, *args: Any, code: Optional[str] = None) -> None:
+        super().__init__(*args)
+        self.code = code
 
 
 @dataclass(frozen=True)
@@ -154,13 +163,18 @@ class SSHRuntime:
     def _validate_linux_user(user: str) -> str:
         value = str(user or "").strip()
         if not value or len(value) > 64:
-            raise SSHRuntimeError("Linux user is required and must be <= 64 characters")
+            raise SSHRuntimeError(
+                "Linux user is required and must be <= 64 characters",
+                code="ssh_user_invalid",
+            )
         if any(
             ch
             not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
             for ch in value
         ):
-            raise SSHRuntimeError("Linux user contains unsupported characters")
+            raise SSHRuntimeError(
+                "Linux user contains unsupported characters", code="ssh_user_invalid"
+            )
         return value
 
     def _resolve_target(
@@ -170,7 +184,9 @@ class SSHRuntime:
     ) -> tuple[SSHTarget, str]:
         target = self._targets.get(str(target_name))
         if target is None:
-            raise SSHRuntimeError(f"Unknown SSH target: {target_name}")
+            raise SSHRuntimeError(
+                f"Unknown SSH target: {target_name}", code="ssh_target_not_found"
+            )
 
         # The deployment chooses one OS account; Logos identity no longer gates access.
         configured_user = target.default_user
@@ -179,7 +195,8 @@ class SSHRuntime:
         user = self._validate_linux_user(configured_user or "")
         if target.allowed_users and user not in target.allowed_users:
             raise SSHRuntimeError(
-                f"Linux user is not allowed for SSH target '{target.name}'"
+                f"Linux user is not allowed for SSH target '{target.name}'",
+                code="ssh_user_not_allowed",
             )
         return target, user
 
@@ -237,7 +254,8 @@ class SSHRuntime:
         known_hosts = target.known_hosts or self._default_known_hosts
         if not known_hosts:
             raise SSHRuntimeError(
-                "SSH host-key verification requires configured known_hosts"
+                "SSH host-key verification requires configured known_hosts",
+                code="ssh_known_hosts_missing",
             )
 
         command = [

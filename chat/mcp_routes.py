@@ -10,6 +10,12 @@ from typing import Any
 from dataclasses import dataclass
 import base64
 import functools
+from chat._error_details import (
+    EMPTY_MODEL_REPLY,
+    PROVIDER_KEY_EXPIRED,
+    PROVIDER_KEY_MISSING,
+    error_body,
+)
 from chat._vendor.partial_output import (
     extract_last_response_text,
     format_partial_output_message,
@@ -493,9 +499,9 @@ def _provider_conversation_id(client, conv_id, trace):
 def _validate_chat_payload(conv_id, model_key, message, attachments):
     """Validate the turn content before creating an invocation or storing a message."""
     if not isinstance(conv_id, str) or not conv_id.strip():
-        return None, None, (jsonify({"error": "conversation_id is required"}), 400)
+        return None, None, (jsonify(error_body("conversation_id is required")), 400)
     if not isinstance(model_key, str):
-        return None, None, (jsonify({"error": "model must be a string"}), 400)
+        return None, None, (jsonify(error_body("model must be a string")), 400)
     # These technologies have their own transports; never substitute a text turn.
     endpoint = None
     if (
@@ -520,7 +526,7 @@ def _validate_chat_payload(conv_id, model_key, message, attachments):
             None,
             (
                 jsonify(
-                    {"error": "model_requires_dedicated_api", "endpoint": endpoint}
+                    error_body("model_requires_dedicated_api", endpoint=endpoint)
                 ),
                 400,
             ),
@@ -532,10 +538,10 @@ def _validate_chat_payload(conv_id, model_key, message, attachments):
             None,
             (
                 jsonify(
-                    {
-                        "error": "model_uses_completion_api",
-                        "endpoint": "/api/completion",
-                    }
+                    error_body(
+                        "model_uses_completion_api",
+                        endpoint="/api/completion",
+                    )
                 ),
                 400,
             ),
@@ -546,7 +552,7 @@ def _validate_chat_payload(conv_id, model_key, message, attachments):
         return (
             None,
             None,
-            (jsonify({"error": "invalid_attachments", "message": str(exc)}), 400),
+            (jsonify(error_body("invalid_attachments", message=str(exc))), 400),
         )
     if message is None and images:
         message = ""
@@ -554,10 +560,10 @@ def _validate_chat_payload(conv_id, model_key, message, attachments):
         return (
             None,
             None,
-            (jsonify({"error": "message or attachments are required"}), 400),
+            (jsonify(error_body("message or attachments are required")), 400),
         )
     if images and model_key not in image_input_model_keys():
-        return None, None, (jsonify({"error": "model_does_not_accept_images"}), 400)
+        return None, None, (jsonify(error_body("model_does_not_accept_images")), 400)
 
     return message, images, None
 
@@ -638,6 +644,10 @@ def _execute_chat_model(message, model_key, invocation, params, trace):
     return _build_chat_reply(client, response, trace)
 
 
+class _EmptyModelReply(RuntimeError):
+    """The provider completed the turn without text; the message is for the user."""
+
+
 def _build_chat_reply(client, response, trace) -> _ChatReply:
     """Interpret provider completion without publishing history or settling billing."""
     provider_message = None
@@ -710,7 +720,7 @@ def _build_chat_reply(client, response, trace) -> _ChatReply:
             )
         reply = format_partial_output_message(partial_output, provider_message)
     elif not reply:
-        raise RuntimeError("Модель не вернула текстовый ответ. Повторите запрос.")
+        raise _EmptyModelReply(EMPTY_MODEL_REPLY)
     usage = client.extract_usage(response)
     timings = response.get("step_timings", []) if isinstance(response, dict) else []
     return _ChatReply(
@@ -848,6 +858,17 @@ def _finalize_chat_turn(
     ), 502 if provider_failed else 200
 
 
+def _turn_error_text(error):
+    """Russian text for a failure the user can fix, or None; the exception is logged."""
+    if isinstance(error, _EmptyModelReply):
+        return str(error)
+    if isinstance(error, bound.NoActiveCredentialError):
+        return PROVIDER_KEY_MISSING
+    if isinstance(error, bound.ExpiredCredentialError):
+        return PROVIDER_KEY_EXPIRED
+    return None
+
+
 def _chat_error_response(
     error,
     *,
@@ -966,7 +987,7 @@ def chat():
     try:
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
-            return jsonify({"error": "json_body_required"}), 400
+            return jsonify(error_body("json_body_required")), 400
         conv_id = data.get("conversation_id")
         session_id = data.get("session_id") or conv_id
         message = data.get("message")
@@ -974,22 +995,22 @@ def chat():
         retry = data.get("retry", False)
         if not isinstance(retry, bool):
             return jsonify(
-                {"error": "invalid_params", "message": "retry must be a boolean"}
+                error_body("invalid_params", message="retry must be a boolean")
             ), 400
         retry_message_id = data.get("retry_message_id")
         if retry_message_id is not None and (
             type(retry_message_id) is not int or retry_message_id < 1 or not retry
         ):
             return jsonify(
-                {
-                    "error": "invalid_params",
-                    "message": "retry_message_id requires retry and a positive integer",
-                }
+                error_body(
+                    "invalid_params",
+                    message="retry_message_id requires retry and a positive integer",
+                )
             ), 400
         raw_params = data.get("params")
         if raw_params is not None and not isinstance(raw_params, dict):
             return jsonify(
-                {"error": "invalid_params", "message": "params must be an object"}
+                error_body("invalid_params", message="params must be an object")
             ), 400
         params = dict(raw_params or {})
         params_role = params.pop("role", None)
@@ -1001,7 +1022,7 @@ def chat():
             params.pop("skills", None)
             params = _client_params(params)
         except (ValueError, bound.SkillRegistryError) as exc:
-            return jsonify({"error": "invalid_params", "message": str(exc)}), 400
+            return jsonify(error_body("invalid_params", message=str(exc))), 400
 
         message, images, invalid_payload = _validate_chat_payload(
             conv_id, model_key, message, data.get("attachments")
@@ -1011,19 +1032,19 @@ def chat():
 
         owner_id = get_current_owner_id(required=False)
         if not check_access(conv_id, owner_id):
-            return jsonify({"error": "conversation_not_found"}), 404
+            return jsonify(error_body("conversation_not_found")), 404
         conv_settings = get_conv_settings(conv_id) or {}
         if not isinstance(conv_settings, dict):
             return jsonify(
-                {
-                    "error": "invalid_settings",
-                    "message": "conversation settings must be an object",
-                }
+                error_body(
+                    "invalid_settings",
+                    message="conversation settings must be an object",
+                )
             ), 400
         try:
             normalize_tools_config(conv_settings.get("tools_config", {}))
         except ValueError as exc:
-            return jsonify({"error": "invalid_settings", "message": str(exc)}), 400
+            return jsonify(error_body("invalid_settings", message=str(exc))), 400
         if retry and retry_message_id is not None:
             original = get_message(conv_id, retry_message_id)
             if (
@@ -1033,10 +1054,10 @@ def chat():
                 or (original.get("attachments") or {}).get("images", 0) != len(images)
             ):
                 return jsonify(
-                    {
-                        "error": "invalid_retry_message",
-                        "message": "The saved user message does not match this retry",
-                    }
+                    error_body(
+                        "invalid_retry_message",
+                        message="The saved user message does not match this retry",
+                    )
                 ), 409
             user_message_id = retry_message_id
         invocation = create_invocation(
@@ -1079,15 +1100,15 @@ def chat():
                 error={"code": "invalid_skill_selection", "message": public_message},
             )
             return jsonify(
-                {
-                    "error": "invalid_skill_selection",
-                    "message": public_message,
-                    "invocation_id": invocation.invocation_id,
-                    "session_id": invocation.session_id,
-                    "conversation_id": invocation.conversation_id,
-                    "trace_id": invocation.trace_id,
-                    "trace": trace_data,
-                }
+                error_body(
+                    "invalid_skill_selection",
+                    message=public_message,
+                    invocation_id=invocation.invocation_id,
+                    session_id=invocation.session_id,
+                    conversation_id=invocation.conversation_id,
+                    trace_id=invocation.trace_id,
+                    trace=trace_data,
+                )
             ), 400
 
         for skill in selected_skills:
@@ -1142,7 +1163,10 @@ def chat():
         error_message = (
             "Некорректное значение temperature"
             if is_temperature_error
-            else f"Внутренняя ошибка обработки запроса ({type(e).__name__}: {internal_error_message[:200]})"
+            else (
+                _turn_error_text(e)
+                or f"Внутренняя ошибка обработки запроса ({type(e).__name__}: {internal_error_message[:200]})"
+            )
         )
 
         try:
@@ -1198,10 +1222,10 @@ def list_skills():
         return jsonify({"skills": skill_registry().catalog(role=role)})
     except bound.SkillRegistryError:
         return jsonify(
-            {
-                "error": "invalid_role",
-                "message": "Role is invalid or unsupported",
-            }
+            error_body(
+                "invalid_role",
+                message="Role is invalid or unsupported",
+            )
         ), 400
 
 
@@ -1224,14 +1248,14 @@ def _tool_category_selection(value: Any) -> list[str] | None:
 def conv_tools(conv_id):
     owner_id = get_current_owner_id(required=False)
     if not check_access(conv_id, owner_id):
-        return jsonify({"error": "conversation_not_found"}), 404
+        return jsonify(error_body("conversation_not_found")), 404
     if request.method == "PUT":
         data = request.get_json(silent=True) or {}
         if not isinstance(data, dict):
-            return jsonify({"error": "JSON object is required"}), 400
+            return jsonify(error_body("JSON object is required")), 400
         categories = _tool_category_selection(data.get("active_tool_categories", []))
         if categories is None:
-            return jsonify({"error": "invalid_tool_categories"}), 400
+            return jsonify(error_body("invalid_tool_categories")), 400
         settings = get_conv_settings(conv_id) or {}
         settings["active_tool_categories"] = categories
         save_conv_settings(conv_id, settings)
@@ -1272,11 +1296,11 @@ def handle_mcp_servers():
     if request.method == "POST":
         data = _update_payload()
         if data is None:
-            return jsonify({"error": "JSON object is required"}), 400
+            return jsonify(error_body("JSON object is required")), 400
         try:
             sid = bound.mcp_storage.create_server(owner_id, data)
         except ValueError as exc:
-            return jsonify({"error": str(exc)}), 400
+            return jsonify(error_body(str(exc), detail_of="invalid_mcp_server")), 400
         return jsonify({"status": "ok", "id": sid}), 201
     servers = bound.mcp_storage.list_servers(owner_id=owner_id)
     return jsonify({"data": [_without_secrets(srv) for srv in servers]})
@@ -1291,18 +1315,22 @@ def handle_mcp_server_item(server_id):
     if request.method == "PUT":
         data = _update_payload()
         if data is None:
-            return jsonify({"error": "JSON object is required"}), 400
+            return jsonify(error_body("JSON object is required")), 400
         try:
             updated = bound.mcp_storage.update_server(server_id, owner_id, data)
         except ValueError as exc:
-            return jsonify({"error": str(exc)}), 400
+            return jsonify(error_body(str(exc), detail_of="invalid_mcp_server")), 400
         if not updated:
-            return jsonify({"error": "Сервер не найден"}), 404
+            return jsonify(
+                error_body("Сервер не найден", detail_of="mcp_server_not_found")
+            ), 404
         return jsonify({"status": "updated"})
 
     srv = bound.mcp_storage.get_server(server_id, owner_id=owner_id)
     if not srv:
-        return jsonify({"error": "Сервер не найден"}), 404
+        return jsonify(
+            error_body("Сервер не найден", detail_of="mcp_server_not_found")
+        ), 404
     return jsonify(_without_secrets(srv))
 
 
@@ -1313,13 +1341,13 @@ def conversations():
     if request.method == "POST":
         data = request.get_json(silent=True) or {}
         if not isinstance(data, dict):
-            return jsonify({"error": "JSON object is required"}), 400
+            return jsonify(error_body("JSON object is required")), 400
         try:
             model = validate_dialog_model(data.get("model", "yandexgpt-5-pro"))
         except ValueError:
-            return jsonify({"error": "model_not_available_for_dialog"}), 400
+            return jsonify(error_body("model_not_available_for_dialog")), 400
         except bound.ModelDiscoveryError:
-            return jsonify({"error": "model_catalog_unavailable"}), 503
+            return jsonify(error_body("model_catalog_unavailable")), 503
         creation_trace = bound.ExecutionTrace()
         creation_trace.set_request(
             {
@@ -1356,7 +1384,7 @@ def conversations():
 def get_conv_messages(conv_id):
     owner_id = get_current_owner_id(required=False)
     if not check_access(conv_id, owner_id):
-        return jsonify({"error": "conversation_not_found"}), 404
+        return jsonify(error_body("conversation_not_found")), 404
     return jsonify({"messages": get_messages(conv_id)})
 
 
@@ -1375,7 +1403,7 @@ def execute_approved():
 
         owner_id = get_current_owner_id(required=False)
         if not conv_id or not check_access(str(conv_id), owner_id):
-            return jsonify({"error": "conversation_not_found"}), 404
+            return jsonify(error_body("conversation_not_found")), 404
         tool_arguments = dict(arguments or {})
         if func_name == "set_ui_theme":
             current_theme = str(data.get("current_theme") or "").strip().lower()
@@ -1395,15 +1423,32 @@ def execute_approved():
         )
         exec_res = bound.UniversalToolExecutor(bound.registry).execute(call)
         if not exec_res.get("success"):
-            return jsonify(
-                {
-                    "error": exec_res.get("error") or "Tool execution failed",
+            # The tool's own text is always logged. A Russian text from the tool is
+            # its own actionable cause and is shown as is; any other text is shown
+            # as the generic Russian detail.
+            logger.warning(
+                "[TOOL_APPROVAL] Tool %s failed (%s): %s",
+                func_name,
+                (exec_res.get("metadata") or {}).get("phase"),
+                exec_res.get("error"),
+            )
+            tool_error = exec_res.get("error") or "Tool execution failed"
+            if re.search("[А-Яа-яЁё]", str(tool_error)):
+                failure_body = {
+                    "error": tool_error,
+                    "detail": str(tool_error),
                     "execution_result": exec_res,
                 }
-            ), 403 if (exec_res.get("metadata") or {}).get("phase") in {
-                "authorization",
-                "approval_required",
-            } else 400
+            else:
+                failure_body = error_body(
+                    tool_error,
+                    detail_of="tool_action_failed",
+                    execution_result=exec_res,
+                )
+            return jsonify(failure_body), 403 if (
+                (exec_res.get("metadata") or {}).get("phase")
+                in {"authorization", "approval_required"}
+            ) else 400
 
         execution_data = exec_res.get("data")
         client = logos_client_type()(bound.Config)
@@ -1511,4 +1556,4 @@ def execute_approved():
         ), 502 if followup_failed else 200
     except Exception:
         logger.exception("[TOOL_APPROVAL] Tool execution failed")
-        return jsonify({"error": "tool_execution_failed"}), 500
+        return jsonify(error_body("tool_execution_failed")), 500

@@ -251,28 +251,33 @@ window.fetchVectorStores = function () {
         btn.addEventListener("click", function () {
           var button = this;
           var vsId = button.dataset.id || "";
-          if (!confirm("Удалить векторное хранилище?")) return;
-          var originalText = button.textContent;
-          button.disabled = true;
-          button.textContent = "...";
-          window.LogosDispatcher.request("/api/vector-stores/" + encodeURIComponent(vsId), {
-            method: "DELETE",
-          })
-            .then(function (response) {
-              if (!response.ok) throw new Error("HTTP " + response.status);
-              return response.json().catch(function () {
-                return {};
+          window.LogosDialog.confirm("Удалить векторное хранилище?", {
+            confirmText: "Удалить",
+            danger: true,
+          }).then(function (confirmed) {
+            if (!confirmed) return;
+            var originalText = button.textContent;
+            button.disabled = true;
+            button.textContent = "...";
+            window.LogosDispatcher.request("/api/vector-stores/" + encodeURIComponent(vsId), {
+              method: "DELETE",
+            })
+              .then(function (response) {
+                if (!response.ok) throw new Error("HTTP " + response.status);
+                return response.json().catch(function () {
+                  return {};
+                });
+              })
+              .then(function () {
+                loadVsList();
+              })
+              .catch(function (error) {
+                button.disabled = false;
+                button.textContent = originalText;
+                button.textContent = "Удалить";
+                LogosToast.error("Не удалось удалить. Попробуйте ещё раз.");
               });
-            })
-            .then(function () {
-              loadVsList();
-            })
-            .catch(function (error) {
-              button.disabled = false;
-              button.textContent = originalText;
-              button.textContent = "Удалить";
-              LogosToast.error("Не удалось удалить. Попробуйте ещё раз.");
-            });
+          });
         });
       });
     }
@@ -570,36 +575,41 @@ window.fetchVectorStores = function () {
           list.querySelectorAll(".fm-delete-btn").forEach(function (btn) {
             btn.addEventListener("click", function () {
               var fileId = this.getAttribute("data-id");
-              if (!confirm("Удалить файл? Он будет удалён из всех хранилищ.")) return;
               var deleteBtn = this;
-              deleteBtn.disabled = true;
-              deleteBtn.innerText = "...";
-              // The server waits up to 30 s for a DELETE and does not retry it, so wait a little longer.
-              window.LogosDispatcher.request(
-                "/api/files/" + encodeURIComponent(fileId),
-                { method: "DELETE" },
-                { timeoutMs: 35000 },
-              )
-                .then(function (r) {
-                  // 404: the file is already gone on the server, so its row is stale and goes too.
-                  if (r.status === 404) return { deleted: true };
-                  if (!r.ok) throw statusError(r);
-                  return r.json();
-                })
-                .then(function (res) {
-                  if (!res.deleted && !res.ok) throw new Error("delete not confirmed");
-                  var row = document.getElementById("file-row-" + fileId);
-                  if (row) row.remove();
-                  if (list.children.length === 0) {
-                    list.innerHTML =
-                      '<div style="padding:20px;text-align:center;color:var(--m-muted,#999);">Нет загруженных файлов.</div>';
-                  }
-                })
-                .catch(function () {
-                  // The outcome is unclear or the delete failed: reload to show what the server has now.
-                  LogosToast.error("Не удалось удалить файл. Список обновлён.");
-                  loadFiles();
-                });
+              window.LogosDialog.confirm("Удалить файл? Он будет удалён из всех хранилищ.", {
+                confirmText: "Удалить",
+                danger: true,
+              }).then(function (confirmed) {
+                if (!confirmed) return;
+                deleteBtn.disabled = true;
+                deleteBtn.innerText = "...";
+                // The server waits up to 30 s for a DELETE and does not retry it, so wait a little longer.
+                window.LogosDispatcher.request(
+                  "/api/files/" + encodeURIComponent(fileId),
+                  { method: "DELETE" },
+                  { timeoutMs: 35000 },
+                )
+                  .then(function (r) {
+                    // 404: the file is already gone on the server, so its row is stale and goes too.
+                    if (r.status === 404) return { deleted: true };
+                    if (!r.ok) throw statusError(r);
+                    return r.json();
+                  })
+                  .then(function (res) {
+                    if (!res.deleted && !res.ok) throw new Error("delete not confirmed");
+                    var row = document.getElementById("file-row-" + fileId);
+                    if (row) row.remove();
+                    if (list.children.length === 0) {
+                      list.innerHTML =
+                        '<div style="padding:20px;text-align:center;color:var(--m-muted,#999);">Нет загруженных файлов.</div>';
+                    }
+                  })
+                  .catch(function () {
+                    // The outcome is unclear or the delete failed: reload to show what the server has now.
+                    LogosToast.error("Не удалось удалить файл. Список обновлён.");
+                    loadFiles();
+                  });
+              });
             });
           });
         })

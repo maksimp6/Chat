@@ -159,7 +159,7 @@
     window.LogosDispatcher.request("/api/ssh-runtime/settings")
       .then(function (r) {
         return r.json().then(function (data) {
-          if (!r.ok) throw new Error(data.error || "Не удалось загрузить SSH settings");
+          if (!r.ok) throw new Error(data.detail || data.error || "Не удалось загрузить SSH settings");
           return data;
         });
       })
@@ -225,7 +225,7 @@
       })
         .then(function (r) {
           return r.json().then(function (data) {
-            if (!r.ok) throw new Error(data.error || "Не удалось сохранить");
+            if (!r.ok) throw new Error(data.detail || data.error || "Не удалось сохранить");
             return data;
           });
         })
@@ -265,7 +265,7 @@
       )
         .then(function (r) {
           return r.json().then(function (data) {
-            if (!r.ok) throw new Error(data.error || "Не удалось подключиться по SSH");
+            if (!r.ok) throw new Error(data.detail || data.error || "Не удалось подключиться по SSH");
             return data;
           });
         })

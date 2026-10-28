@@ -117,7 +117,11 @@
   };
 
   window.clearMemory = async function (category) {
-    if (!confirm("Очистить память?")) return;
+    var confirmed = await window.LogosDialog.confirm("Очистить память?", {
+      confirmText: "Очистить",
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       var response = await window.LogosDispatcher.request("/api/memory/clear", {
         method: "POST",

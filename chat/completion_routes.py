@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import requests
 from flask import Blueprint, jsonify, request
+from chat._error_details import error_body
 from chat.host import (
     bound,
     get_current_trace,
@@ -94,21 +95,23 @@ def _completion_options(body: dict) -> dict:
 def create_completion():
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
-        return jsonify({"error": "json_body_required"}), 400
+        return jsonify(error_body("json_body_required")), 400
     unknown = set(body) - ALLOWED_FIELDS
     if unknown:
         return jsonify(
-            {"error": "unknown_parameters", "parameters": sorted(unknown)}
+            error_body("unknown_parameters", parameters=sorted(unknown))
         ), 400
     if body.get("model", MODEL_KEY) != MODEL_KEY:
         return jsonify(
-            {"error": "unsupported_completion_model", "model": MODEL_KEY}
+            error_body("unsupported_completion_model", model=MODEL_KEY)
         ), 400
     try:
         messages = _messages_from_body(body)
         options = _completion_options(body)
     except _BadInput as exc:
-        return jsonify({"error": str(exc)}), 400
+        return jsonify(
+            error_body(str(exc), detail_of="invalid_completion_request")
+        ), 400
 
     try:
         credential = bound._resolve_global_provider_credential(
@@ -118,9 +121,9 @@ def create_completion():
         headers = provider_request_headers(credential)
         headers["x-folder-id"] = credential.project_id
     except Exception:
-        return jsonify({"error": "completion_not_configured"}), 503
+        return jsonify(error_body("completion_not_configured")), 503
     if not credential.api_key or not str(credential.project_id or "").strip():
-        return jsonify({"error": "completion_not_configured"}), 503
+        return jsonify(error_body("completion_not_configured")), 503
 
     payload = {
         "modelUri": model_uri,
@@ -136,13 +139,15 @@ def create_completion():
         )
     except requests.RequestException:
         return jsonify(
-            {
-                "error": "completion_upstream_failed",
-                "detail": "Completion provider request failed",
-            }
+            error_body(
+                "completion_upstream_failed",
+                detail_of="completion_upstream_unanswered",
+            )
         ), 502
     if response.status_code != 200:
-        detail = f"upstream status {response.status_code}"
+        detail = (
+            f"Провайдер вернул HTTP {response.status_code}. Повторите запрос позже."
+        )
         return jsonify({"error": "completion_upstream_failed", "detail": detail}), 502
     try:
         data = response.json()
@@ -164,7 +169,7 @@ def create_completion():
         ):
             raise ValueError("invalid completion response")
     except (ValueError, KeyError, IndexError, TypeError, AttributeError):
-        return jsonify({"error": "completion_upstream_invalid"}), 502
+        return jsonify(error_body("completion_upstream_invalid")), 502
     trace = get_current_trace()
     if trace is not None:
         trace.add_event(
@@ -172,14 +177,14 @@ def create_completion():
         )
     if status != "ALTERNATIVE_STATUS_FINAL":
         return jsonify(
-            {
-                "error": "completion_incomplete",
-                "model": model_uri,
-                "reply": reply,
-                "usage": usage,
-                "provider_status": status,
-                "transport": "completion",
-            }
+            error_body(
+                "completion_incomplete",
+                model=model_uri,
+                reply=reply,
+                usage=usage,
+                provider_status=status,
+                transport="completion",
+            )
         ), 502
     return jsonify(
         {

@@ -23,6 +23,7 @@ from flask import (
     stream_with_context,
 )
 
+from chat._error_details import error_body
 from chat.mcp_routes import _provider_conversation_id, logos_client_type
 from chat.host import (
     add_message,
@@ -541,13 +542,13 @@ def _process(session: VoiceSession) -> None:
 def _start_processing(session: VoiceSession):
     with _sessions_lock:
         if session.cancelled.is_set():
-            return jsonify({"error": "voice_session_cancelled"}), 409
+            return jsonify(error_body("voice_session_cancelled")), 409
         if session.closed:
             return jsonify(
                 {"status": "completed" if session.finished else "processing"}
             )
         if session.text is None and not session.audio:
-            return jsonify({"error": "text or PCM WAV audio is required"}), 400
+            return jsonify(error_body("text or PCM WAV audio is required")), 400
         session.closed = True
 
     context = copy_context()
@@ -568,21 +569,21 @@ def create_voice_session():
     owner_id = get_current_owner_id()
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
-        return jsonify({"error": "json_body_required"}), 400
+        return jsonify(error_body("json_body_required")), 400
     conversation_id = data.get("conversation_id")
     if (
         not isinstance(conversation_id, str)
         or not conversation_id
         or not check_access(conversation_id, owner_id)
     ):
-        return jsonify({"error": "conversation_not_found"}), 404
+        return jsonify(error_body("conversation_not_found")), 404
     model = data.get("model") or "speech-realtime-deepseek-v4-flash"
     transport = data.get("transport") or "realtime"
     if not isinstance(transport, str) or transport not in {
         "realtime",
         "speechkit_pipeline",
     }:
-        return jsonify({"error": "unsupported_voice_transport"}), 400
+        return jsonify(error_body("unsupported_voice_transport")), 400
     if transport == "speechkit_pipeline":
         if (
             not isinstance(model, str)
@@ -590,57 +591,57 @@ def create_voice_session():
             or bound.TEXT_MODELS.get(model, {}).get("available") is False
         ):
             return jsonify(
-                {"error": "select_an_available_text_model_for_speechkit_pipeline"}
+                error_body("select_an_available_text_model_for_speechkit_pipeline")
             ), 400
     elif (
         not isinstance(model, str)
         or model not in bound.VOICE_MODELS
         or model not in bound.MODEL_UPSTREAMS
     ):
-        return jsonify({"error": "select_a_realtime_voice_model"}), 400
+        return jsonify(error_body("select_a_realtime_voice_model")), 400
     live = transport == "realtime" and model != "speech-realtime-deepseek-v4-flash"
     voice = data.get("voice") or ("sofia" if live else "filipp")
     role = data.get("role")
     if not isinstance(voice, str) or voice not in (
         _LIVE_VOICES if live else _GENERAL_VOICES
     ):
-        return jsonify({"error": "voice_is_not_compatible_with_model"}), 400
+        return jsonify(error_body("voice_is_not_compatible_with_model")), 400
     if role is not None and (
         not isinstance(role, str) or (live and role not in _LIVE_VOICES[voice])
     ):
-        return jsonify({"error": "role_is_not_compatible_with_voice"}), 400
+        return jsonify(error_body("role_is_not_compatible_with_voice")), 400
     mode = data.get("response_mode") or "audio"
     if not isinstance(mode, str) or mode not in {"audio", "both", "text"}:
-        return jsonify({"error": "response_mode_must_be_audio_both_or_text"}), 400
+        return jsonify(error_body("response_mode_must_be_audio_both_or_text")), 400
     if model == bound.TTS_MODEL and mode == "text":
-        return jsonify({"error": "speech_tts_live_requires_audio_output"}), 400
+        return jsonify(error_body("speech_tts_live_requires_audio_output")), 400
     settings = get_conv_settings(conversation_id) or {}
     if not isinstance(settings, dict):
-        return jsonify({"error": "invalid_conversation_settings"}), 400
+        return jsonify(error_body("invalid_conversation_settings")), 400
     instructions = data.get("instructions", settings.get("instructions"))
     if instructions is not None and not isinstance(instructions, str):
-        return jsonify({"error": "instructions_must_be_text"}), 400
+        return jsonify(error_body("instructions_must_be_text")), 400
     try:
         credential = bound._resolve_global_provider_credential(
             logos_client_type()(bound.Config)
         )
     except Exception:
-        return jsonify({"error": "provider_credential_unavailable"}), 503
+        return jsonify(error_body("provider_credential_unavailable")), 503
     if transport == "speechkit_pipeline":
         try:
             get_model_uri(credential.project_id, model)
         except ValueError:
-            return jsonify({"error": "invalid_text_model_uri"}), 400
+            return jsonify(error_body("invalid_text_model_uri")), 400
         if model not in bound.TEXT_MODELS:
             try:
                 discovered = (
                     get_model_discovery().get_models().get("text", {}).get(model)
                 )
             except Exception:
-                return jsonify({"error": "text_model_catalog_unavailable"}), 503
+                return jsonify(error_body("text_model_catalog_unavailable")), 503
             if not discovered or discovered.get("available") is False:
                 return jsonify(
-                    {"error": "select_an_available_discovered_text_model"}
+                    error_body("select_an_available_discovered_text_model")
                 ), 400
     session = VoiceSession(
         session_id=uuid.uuid4().hex,
@@ -678,32 +679,32 @@ def append_voice_audio():
     try:
         session = _require_session(request.args.get("session_id", ""))
     except KeyError:
-        return jsonify({"error": "voice_session_not_found"}), 404
+        return jsonify(error_body("voice_session_not_found")), 404
     if session.model == bound.TTS_MODEL:
-        return jsonify({"error": "speech_tts_live_requires_text"}), 400
+        return jsonify(error_body("speech_tts_live_requires_text")), 400
     if not (request.content_type or "").startswith(("audio/wav", "audio/x-wav")):
-        return jsonify({"error": "realtime_requires_pcm16_wav_audio"}), 415
+        return jsonify(error_body("realtime_requires_pcm16_wav_audio")), 415
     # Read one byte beyond the available space to detect oversize uploads without
     # loading an arbitrary request body into server memory.
     with _sessions_lock:
         if session.closed or session.text is not None:
-            return jsonify({"error": "voice_session_input_closed"}), 409
+            return jsonify(error_body("voice_session_input_closed")), 409
         room = _MAX_AUDIO_BYTES - len(session.audio)
     chunk = request.stream.read(room + 1)
     with _sessions_lock:
         # Concurrent uploads/close may have changed the session while the network
         # body arrived. No slow client may hold the global session lock.
         if session.closed or session.text is not None or session.cancelled.is_set():
-            return jsonify({"error": "voice_session_input_closed"}), 409
+            return jsonify(error_body("voice_session_input_closed")), 409
         room = _MAX_AUDIO_BYTES - len(session.audio)
         if not chunk:
-            return jsonify({"error": "audio_chunk_is_empty"}), 400
+            return jsonify(error_body("audio_chunk_is_empty")), 400
         if len(chunk) > room:
             return jsonify(
-                {
-                    "error": "audio_exceeds_session_upload_limit",
-                    "max_audio_bytes": _MAX_AUDIO_BYTES,
-                }
+                error_body(
+                    "audio_exceeds_session_upload_limit",
+                    max_audio_bytes=_MAX_AUDIO_BYTES,
+                )
             ), 413
         session.audio.extend(chunk)
         total = len(session.audio)
@@ -714,19 +715,19 @@ def append_voice_audio():
 def submit_voice_text():
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
-        return jsonify({"error": "json_body_required"}), 400
+        return jsonify(error_body("json_body_required")), 400
     try:
         session = _require_session(data.get("session_id", ""))
     except KeyError:
-        return jsonify({"error": "voice_session_not_found"}), 404
+        return jsonify(error_body("voice_session_not_found")), 404
     text = data.get("text")
     if not isinstance(text, str) or not text.strip():
-        return jsonify({"error": "text_is_required"}), 400
+        return jsonify(error_body("text_is_required")), 400
     if session.transport != "realtime":
-        return jsonify({"error": "speechkit_pipeline_requires_microphone_audio"}), 400
+        return jsonify(error_body("speechkit_pipeline_requires_microphone_audio")), 400
     with _sessions_lock:
         if session.closed or session.audio or session.text is not None:
-            return jsonify({"error": "voice_session_input_closed"}), 409
+            return jsonify(error_body("voice_session_input_closed")), 409
         session.text = text
     return _start_processing(session)
 
@@ -736,7 +737,7 @@ def voice_events():
     try:
         session = _require_session(request.args.get("session_id", ""))
     except KeyError:
-        return jsonify({"error": "voice_session_not_found"}), 404
+        return jsonify(error_body("voice_session_not_found")), 404
     try:
         start_index = max(0, int(request.headers.get("Last-Event-ID", "0")))
     except ValueError:
@@ -779,9 +780,9 @@ def voice_output():
     try:
         session = _require_session(request.args.get("session_id", ""))
     except KeyError:
-        return jsonify({"error": "voice_session_not_found"}), 404
+        return jsonify(error_body("voice_session_not_found")), 404
     if not session.output_audio:
-        return jsonify({"error": "voice_output_not_ready"}), 404
+        return jsonify(error_body("voice_output_not_ready")), 404
     return Response(
         session.output_audio,
         mimetype="audio/wav",
@@ -793,11 +794,11 @@ def voice_output():
 def close_voice_session():
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
-        return jsonify({"error": "json_body_required"}), 400
+        return jsonify(error_body("json_body_required")), 400
     try:
         session = _require_session(data.get("session_id", ""))
     except KeyError:
-        return jsonify({"error": "voice_session_not_found"}), 404
+        return jsonify(error_body("voice_session_not_found")), 404
     if data.get("cancel") is True:
         session.cancelled.set()
         with session.condition:

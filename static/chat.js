@@ -91,7 +91,17 @@ function renderApprovalCard(toolCall, origMsg) {
             });
           } else {
             addMessage({
-              text: "⚠️ Ошибка выполнения: " + (data.error || `HTTP ${result.status}`),
+              // A 5xx or an unreadable body can follow an action that already ran:
+              // never invite a blind repeat in that case.
+              text: "⚠️ Ошибка выполнения: " + chatErrorReason(
+                data,
+                result.status,
+                result.status >= 500 || !(data.error || data.detail)
+                  ? "Результат действия не подтверждён: оно могло выполниться. Проверьте диалог, прежде чем повторять."
+                  : data.trace
+                    ? "Действие не выполнено. Причина записана в трассе: откройте «Детали» под этим сообщением."
+                    : "Действие не выполнено. Повторите запрос в чате.",
+              ),
               role: "error",
               trace: data.trace,
             });
@@ -196,6 +206,88 @@ function parseMarkdown(text) {
   }
 }
 
+// Server error codes the chat names in plain Russian: what happened and what to do.
+var CHAT_ERROR_TEXTS = {
+  conversation_not_found: "Диалог не найден: его удалили. Откройте другой диалог или создайте новый.",
+  internal_server_error: "Ошибка на сервере. Повторите запрос позже.",
+  json_body_required: "Сервер не получил данные запроса. Повторите отправку.",
+  invalid_params: "Параметры запроса не приняты. Проверьте настройки модели и повторите.",
+  invalid_settings: "Настройки диалога не приняты. Проверьте настройки и инструменты диалога.",
+  invalid_conversation_settings: "Настройки диалога не приняты. Проверьте настройки и инструменты диалога.",
+  invalid_retry_message: "Повторить нельзя: сохранённый вопрос не совпадает с этим. Отправьте вопрос заново.",
+  invalid_skill_selection: "Выбранные навыки недоступны. Измените выбор навыков и повторите.",
+  invalid_attachments: "Фото не приняты: формат, размер или число фото не подходят. Уберите лишние или неподходящие фото и отправьте снова.",
+  model_does_not_accept_images: "Эта модель не принимает фото. Выберите модель с поддержкой фото.",
+  request_too_large: "Запрос слишком большой: уберите фото или уменьшите их.",
+  model_requires_dedicated_api: "Эта модель не отвечает в текстовом чате. Выберите текстовую модель.",
+  model_uses_completion_api: "Эта модель не ведёт диалог. Выберите другую модель.",
+  provider_credential_unavailable: "Нет действующего ключа провайдера. Добавьте ключ в «Ключи провайдеров» и повторите.",
+  not_an_image_model: "Эта модель не создаёт изображения. Выберите модель изображений.",
+  invalid_conversation_id: "Диалог не распознан. Откройте его заново и повторите.",
+  prompt_too_long: "Запрос для изображения слишком длинный. Сократите его и повторите.",
+  invalid_image_size: "Этот размер изображения не поддерживается. Выберите другой размер.",
+  image_model_does_not_take_photos: "Модель изображений не принимает фото: уберите фото или выберите другую модель.",
+  request_id_conflict: "Этот запрос изображения уже отправлен с другим текстом. Отправьте запрос заново.",
+  image_generation_unavailable: "Провайдер изображений не ответил. Повторите позже.",
+  image_generation_failed: "Провайдер не создал изображение. Измените запрос и повторите.",
+  image_generation_storage_failed: "Изображение создано, но не сохранилось на сервере. Чтобы получить его, отправьте запрос заново.",
+  image_generation_outcome_unknown: "Результат генерации не подтверждён. Повторная платная генерация не запускалась: проверьте диалог позже.",
+  image_artifact_unavailable: "Файл изображения недоступен. Повторная платная генерация не запускалась.",
+  image_request_not_found: "Запрос изображения не найден на сервере. Отправьте его заново.",
+  invalid_request_id: "Запрос изображения не распознан. Отправьте его заново.",
+  voice_session_cancelled: "Голосовая сессия отменена. Отправьте сообщение ещё раз.",
+  voice_session_not_found: "Голосовая сессия закончилась. Отправьте сообщение ещё раз.",
+  voice_session_input_closed: "Голосовая сессия уже закрыта. Отправьте сообщение ещё раз.",
+  unsupported_voice_transport: "Этот способ передачи голоса не поддерживается. Выберите другой режим голоса.",
+  select_an_available_text_model_for_speechkit_pipeline: "Для режима SpeechKit нужна доступная текстовая модель. Выберите её в настройках и отправьте сообщение снова.",
+  response_mode_must_be_audio_both_or_text: "Режим ответа не распознан. Выберите в голосовой панели «Голос», «Текст» или «Оба» и отправьте снова.",
+  invalid_text_model_uri: "Адрес текстовой модели не составился. Выберите другую текстовую модель и отправьте снова.",
+  select_an_available_discovered_text_model: "Эта текстовая модель недоступна. Выберите другую модель и отправьте снова.",
+  speechkit_pipeline_requires_microphone_audio: "В режиме SpeechKit модель принимает только запись с микрофона. Скажите фразу голосом вместо текста.",
+  text_is_required: "Введите текст сообщения.",
+  speech_tts_live_requires_text: "Эта модель озвучивает только текст. Введите текст сообщения.",
+  speech_tts_live_requires_audio_output: "Эта модель отвечает только голосом. Выберите режим ответа «Голос» или «Оба».",
+  select_a_realtime_voice_model: "Выберите голосовую модель Realtime.",
+  voice_is_not_compatible_with_model: "Выбранный голос не подходит этой модели. Выберите другой голос в настройках.",
+  role_is_not_compatible_with_voice: "Выбранная роль не подходит этому голосу. Выберите другую роль.",
+  instructions_must_be_text: "Инструкции модели должны быть текстом. Проверьте настройки.",
+  text_model_catalog_unavailable: "Каталог моделей сейчас недоступен. Повторите позже.",
+  provider_quota_exceeded: "Достигнут лимит запросов к провайдеру. Повторите после времени сброса.",
+  invalid_role: "Роль не найдена. Выберите роль из списка.",
+  model_not_available_for_dialog: "Эта модель недоступна для диалога. Выберите другую модель.",
+  model_catalog_unavailable: "Список моделей провайдера сейчас недоступен. Повторите позже.",
+  tool_action_failed: "Инструмент не выполнил действие. Причина записана в журнале сервера. Попросите модель повторить действие в чате.",
+  tool_execution_failed: "Сервер не завершил подтверждённое действие. Проверьте, выполнилось ли оно, прежде чем повторять.",
+  approval_followup_failed: "Действие выполнено, но модель не дописала ответ. Повторять действие не нужно: проверьте результат в диалоге.",
+};
+
+function isRussianText(value) {
+  return typeof value === "string" && /[А-Яа-яЁё]/.test(value);
+}
+
+// The Russian text for a failed request. A known code is named in plain words; the server's explanation then goes to
+// the console only, so the bubble says it once. Without a known code, the server's Russian explanation is the text.
+// A bare code and English server text (exception and library messages) go to the console only.
+function chatErrorReason(data, status, fallback) {
+  var body = data && typeof data === "object" ? data : {};
+  var code = body.error && typeof body.error === "object" ? body.error.code : body.error;
+  var known = typeof code === "string" && Object.prototype.hasOwnProperty.call(CHAT_ERROR_TEXTS, code)
+    ? CHAT_ERROR_TEXTS[code]
+    : "";
+  var own = !known && isRussianText(code) ? code : "";
+  var detail = [body.detail, body.message].find(isRussianText) || "";
+  console.warn("[CHAT] Request failed:", status || "no status", code || "", body.detail || body.message || "");
+  var text = known || detail || own || (body.type && isRussianText(body.title) ? body.title : "");
+  if (!text) {
+    text = fallback || (status >= 500
+      ? "Сервер не смог ответить. Повторите запрос позже."
+      : status >= 400
+        ? "Сервер не принял запрос. Проверьте сообщение и настройки модели, затем повторите."
+        : "Сервер не прислал ответ. Повторите запрос.");
+  }
+  return text;
+}
+
 var CHAT_UI_ROLES = {
   user: "user",
   human: "user",
@@ -252,6 +344,7 @@ function addMessage({
   trace,
   id: messageId,
   onRetry,
+  editText,
 }) {
   const chatbox = document.getElementById("chatbox");
   if (!chatbox) return null;
@@ -289,6 +382,28 @@ function addMessage({
       }
     });
     msg.appendChild(retryBtn);
+  }
+
+  // A question the server already stored is not put back into the field on its own (a plain Enter would store it twice);
+  // «Изменить» puts it there on request, so it can be corrected without typing it again.
+  if (uiRole === "error" && typeof editText === "string" && editText.trim()) {
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    // It shares the retry class, so it leaves together with «Повторить» when a newer question is sent.
+    editBtn.className = "logos-btn msg-retry-btn msg-edit-btn";
+    editBtn.textContent = "Изменить";
+    editBtn.addEventListener("click", function () {
+      const field = document.getElementById("msg-input");
+      if (!field) return;
+      if (field.value.trim() && field.value !== editText) {
+        window.LogosToast.show("В поле уже есть черновик. Отправьте или очистите его и нажмите «Изменить» ещё раз.");
+        return;
+      }
+      field.value = editText;
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      field.focus();
+    });
+    msg.appendChild(editBtn);
   }
 
   // Copy sits over the bubble corner, so it takes no row of its own.
@@ -444,7 +559,9 @@ function addMessage({
       const openTraceBtn = document.createElement("button");
       openTraceBtn.type = "button";
       openTraceBtn.className = "logos-btn logos-trace-open-viewer";
-      openTraceBtn.textContent = "🔍 Открыть трассу";
+      const openTraceLabel = "🔍 Открыть трассу";
+      const traceSummaryText = summary.textContent;
+      openTraceBtn.textContent = openTraceLabel;
       openTraceBtn.title = "Открыть Execution Trace viewer";
 
       openTraceBtn.addEventListener("click", async function (event) {
@@ -457,18 +574,48 @@ function addMessage({
         }
         // A stored message keeps only a reference to its trace; the full trace is read from the invocation.
         if (traceObj.storage === "invocation" && traceObj.invocation_id) {
+          let loaded = null;
+          openTraceBtn.disabled = true;
+          openTraceBtn.textContent = "🔍 Загружаем трассу…";
           try {
             const res = await window.LogosDispatcher.request(
               `/api/invocations/${encodeURIComponent(traceObj.invocation_id)}/trace`,
               {},
               { timeoutMs: 60000 },
             );
-            if (!res.ok) throw new Error("HTTP " + res.status);
-            window.openTraceViewer(await res.json());
+            if (!res.ok) {
+              const httpError = new Error("HTTP " + res.status);
+              httpError.status = res.status;
+              throw httpError;
+            }
+            loaded = await res.json();
           } catch (err) {
-            summary.textContent = "🔍 Трасса недоступна";
-            window.LogosToast.error("Не удалось загрузить трассу. Попробуйте позже.");
-            console.error("[CHAT] Trace load failed: " + err.message);
+            // The reason is named (a missing trace, the server, the connection), and the same button loads it again.
+            const reason = err && err.status === 404
+              ? "трасса не найдена на сервере"
+              : err && err.status
+                ? "сервер не отдал трассу"
+                : err && err.name === "TimeoutError"
+                  ? "сервер долго не отвечает"
+                  : err && err.name === "SyntaxError"
+                    ? "ответ сервера не удалось прочитать"
+                    : "нет связи с сервером";
+            summary.textContent = "🔍 Трасса не загрузилась: " + reason;
+            openTraceBtn.textContent = "🔍 Повторить загрузку трассы";
+            window.LogosToast.error("Трасса не загрузилась: " + reason + ". Нажмите «Повторить загрузку трассы».");
+            console.error("[CHAT] Trace load failed:", err && (err.status || err.name), err && err.message);
+          } finally {
+            openTraceBtn.disabled = false;
+          }
+          if (loaded) {
+            summary.textContent = traceSummaryText;
+            openTraceBtn.textContent = openTraceLabel;
+            try {
+              window.openTraceViewer(loaded);
+            } catch (viewerError) {
+              console.error("[CHAT] Trace viewer failed:", viewerError);
+              window.LogosToast.error("Трасса загружена, но просмотр не открылся. Обновите страницу и нажмите «Открыть трассу» снова.");
+            }
           }
           return;
         }
@@ -496,7 +643,7 @@ function checkStoredImageRequest(convId, anchor, imageRequestId) {
         const data = await response.json().catch(() => ({}));
         if (response.ok && data.status === "done" && data.reply) return { reply: data.reply, id: data.message_id };
         if (response.status === 202 && data.status === "pending") return { text: "Изображение ещё формируется.", retry: true };
-        return { text: "⚠️ Ошибка: " + (data.message || data.error || "HTTP " + response.status) };
+        return { text: "⚠️ Ошибка: " + chatErrorReason(data, response.status) };
       },
       function () {
         return { text: "Не удалось проверить изображение. Проверьте соединение.", retry: true };
@@ -518,10 +665,51 @@ function checkStoredImageRequest(convId, anchor, imageRequestId) {
     });
 }
 
+// A failed history load names its cause (no connection, slow or failing server) and offers «Повторить».
+function historyErrorBlock(convId, message) {
+  const error = document.createElement("div");
+  error.className = "empty-state error-state";
+  const text = document.createElement("p");
+  text.textContent = message;
+  const retry = document.createElement("button");
+  retry.type = "button";
+  retry.className = "logos-btn";
+  retry.textContent = "Повторить";
+  retry.addEventListener("click", function () {
+    error.remove();
+    loadHistory(convId);
+  });
+  error.append(text, retry);
+  return error;
+}
+
+function historyErrorText(err) {
+  if (err && err.status) return "Сервер не смог отдать диалог. Нажмите «Повторить» или попробуйте позже.";
+  if (err && err.name === "TimeoutError") return "Сервер долго не отвечает, диалог не загрузился. Нажмите «Повторить».";
+  if (err && err.name === "SyntaxError") {
+    return "Ответ сервера не удалось прочитать, диалог не загрузился. Нажмите «Повторить» или попробуйте позже.";
+  }
+  return "Нет связи с сервером, диалог не загрузился. Проверьте соединение и нажмите «Повторить».";
+}
+
+function historyReloadErrorText(err) {
+  if (err && err.status) return "Не удалось обновить диалог: сервер не ответил. Нажмите «Повторить» или попробуйте позже.";
+  if (err && err.name === "TimeoutError") return "Не удалось обновить диалог: сервер долго не отвечает. Нажмите «Повторить».";
+  if (err && err.name === "SyntaxError") {
+    return "Не удалось обновить диалог: ответ сервера не прочитался. Нажмите «Повторить» или попробуйте позже.";
+  }
+  return "Не удалось обновить диалог: нет связи с сервером. Проверьте соединение и нажмите «Повторить».";
+}
+
 function loadHistory(convId) {
   const chatbox = document.getElementById("chatbox");
   if (!chatbox) return;
-  chatbox.replaceChildren();
+  // Reloading the open chat keeps its messages on screen until the new copy arrives, so a failed reload hides nothing.
+  const shown = chatbox.dataset.conversationId === convId && chatbox.querySelector(".msg")
+    ? Array.from(chatbox.children)
+    : null;
+  if (!shown) chatbox.replaceChildren();
+  chatbox.dataset.conversationId = convId;
   return window.LogosDispatcher.request(`/api/conversations/${convId}/messages`)
     .then((r) => {
       if (!r.ok) {
@@ -534,6 +722,8 @@ function loadHistory(convId) {
     .then((data) => {
       // The user may have switched conversations while this request was in flight.
       if (convId !== currentConvId) return;
+      // Only the copy shown before the reload is replaced; whatever was added while it was read stays.
+      if (shown) shown.forEach(function (node) { node.remove(); });
       try {
         let rendered = 0;
         // The question still waiting for an answer, as the messages are read in order.
@@ -563,6 +753,8 @@ function loadHistory(convId) {
                 replaces: node,
               });
             },
+            // A question with photos is not offered for editing: the photos would not go with the edited text.
+            editText: retryText !== null && !(owner.attachments && owner.attachments.images) ? retryText : undefined,
           });
           if (node) rendered += 1;
           const imageRequest = msg.role === "user" && typeof msg.source === "string"
@@ -588,10 +780,7 @@ function loadHistory(convId) {
         }
       } catch (renderErr) {
         console.error("[CHAT] Render history error:", renderErr);
-        const error = document.createElement("div");
-        error.className = "empty-state error-state";
-        error.textContent = "Ошибка отрисовки истории: " + renderErr.message;
-        chatbox.replaceChildren(error);
+        chatbox.replaceChildren(historyErrorBlock(convId, "Не удалось показать диалог. Нажмите «Повторить» или обновите страницу."));
       }
       flushApprovalOutputs(convId);
     })
@@ -604,19 +793,15 @@ function loadHistory(convId) {
         return;
       }
       console.error("[CHAT] Fetch history error:", err);
-      const error = document.createElement("div");
-      error.className = "empty-state error-state";
-      const text = document.createElement("p");
-      text.textContent = "Не удалось загрузить диалог. Проверьте соединение.";
-      const retry = document.createElement("button");
-      retry.type = "button";
-      retry.className = "logos-btn";
-      retry.textContent = "Повторить";
-      retry.addEventListener("click", function () {
-        loadHistory(convId);
-      });
-      error.append(text, retry);
-      chatbox.replaceChildren(error);
+      // The chat already on screen stays: the error and «Повторить» go under it,
+      // one block at a time, worded as a failed refresh.
+      if (shown && shown.some(function (node) { return node.isConnected; })) {
+        chatbox.querySelectorAll(".error-state").forEach(function (node) { node.remove(); });
+        chatbox.appendChild(historyErrorBlock(convId, historyReloadErrorText(err)));
+        chatbox.scrollTop = chatbox.scrollHeight;
+      } else {
+        chatbox.replaceChildren(historyErrorBlock(convId, historyErrorText(err)));
+      }
     });
 }
 
@@ -627,22 +812,18 @@ document.addEventListener("DOMContentLoaded", function () {
   // The chat request in flight for each conversation; «Стоп» aborts it from the UI.
   const activeChatRequests = new Map();
   let creatingConversation = false;
+  const turnStarts = new Map();
+  function markTurnStart(convId) { turnStarts.set(convId, (turnStarts.get(convId) || 0) + 1); }
 
-  // A photo error names its cause; other server codes are shown as they are.
-  function errorReasonText(data) {
-    if (data.error === "invalid_attachments") return "Фото не приняты: " + (data.message || "проверьте файлы");
-    if (data.error === "model_does_not_accept_images") {
-      return "Эта модель не принимает фото. Выберите модель с поддержкой фото.";
-    }
-    if (data.error === "invalid_params") return data.message || "Параметры запроса не приняты. Проверьте настройки.";
-    if (data.error === "request_too_large") return "Запрос слишком большой: уберите фото или уменьшите их.";
-    return data.error;
+  // Every server code is named in Russian (chatErrorReason); the code and English server text go to the console.
+  function errorReasonText(data, status) {
+    return chatErrorReason(data, status);
   }
 
   // Shows the reason in Russian. The browser's own message (for example «The operation was aborted») stays out of the chat.
   function chatErrorText(error) {
     if (error && error.name === "AbortError") {
-      return "Ответ остановлен. Сервер мог продолжить работу, проверьте диалог позже.";
+      return "Ответ остановлен. Сервер может дописать его: ответ появится в этом диалоге, когда сохранится.";
     }
     if (error && error.name === "TimeoutError") {
       return "Ответ не пришёл за 5 минут. Повторите запрос.";
@@ -650,16 +831,40 @@ document.addEventListener("DOMContentLoaded", function () {
     return "Не удалось получить ответ. Проверьте соединение и повторите.";
   }
 
-  // The send button becomes «Stop» while the chat in the open conversation is still answering.
+  // A voice failure from the browser (no connection, no answer in time, an unreadable answer) is named in Russian;
+  // the voice module's own Russian text and server codes pass on unchanged. The original error goes to the console.
+  function voiceErrorText(error) {
+    const name = error && error.name;
+    if (name === "TypeError" || name === "AbortError" || name === "TimeoutError" || name === "SyntaxError") {
+      console.warn("[CHAT] Voice request failed:", name, error.message);
+      if (name === "TimeoutError") return "Сервер не ответил вовремя. Повторите сообщение.";
+      if (name === "SyntaxError") return "Ответ сервера не удалось прочитать. Повторите сообщение позже.";
+      return "Нет связи с сервером. Проверьте соединение и повторите.";
+    }
+    return (error && error.message) || "Не удалось получить голосовой ответ";
+  }
+
+  // The send button becomes «Stop» while the answer in the open conversation can be stopped. While a send cannot be made
+  // (an answer that cannot be stopped is on its way, photos are still being read), the button looks disabled but still
+  // takes the tap, and the tap says why nothing is sent instead of being ignored.
   function syncSendButton() {
     if (!sendBtn) return;
     const running = Boolean(currentConvId && activeChatRequests.has(currentConvId));
     const pending = currentConvId ? pendingConversations.has(currentConvId) : creatingConversation;
+    const waiting = !running && (pending || imagesInFlight > 0);
     sendBtn.textContent = running ? "■" : "➤";
-    sendBtn.setAttribute("aria-label", running ? "Остановить ответ" : "Отправить");
-    sendBtn.disabled = !running && (
-      pending || imagesInFlight > 0 || !input || (!input.value.trim() && !pendingImages.length)
-    );
+    const label = running
+      ? "Остановить ответ"
+      : pending
+        ? "Отправка недоступна: ответ ещё формируется"
+        : imagesInFlight > 0
+          ? "Отправка недоступна: фото ещё загружаются"
+          : "Отправить";
+    sendBtn.setAttribute("aria-label", label);
+    sendBtn.title = label;
+    if (waiting) sendBtn.setAttribute("aria-disabled", "true");
+    else sendBtn.removeAttribute("aria-disabled");
+    sendBtn.disabled = !running && !waiting && (!input || (!input.value.trim() && !pendingImages.length));
   }
 
   const attachBtn = document.getElementById("attach-btn");
@@ -781,24 +986,56 @@ document.addEventListener("DOMContentLoaded", function () {
     return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
   }
 
+  // A refused image request keeps the server's code and texts, so the chat names it in Russian (chatErrorReason).
+  function imageFailure(data, response, turn) {
+    return {
+      error: data.error || "HTTP " + response.status,
+      message: data.message,
+      detail: data.detail,
+      httpStatus: response.status,
+      imageRequestId: turn.imageRequestId,
+    };
+  }
+
+  // «Стоп» ends the wait for a picture. The signal is checked between reads, so a stopped wait stops polling too.
+  function throwIfStopped(turn) {
+    if (!turn.signal || !turn.signal.aborted) return;
+    const stopped = new Error("Image wait stopped");
+    stopped.name = "AbortError";
+    throw stopped;
+  }
+
   // Recovery reads our durable request receipt, never repeats the paid provider POST.
   async function readImageResult(turn) {
     const path = "/api/images/requests/" + encodeURIComponent(turn.imageRequestId) +
       "?conversation_id=" + encodeURIComponent(turn.conversationId);
     const deadline = Date.now() + 240000;
     while (Date.now() < deadline) {
+      throwIfStopped(turn);
       let response;
       try {
-        response = await window.LogosDispatcher.request(path, {}, { timeoutMs: 15000 });
+        response = await window.LogosDispatcher.request(path, turn.signal ? { signal: turn.signal } : {}, { timeoutMs: 15000 });
       } catch (error) {
+        throwIfStopped(turn);
         return { error: "Соединение прервалось. Повторите получение результата.", imageRequestId: turn.imageRequestId };
       }
       const data = await response.json().catch(() => ({}));
       if (response.ok && data.status === "done" && data.reply) return data;
+      throwIfStopped(turn);
       if (response.status !== 202 || data.status !== "pending") {
-        return { error: data.message || data.error || "HTTP " + response.status, imageRequestId: turn.imageRequestId };
+        return imageFailure(data, response, turn);
       }
-      await new Promise(function (resolve) { setTimeout(resolve, 2000); });
+      // The pause between reads ends at once on «Стоп».
+      await new Promise(function (resolve) {
+        const signal = turn.signal;
+        const done = function () {
+          clearTimeout(timer);
+          if (signal) signal.removeEventListener("abort", done);
+          resolve();
+        };
+        const timer = setTimeout(done, 2000);
+        if (signal) signal.addEventListener("abort", done);
+      });
     }
     return { error: "Результат ещё не подтверждён. Повторите получение результата.", imageRequestId: turn.imageRequestId };
   }
@@ -810,7 +1047,7 @@ document.addEventListener("DOMContentLoaded", function () {
       addMessage({ text: data.reply, role: "bot", id: data.message_id });
     } else {
       addMessage({
-        text: "⚠️ Ошибка: " + data.error,
+        text: "⚠️ Ошибка: " + chatErrorReason(data, data.httpStatus),
         role: "error",
         onRetry: function () { return window.logosRecoverImage(turn); },
       });
@@ -825,6 +1062,7 @@ document.addEventListener("DOMContentLoaded", function () {
     try {
       response = await window.LogosDispatcher.request("/api/images/generate", {
         method: "POST",
+        signal: turn.signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversation_id: turn.conversationId,
@@ -834,12 +1072,14 @@ document.addEventListener("DOMContentLoaded", function () {
         }),
       }, { timeoutMs: 300000 });
     } catch (error) {
+      throwIfStopped(turn);
       return readImageResult(turn);
     }
     const data = await response.json().catch(() => ({}));
     if (response.ok && data.status === "done" && data.reply) return data;
+    throwIfStopped(turn);
     if (response.status === 202 && data.status === "pending") return readImageResult(turn);
-    return { error: data.message || data.error || "HTTP " + response.status, imageRequestId: turn.imageRequestId };
+    return imageFailure(data, response, turn);
   }
 
   function isVoiceModel(modelKey) {
@@ -870,18 +1110,30 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // One line under the waiting dots: what the turn is doing and for how long. The handle sets the label and removes the line.
+  // The chat is a live region: the label is read out once and when it changes, the per-second timer is not read out.
   function createTurnStatus(chatbox, startedAt) {
     const el = document.createElement("div");
     el.className = "typing-status";
+    const labelEl = document.createElement("span");
+    const timeEl = document.createElement("span");
+    timeEl.setAttribute("aria-hidden", "true");
+    el.append(labelEl, timeEl);
     let label = "Отправляем запрос";
+    labelEl.textContent = label;
     function render() {
-      el.textContent = label + " · " + formatElapsed(Date.now() - startedAt);
+      timeEl.textContent = " · " + formatElapsed(Date.now() - startedAt);
     }
     render();
     if (chatbox) chatbox.appendChild(el);
     const timer = setInterval(render, 1000);
     return {
-      setLabel: function (text) { label = text; render(); },
+      setLabel: function (text) {
+        if (text !== label) {
+          label = text;
+          labelEl.textContent = label;
+        }
+        render();
+      },
       remove: function () { clearInterval(timer); el.remove(); },
     };
   }
@@ -911,15 +1163,45 @@ document.addEventListener("DOMContentLoaded", function () {
     syncSendButton();
   }
 
+  // «Стоп» during the recovery wait ends it at once: abort() also cancels the pause and the poll in flight.
+  function newTurnRecovery() {
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const recovery = {
+      cancelled: false,
+      signal: controller ? controller.signal : undefined,
+      abort: function () {
+        recovery.cancelled = true;
+        if (controller) controller.abort();
+      },
+    };
+    return recovery;
+  }
+
+  function recoveryPause(recovery) {
+    return new Promise(function (resolve) {
+      const timer = setTimeout(done, TURN_RECOVERY_POLL_MS);
+      function done() {
+        clearTimeout(timer);
+        if (recovery.signal) recovery.signal.removeEventListener("abort", done);
+        resolve();
+      }
+      if (recovery.signal) recovery.signal.addEventListener("abort", done);
+    });
+  }
+
   async function recoverTurn(turn, recovery, onMissing) {
     const started = Date.now();
     let missing = 0;
     while (!recovery.cancelled && Date.now() - started < TURN_RECOVERY_MS) {
-      await new Promise(function (resolve) { setTimeout(resolve, TURN_RECOVERY_POLL_MS); });
+      await recoveryPause(recovery);
       if (recovery.cancelled) break;
       let status = null;
       try {
-        const response = await window.LogosDispatcher.request("/api/conversations/" + turn.conversationId + "/messages", undefined, { timeoutMs: 15000 });
+        const response = await window.LogosDispatcher.request(
+          "/api/conversations/" + turn.conversationId + "/messages",
+          recovery.signal ? { signal: recovery.signal } : undefined,
+          { timeoutMs: 15000 },
+        );
         if (!response.ok) continue;
         const data = await response.json();
         status = turnStatus(Array.isArray(data.messages) ? data.messages : [], turn.baselineCount);
@@ -950,13 +1232,56 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  // «Стоп» ends only the wait: the server still finishes the turn and stores its answer. While this chat stays open and no
+  // newer message is on its way in it, the stored answer is shown as soon as it is saved (the history is read again, so
+  // the «stopped» note gives way to what the server stored). Otherwise the answer comes with the next history load.
+  async function watchStoppedTurn(turn) {
+    if (typeof turn.baselineCount !== "number") return;
+    const convId = turn.conversationId;
+    const startMark = turnStarts.get(convId) || 0;
+    const started = Date.now();
+    let missing = 0;
+    while (Date.now() - started < TURN_RECOVERY_MS) {
+      await new Promise(function (resolve) { setTimeout(resolve, TURN_RECOVERY_POLL_MS); });
+      if (currentConvId !== convId || pendingConversations.has(convId) || (turnStarts.get(convId) || 0) !== startMark) return;
+      let messages;
+      try {
+        const response = await window.LogosDispatcher.request("/api/conversations/" + convId + "/messages", undefined, { timeoutMs: 15000 });
+        if (!response.ok) continue;
+        const data = await response.json();
+        messages = Array.isArray(data.messages) ? data.messages : [];
+      } catch (error) {
+        continue;
+      }
+      if (currentConvId !== convId || pendingConversations.has(convId) || (turnStarts.get(convId) || 0) !== startMark) return;
+      const status = turnStatus(messages, turn.baselineCount);
+      if (status === "answered") {
+        if (document.querySelector("#chatbox .approval-card")) return;
+        loadHistory(convId);
+        return;
+      }
+      // A retried question is already stored and adds no new message, so an unchanged count means it is still pending.
+      if (status === "missing" && !turn.userMessageId) {
+        missing += 1;
+        if (missing >= TURN_MISSING_POLLS) {
+          // The server never received the question, so no answer will come for it.
+          addMessage({ text: "Сервер не получил этот вопрос, ответа на него не будет. Отправьте вопрос ещё раз.", role: "error" });
+          return;
+        }
+      } else {
+        missing = 0;
+      }
+    }
+  }
+
   // After a reload, or in another tab, a question with no answer yet is still being answered: its answer is awaited here.
   window.logosResumeWaitingTurn = function (convId, baselineCount) {
     if (pendingConversations.has(convId) || activeChatRequests.has(convId)) return;
     // The baseline is the count before the open question, so the question itself reads as pending.
     const turn = { conversationId: convId, baselineCount: baselineCount };
-    const recovery = { cancelled: false, abort: function () { recovery.cancelled = true; } };
+    const recovery = newTurnRecovery();
     pendingConversations.add(convId);
+    markTurnStart(convId);
     activeChatRequests.set(convId, recovery);
     let typingEl = null;
     if (currentConvId === convId) {
@@ -977,6 +1302,7 @@ document.addEventListener("DOMContentLoaded", function () {
         deliverApprovalOutput(convId, function () {
           addMessage({ text: chatErrorText({ name: "AbortError" }), role: "error" });
         });
+        watchStoppedTurn(turn);
       }
       releaseTurn(turn, false);
     });
@@ -988,7 +1314,18 @@ document.addEventListener("DOMContentLoaded", function () {
     const rawText = retryRequest ? "" : input.value;
     const text = retryRequest ? retryRequest.text : rawText.trim();
     if (retryRequest && currentConvId !== retryRequest.conversationId) return;
-    if (imagesInFlight > 0) return;
+    const selectedAtSubmit = currentConvId;
+    // A send while the chat is busy is not ignored: the hint says why nothing was sent and what to do.
+    if (selectedAtSubmit ? pendingConversations.has(selectedAtSubmit) : creatingConversation) {
+      window.LogosToast.show(selectedAtSubmit && activeChatRequests.has(selectedAtSubmit)
+        ? "Ответ ещё формируется. Дождитесь его или остановите кнопкой ■."
+        : "Ответ ещё формируется, дождитесь его окончания.");
+      return;
+    }
+    if (imagesInFlight > 0) {
+      window.LogosToast.show("Фото ещё загружаются. Отправьте сообщение, когда появится их превью.");
+      return;
+    }
     const sentImages = retryRequest
       ? retryRequest.images || (retryRequest.imageCount ? pendingImages.slice() : [])
       : pendingImages.slice();
@@ -1001,11 +1338,6 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
     if (!text && !sentImages.length) return;
-    const selectedAtSubmit = currentConvId;
-    if (selectedAtSubmit ? pendingConversations.has(selectedAtSubmit) : creatingConversation) {
-      window.LogosToast.show("Ответ ещё формируется, дождитесь его окончания.");
-      return;
-    }
 
     const turn = {
       conversationId: selectedAtSubmit,
@@ -1026,6 +1358,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const needsConversation = !selectedAtSubmit;
     if (needsConversation) creatingConversation = true;
     else pendingConversations.add(turn.conversationId);
+    markTurnStart(turn.conversationId);
     let typingEl = null;
     // True while a lost connection is being recovered: the turn stays pending until its answer is found.
     let recovering = false;
@@ -1058,7 +1391,13 @@ document.addEventListener("DOMContentLoaded", function () {
         if (currentConvId === turn.conversationId) {
           restoreImages();
           if (!input.value) input.value = turn.text;
-          addMessage({ text: settingsError.message, role: "error" });
+          if (!isRussianText(settingsError && settingsError.message)) console.warn("[CHAT] Settings read failed:", settingsError);
+          addMessage({
+            text: isRussianText(settingsError && settingsError.message)
+              ? settingsError.message
+              : "Настройки модели не прочитаны. Проверьте их и повторите.",
+            role: "error",
+          });
         }
         return;
       }
@@ -1071,6 +1410,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         turn.conversationId = createdId;
         pendingConversations.add(createdId);
+        markTurnStart(createdId);
         // Selecting another chat while creation is pending must not pull the user back.
         if (currentConvId === selectedAtSubmit) await selectConv(createdId);
         // The user moved on while the chat was created: the message is not sent into a chat they are not viewing.
@@ -1105,7 +1445,11 @@ document.addEventListener("DOMContentLoaded", function () {
       let response;
       let data;
       if (isImageModel(turn.model)) {
-        data = await runImageTurn({ ...turn, attachmentCount: sentImages.length });
+        // «Стоп» ends the wait for the picture; the generation goes on and its result stays readable.
+        const imageController = new AbortController();
+        activeChatRequests.set(turn.conversationId, imageController);
+        syncSendButton();
+        data = await runImageTurn({ ...turn, attachmentCount: sentImages.length, signal: imageController.signal });
         response = { status: data.error ? 502 : 200, ok: !data.error };
       } else if (isVoiceModel(turn.model)) {
         try {
@@ -1119,7 +1463,7 @@ document.addEventListener("DOMContentLoaded", function () {
             instructions: turn.params.instructions,
           });
         } catch (error) {
-          data = { error: error.message || "Не удалось получить голосовой ответ" };
+          data = { error: voiceErrorText(error) };
         }
         response = { status: data.error ? 502 : 200, ok: !data.error };
       } else {
@@ -1147,6 +1491,12 @@ document.addEventListener("DOMContentLoaded", function () {
         }, { timeoutMs: 300000 });
         // A gateway page is not the server's answer. A 413 names its cause; other non-JSON answers are recovered like a lost connection.
         const body = await response.json().catch(() => null);
+        if (body === null && chatController.signal.aborted) {
+          // «Стоп» pressed while the answer was being read is a stop, not a lost connection.
+          const stoppedRead = new Error("Chat answer read stopped");
+          stoppedRead.name = "AbortError";
+          throw stoppedRead;
+        }
         if (body !== null) {
           data = body;
         } else if (response.status === 413) {
@@ -1156,7 +1506,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }
       const clientTotalMs = Math.round(performance.now() - t0);
-      if (data.title && typeof conversations !== "undefined" && Array.isArray(conversations)) {
+      // The chat takes the conversation title the server stored, also when the turn then failed at the provider. A Problem
+      // Details body (it has «type») is skipped: its «title» describes the error.
+      if (data.title && !data.type && typeof conversations !== "undefined" && Array.isArray(conversations)) {
         const conversation = conversations.find((item) => item.id === turn.conversationId);
         if (conversation) {
           conversation.title = data.title;
@@ -1182,14 +1534,20 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       if (data.error) {
         // A question the server stored is not returned to the field: «Повторить» on its error sends it once.
+        let textReturned = false;
         if (!data.user_message_id) {
           restoreImages();
           // The failed text goes back to the field, unless the user already started a new draft.
-          if (!input.value) input.value = turn.text;
+          if (!input.value) {
+            input.value = turn.text;
+            textReturned = true;
+          }
         }
         const errorNode = addMessage({
-          text: data.reply || "⚠️ Ошибка: " + errorReasonText(data),
+          text: data.reply || "⚠️ Ошибка: " + errorReasonText(data, data.httpStatus || response.status),
           role: "error",
+          // A text that did not go back to the field can be put there with «Изменить»; photos would not follow it.
+          editText: textReturned || sentImages.length ? undefined : turn.text,
           cost: data.cost || 0,
           timings: data.timings,
           totalDurationMs: clientTotalMs,
@@ -1228,9 +1586,12 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       } else {
         restoreImages();
+        // Neither an answer nor an error came back, and the server may have stored the question:
+        // the text is not put back on its own, «Изменить» puts it into the field on request.
         addMessage({
-          text: "⚠️ Ошибка: " + (data.detail || data.title || "HTTP " + response.status),
+          text: "⚠️ Ошибка: " + chatErrorReason(data, response.status),
           role: "error",
+          editText: sentImages.length ? undefined : turn.text,
           cost: data.cost || 0,
           timings: data.timings,
           totalDurationMs: clientTotalMs,
@@ -1247,10 +1608,15 @@ document.addEventListener("DOMContentLoaded", function () {
         // The server may still answer: wait for the stored answer before offering the text again.
         recovering = true;
         // The request's controller has nothing left to stop: «Остановить» now cancels the wait instead.
-        const recovery = { cancelled: false, abort: function () { recovery.cancelled = true; } };
+        const recovery = newTurnRecovery();
         activeChatRequests.set(turn.conversationId, recovery);
+        syncSendButton();
+        // The note names the cause: a slow answer is not a lost connection.
+        const waitNote = error && error.name === "TimeoutError"
+          ? "Ответ идёт дольше 5 минут. Ждём его, он сохраняется на сервере. Нажмите ■, чтобы перестать ждать."
+          : "Соединение прервалось. Ждём ответ, он сохраняется на сервере.";
         deliverApprovalOutput(turn.conversationId, function () {
-          addMessage({ text: "Соединение прервалось. Ждём ответ, он сохраняется на сервере.", role: "error" });
+          addMessage({ text: waitNote, role: "error" });
         });
         recoverTurn(turn, recovery, function () {
           deliverApprovalOutput(turn.conversationId, function () {
@@ -1267,8 +1633,21 @@ document.addEventListener("DOMContentLoaded", function () {
               if (!input.value) input.value = turn.text;
               addMessage({ text: chatErrorText({ name: "AbortError" }), role: "error" });
             });
+            watchStoppedTurn(turn);
           }
           releaseTurn(turn, needsConversation);
+        });
+      } else if (stopped && isImageModel(turn.model)) {
+        // The generation goes on after «Стоп», so the prompt is not put back for a second paid run:
+        // «Повторить» reads the stored result, it never starts a new generation.
+        deliverApprovalOutput(turn.conversationId, function () {
+          addMessage({
+            text: "Ожидание изображения остановлено. Сервер может его создать: «Повторить» покажет результат без новой генерации.",
+            role: "error",
+            onRetry: function () {
+              return window.logosRecoverImage({ conversationId: turn.conversationId, imageRequestId: turn.imageRequestId });
+            },
+          });
         });
       } else {
         deliverApprovalOutput(turn.conversationId, function () {
@@ -1276,6 +1655,7 @@ document.addEventListener("DOMContentLoaded", function () {
           if (!input.value) input.value = turn.text;
           addMessage({ text: chatErrorText(error), role: "error" });
         });
+        if (stopped) watchStoppedTurn(turn);
       }
     } finally {
       if (typingEl) typingEl.remove();
@@ -1288,8 +1668,8 @@ document.addEventListener("DOMContentLoaded", function () {
   if (input) input.addEventListener("input", syncSendButton);
   if (input)
     input.addEventListener("keydown", function (e) {
-      // Enter that confirms an IME word is not a send.
-      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+      // Enter that confirms an IME word is not a send (keyCode 229 is how Android keyboards report a composing key).
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
         e.preventDefault();
         // Enter only sends: during an answer the send is refused with a hint, and «Стоп» alone stops it.
         sendTurn(null);

@@ -2,12 +2,14 @@
 
 import hashlib
 import json
+import logging
 import re
 import time
 
 import requests
 from flask import Blueprint, jsonify, request, send_file
 
+from chat._error_details import DETAILS, error_body
 from chat.mcp_routes import logos_client_type
 from chat.host import (
     add_message,
@@ -25,6 +27,7 @@ from chat.host import (
 )
 
 image_bp = Blueprint("images", __name__)
+logger = logging.getLogger("logos.chat.image_routes")
 REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{16,128}")
 CONVERSATION_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,128}")
 
@@ -67,7 +70,7 @@ def _request_response(conv_id, request_id, record):
             with get_store().transaction() as tx:
                 current = tx.get(_request_key(conv_id, request_id))
                 if current is None or tx.get("chat/conversation/" + conv_id) is None:
-                    return jsonify({"error": "conversation_not_found"}), 404
+                    return jsonify(error_body("conversation_not_found")), 404
                 record = {
                     **current,
                     "status": "image_ready",
@@ -107,7 +110,7 @@ def _request_response(conv_id, request_id, record):
             with get_store().transaction() as tx:
                 current = tx.get(_request_key(conv_id, request_id))
                 if current is None or tx.get("chat/conversation/" + conv_id) is None:
-                    return jsonify({"error": "conversation_not_found"}), 404
+                    return jsonify(error_body("conversation_not_found")), 404
                 tx.set(_request_key(conv_id, request_id), {**current, "status": "done"})
         return jsonify(
             {
@@ -149,33 +152,33 @@ def generate_image():
     owner_id = get_current_owner_id()
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
-        return jsonify({"error": "JSON object is required"}), 400
+        return jsonify(error_body("JSON object is required")), 400
     conv_id = data.get("conversation_id")
     request_id = data.get("request_id")
     model_key = data.get("model")
     prompt = data.get("message")
     size = data.get("size")
     if not isinstance(model_key, str) or model_key not in bound.IMAGE_MODELS:
-        return jsonify({"error": "not_an_image_model"}), 400
+        return jsonify(error_body("not_an_image_model")), 400
     if not isinstance(conv_id, str) or not CONVERSATION_ID_PATTERN.fullmatch(conv_id):
-        return jsonify({"error": "invalid_conversation_id"}), 400
+        return jsonify(error_body("invalid_conversation_id")), 400
     if not isinstance(request_id, str) or not REQUEST_ID_PATTERN.fullmatch(request_id):
-        return jsonify({"error": "request_id is required"}), 400
+        return jsonify(error_body("request_id is required")), 400
     if not isinstance(prompt, str) or not prompt.strip():
-        return jsonify({"error": "message is required"}), 400
+        return jsonify(error_body("message is required")), 400
     prompt = prompt.strip()
     if len(prompt) > bound.MAX_PROMPT_CHARS:
         return jsonify(
-            {"error": "prompt_too_long", "limit": bound.MAX_PROMPT_CHARS}
+            error_body("prompt_too_long", limit=bound.MAX_PROMPT_CHARS)
         ), 400
     if size is not None and (
         not isinstance(size, str) or size not in bound.IMAGE_SIZES
     ):
-        return jsonify({"error": "invalid_image_size"}), 400
+        return jsonify(error_body("invalid_image_size")), 400
     if data.get("attachments"):
-        return jsonify({"error": "image_model_does_not_take_photos"}), 400
+        return jsonify(error_body("image_model_does_not_take_photos")), 400
     if not check_access(conv_id, owner_id):
-        return jsonify({"error": "conversation_not_found"}), 404
+        return jsonify(error_body("conversation_not_found")), 404
 
     fingerprint = hashlib.sha256(
         json.dumps([model_key, prompt, size], ensure_ascii=False).encode()
@@ -184,7 +187,7 @@ def generate_image():
     existing = get_store().get(key)
     if existing is not None:
         if existing.get("fingerprint") != fingerprint:
-            return jsonify({"error": "request_id_conflict"}), 409
+            return jsonify(error_body("request_id_conflict")), 409
         # Only pending and unknown attempts block a new paid call; a failed one may start again.
         if existing.get("status") != "failed":
             return _request_response(conv_id, request_id, existing)
@@ -192,9 +195,14 @@ def generate_image():
     try:
         project_id, headers = _headers()
         payload = build_generation_payload(project_id, model_key, prompt, size)
-    except Exception as exc:
+    except Exception:
+        # The log names the missing or unreadable key; the user learns where to add it.
+        logger.exception("Image generation could not read the provider credential")
         return jsonify(
-            {"error": "provider_credential_unavailable", "message": type(exc).__name__}
+            error_body(
+                "provider_credential_unavailable",
+                message=DETAILS["provider_credential_unavailable"],
+            )
         ), 503
 
     # Reserve before the non-idempotent provider POST, atomically across concurrent clients.
@@ -205,7 +213,7 @@ def generate_image():
             and existing.get("fingerprint") == fingerprint
         ):
             if tx.get("chat/conversation/" + conv_id) is None:
-                return jsonify({"error": "conversation_not_found"}), 404
+                return jsonify(error_body("conversation_not_found")), 404
             tx.set(
                 key,
                 {
@@ -218,7 +226,7 @@ def generate_image():
             existing = None
     if existing is not None:
         if existing.get("fingerprint") != fingerprint:
-            return jsonify({"error": "request_id_conflict"}), 409
+            return jsonify(error_body("request_id_conflict")), 409
         return _request_response(conv_id, request_id, existing)
 
     try:
@@ -254,11 +262,11 @@ def generate_image():
         message = str(exc)[:200]
         _fail_request(key, "image_generation_failed", message)
         return jsonify(
-            {
-                "error": "image_generation_failed",
-                "message": message,
-                "request_id": request_id,
-            }
+            error_body(
+                "image_generation_failed",
+                message=message,
+                request_id=request_id,
+            )
         ), 502
     except Exception:
         _fail_request(
@@ -267,7 +275,7 @@ def generate_image():
             "Не удалось сохранить запрос или результат генерации",
         )
         return jsonify(
-            {"error": "image_generation_storage_failed", "request_id": request_id}
+            error_body("image_generation_storage_failed", request_id=request_id)
         ), 503
 
     try:
@@ -276,7 +284,7 @@ def generate_image():
         with get_store().transaction() as tx:
             record = tx.get(key)
             if record is None or tx.get("chat/conversation/" + conv_id) is None:
-                return jsonify({"error": "conversation_not_found"}), 404
+                return jsonify(error_body("conversation_not_found")), 404
             save_image_file(conv_id, request_id, image)
             record = {
                 **record,
@@ -296,7 +304,7 @@ def generate_image():
             status="storage_failed",
         )
         return jsonify(
-            {"error": "image_generation_storage_failed", "request_id": request_id}
+            error_body("image_generation_storage_failed", request_id=request_id)
         ), 503
 
 
@@ -305,16 +313,16 @@ def read_image_request(request_id):
     owner_id = get_current_owner_id()
     conv_id = request.args.get("conversation_id")
     if not REQUEST_ID_PATTERN.fullmatch(request_id or ""):
-        return jsonify({"error": "invalid_request_id"}), 400
+        return jsonify(error_body("invalid_request_id")), 400
     if (
         not isinstance(conv_id, str)
         or not CONVERSATION_ID_PATTERN.fullmatch(conv_id)
         or not check_access(conv_id, owner_id)
     ):
-        return jsonify({"error": "conversation_not_found"}), 404
+        return jsonify(error_body("conversation_not_found")), 404
     record = get_store().get(_request_key(conv_id, request_id))
     if record is None:
-        return jsonify({"error": "image_request_not_found"}), 404
+        return jsonify(error_body("image_request_not_found")), 404
     return _request_response(conv_id, request_id, record)
 
 
@@ -324,17 +332,17 @@ def read_generated_image(conv_id, request_id):
     if not CONVERSATION_ID_PATTERN.fullmatch(
         conv_id or ""
     ) or not REQUEST_ID_PATTERN.fullmatch(request_id or ""):
-        return jsonify({"error": "invalid_image_id"}), 400
+        return jsonify(error_body("invalid_image_id")), 400
     if not check_access(conv_id, owner_id):
-        return jsonify({"error": "conversation_not_found"}), 404
+        return jsonify(error_body("conversation_not_found")), 404
     record = get_store().get(_request_key(conv_id, request_id)) or {}
     mime_type = record.get("image_mime")
     if mime_type not in {"image/png", "image/jpeg"}:
-        return jsonify({"error": "image_not_found"}), 404
+        return jsonify(error_body("image_not_found")), 404
     try:
         image = open_image_file(conv_id, request_id, record.get("image_bytes"))
     except (OSError, ValueError):
-        return jsonify({"error": "image_not_found"}), 404
+        return jsonify(error_body("image_not_found")), 404
     try:
         response = send_file(
             image,

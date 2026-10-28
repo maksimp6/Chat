@@ -52,6 +52,40 @@ if (document.readyState === "loading") {
   initSidebar();
 }
 
+// A refused request carries the HTTP status and the server's error code, so the message can tell
+// the server's answer from a missing connection.
+function sidebarHttpError(response) {
+  return response
+    .json()
+    .catch(function () {
+      return {};
+    })
+    .then(function (body) {
+      var error = new Error("HTTP " + response.status);
+      error.status = response.status;
+      error.code = body && typeof body.error === "string" ? body.error : "";
+      throw error;
+    });
+}
+
+// What happened and what to do, in Russian: the server's answer is named with its HTTP status and is not
+// called a network error; only a request that got no answer is.
+function sidebarFailureText(err, notDone) {
+  var status = err && err.status;
+  if (status === 404 && err.code === "conversation_not_found") {
+    return "Диалог не найден на сервере: его уже удалили. Обновите страницу, чтобы обновить список диалогов.";
+  }
+  if (status >= 500) return "Ошибка на сервере (код " + status + "). " + notDone + " Повторите позже.";
+  if (status) return "Сервер отклонил запрос (код " + status + "). " + notDone + " Обновите страницу и повторите.";
+  if (err && (err.name === "TimeoutError" || err.name === "AbortError")) {
+    return "Сервер не ответил вовремя, результат не подтверждён. Обновите страницу и проверьте список диалогов.";
+  }
+  if (err && err.name === "SyntaxError") {
+    return "Ответ сервера не удалось прочитать. Обновите страницу и проверьте список диалогов.";
+  }
+  return "Нет связи с сервером. " + notDone + " Проверьте соединение и повторите.";
+}
+
 function renderSidebar() {
   var list = document.getElementById("conv-list");
   if (!list) return;
@@ -92,7 +126,7 @@ function renderSidebar() {
         body: JSON.stringify({ title: name }),
       })
         .then((r) => {
-          if (!r.ok) throw new Error("HTTP " + r.status);
+          if (!r.ok) return sidebarHttpError(r);
           return r.json();
         })
         .then((data) => {
@@ -106,7 +140,7 @@ function renderSidebar() {
         })
         .catch((err) => {
           console.error("[SIDEBAR] Rename error:", err);
-          LogosToast.error("Нет связи с сервером. Диалог не переименован.");
+          LogosToast.error(sidebarFailureText(err, "Диалог не переименован."));
         });
     }
 
@@ -172,17 +206,20 @@ function renderSidebar() {
     delBtn.setAttribute("aria-label", "Удалить диалог");
     delBtn.addEventListener("click", function (e) {
       e.stopPropagation();
-      if (confirm("Удалить этот диалог?")) {
-        window.LogosDispatcher.request("/api/conversations/" + conv.id, { method: "DELETE" })
-          .then((r) => {
-            if (!r.ok) throw new Error("HTTP " + r.status);
-            deleteConv(conv.id);
-          })
-          .catch((err) => {
-            console.error("[SIDEBAR] Delete error:", err);
-            LogosToast.error("Не удалось удалить диалог. Попробуйте ещё раз.");
-          });
-      }
+      window.LogosDialog.confirm("Удалить этот диалог?", { confirmText: "Удалить", danger: true }).then(
+        function (confirmed) {
+          if (!confirmed) return;
+          window.LogosDispatcher.request("/api/conversations/" + conv.id, { method: "DELETE" })
+            .then((r) => {
+              if (!r.ok) return sidebarHttpError(r);
+              deleteConv(conv.id);
+            })
+            .catch((err) => {
+              console.error("[SIDEBAR] Delete error:", err);
+              LogosToast.error(sidebarFailureText(err, "Диалог не удалён."));
+            });
+        },
+      );
     });
 
     var link = document.createElement("a");

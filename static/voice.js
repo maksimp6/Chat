@@ -42,7 +42,7 @@
       body: JSON.stringify(body),
     });
     var data = await res.json();
-    if (!res.ok || data.error) throw new Error(data.message || data.error || "HTTP " + res.status);
+    if (!res.ok || data.error) throw new Error(data.detail || data.message || data.error || "HTTP " + res.status);
     return data;
   }
 
@@ -310,7 +310,7 @@
         if (!micUploadActive(id)) return;
         if (!res.ok) {
           var error = await res.json();
-          throw new Error(error.error || "Не удалось передать запись");
+          throw new Error(error.detail || error.error || "Не удалось передать запись");
         }
         await jsonRequest("/api/voice/close", { session_id: id });
       } catch (err) {

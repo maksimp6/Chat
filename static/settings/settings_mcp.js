@@ -116,15 +116,19 @@
       list.querySelectorAll(".mcp-del-btn").forEach(function (btn) {
         btn.addEventListener("click", function () {
           var sid = this.getAttribute("data-id");
-          if (!confirm("Удалить MCP сервер?")) return;
-          window.LogosDispatcher.request("/api/mcp-servers/" + encodeURIComponent(sid), { method: "DELETE" })
-            .then(function (r) {
-              if (!r.ok) throw new Error("HTTP " + r.status);
-              refreshList();
-            })
-            .catch(function (e) {
-              LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
-            });
+          window.LogosDialog.confirm("Удалить MCP сервер?", { confirmText: "Удалить", danger: true }).then(
+            function (confirmed) {
+              if (!confirmed) return;
+              window.LogosDispatcher.request("/api/mcp-servers/" + encodeURIComponent(sid), { method: "DELETE" })
+                .then(function (r) {
+                  if (!r.ok) throw new Error("HTTP " + r.status);
+                  refreshList();
+                })
+                .catch(function (e) {
+                  LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
+                });
+            },
+          );
         });
       });
     }
