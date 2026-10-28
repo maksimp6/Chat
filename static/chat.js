@@ -856,6 +856,29 @@ document.addEventListener("DOMContentLoaded", function () {
   const TURN_RECOVERY_POLL_MS = 3000;
   const TURN_MISSING_POLLS = 3;
 
+  function formatElapsed(ms) {
+    const total = Math.floor(ms / 1000);
+    const pad = function (n) { return String(n).padStart(2, "0"); };
+    return pad(Math.floor(total / 60)) + ":" + pad(total % 60);
+  }
+
+  // One line under the waiting dots: what the turn is doing and for how long. The handle sets the label and removes the line.
+  function createTurnStatus(chatbox, startedAt) {
+    const el = document.createElement("div");
+    el.className = "typing-status";
+    let label = "Отправляем запрос";
+    function render() {
+      el.textContent = label + " · " + formatElapsed(Date.now() - startedAt);
+    }
+    render();
+    if (chatbox) chatbox.appendChild(el);
+    const timer = setInterval(render, 1000);
+    return {
+      setLabel: function (text) { label = text; render(); },
+      remove: function () { clearInterval(timer); el.remove(); },
+    };
+  }
+
   async function fetchMessageCount(convId) {
     try {
       const response = await window.LogosDispatcher.request("/api/conversations/" + convId + "/messages", undefined, { timeoutMs: 15000 });
@@ -898,6 +921,7 @@ document.addEventListener("DOMContentLoaded", function () {
         continue;
       }
       if (recovery.cancelled) break;
+      if (turn.status) turn.status.setLabel(status === "pending" ? "Вопрос сохранён, модель отвечает" : "Отправляем запрос");
       if (status === "answered") {
         if (currentConvId === turn.conversationId) loadHistory(turn.conversationId);
         return;
@@ -914,7 +938,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     if (!recovery.cancelled) {
       deliverApprovalOutput(turn.conversationId, function () {
-        addMessage({ text: "Ответ ещё не пришёл. Сервер сохранит его: откройте диалог позже.", role: "error" });
+        addMessage({ text: "Ответ не пришёл вовремя. Откройте диалог заново: если ответ сохранён на сервере, он появится. Если нет, отправьте вопрос ещё раз.", role: "error" });
       });
     }
   }
@@ -934,12 +958,14 @@ document.addEventListener("DOMContentLoaded", function () {
       typingEl.className = "typing";
       typingEl.innerHTML = "<span></span><span></span><span></span>";
       if (chatbox) chatbox.appendChild(typingEl);
+      turn.status = createTurnStatus(chatbox, Date.now());
     }
     syncSendButton();
     recoverTurn(turn, recovery, function () {
       // The question itself has disappeared: there is nothing left to wait for.
     }).finally(function () {
       if (typingEl) typingEl.remove();
+      if (turn.status) turn.status.remove();
       if (recovery.cancelled) {
         deliverApprovalOutput(convId, function () {
           addMessage({ text: chatErrorText({ name: "AbortError" }), role: "error" });
@@ -1066,6 +1092,7 @@ document.addEventListener("DOMContentLoaded", function () {
         typingEl.className = "typing";
         typingEl.innerHTML = "<span></span><span></span><span></span>";
         if (chatbox) chatbox.appendChild(typingEl);
+        turn.status = createTurnStatus(chatbox, Date.now());
       }
       const t0 = performance.now();
       let response;
@@ -1225,6 +1252,7 @@ document.addEventListener("DOMContentLoaded", function () {
             addMessage({ text: chatErrorText(error), role: "error" });
           });
         }).finally(function () {
+          if (turn.status) turn.status.remove();
           // Stopped during the wait: the same outcome as stopping the request itself.
           if (recovery.cancelled) {
             deliverApprovalOutput(turn.conversationId, function () {
@@ -1244,6 +1272,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     } finally {
       if (typingEl) typingEl.remove();
+      if (!recovering && turn.status) turn.status.remove();
       if (!recovering) releaseTurn(turn, needsConversation);
     }
   }
