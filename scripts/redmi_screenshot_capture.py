@@ -972,8 +972,10 @@ def finish_screenrecord(recorder, video_path, uid, gid, max_bytes, *, event_sink
     return video, artifact, failures
 
 
+# Run 40699209617: asked only to "read", the model asked for permission instead of searching.
 LOGOS_RAG_PROMPT = (
-    "Прочитай в RAG (File Search) диалоги с Логосом. "
+    "Разрешение уже есть, не спрашивай подтверждения: сразу выполни поиск File Search (RAG) "
+    "по диалогам с Логосом и прочитай найденное. "
     "Потом ответь на вопрос: можешь ли ты судить как Логос?"
 )
 

@@ -31,8 +31,9 @@ generation as a scenario failure. The timeline records wall-clock and monotonic 
 `screenrecord --bugreport` adds a timestamp to the video. The creation/reload
 observer blocks model requests only during those checks.
 After reload, the ordinary scenario sends one request through the real Send
-button: «Прочитай в RAG (File Search) диалоги с Логосом. Потом ответь на вопрос:
-можешь ли ты судить как Логос?» The dialogues come from the chat RAG store,
+button: «Разрешение уже есть, не спрашивай подтверждения: сразу выполни поиск
+File Search (RAG) по диалогам с Логосом и прочитай найденное. Потом ответь на
+вопрос: можешь ли ты судить как Логос?» The dialogues come from the chat RAG store,
 which `redmi9-rag-ingest` fills with issues, pull requests, run metadata and the
 `exports/` dialog archives (GigaChat exports and the Logos memory module).
 
