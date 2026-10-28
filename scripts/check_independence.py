@@ -1505,12 +1505,12 @@ def render_wiring(umap: UnitMap) -> str:
             if repo_module_file(provider) is not None:
                 lines.append(f"    import {provider} as {port}")
                 continue
-            source, name = provider.rsplit(".", 1)
-            line = f"    from {source} import {name} as {port}"
+            source, attr = provider.rsplit(".", 1)
+            line = f"    from {source} import {attr} as {port}"
             lines.append(
                 line
                 if fits(line)
-                else f"    from {source} import (\n        {name} as {port},\n    )"
+                else f"    from {source} import (\n        {attr} as {port},\n    )"
             )
         args = [f"{port}={port}" for port, _ in host_providers(module)]
         call = f"    return host.Host({', '.join(args)})"

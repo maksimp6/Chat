@@ -21,8 +21,7 @@ jobs:
       - name: Ingest GitHub issues, pull requests and run metadata through the app API
         env:
           GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
           STORE_ID: fvtvp6t2su0g5q4ft2ev
         run: |
           set -eu
-          curl -fsSL --max-time 60 "https://raw.githubusercontent.com/${REPO}/${GITHUB_SHA}/scripts/rag_ingest_via_app.py" | python3 -
+          curl -fsSL --max-time 60 "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/scripts/rag_ingest_via_app.py" | python3 -

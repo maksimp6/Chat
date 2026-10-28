@@ -31,19 +31,20 @@ generation as a scenario failure. The timeline records wall-clock and monotonic 
 `screenrecord --bugreport` adds a timestamp to the video. The creation/reload
 observer blocks model requests only during those checks.
 After reload, the ordinary scenario sends one request through the real Send
-button: an imagined conversation between Pushkin and Yesenin about poetry in
-the age of AI, with alternating named lines and distinct voices. Logos plays
-both roles; these are not independent agents or historical quotations. The
-former greeting and three extra model tasks have been removed.
+button: «Прочитай в RAG (File Search) диалоги с Логосом. Потом ответь на вопрос:
+можешь ли ты судить как Логос?» The dialogues come from the chat RAG store,
+which `redmi9-rag-ingest` fills with issues, pull requests, run metadata and the
+`exports/` dialog archives (GigaChat exports and the Logos memory module).
 
 The request and reply must persist without trace errors. A separate
-`poets_dialogue` checkpoint records speaker labels, counts and alternation; it
-does not grade literary quality. Native PNGs `22-poets-dialogue-top.png` and
-`23-poets-dialogue-bottom.png` show the start and end after actual scrolling.
-The conversation video can run for 180 seconds; the reply wait reserves time
-for screenshots and finalization. The newly created conversation is preserved.
-The `tools_self_check` mode retains its separate tool question and does not send
-the poets prompt.
+`logos_rag_judgement` checkpoint records whether the request offered
+`file_search`, whether the provider ran a `file_search_call`, and whether the
+reply has text; it does not grade the judgement itself. Native PNGs
+`22-logos-rag-top.png` and `23-logos-rag-bottom.png` show the start and end
+after actual scrolling. The conversation video can run for 180 seconds; the
+reply wait reserves time for screenshots and finalization. The newly created
+conversation is preserved. The `tools_self_check` mode retains its separate
+tool question and does not send the Logos RAG prompt.
 
 The checks compare conversation IDs across the sidebar, current application
 state, URL, and saved selection; count creation requests; check the empty view;

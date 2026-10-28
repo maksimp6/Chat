@@ -743,6 +743,11 @@ class RDP:
             "items:(b.items||[]).map(i=>pick(i,['type','step','model','input_tokens','cached_input_tokens',"
             "'output_tokens','total_tokens','total_cost','cost_status'])),"
             "tool_calls:(t.tool_calls||[]).map(c=>c.name||c.tool_name),"
+            # Hosted tools (file_search) are sent in the request payload and run by the provider: types and statuses only.
+            "sent_tools:[...new Set((t.api_requests||[]).flatMap(r=>(r.payload?.tools||[]).map(i=>String(i.type||''))))],"
+            "hosted_calls:(t.responses||[]).flatMap(r=>(r.raw?.output||[]).filter(o=>"
+            "['file_search_call','web_search_call','code_interpreter_call'].includes(o.type))"
+            ".map(o=>({type:o.type,status:String(o.status||'')}))),"
             "errors:(t.errors||[]).slice(0,50).map(e=>({source:String(e.source||'').slice(0,80),"
             "type:String(e.type||'').slice(0,80),error:String(e.error||'').slice(0,300)})),"
             "events:(t.events||[]).filter(e=>e.type==='api_request_manifest'||e.event==='api_request_manifest')};})())",
@@ -965,13 +970,9 @@ def finish_screenrecord(recorder, video_path, uid, gid, max_bytes, *, event_sink
     return video, artifact, failures
 
 
-POETS_DIALOGUE_PROMPT = (
-    "Сочини воображаемую беседу Александра Пушкина и Сергея Есенина о том, "
-    "зачем людям поэзия в век искусственного интеллекта. Пусть они отвечают друг другу: "
-    "Пушкин — ясно, остроумно и с лёгкой иронией; Есенин — образно, тепло, с мотивами "
-    "природы и деревни. Напиши шесть коротких реплик по очереди, по три каждому, "
-    "начни с Пушкина. Каждую реплику начни с «Пушкин:» или «Есенин:» на отдельной строке. "
-    "Придумай новые реплики, не выдавай их за настоящие цитаты поэтов."
+LOGOS_RAG_PROMPT = (
+    "Прочитай в RAG (File Search) диалоги с Логосом. "
+    "Потом ответь на вопрос: можешь ли ты судить как Логос?"
 )
 
 
@@ -1106,7 +1107,7 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
             "reason": "new_chat_not_ready",
         }
     else:
-        checkpoints["poets_dialogue"] = {
+        checkpoints["logos_rag_judgement"] = {
             "status": "NOT_RUN",
             "reason": "message_not_answered",
         }
@@ -1131,8 +1132,8 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
             "native_screencap_finished:14-conversation-after-reload.png",
             "message_send_clicked",
             "message_reply_observed",
-            "screenshot_finished:22-poets-dialogue-top.png",
-            "screenshot_finished:23-poets-dialogue-bottom.png",
+            "screenshot_finished:22-logos-rag-top.png",
+            "screenshot_finished:23-logos-rag-bottom.png",
         ):
             if not event.get("recorder_running"):
                 failures.append("native_video_ended_before_scenario_complete")
@@ -1558,17 +1559,17 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                 send_validation_start = len(failures)
                 if recorder is None or recorder.poll() is not None:
                     raise RuntimeError(
-                        "The poets dialogue requires an active native recording"
+                        "The Logos RAG scenario requires an active native recording"
                     )
                 reply_budget = min(
                     120, remaining(135) - 15, video_deadline - time.monotonic() - 15
                 )
                 if reply_budget <= 0:
                     raise RuntimeError(
-                        "No recording time remains for the poets dialogue"
+                        "No recording time remains for the Logos RAG scenario"
                     )
                 counts_before = rdp.message_counts(actor)
-                rdp.send_chat_message(actor, POETS_DIALOGUE_PROMPT)
+                rdp.send_chat_message(actor, LOGOS_RAG_PROMPT)
                 mark("message_send_clicked", rdp.conversation_state(actor))
                 reply_status = "timeout"
                 deadline = time.monotonic() + reply_budget
@@ -1659,7 +1660,7 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                     if details_check["status"] == "FAIL":
                         failures.append("reply_details_mismatch_trace")
                 prompt_persisted = any(
-                    m["role"] == "user" and m["text"] == POETS_DIALOGUE_PROMPT
+                    m["role"] == "user" and m["text"] == LOGOS_RAG_PROMPT
                     for m in persisted["messages"]
                 )
                 if persisted["status"] != 200 or not prompt_persisted:
@@ -1678,69 +1679,51 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                     "reply_receipt": receipt,
                     "browser_details": details["text"],
                     "details_vs_trace": details_check,
-                    "question": POETS_DIALOGUE_PROMPT,
+                    "question": LOGOS_RAG_PROMPT,
                     "user_message_persisted": prompt_persisted,
                     "reply_persisted": "assistant" in roles,
                 }
                 if checkpoints["message_send"]["status"] == "PASS":
                     reply_text = replies[-1] if replies else ""
-                    labels = list(
-                        re.finditer(
-                            r"(?m)^\s*[*_#> -]*(Пушкин|Есенин)[*_]*\s*[:—–-]",
-                            reply_text,
-                        )
+                    # The trace shows whether File Search was offered to the model and whether the provider ran it.
+                    sent_tools = (receipt or {}).get("sent_tools") or []
+                    hosted_calls = (receipt or {}).get("hosted_calls") or []
+                    rag_sent = "file_search" in sent_tools
+                    rag_called = any(
+                        call["type"] == "file_search_call" for call in hosted_calls
                     )
-                    speakers = [label.group(1) for label in labels]
-                    # A turn is the text from its label to the next label; a label with nothing said is not a turn.
-                    spoken = [
-                        bool(
-                            re.search(
-                                r"\w",
-                                reply_text[
-                                    label.end() : (
-                                        labels[i + 1].start()
-                                        if i + 1 < len(labels)
-                                        else len(reply_text)
-                                    )
-                                ],
-                            )
+                    answered = bool(re.search(r"\w", reply_text))
+                    reasons = [
+                        reason
+                        for reason, ok in (
+                            ("rag_not_sent", rag_sent),
+                            ("rag_not_called", rag_called),
+                            ("empty_answer", answered),
                         )
-                        for i, label in enumerate(labels)
+                        if not ok
                     ]
-                    counts = {
-                        name: sum(
-                            1
-                            for who, said in zip(speakers, spoken)
-                            if who == name and said
-                        )
-                        for name in ("Пушкин", "Есенин")
+                    checkpoints["logos_rag_judgement"] = {
+                        "status": "FAIL" if reasons else "PASS",
+                        "reasons": reasons,
+                        "file_search_sent": rag_sent,
+                        "file_search_called": rag_called,
+                        "sent_tools": sent_tools,
+                        "hosted_calls": hosted_calls,
+                        "answered": answered,
+                        "scope": "RAG read and an answer exist; the judgement itself is not graded",
                     }
-                    empty_turns = spoken.count(False)
-                    alternating = all(
-                        left != right for left, right in zip(speakers, speakers[1:])
+                    failures.extend("logos_rag_" + reason for reason in reasons)
+                    mark(
+                        "logos_rag_judgement_observed",
+                        checkpoints["logos_rag_judgement"],
                     )
-                    # The prompt asks for six turns, three each, starting with Pushkin.
-                    expected_speakers = ["Пушкин", "Есенин"] * 3
-                    dialogue_ok = speakers == expected_speakers and not empty_turns
-                    checkpoints["poets_dialogue"] = {
-                        "status": "PASS" if dialogue_ok else "FAIL",
-                        "speakers": speakers,
-                        "expected_speakers": expected_speakers,
-                        "turn_counts": counts,
-                        "empty_turns": empty_turns,
-                        "alternating": alternating,
-                        "scope": "spoken turns, speaker labels and alternation, not literary quality or independent agents",
-                    }
-                    if not dialogue_ok:
-                        failures.append("poets_dialogue_missing_or_not_alternating")
-                    mark("poets_dialogue_observed", checkpoints["poets_dialogue"])
                     for where, filename in (
-                        ("top", "22-poets-dialogue-top.png"),
-                        ("bottom", "23-poets-dialogue-bottom.png"),
+                        ("top", "22-logos-rag-top.png"),
+                        ("bottom", "23-logos-rag-bottom.png"),
                     ):
                         app_state()
                         mark(
-                            "poets_dialogue_scrolled",
+                            "logos_rag_scrolled",
                             {"where": where, **rdp.scroll(actor, "#chatbox", where)},
                         )
                         frame(filename)
