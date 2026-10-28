@@ -6,23 +6,45 @@ A case is a GitHub issue titled ``Суд Логоса: <error>`` with the label
 #1413. The same error (same code and message) goes to one open case: a repeat
 is added to it as a comment instead of opening a second case.
 
+The repository is public, so the issue carries no dialog text: the full error
+(partial answer included) is age-encrypted and committed to the LFS branch
+``data/court-evidence``; the card links it with its SHA-256.
+
+Each month has its own key (``<LOGOS_COURT_KEYS_DIR>/YYYY-MM.agekey``, made on
+first use). A month's key is published on the same branch, ``keys/YYYY-MM.agekey``,
+once the following month is over: every piece of evidence stays sealed for at
+least a month and then becomes readable by everyone.
+
 ``LOGOS_COURT_TOKEN`` (or ``GITHUB_TOKEN`` / ``GH_TOKEN``) authorizes the
 GitHub calls; ``LOGOS_COURT_REPO`` names the repository.
 """
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import logging
 import os
+import shutil
+import subprocess
+import tempfile
 import threading
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional
 
-__all__ = ["case_body", "case_title", "file_case", "file_case_now", "fingerprint"]
+__all__ = [
+    "case_body",
+    "case_title",
+    "file_case",
+    "file_case_now",
+    "fingerprint",
+    "publish_due_keys",
+    "store_evidence",
+]
 
 log = logging.getLogger("logos.court.filing")
 
@@ -30,6 +52,7 @@ API = "https://api.github.com"
 LABEL = "from-dialog"
 CANONICAL_CASE = 1413
 MARKER = "logos-court-auto"
+EVIDENCE_BRANCH = "data/court-evidence"
 # GitHub rejects titles over 256 and bodies over 65536 characters.
 GITHUB_TITLE_CHARS = 256
 GITHUB_BODY_CHARS = 65536
@@ -82,6 +105,189 @@ def _q(value: Any) -> str:
     return json.dumps("UNKNOWN" if value in (None, "") else str(value), ensure_ascii=False)
 
 
+# --- encrypted LFS evidence (same steps as scripts/redmi_publish_diagnostics.sh)
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _keys_dir() -> Path:
+    return Path(
+        os.environ.get("LOGOS_COURT_KEYS_DIR")
+        or Path.home() / ".config" / "logos" / "court-keys"
+    )
+
+
+def _month(when: datetime) -> str:
+    return when.strftime("%Y-%m")
+
+
+def _month_after(month: str, months: int) -> datetime:
+    year, number = (int(part) for part in month.split("-"))
+    index = year * 12 + number - 1 + months
+    return datetime(index // 12, index % 12 + 1, 1, tzinfo=timezone.utc)
+
+
+def _monthly_recipient(now: datetime) -> str:
+    """The public key of this month's key, creating the key on first use."""
+    keys = _keys_dir()
+    keys.mkdir(mode=0o700, parents=True, exist_ok=True)
+    key = keys / f"{_month(now)}.agekey"
+    if not key.exists():
+        subprocess.run(["age-keygen", "-o", str(key)], check=True, capture_output=True)
+        key.chmod(0o600)
+    return subprocess.run(
+        ["age-keygen", "-y", str(key)], check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def _due_keys(now: datetime) -> list[Path]:
+    """Keys of months that ended at least a month ago and are not published yet."""
+    keys = _keys_dir()
+    if not keys.is_dir():
+        return []
+    return [
+        key
+        for key in sorted(keys.glob("????-??.agekey"))
+        if _month_after(key.stem, 2) <= now
+        and not key.with_name(key.name + ".published").exists()
+    ]
+
+
+def _git(args: list[str], cwd: Path, env: dict[str, str]) -> str:
+    return subprocess.run(
+        ["git", *args], cwd=cwd, env=env, check=True, capture_output=True, text=True
+    ).stdout
+
+
+def _publish(files: list[tuple[Path, str]], token: str, message: str) -> dict[str, str]:
+    """Commit files to the evidence branch; prove every .age file from GitHub.
+
+    ``*.age`` goes through LFS; anything else (a published key) is plain git."""
+    repo = _repo()
+    header = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+    env = {
+        **os.environ,
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_SYSTEM": os.devnull,
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_LFS_SKIP_SMUDGE": "1",
+        "GIT_CONFIG_COUNT": "2",
+        "GIT_CONFIG_KEY_0": "credential.helper",
+        "GIT_CONFIG_VALUE_0": "",
+        "GIT_CONFIG_KEY_1": "http.https://github.com/.extraheader",
+        "GIT_CONFIG_VALUE_1": "AUTHORIZATION: basic " + header,
+    }
+    remote = f"https://github.com/{repo}.git"
+    branch = EVIDENCE_BRANCH
+    with tempfile.TemporaryDirectory() as tmp:
+        work = Path(tmp) / "work"
+        work.mkdir()
+        _git(["init", "-q"], work, env)
+        _git(["remote", "add", "origin", remote], work, env)
+        heads = subprocess.run(
+            ["git", "ls-remote", "--exit-code", "--heads", "origin", "refs/heads/" + branch],
+            cwd=work,
+            env=env,
+            capture_output=True,
+        )
+        if heads.returncode == 0:
+            _git(["fetch", "--quiet", "origin", "refs/heads/" + branch], work, env)
+            _git(["checkout", "-q", "-b", branch, "FETCH_HEAD"], work, env)
+        elif heads.returncode == 2:
+            _git(["checkout", "-q", "--orphan", branch], work, env)
+        else:
+            raise RuntimeError(f"git ls-remote exited {heads.returncode}")
+        _git(["config", "user.name", "Logos Court"], work, env)
+        _git(["config", "user.email", "logos-court@users.noreply.github.com"], work, env)
+        _git(["lfs", "install", "--local"], work, env)
+        (work / ".gitattributes").write_text("*.age filter=lfs diff=lfs merge=lfs -text\n")
+        sealed = {}
+        for source, dest in files:
+            target = work / dest
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+            if dest.endswith(".age"):
+                sealed[dest] = _sha256_file(source)
+        _git(["add", "--", ".gitattributes", *(dest for _, dest in files)], work, env)
+        for dest, sha in sealed.items():
+            if f"oid sha256:{sha}" not in _git(["show", ":" + dest], work, env):
+                raise RuntimeError(f"LFS pointer of {dest} does not carry its digest")
+        _git(["commit", "-q", "-m", message], work, env)
+        commit = _git(["rev-parse", "HEAD"], work, env).strip()
+        _git(["push", "origin", "HEAD:refs/heads/" + branch], work, env)
+        if sealed:
+            # Read it back from GitHub into a fresh store: a local object is no upload proof.
+            verify = Path(tmp) / "verify"
+            _git(
+                ["clone", "-q", "--no-checkout", "--single-branch", "--branch", branch, remote, str(verify)],
+                Path(tmp),
+                env,
+            )
+            _git(["lfs", "install", "--local"], verify, env)
+            _git(["checkout", "-q", "--detach", commit], verify, env)
+            for dest, sha in sealed.items():
+                _git(["lfs", "fetch", "--include=" + dest, "--exclude=", "origin", commit], verify, env)
+                _git(["lfs", "checkout", dest], verify, env)
+                if _sha256_file(verify / dest) != sha:
+                    raise RuntimeError(f"{dest} read back from GitHub differs")
+    dest = files[0][1]
+    return {
+        "status": "remote_verified",
+        "url": f"https://github.com/{repo}/blob/{commit}/{dest}",
+        "commit": commit,
+        "path": dest,
+        "sha256": sealed.get(dest) or _sha256_file(files[0][0]),
+    }
+
+
+def publish_due_keys(token: str, now: Optional[datetime] = None) -> list[str]:
+    """Publish every month key whose month ended at least a month ago."""
+    now = now or datetime.now(timezone.utc)
+    published = []
+    for key in _due_keys(now):
+        receipt = _publish(
+            [(key, f"keys/{key.name}")], token, f"Publish court key {key.stem}"
+        )
+        key.with_name(key.name + ".published").write_text(json.dumps(receipt) + "\n")
+        log.info("court key %s published: %s", key.stem, receipt["url"])
+        published.append(receipt["url"])
+    return published
+
+
+def store_evidence(report: dict[str, Any], token: str) -> dict[str, str]:
+    """The full error, encrypted to this month's key, in LFS; never plaintext."""
+    now = datetime.now(timezone.utc)
+    try:
+        recipient = _monthly_recipient(now)
+        with tempfile.TemporaryDirectory() as tmp:
+            plain = Path(tmp) / "evidence.json"
+            plain.write_text(
+                json.dumps(report, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
+            )
+            sealed = Path(tmp) / "evidence.json.age"
+            subprocess.run(["age", "-r", recipient, "-o", str(sealed), str(plain)], check=True)
+            dest = (
+                f"court/{_month(now)}/{fingerprint(report)}/"
+                f"{report.get('invocation_id') or 'unknown'}.json.age"
+            )
+            receipt = _publish([(sealed, dest)], token, "Court evidence " + dest)
+            receipt["key"] = f"keys/{_month(now)}.agekey"
+            receipt["key_published_from"] = _month_after(_month(now), 2).date().isoformat()
+            return receipt
+    except Exception as exc:
+        log.exception("court evidence not stored: %s", _message(report))
+        return {"status": "NOT_STORED", "reason": f"{type(exc).__name__}: {exc}"}
+
+
+# --- case text ---------------------------------------------------------------
+
+
 def case_title(report: dict[str, Any]) -> str:
     title = "Суд Логоса: " + _message(report)
     if len(title) > GITHUB_TITLE_CHARS:
@@ -89,13 +295,20 @@ def case_title(report: dict[str, Any]) -> str:
     return title
 
 
-def _occurrence(report: dict[str, Any], now: datetime) -> str:
+def _evidence_source(evidence: dict[str, str]) -> str:
+    if evidence.get("status") == "remote_verified":
+        return f"улика (age, LFS) {evidence['url']} sha256 {evidence['sha256']}"
+    return f"улика не сохранена: {evidence.get('reason') or 'UNKNOWN'}"
+
+
+def _occurrence(report: dict[str, Any], now: datetime, evidence: dict[str, str]) -> str:
     error = _error_fields(report)
     sources = [
         f"invocation {report.get('invocation_id') or 'UNKNOWN'}",
         f"conversation {report.get('conversation_id') or 'UNKNOWN'}",
         f"session {report.get('session_id') or 'UNKNOWN'}",
         f"trace {report.get('trace_id') or 'UNKNOWN'}",
+        _evidence_source(evidence),
     ]
     provider = {
         key: error[key]
@@ -104,10 +317,9 @@ def _occurrence(report: dict[str, Any], now: datetime) -> str:
     }
     if provider:
         sources.append("provider " + json.dumps(provider, ensure_ascii=False, default=str))
-    partial = error.get("partial_output")
     fact = f"Ход завершился ошибкой: {_message(report)}"
-    if partial:
-        fact += f". Частичный ответ: {partial}"
+    if error.get("partial_output"):
+        fact += ". Частичный ответ есть, он только в зашифрованной улике"
     return "\n".join(
         [
             f"recorded_at: {_q(now.isoformat())}",
@@ -119,11 +331,6 @@ def _occurrence(report: dict[str, Any], now: datetime) -> str:
     )
 
 
-def _raw(report: dict[str, Any]) -> str:
-    raw = json.dumps(report.get("error"), ensure_ascii=False, indent=2, default=str)
-    return f"<details><summary>Ошибка, как она сохранена</summary>\n\n```json\n{raw}\n```\n\n</details>"
-
-
 def _fit(text: str) -> str:
     if len(text) <= GITHUB_BODY_CHARS:
         return text
@@ -131,7 +338,9 @@ def _fit(text: str) -> str:
     return text[: GITHUB_BODY_CHARS - len(note)] + note
 
 
-def case_body(report: dict[str, Any], now: Optional[datetime] = None) -> str:
+def case_body(
+    report: dict[str, Any], evidence: dict[str, str], now: Optional[datetime] = None
+) -> str:
     now = now or datetime.now(timezone.utc)
     fp = fingerprint(report)
     repo = _repo()
@@ -139,7 +348,7 @@ def case_body(report: dict[str, Any], now: Optional[datetime] = None) -> str:
         [
             f"episode: {_q(f'{CANONICAL_CASE}/auto-{fp}/1')}",
             f"task: {_q(f'https://github.com/{repo}/issues/{CANONICAL_CASE}')}",
-            _occurrence(report, now),
+            _occurrence(report, now, evidence),
             "owner: UNASSIGNED",
             f"rule_at_event: {_q('AGENTS.md, «Ошибки и дела Суда»')}",
             f"current_rule: {_q('AGENTS.md, «Ошибки и дела Суда»')}",
@@ -166,16 +375,20 @@ def case_body(report: dict[str, Any], now: Optional[datetime] = None) -> str:
         f"<!-- {MARKER}:{fp} -->\n"
         f"Дело подано автоматически: ход Логоса завершился ошибкой. "
         f"Каноническое дело: #{CANONICAL_CASE}. "
-        f"Повторы той же ошибки добавляются сюда комментариями.\n\n"
-        f"```yaml\n{card}\n```\n\n{_raw(report)}\n"
+        f"Повторы той же ошибки добавляются сюда комментариями. "
+        f"Текст диалога здесь не публикуется: полная ошибка — в зашифрованной улике.\n\n"
+        f"```yaml\n{card}\n```\n"
     )
 
 
-def _comment_body(report: dict[str, Any], now: datetime) -> str:
+def _comment_body(report: dict[str, Any], evidence: dict[str, str], now: datetime) -> str:
     return _fit(
         f"Повтор ошибки ({MARKER}:{fingerprint(report)}).\n\n"
-        f"```yaml\n{_occurrence(report, now)}\n```\n\n{_raw(report)}\n"
+        f"```yaml\n{_occurrence(report, now, evidence)}\n```\n"
     )
+
+
+# --- GitHub ------------------------------------------------------------------
 
 
 def _request(method: str, path: str, token: str, payload: Any = None) -> Any:
@@ -211,17 +424,29 @@ def file_case_now(report: dict[str, Any]) -> Optional[str]:
     now = datetime.now(timezone.utc)
     fp = fingerprint(report)
     repo = _repo()
+    evidence = store_evidence(report, token)
+    try:
+        publish_due_keys(token, now)
+    except Exception:
+        log.exception("court keys due for publication were not published")
     number = _find_open_case(fp, token)
     if number is not None:
         _request(
-            "POST", f"/repos/{repo}/issues/{number}/comments", token, {"body": _comment_body(report, now)}
+            "POST",
+            f"/repos/{repo}/issues/{number}/comments",
+            token,
+            {"body": _comment_body(report, evidence, now)},
         )
     else:
         issue = _request(
             "POST",
             f"/repos/{repo}/issues",
             token,
-            {"title": case_title(report), "body": case_body(report, now), "labels": [LABEL]},
+            {
+                "title": case_title(report),
+                "body": case_body(report, evidence, now),
+                "labels": [LABEL],
+            },
         )
         number = issue["number"]
     with _known_lock:

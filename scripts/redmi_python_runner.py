@@ -14,11 +14,15 @@ import os
 from pathlib import Path
 import platform
 import re
+import shutil
 import signal
 import subprocess
 import sys
+import tarfile
+import tempfile
 import threading
 import time
+import hashlib
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -29,8 +33,145 @@ USER_AGENT = "GitHubActionsRunner/2.338.1 RedmiPythonRunner/0.1"
 DEFAULT_STATE = Path.home() / "github-python-runner"
 
 
+WORKSPACE_BRANCH = "data/redmi9-job-workspaces"
+# Month keys of the workspace archive, separate from the diagnostics key:
+# a month's key is published once the following month is over.
+WORKSPACE_KEYS = Path(
+    os.environ.get(
+        "LOGOS_WORKSPACE_KEYS_DIR",
+        str(Path.home() / "backups" / "android-diagnostics" / "keys" / "workspaces"),
+    )
+)
+
+
 def b64(data):
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+# --- encrypted LFS archive (same steps as scripts/redmi_publish_diagnostics.sh) --
+
+
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def month_of(when):
+    return when.strftime("%Y-%m")
+
+
+def month_after(month, months):
+    year, number = (int(part) for part in month.split("-"))
+    index = year * 12 + number - 1 + months
+    return datetime.datetime(index // 12, index % 12 + 1, 1, tzinfo=datetime.timezone.utc)
+
+
+def monthly_recipient(now):
+    """The public key of this month's key, creating the key on first use."""
+    WORKSPACE_KEYS.mkdir(mode=0o700, parents=True, exist_ok=True)
+    key = WORKSPACE_KEYS / f"{month_of(now)}.agekey"
+    if not key.exists():
+        subprocess.run(["age-keygen", "-o", str(key)], check=True, capture_output=True)
+        key.chmod(0o600)
+    return subprocess.run(
+        ["age-keygen", "-y", str(key)], check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def due_keys(now):
+    """Keys of months that ended at least a month ago and are not published yet."""
+    if not WORKSPACE_KEYS.is_dir():
+        return []
+    return [
+        key
+        for key in sorted(WORKSPACE_KEYS.glob("????-??.agekey"))
+        if month_after(key.stem, 2) <= now
+        and not key.with_name(key.name + ".published").exists()
+    ]
+
+
+def age_encrypt(source, target, now):
+    subprocess.run(
+        ["age", "-r", monthly_recipient(now), "-o", str(target), str(source)], check=True
+    )
+
+
+def _git(args, cwd, env):
+    return subprocess.run(
+        ["git", *args], cwd=cwd, env=env, check=True, capture_output=True, text=True
+    ).stdout
+
+
+def publish_files(files, repo, branch, token, message):
+    """Commit files to a data branch; prove every .age file from GitHub.
+
+    ``*.age`` goes through LFS; anything else (a manifest, a published key) is plain git."""
+    header = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+    env = {
+        **os.environ,
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_SYSTEM": os.devnull,
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_LFS_SKIP_SMUDGE": "1",
+        "GIT_CONFIG_COUNT": "2",
+        "GIT_CONFIG_KEY_0": "credential.helper",
+        "GIT_CONFIG_VALUE_0": "",
+        "GIT_CONFIG_KEY_1": "http.https://github.com/.extraheader",
+        "GIT_CONFIG_VALUE_1": "AUTHORIZATION: basic " + header,
+    }
+    remote = f"https://github.com/{repo}.git"
+    with tempfile.TemporaryDirectory() as tmp:
+        work = Path(tmp) / "work"
+        work.mkdir()
+        _git(["init", "-q"], work, env)
+        _git(["remote", "add", "origin", remote], work, env)
+        heads = subprocess.run(
+            ["git", "ls-remote", "--exit-code", "--heads", "origin", "refs/heads/" + branch],
+            cwd=work, env=env, capture_output=True,
+        )
+        if heads.returncode == 0:
+            _git(["fetch", "--quiet", "origin", "refs/heads/" + branch], work, env)
+            _git(["checkout", "-q", "-b", branch, "FETCH_HEAD"], work, env)
+        elif heads.returncode == 2:
+            _git(["checkout", "-q", "--orphan", branch], work, env)
+        else:
+            raise RuntimeError(f"git ls-remote exited {heads.returncode}")
+        _git(["config", "user.name", "Redmi 9 job archive"], work, env)
+        _git(["config", "user.email", "redmi9-diagnostics@users.noreply.github.com"], work, env)
+        _git(["lfs", "install", "--local"], work, env)
+        (work / ".gitattributes").write_text("*.age filter=lfs diff=lfs merge=lfs -text\n")
+        sealed = {}
+        for source, dest in files:
+            target = work / dest
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+            if dest.endswith(".age"):
+                sealed[dest] = sha256_file(source)
+        _git(["add", "--", ".gitattributes", *(dest for _, dest in files)], work, env)
+        for dest, sha in sealed.items():
+            if f"oid sha256:{sha}" not in _git(["show", ":" + dest], work, env):
+                raise RuntimeError(f"LFS pointer of {dest} does not carry its digest")
+        _git(["commit", "-q", "-m", message], work, env)
+        commit = _git(["rev-parse", "HEAD"], work, env).strip()
+        _git(["push", "origin", "HEAD:refs/heads/" + branch], work, env)
+        if sealed:
+            # Read it back from GitHub into a fresh store: a local object is no upload proof.
+            verify = Path(tmp) / "verify"
+            _git(
+                ["clone", "-q", "--no-checkout", "--single-branch", "--branch", branch, remote, str(verify)],
+                Path(tmp), env,
+            )
+            _git(["lfs", "install", "--local"], verify, env)
+            _git(["checkout", "-q", "--detach", commit], verify, env)
+            for dest, sha in sealed.items():
+                _git(["lfs", "fetch", "--include=" + dest, "--exclude=", "origin", commit], verify, env)
+                _git(["lfs", "checkout", dest], verify, env)
+                if sha256_file(verify / dest) != sha:
+                    raise RuntimeError(f"{dest} read back from GitHub differs")
+    return {"status": "remote_verified", "commit": commit, "branch": branch, "files": sorted(d for _, d in files)}
 
 
 def timestamp():
@@ -691,9 +832,10 @@ class Job:
         step_results, output = [], []
         renew = threading.Thread(target=self.renew, daemon=True)
         renew.start()
+        work = self.listener.state / "work" / self.id
+        github = {}
         try:
             github = validate_job(self.message, self.listener.config["repo"])
-            work = self.listener.state / "work" / self.id
             work.mkdir(mode=0o700, parents=True, exist_ok=True)
             runner_temp = work / "_runner_temp"
             runner_temp.mkdir(mode=0o700, exist_ok=True)
@@ -848,6 +990,8 @@ class Job:
             output.append({"error": self.api.mask(str(exc))})
         finally:
             self.finished.set()
+        # While the job token is still valid: the workspace goes to encrypted LFS.
+        captured = self.archive_workspace(work, github, result)
         try:
             self.request(
                 "completejob",
@@ -891,6 +1035,70 @@ class Job:
             )
             print("JOB_REPORT_ERROR", self.error, flush=True)
             self.listener.stop.set()
+        # Leaving work/<job_id> made workspaces pile up until the phone ran out
+        # of space (#1637, ENOSPC). It goes only once its archive is in the spool.
+        if captured:
+            shutil.rmtree(work, ignore_errors=True)
+
+    def archive_workspace(self, work, github, result):
+        """Spool the workspace as an age-encrypted tar.gz, then publish the spool.
+
+        Returns True once the workspace is safe in the spool (or absent). A spooled
+        archive is removed only after GitHub serves it back with the same digest;
+        until then it waits for the next job's token."""
+        spool = self.listener.state / "workspace-spool"
+        captured = not work.is_dir()
+        now = datetime.datetime.now(datetime.timezone.utc)
+        try:
+            spool.mkdir(mode=0o700, exist_ok=True)
+            if work.is_dir():
+                plain = spool / f"{self.id}.tar.gz"
+                with tarfile.open(plain, "w:gz") as tar:
+                    tar.add(work, arcname=self.id)
+                secure_json(
+                    spool / f"{self.id}.json",
+                    {
+                        "job_id": self.id,
+                        "request_id": self.message.get("requestId"),
+                        "run_id": github.get("run_id"),
+                        "conclusion": result,
+                        "archived_at": timestamp(),
+                        "key": f"keys/{month_of(now)}.agekey",
+                        "key_published_from": month_after(month_of(now), 2).date().isoformat(),
+                    },
+                )
+                captured = True
+            for plain in sorted(spool.glob("*.tar.gz")):
+                age_encrypt(plain, plain.with_name(plain.name + ".age"), now)
+                plain.unlink()
+            token = github.get("token")
+            if not token:
+                return captured
+            repo = self.listener.config["repo"]
+            for archive in sorted(spool.glob("*.tar.gz.age")):
+                job_id = archive.name[: -len(".tar.gz.age")]
+                meta_path = spool / f"{job_id}.json"
+                if not meta_path.exists():
+                    secure_json(meta_path, {"job_id": job_id})
+                month = json.loads(meta_path.read_text()).get("key", "")[5:12] or month_of(now)
+                dest = f"android/redmi9/workspaces/{month}/{archive.name}"
+                receipt = publish_files(
+                    [(archive, dest), (meta_path, dest + ".json")],
+                    repo, WORKSPACE_BRANCH, token, "Archive " + dest,
+                )
+                print("WORKSPACE_LFS_REMOTE_VERIFIED", json.dumps(receipt), flush=True)
+                archive.unlink()
+                meta_path.unlink(missing_ok=True)
+            for key in due_keys(now):
+                receipt = publish_files(
+                    [(key, f"keys/{key.name}")], repo, WORKSPACE_BRANCH, token,
+                    f"Publish workspace key {key.stem}",
+                )
+                secure_json(key.with_name(key.name + ".published"), receipt)
+                print("WORKSPACE_KEY_PUBLISHED", key.stem, flush=True)
+        except Exception as exc:
+            print("WORKSPACE_ARCHIVE_ERROR", self.api.mask(str(exc)), flush=True)
+        return captured
 
 
 def run_listener(listener):

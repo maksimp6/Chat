@@ -32,6 +32,18 @@ FILE_SEARCH_OFF_NOTE = (
     "Не предлагай поиск вручную вместо этого."
 )
 
+# The hosted file_search tool carries no description, so the model did not
+# connect it with "память", "индекс" or "RAG" and answered from the web (#1660).
+FILE_SEARCH_ON_NOTE = (
+    "\n\nВ этом диалоге подключён поиск по векторному хранилищу (File Search, RAG; "
+    "инструмент file_search, он же search_index): в нём архив диалогов с Логосом, "
+    "issues и документы репозитория владельца. Когда пользователь просит найти что-то "
+    "в памяти, в индексе, в RAG, в архиве, в диалогах или файлах, вызови file_search "
+    "и отвечай по найденным фрагментам, называя файлы-источники (filename). "
+    "Не подменяй найденное общими сведениями и веб-поиском; если в индексе ничего "
+    "подходящего нет, так и скажи."
+)
+
 
 class YandexMcpMixin:
     def _execute_single_tool(
@@ -337,10 +349,10 @@ class YandexMcpMixin:
                 ask_params["instructions"] = (
                     ask_params.get("instructions") or ""
                 ) + memory_summary
-        if settings_id and execution_policy is None and not file_search_active:
-            ask_params["instructions"] = (
-                ask_params.get("instructions") or ""
-            ) + FILE_SEARCH_OFF_NOTE
+        if settings_id and execution_policy is None:
+            ask_params["instructions"] = (ask_params.get("instructions") or "") + (
+                FILE_SEARCH_ON_NOTE if file_search_active else FILE_SEARCH_OFF_NOTE
+            )
         if tools or execution_policy is not None:
             ask_params["tools"] = tools
 
