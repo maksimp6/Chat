@@ -39,7 +39,10 @@ jobs:
           test ! -L "$HOME/github-python-runner"
           test ! -L "$cleanup_root"
           df -k "$cleanup_root"
-          find "$cleanup_root" -mindepth 2 -maxdepth 2 -type d \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' -o -name '.logos-tools-check-*' -o -name '.logos-tools-tests-*' -o -name '.logos-candidate-tools-*' \) -print -exec rm -rf -- {} +
+          find "$cleanup_root" -mindepth 2 -maxdepth 2 -type d \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' -o -name '.logos-tools-check-*' -o -name '.logos-tools-tests-*' -o -name '.logos-candidate-tools-*' \) -print0 | while IFS= read -r -d '' leftover; do
+            # Root capture children may leave root-owned files; retry as root, never fail the job on stale garbage.
+            rm -rf -- "$leftover" 2>/dev/null || timeout 30 su -c "rm -rf -- '$leftover'" || echo "::warning::could not remove $leftover"
+          done
           df -k "$cleanup_root"
           for file in scripts/redmi_app_server.sh scripts/redmi_app_launcher.py scripts/redmi_wifi_probe.py scripts/redmi_remove_autoupdate.py .github/workflows/redmi9-app-server.yml; do
             mkdir -p "$(dirname "$file")"
@@ -83,7 +86,10 @@ jobs:
           test ! -L "$HOME/github-python-runner"
           test ! -L "$cleanup_root"
           df -k "$cleanup_root"
-          find "$cleanup_root" -mindepth 2 -maxdepth 2 -type d \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' -o -name '.logos-tools-check-*' -o -name '.logos-tools-tests-*' -o -name '.logos-candidate-tools-*' \) -print -exec rm -rf -- {} +
+          find "$cleanup_root" -mindepth 2 -maxdepth 2 -type d \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' -o -name '.logos-tools-check-*' -o -name '.logos-tools-tests-*' -o -name '.logos-candidate-tools-*' \) -print0 | while IFS= read -r -d '' leftover; do
+            # Root capture children may leave root-owned files; retry as root, never fail the job on stale garbage.
+            rm -rf -- "$leftover" 2>/dev/null || timeout 30 su -c "rm -rf -- '$leftover'" || echo "::warning::could not remove $leftover"
+          done
           df -k "$cleanup_root"
           capture_job_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-screenshots-", dir=".")).resolve())')
           export RUNNER_TEMP="$capture_job_temp"
@@ -142,7 +148,10 @@ jobs:
           test ! -L "$HOME/github-python-runner"
           test ! -L "$cleanup_root"
           df -k "$cleanup_root"
-          find "$cleanup_root" -mindepth 2 -maxdepth 2 -type d \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' -o -name '.logos-tools-check-*' -o -name '.logos-tools-tests-*' -o -name '.logos-candidate-tools-*' \) -print -exec rm -rf -- {} +
+          find "$cleanup_root" -mindepth 2 -maxdepth 2 -type d \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' -o -name '.logos-tools-check-*' -o -name '.logos-tools-tests-*' -o -name '.logos-candidate-tools-*' \) -print0 | while IFS= read -r -d '' leftover; do
+            # Root capture children may leave root-owned files; retry as root, never fail the job on stale garbage.
+            rm -rf -- "$leftover" 2>/dev/null || timeout 30 su -c "rm -rf -- '$leftover'" || echo "::warning::could not remove $leftover"
+          done
           df -k "$cleanup_root"
           check_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-tools-check-", dir=".")).resolve())')
           export RUNNER_TEMP="$check_temp"
@@ -191,7 +200,10 @@ jobs:
           test ! -L "$HOME/github-python-runner"
           test ! -L "$cleanup_root"
           df -k "$cleanup_root"
-          find "$cleanup_root" -mindepth 2 -maxdepth 2 -type d \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' -o -name '.logos-tools-check-*' -o -name '.logos-tools-tests-*' -o -name '.logos-candidate-tools-*' \) -print -exec rm -rf -- {} +
+          find "$cleanup_root" -mindepth 2 -maxdepth 2 -type d \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' -o -name '.logos-tools-check-*' -o -name '.logos-tools-tests-*' -o -name '.logos-candidate-tools-*' \) -print0 | while IFS= read -r -d '' leftover; do
+            # Root capture children may leave root-owned files; retry as root, never fail the job on stale garbage.
+            rm -rf -- "$leftover" 2>/dev/null || timeout 30 su -c "rm -rf -- '$leftover'" || echo "::warning::could not remove $leftover"
+          done
           df -k "$cleanup_root"
           verification_job_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-screenshot-verification-", dir=".")).resolve())')
           export RUNNER_TEMP="$verification_job_temp"
@@ -218,7 +230,10 @@ jobs:
           test ! -L "$HOME/github-python-runner"
           test ! -L "$cleanup_root"
           df -k "$cleanup_root"
-          find "$cleanup_root" -mindepth 2 -maxdepth 2 -type d \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' -o -name '.logos-tools-check-*' -o -name '.logos-tools-tests-*' -o -name '.logos-candidate-tools-*' \) -print -exec rm -rf -- {} +
+          find "$cleanup_root" -mindepth 2 -maxdepth 2 -type d \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' -o -name '.logos-tools-check-*' -o -name '.logos-tools-tests-*' -o -name '.logos-candidate-tools-*' \) -print0 | while IFS= read -r -d '' leftover; do
+            # Root capture children may leave root-owned files; retry as root, never fail the job on stale garbage.
+            rm -rf -- "$leftover" 2>/dev/null || timeout 30 su -c "rm -rf -- '$leftover'" || echo "::warning::could not remove $leftover"
+          done
           df -k "$cleanup_root"
           native_job_temp=$(python -c 'from pathlib import Path; import tempfile; print(Path(tempfile.mkdtemp(prefix=".logos-rootagent-", dir=".")).resolve())')
           export RUNNER_TEMP="$native_job_temp"
@@ -249,7 +264,10 @@ jobs:
           test ! -L "$HOME/github-python-runner"
           test ! -L "$cleanup_root"
           df -k "$cleanup_root"
-          find "$cleanup_root" -mindepth 2 -maxdepth 2 -type d \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' -o -name '.logos-tools-check-*' -o -name '.logos-tools-tests-*' -o -name '.logos-candidate-tools-*' \) -print -exec rm -rf -- {} +
+          find "$cleanup_root" -mindepth 2 -maxdepth 2 -type d \( -name '.logos-screenshots-*' -o -name '.logos-screenshot-verification-*' -o -name '.logos-tools-check-*' -o -name '.logos-tools-tests-*' -o -name '.logos-candidate-tools-*' \) -print0 | while IFS= read -r -d '' leftover; do
+            # Root capture children may leave root-owned files; retry as root, never fail the job on stale garbage.
+            rm -rf -- "$leftover" 2>/dev/null || timeout 30 su -c "rm -rf -- '$leftover'" || echo "::warning::could not remove $leftover"
+          done
           df -k "$cleanup_root"
           export OUT_DIR="$HOME/logos-art-real"
           mkdir -p "$OUT_DIR"

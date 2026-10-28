@@ -1605,9 +1605,10 @@ def main():
                 "github_run_url": "https://github.com/maksimp6/Chat/actions/runs/" + os.environ["GITHUB_RUN_ID"]}
     metadata["tools_self_check"] = os.environ.get("LOGOS_TOOLS_SELF_CHECK") == "1"
     metadata["capture_url"] = capture_url(os.environ.get("LOGOS_CAPTURE_URL", LOGOS_URL))
-    argv = [sys.executable, str(Path(__file__).resolve()), "_capture", str(output),
+    # -B: the root child must not write root-owned __pycache__ that the runner user cannot delete.
+    argv = [sys.executable, "-B", str(Path(__file__).resolve()), "_capture", str(output),
             str(os.getuid()), str(os.getgid()), json.dumps(metadata)]
-    safe_env = {"PATH": os.environ.get("PATH", "/system/bin"), "TMPDIR": os.environ.get("TMPDIR", str(runner_temp))}
+    safe_env = {"PATH": os.environ.get("PATH", "/system/bin"), "TMPDIR": os.environ.get("TMPDIR", str(runner_temp)), "PYTHONDONTWRITEBYTECODE": "1"}
     result = subprocess.run(["su", "-c", shlex.join(argv)], env=safe_env, capture_output=True, timeout=300)
     if result.returncode:
         # No job token is in the capture child's environment or argv.
