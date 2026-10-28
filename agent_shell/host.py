@@ -27,15 +27,7 @@ bind = _binding.bind
 current = _binding.current
 bound = _binding.names()
 
-__all__ = [
-    "Host",
-    "HostNotBound",
-    "bind",
-    "bound",
-    "current",
-    "provide",
-    "get_memory_client",
-]
+__all__ = ["Host", "HostNotBound", "bind", "bound", "current", "provide", "get_memory_client"]
 
 
 def get_memory_client(*args: Any, **kwargs: Any) -> Any:

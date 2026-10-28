@@ -16,9 +16,7 @@ from plugin_system._binding import Binding, HostNotBound
 @dataclass(frozen=True, kw_only=True)
 class Host:
     UniversalToolCall: Any  # tool_providers.universal_tool_platform.UniversalToolCall
-    UniversalToolExecutor: (
-        Any  # tool_providers.universal_tool_platform.UniversalToolExecutor
-    )
+    UniversalToolExecutor: Any  # tool_providers.universal_tool_platform.UniversalToolExecutor
 
 
 _binding: Binding[Host] = Binding("plugin_system")

@@ -19,9 +19,7 @@ class Host:
     DatabaseError: Any  # storage.memory_db.DatabaseError
     LogosClient: Any  # chat.mcp_routes.LogosClient
     UniversalToolCall: Any  # tool_providers.universal_tool_platform.UniversalToolCall
-    UniversalToolExecutor: (
-        Any  # tool_providers.universal_tool_platform.UniversalToolExecutor
-    )
+    UniversalToolExecutor: Any  # tool_providers.universal_tool_platform.UniversalToolExecutor
     bootstrap_credential: Any  # provider_accounts.credentials.bootstrap_credential
     create_invocation: Any  # invocation.manager.create_invocation
     create_invocation_trace: Any  # invocation.trace.create_invocation_trace
@@ -44,24 +42,7 @@ bind = _binding.bind
 current = _binding.current
 bound = _binding.names()
 
-__all__ = [
-    "Host",
-    "HostNotBound",
-    "bind",
-    "bound",
-    "current",
-    "provide",
-    "bootstrap_credential",
-    "create_invocation",
-    "create_invocation_trace",
-    "current_runtime_data_root",
-    "current_runtime_id",
-    "fail_invocation",
-    "finish_invocation",
-    "get_store",
-    "persist_invocation_trace",
-    "start_invocation",
-]
+__all__ = ["Host", "HostNotBound", "bind", "bound", "current", "provide", "bootstrap_credential", "create_invocation", "create_invocation_trace", "current_runtime_data_root", "current_runtime_id", "fail_invocation", "finish_invocation", "get_store", "persist_invocation_trace", "start_invocation"]
 
 
 def bootstrap_credential(*args: Any, **kwargs: Any) -> Any:

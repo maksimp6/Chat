@@ -16,9 +16,7 @@ from secret_store._binding import Binding, HostNotBound
 @dataclass(frozen=True, kw_only=True)
 class Host:
     CloudProviderError: Any  # cloud.base.CloudProviderError
-    CloudRuSecretManagementClient: (
-        Any  # cloud.cloudru.secret_management.CloudRuSecretManagementClient
-    )
+    CloudRuSecretManagementClient: Any  # cloud.cloudru.secret_management.CloudRuSecretManagementClient
     get_store: Any  # storage.db.get_store
 
 

@@ -25,16 +25,7 @@ bind = _binding.bind
 current = _binding.current
 bound = _binding.names()
 
-__all__ = [
-    "Host",
-    "HostNotBound",
-    "bind",
-    "bound",
-    "current",
-    "provide",
-    "get_current_owner_id",
-    "get_store",
-]
+__all__ = ["Host", "HostNotBound", "bind", "bound", "current", "provide", "get_current_owner_id", "get_store"]
 
 
 def get_current_owner_id(*args: Any, **kwargs: Any) -> Any:

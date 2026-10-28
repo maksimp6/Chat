@@ -94,6 +94,7 @@ class Config:
     effect_calls: set[str] = field(default_factory=set)
     system_log_module: str = ""
     tool_registry_file: str = ""
+    tool_sources_file: str = ""
     mcp_tools_file: str = ""
 
 
@@ -117,6 +118,7 @@ def load_config() -> Config:
         effect_calls=EFFECT_CALLS | set(ind.get("effect-calls", [])),
         system_log_module=ind.get("system-log-module", ""),
         tool_registry_file=ind.get("tool-registry-file", ""),
+        tool_sources_file=ind.get("tool-sources-file", ""),
         mcp_tools_file=ind.get("mcp-tools-file", ""),
     )
 
@@ -958,6 +960,114 @@ def check_wiring(umap: UnitMap, violations: list[Violation]) -> None:
             violations.append(
                 Violation("W", path, 0, f"{unit} host is never bound by a root")
             )
+        check_host_names(umap, path, tree, violations)
+    for path in sorted(umap.root_files):
+        tree = parse(path)
+        if tree is None:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom) or node.level:
+                continue
+            target = repo_module_file(node.module or "")
+            if target is None:
+                continue
+            names, dynamic = top_level_names(target)
+            for alias in node.names:
+                if alias.name in names or dynamic or alias.name == "*":
+                    continue
+                if repo_module_file(f"{node.module}.{alias.name}") is None:
+                    violations.append(
+                        Violation(
+                            "W",
+                            path,
+                            node.lineno,
+                            f"provider {node.module}.{alias.name} does not exist",
+                        )
+                    )
+
+
+def repo_module_file(module: str) -> str | None:
+    """The repository file of a dotted module name, if it is one."""
+    base = ROOT.joinpath(*module.split("."))
+    for candidate in (base.with_suffix(".py"), base / "__init__.py"):
+        if candidate.is_file():
+            return candidate.relative_to(ROOT).as_posix()
+    return None
+
+
+def top_level_names(path: str) -> tuple[set[str], bool]:
+    """Names a module binds at top level, and whether it has a module ``__getattr__``."""
+    tree = parse(path)
+    names: set[str] = set()
+    if tree is None:
+        return names, True
+    statements = list(tree.body)
+    while statements:
+        node = statements.pop()
+        if isinstance(node, (ast.If, ast.Try)):
+            statements.extend(node.body)
+            statements.extend(node.orelse)
+            if isinstance(node, ast.Try):
+                statements.extend(node.finalbody)
+                for handler in node.handlers:
+                    statements.extend(handler.body)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(node.name)
+        elif isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for target in targets:
+                names.update(n.id for n in ast.walk(target) if isinstance(n, ast.Name))
+        elif isinstance(node, ast.Import):
+            names.update((a.asname or a.name).split(".")[0] for a in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            names.update(a.asname or a.name for a in node.names)
+    return names, "__getattr__" in names
+
+
+def check_host_names(
+    umap: UnitMap, host_path: str, host_tree: ast.Module, violations: list[Violation]
+) -> None:
+    """Every ``bound.<name>`` and every name imported from the host exists in it."""
+    fields: set[str] = set()
+    for node in host_tree.body:
+        if isinstance(node, ast.ClassDef) and node.name == "Host":
+            fields = {
+                stmt.target.id
+                for stmt in node.body
+                if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name)
+            }
+    exported, _ = top_level_names(host_path)
+    host_module = module_name(host_path)
+    unit = umap.unit_of[host_path]
+    for path in umap.unit_files(unit):
+        tree = parse(path)
+        if tree is None:
+            continue
+        bound_names = {"bound"} if path == host_path else set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module == host_module:
+                for alias in node.names:
+                    if alias.name == "bound":
+                        bound_names.add(alias.asname or alias.name)
+                    if alias.name not in exported:
+                        violations.append(
+                            Violation(
+                                "W",
+                                path,
+                                node.lineno,
+                                f"{host_module} has no {alias.name}",
+                            )
+                        )
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name)
+                and node.value.id in bound_names
+                and node.attr not in fields
+            ):
+                violations.append(
+                    Violation("W", path, node.lineno, f"Host has no port {node.attr}")
+                )
 
 
 def check_docs(umap: UnitMap, violations: list[Violation], mermaid: str) -> None:
@@ -1142,6 +1252,16 @@ def tool_order(config: Config) -> list[str]:
             )
             if any(
                 isinstance(t, ast.Name) and t.id == "_TOOL_SOURCES" for t in targets
+            ):
+                for item in getattr(node.value, "elts", []):
+                    first = item.elts[0] if isinstance(item, ast.Tuple) else None
+                    if isinstance(first, ast.Constant) and first.value not in order:
+                        order.append(first.value)
+    sources = parse(config.tool_sources_file) if config.tool_sources_file else None
+    if sources is not None:
+        for node in ast.walk(sources):
+            if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == "SOURCES" for t in node.targets
             ):
                 for item in getattr(node.value, "elts", []):
                     first = item.elts[0] if isinstance(item, ast.Tuple) else None

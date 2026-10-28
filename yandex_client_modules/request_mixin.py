@@ -173,8 +173,11 @@ def _resolve_global_provider_credential(client, execution_trace=None):
     return credential
 
 
-# Public name for other units; they reach it through their host ports.
+# Public names for other units; they reach them through their host ports.
 resolve_global_provider_credential = _resolve_global_provider_credential
+resolve_quota_user_id = _resolve_quota_user_id
+record_quota_usage = _record_quota_usage
+transport_timeout = _transport_timeout
 
 
 def _key_mask(api_key):

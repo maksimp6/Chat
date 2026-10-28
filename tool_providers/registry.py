@@ -8,13 +8,16 @@ contract for every registered tool.
 from __future__ import annotations
 
 import copy
+import functools
 import inspect
 import logging
 import re
 import shutil
+import threading
 from importlib import import_module
 from typing import Any, Mapping, Optional
 
+from tool_providers.host import bound
 from tool_providers.universal_tool_platform import (
     UniversalToolDefinition,
     validate_json_schema,
@@ -49,24 +52,16 @@ _TOOL_SOURCES: tuple[tuple[str, str, str, str, type[BaseException]], ...] = (
     ("profiler", "tool_providers.profiler", "PROFILER_TOOLS", "Profiler", Exception),
     ("theme", "tool_providers.theme", "THEME_TOOLS", "Theme", Exception),
     ("runtime", "tool_providers.runtime_tools", "RUNTIME_TOOLS", "Runtime", Exception),
-    (
-        "government",
-        "organization.government",
-        "GOVERNMENT_TOOLS",
-        "Government",
-        Exception,
-    ),
-    (
-        "partner",
-        "organization.partner_relations",
-        "PARTNER_TOOLS",
-        "Partner Relations",
-        Exception,
-    ),
-    ("3d", "forge.tools", "PRINTING3D_TOOLS", "3D Printing", Exception),
-    ("3d", "model_editor.tools", "MODEL_EDITOR_TOOLS", "Model Editor", ImportError),
-    ("cloud", "cloud.tools", "CLOUD_TOOLS", "Cloud tools", Exception),
 )
+# Other units' sources (government, partner relations, 3D printing, model editor,
+# cloud) arrive through the external_tool_sources port and load after these.
+
+
+def _module_tools(module_name: str, attribute: str) -> Mapping[str, Any]:
+    tools = getattr(import_module(module_name), attribute, None)
+    if tools is None:
+        raise ImportError(f"{module_name} does not export {attribute}")
+    return tools
 
 
 def _git_policy(name: str, cfg: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -137,11 +132,18 @@ class ToolRegistry:
         self._register(category, name, cfg)
 
     def _load_all(self):
-        for category, module_name, attribute, label, failure in _TOOL_SOURCES:
+        own = [
+            (
+                category,
+                functools.partial(_module_tools, module_name, attribute),
+                label,
+                failure,
+            )
+            for category, module_name, attribute, label, failure in _TOOL_SOURCES
+        ]
+        for category, load, label, failure in own + list(bound.external_tool_sources):
             try:
-                tools = getattr(import_module(module_name), attribute, None)
-                if tools is None:
-                    raise ImportError(f"{module_name} does not export {attribute}")
+                tools = load()
                 for name, cfg in tools.items():
                     if category == "git":
                         cfg = _git_policy(name, cfg)
@@ -328,6 +330,25 @@ class ToolRegistry:
         return {cat: list(names) for cat, names in self._categories.items()}
 
 
-registry = ToolRegistry()
+_default_registry = None
+_default_registry_lock = threading.RLock()
 
-__all__ = ["ToolRegistry", "registry"]
+
+def default_registry() -> ToolRegistry:
+    """The process tool registry, created once on first use."""
+    global _default_registry
+    with _default_registry_lock:
+        if _default_registry is None:
+            _default_registry = ToolRegistry()
+        return _default_registry
+
+
+def __getattr__(name: str) -> Any:
+    """``registry`` is the process registry, created on first use."""
+    if name == "registry":
+        return default_registry()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+# "registry" resolves through __getattr__ above.
+__all__ = ["ToolRegistry", "default_registry", "registry"]  # noqa: F822

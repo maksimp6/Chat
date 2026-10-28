@@ -20,9 +20,7 @@ class Host:
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_session: Any  # sessions.manager.get_session
     get_store: Any  # storage.db.get_store
-    validate_json_schema: (
-        Any  # tool_providers.universal_tool_platform.validate_json_schema
-    )
+    validate_json_schema: Any  # tool_providers.universal_tool_platform.validate_json_schema
 
 
 _binding: Binding[Host] = Binding("organization")
@@ -31,19 +29,7 @@ bind = _binding.bind
 current = _binding.current
 bound = _binding.names()
 
-__all__ = [
-    "Host",
-    "HostNotBound",
-    "bind",
-    "bound",
-    "current",
-    "provide",
-    "create_session",
-    "get_current_owner_id",
-    "get_session",
-    "get_store",
-    "validate_json_schema",
-]
+__all__ = ["Host", "HostNotBound", "bind", "bound", "current", "provide", "create_session", "get_current_owner_id", "get_session", "get_store", "validate_json_schema"]
 
 
 def create_session(*args: Any, **kwargs: Any) -> Any:

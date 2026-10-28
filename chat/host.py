@@ -22,18 +22,14 @@ class Host:
     ExecutionTrace: Any  # observability.trace_manager.ExecutionTrace
     IMAGE_MODELS: Any  # core.config.IMAGE_MODELS
     IMAGE_SIZES: Any  # yandex_client_modules.image_generation.IMAGE_SIZES
-    ImageGenerationError: (
-        Any  # yandex_client_modules.image_generation.ImageGenerationError
-    )
+    ImageGenerationError: Any  # yandex_client_modules.image_generation.ImageGenerationError
     KnowledgeCostConfig: Any  # economy.knowledge_economics.KnowledgeCostConfig
     MAX_PROMPT_CHARS: Any  # yandex_client_modules.image_generation.MAX_PROMPT_CHARS
     MODEL_UPSTREAMS: Any  # yandex_client_modules.realtime.MODEL_UPSTREAMS
     ModelDiscoveryError: Any  # provider_accounts.model_discovery.ModelDiscoveryError
     OUTPUT_RATE: Any  # yandex_client_modules.realtime.OUTPUT_RATE
     ProviderQuotaExceeded: Any  # provider_accounts.quotas.ProviderQuotaExceeded
-    REQUEST_TIMEOUT_SECONDS: (
-        Any  # yandex_client_modules.image_generation.REQUEST_TIMEOUT_SECONDS
-    )
+    REQUEST_TIMEOUT_SECONDS: Any  # yandex_client_modules.image_generation.REQUEST_TIMEOUT_SECONDS
     RealtimeError: Any  # yandex_client_modules.realtime.RealtimeError
     RealtimeResult: Any  # yandex_client_modules.realtime.RealtimeResult
     SkillRegistry: Any  # agent_skills.registry.SkillRegistry
@@ -41,30 +37,20 @@ class Host:
     TEXT_MODELS: Any  # core.config.TEXT_MODELS
     TTS_MODEL: Any  # yandex_client_modules.realtime.TTS_MODEL
     UniversalToolCall: Any  # tool_providers.universal_tool_platform.UniversalToolCall
-    UniversalToolExecutor: (
-        Any  # tool_providers.universal_tool_platform.UniversalToolExecutor
-    )
+    UniversalToolExecutor: Any  # tool_providers.universal_tool_platform.UniversalToolExecutor
     VOICE_MODELS: Any  # core.config.VOICE_MODELS
     YandexResponsesClient: Any  # yandex_client_modules.client.YandexResponsesClient
     _record_quota_usage: Any  # yandex_client_modules.request_mixin._record_quota_usage
-    _resolve_global_provider_credential: (
-        Any  # yandex_client_modules.request_mixin._resolve_global_provider_credential
-    )
-    _resolve_quota_user_id: (
-        Any  # yandex_client_modules.request_mixin._resolve_quota_user_id
-    )
+    _resolve_global_provider_credential: Any  # yandex_client_modules.request_mixin._resolve_global_provider_credential
+    _resolve_quota_user_id: Any  # yandex_client_modules.request_mixin._resolve_quota_user_id
     _response_input: Any  # yandex_client_modules.request_builder._response_input
     _transport_timeout: Any  # yandex_client_modules.request_mixin._transport_timeout
     add_message: Any  # storage.db.add_message
     aggregate_billing: Any  # economy.billing.aggregate_billing
     bind_current_trace: Any  # observability.trace_manager.bind_current_trace
     build_ai_billing_item: Any  # economy.billing.build_ai_billing_item
-    build_generation_payload: (
-        Any  # yandex_client_modules.image_generation.build_generation_payload
-    )
-    calculate_knowledge_cost: (
-        Any  # economy.knowledge_economics.calculate_knowledge_cost
-    )
+    build_generation_payload: Any  # yandex_client_modules.image_generation.build_generation_payload
+    calculate_knowledge_cost: Any  # economy.knowledge_economics.calculate_knowledge_cost
     check_access: Any  # conversations.ownership.check_access
     completion_model_keys: Any  # core.model_profiles.completion_model_keys
     compose_skill_instructions: Any  # agent_skills.registry.compose_skill_instructions
@@ -90,14 +76,10 @@ class Host:
     maybe_update_conversation_title: Any  # storage.db.maybe_update_conversation_title
     mcp_storage: Any  # mcp_server.storage
     normalize_conversation_title: Any  # storage.db.normalize_conversation_title
-    normalize_tools_config: (
-        Any  # yandex_client_modules.tool_config.normalize_tools_config
-    )
+    normalize_tools_config: Any  # yandex_client_modules.tool_config.normalize_tools_config
     open_image_file: Any  # storage.generated_images.open_image_file
     persist_invocation_trace: Any  # invocation.manager.persist_invocation_trace
-    provider_request_headers: (
-        Any  # yandex_client_modules.request_mixin.provider_request_headers
-    )
+    provider_request_headers: Any  # yandex_client_modules.request_mixin.provider_request_headers
     record_usage: Any  # provider_accounts.quotas.record_usage
     record_yandex_mcp_activity: Any  # mcp_server.trace.record_yandex_mcp_activity
     registry: Any  # tool_providers.registry.registry
@@ -112,12 +94,8 @@ class Host:
     settle_billing_to_treasury: Any  # economy.billing.settle_billing_to_treasury
     start_invocation: Any  # invocation.manager.start_invocation
     traced_operation: Any  # observability.trace_manager.traced_operation
-    validate_dialog_model: (
-        Any  # provider_accounts.model_discovery.validate_dialog_model
-    )
-    validate_generation_params: (
-        Any  # yandex_client_modules.request_builder.validate_generation_params
-    )
+    validate_dialog_model: Any  # provider_accounts.model_discovery.validate_dialog_model
+    validate_generation_params: Any  # yandex_client_modules.request_builder.validate_generation_params
 
 
 _binding: Binding[Host] = Binding("chat")
@@ -126,63 +104,7 @@ bind = _binding.bind
 current = _binding.current
 bound = _binding.names()
 
-__all__ = [
-    "Host",
-    "HostNotBound",
-    "bind",
-    "bound",
-    "current",
-    "provide",
-    "add_message",
-    "aggregate_billing",
-    "bind_current_trace",
-    "build_ai_billing_item",
-    "build_generation_payload",
-    "calculate_knowledge_cost",
-    "check_access",
-    "completion_model_keys",
-    "compose_skill_instructions",
-    "create_conversation",
-    "create_invocation",
-    "create_invocation_trace",
-    "fail_invocation",
-    "finish_invocation",
-    "generate_realtime",
-    "get_conv_settings",
-    "get_conversation_title",
-    "get_current_owner_id",
-    "get_current_trace",
-    "get_message",
-    "get_messages",
-    "get_model_discovery",
-    "get_model_uri",
-    "get_store",
-    "get_yandex_conversation",
-    "image_file_metadata",
-    "is_provider_pending",
-    "list_owned_conversations",
-    "maybe_update_conversation_title",
-    "normalize_conversation_title",
-    "normalize_tools_config",
-    "open_image_file",
-    "persist_invocation_trace",
-    "provider_request_headers",
-    "record_usage",
-    "record_yandex_mcp_activity",
-    "release_request",
-    "request_image",
-    "reserve_request",
-    "reset_current_trace",
-    "save_conv_settings",
-    "save_image_file",
-    "set_owner",
-    "set_yandex_conversation",
-    "settle_billing_to_treasury",
-    "start_invocation",
-    "traced_operation",
-    "validate_dialog_model",
-    "validate_generation_params",
-]
+__all__ = ["Host", "HostNotBound", "bind", "bound", "current", "provide", "add_message", "aggregate_billing", "bind_current_trace", "build_ai_billing_item", "build_generation_payload", "calculate_knowledge_cost", "check_access", "completion_model_keys", "compose_skill_instructions", "create_conversation", "create_invocation", "create_invocation_trace", "fail_invocation", "finish_invocation", "generate_realtime", "get_conv_settings", "get_conversation_title", "get_current_owner_id", "get_current_trace", "get_message", "get_messages", "get_model_discovery", "get_model_uri", "get_store", "get_yandex_conversation", "image_file_metadata", "is_provider_pending", "list_owned_conversations", "maybe_update_conversation_title", "normalize_conversation_title", "normalize_tools_config", "open_image_file", "persist_invocation_trace", "provider_request_headers", "record_usage", "record_yandex_mcp_activity", "release_request", "request_image", "reserve_request", "reset_current_trace", "save_conv_settings", "save_image_file", "set_owner", "set_yandex_conversation", "settle_billing_to_treasury", "start_invocation", "traced_operation", "validate_dialog_model", "validate_generation_params"]
 
 
 def add_message(*args: Any, **kwargs: Any) -> Any:

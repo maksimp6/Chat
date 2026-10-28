@@ -20,12 +20,8 @@ class Host:
     StorageError: Any  # storage.contracts.StorageError
     StorageProviderUnavailable: Any  # storage.contracts.StorageProviderUnavailable
     UniversalToolCall: Any  # tool_providers.universal_tool_platform.UniversalToolCall
-    UniversalToolExecutor: (
-        Any  # tool_providers.universal_tool_platform.UniversalToolExecutor
-    )
-    _warn_deprecated_execution_hooks: (
-        Any  # tool_providers.universal_tool_platform._warn_deprecated_execution_hooks
-    )
+    UniversalToolExecutor: Any  # tool_providers.universal_tool_platform.UniversalToolExecutor
+    _warn_deprecated_execution_hooks: Any  # tool_providers.universal_tool_platform._warn_deprecated_execution_hooks
     check_access: Any  # conversations.ownership.check_access
     clone_profile: Any  # sessions.profiles.clone_profile
     create_invocation: Any  # invocation.manager.create_invocation
@@ -46,26 +42,7 @@ bind = _binding.bind
 current = _binding.current
 bound = _binding.names()
 
-__all__ = [
-    "Host",
-    "HostNotBound",
-    "bind",
-    "bound",
-    "current",
-    "provide",
-    "check_access",
-    "clone_profile",
-    "create_invocation",
-    "create_session",
-    "get_current_owner_id",
-    "get_invocation_status",
-    "get_invocation_trace",
-    "get_profile",
-    "get_session",
-    "list_profiles",
-    "session_profile",
-    "validate_api_contract",
-]
+__all__ = ["Host", "HostNotBound", "bind", "bound", "current", "provide", "check_access", "clone_profile", "create_invocation", "create_session", "get_current_owner_id", "get_invocation_status", "get_invocation_trace", "get_profile", "get_session", "list_profiles", "session_profile", "validate_api_contract"]
 
 
 def check_access(*args: Any, **kwargs: Any) -> Any:

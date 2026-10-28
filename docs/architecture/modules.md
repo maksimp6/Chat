@@ -85,9 +85,5 @@ flowchart LR
     tool_providers[tool_providers]
     workspace[workspace]
     yandex_client_modules[yandex_client_modules]
-    tool_providers -->|1| cloud
-    tool_providers -->|1| model_editor
-    tool_providers -->|2| organization
-    tool_providers -->|1| printing3d
 ```
 <!-- END GENERATED: unit map -->

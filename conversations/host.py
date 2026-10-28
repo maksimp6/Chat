@@ -15,9 +15,7 @@ from conversations._binding import Binding, HostNotBound
 
 @dataclass(frozen=True, kw_only=True)
 class Host:
-    ConversationOwnershipStore: (
-        Any  # agent_memory.conversation_ownership_store.ConversationOwnershipStore
-    )
+    ConversationOwnershipStore: Any  # agent_memory.conversation_ownership_store.ConversationOwnershipStore
     get_conversations: Any  # storage.db.get_conversations
     get_memory_client: Any  # agent_memory.client.get_memory_client
     memory_file_path: Any  # storage.db.memory_file_path
@@ -29,17 +27,7 @@ bind = _binding.bind
 current = _binding.current
 bound = _binding.names()
 
-__all__ = [
-    "Host",
-    "HostNotBound",
-    "bind",
-    "bound",
-    "current",
-    "provide",
-    "get_conversations",
-    "get_memory_client",
-    "memory_file_path",
-]
+__all__ = ["Host", "HostNotBound", "bind", "bound", "current", "provide", "get_conversations", "get_memory_client", "memory_file_path"]
 
 
 def get_conversations(*args: Any, **kwargs: Any) -> Any:

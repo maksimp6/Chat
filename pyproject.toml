@@ -38,7 +38,12 @@ exclude = ["^docs/mirrors/", "^datasets/"]
 # Unit map for scripts/check_independence.py: which files form one unit and
 # which files are composition roots. See docs/architecture/modules.md.
 [tool.logos.independence]
-roots = ["app.py", "composition/"]
+roots = [
+    "app.py",
+    "composition/",
+    "scripts/rotate_provider_key.py",
+    "scripts/rotate_cloudru_provider_key.py",
+]
 entry-blocks = [
     "agent_memory/extractor.py",
     "yandex_client_modules/sdk.py",
@@ -48,8 +53,6 @@ entry-blocks = [
     "agent_shell/__main__.py",
     "scripts/logos_dialogue.py",
     "scripts/logos_tool_probe.py",
-    "scripts/rotate_provider_key.py",
-    "scripts/rotate_cloudru_provider_key.py",
 ]
 embedded-programs = ["scripts/redmi_candidate_tools_check.py"]
 standalone-downloads = [
@@ -77,6 +80,7 @@ exclude = ["docs/", "datasets/"]
 effect-calls = ["ToolRegistry"]
 system-log-module = "observability.system_log"
 tool-registry-file = "tool_providers/registry.py"
+tool-sources-file = "composition/tool_sources.py"
 mcp-tools-file = "mcp_server/tools.py"
 
 [tool.logos.units]
@@ -230,6 +234,7 @@ copies = [
     "observability/_binding.py",
     "organization/_binding.py",
     "plugin_system/_binding.py",
+    "printing3d/_binding.py",
     "project_board/_binding.py",
     "provider_accounts/_binding.py",
     "remote_runtime/_binding.py",

@@ -33,6 +33,10 @@ def _warn_deprecated_execution_hooks(hooks: Mapping[str, Any]) -> None:
         )
 
 
+# Public name for other units; they reach it through their host ports.
+warn_deprecated_execution_hooks = _warn_deprecated_execution_hooks
+
+
 @dataclass(frozen=True)
 class UniversalToolDefinition:
     name: str
@@ -675,4 +679,5 @@ __all__ = [
     "UniversalToolResult",
     "tool_call_requires_approval",
     "validate_json_schema",
+    "warn_deprecated_execution_hooks",
 ]

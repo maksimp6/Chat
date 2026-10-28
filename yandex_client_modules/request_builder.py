@@ -196,6 +196,10 @@ def _response_input(params, message):
     return [{"role": "user", "content": message}]
 
 
+# Public name for other units; they reach it through their host ports.
+response_input = _response_input
+
+
 # Every request parameter is named the way an Ultra profile names each setting: the value that
 # was sent, or the reason it was left to the provider. Nothing is silently absent.
 _RESPONSES_PARAMETERS = (

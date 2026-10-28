@@ -20,14 +20,10 @@ class Host:
     IMAGE_MODELS: Any  # core.config.IMAGE_MODELS
     ProviderQuotaExceeded: Any  # provider_accounts.quotas.ProviderQuotaExceeded
     UniversalToolCall: Any  # tool_providers.universal_tool_platform.UniversalToolCall
-    UniversalToolExecutor: (
-        Any  # tool_providers.universal_tool_platform.UniversalToolExecutor
-    )
+    UniversalToolExecutor: Any  # tool_providers.universal_tool_platform.UniversalToolExecutor
     decrypt_secret: Any  # secret_store.credential_crypto.decrypt_secret
     encrypt_secret: Any  # secret_store.credential_crypto.encrypt_secret
-    get_controlled_memory_summary: (
-        Any  # agent_memory.manager.get_controlled_memory_summary
-    )
+    get_controlled_memory_summary: Any  # agent_memory.manager.get_controlled_memory_summary
     get_conv_settings: Any  # storage.db.get_conv_settings
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_model_uri: Any  # core.config.get_model_uri
@@ -37,13 +33,9 @@ class Host:
     registry: Any  # tool_providers.registry.registry
     release_request: Any  # provider_accounts.quotas.release_request
     reserve_request: Any  # provider_accounts.quotas.reserve_request
-    resolve_client_credential: (
-        Any  # provider_accounts.credentials.resolve_client_credential
-    )
+    resolve_client_credential: Any  # provider_accounts.credentials.resolve_client_credential
     ultra_profiles: Any  # core.model_profiles.ultra_profiles
-    ultra_reasoning_controllable: (
-        Any  # core.model_profiles.ultra_reasoning_controllable
-    )
+    ultra_reasoning_controllable: Any  # core.model_profiles.ultra_reasoning_controllable
     ultra_request_defaults: Any  # core.model_profiles.ultra_request_defaults
     upstream_model_id: Any  # core.config.upstream_model_id
 
@@ -54,27 +46,7 @@ bind = _binding.bind
 current = _binding.current
 bound = _binding.names()
 
-__all__ = [
-    "Host",
-    "HostNotBound",
-    "bind",
-    "bound",
-    "current",
-    "provide",
-    "get_controlled_memory_summary",
-    "get_conv_settings",
-    "get_current_owner_id",
-    "get_model_uri",
-    "get_store",
-    "record_usage",
-    "release_request",
-    "reserve_request",
-    "resolve_client_credential",
-    "ultra_profiles",
-    "ultra_reasoning_controllable",
-    "ultra_request_defaults",
-    "upstream_model_id",
-]
+__all__ = ["Host", "HostNotBound", "bind", "bound", "current", "provide", "get_controlled_memory_summary", "get_conv_settings", "get_current_owner_id", "get_model_uri", "get_store", "record_usage", "release_request", "reserve_request", "resolve_client_credential", "ultra_profiles", "ultra_reasoning_controllable", "ultra_request_defaults", "upstream_model_id"]
 
 
 def get_controlled_memory_summary(*args: Any, **kwargs: Any) -> Any:

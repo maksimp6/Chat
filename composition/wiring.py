@@ -550,6 +550,13 @@ def _plugin_system():
     )
 
 
+def _printing3d():
+    from printing3d import host
+    from forge.binding import printing_store as printing_store
+
+    return host.Host(printing_store=printing_store)
+
+
 def _project_board():
     from project_board import host
     from memory_engine import MemoryStore as MemoryStore
@@ -770,6 +777,7 @@ def _tool_providers():
     from agent_runtime.local_gateway import (
         enqueue_local_tool_job as enqueue_local_tool_job,
     )
+    from composition.tool_sources import SOURCES as external_tool_sources
     from storage.db import memory_file_path as memory_file_path
     from agent_runtime.local_gateway import (
         wait_for_local_tool_job as wait_for_local_tool_job,
@@ -781,6 +789,7 @@ def _tool_providers():
         assert_operation_allowed=assert_operation_allowed,
         build_runtime=build_runtime,
         enqueue_local_tool_job=enqueue_local_tool_job,
+        external_tool_sources=external_tool_sources,
         memory_file_path=memory_file_path,
         wait_for_local_tool_job=wait_for_local_tool_job,
     )
@@ -910,6 +919,9 @@ def register_all() -> None:
     from plugin_system import host as plugin_system_host
 
     plugin_system_host.provide(_plugin_system)
+    from printing3d import host as printing3d_host
+
+    printing3d_host.provide(_printing3d)
     from project_board import host as project_board_host
 
     project_board_host.provide(_project_board)

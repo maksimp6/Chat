@@ -25,15 +25,7 @@ bind = _binding.bind
 current = _binding.current
 bound = _binding.names()
 
-__all__ = [
-    "Host",
-    "HostNotBound",
-    "bind",
-    "bound",
-    "current",
-    "provide",
-    "memory_file_path",
-]
+__all__ = ["Host", "HostNotBound", "bind", "bound", "current", "provide", "memory_file_path"]
 
 
 def memory_file_path(*args: Any, **kwargs: Any) -> Any:

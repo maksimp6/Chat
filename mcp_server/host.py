@@ -23,9 +23,7 @@ class Host:
     RuntimeOperationNotFound: Any  # runtime.RuntimeOperationNotFound
     RuntimeScopeViolation: Any  # runtime.RuntimeScopeViolation
     UniversalToolCall: Any  # tool_providers.universal_tool_platform.UniversalToolCall
-    UniversalToolExecutor: (
-        Any  # tool_providers.universal_tool_platform.UniversalToolExecutor
-    )
+    UniversalToolExecutor: Any  # tool_providers.universal_tool_platform.UniversalToolExecutor
     bind_current_trace: Any  # observability.trace_manager.bind_current_trace
     check_access: Any  # conversations.ownership.check_access
     create_invocation: Any  # invocation.manager.create_invocation
@@ -49,9 +47,7 @@ class Host:
     registry: Any  # tool_providers.registry.registry
     reset_current_trace: Any  # observability.trace_manager.reset_current_trace
     start_invocation: Any  # invocation.manager.start_invocation
-    tool_call_requires_approval: (
-        Any  # tool_providers.universal_tool_platform.tool_call_requires_approval
-    )
+    tool_call_requires_approval: Any  # tool_providers.universal_tool_platform.tool_call_requires_approval
 
 
 _binding: Binding[Host] = Binding("mcp_server")
@@ -60,37 +56,7 @@ bind = _binding.bind
 current = _binding.current
 bound = _binding.names()
 
-__all__ = [
-    "Host",
-    "HostNotBound",
-    "bind",
-    "bound",
-    "current",
-    "provide",
-    "bind_current_trace",
-    "check_access",
-    "create_invocation",
-    "create_invocation_trace",
-    "decrypt_secret",
-    "encrypt_secret",
-    "fail_invocation",
-    "finish_invocation",
-    "get_current_owner_id",
-    "get_invocation_status",
-    "get_invocation_trace",
-    "get_messages",
-    "get_owned_conversation",
-    "get_session",
-    "get_store",
-    "grep_search",
-    "list_directory",
-    "list_owned_conversations",
-    "persist_invocation_trace",
-    "read_file",
-    "reset_current_trace",
-    "start_invocation",
-    "tool_call_requires_approval",
-]
+__all__ = ["Host", "HostNotBound", "bind", "bound", "current", "provide", "bind_current_trace", "check_access", "create_invocation", "create_invocation_trace", "decrypt_secret", "encrypt_secret", "fail_invocation", "finish_invocation", "get_current_owner_id", "get_invocation_status", "get_invocation_trace", "get_messages", "get_owned_conversation", "get_session", "get_store", "grep_search", "list_directory", "list_owned_conversations", "persist_invocation_trace", "read_file", "reset_current_trace", "start_invocation", "tool_call_requires_approval"]
 
 
 def bind_current_trace(*args: Any, **kwargs: Any) -> Any:
