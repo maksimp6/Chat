@@ -117,18 +117,18 @@ def _check_active(row: DatabaseRow) -> None:
             raise KeyExpiredError(f"Key '{row['key_ref']}' is expired")
 
 
-def store_secret(
+def _new_row(
     *,
     secret: str,
     name: str,
     purpose: str,
     provider: str,
-    environment: str = "production",
-    owner: str = "",
-    expires_at: Optional[datetime] = None,
-    key_ref: Optional[str] = None,
-    rotated_from: Optional[str] = None,
-) -> KeyMetadata:
+    environment: str,
+    owner: str,
+    expires_at: Optional[datetime],
+    key_ref: Optional[str],
+    rotated_from: Optional[str],
+) -> DatabaseRow:
     if not isinstance(secret, str) or not secret:
         raise ValueError("secret must be a non-empty string")
     for field_name, value in (
@@ -161,8 +161,34 @@ def store_secret(
         "fingerprint": fingerprint_key(secret),
         "revoked_at": None,
     }
+    return row
+
+
+def store_secret(
+    *,
+    secret: str,
+    name: str,
+    purpose: str,
+    provider: str,
+    environment: str = "production",
+    owner: str = "",
+    expires_at: Optional[datetime] = None,
+    key_ref: Optional[str] = None,
+    rotated_from: Optional[str] = None,
+) -> KeyMetadata:
+    row = _new_row(
+        secret=secret,
+        name=name,
+        purpose=purpose,
+        provider=provider,
+        environment=environment,
+        owner=owner,
+        expires_at=expires_at,
+        key_ref=key_ref,
+        rotated_from=rotated_from,
+    )
     with get_store().transaction() as tx:
-        key = "key-manager/" + ref
+        key = "key-manager/" + row["key_ref"]
         if tx.get(key) is not None:
             raise KeyManagerError("Managed key reference already exists")
         tx.set(key, row)
@@ -243,7 +269,7 @@ def rotate_key(
 ) -> KeyMetadata:
     old = _get_row(key_ref)
     _check_active(old)
-    new_meta = store_secret(
+    row = _new_row(
         secret=secret,
         name=name or old["name"],
         purpose=old["purpose"],
@@ -251,10 +277,31 @@ def rotate_key(
         environment=old["environment"],
         owner=old["owner"],
         expires_at=expires_at,
+        key_ref=None,
         rotated_from=key_ref,
     )
-    revoke_key(key_ref)
-    return new_meta
+    key = "key-manager/" + key_ref
+    # Successor and revocation commit together, and the old key is checked
+    # again inside: a parallel rotation finds it revoked instead of creating
+    # a second active successor.
+    with get_store().transaction() as tx:
+        current = tx.get(key)
+        if current is None:
+            raise KeyNotFoundError("Managed key not found")
+        _check_active(current)
+        new_key = "key-manager/" + row["key_ref"]
+        if tx.get(new_key) is not None:
+            raise KeyManagerError("Managed key reference already exists")
+        tx.set(new_key, row)
+        tx.set(
+            key,
+            {
+                **current,
+                "status": "revoked",
+                "revoked_at": _iso(datetime.now(timezone.utc)),
+            },
+        )
+    return _metadata(row)
 
 
 def _metadata(row: DatabaseRow) -> KeyMetadata:

@@ -381,7 +381,9 @@ def get_invocation(invocation_id: str) -> Optional[dict[str, Any]]:
     if value is None:
         return None
     if not isinstance(value, dict) or value.get("id") != str(invocation_id):
-        raise ValueError("invalid invocation record")
+        # A record that is not this invocation is treated as absent, as in
+        # get_invocation_owner and get_session, not as a server error.
+        return None
     for field in ("trace", "result", "error"):
         if field + "_chunks" in value:
             value[field] = _read_chunked_value(

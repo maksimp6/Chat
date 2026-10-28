@@ -19,6 +19,9 @@ from conversations.host import (
 
 
 _OWNERSHIP_LOCK = RLock()
+# Every conversation is its own journal record "chat/conversation/<id>" (storage.records),
+# so one conversation is read by its key without building the whole list.
+_CONVERSATION_PREFIX = "chat/conversation/"
 
 
 class ConversationView(TypedDict):
@@ -29,18 +32,25 @@ class ConversationView(TypedDict):
     updated_at: int
 
 
+def _conversation_view(row: dict[str, Any]) -> ConversationView:
+    return ConversationView(
+        id=str(row["id"]),
+        title=str(row["title"]),
+        model=str(row["model"]),
+        created_at=int(row["created_at"]),
+        updated_at=int(row["updated_at"]),
+    )
+
+
 def _conversation_rows() -> list[ConversationView]:
     rows = get_conversations()
-    return [
-        ConversationView(
-            id=str(row["id"]),
-            title=str(row["title"]),
-            model=str(row["model"]),
-            created_at=int(row["created_at"]),
-            updated_at=int(row["updated_at"]),
-        )
-        for row in rows
-    ]
+    return [_conversation_view(row) for row in rows]
+
+
+def _conversation_record(conversation_id: str) -> Any:
+    return get_memory_client(memory_file_path()).get(
+        _CONVERSATION_PREFIX + str(conversation_id)
+    )
 
 
 def _store() -> Any:
@@ -78,7 +88,7 @@ def set_owner(conversation_id: str, user_id: str) -> None:
 
 def check_access(conversation_id: str, user_id: str) -> bool:
     """Every existing conversation is available to every client."""
-    return any(row["id"] == str(conversation_id) for row in _conversation_rows())
+    return _conversation_record(conversation_id) is not None
 
 
 def list_owned_conversations(user_id: str) -> list[ConversationView]:
@@ -88,17 +98,10 @@ def list_owned_conversations(user_id: str) -> list[ConversationView]:
 def get_owned_conversation(
     conversation_id: str, user_id: str
 ) -> Optional[ConversationView]:
-    if not check_access(conversation_id, user_id):
+    record = _conversation_record(conversation_id)
+    if record is None:
         return None
-    conversation_id = str(conversation_id)
-    return next(
-        (
-            conversation
-            for conversation in _conversation_rows()
-            if conversation["id"] == conversation_id
-        ),
-        None,
-    )
+    return _conversation_view(record)
 
 
 def delete_owner(conversation_id: str, user_id: str) -> None:

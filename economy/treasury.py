@@ -44,10 +44,11 @@ def get_account(owner_id: str = "default") -> dict[str, Any]:
     with store.transaction() as tx:
         account = tx.get(key)
         if account is None:
+            # A read shows an empty account without writing one; a posting stores it.
             account = _empty_account(owner_id)
-            tx.set(key, account)
+        # The ledger keeps exact decimal text, like the balance; the API shows numbers.
         ledger = [
-            row
+            {**row, "amount": float(_money(row["amount"]))}
             for row in store.items(prefix="treasury/ledger/").values()
             if row["owner_id"] == owner_id
         ]
@@ -65,40 +66,65 @@ def _record(
     kind: str,
     reference: str | None = None,
 ) -> bool:
+    with get_store().transaction() as tx:
+        return _record_in(tx, owner_id, amount, description, kind, reference)
+
+
+def _record_in(
+    tx: Any,
+    owner_id: str,
+    amount: Any,
+    description: str,
+    kind: str,
+    reference: str | None = None,
+) -> bool:
+    """Post one entry inside the caller's store transaction."""
     value = _money(amount)
     if value <= 0 or not description or not owner_id:
         raise ValueError("owner, positive finite amount and description are required")
-    store = get_store()
+    if kind not in {"credit", "debit"}:
+        raise ValueError("kind must be credit or debit")
     account_key = "treasury/account/" + owner_id
     reference_key = "treasury/reference/" + json.dumps(
         [owner_id, reference], ensure_ascii=False
     )
-    with store.transaction() as tx:
-        if reference and tx.get(reference_key) is not None:
+    if reference:
+        posted = tx.get(reference_key)
+        if posted is not None:
+            row = tx.get("treasury/ledger/" + str(posted))
+            # A reference repeats a posting only with the same kind, amount and
+            # description; anything else is a conflict, not a duplicate to drop.
+            if row is not None and (
+                row["kind"],
+                _money(row["amount"]),
+                row["description"],
+            ) != (kind, value, description):
+                raise ValueError("reference conflicts with another posting")
             return False
-        account = tx.get(account_key) or _empty_account(owner_id)
-        current = _money(account["balance"])
-        if kind == "debit" and current < value:
-            raise ValueError("insufficient balance")
-        now = datetime.now(timezone.utc).isoformat()
-        identity = int(tx.get("treasury/next-ledger-id") or 0) + 1
-        balance = current + value if kind == "credit" else current - value
-        tx.set(account_key, {**account, "balance": str(balance), "updated_at": now})
-        tx.set("treasury/next-ledger-id", identity)
-        tx.set(
-            "treasury/ledger/" + str(identity),
-            {
-                "id": identity,
-                "owner_id": owner_id,
-                "kind": kind,
-                "amount": float(value),
-                "description": description,
-                "reference": reference,
-                "created_at": now,
-            },
-        )
-        if reference:
-            tx.set(reference_key, identity)
+    account = tx.get(account_key) or _empty_account(owner_id)
+    current = _money(account["balance"])
+    if kind == "debit" and current < value:
+        raise ValueError("insufficient balance")
+    now = datetime.now(timezone.utc).isoformat()
+    identity = int(tx.get("treasury/next-ledger-id") or 0) + 1
+    balance = current + value if kind == "credit" else current - value
+    tx.set(account_key, {**account, "balance": str(balance), "updated_at": now})
+    tx.set("treasury/next-ledger-id", identity)
+    tx.set(
+        "treasury/ledger/" + str(identity),
+        {
+            "id": identity,
+            "owner_id": owner_id,
+            "kind": kind,
+            # Exact decimal text, like the balance, so the ledger always sums to it.
+            "amount": str(value),
+            "description": description,
+            "reference": reference,
+            "created_at": now,
+        },
+    )
+    if reference:
+        tx.set(reference_key, identity)
     return True
 
 
@@ -121,15 +147,17 @@ def demo_top_up(
             f"amount exceeds the demo top-up limit of {DEMO_TOP_UP_LIMIT:g}"
         )
     key = "treasury/demo/" + str(owner_id)
-    # The check, the credit and the running total are one step for this process.
+    # The check, the credit and the running total are one store transaction: they commit
+    # together or not at all, so neither a failure between them nor another writer
+    # can credit without counting it toward the total.
     with _DEMO_LOCK:
-        credited = float((get_store().get(key) or {}).get("total", 0.0))
-        if credited + value > DEMO_TOP_UP_TOTAL_LIMIT:
-            raise ValueError(
-                f"demo top-ups are limited to {DEMO_TOP_UP_TOTAL_LIMIT:g} per owner"
-            )
-        _record(owner_id, value, description, "credit")
         with get_store().transaction() as tx:
+            credited = float((tx.get(key) or {}).get("total", 0.0))
+            if credited + value > DEMO_TOP_UP_TOTAL_LIMIT:
+                raise ValueError(
+                    f"demo top-ups are limited to {DEMO_TOP_UP_TOTAL_LIMIT:g} per owner"
+                )
+            _record_in(tx, owner_id, value, description, "credit")
             tx.set(key, {"total": credited + value})
     return get_account(owner_id)
 

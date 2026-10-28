@@ -370,5 +370,22 @@ def calculate_cost(
     return round(cost, 2)
 
 
+def calculate_full_cost(model_key, usage):
+    m = get_model_info(model_key)
+    if m.get("pricing_status") == "unknown":
+        return None
+    if not usage:
+        return 0.0
+    token_cost = (
+        usage.get("input_tokens", 0) * m["input"]
+        + usage.get("output_tokens", 0) * m.get("output", m["input"])
+    ) / 1000
+    audio_cost = (
+        usage.get("audio_seconds_stt", 0) * AUDIO_STT_PRICE_PER_SEC
+        + usage.get("audio_seconds_tts", 0) * AUDIO_TTS_PRICE_PER_SEC
+    )
+    return round(token_cost + audio_cost, 4)
+
+
 config = Config()
 REPO_DIR = "/sdcard/repo"

@@ -2,6 +2,7 @@
 
 import copy
 import json
+import logging
 import re
 import threading
 import time
@@ -15,11 +16,6 @@ from observability.host import (
     build_ai_billing_item,
     build_compute_billing_item,
 )
-
-_current_trace: ContextVar["ExecutionTrace | None"] = ContextVar(
-    "logos_execution_trace", default=None
-)
-
 from observability.trace_security import (
     MAX_DEPTH,
     MAX_ITEMS,
@@ -35,7 +31,9 @@ from observability.trace_timing import (
     step_correlation_id,
 )
 
-import logging
+_current_trace: ContextVar["ExecutionTrace | None"] = ContextVar(
+    "logos_execution_trace", default=None
+)
 
 logger = logging.getLogger("logos.observability.trace_manager")
 
@@ -106,7 +104,10 @@ def traced_operation(operation: str, *, include_request: bool = True):
                             "operation_completed",
                             {
                                 "operation": operation,
-                                "success": not isinstance(result, int) or result == 0,
+                                # A bool is no exit code: True is not a failure.
+                                "success": isinstance(result, bool)
+                                or not isinstance(result, int)
+                                or result == 0,
                                 "result_type": type(result).__name__,
                             },
                         )
@@ -191,13 +192,14 @@ class ExecutionTrace:
             if not self._finalized:
                 self._sensitive_values.add(value)
 
-    def _redact_registered_values(self, value: Any) -> Any:
+    def _registered_values_redactor(self) -> Callable[[Any], Any]:
+        """Build the redactor of the secrets registered so far, once for many values."""
         with self._sensitive_values_lock:
             sensitive_values = tuple(
                 sorted(self._sensitive_values, key=len, reverse=True)
             )
         if not sensitive_values:
-            return value
+            return lambda item: item
         substring_values = tuple(
             secret for secret in sensitive_values if len(secret) >= 4
         )
@@ -234,11 +236,27 @@ class ExecutionTrace:
 
             return substring_pattern.sub(replace_secret, text)
 
+        def redact_key(key: Any, item: dict, redacted: dict) -> Any:
+            """A secret used as a key is redacted too, never overwriting another key."""
+            if not isinstance(key, str):
+                return key
+            clean_key = redact_text(key)
+            if clean_key == key:
+                return key
+            unique_key, suffix = clean_key, 2
+            while unique_key in redacted or unique_key in item:
+                unique_key = f"{clean_key} #{suffix}"
+                suffix += 1
+            return unique_key
+
         def redact(item: Any) -> Any:
             if isinstance(item, str):
                 return redact_text(item)
             if isinstance(item, dict):
-                return {key: redact(entry) for key, entry in item.items()}
+                redacted = {}
+                for key, entry in item.items():
+                    redacted[redact_key(key, item, redacted)] = redact(entry)
+                return redacted
             if isinstance(item, list):
                 return [redact(entry) for entry in item]
             if isinstance(item, tuple):
@@ -247,7 +265,10 @@ class ExecutionTrace:
                 return {redact(entry) for entry in item}
             return item
 
-        return redact(value)
+        return redact
+
+    def _redact_registered_values(self, value: Any) -> Any:
+        return self._registered_values_redactor()(value)
 
     def get_metadata(self) -> dict[str, str]:
         return {"trace_id": str(self.trace_id)}
@@ -374,27 +395,38 @@ class ExecutionTrace:
         return safe_repr(value, depth)
 
     def _capture_exception_state(self, exc: BaseException) -> dict[str, Any]:
+        # One redactor for the whole capture: record_error holds the trace lock, so no
+        # secret can be registered meanwhile.
+        redact_registered = self._registered_values_redactor()
         frames = []
         tb = exc.__traceback__
         for frame, lineno in traceback.walk_tb(tb):
             locals_snapshot = {}
             for name, value in frame.f_locals.items():
-                if name.lower() in self._SENSITIVE_KEYS or any(
-                    secret in name.lower()
-                    for secret in (
-                        "api_key",
-                        "password",
-                        "secret",
-                        "token",
-                        "credential",
+                if (
+                    name.lower() in self._SENSITIVE_KEYS
+                    or any(
+                        secret in name.lower()
+                        for secret in (
+                            "api_key",
+                            "password",
+                            "secret",
+                            "credential",
+                        )
+                    )
+                    # "token" only as a whole name part, so max_tokens stays visible.
+                    or re.search(
+                        r"(?:^|_)token(?:_|$)",
+                        re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name)
+                        .lower()
+                        .replace("-", "_"),
                     )
                 ):
                     locals_snapshot[name] = "<redacted>"
                 else:
-                    safe_value = self._redact_registered_values(value)
-                    locals_snapshot[name] = self._redact_registered_values(
-                        self._safe_repr(safe_value)
-                    )
+                    # Redacted before safe_repr truncates, so no secret is cut in half;
+                    # the repr text is covered by the closing pass below.
+                    locals_snapshot[name] = self._safe_repr(redact_registered(value))
             frames.append(
                 {
                     "file": frame.f_code.co_filename,
@@ -403,7 +435,7 @@ class ExecutionTrace:
                     "locals": locals_snapshot,
                 }
             )
-        return self._redact_registered_values(
+        return redact_registered(
             {
                 "exception_type": type(exc).__name__,
                 "exception_message": redact_text(str(exc)),
@@ -639,6 +671,23 @@ class ExecutionTrace:
         )
         self._update_billing_for_response(clean_raw, idx, response_id)
 
+    def _record_unless_finalized(
+        self, write: Callable[..., Any], *args: Any, **kwargs: Any
+    ) -> None:
+        """Record a tool outcome unless another thread finalized the trace while the
+        tool ran: the tool's own result or exception then reaches the caller instead
+        of the RuntimeError of a late write, and the skipped write is logged."""
+        with self._sensitive_values_lock:
+            finalized = self._finalized
+            if not finalized:
+                write(*args, **kwargs)
+        if finalized:
+            logger.warning(
+                "[TRACE] %s not recorded: trace %s was finalized while a tool ran",
+                getattr(write, "__name__", "write"),
+                self.trace_id,
+            )
+
     def track_tool_execution(
         self,
         name: str,
@@ -662,7 +711,8 @@ class ExecutionTrace:
             result = executor_fn(*args, **kwargs)
             if isinstance(result, dict) and result.get("error"):
                 error = str(result.get("error"))
-                self.record_error(
+                self._record_unless_finalized(
+                    self.record_error,
                     f"tool:{name}",
                     error,
                     call_id=call_id,
@@ -672,7 +722,8 @@ class ExecutionTrace:
             return result
         except Exception as exc:
             error = str(exc)
-            self.record_error(
+            self._record_unless_finalized(
+                self.record_error,
                 f"tool:{name}",
                 error,
                 call_id=call_id,
@@ -706,21 +757,28 @@ class ExecutionTrace:
                 entry["step"] = step
             if server is not None:
                 entry["server"] = server
-            with self._sensitive_values_lock:
+
+            def record_tool_call() -> None:
                 self.trace["tool_calls"].append(entry)
-            self.add_event(
-                "tool_executed",
-                {
-                    "name": name,
-                    "timing_ms": elapsed_ms,
-                    "success": error is None,
-                    "start_timestamp": start_timestamp,
-                    "end_timestamp": end_timestamp,
-                    **({"call_id": str(call_id)} if call_id is not None else {}),
-                    **({"parent_id": str(parent_id)} if parent_id is not None else {}),
-                    **({"step": step} if step is not None else {}),
-                },
-            )
+                self.add_event(
+                    "tool_executed",
+                    {
+                        "name": name,
+                        "timing_ms": elapsed_ms,
+                        "success": error is None,
+                        "start_timestamp": start_timestamp,
+                        "end_timestamp": end_timestamp,
+                        **({"call_id": str(call_id)} if call_id is not None else {}),
+                        **(
+                            {"parent_id": str(parent_id)}
+                            if parent_id is not None
+                            else {}
+                        ),
+                        **({"step": step} if step is not None else {}),
+                    },
+                )
+
+            self._record_unless_finalized(record_tool_call)
 
     @_guarded
     def set_reasoning_plan(self, plan: dict[str, Any]) -> None:
@@ -866,7 +924,9 @@ class ExecutionTrace:
 
     @_guarded
     def _build_snapshot(self, *, end_perf: Optional[float] = None) -> dict[str, Any]:
-        """Build a read-only view and derive billing solely from source billing items."""
+        """Build a read-only view and derive billing solely from source billing items.
+
+        The trace is copied once; only the derived billing is made JSON-safe again."""
         snapshot = self._snapshot_copy(self.trace)
         if end_perf is not None:
             snapshot.setdefault("timings", {})["total_duration_ms"] = round(
@@ -877,14 +937,15 @@ class ExecutionTrace:
         # Billing items are source facts.  Never use a previously generated total
         # as an input to a later calculation.  The compute item is derived from
         # the recorded compute boundary, so reading a snapshot is never billed.
+        # The snapshot is already an independent copy, so its items need no deepcopy.
         items = [
-            item
-            for item in copy.deepcopy(billing.get("items", []))
-            if item.get("type") != "compute"
+            item for item in billing.get("items", []) if item.get("type") != "compute"
         ]
         items.append(self._compute_billing_item(snapshot.get("timings") or {}))
-        snapshot["billing"] = aggregate_billing(items, snapshot.get("context", {}))
-        return self._snapshot_copy(snapshot)
+        snapshot["billing"] = self._snapshot_copy(
+            aggregate_billing(items, snapshot.get("context", {}))
+        )
+        return snapshot
 
     @_guarded
     def make_snapshot(self) -> dict[str, Any]:
@@ -897,13 +958,16 @@ class ExecutionTrace:
         """Freeze one validated terminal snapshot; repeated calls are idempotent."""
         with self._sensitive_values_lock:
             if self._finalized:
-                return copy.deepcopy(self._final_result)
-
-            # Build before changing terminal state, so a failed rebuild leaves the
-            # live trace open for diagnosis or retry. The snapshot is already JSON-safe.
-            final = self._build_snapshot(end_perf=time.perf_counter())
-            self.trace = self._redact_registered_values(self.trace)
-            self._final_result = final
-            self._sensitive_values.clear()
-            self._finalized = True
-            return copy.deepcopy(final)
+                final = self._final_result
+            else:
+                # Build before changing terminal state, so a failed rebuild leaves the
+                # live trace open for diagnosis or retry. The snapshot is already
+                # JSON-safe. The build keeps the lock, so the terminal snapshot holds
+                # exactly the writes accepted before the trace is finalized.
+                final = self._build_snapshot(end_perf=time.perf_counter())
+                self.trace = self._redact_registered_values(self.trace)
+                self._final_result = final
+                self._sensitive_values.clear()
+                self._finalized = True
+        # The terminal snapshot never changes, so the caller's copy is made unlocked.
+        return copy.deepcopy(final)

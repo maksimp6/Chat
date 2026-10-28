@@ -140,6 +140,11 @@ class CloudRuSecretManagementClient:
         del secret_id
         self._value_cache.clear()
 
+    def _sweep_cache(self, now_monotonic: float | None = None) -> None:
+        """Compatibility hook: plaintext caching is disabled, so only clear stale state."""
+        del now_monotonic
+        self._value_cache.clear()
+
     def get_secret_value(self, secret_id: str, version_id: str) -> str:
         """Return the plaintext payload for one pinned, immutable secret version."""
         secret_id = (secret_id or "").strip()

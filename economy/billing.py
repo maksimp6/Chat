@@ -4,9 +4,12 @@ Pricing is intentionally read from the existing model configuration. Unknown
 models never become a confirmed zero-cost invocation.
 """
 
+import logging
 from typing import Any, Optional
 from economy.host import bound, canonical_model_key
 
+
+logger = logging.getLogger("logos.economy.billing")
 
 PRICING_CURRENCY = "RUB"
 PRICING_VERSION = "config-v1"
@@ -107,10 +110,57 @@ def build_ai_billing_item(
     return item
 
 
+_COUNT_FIELDS = ("input_tokens", "output_tokens", "cached_input_tokens", "total_tokens")
+# Summed only for items whose cost is calculated.
+_COST_FIELDS = (
+    "total_cost",
+    "input_cost",
+    "output_cost",
+    "cached_input_cost",
+    "cache_savings",
+)
+# Summed only for compute items.
+_COMPUTE_FIELDS = ("cpu_seconds", "energy_wh")
+
+
+def _readable_billing_item(item: Any) -> bool:
+    """Whether every field the aggregate sums from this item reads as a number."""
+    if not isinstance(item, dict):
+        return False
+    try:
+        for name in _COUNT_FIELDS:
+            int(item.get(name) or 0)
+        if item.get("cost_status") == "calculated":
+            for name in _COST_FIELDS:
+                float(item.get(name) or 0)
+        if item.get("type") == "compute":
+            for name in _COMPUTE_FIELDS:
+                float(item.get(name) or 0)
+    except (TypeError, ValueError, OverflowError):
+        return False
+    return True
+
+
 def aggregate_billing(
     items, context: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
-    known = [item for item in items if item.get("cost_status") == "calculated"]
+    # One malformed item must not discard the whole aggregate. It is left out of every
+    # sum, logged, and counted as an unknown cost, so the total is never settled as
+    # complete without it.
+    readable = []
+    unreadable = 0
+    for item in items:
+        if _readable_billing_item(item):
+            readable.append(item)
+        else:
+            unreadable += 1
+            logger.warning(
+                "[BILLING] Billing item has unreadable amounts; "
+                "left out of the totals: type=%r step=%r",
+                item.get("type") if isinstance(item, dict) else type(item).__name__,
+                item.get("step") if isinstance(item, dict) else None,
+            )
+    known = [item for item in readable if item.get("cost_status") == "calculated"]
     total = round(sum(float(item.get("total_cost") or 0) for item in known), 6)
     input_cost = round(sum(float(item.get("input_cost") or 0) for item in known), 6)
     output_cost = round(sum(float(item.get("output_cost") or 0) for item in known), 6)
@@ -120,8 +170,10 @@ def aggregate_billing(
     cache_savings = round(
         sum(float(item.get("cache_savings") or 0) for item in known), 6
     )
-    unknown = sum(1 for item in items if item.get("cost_status") == "unknown")
-    compute = [item for item in items if item.get("type") == "compute"]
+    unknown = (
+        sum(1 for item in readable if item.get("cost_status") == "unknown") + unreadable
+    )
+    compute = [item for item in readable if item.get("type") == "compute"]
     compute_cost = round(
         sum(
             float(item.get("total_cost") or 0)
@@ -134,12 +186,12 @@ def aggregate_billing(
         "currency": PRICING_CURRENCY,
         "provider": PROVIDER,
         "pricing_version": PRICING_VERSION,
-        "input_tokens": sum(int(item.get("input_tokens") or 0) for item in items),
-        "output_tokens": sum(int(item.get("output_tokens") or 0) for item in items),
+        "input_tokens": sum(int(item.get("input_tokens") or 0) for item in readable),
+        "output_tokens": sum(int(item.get("output_tokens") or 0) for item in readable),
         "cached_input_tokens": sum(
-            int(item.get("cached_input_tokens") or 0) for item in items
+            int(item.get("cached_input_tokens") or 0) for item in readable
         ),
-        "total_tokens": sum(int(item.get("total_tokens") or 0) for item in items),
+        "total_tokens": sum(int(item.get("total_tokens") or 0) for item in readable),
         "input_cost": input_cost,
         "output_cost": output_cost,
         "cached_input_cost": cached_cost,

@@ -27,6 +27,8 @@ def _decimal(value: Any) -> Decimal:
     amount = Decimal(str(value))
     if not amount.is_finite() or amount < 0:
         raise ValueError("amount must be finite and non-negative")
+    # Drop a float's binary noise first, as BudgetController does: 0.1 + 0.2 stays 0.30.
+    amount = amount.quantize(Decimal("0.000000001"))
     # Round up, matching BudgetController: sub-cent spend is never dropped.
     return amount.quantize(Decimal("0.01"), rounding=ROUND_CEILING)
 

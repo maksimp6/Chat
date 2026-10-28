@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from copy import deepcopy
 from typing import Any
 
@@ -10,6 +11,7 @@ from agent_memory.extractor import list_global_memory_facts
 from agent_memory.host import memory_file_path
 
 _MEMORY_CONFIG_KEY = "global_memory_config"
+logger = logging.getLogger("logos.agent_memory.manager")
 DEFAULT_CONFIG = {
     "enabled": True,
     "max_context_facts": 15,
@@ -80,13 +82,15 @@ def get_controlled_memory_summary() -> str:
     limit = cfg.get("max_context_facts", 15)
     if type(limit) is not int or limit < 0:
         raise ValueError("max_context_facts must be a nonnegative integer")
+    # An absent key keeps every category; an empty list allows none.
+    restricted = "categories_allowed" in cfg
     allowed = cfg.get("categories_allowed", [])
     if not isinstance(allowed, list):
         raise ValueError("categories_allowed must be a list")
     facts = [
         item
         for item in list_global_memory_facts()
-        if not allowed or item["category"] in allowed
+        if not restricted or item["category"] in allowed
     ][:limit]
     if not facts:
         return ""
@@ -100,7 +104,8 @@ def clear_global_memory(category: str | None = None) -> None:
     store = get_memory_client(memory_file_path())
     with store.transaction() as tx:
         for key, record in store.items(prefix="global_fact:").items():
-            if not isinstance(record, dict):
-                raise ValueError("invalid native memory fact")
+            if not isinstance(record, dict) and category is not None:
+                logger.warning("skipping invalid native memory fact: %s", key)
+                continue
             if category is None or record.get("category") == category:
                 tx.delete(key)

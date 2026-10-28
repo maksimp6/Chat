@@ -101,41 +101,21 @@ def redact_text(value: str) -> str:
     return _sanitize_string(value)
 
 
+def _distinct_key_text(key: Any, key_text: str, taken: dict[str, Any]) -> str:
+    """Key text that keeps keys such as 1 and "1" apart instead of merging them."""
+    if key_text not in taken:
+        return key_text
+    distinct = f"{key_text} ({type(key).__name__})"
+    candidate, suffix = distinct, 2
+    while candidate in taken:
+        candidate = f"{distinct} #{suffix}"
+        suffix += 1
+    return candidate
+
+
 def safe_repr(value: Any, depth: int = 0) -> Any:
-    if depth > MAX_DEPTH:
-        return "<max-depth>"
-    if value is None or isinstance(value, (bool, int, float, str)):
-        if isinstance(value, str):
-            value = _sanitize_string(value)
-            if len(value) > MAX_REPR:
-                return value[:MAX_REPR] + "... <truncated>"
-        return value
-    if isinstance(value, dict):
-        result = {}
-        for index, (key, item) in enumerate(value.items()):
-            if index >= MAX_ITEMS:
-                result["<truncated>"] = f"{len(value) - MAX_ITEMS} more items"
-                break
-            key_text = str(key)
-            if _is_sensitive_key(key_text):
-                result[key_text] = "<redacted>"
-            else:
-                result[key_text] = safe_repr(item, depth + 1)
-        return result
-    if isinstance(value, (list, tuple, set)):
-        values = list(value)
-        result = [safe_repr(item, depth + 1) for item in values[:MAX_ITEMS]]
-        if len(values) > MAX_ITEMS:
-            result.append(f"<truncated: {len(values) - MAX_ITEMS} more items>")
-        return result
-    try:
-        text = repr(value)
-    except Exception:
-        text = f"<{type(value).__name__}: repr failed>"
-    text = _sanitize_string(text)
-    if len(text) > MAX_REPR:
-        text = text[:MAX_REPR] + "... <truncated>"
-    return text
+    """The same sanitization as sanitize_trace_value, kept under its own name."""
+    return sanitize_trace_value(value, depth)
 
 
 def sanitize_trace_value(value: Any, depth: int = 0) -> Any:
@@ -151,7 +131,7 @@ def sanitize_trace_value(value: Any, depth: int = 0) -> Any:
         result = {}
         for key, item in list(value.items())[:MAX_ITEMS]:
             key_text = str(key)
-            result[key_text] = (
+            result[_distinct_key_text(key, key_text, result)] = (
                 "<redacted>"
                 if _is_sensitive_key(key_text)
                 else sanitize_trace_value(item, depth + 1)
@@ -165,4 +145,11 @@ def sanitize_trace_value(value: Any, depth: int = 0) -> Any:
         if len(items) > MAX_ITEMS:
             result.append(f"<truncated: {len(items) - MAX_ITEMS} more items>")
         return result
-    return safe_repr(value, depth)
+    try:
+        text = repr(value)
+    except Exception:
+        text = f"<{type(value).__name__}: repr failed>"
+    text = _sanitize_string(text)
+    if len(text) > MAX_REPR:
+        text = text[:MAX_REPR] + "... <truncated>"
+    return text

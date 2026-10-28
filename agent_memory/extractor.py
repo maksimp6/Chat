@@ -5,6 +5,7 @@ import os
 
 import hashlib
 import json
+import logging
 import time
 from typing import Any
 
@@ -15,6 +16,7 @@ from agent_memory.host import memory_file_path
 
 API_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 _FACT_PREFIX = "global_fact:"
+logger = logging.getLogger("logos.agent_memory.extractor")
 
 MEMORY_SCHEMA = {
     "type": "object",
@@ -41,6 +43,11 @@ MEMORY_SCHEMA = {
 }
 
 
+def init_global_memory() -> None:
+    """Open the native journal. There is no SQL schema to initialize."""
+    get_memory_client(memory_file_path())
+
+
 def list_global_memory_facts() -> list[dict[str, Any]]:
     """Return detached facts, most recent first, with stable tie ordering."""
     raw = get_memory_client(memory_file_path()).items(prefix=_FACT_PREFIX)
@@ -52,7 +59,8 @@ def list_global_memory_facts() -> list[dict[str, Any]]:
             or not isinstance(value.get("fact"), str)
             or type(value.get("updated_at")) is not int
         ):
-            raise ValueError(f"invalid native memory fact: {name}")
+            logger.warning("skipping invalid native memory fact: %s", name)
+            continue
         facts.append({"id": name[len(_FACT_PREFIX) :], **value})
     return sorted(facts, key=lambda row: (-row["updated_at"], row["id"]))
 
@@ -60,7 +68,7 @@ def list_global_memory_facts() -> list[dict[str, Any]]:
 def save_global_memory_facts(
     facts: list[dict[str, Any]], *, now: int | None = None
 ) -> int:
-    """Atomically insert unique facts without rewriting unaffected records."""
+    """Atomically insert facts; a repeated fact refreshes its category and time."""
     if not isinstance(facts, list):
         raise ValueError("facts must be a list")
     timestamp = int(time.time()) if now is None else int(now)
@@ -77,13 +85,19 @@ def save_global_memory_facts(
             if not fact or len(fact) > 8192:
                 continue
             category = entry.get("category", "general")
-            if not isinstance(category, str) or not category.strip():
-                category = "general"
             key = _FACT_PREFIX + hashlib.sha256(fact.encode("utf-8")).hexdigest()
-            if tx.get(key) is not None:
-                continue
+            existing = tx.get(key)
+            if not isinstance(category, str) or not category.strip():
+                # A missing category never overwrites the one already stored.
+                stored = (
+                    existing.get("category") if isinstance(existing, dict) else None
+                )
+                category = (
+                    stored if isinstance(stored, str) and stored.strip() else "general"
+                )
+            if existing is None:
+                saved += 1
             tx.set(key, {"category": category, "fact": fact, "updated_at": timestamp})
-            saved += 1
     return saved
 
 
@@ -91,25 +105,25 @@ def extract_and_save_facts(dialog_messages: list) -> int:
     """Use the provider to extract stable facts, then commit only validated data."""
     if not dialog_messages:
         return 0
-    formatted_chat = "\n".join(
-        f"{msg['role']}: {msg['text']}" for msg in dialog_messages[-12:]
-    )
-    payload = {
-        "modelUri": f"gpt://{os.environ['YANDEX_PROJECT_ID']}/yandexgpt/latest",
-        "completionOptions": {
-            "temperature": 0.1,
-            "maxTokens": "1000",
-            "responseFormat": {"type": "JSON_OBJECT", "jsonSchema": MEMORY_SCHEMA},
-        },
-        "messages": [
-            {
-                "role": "system",
-                "text": "Извлеки устойчивые факты о проектах, путях и конфигурации.",
-            },
-            {"role": "user", "text": f"Факты из диалога:\n\n{formatted_chat}"},
-        ],
-    }
     try:
+        formatted_chat = "\n".join(
+            f"{msg['role']}: {msg['text']}" for msg in dialog_messages[-12:]
+        )
+        payload = {
+            "modelUri": f"gpt://{os.environ['YANDEX_PROJECT_ID']}/yandexgpt/latest",
+            "completionOptions": {
+                "temperature": 0.1,
+                "maxTokens": "1000",
+                "responseFormat": {"type": "JSON_OBJECT", "jsonSchema": MEMORY_SCHEMA},
+            },
+            "messages": [
+                {
+                    "role": "system",
+                    "text": "Извлеки устойчивые факты о проектах, путях и конфигурации.",
+                },
+                {"role": "user", "text": f"Факты из диалога:\n\n{formatted_chat}"},
+            ],
+        }
         response = requests.post(
             API_URL,
             headers={
@@ -120,17 +134,23 @@ def extract_and_save_facts(dialog_messages: list) -> int:
             timeout=30,
         )
         if response.status_code != 200:
+            logger.warning(
+                "memory fact extraction: provider HTTP %s", response.status_code
+            )
             return 0
         parsed = json.loads(
             response.json()["result"]["alternatives"][0]["message"]["text"]
         )
         if not isinstance(parsed, dict):
+            logger.warning("memory fact extraction: response is not a JSON object")
             return 0
         facts = parsed.get("facts", [])
         if not isinstance(facts, list):
+            logger.warning("memory fact extraction: facts is not a list")
             return 0
         return save_global_memory_facts(facts, now=int(time.time()))
-    except (KeyError, ValueError, TypeError, requests.RequestException):
+    except (KeyError, ValueError, TypeError, requests.RequestException) as exc:
+        logger.warning("memory fact extraction failed: %s", type(exc).__name__)
         return 0
 
 

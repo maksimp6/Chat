@@ -6,6 +6,7 @@ No SQL, background flush, or unsafe pickle deserialization.
 
 from __future__ import annotations
 
+from bisect import bisect_left, insort
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
@@ -64,6 +65,49 @@ def _validate_value_shape(value: Any) -> None:
 
 def _validate_value(value: Any) -> None:
     validate_json_values(_walk_value(value), KristallError)
+
+
+def _copy_value(value: Any) -> Any:
+    """Detach a shape-checked value in one pass, without a deepcopy memo.
+
+    JSON scalar subclasses (str/int enums, float subclasses) become the exact
+    base type, which is what the journal encodes and replay returns, so RAM and
+    replayed values stay identical. Other objects keep deepcopy semantics.
+    """
+    kind = type(value)
+    if kind is dict:
+        return {_copy_value(key): _copy_value(item) for key, item in value.items()}
+    if kind is list:
+        return [_copy_value(item) for item in value]
+    if value is None or kind is str or kind is int or kind is float or kind is bool:
+        return value
+    if isinstance(value, str):
+        return str.__str__(value)
+    if isinstance(value, int):
+        return int.__int__(value)
+    if isinstance(value, float):
+        return float.__float__(value)
+    return deepcopy(value)
+
+
+def _canonical_json(value: Any) -> bytes:
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+
+
+def _encode_journal_frame(payload: dict[str, Any], previous: str) -> tuple[bytes, str]:
+    """Encode a payload once and chain its frame to the previous digest."""
+    encoded = _canonical_json(payload)
+    digest = hashlib.sha256(bytes.fromhex(previous) + encoded).hexdigest()
+    # Byte-identical to dumping {"digest": ..., "payload": ...} with sorted
+    # keys, without serializing the whole payload a second time.
+    frame = b'{"digest":"' + digest.encode("ascii") + b'","payload":' + encoded
+    return frame + b"}\n", digest
 
 
 def _validate_journal_changes(changes: list[Any]) -> list[tuple[str, str, str, Any]]:
@@ -145,6 +189,10 @@ class _JournalStore:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = RLock()
+        # Writers (commits, transactions, compaction) serialize on _lock and hold
+        # _view_lock only to publish RAM changes. Readers take only _view_lock,
+        # so they never wait for a transaction body or a journal fsync.
+        self._view_lock = RLock()
         # Keep the lock in a separate stable file: replacing journal files must not
         # silently release ownership of the single-writer role.
         self._lock_file = self.path.with_name(self.path.name + ".lock").open("a+b")
@@ -154,6 +202,8 @@ class _JournalStore:
             self._lock_file.close()
             raise KristallError("database already has a writer") from exc
         self._state: dict[str, dict[str, Any]] = {}
+        # Sorted names per namespace: prefix reads cost the matching range only.
+        self._keys: dict[str, list[str]] = {}
         self._sequence: int = 0
         self._digest: str = "0" * 64
         self._failed: bool = False
@@ -174,13 +224,13 @@ class _JournalStore:
 
     def info(self) -> DatabaseInfo:
         """Return confirmed in-memory sequence without reading the journal."""
-        with self._lock:
+        with self._view_lock:
             self._ensure_open()
             return DatabaseInfo(last_commit=self._sequence if self._ram_valid else None)
 
     @property
     def last_commit(self) -> Commit:
-        with self._lock:
+        with self._view_lock:
             self._ensure_open()
             if not self._ram_valid:
                 raise KristallError(
@@ -273,16 +323,25 @@ class _JournalStore:
 
     def _replay(self) -> None:
         self._state, self._sequence, self._digest = self._inspect_log(self.path)
+        self._index_keys()
+
+    def _index_keys(self) -> None:
+        """Rebuild the sorted name index after the whole RAM state was replaced."""
+        self._keys = {
+            namespace: sorted(values) for namespace, values in self._state.items()
+        }
 
     def get(self, namespace: str, key: str) -> Any | None:
         """Return a deep copy of the last confirmed value from RAM."""
-        with self._lock:
+        with self._view_lock:
             self._ensure_open()
             if not self._ram_valid:
                 raise KristallError(
                     "recovery required; RAM publication was interrupted"
                 )
-            return deepcopy(self._state.get(namespace, {}).get(key))
+            value = self._state.get(namespace, {}).get(key)
+        # Committed values are replaced, never mutated in place: copy unlocked.
+        return _copy_value(value)
 
     def _encode_frame(self, changes: list[dict[str, Any]]) -> tuple[bytes, str]:
         for change in changes:
@@ -294,24 +353,7 @@ class _JournalStore:
                 _validate_value(change["value"])
         payload = {"format": 1, "seq": self._sequence + 1, "changes": changes}
         try:
-            encoded = json.dumps(
-                payload,
-                sort_keys=True,
-                separators=(",", ":"),
-                ensure_ascii=False,
-                allow_nan=False,
-            ).encode("utf-8")
-            digest = hashlib.sha256(bytes.fromhex(self._digest) + encoded).hexdigest()
-            frame = (
-                json.dumps(
-                    {"payload": payload, "digest": digest},
-                    sort_keys=True,
-                    separators=(",", ":"),
-                    ensure_ascii=False,
-                    allow_nan=False,
-                ).encode("utf-8")
-                + b"\n"
-            )
+            frame, digest = _encode_journal_frame(payload, self._digest)
             if len(frame) > MAX_JOURNAL_FRAME_BYTES:
                 raise KristallLimitError("journal frame exceeds size limit")
             return frame, digest
@@ -338,9 +380,16 @@ class _JournalStore:
         for change in changes:
             namespace, key = change["namespace"], change["key"]
             if change["op"] == "set":
-                self._state.setdefault(namespace, {})[key] = change["value"]
+                values = self._state.setdefault(namespace, {})
+                if key not in values:
+                    insort(self._keys.setdefault(namespace, []), key)
+                values[key] = change["value"]
             else:
-                self._state.get(namespace, {}).pop(key, None)
+                values = self._state.get(namespace, {})
+                if key in values:
+                    names = self._keys[namespace]
+                    del names[bisect_left(names, key)]
+                values.pop(key, None)
 
     def _commit_changes(self, changes: list[dict[str, Any]]) -> None:
         """Publish a transaction only after its delta journal is durable."""
@@ -353,11 +402,12 @@ class _JournalStore:
         try:
             self._append_frame(frame)
             # Publish only confirmed changes to the RAM view seen by readers.
-            self._ram_valid = False
-            self._apply_changes(changes)
-            self._sequence += 1
-            self._digest = digest
-            self._ram_valid = True
+            with self._view_lock:
+                self._ram_valid = False
+                self._apply_changes(changes)
+                self._sequence += 1
+                self._digest = digest
+                self._ram_valid = True
         except BaseException:
             # A complete frame may exist even when append or RAM publication
             # was interrupted. Retrying from stale metadata would break replay.
@@ -377,7 +427,7 @@ class _JournalStore:
                         "op": "set",
                         "namespace": namespace,
                         "key": key,
-                        "value": deepcopy(value),
+                        "value": _copy_value(value),
                     }
                 ]
             )
@@ -469,8 +519,87 @@ class _JournalStore:
             self._failed = True
             raise KristallError("checkpoint source changed; recovery required")
 
+    def _checkpoint_frames(self) -> tuple[bytes, str]:
+        """Encode RAM state as a baseline frame plus ordinary set frames.
+
+        A state that fits one frame yields the single baseline frame. A larger
+        state continues in chained set frames, each within the frame limit, so
+        replay reads the compacted journal and it ends at the same sequence.
+        """
+        limit = MAX_JOURNAL_FRAME_BYTES
+        zero = "0" * 64
+        baseline: dict[str, dict[str, Any]] = {name: {} for name in self._state}
+        # Sizes are measured at the current sequence: no frame number is longer.
+        size = len(
+            _encode_journal_frame(
+                {
+                    "format": 1,
+                    "seq": self._sequence,
+                    "changes": [],
+                    "checkpoint": True,
+                    "state": baseline,
+                },
+                zero,
+            )[0]
+        )
+        empty_frame = len(
+            _encode_journal_frame(
+                {"format": 1, "seq": self._sequence, "changes": []}, zero
+            )[0]
+        )
+        groups: list[list[dict[str, Any]]] = []
+        for namespace in sorted(self._state):
+            values = self._state[namespace]
+            for key in sorted(values):
+                value = values[key]
+                if not groups:
+                    cost = len(_canonical_json(key)) + 1 + len(_canonical_json(value))
+                    cost += 1 if baseline[namespace] else 0
+                    if size + cost <= limit:
+                        baseline[namespace][key] = value
+                        size += cost
+                        continue
+                    groups.append([])
+                    size = empty_frame
+                change = {
+                    "op": "set",
+                    "namespace": namespace,
+                    "key": key,
+                    "value": value,
+                }
+                cost = len(_canonical_json(change))
+                if groups[-1] and size + 1 + cost > limit:
+                    groups.append([])
+                    size = empty_frame
+                size += cost + (1 if groups[-1] else 0)
+                groups[-1].append(change)
+        # The baseline keeps a positive sequence; set frames number up to now.
+        if len(groups) >= self._sequence:
+            raise KristallError("checkpoint exceeds frame size limit")
+        sequence = self._sequence - len(groups)
+        frame, digest = _encode_journal_frame(
+            {
+                "format": 1,
+                "seq": sequence,
+                "changes": [],
+                "checkpoint": True,
+                "state": baseline,
+            },
+            zero,
+        )
+        frames = [frame]
+        for group in groups:
+            sequence += 1
+            frame, digest = _encode_journal_frame(
+                {"format": 1, "seq": sequence, "changes": group}, digest
+            )
+            frames.append(frame)
+        if any(len(frame) > limit for frame in frames):
+            raise KristallError("checkpoint exceeds frame size limit")
+        return b"".join(frames), digest
+
     def checkpoint(self) -> int:
-        """Atomically replace a long journal with one verified RAM-state frame."""
+        """Atomically replace a long journal with verified RAM-state frames."""
         import tempfile
 
         with self._lock:
@@ -479,33 +608,7 @@ class _JournalStore:
                 raise KristallError("checkpoint requires a healthy idle store")
             if self._sequence == 0:
                 return 0
-            payload = {
-                "format": 1,
-                "seq": self._sequence,
-                "changes": [],
-                "checkpoint": True,
-                "state": deepcopy(self._state),
-            }
-            encoded = json.dumps(
-                payload,
-                sort_keys=True,
-                separators=(",", ":"),
-                ensure_ascii=False,
-                allow_nan=False,
-            ).encode("utf-8")
-            digest = hashlib.sha256(bytes(32) + encoded).hexdigest()
-            frame = (
-                json.dumps(
-                    {"payload": payload, "digest": digest},
-                    sort_keys=True,
-                    separators=(",", ":"),
-                    ensure_ascii=False,
-                    allow_nan=False,
-                ).encode("utf-8")
-                + b"\n"
-            )
-            if len(frame) > MAX_JOURNAL_FRAME_BYTES:
-                raise KristallError("checkpoint exceeds frame size limit")
+            frame, digest = self._checkpoint_frames()
             temporary: Path | None = None
             replaced = False
             publication_started = False
@@ -534,7 +637,8 @@ class _JournalStore:
                 os.replace(temporary, self.path)
                 replaced = True
                 _fsync_directory(self.path.parent)
-                self._digest = digest
+                with self._view_lock:
+                    self._digest = digest
                 return self._sequence
             except OSError as exc:
                 # A replace or directory fsync failure leaves publication uncertain.
@@ -580,18 +684,20 @@ class _JournalStore:
             origin = Path(source)
             if origin.resolve() == self.path.resolve():
                 raise KristallError("cannot restore from the live database path")
-            state, sequence, digest = self._inspect_log(origin)
             if not origin.exists():
                 raise KristallError("backup source does not exist")
+            state, sequence, digest = self._inspect_log(origin)
             try:
                 self._copy_verified_file(
                     origin, self.path, state, Commit(sequence, digest)
                 )
-                self._ram_valid = False
-                self._state = state
-                self._sequence = sequence
-                self._digest = digest
-                self._ram_valid = True
+                with self._view_lock:
+                    self._ram_valid = False
+                    self._state = state
+                    self._sequence = sequence
+                    self._digest = digest
+                    self._index_keys()
+                    self._ram_valid = True
             except OSError as exc:
                 self._failed = True
                 raise KristallError("restore failed; recovery required") from exc
@@ -600,6 +706,37 @@ class _JournalStore:
                 # Empty/partial RAM metadata cannot be used to append to that log.
                 self._failed = True
                 raise
+
+    def recover(self) -> Commit:
+        """Accept writes again after a failure by republishing the disk journal.
+
+        The journal is verified and replayed as a process restart would do, and
+        the file and directory fsync barriers run again before writes resume. A
+        corrupt or incomplete journal raises and keeps writes blocked.
+        """
+        with self._lock:
+            self._ensure_open()
+            if self._active_transaction:
+                raise KristallError("recovery requires an idle store")
+            state, sequence, digest = self._inspect_log(self.path)
+            # Fence writers until RAM matches the verified journal again.
+            self._failed = True
+            try:
+                if self.path.exists():
+                    with self.path.open("rb") as stream:
+                        os.fsync(stream.fileno())
+                _fsync_directory(self.path.parent)
+            except OSError as exc:
+                raise KristallError("recovery failed; recovery required") from exc
+            with self._view_lock:
+                self._ram_valid = False
+                self._state = state
+                self._sequence = sequence
+                self._digest = digest
+                self._index_keys()
+                self._ram_valid = True
+            self._failed = False
+            return Commit(sequence, digest)
 
     def close(self) -> None:
         """Release the exclusive writer lock when no transaction is active."""
@@ -671,11 +808,14 @@ class Kristall:
     def get(self, name: str) -> Any | None:
         """Read staged data first; otherwise return a copy of committed data."""
         _validate_name(name)
-        with self._engine._lock:
+        with self._engine._view_lock:
             self._engine._ensure_open()
-            if name in self._pending:
-                return deepcopy(self._pending[name])
+            staged = name in self._pending
+            value = self._pending.get(name)
+        if not staged:
             return self._engine.get(self._NAMESPACE, name)
+        # Staged values are replaced, never mutated in place: copy unlocked.
+        return _copy_value(value)
 
     def set(self, name: str, value: Any) -> None:
         """Stage a copy without acknowledging a durable write."""
@@ -687,7 +827,9 @@ class Kristall:
                 raise KristallError("direct mutation during transaction is forbidden")
             _validate_name(name)
             _validate_value_shape(value)
-            self._pending[name] = deepcopy(value)
+            staged = _copy_value(value)
+            with self._engine._view_lock:
+                self._pending[name] = staged
 
     def commit(self) -> int:
         """Atomically persist staged names and return the confirmed sequence."""
@@ -702,7 +844,8 @@ class Kristall:
                 for name, value in sorted(self._pending.items())
             ]
             self._engine._commit_changes(changes)
-            self._pending.clear()
+            with self._engine._view_lock:
+                self._pending.clear()
             return self._engine.last_commit.sequence
 
     @contextmanager
@@ -715,11 +858,10 @@ class Kristall:
                 wrapper = Transaction(self._engine._state.get(self._NAMESPACE, {}))
                 try:
                     yield wrapper
+                    # Wrapper values are already private shape-checked copies:
+                    # stage them without a second walk and copy.
                     for change in wrapper._pending_changes():
-                        if change["op"] == "delete":
-                            tx.delete(change["namespace"], change["key"])
-                        else:
-                            tx.set(change["namespace"], change["key"], change["value"])
+                        tx._stage_copied(change)
                 finally:
                     wrapper._closed = True
 
@@ -741,11 +883,23 @@ class Kristall:
                 raise KristallError("restore requires no staged values")
             self._engine.restore(source)
 
+    def recover(self) -> Commit:
+        """Accept writes again after a failure once the disk journal verifies.
+
+        As after a restart, values staged before the failure are discarded.
+        """
+        with self._engine._lock:
+            commit = self._engine.recover()
+            with self._engine._view_lock:
+                self._pending.clear()
+            return commit
+
     def close(self) -> None:
         """Discard staging and release the single-writer lock."""
         with self._engine._lock:
             self._engine.close()
-            self._pending.clear()
+            with self._engine._view_lock:
+                self._pending.clear()
 
     def __enter__(self) -> "Kristall":
         return self
@@ -769,19 +923,24 @@ class Kristall:
         """Read a detached snapshot of committed and staged named values."""
         if not isinstance(prefix, str):
             raise KristallError("prefix must be a string")
-        with self._engine._lock:
+        with self._engine._view_lock:
             self._engine._ensure_open()
             # Reading last_commit raises KristallError while recovery is required.
             _ = self._engine.last_commit
             values = self._engine._state.get(self._NAMESPACE, {})
-            names = set(values) | set(self._pending)
-            return {
-                name: deepcopy(
-                    self._pending[name] if name in self._pending else values[name]
-                )
-                for name in sorted(names)
-                if name.startswith(prefix)
-            }
+            # The sorted name index limits the scan to the matching range.
+            names = self._engine._keys.get(self._NAMESPACE, [])
+            selected: dict[str, Any] = {}
+            for index in range(bisect_left(names, prefix), len(names)):
+                name = names[index]
+                if not name.startswith(prefix):
+                    break
+                selected[name] = values[name]
+            for name, value in self._pending.items():
+                if name.startswith(prefix):
+                    selected[name] = value
+        # Values are replaced, never mutated in place: copy without the lock.
+        return {name: _copy_value(selected[name]) for name in sorted(selected)}
 
 
 class Transaction:
@@ -805,7 +964,7 @@ class Transaction:
         _validate_name(name)
         if name in self._deleted:
             return None
-        return deepcopy(
+        return _copy_value(
             self._pending[name] if name in self._pending else self._committed.get(name)
         )
 
@@ -814,7 +973,7 @@ class Transaction:
         _validate_name(name)
         _validate_value_shape(value)
         self._deleted.discard(name)
-        self._pending[name] = deepcopy(value)
+        self._pending[name] = _copy_value(value)
 
     def _pending_changes(self) -> list[dict[str, Any]]:
         self._ensure_open()
@@ -857,8 +1016,8 @@ class _JournalTransaction:
         self._ensure_open()
         pending = self._changes.get((namespace, key))
         if pending is not None:
-            return deepcopy(pending["value"]) if pending["op"] == "set" else None
-        return deepcopy(self._committed.get(namespace, {}).get(key))
+            return _copy_value(pending["value"]) if pending["op"] == "set" else None
+        return _copy_value(self._committed.get(namespace, {}).get(key))
 
     def set(self, namespace: str, key: str, value: Any) -> None:
         """Stage a copy of the value without publishing it."""
@@ -868,8 +1027,13 @@ class _JournalTransaction:
             "op": "set",
             "namespace": namespace,
             "key": key,
-            "value": deepcopy(value),
+            "value": _copy_value(value),
         }
+
+    def _stage_copied(self, change: dict[str, Any]) -> None:
+        """Stage a change whose value is already a private shape-checked copy."""
+        self._ensure_open()
+        self._changes[(change["namespace"], change["key"])] = change
 
     def delete(self, namespace: str, key: str) -> None:
         """Stage a key deletion without changing committed RAM state."""

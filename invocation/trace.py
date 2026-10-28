@@ -17,3 +17,8 @@ def create_invocation_trace(context: InvocationContext) -> Any:
         runtime_id=context.runtime_id,
     )
     return trace
+
+
+def get_context_metadata(context: InvocationContext) -> dict:
+    """Return safe request-scoped metadata for provider calls."""
+    return context.as_dict()

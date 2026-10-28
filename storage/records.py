@@ -277,12 +277,18 @@ def is_provider_pending(conv_id: str) -> bool:
     return bool(record.get("provider_pending"))
 
 
+def init_config_table() -> None:
+    init_db()
+
+
 def get_config(key: str, default: Any = None) -> Any:
     record = get_store().get("config/" + key)
     if record is None:
         return default
     value = record["value"]
-    if isinstance(value, str):
+    # set_config marks its records "native": their value comes back exactly as it was set.
+    # An unmarked record, written before that mark, keeps the former reading of JSON text.
+    if isinstance(value, str) and not record.get("native"):
         try:
             return json.loads(value)
         except ValueError:
@@ -292,7 +298,7 @@ def get_config(key: str, default: Any = None) -> Any:
 
 def set_config(key: str, value: Any) -> None:
     with get_store().transaction() as tx:
-        tx.set("config/" + key, {"value": value})
+        tx.set("config/" + key, {"value": value, "native": True})
 
 
 __all__ = [
@@ -308,6 +314,7 @@ __all__ = [
     "get_messages",
     "get_store",
     "get_yandex_conversation",
+    "init_config_table",
     "init_db",
     "is_provider_pending",
     "maybe_update_conversation_title",

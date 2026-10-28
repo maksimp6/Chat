@@ -10,8 +10,10 @@ import time
 from sessions.host import get_memory_client, memory_file_path
 
 _SESSION_PREFIX = "runtime_session:"
+# "token" matches credential names such as access_token, but not usage counters such as
+# input_tokens or max_tokens, which are kept in the metadata.
 _SENSITIVE_KEY_RE = re.compile(
-    r"(?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)",
+    r"(?:api[_-]?key|authorization|password|passwd|secret|token(?!s(?![A-Za-z]))|credential|cookie|private[_-]?key)",
     re.IGNORECASE,
 )
 
@@ -109,5 +111,8 @@ def update_session(
             record["status"] = status
             if status in {"completed", "failed", "cancelled"}:
                 record["completed_at"] = int(time.time())
+            else:
+                # A session made active again is no longer completed.
+                record["completed_at"] = None
         tx.set(key, record)
         return record

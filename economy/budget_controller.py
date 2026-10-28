@@ -327,6 +327,7 @@ class BudgetController:
             amount = _money(amount)
             if amount > account.reserved:
                 raise InvalidOperation("cannot settle more than reserved")
+            self._check_settle_limits(account, amount)
             self._persist("SETTLE", account_type, amount)
             before = account.available
             account.reserved -= amount
@@ -552,6 +553,18 @@ class BudgetController:
             # Pending exposure only: deny without cooldown, release restores headroom.
             raise BudgetLimitExceeded("daily-loss limit exceeded")
 
+    def _check_settle_limits(self, account: BudgetAccount, amount: Decimal) -> None:
+        # The same SETTLE limits as BudgetRepository, so memory never admits what the
+        # stored ledger denies. The amount is already in ``reserved``: count it once.
+        if restrictions_lifted():
+            return
+        if amount > account.limits.max_single_operation:
+            raise BudgetLimitExceeded("single-operation limit exceeded")
+        if account.spent + amount > account.limits.max_total_loss:
+            raise BudgetLimitExceeded("total-loss limit exceeded")
+        if account.loss_today + amount > account.limits.max_daily_loss:
+            raise BudgetLimitExceeded("daily-loss limit exceeded")
+
     def _roll_loss_period(self, account: BudgetAccount) -> None:
         today = self._now().date().isoformat()
         if account.loss_period != today:
@@ -661,6 +674,9 @@ class CloudBudgetLimits:
             warn_ratio = Decimal(raw_ratio)
         except DecimalInvalidOperation as exc:
             raise ValueError("CLOUDRU_BUDGET_WARN_RATIO must be a number") from exc
+        # NaN parses, but ordering it raises decimal.InvalidOperation in __post_init__.
+        if warn_ratio.is_nan():
+            raise ValueError("CLOUDRU_BUDGET_WARN_RATIO must be a number")
         return cls(_money(raw_limit) if raw_limit else None, warn_ratio, currency)
 
 

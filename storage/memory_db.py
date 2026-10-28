@@ -199,29 +199,45 @@ class _Transaction:
     def __init__(self, db: MemoryDatabase) -> None:
         self.db = db
         self._active = False
+        self._snapshot: dict[str, Table] | None = None
 
     def __enter__(self) -> MemoryDatabase:
-        with self.db._lock:
+        # The lock stays held until commit or rollback: another thread's write waits for the
+        # transaction instead of landing in a state that a rollback would discard.
+        self.db._lock.acquire()
+        try:
             if self._active:
                 raise TransactionError("transaction already active")
-            self.db._snapshots.append(deepcopy(self.db._tables))
+            self._snapshot = deepcopy(self.db._tables)
+            self.db._snapshots.append(self._snapshot)
             self._active = True
+        except BaseException:
+            self.db._lock.release()
+            raise
         return self.db
+
+    def _end(self) -> dict[str, Table]:
+        """Drop this transaction's own snapshot and release the lock taken on enter."""
+        snapshot = self._snapshot
+        self.db._snapshots[:] = [
+            other for other in self.db._snapshots if other is not snapshot
+        ]
+        self._snapshot = None
+        self._active = False
+        self.db._lock.release()
+        return snapshot
 
     def commit(self) -> None:
         with self.db._lock:
             if not self._active:
                 raise TransactionError("transaction is not active")
-            self.db._snapshots.pop()
-            self._active = False
+            self._end()
 
     def rollback(self) -> None:
         with self.db._lock:
             if not self._active:
                 raise TransactionError("transaction is not active")
-            snapshot = self.db._snapshots.pop()
-            self.db._tables = snapshot
-            self._active = False
+            self.db._tables = self._end()
 
     def __exit__(self, exc_type, exc, tb) -> None:
         if not self._active:
