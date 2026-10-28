@@ -311,18 +311,10 @@ function findRenderedMessage(chatbox, messageId) {
 }
 
 // Folds the per-message diagnostics into one line, so the answer keeps the focus.
-function buildDetails(content, usage, totalDurationMs, cost, settlement) {
+function buildDetails(content, usage, totalDurationMs, cost) {
   const parts = [];
   if (usage && usage.total_tokens) parts.push(`${usage.total_tokens} токенов`);
   if (cost && cost > 0) parts.push(`≈ ${cost.toFixed(2)} ₽`);
-  // The price is shown even when the treasury could not charge it; the failure is said, not hidden (#1664).
-  if (settlement && settlement.status === "failed") {
-    parts.push(
-      settlement.reason === "insufficient_balance"
-        ? "⚠️ не списано: на балансе казначейства не хватает средств"
-        : "⚠️ не списано с казначейства"
-    );
-  }
   if (totalDurationMs) parts.push(`${(totalDurationMs / 1000).toFixed(1)} с`);
   // The cost is shown once, in this line; with nothing else to unfold it is a plain line.
   if (!content.children.length) {
@@ -345,7 +337,6 @@ function addMessage({
   text,
   role,
   cost = 0,
-  settlement,
   timings,
   totalDurationMs,
   reasoning,
@@ -635,8 +626,7 @@ function addMessage({
     }
   }
 
-  if (metaWrap.children.length > 0 || (cost && cost > 0) || (settlement && settlement.status === "failed"))
-    msg.appendChild(buildDetails(metaWrap, usage, totalDurationMs, cost, settlement));
+  if (metaWrap.children.length > 0 || (cost && cost > 0)) msg.appendChild(buildDetails(metaWrap, usage, totalDurationMs, cost));
   chatbox.appendChild(msg);
   chatbox.scrollTop = chatbox.scrollHeight;
   return msg;
@@ -1559,7 +1549,6 @@ document.addEventListener("DOMContentLoaded", function () {
           // A text that did not go back to the field can be put there with «Изменить»; photos would not follow it.
           editText: textReturned || sentImages.length ? undefined : turn.text,
           cost: data.cost || 0,
-          settlement: data.settlement,
           timings: data.timings,
           totalDurationMs: clientTotalMs,
           reasoning: data.reasoning,
@@ -1583,7 +1572,6 @@ document.addEventListener("DOMContentLoaded", function () {
           text: data.reply,
           role: "bot",
           cost: data.cost || 0,
-          settlement: data.settlement,
           timings: data.timings,
           totalDurationMs: data.total_duration_ms || clientTotalMs,
           reasoning: data.reasoning,
