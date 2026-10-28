@@ -144,7 +144,7 @@ python3 scripts/check_independence.py --write-wiring
 | **I** import effects | no registration, binding, environment loading, logging setup or threads on import |
 | **L** logging | units log only through `logos.<unit>` loggers |
 | **A** API | every package has `__all__`; nobody uses another unit's private names |
-| **W** wiring | hosts have no defaults and are registered by a root; every provider exists; every `bound.<name>` is a port |
+| **W** wiring | hosts have no defaults and are registered by a root; every provider exists; every `bound.<name>` is a port; `composition/wiring.py` is current; no root reads an undefined name |
 | **D** docs | every unit has a README (Public API, Ports, Install; Role in a dialog for units on a dialog path), the life of a dialog matches the code and this map is current |
 
 The check is static and manual; it is not a CI gate. It prints `TOTAL=0`.

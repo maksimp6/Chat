@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import builtins
 import collections
 import io
 import json
@@ -42,6 +43,7 @@ import os
 import re
 import tokenize
 import subprocess
+import symtable
 import sys
 import tomllib
 from dataclasses import dataclass, field
@@ -971,7 +973,43 @@ def check_api(umap: UnitMap, violations: list[Violation]) -> None:
                         )
 
 
+def undefined_globals(path: str) -> list[tuple[int, str]]:
+    """Names a module reads as globals but never binds (what would raise NameError)."""
+    text = (ROOT / path).read_text(encoding="utf-8")
+    try:
+        module = symtable.symtable(text, path, "exec")
+    except SyntaxError:
+        return []
+    bound = {
+        s.get_name()
+        for s in module.get_symbols()
+        if s.is_assigned() or s.is_imported() or s.is_namespace()
+    }
+    known = bound | set(dir(builtins)) | {"__file__", "__builtins__"}
+    missing: set[str] = set()
+    tables = [module]
+    while tables:
+        table = tables.pop()
+        tables.extend(table.get_children())
+        for symbol in table.get_symbols():
+            if not symbol.is_referenced() or symbol.get_name() in known:
+                continue
+            if table is module or symbol.is_global():
+                missing.add(symbol.get_name())
+    lines = []
+    for node in ast.walk(ast.parse(text)):
+        if isinstance(node, ast.Name) and node.id in missing:
+            lines.append((node.lineno, node.id))
+            missing.discard(node.id)
+    return sorted(lines)
+
+
 def check_wiring(umap: UnitMap, violations: list[Violation]) -> None:
+    for path in sorted(umap.root_files):
+        for line, name in undefined_globals(path):
+            violations.append(
+                Violation("W", path, line, f"root reads undefined name {name}")
+            )
     wiring = ROOT / WIRING_FILE
     if wiring.is_file() and wiring.read_text(encoding="utf-8") != render_wiring(umap):
         violations.append(Violation("W", WIRING_FILE, 0, "stale: run --write-wiring"))
@@ -1761,7 +1799,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.write_wiring:
         (ROOT / WIRING_FILE).write_text(render_wiring(umap), encoding="utf-8")
         print(f"wrote {WIRING_FILE}")
-        return 0
+        undefined = undefined_globals(WIRING_FILE)
+        for line, name in undefined:
+            print(f"{WIRING_FILE}:{line}: undefined name {name}")
+        return 1 if undefined else 0
     if args.entrypoints:
         problems = entrypoint_report(umap)
         print("\n".join(problems) if problems else "all documented invocations resolve")
