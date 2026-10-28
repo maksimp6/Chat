@@ -128,6 +128,30 @@ def create_server(owner_id: str, data: dict[str, Any]) -> str:
     return sid
 
 
+RDC_SERVER = {
+    "name": "RDC — Desktop Commander",
+    "server_label": "rdc",
+    "server_url": "https://mcp.desktopcommander.app/mcp",
+    "server_description": (
+        "Remote Desktop Commander: терминал, файлы и процессы подключённых устройств "
+        "владельца (ПК, сервер, телефон)."
+    ),
+    # Sent to the provider only once the owner has put a token into authorization.
+    "config": {"requires_authorization": True},
+}
+
+
+def ensure_rdc_server() -> None:
+    """Create the RDC server record once; the owner adds its token in the MCP panel."""
+    rows = get_store().items(prefix="mcp/server/").values()
+    if any(
+        isinstance(row, dict) and row.get("server_url") == RDC_SERVER["server_url"]
+        for row in rows
+    ):
+        return
+    create_server("", RDC_SERVER)
+
+
 def get_server(server_id: str, *, owner_id: str) -> dict[str, Any] | None:
     record = get_store().get("mcp/server/" + server_id)
     if not isinstance(record, dict):

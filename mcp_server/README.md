@@ -74,3 +74,4 @@ Everything `mcp_server` uses from other units is a field of `Host` in [`mcp_serv
 - `composition/wiring.py` registers the `mcp_server` host factory (`register_all()`, or `register_units("mcp_server")` for this unit alone); the host is built on first use.
 - `composition/web.py` registers the blueprint `chatgpt_mcp_bp` (`mcp_server`).
 - `composition/web.py` calls `mcp_server.tools.register_mcp_tools()`.
+- Storage start-up (`web_shell`) runs `mcp_server.storage.ensure_rdc_server`: the Remote Desktop Commander server (`https://mcp.desktopcommander.app/mcp`, label `rdc`) is created once without a token; it reaches the provider only after the owner puts `Bearer <token>` into its authorization in the MCP panel.

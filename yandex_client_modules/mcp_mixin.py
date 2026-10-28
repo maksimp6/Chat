@@ -200,6 +200,11 @@ class YandexMcpMixin:
                 enabled_servers = []
 
         for s in enabled_servers if execution_policy is None else []:
+            if (s.get("config") or {}).get("requires_authorization") and not s.get(
+                "authorization"
+            ):
+                # No token yet (e.g. the seeded RDC record): every call would be refused.
+                continue
             if s.get("server_url") or (s.get("connector_id") or "").startswith(
                 "connector_"
             ):

@@ -27,6 +27,7 @@ from economy.treasury_routes import install as install_treasury_routes
 from forge import prepare_printing_records
 from forge.routes import printing3d_bp
 from mcp_server import chatgpt_mcp_bp
+from mcp_server.storage import ensure_rdc_server
 from mcp_server.tools import register_mcp_tools
 from organization.departments import departments_bp, prepare_department_records
 from organization.government import (
@@ -91,6 +92,7 @@ STORAGE_INITIALIZERS = (
     prepare_government_records,
     ensure_government_department,
     prepare_environment_records,
+    ensure_rdc_server,
 )
 
 
