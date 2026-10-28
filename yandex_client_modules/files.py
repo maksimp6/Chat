@@ -227,11 +227,15 @@ class YandexFileManagerMixin:
             self._fm_handle_error(resp, "Delete VS")
         return resp.json()
 
-    def list_vs_files(self, vs_id, limit=100, filter_status=None):
-        api_logger.info(f"[VS] List files in {vs_id} (filter={filter_status})")
+    def list_vs_files(self, vs_id, limit=100, filter_status=None, after=None):
+        api_logger.info(
+            f"[VS] List files in {vs_id} (filter={filter_status}, after={after})"
+        )
         params = {"limit": limit}
         if filter_status:
             params["filter"] = filter_status
+        if after:
+            params["after"] = after
         resp = self._fm_request(
             "GET", f"{self.base_url}/vector_stores/{vs_id}/files", params=params
         )

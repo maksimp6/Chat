@@ -1,5 +1,9 @@
 """Ingest GitHub issues, pull requests, Actions run metadata and the exports/ dialog archives into the chat RAG store.
 
+Incremental: items are grouped by month, and a month whose (number, updated_at) signature already has
+its complete set of packs in the store is skipped without fetching its comments or reviews. A changed
+month is rebuilt and its older packs are removed from the store.
+
 Runs on the Redmi 9 runner, piped from the repository into python3 so that no copy of
 the script or of the data is written to disk. Packs are built in memory and sent to the
 running app's own API on 127.0.0.1, so no provider key is needed here. Known secret
@@ -127,73 +131,93 @@ def window_of(stamp):
     return (stamp or "unknown")[:7]
 
 
+# Collectors yield (window, version, render). The listings are cheap; render() fetches the
+# comments and reviews, and runs only for windows whose stored packs are out of date.
+
+
+def render_issue(issue):
+    number = issue["number"]
+    lines = [
+        f"# Issue #{number}: {issue['title']}",
+        f"url: {issue['html_url']}",
+        f"state: {issue['state']}",
+        f"created: {issue['created_at']}",
+        f"updated: {issue['updated_at']}",
+        f"author: {login(issue.get('user'))}",
+        f"labels: {', '.join(label['name'] for label in issue.get('labels', []))}",
+        "",
+        issue.get("body") or "",
+    ]
+    if issue.get("comments"):
+        for comment in pages(f"/repos/{REPO}/issues/{number}/comments"):
+            lines.append(
+                f"\n## Comment by {login(comment.get('user'))} at {comment['created_at']}\n\n"
+                + (comment.get("body") or "")
+            )
+    return "\n".join(lines)
+
+
 def collect_issues():
     for issue in pages(f"/repos/{REPO}/issues", {"state": "all"}):
         if "pull_request" in issue:
             continue
-        number = issue["number"]
-        lines = [
-            f"# Issue #{number}: {issue['title']}",
-            f"url: {issue['html_url']}",
-            f"state: {issue['state']}",
-            f"created: {issue['created_at']}",
-            f"updated: {issue['updated_at']}",
-            f"author: {login(issue.get('user'))}",
-            f"labels: {', '.join(label['name'] for label in issue.get('labels', []))}",
-            "",
-            issue.get("body") or "",
-        ]
-        if issue.get("comments"):
-            for comment in pages(f"/repos/{REPO}/issues/{number}/comments"):
-                lines.append(
-                    f"\n## Comment by {login(comment.get('user'))} at {comment['created_at']}\n\n"
-                    + (comment.get("body") or "")
-                )
-        yield window_of(issue["updated_at"]), "\n".join(lines)
+        version = f"{issue['number']}:{issue['updated_at']}:{issue.get('comments')}"
+        yield window_of(issue["updated_at"]), version, lambda issue=issue: render_issue(issue)
+
+
+def render_pull(pr):
+    number = pr["number"]
+    lines = [
+        f"# Pull request #{number}: {pr['title']}",
+        f"url: {pr['html_url']}",
+        f"state: {pr['state']}",
+        f"merged: {pr.get('merged_at')}",
+        f"created: {pr['created_at']}",
+        f"updated: {pr['updated_at']}",
+        f"author: {login(pr.get('user'))}",
+        f"base: {pr['base']['ref']} head: {pr['head']['ref']}",
+        "",
+        pr.get("body") or "",
+    ]
+    if pr.get("comments"):
+        for comment in pages(f"/repos/{REPO}/issues/{number}/comments"):
+            lines.append(
+                f"\n## Comment by {login(comment.get('user'))} at {comment['created_at']}\n\n"
+                + (comment.get("body") or "")
+            )
+    for review in pages(f"/repos/{REPO}/pulls/{number}/reviews"):
+        lines.append(
+            f"\n## Review by {login(review.get('user'))} ({review.get('state')}) at "
+            f"{review.get('submitted_at')}\n\n" + (review.get("body") or "")
+        )
+    if pr.get("review_comments"):
+        for comment in pages(f"/repos/{REPO}/pulls/{number}/comments"):
+            lines.append(
+                f"\n## Review comment by {login(comment.get('user'))} on {comment.get('path')} "
+                f"at {comment['created_at']}\n\n" + (comment.get("body") or "")
+            )
+    return "\n".join(lines)
 
 
 def collect_pulls():
     for pr in pages(f"/repos/{REPO}/pulls", {"state": "all"}):
-        number = pr["number"]
-        lines = [
-            f"# Pull request #{number}: {pr['title']}",
-            f"url: {pr['html_url']}",
-            f"state: {pr['state']}",
-            f"merged: {pr.get('merged_at')}",
-            f"created: {pr['created_at']}",
-            f"updated: {pr['updated_at']}",
-            f"author: {login(pr.get('user'))}",
-            f"base: {pr['base']['ref']} head: {pr['head']['ref']}",
-            "",
-            pr.get("body") or "",
-        ]
-        if pr.get("comments"):
-            for comment in pages(f"/repos/{REPO}/issues/{number}/comments"):
-                lines.append(
-                    f"\n## Comment by {login(comment.get('user'))} at {comment['created_at']}\n\n"
-                    + (comment.get("body") or "")
-                )
-        for review in pages(f"/repos/{REPO}/pulls/{number}/reviews"):
-            lines.append(
-                f"\n## Review by {login(review.get('user'))} ({review.get('state')}) at "
-                f"{review.get('submitted_at')}\n\n" + (review.get("body") or "")
-            )
-        if pr.get("review_comments"):
-            for comment in pages(f"/repos/{REPO}/pulls/{number}/comments"):
-                lines.append(
-                    f"\n## Review comment by {login(comment.get('user'))} on {comment.get('path')} "
-                    f"at {comment['created_at']}\n\n" + (comment.get("body") or "")
-                )
-        yield window_of(pr["updated_at"]), "\n".join(lines)
+        yield window_of(pr["updated_at"]), f"{pr['number']}:{pr['updated_at']}", lambda pr=pr: render_pull(pr)
 
 
 def collect_runs():
     for run in pages(f"/repos/{REPO}/actions/runs", key="workflow_runs"):
-        yield window_of(run["created_at"]), (
+        text = (
             f"run {run['id']}: {run['name']} | event {run['event']} | status {run['status']} | "
             f"conclusion {run.get('conclusion')} | branch {run['head_branch']} | "
             f"sha {run['head_sha']} | created {run['created_at']} | url {run['html_url']}"
         )
+        yield window_of(run["created_at"]), text, lambda text=text: text
+
+
+def render_export(entry):
+    with OPENER.open(entry["download_url"], timeout=300) as response:
+        text = response.read().decode()
+    return f"# File exports/{entry['name']}\nurl: {entry['html_url']}\n\n" + text
 
 
 def collect_exports():
@@ -202,29 +226,25 @@ def collect_exports():
     for entry in listing or []:
         if entry.get("type") != "file" or not entry["name"].endswith(".md"):
             continue
-        with OPENER.open(entry["download_url"], timeout=300) as response:
-            text = response.read().decode()
-        yield "exports", f"# File exports/{entry['name']}\nurl: {entry['html_url']}\n\n" + text
+        yield "exports", f"{entry['name']}:{entry['sha']}", lambda entry=entry: render_export(entry)
 
 
-def make_pack(kind, window, part, parts):
-    body = ("\n\n---\n\n".join(parts) + "\n").encode()
-    digest = hashlib.sha256(body).hexdigest()[:12]
-    return f"gh-{kind}-{window}-{part:03d}-{digest}.md", body
-
-
-def build_packs(kind, window, chunks):
-    current, size, part = [], 0, 0
+def build_packs(kind, window, signature, chunks):
+    bodies, current, size = [], [], 0
     for chunk in chunks:
         masked = mask(chunk)
         encoded = len(masked.encode()) + 16
         if current and size + encoded > PACK_LIMIT:
-            yield make_pack(kind, window, part, current)
-            current, size, part = [], 0, part + 1
+            bodies.append(current)
+            current, size = [], 0
         current.append(masked)
         size += encoded
     if current:
-        yield make_pack(kind, window, part, current)
+        bodies.append(current)
+    # The name carries the window's signature and the pack count, so a complete stored set is recognised.
+    for part, parts in enumerate(bodies):
+        name = f"gh-{kind}-{window}-{signature}-{part:03d}of{len(bodies):03d}.md"
+        yield name, ("\n\n---\n\n".join(parts) + "\n").encode()
 
 
 def app(method, path, body=None, headers=None):
@@ -248,10 +268,32 @@ def upload(name, body):
     return app("POST", "/api/files", head + body + tail, {"Content-Type": f"multipart/form-data; boundary={boundary}"})
 
 
+def listing(path):
+    """Every row of a paginated app listing (100 rows a page)."""
+    after = None
+    while True:
+        query = "?limit=100" + ("&after=" + urllib.parse.quote(after) if after else "")
+        page = app("GET", path + query)
+        rows = page.get("data", [])
+        yield from rows
+        if not page.get("has_more") or not rows:
+            return
+        after = page.get("last_id") or rows[-1]["id"]
+
+
+def window_set(stored, kind, window, signature):
+    """The stored packs of this window's current signature, if all of them are there."""
+    prefix = f"gh-{kind}-{window}-{signature}-"
+    names = [name for name in stored if name.startswith(prefix)]
+    counts = {re.search(r"of(\d{3})\.md$", name) for name in names}
+    totals = {int(match.group(1)) for match in counts if match}
+    return names if len(totals) == 1 and len(names) == totals.pop() else None
+
+
 def main():
-    stored = {row["filename"]: row["id"] for row in app("GET", "/api/files").get("data", [])}
-    attached = {row["id"] for row in app("GET", f"/api/vector-stores/{STORE_ID}/files").get("data", [])}
-    totals = {"packs": 0, "uploaded": 0, "attached": 0, "failed": 0, "chunks": 0}
+    stored = {row["filename"]: row["id"] for row in listing("/api/files")}
+    attached = {row["id"] for row in listing(f"/api/vector-stores/{STORE_ID}/files")}
+    totals = {"packs": 0, "uploaded": 0, "attached": 0, "removed": 0, "failed": 0, "chunks": 0, "windows_unchanged": 0}
     collectors = {
         "export": collect_exports,
         "issue": collect_issues,
@@ -262,36 +304,59 @@ def main():
     kinds = os.environ.get("KINDS", ",".join(collectors)).split(",")
     for kind, collector in ((kind, collectors[kind]) for kind in kinds):
         windows = {}
-        for window, text in collector():
-            windows.setdefault(window, []).append(text)
+        for window, version, render in collector():
+            windows.setdefault(window, []).append((version, render))
             totals["chunks"] += 1
         for window in sorted(windows):
-            for name, body in build_packs(kind, window, windows[window]):
-                totals["packs"] += 1
+            items = windows[window]
+            signature = hashlib.sha256("\n".join(sorted(v for v, _ in items)).encode()).hexdigest()[:12]
+            current = window_set(stored, kind, window, signature)
+            if current is not None and all(stored[name] in attached for name in current):
+                totals["windows_unchanged"] += 1
+                keep = set(current)
+            else:
+                keep, window_failed = set(), False
+                for name, body in build_packs(kind, window, signature, (render() for _, render in items)):
+                    totals["packs"] += 1
+                    keep.add(name)
+                    try:
+                        file_id = stored.get(name)
+                        if file_id is None:
+                            file_id = upload(name, body)["id"]
+                            stored[name] = file_id
+                            totals["uploaded"] += 1
+                        if file_id not in attached:
+                            app(
+                                "POST",
+                                f"/api/vector-stores/{STORE_ID}/files",
+                                json.dumps({"file_id": file_id}).encode(),
+                                {"Content-Type": "application/json"},
+                            )
+                            attached.add(file_id)
+                            totals["attached"] += 1
+                    except (urllib.error.URLError, OSError, KeyError, ValueError) as error:
+                        totals["failed"] += 1
+                        window_failed = True
+                        print(f"pack {name} failed: {type(error).__name__}", file=sys.stderr)
+                if window_failed:
+                    continue
+            # Older versions of this window's packs are replaced by the current set.
+            for name in [n for n in stored if n.startswith(f"gh-{kind}-{window}-") and n not in keep]:
+                file_id = stored.pop(name)
                 try:
-                    file_id = stored.get(name)
-                    if file_id is None:
-                        file_id = upload(name, body)["id"]
-                        stored[name] = file_id
-                        totals["uploaded"] += 1
-                    if file_id not in attached:
-                        app(
-                            "POST",
-                            f"/api/vector-stores/{STORE_ID}/files",
-                            json.dumps({"file_id": file_id}).encode(),
-                            {"Content-Type": "application/json"},
-                        )
-                        attached.add(file_id)
-                        totals["attached"] += 1
-                except (urllib.error.URLError, OSError, KeyError, ValueError) as error:
+                    if file_id in attached:
+                        app("DELETE", f"/api/vector-stores/{STORE_ID}/files/{file_id}")
+                        attached.discard(file_id)
+                    app("DELETE", f"/api/files/{file_id}")
+                    totals["removed"] += 1
+                except (urllib.error.URLError, OSError, ValueError) as error:
                     totals["failed"] += 1
-                    print(f"pack {name} failed: {type(error).__name__}", file=sys.stderr)
+                    print(f"stale pack {name} not removed: {type(error).__name__}", file=sys.stderr)
         print(f"{kind}: {sum(len(v) for v in windows.values())} items in {len(windows)} windows", flush=True)
     totals["redactions"] = REDACTIONS["count"]
     print(json.dumps(totals, sort_keys=True), flush=True)
     if totals["failed"]:
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
