@@ -68,6 +68,15 @@ def build_continuation_input(
     ]
 
 
+def _call_key(call: dict[str, Any]) -> Any:
+    """What identifies one call: the item id, else its call_id.
+
+    call_id only pairs a call with its output. Alice AI LLM sets call_id to the
+    function name, so parallel calls of one function (and calls of it in later
+    rounds) share it while each item id stays unique."""
+    return call.get("id") or call.get("call_id")
+
+
 def run_tool_loop(
     initial_response: dict[str, Any],
     execute_tool: Callable[[dict[str, Any]], Any],
@@ -115,12 +124,13 @@ def run_tool_loop(
             call_id = call.get("call_id") or call.get("id")
             if not isinstance(call_id, str) or not call_id.strip():
                 raise ValueError("function_call is missing a valid call_id/id")
-            if call_id in batch_ids:
+            key = _call_key(call)
+            if key in batch_ids:
                 raise ValueError("duplicate function_call id in one response")
-            batch_ids.add(call_id)
+            batch_ids.add(key)
             if call.get("status") not in (None, "completed"):
                 raise ValueError("function_call is not completed")
-            if call_id in executed:
+            if key in executed:
                 raise ValueError("function_call id already executed")
         tool_outputs = []
         for call in calls:
@@ -133,8 +143,9 @@ def run_tool_loop(
                 )
                 # The model gets the failure as this call's output; the loop goes on.
                 result = {"error": str(exc) or type(exc).__name__}
+            # Outputs follow the calls' order, so calls sharing a call_id still pair up.
             tool_outputs.append(make_function_call_output(call, result))
-            executed.add(call_id)
+            executed.add(_call_key(call))
         continuation_input = list(response.get("output", []) or []) + tool_outputs
         response = continue_request(continuation_input, response)
         rounds += 1
