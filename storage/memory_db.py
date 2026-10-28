@@ -125,6 +125,19 @@ class MemoryDatabase:
         self._lock = RLock()
         self._snapshots: list[dict[str, Table]] = []
 
+    def create_table(self, name: str, columns: Iterable[Column]) -> Table:
+        with self._lock:
+            if name in self._tables:
+                raise DatabaseError(f"table already exists: {name}")
+            table = Table(name, columns)
+            self._tables[name] = table
+            return table
+
+    def drop_table(self, name: str) -> None:
+        with self._lock:
+            self._require_table(name)
+            del self._tables[name]
+
     def table(self, name: str) -> Table:
         with self._lock:
             return self._require_table(name)

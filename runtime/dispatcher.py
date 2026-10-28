@@ -10,6 +10,7 @@ from typing import Any, Callable, Mapping
 from tool_providers.universal_tool_platform import (
     UniversalToolCall,
     UniversalToolExecutor,
+    _warn_deprecated_execution_hooks,
 )
 from storage.contracts import (
     StorageCredentialsMissing,
@@ -137,6 +138,25 @@ class RuntimeDispatcher:
             self._runtimes.pop(runtime_id, None)
             self._tool_boundaries.pop(runtime_id, None)
 
+    def register_tool_executor(
+        self,
+        runtime_id: str,
+        executor: UniversalToolExecutor,
+        **legacy_hooks: Any,
+    ) -> None:
+        """Bind one tool executor to an existing runtime.
+
+        Runtime code receives only the ``tools.execute`` dispatcher operation;
+        the registry, MCP connectors, and credentials owned by the executor stay
+        behind this boundary.
+        """
+        self.context(runtime_id)
+        if not isinstance(executor, UniversalToolExecutor):
+            raise TypeError("executor must be a UniversalToolExecutor")
+        _warn_deprecated_execution_hooks(legacy_hooks)
+        with self._lock:
+            self._tool_boundaries[runtime_id] = executor
+
     def register_operation(self, name: str, handler: RuntimeHandler) -> None:
         name = str(name or "").strip()
         if not name:
@@ -145,6 +165,21 @@ class RuntimeDispatcher:
             raise TypeError("operation handler must be callable")
         with self._lock:
             self._operations[name] = handler
+
+    def set_storage_credential_resolver(
+        self, resolver: Callable[[RuntimeContext, str], object | None] | None
+    ) -> None:
+        self._storage_credentials = resolver
+
+    def register_storage_provider(
+        self, runtime_id: str, provider: StorageProvider, *, owner_id: str | None = None
+    ) -> None:
+        context = self.context(runtime_id)
+        scoped_owner = context.owner_id if owner_id is None else owner_id
+        if scoped_owner != context.owner_id:
+            raise RuntimeScopeViolation("Storage provider owner does not match runtime owner")
+        with self._lock:
+            self._storage_providers[(runtime_id, scoped_owner, provider.name)] = provider
 
     def dispatch_storage(
         self,
@@ -189,6 +224,12 @@ class RuntimeDispatcher:
         if context is None:
             raise RuntimeNotFound(runtime_id)
         return context
+
+    def current_context(self) -> RuntimeContext:
+        runtime_id = getattr(self._local, "runtime_id", None)
+        if runtime_id is None:
+            raise RuntimeNotFound("no runtime is bound to this thread")
+        return self.context(runtime_id)
 
     def authorize(self, runtime_id: str, owner_id: str | None) -> RuntimeContext:
         """Resolve a registered runtime; owner metadata does not restrict access."""

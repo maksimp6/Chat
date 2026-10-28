@@ -56,6 +56,39 @@ class BrowserCapabilityContract:
         if not self.allowed_scopes:
             raise ValueError("browser capability must declare an allowed scope")
 
+    def to_definition(self) -> dict[str, Any]:
+        """Return a UniversalToolDefinition-compatible mapping."""
+        return {
+            "title": self.name.replace("_", " ").title(),
+            "description": (
+                f"{self.mode.title()} browsing capability. "
+                "The adapter must keep credentials outside model-visible data."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": list(self.actions)},
+                    "target": {"type": "string", "minLength": 1},
+                    "value": {"type": ["string", "null"]},
+                },
+                "required": ["action", "target", "value"],
+                "additionalProperties": False,
+            },
+            "capabilities": ["browser", self.mode],
+            "risk_level": "high" if self.mode == "cloud" else "medium",
+            "read_only": False,
+            "requires_approval": False,
+            "supported_transports": ["responses_api", "local_agent", "mcp"],
+            "executor": {"type": "browser_adapter", "mode": self.mode},
+            "metadata": {
+                "allowed_scopes": list(self.allowed_scopes),
+                "approval_actions": list(self.approval_actions),
+                "requires_emulator": self.requires_emulator,
+                **dict(self.metadata),
+            },
+        }
+
+
 CLOUD_BROWSING = BrowserCapabilityContract(
     name="browser_cloud",
     mode="cloud",
@@ -93,6 +126,10 @@ class BrowserAction:
     action: str
     target: str
     value: str | None = None
+
+    def to_arguments(self) -> dict[str, Any]:
+        return {"action": self.action, "target": self.target, "value": self.value}
+
 
 def validate_browser_action(action: BrowserAction) -> list[str]:
     contract = BROWSER_CAPABILITY_CONTRACTS.get(action.capability)

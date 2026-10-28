@@ -15,6 +15,7 @@ import ssl
 import struct
 import sys
 import tempfile
+import time
 
 HOME = Path.home() / ".logos-rdc"
 CODE_FILE = HOME / "state" / "bambu-camera-code"

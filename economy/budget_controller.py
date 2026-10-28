@@ -55,6 +55,10 @@ class InvalidOperation(BudgetError):
     pass
 
 
+class DemoConversionDenied(BudgetError):
+    pass
+
+
 def _money(value: Any) -> Decimal:
     try:
         amount = Decimal(str(value))
@@ -293,6 +297,38 @@ class BudgetController:
             )
             return self.snapshot()
 
+    def settle_reservation(
+        self,
+        amount: Any,
+        *,
+        account_type: Optional[AccountType] = None,
+    ) -> dict[str, Any]:
+        """Convert an existing reservation into a spend atomically."""
+        with self._lock:
+            account_type = AccountType(account_type or self.active_account)
+            account = self.account(account_type)
+            # The day's loss is counted from the new period, as in spend; otherwise yesterday's loss is
+            # added to today's and the account is locked too early.
+            self._roll_loss_period(account)
+            amount = _money(amount)
+            if amount > account.reserved:
+                raise InvalidOperation("cannot settle more than reserved")
+            self._persist("SETTLE", account_type, amount)
+            before = account.available
+            account.reserved -= amount
+            account.spent += amount
+            account.loss_today += amount
+            self._apply_cooldown_if_needed(account)
+            self._emit(
+                "reservation_settled",
+                account_type=account_type.value,
+                currency=account.currency,
+                amount=str(amount),
+                balance_before=str(before),
+                balance_after=str(account.available),
+            )
+            return self.snapshot()
+
     def spend(self, amount: Any, *, account_type: Optional[AccountType] = None) -> dict[str, Any]:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
@@ -334,6 +370,50 @@ class BudgetController:
                 )
             return self.snapshot()
 
+    def _record_win(
+        self, amount: Any, *, account_type: Optional[AccountType] = None
+    ) -> dict[str, Any]:
+        """Record a provider-confirmed win. Private: nothing in the app may mint wins,
+        and no provider settlement path exists yet to call this."""
+        with self._lock:
+            account_type = AccountType(account_type or self.active_account)
+            account = self.account(account_type)
+            amount = _money(amount)
+            self._persist("WIN", account_type, amount)
+            before = account.available
+            account.won += amount
+            self._emit(
+                "win",
+                account_type=account_type.value,
+                currency=account.currency,
+                amount=str(amount),
+                balance_before=str(before),
+                balance_after=str(account.available),
+            )
+            return self.snapshot()
+
+    def release_reservation(
+        self, amount: Any, *, account_type: Optional[AccountType] = None
+    ) -> dict[str, Any]:
+        with self._lock:
+            account_type = AccountType(account_type or self.active_account)
+            account = self.account(account_type)
+            amount = _money(amount)
+            if amount > account.reserved:
+                raise InvalidOperation("cannot release more than reserved")
+            self._persist("RELEASE", account_type, amount)
+            before = account.available
+            account.reserved -= amount
+            self._emit(
+                "reservation_released",
+                account_type=account_type.value,
+                currency=account.currency,
+                amount=str(amount),
+                balance_before=str(before),
+                balance_after=str(account.available),
+            )
+            return self.snapshot()
+
     def refund(self, amount: Any, *, account_type: Optional[AccountType] = None) -> dict[str, Any]:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
@@ -371,6 +451,30 @@ class BudgetController:
                 reason=reason,
             )
             return self.snapshot()
+
+    def activate_real(
+        self,
+        *,
+        actor: str,
+        authorization_check: Callable[[], bool],
+    ) -> dict[str, Any]:
+        """Return DEMO -> REAL only after explicit external authorization."""
+        with self._lock:
+            self._require_actor(actor)
+            if self.active_account is AccountType.REAL:
+                return self.snapshot()
+            if not authorization_check():
+                self._emit("real_mode_denied", account_type="REAL", actor=actor)
+                raise AuthorizationRequired("explicit authorization required for DEMO -> REAL")
+            self.active_account = AccountType.REAL
+            self._emit(
+                "mode_switch", account_type="REAL", actor=actor, reason="manual_authorization"
+            )
+            return self.snapshot()
+
+    def convert_demo_to_real(self, amount: Any) -> None:
+        _money(amount)
+        raise DemoConversionDenied("DEMO funds have no monetary value and cannot convert to REAL")
 
     def _persist(
         self,

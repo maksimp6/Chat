@@ -2,7 +2,7 @@
 
 import base64
 from io import BytesIO
-from PIL import Image, ImageChops
+from PIL import Image, ImageChops, ImageFilter
 
 
 class DeltaDetector:

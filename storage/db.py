@@ -39,6 +39,16 @@ def init_db() -> None:
     get_store()
 
 
+def reset_memory_db() -> None:
+    """Reset chat/config records in explicitly isolated test clients."""
+    store = get_store()
+    with store.transaction() as tx:
+        for key in store.items(prefix="chat/"):
+            tx.delete(key)
+        for key in store.items(prefix="config/"):
+            tx.delete(key)
+
+
 def get_conversations() -> list[dict[str, Any]]:
     records = list(get_store().items(prefix="chat/conversation/").values())
     return sorted(records, key=lambda record: record["updated_at"], reverse=True)
@@ -244,6 +254,10 @@ def set_yandex_conversation(conv_id: str, yandex_id: str) -> str:
 def is_provider_pending(conv_id: str) -> bool:
     record = get_store().get("chat/conversation/" + conv_id) or {}
     return bool(record.get("provider_pending"))
+
+
+def init_config_table() -> None:
+    init_db()
 
 
 def get_config(key: str, default: Any = None) -> Any:

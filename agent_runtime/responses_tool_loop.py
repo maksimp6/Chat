@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
 
 # WIKIFUNCTIONS-CANDIDATE WF-12: https://www.wikifunctions.org/wiki/Z872 + Z873 + Z18755.
@@ -44,6 +44,20 @@ def make_function_call_output(call: dict[str, Any], result: Any) -> dict[str, An
     else:
         output = "" if result is None else str(result)
     return {"type": "function_call_output", "call_id": call_id, "output": output}
+
+
+# WIKIFUNCTIONS-CANDIDATE WF-13: https://www.wikifunctions.org/wiki/Z14779.
+# Заменить попарную сборку на map двух списков одинаковой длины; адаптер материализует
+# results один раз, сохраняет прежнюю ошибку размера до сборки и callback make_function_call_output.
+def build_continuation_input(
+    response: dict[str, Any], results: Iterable[Any]
+) -> list[dict[str, Any]]:
+    """Pair tool calls with execution results in response order."""
+    calls = extract_function_calls(response)
+    values = list(results)
+    if len(calls) != len(values):
+        raise ValueError(f"tool call/result count mismatch: {len(calls)} != {len(values)}")
+    return [make_function_call_output(call, result) for call, result in zip(calls, values)]
 
 
 def run_tool_loop(

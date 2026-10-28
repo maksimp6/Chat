@@ -72,6 +72,7 @@ def rotate_active_key(
     project_id: str,
     old_provider_key_id: str | None = None,
     now: datetime | None = None,
+    commit_before_revoke: bool = False,
     provider_name: str = "yandex",
     reissue_existing: bool = False,
     ttl: timedelta | None = None,

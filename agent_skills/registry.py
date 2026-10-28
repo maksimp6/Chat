@@ -270,6 +270,13 @@ class SkillRegistry:
             unique.append(name)
         return [self.load(name, role=role) for name in unique]
 
+    def validate_all(self) -> list[dict[str, str]]:
+        names = self._names()
+        if not names:
+            raise SkillFormatError(f"no skills found under {self.root}")
+        return [self.load(name).metadata() for name in names]
+
+
 def compose_skill_instructions(
     skills: Iterable[Skill], *, base_instructions: Optional[str] = None
 ) -> str:

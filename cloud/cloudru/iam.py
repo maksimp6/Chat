@@ -215,6 +215,24 @@ class CloudRuIamClient:
         accounts = body.get("service_accounts") or body.get("accounts") or body.get("items") or []
         return [dict(item) for item in accounts] if isinstance(accounts, list) else []
 
+    def create_service_account(
+        self,
+        *,
+        project_id: str,
+        name: str,
+        description: str = "",
+    ) -> dict[str, Any]:
+        if not project_id.strip():
+            raise ValueError("project_id is required")
+        if not name.strip():
+            raise ValueError("name is required")
+        body = {
+            "name": name.strip(),
+            "description": description.strip(),
+            "target": {"project_id": project_id.strip()},
+        }
+        return self._request("POST", SERVICE_ACCOUNTS_PATH, json_body=body)
+
     def list_api_keys(
         self,
         *,

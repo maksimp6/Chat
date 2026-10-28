@@ -13,6 +13,7 @@ import re
 import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener

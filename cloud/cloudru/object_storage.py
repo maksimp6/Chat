@@ -307,3 +307,44 @@ class CloudRuObjectStorage:
                 raise StorageError("Storage provider operation failed")
         return sorted(objects, key=lambda item: item.object_id)
 
+
+def cloudru_storage_credential_resolver(
+    load_iam_credentials: Callable[[], Mapping[str, str] | None] | None = None,
+    env: Mapping[str, str] | None = None,
+) -> Callable[[object, str], S3Credentials | None]:
+    """Dispatcher resolver for Cloud.ru storage credentials.
+
+    Order: a dedicated Object Storage access key (``CLOUDRU_STORAGE_KEY_ID``/
+    ``CLOUDRU_STORAGE_KEY_SECRET``), then the stored Cloud.ru service account access key
+    (``provider_credentials.get_cloudru_iam_credentials``) when a loader is given, then
+    ``CLOUDRU_IAM_KEY_ID``/``CLOUDRU_IAM_KEY_SECRET``. Foundation Models API keys are not
+    S3 access keys and are never used. The tenant prefix comes from
+    ``CLOUDRU_STORAGE_TENANT_ID``.
+    """
+
+    def resolve(_context: object, provider: str) -> S3Credentials | None:
+        if provider != CloudRuObjectStorage.name:
+            return None
+        values = env_snapshot() if env is None else env
+        tenant_id = values.get("CLOUDRU_STORAGE_TENANT_ID", "")
+        dedicated = cloudru_s3_credentials(
+            values.get("CLOUDRU_STORAGE_KEY_ID", ""),
+            values.get("CLOUDRU_STORAGE_KEY_SECRET", ""),
+            tenant_id,
+        )
+        if dedicated is not None:
+            return dedicated
+        stored = load_iam_credentials() if load_iam_credentials else None
+        if stored:
+            resolved = cloudru_s3_credentials(
+                stored.get("key_id", ""), stored.get("key_secret", ""), tenant_id
+            )
+            if resolved is not None:
+                return resolved
+        return cloudru_s3_credentials(
+            values.get("CLOUDRU_IAM_KEY_ID", ""),
+            values.get("CLOUDRU_IAM_KEY_SECRET", ""),
+            tenant_id,
+        )
+
+    return resolve

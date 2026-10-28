@@ -289,6 +289,17 @@ def registry_key_for_upstream(upstream_id: str) -> str | None:
     return None
 
 
+def get_model_info(model_key):
+    info = ALL_MODELS.get(canonical_model_key(model_key))
+    if info is None:
+        # Discovered tuned/versioned models have no public tariff. Preserve unknown
+        # cost instead of inventing another model's rate or failing after execution.
+        if not isinstance(model_key, str) or not model_key.strip():
+            raise ValueError("model key is required")
+        return {"name": model_key, "type": "text", "pricing_status": "unknown"}
+    return info
+
+
 # The registry key is ours; the upstream id is the name Yandex knows the model by.
 # Keys that are not in the registry (including legacy stored keys) pass through unchanged.
 def upstream_model_id(model_key: str) -> str:
@@ -327,6 +338,36 @@ def get_model_uri(project_id, model_key):
         raise ValueError("invalid Yandex text model ID")
     # Do not strip a tuned suffix, change an explicit version, or append /latest.
     return "gpt://" + project_id + "/" + suffix
+
+
+def calculate_cost(model_key, input_tokens, output_tokens=0, cached_tokens=0, tool_tokens=0):
+    m = get_model_info(model_key)
+    if m.get("pricing_status") == "unknown":
+        return None
+    cost = (
+        input_tokens * m["input"]
+        + cached_tokens * m.get("cached", m["input"])
+        + tool_tokens * m.get("tool", m["input"])
+        + output_tokens * m.get("output", m["input"])
+    ) / 1000
+    return round(cost, 2)
+
+
+def calculate_full_cost(model_key, usage):
+    m = get_model_info(model_key)
+    if m.get("pricing_status") == "unknown":
+        return None
+    if not usage:
+        return 0.0
+    token_cost = (
+        usage.get("input_tokens", 0) * m["input"]
+        + usage.get("output_tokens", 0) * m.get("output", m["input"])
+    ) / 1000
+    audio_cost = (
+        usage.get("audio_seconds_stt", 0) * AUDIO_STT_PRICE_PER_SEC
+        + usage.get("audio_seconds_tts", 0) * AUDIO_TTS_PRICE_PER_SEC
+    )
+    return round(token_cost + audio_cost, 4)
 
 
 config = Config()

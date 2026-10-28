@@ -169,6 +169,16 @@ def get_conv_mcp_settings(conv_id: str) -> dict[str, Any]:
     }
 
 
+def save_conv_mcp_settings(
+    conv_id: str, enabled_ids: list[str], approval_map: dict[str, Any]
+) -> None:
+    with get_store().transaction() as tx:
+        tx.set(
+            "mcp/conversation/" + conv_id,
+            {"enabled_mcp_servers": enabled_ids, "mcp_approval": approval_map},
+        )
+
+
 def get_enabled_servers_for_conv(conv_id: str, *, owner_id: str) -> list[dict[str, Any]]:
     servers = list_servers(owner_id=owner_id)
     if not isinstance(get_store().get("mcp/conversation/" + conv_id), dict):
@@ -177,3 +187,13 @@ def get_enabled_servers_for_conv(conv_id: str, *, owner_id: str) -> list[dict[st
     enabled = set(get_conv_mcp_settings(conv_id)["enabled_mcp_servers"])
     return [server for server in servers if server["id"] in enabled]
 
+
+def get_server_config(server_id: str, *, owner_id: str) -> dict[str, Any]:
+    server = get_server(server_id, owner_id=owner_id)
+    if server is None:
+        return {}
+    return {**DEFAULT_CONFIGS.get(server["connector_id"], {}), **server.get("config", {})}
+
+
+def set_server_config(server_id: str, owner_id: str, cfg: dict[str, Any]) -> None:
+    update_server(server_id, owner_id, {"config": cfg})

@@ -1741,6 +1741,13 @@ def _repository_vector_text_valid(source: dict) -> bool:
     )
 
 
+def verify_repository_vector_result(item: dict, repository_files: list[dict]) -> dict:
+    """Resolve an excerpt to the tracked text file path stamped into its segment."""
+    if not _repository_vector_sources_valid(repository_files):
+        return {"verbatim": False, "reason": "repository_source_hash_mismatch"}
+    return _repository_vector_match(item, repository_files)
+
+
 def _repository_vector_match(item: dict, repository_files: list[dict]) -> dict:
     """Match a repository snapshot already validated by the public entrypoint."""
     by_path = {source["path"]: source for source in repository_files}

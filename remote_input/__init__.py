@@ -1,0 +1,19 @@
+"""Logos Mouse isolated control module. No automatic root access."""
+
+from remote_input.core import (
+    Command,
+    MouseError,
+    MouseModule,
+    RecordingBackend,
+    RootSocketBackend,
+    Cursor,
+)
+
+__all__ = [
+    "Command",
+    "MouseError",
+    "MouseModule",
+    "RecordingBackend",
+    "RootSocketBackend",
+    "Cursor",
+]

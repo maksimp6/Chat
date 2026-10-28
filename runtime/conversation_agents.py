@@ -9,7 +9,7 @@ from typing import Any, Mapping
 from invocation.context import InvocationContext
 from observability.trace_manager import ExecutionTrace
 
-from runtime.dispatcher import RuntimeDispatcher
+from runtime.dispatcher import RuntimeDispatcher, RuntimeScopeViolation
 
 
 def _freeze(value: Any) -> Any:
@@ -90,6 +90,45 @@ class ConversationAgentRouter:
             },
         )
         return target
+
+    def invoke_tool(
+        self,
+        context: InvocationContext,
+        agent: ConversationAgent,
+        tool_name: str,
+        arguments: Mapping[str, Any],
+        trace: ExecutionTrace,
+    ) -> Any:
+        self._validate_context(context)
+        if (agent.runtime_id, agent.conversation_id) != (
+            context.runtime_id,
+            context.conversation_id,
+        ):
+            raise RuntimeScopeViolation(
+                "agent does not belong to the invocation runtime and conversation"
+            )
+        trace.add_event(
+            "conversation_agent_tool_invoked",
+            {
+                "runtime_id": agent.runtime_id,
+                "conversation_id": agent.conversation_id,
+                "agent_id": agent.agent_id,
+                "tool_name": str(tool_name),
+            },
+        )
+        return self._dispatcher.dispatch(
+            agent.runtime_id,
+            self.TOOL_OPERATION,
+            {
+                "agent_id": agent.agent_id,
+                "conversation_id": agent.conversation_id,
+                "invocation_id": context.invocation_id,
+                "trace_id": context.trace_id,
+                "tool_name": str(tool_name),
+                "arguments": dict(arguments),
+            },
+            resource_runtime_id=agent.runtime_id,
+        )
 
     @staticmethod
     def _validate_context(context: InvocationContext) -> None:

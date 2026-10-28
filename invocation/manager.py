@@ -336,10 +336,22 @@ def fail_invocation(invocation_id: str, error: Any = None) -> bool:
     return _complete(invocation_id, "failed", error=error)
 
 
+def cancel_invocation(invocation_id: str, reason: Any = None) -> bool:
+    return _complete(invocation_id, "cancelled", error=reason)
+
+
 def _complete(invocation_id: str, status: str, result: Any = None, error: Any = None) -> bool:
     return _publish_invocation_values(
         invocation_id, {"result": result, "error": error}, status=status
     )
+
+
+def get_invocation_owner(invocation_id: str) -> Optional[str]:
+    """Return the owner an invocation was created for, without reading its trace or result."""
+    value = get_memory_client(memory_file_path()).get(_key(invocation_id))
+    if not isinstance(value, dict) or value.get("id") != str(invocation_id):
+        return None
+    return value.get("user_id")
 
 
 def get_invocation(invocation_id: str) -> Optional[dict[str, Any]]:

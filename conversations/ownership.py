@@ -49,6 +49,11 @@ def init_conversation_ownership_table() -> None:
         _store()
 
 
+def get_owner(conversation_id: str) -> Optional[str]:
+    with _OWNERSHIP_LOCK:
+        return _store().get(conversation_id)
+
+
 def set_owner(conversation_id: str, user_id: str) -> None:
     conversation_id = str(conversation_id).strip()
     user_id = str(user_id).strip()

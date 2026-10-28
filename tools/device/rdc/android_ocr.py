@@ -7,6 +7,8 @@ import csv
 import io
 import json
 from pathlib import Path
+import re
+import struct
 import subprocess
 
 ENV = dict(env_snapshot(), TMPDIR="/data/data/com.termux/files/usr/tmp")

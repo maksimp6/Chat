@@ -17,3 +17,7 @@ def create_invocation_trace(context: InvocationContext) -> ExecutionTrace:
     )
     return trace
 
+
+def get_context_metadata(context: InvocationContext) -> dict:
+    """Return safe request-scoped metadata for provider calls."""
+    return context.as_dict()

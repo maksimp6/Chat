@@ -11,7 +11,7 @@ MAX_TITLE = 200
 MAX_BODY = 8000
 
 
-def default_handlers(run_issue=None):
+def default_handlers(check_run=None, run_issue=None):
     def logos_task(payload):
         """Runs Logos headlessly on a task text with its sandboxed filesystem tools.
 
