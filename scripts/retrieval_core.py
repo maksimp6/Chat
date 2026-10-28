@@ -43,7 +43,9 @@ class BM25Index:
         df = self.df.get(term, 0)
         return math.log(1 + (self.N - df + 0.5) / (df + 0.5))
 
-    def search_tokens(self, query_tokens: list[str], *, top: int, per_issue_cap: int) -> list[dict]:
+    def search_tokens(
+        self, query_tokens: list[str], *, top: int, per_issue_cap: int
+    ) -> list[dict]:
         results = []
         for unit in self.units:
             counts = Counter(unit["tokens"])
@@ -57,7 +59,10 @@ class BM25Index:
                     self._idf(term)
                     * frequency
                     * (self.k1 + 1)
-                    / (frequency + self.k1 * (1 - self.b + self.b * length / self.avgdl))
+                    / (
+                        frequency
+                        + self.k1 * (1 - self.b + self.b * length / self.avgdl)
+                    )
                 )
             if score > 0:
                 results.append({**unit, "score": round(score, self.score_precision)})

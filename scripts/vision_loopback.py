@@ -31,7 +31,9 @@ from scripts.visual_object_contract import load_cases
 MAX_WIRE = 11 * 1024 * 1024
 MAX_PNG = 8 * 1024 * 1024
 MAX_PROMPT_CHARS = 2048
-_ALLOWED_KEYS = frozenset({"image_base64", "image_sha256", "mime_type", "prompt", "case_id"})
+_ALLOWED_KEYS = frozenset(
+    {"image_base64", "image_sha256", "mime_type", "prompt", "case_id"}
+)
 
 
 class _RejectedRequest(Exception):
@@ -225,14 +227,18 @@ def local_e2e(
 def main() -> int:
     cli = argparse.ArgumentParser(description=__doc__)
     sub = cli.add_subparsers(dest="command", required=True)
-    test = sub.add_parser("evaluate", help="Train locally and run model through HTTP E2E")
+    test = sub.add_parser(
+        "evaluate", help="Train locally and run model through HTTP E2E"
+    )
     test.add_argument("--train-manifest", type=Path, required=True)
     test.add_argument("--eval-manifest", type=Path, required=True)
     test.add_argument("--gallery", type=Path, required=True)
     test.add_argument("--eval-gallery", type=Path)
     test.add_argument("--results", type=Path, required=True)
     test.add_argument("--model", type=Path, required=True)
-    serve = sub.add_parser("serve", help="Serve a pinned private model on loopback only")
+    serve = sub.add_parser(
+        "serve", help="Serve a pinned private model on loopback only"
+    )
     serve.add_argument("--model", type=Path, required=True)
     serve.add_argument("--model-sha256", required=True)
     serve.add_argument("--port", type=int, default=8765)
@@ -241,7 +247,12 @@ def main() -> int:
         if args.command == "serve":
             model = load_model(args.model, expected_sha256=args.model_sha256)
             server = LocalVisionHTTP(model, args.port)
-            print("LOCAL_VISION_READY", server.server_port, server.vision_sha256, flush=True)
+            print(
+                "LOCAL_VISION_READY",
+                server.server_port,
+                server.vision_sha256,
+                flush=True,
+            )
             try:
                 server.serve_forever(poll_interval=0.1)
             finally:

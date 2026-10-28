@@ -28,7 +28,11 @@ def _read_private_file(dirfd: int, name: str, max_bytes: int) -> str:
     fd = os.open(name, flags, dir_fd=dirfd)
     try:
         info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_uid != os.getuid()
+            or info.st_mode & 0o077
+        ):
             raise PermissionError("printer profile file must be owner-private")
         data = os.read(fd, max_bytes + 1)
         if len(data) > max_bytes:
@@ -43,7 +47,11 @@ def load_local_profile(directory: str | Path) -> LocalBambuProfile:
     dirfd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     try:
         info = os.fstat(dirfd)
-        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+        if (
+            not stat.S_ISDIR(info.st_mode)
+            or info.st_uid != os.getuid()
+            or info.st_mode & 0o077
+        ):
             raise PermissionError("printer profile directory must be mode 0700")
         serial = _read_private_file(dirfd, "serial", 64)
         host = _read_private_file(dirfd, "host", 64)
@@ -61,7 +69,9 @@ def load_local_profile(directory: str | Path) -> LocalBambuProfile:
     if len(code) != 8 or not code.isascii() or not code.isalnum():
         raise ValueError("invalid printer access code format")
     _certificate_fingerprint(pem)
-    return LocalBambuProfile(host=host, serial=serial, access_code=code, trusted_cert_pem=pem)
+    return LocalBambuProfile(
+        host=host, serial=serial, access_code=code, trusted_cert_pem=pem
+    )
 
 
 def read_status_from_local_profile(

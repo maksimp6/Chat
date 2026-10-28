@@ -52,7 +52,9 @@ class CloudRuSecretBackend:
     def resolve(self, reference: SecretReference) -> str:
         """Delegate to the Cloud.ru client; translate errors to the contract type."""
         try:
-            return self._client.get_secret_value(reference.secret_id, reference.version_id)
+            return self._client.get_secret_value(
+                reference.secret_id, reference.version_id
+            )
         except CloudProviderError as exc:
             normalized = _CLOUDRU_CODE_MAP.get(exc.code, PROVIDER_UNAVAILABLE)
             raise SecretResolverError(

@@ -94,7 +94,9 @@ def _request_fields(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("MCP server data must be an object")
     _validate_server_url(data.get("server_url"))
-    return {key: value for key, value in data.items() if key not in _SERVER_OWNED_FIELDS}
+    return {
+        key: value for key, value in data.items() if key not in _SERVER_OWNED_FIELDS
+    }
 
 
 def list_servers(*, owner_id: str) -> list[dict[str, Any]]:
@@ -179,7 +181,9 @@ def save_conv_mcp_settings(
         )
 
 
-def get_enabled_servers_for_conv(conv_id: str, *, owner_id: str) -> list[dict[str, Any]]:
+def get_enabled_servers_for_conv(
+    conv_id: str, *, owner_id: str
+) -> list[dict[str, Any]]:
     servers = list_servers(owner_id=owner_id)
     if not isinstance(get_store().get("mcp/conversation/" + conv_id), dict):
         # No per-chat choice was stored: every configured server is available at once (A-006, policy).
@@ -192,7 +196,10 @@ def get_server_config(server_id: str, *, owner_id: str) -> dict[str, Any]:
     server = get_server(server_id, owner_id=owner_id)
     if server is None:
         return {}
-    return {**DEFAULT_CONFIGS.get(server["connector_id"], {}), **server.get("config", {})}
+    return {
+        **DEFAULT_CONFIGS.get(server["connector_id"], {}),
+        **server.get("config", {}),
+    }
 
 
 def set_server_config(server_id: str, owner_id: str, cfg: dict[str, Any]) -> None:

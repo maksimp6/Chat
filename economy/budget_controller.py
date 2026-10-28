@@ -80,7 +80,9 @@ class BudgetLimits:
     max_total_loss: Decimal
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "max_single_operation", _money(self.max_single_operation))
+        object.__setattr__(
+            self, "max_single_operation", _money(self.max_single_operation)
+        )
         object.__setattr__(self, "max_daily_loss", _money(self.max_daily_loss))
         object.__setattr__(self, "max_total_loss", _money(self.max_total_loss))
 
@@ -109,7 +111,9 @@ class BudgetAccount:
         self.reserved = _money(self.reserved)
         self.won = _money(self.won)
         self.loss_today = _money(self.loss_today)
-        self.loss_period = self.loss_period or datetime.now(timezone.utc).date().isoformat()
+        self.loss_period = (
+            self.loss_period or datetime.now(timezone.utc).date().isoformat()
+        )
         self.currency = self.currency.upper()
         if self.carried_spent is None:
             self.carried_spent = max(Decimal("0.00"), self.spent - self.loss_today)
@@ -155,7 +159,9 @@ class BudgetController:
         if demo.account_type is not AccountType.DEMO:
             raise InvalidOperation("demo account must have account_type DEMO")
         if real.currency != demo.currency:
-            raise InvalidOperation("REAL and DEMO accounts must use the same currency code")
+            raise InvalidOperation(
+                "REAL and DEMO accounts must use the same currency code"
+            )
         if cooldown_seconds < 0:
             raise InvalidOperation("cooldown_seconds must be non-negative")
         self.budget_id = budget_id
@@ -214,7 +220,9 @@ class BudgetController:
                         if account.locked_until
                         else None,
                         "limits": {
-                            "max_single_operation": str(account.limits.max_single_operation),
+                            "max_single_operation": str(
+                                account.limits.max_single_operation
+                            ),
                             "max_daily_loss": str(account.limits.max_daily_loss),
                             "max_total_loss": str(account.limits.max_total_loss),
                         },
@@ -223,7 +231,9 @@ class BudgetController:
                 },
             }
 
-    def _allocate(self, account_type: AccountType, amount: Any, *, actor: str) -> dict[str, Any]:
+    def _allocate(
+        self, account_type: AccountType, amount: Any, *, actor: str
+    ) -> dict[str, Any]:
         # Private: money enters only through request_replenishment's policy check.
         with self._lock:
             self._require_actor(actor)
@@ -265,9 +275,13 @@ class BudgetController:
                     actor=requested_by,
                 )
                 raise AuthorizationRequired("policy denied replenishment")
-            return self._allocate(account_type, amount, actor="policy-approved:" + requested_by)
+            return self._allocate(
+                account_type, amount, actor="policy-approved:" + requested_by
+            )
 
-    def reserve(self, amount: Any, *, account_type: Optional[AccountType] = None) -> dict[str, Any]:
+    def reserve(
+        self, amount: Any, *, account_type: Optional[AccountType] = None
+    ) -> dict[str, Any]:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
             account = self.account(account_type)
@@ -329,7 +343,9 @@ class BudgetController:
             )
             return self.snapshot()
 
-    def spend(self, amount: Any, *, account_type: Optional[AccountType] = None) -> dict[str, Any]:
+    def spend(
+        self, amount: Any, *, account_type: Optional[AccountType] = None
+    ) -> dict[str, Any]:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
             account = self.account(account_type)
@@ -414,7 +430,9 @@ class BudgetController:
             )
             return self.snapshot()
 
-    def refund(self, amount: Any, *, account_type: Optional[AccountType] = None) -> dict[str, Any]:
+    def refund(
+        self, amount: Any, *, account_type: Optional[AccountType] = None
+    ) -> dict[str, Any]:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
             account = self.account(account_type)
@@ -427,7 +445,9 @@ class BudgetController:
             from_carried = min(amount, account.carried_spent)
             account.carried_spent -= from_carried
             account.spent -= amount
-            account.loss_today = max(Decimal("0.00"), account.loss_today - (amount - from_carried))
+            account.loss_today = max(
+                Decimal("0.00"), account.loss_today - (amount - from_carried)
+            )
             self._emit(
                 "refund",
                 account_type=account_type.value,
@@ -465,16 +485,23 @@ class BudgetController:
                 return self.snapshot()
             if not authorization_check():
                 self._emit("real_mode_denied", account_type="REAL", actor=actor)
-                raise AuthorizationRequired("explicit authorization required for DEMO -> REAL")
+                raise AuthorizationRequired(
+                    "explicit authorization required for DEMO -> REAL"
+                )
             self.active_account = AccountType.REAL
             self._emit(
-                "mode_switch", account_type="REAL", actor=actor, reason="manual_authorization"
+                "mode_switch",
+                account_type="REAL",
+                actor=actor,
+                reason="manual_authorization",
             )
             return self.snapshot()
 
     def convert_demo_to_real(self, amount: Any) -> None:
         _money(amount)
-        raise DemoConversionDenied("DEMO funds have no monetary value and cannot convert to REAL")
+        raise DemoConversionDenied(
+            "DEMO funds have no monetary value and cannot convert to REAL"
+        )
 
     def _persist(
         self,
@@ -497,7 +524,11 @@ class BudgetController:
         )
 
     def _check_limits(
-        self, account: BudgetAccount, amount: Decimal, *, lock_on_daily_breach: bool = True
+        self,
+        account: BudgetAccount,
+        amount: Decimal,
+        *,
+        lock_on_daily_breach: bool = True,
     ) -> None:
         self._roll_loss_period(account)
         if restrictions_lifted():
@@ -514,7 +545,10 @@ class BudgetController:
             if lock_on_daily_breach:
                 self._lock_account(account, reason="daily_loss_limit")
             raise BudgetLimitExceeded("daily-loss limit exceeded")
-        if account.loss_today + account.reserved + amount > account.limits.max_daily_loss:
+        if (
+            account.loss_today + account.reserved + amount
+            > account.limits.max_daily_loss
+        ):
             # Pending exposure only: deny without cooldown, release restores headroom.
             raise BudgetLimitExceeded("daily-loss limit exceeded")
 
@@ -632,7 +666,10 @@ class CloudBudgetLimits:
 def evaluate_cloud_spend(spent: Any, limits: CloudBudgetLimits) -> dict[str, Any]:
     """Classify current-period cloud spend against a monthly limit."""
     if limits.monthly_limit is None:
-        return {"status": CloudSpendStatus.UNCONFIGURED.value, "currency": limits.currency}
+        return {
+            "status": CloudSpendStatus.UNCONFIGURED.value,
+            "currency": limits.currency,
+        }
     if spent is None:
         return {
             "status": CloudSpendStatus.UNKNOWN.value,
@@ -652,7 +689,9 @@ def evaluate_cloud_spend(spent: Any, limits: CloudBudgetLimits) -> dict[str, Any
         "spent": str(amount),
         "limit": str(limit),
         "remaining": str(max(Decimal("0.00"), limit - amount)),
-        "ratio": str((amount / limit).quantize(Decimal("0.0001"))) if limit > 0 else None,
+        "ratio": str((amount / limit).quantize(Decimal("0.0001")))
+        if limit > 0
+        else None,
         "currency": limits.currency,
     }
 
@@ -720,7 +759,10 @@ class CloudBudgetGuard:
         except BudgetError:
             result = evaluate_cloud_spend(None, self.limits)
             result["error"] = "invalid_total"
-        if summary.get("complete") is False and result["status"] == CloudSpendStatus.OK.value:
+        if (
+            summary.get("complete") is False
+            and result["status"] == CloudSpendStatus.OK.value
+        ):
             # A partial sum is only a lower bound: it can show a block, never an all-clear.
             result["status"] = CloudSpendStatus.UNKNOWN.value
             result["error"] = "incomplete_billing_rows"
@@ -733,12 +775,18 @@ class CloudBudgetGuard:
         return result
 
     def _emit_if_not_ok(self, result: dict[str, Any]) -> None:
-        if result["status"] not in {CloudSpendStatus.OK.value, CloudSpendStatus.UNCONFIGURED.value}:
+        if result["status"] not in {
+            CloudSpendStatus.OK.value,
+            CloudSpendStatus.UNCONFIGURED.value,
+        }:
             self._emit("cloud_budget_" + result["status"], result)
 
     def enforce(self, operation: str) -> dict[str, Any]:
         result = self.status()
-        if result["status"] == CloudSpendStatus.BLOCK.value and not restrictions_lifted():
+        if (
+            result["status"] == CloudSpendStatus.BLOCK.value
+            and not restrictions_lifted()
+        ):
             raise BudgetLimitExceeded(
                 f"cloud monthly budget exhausted: {result['spent']} of "
                 f"{result['limit']} {result['currency']}; '{operation}' blocked"

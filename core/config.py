@@ -1,4 +1,5 @@
 """Logos - Configuration & Pricing"""
+
 from core.env import env_get
 
 import logging
@@ -36,7 +37,9 @@ def get_donation_url():
     if not raw:
         return None
     if any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in raw):
-        logger.warning("LOGOS_DONATION_URL ignored: contains whitespace or control characters")
+        logger.warning(
+            "LOGOS_DONATION_URL ignored: contains whitespace or control characters"
+        )
         return None
     try:
         parts = urlsplit(raw)
@@ -45,10 +48,14 @@ def get_donation_url():
         logger.warning("LOGOS_DONATION_URL ignored: malformed URL")
         return None
     if parts.scheme.lower() not in {"http", "https"} or not hostname:
-        logger.warning("LOGOS_DONATION_URL ignored: only absolute http/https URLs are allowed")
+        logger.warning(
+            "LOGOS_DONATION_URL ignored: only absolute http/https URLs are allowed"
+        )
         return None
     if parts.username is not None or parts.password is not None:
-        logger.warning("LOGOS_DONATION_URL ignored: URLs with embedded credentials are not allowed")
+        logger.warning(
+            "LOGOS_DONATION_URL ignored: URLs with embedded credentials are not allowed"
+        )
         return None
     return raw
 
@@ -168,8 +175,11 @@ VOICE_MODELS = {
         "transport": "realtime",
         "voice_family": "general",
         "capabilities": {
-            "audio_input": True, "text_input": True, "audio_output": True,
-            "tools": False, "function_calling": False,
+            "audio_input": True,
+            "text_input": True,
+            "audio_output": True,
+            "tools": False,
+            "function_calling": False,
         },
         "pricing_status": "unknown",
     },
@@ -180,8 +190,11 @@ VOICE_MODELS = {
         "transport": "realtime",
         "voice_family": "livetts",
         "capabilities": {
-            "audio_input": True, "text_input": True, "audio_output": True,
-            "tools": False, "function_calling": False,
+            "audio_input": True,
+            "text_input": True,
+            "audio_output": True,
+            "tools": False,
+            "function_calling": False,
         },
         "pricing_status": "unknown",
     },
@@ -192,8 +205,11 @@ VOICE_MODELS = {
         "transport": "realtime",
         "voice_family": "livetts",
         "capabilities": {
-            "audio_input": False, "text_input": True, "audio_output": True,
-            "tools": False, "function_calling": False,
+            "audio_input": False,
+            "text_input": True,
+            "audio_output": True,
+            "tools": False,
+            "function_calling": False,
         },
         "pricing_status": "unknown",
     },
@@ -312,9 +328,8 @@ def get_model_uri(project_id, model_key):
     if not isinstance(project_id, str) or not project_id.strip():
         raise ValueError("Yandex project_id is required")
     project_id = project_id.strip()
-    if (
-        any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in project_id)
-        or any(ch in project_id for ch in "/?#:@\\")
+    if any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in project_id) or any(
+        ch in project_id for ch in "/?#:@\\"
     ):
         raise ValueError("invalid Yandex project_id")
     upstream = upstream_model_id(model_key)
@@ -340,7 +355,9 @@ def get_model_uri(project_id, model_key):
     return "gpt://" + project_id + "/" + suffix
 
 
-def calculate_cost(model_key, input_tokens, output_tokens=0, cached_tokens=0, tool_tokens=0):
+def calculate_cost(
+    model_key, input_tokens, output_tokens=0, cached_tokens=0, tool_tokens=0
+):
     m = get_model_info(model_key)
     if m.get("pricing_status") == "unknown":
         return None

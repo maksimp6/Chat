@@ -19,7 +19,9 @@ _FIELDS = ("allocated", "spent", "reserved", "won", "loss_today", "carried_spent
 
 
 def _key(budget_id: str, account_type: str) -> str:
-    return "budget/account/" + json.dumps([budget_id, account_type], separators=(",", ":"))
+    return "budget/account/" + json.dumps(
+        [budget_id, account_type], separators=(",", ":")
+    )
 
 
 def _decimal(value: Any) -> Decimal:
@@ -45,10 +47,16 @@ class BudgetRepository:
             "currency": account.currency,
             **{field: str(getattr(account, field)) for field in _FIELDS},
             "loss_period": account.loss_period,
-            "locked_until": account.locked_until.isoformat() if account.locked_until else None,
+            "locked_until": account.locked_until.isoformat()
+            if account.locked_until
+            else None,
             "limits": {
                 field: str(getattr(account.limits, field))
-                for field in ("max_single_operation", "max_daily_loss", "max_total_loss")
+                for field in (
+                    "max_single_operation",
+                    "max_daily_loss",
+                    "max_total_loss",
+                )
             },
             "version": 0,
         }
@@ -90,7 +98,9 @@ class BudgetRepository:
                     operation_type,
                     str(amount),
                 ):
-                    raise BudgetPersistenceError("idempotency key conflicts with another operation")
+                    raise BudgetPersistenceError(
+                        "idempotency key conflicts with another operation"
+                    )
                 return {"operation_id": old["operation_id"], "status": "APPLIED"}
             row = tx.get(account_key)
             if row is None:
@@ -107,7 +117,9 @@ class BudgetRepository:
                 and balances["loss_today"] >= Decimal(row["limits"]["max_daily_loss"])
                 and cooldown_seconds
             ):
-                row["locked_until"] = (now + timedelta(seconds=cooldown_seconds)).isoformat()
+                row["locked_until"] = (
+                    now + timedelta(seconds=cooldown_seconds)
+                ).isoformat()
             operation_id = str(uuid.uuid4())
             operation = {
                 "operation_id": operation_id,
@@ -159,7 +171,10 @@ def _admit(
     if restrictions_lifted():
         # Limits and cooldowns are lifted; spending more than is available still fails.
         if operation in {"RESERVE", "SPEND"} and amount > (
-            balances["allocated"] + balances["won"] - balances["spent"] - balances["reserved"]
+            balances["allocated"]
+            + balances["won"]
+            - balances["spent"]
+            - balances["reserved"]
         ):
             raise BudgetPersistenceError("insufficient available budget")
         return
@@ -168,7 +183,10 @@ def _admit(
             raise BudgetPersistenceError("budget is in cooldown")
         if (
             amount
-            > balances["allocated"] + balances["won"] - balances["spent"] - balances["reserved"]
+            > balances["allocated"]
+            + balances["won"]
+            - balances["spent"]
+            - balances["reserved"]
         ):
             raise BudgetPersistenceError("insufficient available budget")
     if operation in {"RESERVE", "SPEND", "SETTLE"} and amount > Decimal(
@@ -202,7 +220,9 @@ def _mutate(
 ) -> None:
     _admit(row, balances, operation, amount, now)
     if operation in {"ALLOCATE", "WIN", "RESERVE"}:
-        field = {"ALLOCATE": "allocated", "WIN": "won", "RESERVE": "reserved"}[operation]
+        field = {"ALLOCATE": "allocated", "WIN": "won", "RESERVE": "reserved"}[
+            operation
+        ]
         balances[field] += amount
     elif operation in {"RELEASE", "SETTLE"}:
         if amount > balances["reserved"]:
@@ -221,6 +241,8 @@ def _mutate(
         from_carried = min(amount, balances["carried_spent"])
         balances["carried_spent"] -= from_carried
         balances["spent"] -= amount
-        balances["loss_today"] = max(Decimal("0"), balances["loss_today"] - (amount - from_carried))
+        balances["loss_today"] = max(
+            Decimal("0"), balances["loss_today"] - (amount - from_carried)
+        )
     else:
         raise BudgetPersistenceError("unsupported budget operation")

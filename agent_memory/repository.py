@@ -19,7 +19,9 @@ class AgentMemoryStore:
     """Persist validated records as independent native Kristall journal keys."""
 
     def __init__(self, store: Kristall | None = None) -> None:
-        self._store = store if store is not None else get_memory_client(memory_file_path())
+        self._store = (
+            store if store is not None else get_memory_client(memory_file_path())
+        )
 
     @staticmethod
     def _key(memory_id: str) -> str:
@@ -59,8 +61,12 @@ class AgentMemoryStore:
     ) -> MemoryLookup:
         record = self.get(memory_id)
         if record is None:
-            return MemoryLookup(status="miss", memory_id=str(memory_id), reason="not_found")
-        if record.visibility and (visible_to is None or str(visible_to) not in record.visibility):
+            return MemoryLookup(
+                status="miss", memory_id=str(memory_id), reason="not_found"
+            )
+        if record.visibility and (
+            visible_to is None or str(visible_to) not in record.visibility
+        ):
             return MemoryLookup(
                 status="miss",
                 memory_id=record.memory_id,
@@ -126,9 +132,13 @@ class AgentMemoryStore:
         if visible_to is None:
             return [item for item in records if not item.visibility]
         role = str(visible_to)
-        return [item for item in records if not item.visibility or role in item.visibility]
+        return [
+            item for item in records if not item.visibility or role in item.visibility
+        ]
 
-    def mark_stale(self, memory_id: str, *, reason: str, now: int | None = None) -> bool:
+    def mark_stale(
+        self, memory_id: str, *, reason: str, now: int | None = None
+    ) -> bool:
         record = self.get(memory_id)
         if record is None:
             return False
@@ -183,4 +193,7 @@ class AgentMemoryStore:
 
     def export_records(self) -> list[dict[str, Any]]:
         records = self.list_records(status=None, include_restricted=True)
-        return [record.as_dict() for record in sorted(records, key=lambda item: item.memory_id)]
+        return [
+            record.as_dict()
+            for record in sorted(records, key=lambda item: item.memory_id)
+        ]

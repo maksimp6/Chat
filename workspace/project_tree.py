@@ -1,4 +1,5 @@
 """Functional project tree API with safe, bounded filesystem traversal."""
+
 from core.env import env_get
 
 import os
@@ -6,7 +7,10 @@ from flask import Blueprint, jsonify
 
 project_tree_bp = Blueprint("project_tree", __name__)
 PROJECT_ROOT = os.path.realpath(
-    env_get("LOGOS_PROJECT_ROOT", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    env_get(
+        "LOGOS_PROJECT_ROOT",
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    )
 )
 MAX_NODES = 2000
 SKIP_NAMES = {".git", "node_modules", "__pycache__", ".venv", "venv", ".pytest_cache"}
@@ -22,7 +26,10 @@ def _tree(path, depth=0, budget=None):
     try:
         names = sorted(
             os.listdir(path),
-            key=lambda value: (not os.path.isdir(os.path.join(path, value)), value.lower()),
+            key=lambda value: (
+                not os.path.isdir(os.path.join(path, value)),
+                value.lower(),
+            ),
         )
     except OSError as exc:
         raise RuntimeError(f"Cannot read project tree: {exc}") from exc

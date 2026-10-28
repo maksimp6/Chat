@@ -29,7 +29,9 @@ def default_handlers(check_run=None, run_issue=None):
             and 1 <= len(title) <= MAX_TITLE
             and isinstance(body, str)
             and len(body) <= MAX_BODY
-            and (model is None or (isinstance(model, str) and MODEL_RE.fullmatch(model)))
+            and (
+                model is None or (isinstance(model, str) and MODEL_RE.fullmatch(model))
+            )
         )
         if not valid:
             raise TaskFailed("invalid_payload")

@@ -73,7 +73,11 @@ class PlanValidation:
     warnings: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
-        return {"valid": self.valid, "errors": list(self.errors), "warnings": list(self.warnings)}
+        return {
+            "valid": self.valid,
+            "errors": list(self.errors),
+            "warnings": list(self.warnings),
+        }
 
 
 class PlanValidator:
@@ -93,7 +97,9 @@ class PlanValidator:
         step_ids = [step.id for step in plan.steps]
         if any(not step_id.strip() for step_id in step_ids):
             errors.append("step ids must not be empty")
-        duplicates = sorted(step_id for step_id, count in Counter(step_ids).items() if count > 1)
+        duplicates = sorted(
+            step_id for step_id, count in Counter(step_ids).items() if count > 1
+        )
         if duplicates:
             errors.append("duplicate step ids: " + ", ".join(duplicates))
 
@@ -102,7 +108,10 @@ class PlanValidator:
             missing = sorted(set(step.depends_on) - known)
             if missing:
                 errors.append(
-                    "step " + repr(step.id) + " depends on unknown steps: " + ", ".join(missing)
+                    "step "
+                    + repr(step.id)
+                    + " depends on unknown steps: "
+                    + ", ".join(missing)
                 )
             if step.id in step.depends_on:
                 errors.append(f"step {step.id!r} cannot depend on itself")

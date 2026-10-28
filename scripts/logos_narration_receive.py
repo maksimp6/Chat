@@ -67,12 +67,16 @@ def recover(log: str, output: Path) -> dict:
         if not data.startswith(b"OggS") or b"OpusHead" not in data[:512]:
             raise ValueError("Narration part is not OggOpus")
         files[name] = data
-        clean_parts.append({key: value for key, value in part.items() if key != "audio_base64"})
+        clean_parts.append(
+            {key: value for key, value in part.items() if key != "audio_base64"}
+        )
     if receipt.get("audio_status") == "ready" and (
         not files or receipt.get("status") != "audio_ready"
     ):
         raise ValueError("Contradictory narration status")
-    receipt.update(parts=clean_parts, delivery="recovered_from_log_playback_not_verified")
+    receipt.update(
+        parts=clean_parts, delivery="recovered_from_log_playback_not_verified"
+    )
     # Validate every part before writing anything. Never reuse an old audio directory.
     output.mkdir(parents=True, exist_ok=False)
     (output / "story.txt").write_text(text, encoding="utf-8")
@@ -95,7 +99,11 @@ def main(argv: list[str] | None = None) -> int:
     if len(raw) > MAX_LOG_BYTES:
         raise ValueError("Log exceeds recovery limit")
     receipt = recover(raw.decode("utf-8"), args.out)
-    print(json.dumps({key: receipt.get(key) for key in ("status", "audio_status", "delivery")}))
+    print(
+        json.dumps(
+            {key: receipt.get(key) for key in ("status", "audio_status", "delivery")}
+        )
+    )
     return int(receipt.get("status") == "failed")
 
 

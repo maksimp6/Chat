@@ -42,7 +42,9 @@ OUTPUT = "Logos_BagClip_PR1113_A1mini_PLA_PROTOTYPE.gcode.3mf"
 NS = "{http://schemas.microsoft.com/3dmanufacturing/core/2015/02}"
 
 
-def _triangle_indices(mesh: ET.Element, vertex_count: int) -> list[tuple[int, int, int]]:
+def _triangle_indices(
+    mesh: ET.Element, vertex_count: int
+) -> list[tuple[int, int, int]]:
     """Return triangle vertex indices, rejecting missing, non-integer or out-of-range values.
 
     Negative indices must not be accepted: Python would silently wrap them around.
@@ -106,7 +108,9 @@ def _validate_build(root: ET.Element, geometry: dict) -> None:
             raise RuntimeError("unexpected source rotation or scaling")
         for x, y, z in geometry[object_id][0]:
             pos = (x + matrix[9], y + matrix[10], z + matrix[11])
-            if not (1 <= pos[0] <= 179 and 1 <= pos[1] <= 179 and -0.01 <= pos[2] <= 180):
+            if not (
+                1 <= pos[0] <= 179 and 1 <= pos[1] <= 179 and -0.01 <= pos[2] <= 180
+            ):
                 raise RuntimeError("source object outside A1 mini build volume")
 
 
@@ -181,7 +185,10 @@ def _verified_plate(dest: Path, result_file: Path, face_count: int) -> tuple[dic
     settings, gcode = _read_sliced_archive(dest)
     _validate_profile(settings)
     _validate_gcode(gcode)
-    if settings.get("wall_loops") != "4" or settings.get("sparse_infill_density") != "25%":
+    if (
+        settings.get("wall_loops") != "4"
+        or settings.get("sparse_infill_density") != "25%"
+    ):
         raise RuntimeError("four-wall/25-percent process not preserved")
     if not any(
         line.startswith(("G1 ", "G1\t")) and " E" in line

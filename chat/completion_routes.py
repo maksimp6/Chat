@@ -58,7 +58,9 @@ def _messages_from_body(body: dict) -> list[dict]:
         if not isinstance(text, str) or not text.strip():
             raise _BadInput("every message text must be a non-empty string")
         if len(text) > MAX_TEXT_CHARS:
-            raise _BadInput(f"every message text must be at most {MAX_TEXT_CHARS} characters")
+            raise _BadInput(
+                f"every message text must be at most {MAX_TEXT_CHARS} characters"
+            )
         messages.append({"role": item["role"], "text": text})
     return messages
 
@@ -94,9 +96,13 @@ def create_completion():
         return jsonify({"error": "json_body_required"}), 400
     unknown = set(body) - ALLOWED_FIELDS
     if unknown:
-        return jsonify({"error": "unknown_parameters", "parameters": sorted(unknown)}), 400
+        return jsonify(
+            {"error": "unknown_parameters", "parameters": sorted(unknown)}
+        ), 400
     if body.get("model", MODEL_KEY) != MODEL_KEY:
-        return jsonify({"error": "unsupported_completion_model", "model": MODEL_KEY}), 400
+        return jsonify(
+            {"error": "unsupported_completion_model", "model": MODEL_KEY}
+        ), 400
     try:
         messages = _messages_from_body(body)
         options = _completion_options(body)
@@ -115,7 +121,11 @@ def create_completion():
     if not credential.api_key or not str(credential.project_id or "").strip():
         return jsonify({"error": "completion_not_configured"}), 503
 
-    payload = {"modelUri": model_uri, "completionOptions": options, "messages": messages}
+    payload = {
+        "modelUri": model_uri,
+        "completionOptions": options,
+        "messages": messages,
+    }
     try:
         response = requests.post(
             UPSTREAM_URL,
@@ -124,7 +134,12 @@ def create_completion():
             timeout=UPSTREAM_TIMEOUT_SECONDS,
         )
     except requests.RequestException:
-        return jsonify({"error": "completion_upstream_failed", "detail": "Completion provider request failed"}), 502
+        return jsonify(
+            {
+                "error": "completion_upstream_failed",
+                "detail": "Completion provider request failed",
+            }
+        ), 502
     if response.status_code != 200:
         detail = f"upstream status {response.status_code}"
         return jsonify({"error": "completion_upstream_failed", "detail": detail}), 502
@@ -151,21 +166,27 @@ def create_completion():
         return jsonify({"error": "completion_upstream_invalid"}), 502
     trace = get_current_trace()
     if trace is not None:
-        trace.add_event("completion_usage", {"model": MODEL_KEY, "usage": usage, "status": status})
+        trace.add_event(
+            "completion_usage", {"model": MODEL_KEY, "usage": usage, "status": status}
+        )
     if status != "ALTERNATIVE_STATUS_FINAL":
-        return jsonify({
-            "error": "completion_incomplete",
+        return jsonify(
+            {
+                "error": "completion_incomplete",
+                "model": model_uri,
+                "reply": reply,
+                "usage": usage,
+                "provider_status": status,
+                "transport": "completion",
+            }
+        ), 502
+    return jsonify(
+        {
             "model": model_uri,
             "reply": reply,
             "usage": usage,
             "provider_status": status,
+            "provider_model_version": result.get("modelVersion"),
             "transport": "completion",
-        }), 502
-    return jsonify({
-        "model": model_uri,
-        "reply": reply,
-        "usage": usage,
-        "provider_status": status,
-        "provider_model_version": result.get("modelVersion"),
-        "transport": "completion",
-    })
+        }
+    )

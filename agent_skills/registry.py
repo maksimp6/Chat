@@ -151,11 +151,17 @@ def _parse_frontmatter_lines(lines: list[str], source: str) -> dict[str, Any]:
         metadata = yaml.safe_load(document)
     except yaml.YAMLError as exc:
         raise SkillFormatError(f"{source}: invalid YAML frontmatter") from exc
-    if not isinstance(metadata, dict) or not all(isinstance(key, str) for key in metadata):
-        raise SkillFormatError(f"{source}: frontmatter must be a mapping with string keys")
+    if not isinstance(metadata, dict) or not all(
+        isinstance(key, str) for key in metadata
+    ):
+        raise SkillFormatError(
+            f"{source}: frontmatter must be a mapping with string keys"
+        )
     for key in ("name", "description"):
         if not isinstance(metadata.get(key), str) or not metadata[key].strip():
-            raise SkillFormatError(f"{source}: frontmatter field {key} must be a non-empty string")
+            raise SkillFormatError(
+                f"{source}: frontmatter field {key} must be a non-empty string"
+            )
     return metadata
 
 
@@ -184,13 +190,17 @@ class SkillRegistry:
                     break
                 size += len(line.encode("utf-8"))
                 if size > MAX_SKILL_BYTES:
-                    raise SkillFormatError(f"{name}: frontmatter exceeds {MAX_SKILL_BYTES} bytes")
+                    raise SkillFormatError(
+                        f"{name}: frontmatter exceeds {MAX_SKILL_BYTES} bytes"
+                    )
                 lines.append(line)
                 if len(lines) > 1 and line.strip() == "---":
                     break
         metadata = _parse_frontmatter_lines(lines, str(path))
         if metadata["name"] != name:
-            raise SkillFormatError(f"{name}: frontmatter name must match directory name")
+            raise SkillFormatError(
+                f"{name}: frontmatter name must match directory name"
+            )
         return metadata
 
     def _names(self) -> list[str]:
@@ -225,7 +235,9 @@ class SkillRegistry:
                     "name": name,
                     "description": metadata["description"],
                     "source": str(
-                        (self.root / name / "SKILL.md").relative_to(self.root.parent.parent)
+                        (self.root / name / "SKILL.md").relative_to(
+                            self.root.parent.parent
+                        )
                     ),
                 }
             )
@@ -234,7 +246,9 @@ class SkillRegistry:
     def load(self, name: str, role: Optional[str] = None) -> Skill:
         allowed = self._allowed_for_role(role)
         if allowed is not None and name not in allowed:
-            raise SkillPolicyError(f"role {_normalize_role(role)} cannot use skill {name}")
+            raise SkillPolicyError(
+                f"role {_normalize_role(role)} cannot use skill {name}"
+            )
         metadata = self._read_metadata(name)
         path = self._skill_path(name)
         raw = path.read_bytes()
@@ -243,14 +257,17 @@ class SkillRegistry:
         text = raw.decode("utf-8")
         lines = text.splitlines()
         closing_index = next(
-            (i for i, line in enumerate(lines[1:], start=1) if line.strip() == "---"), None
+            (i for i, line in enumerate(lines[1:], start=1) if line.strip() == "---"),
+            None,
         )
         if closing_index is None:
             raise SkillFormatError(f"{name}: frontmatter is not closed")
         body = "\n".join(lines[closing_index + 1 :]).strip()
         for section in REQUIRED_SECTIONS:
             if not re.search(
-                rf"^##\s+{re.escape(section)}\s*$", body, flags=re.IGNORECASE | re.MULTILINE
+                rf"^##\s+{re.escape(section)}\s*$",
+                body,
+                flags=re.IGNORECASE | re.MULTILINE,
             ):
                 raise SkillFormatError(f"{name}: missing section ## {section}")
         version = hashlib.sha256(raw).hexdigest()[:16]
@@ -262,11 +279,15 @@ class SkillRegistry:
             body=body,
         )
 
-    def load_many(self, names: Iterable[str], role: Optional[str] = None) -> list[Skill]:
+    def load_many(
+        self, names: Iterable[str], role: Optional[str] = None
+    ) -> list[Skill]:
         unique: list[str] = []
         for name in unique_strings(names):
             if len(unique) >= MAX_SELECTED_SKILLS:
-                raise SkillPolicyError(f"at most {MAX_SELECTED_SKILLS} skills may be selected")
+                raise SkillPolicyError(
+                    f"at most {MAX_SELECTED_SKILLS} skills may be selected"
+                )
             unique.append(name)
         return [self.load(name, role=role) for name in unique]
 

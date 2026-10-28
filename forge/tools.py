@@ -46,7 +46,10 @@ def plate_inspect(
         raise ValueError("artifact_name must be one plain .3mf or .gcode.3mf filename")
     root = env_get("LOGOS_3D_ARTIFACT_ROOT")
     if not root:
-        return {"status": "needs_configuration", "missing_fields": ["LOGOS_3D_ARTIFACT_ROOT"]}
+        return {
+            "status": "needs_configuration",
+            "missing_fields": ["LOGOS_3D_ARTIFACT_ROOT"],
+        }
     # Use the installation's shared artifact namespace.
     owner = _trusted_owner(cfg)
     owner_folder = hashlib.sha256(owner.encode("utf-8")).hexdigest()
@@ -60,7 +63,10 @@ def plate_inspect(
                 with os.fdopen(file_fd, "rb") as handle:
                     info = os.fstat(handle.fileno())
                     if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_FILE_BYTES:
-                        return {"status": "blocked", "reason": "not a bounded regular file"}
+                        return {
+                            "status": "blocked",
+                            "reason": "not a bounded regular file",
+                        }
                     return inspect_archive(handle, name)
             finally:
                 os.close(owner_fd)
@@ -188,11 +194,16 @@ _QUOTE_PROPERTIES: dict[str, Any] = {
     "depreciation_per_hour": _nullable_number(),
     "packaging_cost": _nullable_number(),
     "failure_rate_percent": {
-        "anyOf": [{"type": "number", "minimum": 0, "exclusiveMaximum": 100}, {"type": "null"}]
+        "anyOf": [
+            {"type": "number", "minimum": 0, "exclusiveMaximum": 100},
+            {"type": "null"},
+        ]
     },
     "platform_fee_percent": _nullable_number(),
     "target_margin_percent": _nullable_number(),
-    "currency": {"anyOf": [{"type": "string", "minLength": 1, "maxLength": 8}, {"type": "null"}]},
+    "currency": {
+        "anyOf": [{"type": "string", "minLength": 1, "maxLength": 8}, {"type": "null"}]
+    },
 }
 
 
@@ -254,10 +265,14 @@ PRINTING3D_TOOLS = {
                         {"type": "null"},
                     ]
                 },
-                "quote": {"anyOf": [object_schema(_QUOTE_PROPERTIES, []), {"type": "null"}]},
+                "quote": {
+                    "anyOf": [object_schema(_QUOTE_PROPERTIES, []), {"type": "null"}]
+                },
                 "quoted_price": _nullable_number(),
                 "currency": _QUOTE_PROPERTIES["currency"],
-                "notes": {"anyOf": [{"type": "string", "maxLength": 2000}, {"type": "null"}]},
+                "notes": {
+                    "anyOf": [{"type": "string", "maxLength": 2000}, {"type": "null"}]
+                },
             },
             ["title"],
         ),
@@ -292,16 +307,30 @@ PRINTING3D_TOOLS = {
                         {"type": "null"},
                     ]
                 },
-                "equipment_price": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
-                "setup_cost": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
-                "down_payment": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
-                "credit_principal": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
+                "equipment_price": {
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
+                },
+                "setup_cost": {
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
+                },
+                "down_payment": {
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
+                },
+                "credit_principal": {
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
+                },
                 "credit_total_repayment": {
                     "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
                 },
-                "monthly_payment": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
-                "term_months": {"anyOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]},
-                "psk_percent": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
+                "monthly_payment": {
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
+                },
+                "term_months": {
+                    "anyOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]
+                },
+                "psk_percent": {
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
+                },
                 "currency": {
                     "anyOf": [
                         {"type": "string", "minLength": 1, "maxLength": 8},
@@ -360,11 +389,19 @@ PRINTING3D_TOOLS = {
                 "credit_total_repayment": {
                     "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
                 },
-                "monthly_payment": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
-                "term_months": {"anyOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]},
-                "psk_percent": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
+                "monthly_payment": {
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
+                },
+                "term_months": {
+                    "anyOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]
+                },
+                "psk_percent": {
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
+                },
                 "currency": {"type": "string", "minLength": 1, "maxLength": 8},
-                "started_at": {"anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]},
+                "started_at": {
+                    "anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]
+                },
             },
             [
                 "printer_model",

@@ -26,7 +26,17 @@ except ImportError:  # pragma: no cover
     resource = None
 
 
-_COMMAND_ENV_NAMES = ("PATH", "HOME", "LANG", "LC_ALL", "TERM", "TMPDIR", "USER", "LOGNAME", "SHELL")
+_COMMAND_ENV_NAMES = (
+    "PATH",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "TERM",
+    "TMPDIR",
+    "USER",
+    "LOGNAME",
+    "SHELL",
+)
 
 
 def _output_text(value: Any) -> str:
@@ -51,7 +61,15 @@ class VirtualServerConfig:
 
 
 class VirtualLowConsumptionServer:
-    STATES = {"stopped", "starting", "running", "idle", "suspended", "stopping", "failed"}
+    STATES = {
+        "stopped",
+        "starting",
+        "running",
+        "idle",
+        "suspended",
+        "stopping",
+        "failed",
+    }
 
     def __init__(self, session_id: str, config: Optional[VirtualServerConfig] = None):
         self.session_id = session_id
@@ -90,10 +108,16 @@ class VirtualLowConsumptionServer:
         with self._lock:
             self.start()
             # Only what a shell needs: the backend's own environment holds provider and deployment secrets.
-            env = {name: env_require(name) for name in _COMMAND_ENV_NAMES if name in env_snapshot()}
+            env = {
+                name: env_require(name)
+                for name in _COMMAND_ENV_NAMES
+                if name in env_snapshot()
+            }
             env.update({str(k): str(v) for k, v in self.config.env.items()})
             try:
-                timeout = clamp_integer(1, int(timeout or self.config.command_timeout_seconds), 3600)
+                timeout = clamp_integer(
+                    1, int(timeout or self.config.command_timeout_seconds), 3600
+                )
             except (TypeError, ValueError):
                 raise ValueError("timeout must be an integer") from None
 
@@ -219,12 +243,22 @@ DEFAULT_SESSIONS = [
         tools=["filesystem", "terminal", "git"],
         template=True,
     ),
-    ReadyMadeSession("researcher", "Researcher", "researcher", tools=["web", "mcp"], template=True),
+    ReadyMadeSession(
+        "researcher", "Researcher", "researcher", tools=["web", "mcp"], template=True
+    ),
     ReadyMadeSession("assistant", "Assistant", "assistant", template=True),
     ReadyMadeSession(
-        "terminal", "Terminal", "terminal", tools=["terminal", "filesystem"], template=True
+        "terminal",
+        "Terminal",
+        "terminal",
+        tools=["terminal", "filesystem"],
+        template=True,
     ),
     ReadyMadeSession(
-        "agent", "Agent", "agent", tools=["filesystem", "terminal", "mcp"], template=True
+        "agent",
+        "Agent",
+        "agent",
+        tools=["filesystem", "terminal", "mcp"],
+        template=True,
     ),
 ]

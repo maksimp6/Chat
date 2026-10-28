@@ -69,7 +69,9 @@ class DowntimeTracker:
     ) -> bool:
         self._validate_input(state, timestamp, reason, event_id)
         canonical_reason = reason if state == "blocked" and reason else "undetermined"
-        entry = Observation(_STATES[state], float(timestamp), canonical_reason, event_id)
+        entry = Observation(
+            _STATES[state], float(timestamp), canonical_reason, event_id
+        )
         if event_id is not None and event_id in self._ids:
             if entry != self._ids[event_id]:
                 raise ValueError("Conflicting event id")

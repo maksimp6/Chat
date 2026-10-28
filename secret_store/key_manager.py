@@ -59,7 +59,9 @@ def _iso(value: datetime) -> str:
 
 def _manager_key() -> bytes:
     raw = (
-        env_get("LOGOS_KEY_MANAGER_KEY") or env_get("LOGOS_PROVIDER_CREDENTIAL_KEY") or ""
+        env_get("LOGOS_KEY_MANAGER_KEY")
+        or env_get("LOGOS_PROVIDER_CREDENTIAL_KEY")
+        or ""
     ).strip()
     if not raw:
         raise KeyManagerError(
@@ -68,7 +70,9 @@ def _manager_key() -> bytes:
     try:
         return raw.encode("ascii")
     except UnicodeEncodeError as exc:
-        raise KeyManagerError("Key-manager encryption key must be ASCII Fernet material") from exc
+        raise KeyManagerError(
+            "Key-manager encryption key must be ASCII Fernet material"
+        ) from exc
 
 
 def _fernet() -> Fernet:
@@ -171,7 +175,9 @@ def read_secret(key_ref: str) -> str:
     row = _get_row(key_ref)
     _check_active(row)
     try:
-        return _fernet().decrypt(row["encrypted_secret"].encode("ascii")).decode("utf-8")
+        return (
+            _fernet().decrypt(row["encrypted_secret"].encode("ascii")).decode("utf-8")
+        )
     except InvalidToken as exc:
         raise KeyManagerError("Unable to decrypt managed secret") from exc
 
@@ -197,7 +203,8 @@ def list_keys(
         and (include_revoked or row["status"] != "revoked")
     ]
     return [
-        _metadata(row) for row in sorted(selected, key=lambda row: row["created_at"], reverse=True)
+        _metadata(row)
+        for row in sorted(selected, key=lambda row: row["created_at"], reverse=True)
     ]
 
 

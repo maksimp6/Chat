@@ -20,14 +20,20 @@ _REVISION = re.compile(r"[0-9a-f]{64}\Z")
 
 def _canonical(state: dict[str, Any]) -> bytes:
     return json.dumps(
-        state, sort_keys=True, ensure_ascii=False, allow_nan=False, separators=(",", ":")
+        state,
+        sort_keys=True,
+        ensure_ascii=False,
+        allow_nan=False,
+        separators=(",", ":"),
     ).encode("utf-8")
 
 
 class ModelStore:
     """Content-addressed, immutable scene snapshots in an owner namespace."""
 
-    def __init__(self, provider: StorageProvider, owner_id: str, runtime_id: str = "host") -> None:
+    def __init__(
+        self, provider: StorageProvider, owner_id: str, runtime_id: str = "host"
+    ) -> None:
         if not isinstance(owner_id, str) or not owner_id.strip():
             raise ValueError("trusted owner identity is required")
         if not isinstance(runtime_id, str) or not runtime_id.strip():
@@ -109,7 +115,10 @@ class ModelStore:
         digest = hashlib.sha256(raw).hexdigest()
         key = f"{self.prefix}/{model_id}/exports/{rev}.stl"
         obj = self.provider.upload(key, raw, credentials=None)
-        if hashlib.sha256(self.provider.download(key, credentials=None)).hexdigest() != digest:
+        if (
+            hashlib.sha256(self.provider.download(key, credentials=None)).hexdigest()
+            != digest
+        ):
             raise OSError("STL storage verification failed")
         return {
             "format": "stl",

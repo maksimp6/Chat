@@ -37,7 +37,9 @@ class CloudRuSecretManagementAdminClient:
             api_key_auth=False,
         )
 
-    def create_secret(self, *, name: str, value: str, description: str = "") -> tuple[str, str]:
+    def create_secret(
+        self, *, name: str, value: str, description: str = ""
+    ) -> tuple[str, str]:
         self._ensure_admin()
         if not self.parent_id:
             raise CloudProviderError(
@@ -110,7 +112,10 @@ class CloudRuSecretManagementAdminClient:
             response = requests.request(
                 method,
                 url,
-                headers={"Accept": "application/json", "Authorization": f"Bearer {token}"},
+                headers={
+                    "Accept": "application/json",
+                    "Authorization": f"Bearer {token}",
+                },
                 json=payload,
                 timeout=self.timeout,
             )

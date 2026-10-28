@@ -79,13 +79,21 @@ def _read_token(path: Path) -> str:
     try:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077:
-            raise ConfigError(f"token file {path} must be a private regular file (0600)")
+            raise ConfigError(
+                f"token file {path} must be a private regular file (0600)"
+            )
         raw = os.read(fd, 4097)
     finally:
         os.close(fd)
     token = raw.decode("ascii", "replace").strip()
-    if len(token) < 16 or len(raw) > 4096 or not all(33 <= ord(ch) <= 126 for ch in token):
-        raise ConfigError(f"token file {path} must hold one printable token of 16..4096 bytes")
+    if (
+        len(token) < 16
+        or len(raw) > 4096
+        or not all(33 <= ord(ch) <= 126 for ch in token)
+    ):
+        raise ConfigError(
+            f"token file {path} must hold one printable token of 16..4096 bytes"
+        )
     return token
 
 
@@ -96,7 +104,9 @@ class ExecutionJournal:
         state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         info = os.lstat(state_dir)
         if not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o077:
-            raise ConfigError("agent state directory must be a private (0700) directory")
+            raise ConfigError(
+                "agent state directory must be a private (0700) directory"
+            )
         self.path = state_dir / "executed.log"
         self._entries: dict[str, str] = {}
         if self.path.exists():
@@ -111,7 +121,11 @@ class ExecutionJournal:
             fields = line.decode("ascii", "strict").split()
             if len(fields) == 2 and fields[0] == "S":
                 self._entries.setdefault(fields[1], "started")
-            elif len(fields) == 3 and fields[0] == "F" and fields[2] in ("done", "failed"):
+            elif (
+                len(fields) == 3
+                and fields[0] == "F"
+                and fields[2] in ("done", "failed")
+            ):
                 self._entries[fields[1]] = fields[2]
             else:
                 raise ConfigError("agent journal is corrupt")
@@ -122,7 +136,9 @@ class ExecutionJournal:
                 os.fsync(handle.fileno())
 
     def _append(self, line: str) -> None:
-        fd = os.open(self.path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        fd = os.open(
+            self.path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600
+        )
         try:
             os.write(fd, line.encode("ascii"))
             os.fsync(fd)
@@ -165,14 +181,18 @@ class FallbackAgent:
                 parts.hostname, parts.port, timeout=timeout, context=context
             )
         else:
-            conn = http.client.HTTPConnection(parts.hostname, parts.port, timeout=timeout)
+            conn = http.client.HTTPConnection(
+                parts.hostname, parts.port, timeout=timeout
+            )
         headers = {"Authorization": "Bearer " + token}
         data = None
         if body is not None:
             data = json.dumps(body).encode("utf-8")
             headers["Content-Type"] = "application/json"
         try:
-            conn.request(method, parts.path.rstrip("/") + path, body=data, headers=headers)
+            conn.request(
+                method, parts.path.rstrip("/") + path, body=data, headers=headers
+            )
             response = conn.getresponse()
             payload = response.read(RESPONSE_MAX_BYTES + 1)
         except (OSError, http.client.HTTPException) as exc:
@@ -202,7 +222,9 @@ class FallbackAgent:
         return commands
 
     def ack(self, command_id: str, status: str) -> None:
-        code, _ = self._request("POST", f"/v1/commands/{command_id}/ack", {"status": status})
+        code, _ = self._request(
+            "POST", f"/v1/commands/{command_id}/ack", {"status": status}
+        )
         if code not in (200, 204, 404, 409):  # 404/409: nothing left to acknowledge
             raise TransportError(f"ack: HTTP {code}")
 
@@ -256,7 +278,9 @@ class FallbackAgent:
             except (TransportError, AuthError) as exc:
                 failures += 1
                 print(f"logos-fallback-agent: {exc}", file=sys.stderr)
-            delay = min(BACKOFF_MAX_SECONDS, BACKOFF_BASE_SECONDS * 2 ** min(failures - 1, 16))
+            delay = min(
+                BACKOFF_MAX_SECONDS, BACKOFF_BASE_SECONDS * 2 ** min(failures - 1, 16)
+            )
             if wait(delay * random.uniform(0.5, 1.0)):
                 return
 
@@ -277,7 +301,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         agent = FallbackAgent(
             AgentConfig(
-                args.url, args.token_file, args.state_dir, args.poll_timeout_ms, args.ca_file
+                args.url,
+                args.token_file,
+                args.state_dir,
+                args.poll_timeout_ms,
+                args.ca_file,
             )
         )
     except ConfigError as exc:

@@ -27,7 +27,12 @@ MAX_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
 MAX_REQUESTS = 1500
 MAX_PAGES = 10000
 DOWNLOAD_TIMEOUT_SECONDS = 45
-RETRYABLE_ERRORS = {"github_json_invalid", "github_http_502", "github_http_503", "github_http_504"}
+RETRYABLE_ERRORS = {
+    "github_json_invalid",
+    "github_http_502",
+    "github_http_503",
+    "github_http_504",
+}
 
 
 class CollectionError(ValueError):
@@ -76,8 +81,15 @@ class _DownloadRedirect(urllib.request.HTTPRedirectHandler):
             "api.github.com",
             "github.com",
             "github-production-user-asset-6210df.s3.amazonaws.com",
-        } or host.endswith((".githubusercontent.com", ".github.com", ".blob.core.windows.net"))
-        if parsed.scheme != "https" or not allowed or parsed.username or parsed.password:
+        } or host.endswith(
+            (".githubusercontent.com", ".github.com", ".blob.core.windows.net")
+        )
+        if (
+            parsed.scheme != "https"
+            or not allowed
+            or parsed.username
+            or parsed.password
+        ):
             raise CollectionError("download_redirect_not_allowed")
         redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
         if redirected is not None:
@@ -194,7 +206,9 @@ class GitHubReader:
     ) -> bytes:
         for attempt in range(2):
             try:
-                return self._request_once(path, body=body, binary=binary, immutable=immutable)
+                return self._request_once(
+                    path, body=body, binary=binary, immutable=immutable
+                )
             except CollectionError as error:
                 if str(error) not in RETRYABLE_ERRORS:
                     raise
@@ -229,7 +243,12 @@ class GitHubReader:
 
     @staticmethod
     def _request_key(path, body, binary):
-        if not path.startswith("/") or path.startswith("//") or "\n" in path or "\r" in path:
+        if (
+            not path.startswith("/")
+            or path.startswith("//")
+            or "\n" in path
+            or "\r" in path
+        ):
             raise CollectionError("github_path_invalid")
         if body is not None and path != "/graphql":
             raise CollectionError("github_write_forbidden")
@@ -271,7 +290,9 @@ class GitHubReader:
 
     def _read_response(self, request, limit):
         with self.opener.open(request, timeout=45) as response:
-            raw = response.read(min(limit, self.max_total_bytes - self.downloaded_bytes) + 1)
+            raw = response.read(
+                min(limit, self.max_total_bytes - self.downloaded_bytes) + 1
+            )
             self.downloaded_bytes += len(raw)
             if len(raw) > limit:
                 raise CollectionError("source_byte_limit_exceeded")
@@ -350,13 +371,18 @@ class GitHubReader:
         with self.opener.open(request, timeout=_remaining(deadline)) as response:
             while True:
                 remaining = _remaining(deadline)
-                sock = getattr(getattr(getattr(response, "fp", None), "raw", None), "_sock", None)
+                sock = getattr(
+                    getattr(getattr(response, "fp", None), "raw", None), "_sock", None
+                )
                 if sock is not None:
                     sock.settimeout(remaining)
                 allowance = min(
-                    self.max_download_bytes - size, self.max_total_bytes - self.downloaded_bytes
+                    self.max_download_bytes - size,
+                    self.max_total_bytes - self.downloaded_bytes,
                 )
-                chunk = getattr(response, "read1", response.read)(min(65536, allowance + 1))
+                chunk = getattr(response, "read1", response.read)(
+                    min(65536, allowance + 1)
+                )
                 if not chunk:
                     break
                 size += len(chunk)
@@ -375,7 +401,8 @@ class GitHubReader:
         if not query.lstrip().startswith("query ") or re.search(r"\bmutation\b", query):
             raise CollectionError("github_write_forbidden")
         result = self._json_request(
-            "/graphql", body=json.dumps({"query": query, "variables": variables}).encode()
+            "/graphql",
+            body=json.dumps({"query": query, "variables": variables}).encode(),
         )
         if not isinstance(result, dict) or result.get("errors"):
             raise CollectionError("github_graphql_unavailable")
@@ -383,7 +410,9 @@ class GitHubReader:
 
 
 def _encoded(value) -> bytes:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    return json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode()
 
 
 class _Progress:
@@ -416,13 +445,17 @@ class _Progress:
         if last_id not in ids:
             return rows, set(), digest
         split = ids.index(last_id) + 1
-        historical = set(ids[:split]) if previous.get("inventory_sha256") == digest else set()
+        historical = (
+            set(ids[:split]) if previous.get("inventory_sha256") == digest else set()
+        )
         return rows[split:] + rows[:split], historical, digest
 
     def advance(self, family, source_id, digest):
         self.families[family] = {"last_id": source_id, "inventory_sha256": digest}
         data = {"schema": 1, "repository": self.repository, "families": self.families}
-        content = _encoded({"data": data, "sha256": hashlib.sha256(_encoded(data)).hexdigest()})
+        content = _encoded(
+            {"data": data, "sha256": hashlib.sha256(_encoded(data)).hexdigest()}
+        )
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         temporary = self.path.with_suffix(".tmp")
         with temporary.open("wb") as handle:
@@ -455,7 +488,9 @@ class _Collector:
         self.sink.gap(kind, source_id, reason, metadata or {})
 
     def record(self, kind, row, *, source_id=None, url=None):
-        identity = source_id or str(row.get("id") or row.get("node_id") or row.get("number") or "")
+        identity = source_id or str(
+            row.get("id") or row.get("node_id") or row.get("number") or ""
+        )
         if not identity:
             self.gap(kind, kind, "source_identity_missing")
             return
@@ -472,7 +507,11 @@ class _Collector:
             url or row.get("html_url") or row.get("url") or self.web,
             version,
             raw,
-            {"repository": self.repository, "source_id": identity, "access_scope": "repository"},
+            {
+                "repository": self.repository,
+                "source_id": identity,
+                "access_scope": "repository",
+            },
         )
         self.counts[kind] = self.counts.get(kind, 0) + 1
         self._attachment_links(
@@ -514,7 +553,8 @@ class _Collector:
         try:
             for page in range(1, self.max_pages + 1):
                 response = self.reader.json(
-                    f"{self.base}{path}{separator}per_page=100&page={page}", immutable=immutable
+                    f"{self.base}{path}{separator}per_page=100&page={page}",
+                    immutable=immutable,
                 )
                 rows = self._collection_rows(kind, path, response, key, state)
                 if not rows:
@@ -536,7 +576,10 @@ class _Collector:
                 )
         except CollectionError as error:
             self.gap(
-                kind, path, str(error), {"collected": len(result), "expected": state["expected"]}
+                kind,
+                path,
+                str(error),
+                {"collected": len(result), "expected": state["expected"]},
             )
         self.inventory[kind + ":" + path] = {
             "complete": complete and state["consistent"],
@@ -547,7 +590,9 @@ class _Collector:
 
     def _collection_rows(self, kind, path, response, key, state):
         if key:
-            if not isinstance(response, dict) or not isinstance(response.get(key), list):
+            if not isinstance(response, dict) or not isinstance(
+                response.get(key), list
+            ):
                 raise CollectionError("collection_shape_invalid")
             rows = response[key]
             total = response.get("total_count")
@@ -606,7 +651,12 @@ class _Collector:
         size = row.get("size_in_bytes", row.get("size"))
         limit = getattr(self.reader, "max_download_bytes", MAX_DOWNLOAD_BYTES)
         if type(size) is int and size > limit:
-            self.gap(kind, path, "source_byte_limit_exceeded", {"bytes": size, "limit": limit})
+            self.gap(
+                kind,
+                path,
+                "source_byte_limit_exceeded",
+                {"bytes": size, "limit": limit},
+            )
             return
         try:
             raw = self.reader.binary(self.base + path, immutable=immutable)
@@ -618,7 +668,9 @@ class _Collector:
                 and expected[7:] != digest
             ):
                 raise CollectionError("download_digest_mismatch")
-            if kind in {"actions_logs", "actions_artifact"} and not raw.startswith(b"PK"):
+            if kind in {"actions_logs", "actions_artifact"} and not raw.startswith(
+                b"PK"
+            ):
                 raise CollectionError("download_zip_invalid")
             self.sink.add(
                 kind,
@@ -643,12 +695,16 @@ class _Collector:
     def deferred(self, kind, rows, *, reason=None):
         if rows:
             reason = (
-                reason or getattr(self.reader, "stop_reason", None) or "request_budget_exhausted"
+                reason
+                or getattr(self.reader, "stop_reason", None)
+                or "request_budget_exhausted"
             )
             ids = [row["id"] for row in rows]
             metadata = {"count": len(rows), "source_ids": ids}
             historical = [
-                source_id for source_id in ids if source_id in self.prior_attempts.get(kind, set())
+                source_id
+                for source_id in ids
+                if source_id in self.prior_attempts.get(kind, set())
             ]
             if historical:
                 metadata.update(
@@ -745,7 +801,11 @@ def _graphql_pages(collector, kind, query, variables, location):
                 {"expected": expected, "collected": len(rows)},
             )
     except (CollectionError, KeyError, TypeError, AttributeError) as error:
-        reason = str(error) if isinstance(error, CollectionError) else "graphql_shape_invalid"
+        reason = (
+            str(error)
+            if isinstance(error, CollectionError)
+            else "graphql_shape_invalid"
+        )
         collector.gap(
             kind,
             kind + ":" + str(variables.get("id", "repository")),
@@ -779,7 +839,9 @@ def _discussions(collector):
             ("node", "comments"),
         )
         for comment in comments:
-            collector.record("discussion_comment", {**comment, "discussion_id": discussion["id"]})
+            collector.record(
+                "discussion_comment", {**comment, "discussion_id": discussion["id"]}
+            )
             replies = (
                 _graphql_pages(
                     collector,
@@ -837,7 +899,9 @@ def collect_github(
         repository, reader, sink, max_pages, _Progress(Path(progress_dir), repository)
     )
     collector.epoch = (
-        epoch or getattr(sink, "captured_at", None) or datetime.now(timezone.utc).isoformat()
+        epoch
+        or getattr(sink, "captured_at", None)
+        or datetime.now(timezone.utc).isoformat()
     )
     inventories = _collect_inventories(collector)
     # A denied GraphQL API is a visible gap, not an empty discussion set.
@@ -868,10 +932,14 @@ def _collect_attachments(collector):
             if url in collector.attachment_failures:
                 raise CollectionError(collector.attachment_failures[url])
             raw = collector.reader.attachment(url)
-            if urlsplit(url).path.lower().endswith(".zip") and not raw.startswith(b"PK"):
+            if urlsplit(url).path.lower().endswith(".zip") and not raw.startswith(
+                b"PK"
+            ):
                 raise CollectionError("download_zip_invalid")
             metadata["content_type"] = (
-                "application/zip" if raw.startswith(b"PK") else "application/octet-stream"
+                "application/zip"
+                if raw.startswith(b"PK")
+                else "application/octet-stream"
             )
             collector.sink.add(
                 "github_attachment",
@@ -881,7 +949,9 @@ def _collect_attachments(collector):
                 raw,
                 metadata,
             )
-            collector.counts["github_attachment"] = collector.counts.get("github_attachment", 0) + 1
+            collector.counts["github_attachment"] = (
+                collector.counts.get("github_attachment", 0) + 1
+            )
         except CollectionError as error:
             collector.attachment_failures[url] = str(error)
             collector.gap("github_attachment", url, str(error), metadata)
@@ -892,7 +962,9 @@ def _collect_inventories(collector):
     repository_metadata = collector.read_object("repository", "")
     if repository_metadata and repository_metadata.get("has_wiki"):
         collector.gap(
-            "wiki", collector.repository + ".wiki.git", "separate_wiki_repository_not_collected"
+            "wiki",
+            collector.repository + ".wiki.git",
+            "separate_wiki_repository_not_collected",
         )
     inventories = {}
     specs = (
@@ -928,19 +1000,25 @@ def _collect_reviews(collector, rows):
             break
         if collector.phase_exhausted(review_limit):
             collector.deferred(
-                "pull_request_reviews", pulls[index:], reason="detail_phase_budget_exhausted"
+                "pull_request_reviews",
+                pulls[index:],
+                reason="detail_phase_budget_exhausted",
             )
             break
         number = pull.get("number")
         if type(number) is not int or number < 1:
             collector.gap(
-                "pull_request_reviews", str(pull.get("id")), "pull_request_number_invalid"
+                "pull_request_reviews",
+                str(pull.get("id")),
+                "pull_request_number_invalid",
             )
             collector.advance("pull_request_reviews", pull)
             continue
         reviews = collector.pages("pull_request_review", f"/pulls/{number}/reviews")
         for review in reviews:
-            collector.record("pull_request_review", {**review, "pull_request_number": number})
+            collector.record(
+                "pull_request_review", {**review, "pull_request_number": number}
+            )
         if getattr(reader, "stop_reason", None):
             collector.deferred("pull_request_reviews", pulls[index:])
             break
@@ -957,20 +1035,26 @@ def _collect_runs(collector, rows):
             break
         if collector.phase_exhausted(run_limit):
             collector.deferred(
-                "actions_run_details", runs[index:], reason="detail_phase_budget_exhausted"
+                "actions_run_details",
+                runs[index:],
+                reason="detail_phase_budget_exhausted",
             )
             break
         attempts = run.get("run_attempt")
         run_id = run["id"]
         if type(attempts) is not int or not 1 <= attempts <= 10000:
-            collector.gap("actions_run_details", str(run_id), "run_attempt_count_invalid")
+            collector.gap(
+                "actions_run_details", str(run_id), "run_attempt_count_invalid"
+            )
             collector.advance("actions_run_details", run)
             continue
         for attempt in range(1, attempts + 1):
             path = f"/actions/runs/{run_id}/attempts/{attempt}"
             immutable = attempt < attempts or run.get("status") == "completed"
             detail = collector.read_object("actions_attempt", path, immutable=immutable)
-            jobs = collector.pages("actions_job", path + "/jobs", key="jobs", immutable=immutable)
+            jobs = collector.pages(
+                "actions_job", path + "/jobs", key="jobs", immutable=immutable
+            )
             for job in jobs:
                 collector.record("actions_job", {**job, "run_attempt": attempt})
             if detail is not None:
@@ -1004,10 +1088,14 @@ def _collect_artifacts(collector, rows):
             break
         if collector.phase_exhausted(artifact_limit):
             collector.deferred(
-                "actions_artifact", artifacts[index:], reason="detail_phase_budget_exhausted"
+                "actions_artifact",
+                artifacts[index:],
+                reason="detail_phase_budget_exhausted",
             )
             break
-        collector.download("actions_artifact", f"/actions/artifacts/{artifact['id']}/zip", artifact)
+        collector.download(
+            "actions_artifact", f"/actions/artifacts/{artifact['id']}/zip", artifact
+        )
         if getattr(reader, "stop_reason", None):
             collector.deferred("actions_artifact", artifacts[index:])
             break
@@ -1021,11 +1109,16 @@ def _collect_releases(collector, rows):
         if getattr(reader, "stop_reason", None):
             collector.deferred("release_assets", releases[index:])
             break
-        assets = collector.pages("release_asset_metadata", f"/releases/{release['id']}/assets")
+        assets = collector.pages(
+            "release_asset_metadata", f"/releases/{release['id']}/assets"
+        )
         for asset in assets:
             collector.record("release_asset_metadata", asset)
             collector.download(
-                "release_asset", f"/releases/assets/{asset['id']}", asset, immutable=False
+                "release_asset",
+                f"/releases/assets/{asset['id']}",
+                asset,
+                immutable=False,
             )
         if getattr(reader, "stop_reason", None):
             collector.deferred("release_assets", releases[index:])

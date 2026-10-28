@@ -18,7 +18,9 @@ I = {"type": "integer"}
 SCHEMA_OBJECT = {"type": "object", "additionalProperties": True}
 
 
-def obj(properties: dict[str, Any], *required: str, **constraints: Any) -> dict[str, Any]:
+def obj(
+    properties: dict[str, Any], *required: str, **constraints: Any
+) -> dict[str, Any]:
     return {
         "type": "object",
         "properties": properties,
@@ -58,7 +60,9 @@ METADATA = {
 ATTRIBUTES = {
     "type": "object",
     "maxProperties": 16,
-    "additionalProperties": union({"type": "string", "maxLength": 512}, {"type": "number"}, B),
+    "additionalProperties": union(
+        {"type": "string", "maxLength": 512}, {"type": "number"}, B
+    ),
 }
 STATUS = enum("in_progress", "completed", "incomplete")
 CONTENT = union(
@@ -74,9 +78,19 @@ CONTENT = union(
         anyOf=[{"required": ["image_url"]}, {"required": ["file_id"]}],
     ),
     obj(
-        {"type": enum("input_file"), "file_data": S, "file_id": S, "filename": S, "file_url": S},
+        {
+            "type": enum("input_file"),
+            "file_data": S,
+            "file_id": S,
+            "filename": S,
+            "file_url": S,
+        },
         "type",
-        anyOf=[{"required": ["file_data"]}, {"required": ["file_id"]}, {"required": ["file_url"]}],
+        anyOf=[
+            {"required": ["file_data"]},
+            {"required": ["file_id"]},
+            {"required": ["file_url"]},
+        ],
     ),
 )
 INPUT = union(
@@ -122,8 +136,12 @@ INPUT = union(
             "type": enum("reasoning"),
             "id": S,
             "encrypted_content": S,
-            "summary": array(obj({"type": enum("summary_text"), "text": S}, "type", "text")),
-            "content": array(obj({"type": enum("reasoning_text"), "text": S}, "type", "text")),
+            "summary": array(
+                obj({"type": enum("summary_text"), "text": S}, "type", "text")
+            ),
+            "content": array(
+                obj({"type": enum("reasoning_text"), "text": S}, "type", "text")
+            ),
             "status": STATUS,
         },
         "type",
@@ -147,13 +165,17 @@ FILTER = union(
         {
             "type": enum("eq", "ne", "gt", "gte", "lt", "lte", "in", "nin"),
             "key": TEXT,
-            "value": union(S, {"type": "number"}, B, array(union(S, {"type": "number"}))),
+            "value": union(
+                S, {"type": "number"}, B, array(union(S, {"type": "number"}))
+            ),
         },
         "type",
         "key",
         "value",
     ),
-    obj({"type": enum("and", "or"), "filters": array(ref("Filter"))}, "type", "filters"),
+    obj(
+        {"type": enum("and", "or"), "filters": array(ref("Filter"))}, "type", "filters"
+    ),
 )
 RANKING = obj(
     {
@@ -186,7 +208,9 @@ TOOLS = union(
             "authorization": S,
             "headers": STRING_MAP,
             "server_description": S,
-            "allowed_tools": union(array(S), obj({"tool_names": array(S), "read_only": B})),
+            "allowed_tools": union(
+                array(S), obj({"tool_names": array(S), "read_only": B})
+            ),
             "require_approval": union(
                 enum("always", "never"),
                 obj(
@@ -218,7 +242,13 @@ TOOLS = union(
             "search_context_size": enum("low", "medium", "high"),
             "filters": obj({"allowed_domains": array(S)}),
             "user_location": obj(
-                {"type": enum("approximate"), "city": S, "country": S, "region": S, "timezone": S}
+                {
+                    "type": enum("approximate"),
+                    "city": S,
+                    "country": S,
+                    "region": S,
+                    "timezone": S,
+                }
             ),
         },
         "type",
@@ -257,15 +287,24 @@ RESPONSES = obj(
         "top_logprobs": {"type": "integer", "minimum": 0, "maximum": 20},
         "prompt_cache_key": S,
         "service_tier": enum("auto", "default", "flex", "scale", "priority"),
-        "reasoning": obj({"effort": enum("none", "minimal", "low", "medium", "high", "xhigh")}),
+        "reasoning": obj(
+            {"effort": enum("none", "minimal", "low", "medium", "high", "xhigh")}
+        ),
         "text": obj({"format": FORMAT, "verbosity": enum("low", "medium", "high")}),
         "tools": array(TOOLS),
         "parallel_tool_calls": B,
         "tool_choice": union(
             enum("auto", "none", "required"),
             obj({"type": enum("function"), "name": TEXT}, "type", "name"),
-            obj({"type": enum("mcp"), "server_label": TEXT, "name": S}, "type", "server_label"),
-            obj({"type": enum("file_search", "web_search", "web_search_preview")}, "type"),
+            obj(
+                {"type": enum("mcp"), "server_label": TEXT, "name": S},
+                "type",
+                "server_label",
+            ),
+            obj(
+                {"type": enum("file_search", "web_search", "web_search_preview")},
+                "type",
+            ),
         ),
         "prompt": obj({"id": TEXT, "version": S, "variables": STRING_MAP}, "id"),
         "truncation": enum("auto", "disabled"),
@@ -312,7 +351,11 @@ def add(
         "name": name,
         "availability": "not_verified_live",
         "profile_for": key,
-        "transport": {"kind": "http", "method": method, "url_template": "https://" + host + path},
+        "transport": {
+            "kind": "http",
+            "method": method,
+            "url_template": "https://" + host + path,
+        },
         "request": locations,
         "responses": {},
         "body_format": body_format,
@@ -351,7 +394,10 @@ add(
 )
 LIMIT = {"type": "integer", "minimum": 1, "maximum": 100}
 EXPIRES = obj(
-    {"anchor": enum("last_active_at"), "days": {"type": "integer", "minimum": 1, "maximum": 365}},
+    {
+        "anchor": enum("last_active_at"),
+        "days": {"type": "integer", "minimum": 1, "maximum": 365},
+    },
     "anchor",
     "days",
 )
@@ -362,7 +408,11 @@ CHUNKING = union(
             "type": enum("static"),
             "static": obj(
                 {
-                    "max_chunk_size_tokens": {"type": "integer", "minimum": 100, "maximum": 4096},
+                    "max_chunk_size_tokens": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 4096,
+                    },
                     "chunk_overlap_tokens": {"type": "integer", "minimum": 0},
                 },
                 "max_chunk_size_tokens",
@@ -423,7 +473,11 @@ add(
     "POST",
     "/v1/vector_stores/{vector_store_id}/files",
     body=obj(
-        {"file_id": TEXT, "chunking_strategy": CHUNKING, "attributes": nullable(ATTRIBUTES)},
+        {
+            "file_id": TEXT,
+            "chunking_strategy": CHUNKING,
+            "attributes": nullable(ATTRIBUTES),
+        },
         "file_id",
     ),
     source=AI + "Vector-stores/createVectorStoreFile",
@@ -467,16 +521,26 @@ add(
 )
 for verb, operation in (("GET", "get"), ("DELETE", "delete")):
     add(
-        "files." + operation, verb, "/v1/files/{file_id}", source=AI + "Files/" + operation + "File"
+        "files." + operation,
+        verb,
+        "/v1/files/{file_id}",
+        source=AI + "Files/" + operation + "File",
     )
-add("files.content", "GET", "/v1/files/{file_id}/content", source=AI + "Files/downloadFile")
+add(
+    "files.content",
+    "GET",
+    "/v1/files/{file_id}/content",
+    source=AI + "Files/downloadFile",
+)
 add(
     "files.upload",
     "POST",
     "/v1/files",
     body=obj(
         {
-            "purpose": enum("assistants", "batch", "fine-tune", "vision", "user_data", "evals"),
+            "purpose": enum(
+                "assistants", "batch", "fine-tune", "vision", "user_data", "evals"
+            ),
             "expires_after": obj(
                 {
                     "anchor": enum("created_at"),
@@ -503,14 +567,28 @@ add(
                 {
                     "stream": B,
                     "temperature": {"type": "number", "minimum": 0, "maximum": 1},
-                    "maxTokens": {"type": "string", "format": "int64", "pattern": "^[1-9][0-9]*$"},
+                    "maxTokens": {
+                        "type": "string",
+                        "format": "int64",
+                        "pattern": "^[1-9][0-9]*$",
+                    },
                     "reasoningOptions": obj(
-                        {"mode": enum("REASONING_MODE_UNSPECIFIED", "DISABLED", "ENABLED_HIDDEN")}
+                        {
+                            "mode": enum(
+                                "REASONING_MODE_UNSPECIFIED",
+                                "DISABLED",
+                                "ENABLED_HIDDEN",
+                            )
+                        }
                     ),
                 }
             ),
             "messages": array(
-                obj({"role": enum("system", "user", "assistant"), "text": S}, "role", "text")
+                obj(
+                    {"role": enum("system", "user", "assistant"), "text": S},
+                    "role",
+                    "text",
+                )
             ),
             "jsonObject": B,
             "jsonSchema": obj({"schema": SCHEMA_OBJECT}, "schema"),

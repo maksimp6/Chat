@@ -88,7 +88,9 @@ def get_active_credential(
     if provider not in SUPPORTED_PROVIDERS:
         raise ValueError(f"Unsupported provider: {provider}")
     identity = db.get("provider/active/" + provider)
-    row = db.get("provider/credential/" + str(identity)) if identity is not None else None
+    row = (
+        db.get("provider/credential/" + str(identity)) if identity is not None else None
+    )
     if row is None or row["status"] != ACTIVE:
         raise NoActiveCredentialError(f"No active {provider} provider credential")
     expires = _as_utc(row["expires_at"])
@@ -137,7 +139,9 @@ def bootstrap_credential(
         existing = tx.get("provider/active/" + provider)
         if existing is not None:
             if decrypt is None:
-                raise NoActiveCredentialError("provider credential already bootstrapped")
+                raise NoActiveCredentialError(
+                    "provider credential already bootstrapped"
+                )
             current = tx.get("provider/credential/" + str(existing)) or {}
             if current.get("fingerprint") != fingerprint_key(api_key):
                 # The key given here would be dropped silently; changing the key is a rotation.
@@ -179,7 +183,10 @@ def replace_active_credential(
     encrypted = encrypt(api_key)
     with db.transaction() as tx:
         # Checked inside the transaction: a key that became active after the caller's read is never overwritten.
-        if expected_active_id is not None and tx.get("provider/active/" + provider) != expected_active_id:
+        if (
+            expected_active_id is not None
+            and tx.get("provider/active/" + provider) != expected_active_id
+        ):
             raise CredentialError("Provider credential changed before replacement")
         identity = _publish_credential(
             tx,
@@ -212,7 +219,9 @@ def resolve_client_credential(
     provider: str = YANDEX,
 ) -> ProviderCredential:
     if db is None:
-        raise NoActiveCredentialError("No native store configured for provider credentials")
+        raise NoActiveCredentialError(
+            "No native store configured for provider credentials"
+        )
     if decrypt is None:
         if db.get("provider/active/" + provider) is not None:
             raise CredentialError("Provider encryption is not configured")
@@ -337,7 +346,11 @@ def set_secret_management_ref(
     *,
     now: Optional[datetime] = None,
 ) -> SecretManagementRef:
-    purpose, secret_id, version_id = purpose.strip(), secret_id.strip(), version_id.strip()
+    purpose, secret_id, version_id = (
+        purpose.strip(),
+        secret_id.strip(),
+        version_id.strip(),
+    )
     if not purpose or not secret_id or not version_id:
         raise ValueError("purpose, secret_id and version_id are required")
     key = "secret/ref/" + purpose
@@ -397,7 +410,9 @@ def _get_secret_management_client():
     if _SECRET_MANAGEMENT_CLIENT is None:
         with _SECRET_MANAGEMENT_CLIENT_LOCK:
             if _SECRET_MANAGEMENT_CLIENT is None:
-                from cloud.cloudru.secret_management import CloudRuSecretManagementClient
+                from cloud.cloudru.secret_management import (
+                    CloudRuSecretManagementClient,
+                )
 
                 _SECRET_MANAGEMENT_CLIENT = CloudRuSecretManagementClient()
     return _SECRET_MANAGEMENT_CLIENT
@@ -417,7 +432,9 @@ def resolve_secret_management_value(
     """
     ref = get_secret_management_ref(db, purpose)
     if ref is None:
-        raise NoActiveCredentialError(f"No secret management ref configured for '{purpose}'")
+        raise NoActiveCredentialError(
+            f"No secret management ref configured for '{purpose}'"
+        )
     if client is None:
         client = _get_secret_management_client()
     secret_value = client.get_secret_value(ref.secret_id, ref.pinned_version_id)
@@ -469,7 +486,9 @@ def _publish_credential(
     return identity
 
 
-def get_cloudru_iam_credentials(db: Any, decrypt: Callable[[str], str]) -> Optional[dict[str, str]]:
+def get_cloudru_iam_credentials(
+    db: Any, decrypt: Callable[[str], str]
+) -> Optional[dict[str, str]]:
     row = db.get("provider/cloudru-iam")
     if row is None:
         return None
@@ -515,6 +534,8 @@ def _ref_from_record(row: dict[str, Any]) -> SecretManagementRef:
         purpose=str(row["purpose"]),
         secret_id=str(row["secret_id"]),
         pinned_version_id=str(row["pinned_version_id"]),
-        previous_version_id=str(row["previous_version_id"]) if row["previous_version_id"] else None,
+        previous_version_id=str(row["previous_version_id"])
+        if row["previous_version_id"]
+        else None,
         updated_at=_as_utc(row["updated_at"]),
     )

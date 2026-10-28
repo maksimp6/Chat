@@ -1,4 +1,5 @@
 """Launch the existing Redmi installation with its private state and network settings."""
+
 import json
 import os
 from pathlib import Path
@@ -8,8 +9,12 @@ import subprocess
 
 def main():
     os.umask(0o077)
-    app = Path(os.environ.get("LOGOS_APP_DIR", str(Path.home() / "logos-local"))).resolve()
-    state = Path(os.environ.get("LOGOS_STATE_DIR", str(Path.home() / "logos-local-state"))).resolve()
+    app = Path(
+        os.environ.get("LOGOS_APP_DIR", str(Path.home() / "logos-local"))
+    ).resolve()
+    state = Path(
+        os.environ.get("LOGOS_STATE_DIR", str(Path.home() / "logos-local-state"))
+    ).resolve()
     settings = state / "server-network.json"
     try:
         network = json.loads(settings.read_text()) if settings.exists() else {}
@@ -26,8 +31,14 @@ def main():
         check.settimeout(1)
         if check.connect_ex(("127.0.0.1", port)) == 0:
             raise SystemExit("Application port is already occupied")
-    env = {k: v for k, v in os.environ.items() if not k.startswith(("GITHUB_", "ACTIONS_", "RUNNER_", "GH_"))}
-    env.update(HOST=host, PORT=str(port), FLASK_DEBUG="0", PYTHONPATH=str(native[0].parent))
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if not k.startswith(("GITHUB_", "ACTIONS_", "RUNNER_", "GH_"))
+    }
+    env.update(
+        HOST=host, PORT=str(port), FLASK_DEBUG="0", PYTHONPATH=str(native[0].parent)
+    )
     try:
         secret = (state / "provider-encryption.key").read_text().strip()
     except OSError as exc:
@@ -40,8 +51,13 @@ def main():
         log_path.replace(state / "backend.log.1")
     with log_path.open("ab", buffering=0) as log:
         process = subprocess.Popen(
-            [str(app / ".venv/bin/python"), "app.py"], cwd=app, env=env,
-            stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True,
+            [str(app / ".venv/bin/python"), "app.py"],
+            cwd=app,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=log,
+            start_new_session=True,
         )
     temporary = state / "backend.pid.next"
     with temporary.open("w") as stream:

@@ -164,7 +164,9 @@ def validate_params(p: Parameters) -> None:
         and p.loop_od / 2 - 3 <= p.loop_projection <= p.loop_od / 2 - 0.8
         and 0 <= p.loop_y_offset <= 0.5
     ):
-        raise ValueError("Lanyard loop would protrude through seam/bottom or disconnect")
+        raise ValueError(
+            "Lanyard loop would protrude through seam/bottom or disconnect"
+        )
 
 
 def rounded_body(
@@ -200,10 +202,14 @@ def create_assembled_solids(p: Parameters) -> dict[str, cq.Workplane]:
     empty_shell = outer.cut(inner)
     # Cut entire shell at photo-derived seam so both pieces are truly independent.
     top_cut = (
-        cq.Workplane("XY").box(200, 200, 120).translate((0, p.seam_y + p.separation / 2 + 100, 0))
+        cq.Workplane("XY")
+        .box(200, 200, 120)
+        .translate((0, p.seam_y + p.separation / 2 + 100, 0))
     )
     base_cut = (
-        cq.Workplane("XY").box(200, 200, 120).translate((0, p.seam_y - p.separation / 2 - 100, 0))
+        cq.Workplane("XY")
+        .box(200, 200, 120)
+        .translate((0, p.seam_y - p.separation / 2 - 100, 0))
     )
     lid = empty_shell.intersect(top_cut)
     base = empty_shell.intersect(base_cut)
@@ -284,7 +290,9 @@ def print_oriented(shape: cq.Workplane, part: str) -> cq.Workplane:
     angle = -90 if part == "lid" else 90
     rotated = shape.rotate((0, 0, 0), (1, 0, 0), angle)
     bb = rotated.val().BoundingBox()
-    return rotated.translate((-(bb.xmin + bb.xmax) / 2, -(bb.ymin + bb.ymax) / 2, -bb.zmin))
+    return rotated.translate(
+        (-(bb.xmin + bb.xmax) / 2, -(bb.ymin + bb.ymax) / 2, -bb.zmin)
+    )
 
 
 def mesh_validation(stl: Path) -> dict[str, Any]:
@@ -332,7 +340,9 @@ def generate(config: dict[str, Any], outdir: Path) -> dict[str, Any]:
     for part, cad in parts.items():
         stl = outdir / "stl" / f"Yandex_Drops_TPU_{part}_PRINT_ORIENTED_UNVERIFIED.stl"
         step = outdir / "step" / f"Yandex_Drops_TPU_{part}_ASSEMBLY_COORDS.step"
-        exporters.export(print_oriented(cad, part), str(stl), tolerance=0.09, angularTolerance=0.13)
+        exporters.export(
+            print_oriented(cad, part), str(stl), tolerance=0.09, angularTolerance=0.13
+        )
         exporters.export(cad, str(step))
         validations[part] = mesh_validation(stl)
         validations[part]["step_bytes"] = step.stat().st_size
@@ -371,7 +381,10 @@ def generate(config: dict[str, Any], outdir: Path) -> dict[str, Any]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
-        "--config", type=Path, required=True, help="JSON dimensions (all assumptions adjustable)"
+        "--config",
+        type=Path,
+        required=True,
+        help="JSON dimensions (all assumptions adjustable)",
     )
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()

@@ -44,7 +44,11 @@ LABEL_VOCABULARY = (
 
 def _safe_image(root: Path, case: dict) -> tuple[Path, bytes]:
     name = case["image"]
-    if not re.fullmatch(r"[a-zA-Z0-9_.-]+\.png", name) or name.startswith(".") or ".." in name:
+    if (
+        not re.fullmatch(r"[a-zA-Z0-9_.-]+\.png", name)
+        or name.startswith(".")
+        or ".." in name
+    ):
         raise ValueError("only simple PNG basenames are accepted")
     root = root.resolve(strict=True)
     path = root / name
@@ -150,7 +154,9 @@ def _private_response(predictions_dir: Path, case: dict) -> dict | None:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _draw_objects(draw, objects: list[dict], *, offset: int, width: int, height: int, color: str):
+def _draw_objects(
+    draw, objects: list[dict], *, offset: int, width: int, height: int, color: str
+):
     for obj in objects:
         x0, y0, x1, y1 = obj["bbox"]
         bounds = (
@@ -192,26 +198,37 @@ def _save_overlay(
     }[backend]
     draw.text((8, 9), "EXPECTED OBJECTS", fill="#00d18a")
     draw.text((width + 8, 9), mode, fill="#ffb346")
-    _draw_objects(draw, case["objects"], offset=0, width=width, height=height, color="#00b67a")
+    _draw_objects(
+        draw, case["objects"], offset=0, width=width, height=height, color="#00b67a"
+    )
     predicted = prediction.get("objects", []) if prediction else []
-    _draw_objects(draw, predicted, offset=width, width=width, height=height, color="#f59e0b")
+    _draw_objects(
+        draw, predicted, offset=width, width=width, height=height, color="#f59e0b"
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(path, format="PNG")
 
 
 def _summary(cases: list[dict], results: list[dict], backend: str) -> dict:
     assessed = [entry for entry in results if entry["status"] == "evaluated"]
-    counts = {key: sum(entry["metrics"][key] for entry in assessed) for key in ("tp", "fp", "fn")}
+    counts = {
+        key: sum(entry["metrics"][key] for entry in assessed)
+        for key in ("tp", "fp", "fn")
+    }
     tp, fp, fn = counts["tp"], counts["fp"], counts["fn"]
     counts["precision"] = (
         (round(tp / (tp + fp), 6) if tp + fp else float(fn == 0)) if assessed else None
     )
-    counts["recall"] = (round(tp / (tp + fn), 6) if tp + fn else 1.0) if assessed else None
+    counts["recall"] = (
+        (round(tp / (tp + fn), 6) if tp + fn else 1.0) if assessed else None
+    )
     if any(entry["status"] == "blocked" for entry in results):
         status = "BLOCKED"
     elif any(not entry["metrics"]["passed"] for entry in assessed):
         status = "FAILED"
-    elif backend != "loopback" or any(c.get("annotation_status") != "reviewed" for c in cases):
+    elif backend != "loopback" or any(
+        c.get("annotation_status") != "reviewed" for c in cases
+    ):
         status = "REVIEW_PENDING"
     else:
         status = "EVALUATED"
@@ -246,7 +263,9 @@ def run_benchmark(
     if endpoint:
         _validate_endpoint(endpoint)
     cases = load_cases(manifest)
-    backend = "loopback" if endpoint else ("offline_responses" if predictions_dir else "none")
+    backend = (
+        "loopback" if endpoint else ("offline_responses" if predictions_dir else "none")
+    )
     results = []
     for case in cases:
         _, source = _safe_image(image_root, case)
@@ -258,7 +277,13 @@ def run_benchmark(
         if endpoint:
             try:
                 prediction = _request_prediction(endpoint, case, cropped)
-            except (error.URLError, OSError, TimeoutError, ValueError, TypeError) as exc:
+            except (
+                error.URLError,
+                OSError,
+                TimeoutError,
+                ValueError,
+                TypeError,
+            ) as exc:
                 reason = "prediction_unavailable_" + type(exc).__name__
         elif predictions_dir:
             prediction = _private_response(predictions_dir, case)
@@ -279,10 +304,16 @@ def run_benchmark(
                 entry["metrics"] = verify_case(case, prediction)
                 entry["status"] = "evaluated"
             except (ValueError, KeyError, TypeError) as exc:
-                entry.update(status="blocked", reason="invalid_prediction_" + type(exc).__name__)
+                entry.update(
+                    status="blocked", reason="invalid_prediction_" + type(exc).__name__
+                )
                 prediction = None
         _save_overlay(
-            cropped, case, prediction, output_root / "overlays" / (case["id"] + ".png"), backend
+            cropped,
+            case,
+            prediction,
+            output_root / "overlays" / (case["id"] + ".png"),
+            backend,
         )
         results.append(entry)
     report = _summary(cases, results, backend)
@@ -330,7 +361,9 @@ def main() -> int:
         print("BENCHMARK_FAILED", type(exc).__name__, str(exc), file=sys.stderr)
         return 1
     print("VISUAL_BENCHMARK", report["status"], json.dumps(report["total"]))
-    return {"EVALUATED": 0, "REVIEW_PENDING": 2, "BLOCKED": 3, "FAILED": 4}[report["status"]]
+    return {"EVALUATED": 0, "REVIEW_PENDING": 2, "BLOCKED": 3, "FAILED": 4}[
+        report["status"]
+    ]
 
 
 if __name__ == "__main__":

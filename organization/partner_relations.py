@@ -58,7 +58,9 @@ def _trusted_owner(cfg: Optional[dict[str, Any]] = None) -> str:
     return get_current_owner_id()
 
 
-def _trace_event(cfg: Optional[dict[str, Any]], event_type: str, payload: dict[str, Any]) -> None:
+def _trace_event(
+    cfg: Optional[dict[str, Any]], event_type: str, payload: dict[str, Any]
+) -> None:
     context = (cfg or {}).get("_universal_context") if isinstance(cfg, dict) else None
     call = context.get("call") if isinstance(context, dict) else None
     metadata = getattr(call, "metadata", {}) if call is not None else {}
@@ -109,7 +111,9 @@ def create_partner(
     name = str(arguments.get("name") or "").strip()
     if not name:
         raise ValueError("partner name is required")
-    status = _validate_status(arguments.get("status") or "lead", PARTNER_STATUSES, "partner status")
+    status = _validate_status(
+        arguments.get("status") or "lead", PARTNER_STATUSES, "partner status"
+    )
     partner_id = str(arguments.get("id") or uuid4())
     metadata = dict(arguments.get("metadata") or {})
     if len(_json(metadata)) > _MAX_METADATA_CHARS:
@@ -157,7 +161,9 @@ def list_partners(
     if status:
         _validate_status(status, PARTNER_STATUSES, "partner status")
     rows = [
-        row for row in _owned_rows("partner", owner_id) if not status or row["status"] == status
+        row
+        for row in _owned_rows("partner", owner_id)
+        if not status or row["status"] == status
     ]
     rows.sort(key=lambda row: (-row["updated_at"], row["name"]))
     return {"partners": [_partner_row(row) for row in rows]}
@@ -200,7 +206,9 @@ def delete_partner(
     if not _get_partner(owner_id, partner_id):
         raise ValueError("partner not found")
     now = unix_seconds()
-    _update_owned("partner", partner_id, owner_id, {"status": "archived", "updated_at": now})
+    _update_owned(
+        "partner", partner_id, owner_id, {"status": "archived", "updated_at": now}
+    )
     _trace_event(
         cfg,
         "partner_action",
@@ -378,7 +386,11 @@ def delete_contact(
             "owner_id": owner_id,
         },
     )
-    return {"deleted": True, "contact_id": contact_id, "partner_id": existing["partner_id"]}
+    return {
+        "deleted": True,
+        "contact_id": contact_id,
+        "partner_id": existing["partner_id"],
+    }
 
 
 def prepare_message(
@@ -392,7 +404,9 @@ def prepare_message(
     if not _get_partner(owner_id, partner_id):
         raise ValueError("partner not found")
     direction = _validate_status(
-        arguments.get("direction") or "outgoing", MESSAGE_DIRECTIONS, "message direction"
+        arguments.get("direction") or "outgoing",
+        MESSAGE_DIRECTIONS,
+        "message direction",
     )
     message_id = str(arguments.get("message_id") or uuid4())
     status = "prepared" if direction == "outgoing" else "recorded"
@@ -427,7 +441,10 @@ def prepare_message(
             "owner_id": owner_id,
         },
     )
-    return {"message": get_message(owner_id, message_id), "delivery": {"status": "prepared"}}
+    return {
+        "message": get_message(owner_id, message_id),
+        "delivery": {"status": "prepared"},
+    }
 
 
 def get_message(owner_id: str, message_id: str) -> Optional[dict[str, Any]]:
@@ -485,7 +502,9 @@ def get_thread(
         raise ValueError("partner_id is required")
     if not _get_partner(owner_id, partner_id):
         raise ValueError("partner not found")
-    rows = sorted(_owned_rows("message", owner_id, partner_id), key=lambda row: row["created_at"])
+    rows = sorted(
+        _owned_rows("message", owner_id, partner_id), key=lambda row: row["created_at"]
+    )
     return {"messages": [_message_row(row) for row in rows]}
 
 
@@ -494,10 +513,17 @@ def update_status(
 ) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     partner_id = str(arguments.get("partner_id") or "").strip()
-    status = _validate_status(arguments.get("status"), PARTNER_STATUSES, "partner status")
+    status = _validate_status(
+        arguments.get("status"), PARTNER_STATUSES, "partner status"
+    )
     if not partner_id or not _get_partner(owner_id, partner_id):
         raise ValueError("partner not found")
-    _update_owned("partner", partner_id, owner_id, {"status": status, "updated_at": unix_seconds()})
+    _update_owned(
+        "partner",
+        partner_id,
+        owner_id,
+        {"status": status, "updated_at": unix_seconds()},
+    )
     _trace_event(
         cfg,
         "partner_status_updated",
@@ -573,7 +599,9 @@ def complete_followup(
         arguments.get("status") or "completed", FOLLOWUP_STATUSES, "follow-up status"
     )
     now = unix_seconds()
-    _update_owned("followup", followup_id, owner_id, {"status": status, "updated_at": now})
+    _update_owned(
+        "followup", followup_id, owner_id, {"status": status, "updated_at": now}
+    )
     _trace_event(
         cfg,
         "partner_followup_completed",
@@ -601,9 +629,20 @@ PARTNER_TOOLS = {
                 "status": {"type": "string", "enum": list(PARTNER_STATUSES)},
                 "notes": {"type": "string", "maxLength": 10000},
                 "metadata": {"type": "object"},
-                "id": {"anyOf": [{"type": "string", "maxLength": 128}, {"type": "null"}]},
+                "id": {
+                    "anyOf": [{"type": "string", "maxLength": 128}, {"type": "null"}]
+                },
             },
-            ["name", "organization", "email", "phone", "status", "notes", "metadata", "id"],
+            [
+                "name",
+                "organization",
+                "email",
+                "phone",
+                "status",
+                "notes",
+                "metadata",
+                "id",
+            ],
         ),
         "capabilities": ["partner", "crm"],
         "risk_level": "medium",
@@ -619,7 +658,10 @@ PARTNER_TOOLS = {
         "parameters": object_schema(
             {
                 "status": {
-                    "anyOf": [{"type": "string", "enum": list(PARTNER_STATUSES)}, {"type": "null"}]
+                    "anyOf": [
+                        {"type": "string", "enum": list(PARTNER_STATUSES)},
+                        {"type": "null"},
+                    ]
                 },
             },
             ["status"],
@@ -683,7 +725,9 @@ PARTNER_TOOLS = {
                 "email": {"type": "string", "maxLength": 320},
                 "phone": {"type": "string", "maxLength": 64},
                 "notes": {"type": "string", "maxLength": 10000},
-                "id": {"anyOf": [{"type": "string", "maxLength": 128}, {"type": "null"}]},
+                "id": {
+                    "anyOf": [{"type": "string", "maxLength": 128}, {"type": "null"}]
+                },
             },
             ["partner_id", "name", "role", "email", "phone", "notes", "id"],
         ),
@@ -779,7 +823,9 @@ PARTNER_TOOLS = {
                 "direction": {"type": "string", "enum": list(MESSAGE_DIRECTIONS)},
                 "reference_type": {"type": "string", "maxLength": 100},
                 "reference_id": {"type": "string", "maxLength": 200},
-                "message_id": {"anyOf": [{"type": "string", "maxLength": 128}, {"type": "null"}]},
+                "message_id": {
+                    "anyOf": [{"type": "string", "maxLength": 128}, {"type": "null"}]
+                },
             },
             [
                 "partner_id",
@@ -862,9 +908,19 @@ PARTNER_TOOLS = {
                 "notes": {"type": "string", "maxLength": 10000},
                 "reference_type": {"type": "string", "maxLength": 100},
                 "reference_id": {"type": "string", "maxLength": 200},
-                "id": {"anyOf": [{"type": "string", "maxLength": 128}, {"type": "null"}]},
+                "id": {
+                    "anyOf": [{"type": "string", "maxLength": 128}, {"type": "null"}]
+                },
             },
-            ["partner_id", "title", "due_at", "notes", "reference_type", "reference_id", "id"],
+            [
+                "partner_id",
+                "title",
+                "due_at",
+                "notes",
+                "reference_type",
+                "reference_id",
+                "id",
+            ],
         ),
         "capabilities": ["partner", "followup"],
         "risk_level": "medium",
@@ -979,7 +1035,9 @@ def partner_contacts_list(partner_id: str):
 @partner_relations_bp.post("/<partner_id>/contacts")
 def partner_contact_create(partner_id: str):
     try:
-        data = _http_arguments("partner.contact.create", request.get_json(silent=True) or {})
+        data = _http_arguments(
+            "partner.contact.create", request.get_json(silent=True) or {}
+        )
         data["partner_id"] = partner_id
         return jsonify(add_contact(data)), 201
     except TreasuryIdentityError as exc:
@@ -992,7 +1050,9 @@ def partner_contact_create(partner_id: str):
 @partner_relations_bp.put("/contacts/<contact_id>")
 def partner_contact_update(contact_id: str):
     try:
-        data = _http_arguments("partner.contact.update", request.get_json(silent=True) or {})
+        data = _http_arguments(
+            "partner.contact.update", request.get_json(silent=True) or {}
+        )
         data["contact_id"] = contact_id
         return jsonify(update_contact(data))
     except TreasuryIdentityError as exc:
@@ -1027,7 +1087,9 @@ def partner_messages(partner_id: str):
 @partner_relations_bp.post("/<partner_id>/messages")
 def partner_message_record(partner_id: str):
     try:
-        data = _http_arguments("partner.message.prepare", request.get_json(silent=True) or {})
+        data = _http_arguments(
+            "partner.message.prepare", request.get_json(silent=True) or {}
+        )
         data["partner_id"] = partner_id
         result = prepare_message(data)
         return jsonify(result), 201
@@ -1041,7 +1103,9 @@ def partner_message_record(partner_id: str):
 @partner_relations_bp.post("/<partner_id>/followups")
 def partner_followup_create(partner_id: str):
     try:
-        data = _http_arguments("partner.followup.create", request.get_json(silent=True) or {})
+        data = _http_arguments(
+            "partner.followup.create", request.get_json(silent=True) or {}
+        )
         data["partner_id"] = partner_id
         return jsonify({"followup": create_followup(data)}), 201
     except TreasuryIdentityError as exc:
@@ -1054,7 +1118,9 @@ def partner_followup_create(partner_id: str):
 @partner_relations_bp.post("/<partner_id>/status")
 def partner_status_update(partner_id: str):
     try:
-        data = _http_arguments("partner.status.update", request.get_json(silent=True) or {})
+        data = _http_arguments(
+            "partner.status.update", request.get_json(silent=True) or {}
+        )
         data["partner_id"] = partner_id
         return jsonify({"partner": update_status(data)})
     except TreasuryIdentityError as exc:
@@ -1067,7 +1133,9 @@ def partner_status_update(partner_id: str):
 @partner_relations_bp.post("/followups/<followup_id>/complete")
 def partner_followup_complete(followup_id: str):
     try:
-        data = _http_arguments("partner.followup.complete", request.get_json(silent=True) or {})
+        data = _http_arguments(
+            "partner.followup.complete", request.get_json(silent=True) or {}
+        )
         data["followup_id"] = followup_id
         return jsonify({"followup": complete_followup(data)})
     except TreasuryIdentityError as exc:
@@ -1089,7 +1157,13 @@ def ensure_partner_department() -> None:
             "type": "partner-relations",
             "description": "Поиск, ведение и сопровождение коммуникации с партнёрами.",
             "agent_id": "partner-relations",
-            "capabilities": ["partners", "contacts", "communication", "followup", "orders"],
+            "capabilities": [
+                "partners",
+                "contacts",
+                "communication",
+                "followup",
+                "orders",
+            ],
             "tools": sorted(PARTNER_TOOLS),
             "policies": {
                 "external_messages_require_approval": True,
@@ -1137,7 +1211,11 @@ def _migrate_owner_keys() -> None:
     moves = []
     for kind in _KINDS:
         for key, row in store.items(prefix="partners/" + kind + "/").items():
-            if not isinstance(row, dict) or not row.get("id") or not row.get("owner_id"):
+            if (
+                not isinstance(row, dict)
+                or not row.get("id")
+                or not row.get("owner_id")
+            ):
                 continue
             target = _key(kind, row["id"], row["owner_id"])
             if key != target:
@@ -1162,7 +1240,8 @@ def _stored_key(kind: str, identity: str, owner_id: str) -> str:
     if store.get(preferred) is not None:
         return preferred
     matches = [
-        key for key, row in store.items(prefix="partners/" + kind + "/").items()
+        key
+        for key, row in store.items(prefix="partners/" + kind + "/").items()
         if row.get("id") == identity
     ]
     if len(matches) > 1:
@@ -1172,10 +1251,14 @@ def _stored_key(kind: str, identity: str, owner_id: str) -> str:
 
 def _get_owned(kind: str, identity: str, owner_id: str) -> Optional[dict[str, Any]]:
     row = get_store().get(_stored_key(kind, identity, owner_id))
-    return {key: value for key, value in row.items() if key != "owner_id"} if row else None
+    return (
+        {key: value for key, value in row.items() if key != "owner_id"} if row else None
+    )
 
 
-def _owned_rows(kind: str, owner_id: str, partner_id: Optional[str] = None) -> list[dict[str, Any]]:
+def _owned_rows(
+    kind: str, owner_id: str, partner_id: Optional[str] = None
+) -> list[dict[str, Any]]:
     return [
         row
         for row in get_store().items(prefix="partners/" + kind + "/").values()

@@ -61,13 +61,17 @@ def main():
 
     # Validate command
     validate_parser = subparsers.add_parser("validate", help="Validate config")
-    validate_parser.add_argument("--config-dir", help="Config directory (default: config/platform)")
+    validate_parser.add_argument(
+        "--config-dir", help="Config directory (default: config/platform)"
+    )
     validate_parser.set_defaults(func=cmd_validate)
 
     # Health command
     health_parser = subparsers.add_parser("health", help="Show health checks")
     health_parser.add_argument("lane", help="Lane name (test, production, etc)")
-    health_parser.add_argument("--config-dir", help="Config directory (default: config/platform)")
+    health_parser.add_argument(
+        "--config-dir", help="Config directory (default: config/platform)"
+    )
     health_parser.set_defaults(func=cmd_health)
 
     args = parser.parse_args()

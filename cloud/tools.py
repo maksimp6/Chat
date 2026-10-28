@@ -67,28 +67,38 @@ def cloud_capabilities(args: dict[str, Any], cfg: dict | None = None) -> dict[st
 
 
 @_result
-def cloud_resources_list(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
+def cloud_resources_list(
+    args: dict[str, Any], cfg: dict | None = None
+) -> dict[str, Any]:
     provider = _provider(args)
     return provider.list_resources(
         service=str(args.get("service") or ""),
         resource_type=(
-            str(args.get("resource_type")) if isinstance(args.get("resource_type"), str) else None
+            str(args.get("resource_type"))
+            if isinstance(args.get("resource_type"), str)
+            else None
         ),
         filters=dict(args.get("filters") or {}),
     )
 
 
 @_result
-def cloud_resources_get(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
+def cloud_resources_get(
+    args: dict[str, Any], cfg: dict | None = None
+) -> dict[str, Any]:
     provider = _provider(args)
     return provider.get_resource(
         resource_type=str(args.get("resource_type") or ""),
         resource_id=str(args.get("resource_id") or ""),
-        service=(str(args.get("service")) if isinstance(args.get("service"), str) else None),
+        service=(
+            str(args.get("service")) if isinstance(args.get("service"), str) else None
+        ),
     )
 
 
-def _budget_gate(provider, operation: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+def _budget_gate(
+    provider, operation: str
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     """Return (refusal, budget): a refusal when blocked, else the budget status worth reporting."""
     try:
         status = _budget_guard(provider).enforce(operation)
@@ -103,7 +113,9 @@ def _budget_gate(provider, operation: str) -> tuple[dict[str, Any] | None, dict[
     return None, status
 
 
-def _with_budget(result: dict[str, Any], budget: dict[str, Any] | None) -> dict[str, Any]:
+def _with_budget(
+    result: dict[str, Any], budget: dict[str, Any] | None
+) -> dict[str, Any]:
     if budget is None:
         return result
     return {**result, "budget": budget}
@@ -119,7 +131,11 @@ def cloud_compute(args: dict[str, Any], cfg: dict | None = None) -> dict[str, An
             return refusal
     result = provider.compute(
         operation=str(args.get("operation") or ""),
-        instance_id=(str(args.get("instance_id")) if args.get("instance_id") is not None else None),
+        instance_id=(
+            str(args.get("instance_id"))
+            if args.get("instance_id") is not None
+            else None
+        ),
         extra=dict(args.get("extra") or {}),
     )
     return _with_budget(result, budget)
@@ -130,18 +146,26 @@ def cloud_logs_query(args: dict[str, Any], cfg: dict | None = None) -> dict[str,
     provider = _provider(args)
     return provider.query_logs(
         query=str(args.get("query") or ""),
-        service=(str(args.get("service")) if isinstance(args.get("service"), str) else None),
+        service=(
+            str(args.get("service")) if isinstance(args.get("service"), str) else None
+        ),
         limit=int(100 if args.get("limit") is None else args["limit"]),
     )
 
 
 @_result
-def cloud_metrics_query(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
+def cloud_metrics_query(
+    args: dict[str, Any], cfg: dict | None = None
+) -> dict[str, Any]:
     provider = _provider(args)
     return provider.query_metrics(
         query=str(args.get("query") or ""),
-        service=(str(args.get("service")) if isinstance(args.get("service"), str) else None),
-        window=(str(args.get("window")) if isinstance(args.get("window"), str) else None),
+        service=(
+            str(args.get("service")) if isinstance(args.get("service"), str) else None
+        ),
+        window=(
+            str(args.get("window")) if isinstance(args.get("window"), str) else None
+        ),
         limit=int(100 if args.get("limit") is None else args["limit"]),
     )
 
@@ -157,23 +181,35 @@ def cloud_backup(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any
             return refusal
     result = provider.backup(
         operation=str(args.get("operation") or ""),
-        resource_id=(str(args.get("resource_id")) if args.get("resource_id") is not None else None),
+        resource_id=(
+            str(args.get("resource_id"))
+            if args.get("resource_id") is not None
+            else None
+        ),
         options=dict(args.get("options") or {}),
     )
     return _with_budget(result, budget)
 
 
 @_result
-def cloud_costs_summary(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
+def cloud_costs_summary(
+    args: dict[str, Any], cfg: dict | None = None
+) -> dict[str, Any]:
     provider = _provider(args)
     return provider.costs_summary(
-        period=(str(args.get("period")) if isinstance(args.get("period"), str) else None),
-        group_by=(str(args.get("group_by")) if isinstance(args.get("group_by"), str) else None),
+        period=(
+            str(args.get("period")) if isinstance(args.get("period"), str) else None
+        ),
+        group_by=(
+            str(args.get("group_by")) if isinstance(args.get("group_by"), str) else None
+        ),
     )
 
 
 @_result
-def cloud_budget_status(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
+def cloud_budget_status(
+    args: dict[str, Any], cfg: dict | None = None
+) -> dict[str, Any]:
     provider = _provider(args)
     return _budget_guard(provider).status(refresh=bool(args.get("refresh")))
 
@@ -234,7 +270,9 @@ CLOUD_TOOLS = {
             {
                 **_PROVIDER,
                 "service": {"type": "string", "minLength": 1, "maxLength": 64},
-                "resource_type": {"anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]},
+                "resource_type": {
+                    "anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]
+                },
                 "filters": {"anyOf": [{"type": "object"}, {"type": "null"}]},
             },
             ["service"],
@@ -249,7 +287,9 @@ CLOUD_TOOLS = {
         schema=object_schema(
             {
                 **_PROVIDER,
-                "service": {"anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]},
+                "service": {
+                    "anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]
+                },
                 "resource_type": {"type": "string", "minLength": 1, "maxLength": 64},
                 "resource_id": {"type": "string", "minLength": 1, "maxLength": 256},
             },
@@ -346,9 +386,14 @@ CLOUD_TOOLS = {
             {
                 **_PROVIDER,
                 "query": {"type": "string", "minLength": 1, "maxLength": 8000},
-                "service": {"anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]},
+                "service": {
+                    "anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]
+                },
                 "limit": {
-                    "anyOf": [{"type": "integer", "minimum": 1, "maximum": 1000}, {"type": "null"}]
+                    "anyOf": [
+                        {"type": "integer", "minimum": 1, "maximum": 1000},
+                        {"type": "null"},
+                    ]
                 },
             },
             ["query"],
@@ -364,10 +409,17 @@ CLOUD_TOOLS = {
             {
                 **_PROVIDER,
                 "query": {"type": "string", "minLength": 1, "maxLength": 8000},
-                "service": {"anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]},
-                "window": {"anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]},
+                "service": {
+                    "anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]
+                },
+                "window": {
+                    "anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]
+                },
                 "limit": {
-                    "anyOf": [{"type": "integer", "minimum": 1, "maximum": 1000}, {"type": "null"}]
+                    "anyOf": [
+                        {"type": "integer", "minimum": 1, "maximum": 1000},
+                        {"type": "null"},
+                    ]
                 },
             },
             ["query"],
@@ -383,7 +435,9 @@ CLOUD_TOOLS = {
             {
                 **_PROVIDER,
                 "operation": {"type": "string", "const": "create"},
-                "resource_id": {"anyOf": [{"type": "string", "maxLength": 256}, {"type": "null"}]},
+                "resource_id": {
+                    "anyOf": [{"type": "string", "maxLength": 256}, {"type": "null"}]
+                },
                 "options": {"anyOf": [{"type": "object"}, {"type": "null"}]},
             },
             ["operation"],
@@ -398,8 +452,12 @@ CLOUD_TOOLS = {
         schema=object_schema(
             {
                 **_PROVIDER,
-                "period": {"anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]},
-                "group_by": {"anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]},
+                "period": {
+                    "anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]
+                },
+                "group_by": {
+                    "anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]
+                },
             },
             [],
         ),

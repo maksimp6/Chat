@@ -17,7 +17,10 @@ from threading import RLock
 from types import MappingProxyType
 from typing import Callable, Mapping, Protocol, Any
 
-from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_providers.universal_tool_platform import (
+    UniversalToolCall,
+    UniversalToolExecutor,
+)
 
 
 RULES = MappingProxyType(
@@ -189,7 +192,9 @@ class GuardedTask:
             self._propose(method)
         return result
 
-    def _run(self, call: UniversalToolCall, method: str, hooks: dict[str, Any]) -> dict[str, Any]:
+    def _run(
+        self, call: UniversalToolCall, method: str, hooks: dict[str, Any]
+    ) -> dict[str, Any]:
         self._attempts += 1
         result = self._host_check(self.executor.execute, call, **hooks)
         if not isinstance(result, Mapping) or result.get("success") is not True:
@@ -217,4 +222,7 @@ class GuardedTask:
                 return self._violation("AR-002", "closeout")
             if claim_success and (self._violated or self._verified != self._attempts):
                 return self._violation("AR-003", "closeout")
-            return {"success": claim_success, "status": "VERIFIED" if claim_success else "FAILED"}
+            return {
+                "success": claim_success,
+                "status": "VERIFIED" if claim_success else "FAILED",
+            }

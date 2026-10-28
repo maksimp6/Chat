@@ -40,7 +40,9 @@ def run_next(store, handlers):
             json.dumps(exc.result, allow_nan=False)
         except (TypeError, ValueError):
             exc.result = None
-        store.fail(task_id, exc.code if known else "task_failed", exc.result if known else None)
+        store.fail(
+            task_id, exc.code if known else "task_failed", exc.result if known else None
+        )
         return store.get(task_id)
     except Exception:  # fixed code only: the message may contain a secret
         store.fail(task_id, "task_failed")

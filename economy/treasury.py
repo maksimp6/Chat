@@ -26,7 +26,12 @@ def init_treasury_tables() -> None:
 
 
 def _empty_account(owner_id: str) -> dict[str, Any]:
-    return {"owner_id": owner_id, "balance": "0", "currency": "RUB", "updated_at": utc_iso()}
+    return {
+        "owner_id": owner_id,
+        "balance": "0",
+        "currency": "RUB",
+        "updated_at": utc_iso(),
+    }
 
 
 def get_account(owner_id: str = "default") -> dict[str, Any]:
@@ -50,14 +55,20 @@ def get_account(owner_id: str = "default") -> dict[str, Any]:
 
 
 def _record(
-    owner_id: str, amount: Any, description: str, kind: str, reference: str | None = None
+    owner_id: str,
+    amount: Any,
+    description: str,
+    kind: str,
+    reference: str | None = None,
 ) -> bool:
     value = _money(amount)
     if value <= 0 or not description or not owner_id:
         raise ValueError("owner, positive finite amount and description are required")
     store = get_store()
     account_key = "treasury/account/" + owner_id
-    reference_key = "treasury/reference/" + json.dumps([owner_id, reference], ensure_ascii=False)
+    reference_key = "treasury/reference/" + json.dumps(
+        [owner_id, reference], ensure_ascii=False
+    )
     with store.transaction() as tx:
         if reference and tx.get(reference_key) is not None:
             return False
@@ -94,13 +105,17 @@ DEMO_TOP_UP_TOTAL_LIMIT = 10_000.0
 _DEMO_LOCK = threading.Lock()
 
 
-def demo_top_up(owner_id: str, amount: Any, description: str = "Demo top-up") -> dict[str, Any]:
+def demo_top_up(
+    owner_id: str, amount: Any, description: str = "Demo top-up"
+) -> dict[str, Any]:
     try:
         value = float(amount)
     except (TypeError, ValueError) as exc:
         raise ValueError("amount must be a number") from exc
     if value > DEMO_TOP_UP_LIMIT:
-        raise ValueError(f"amount exceeds the demo top-up limit of {DEMO_TOP_UP_LIMIT:g}")
+        raise ValueError(
+            f"amount exceeds the demo top-up limit of {DEMO_TOP_UP_LIMIT:g}"
+        )
     key = "treasury/demo/" + str(owner_id)
     # The check, the credit and the running total are one step for this process.
     with _DEMO_LOCK:

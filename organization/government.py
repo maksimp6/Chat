@@ -79,7 +79,9 @@ def _save(case: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("government case not found")
         if int(current.get("revision") or 0) != read_revision:
             raise ValueError("government case was changed concurrently; retry")
-        tx.set(key, {**case, "revision": read_revision + 1, "updated_at": unix_seconds()})
+        tx.set(
+            key, {**case, "revision": read_revision + 1, "updated_at": unix_seconds()}
+        )
     return _require_case(case["case_id"])
 
 
@@ -156,7 +158,8 @@ def validate_data(case_id: str) -> dict[str, Any]:
     ]
     okved = payload.get("okved")
     if okved is not None and (
-        not isinstance(okved, list) or not all(isinstance(v, str) and v.strip() for v in okved)
+        not isinstance(okved, list)
+        or not all(isinstance(v, str) and v.strip() for v in okved)
     ):
         errors.append({"field": "okved", "code": "invalid_format"})
     case["status"] = "PENDING_USER_DATA" if errors else "READY_FOR_APPROVAL"
@@ -191,7 +194,9 @@ def prepare_application(case_id: str) -> dict[str, Any]:
         raise ValueError("case data is incomplete")
     case = _require_case(case_id)
     if case["case_type"] != "IP_REGISTRATION":
-        raise ValueError("application preparation is only implemented for IP_REGISTRATION")
+        raise ValueError(
+            "application preparation is only implemented for IP_REGISTRATION"
+        )
     document = {
         "document_id": "doc-" + uuid4().hex[:16],
         "template": "R21001",
@@ -207,7 +212,11 @@ def prepare_application(case_id: str) -> dict[str, Any]:
 def prepare_documents(case_id: str) -> dict[str, Any]:
     prepare_application(case_id)
     case = _require_case(case_id)
-    return {"case_id": case_id, "documents": case["documents"], "status": case["status"]}
+    return {
+        "case_id": case_id,
+        "documents": case["documents"],
+        "status": case["status"],
+    }
 
 
 def request_approval(case_id: str) -> dict[str, Any]:
@@ -275,14 +284,26 @@ def process_response(case_id: str, response: Mapping[str, Any]) -> dict[str, Any
 
 def archive_case(case_id: str) -> dict[str, Any]:
     case = _require_case(case_id)
-    if case["status"] not in {"DRAFT", "PENDING_USER_DATA", "COMPLETED", "REJECTED", "ARCHIVED"}:
+    if case["status"] not in {
+        "DRAFT",
+        "PENDING_USER_DATA",
+        "COMPLETED",
+        "REJECTED",
+        "ARCHIVED",
+    }:
         raise ValueError("case cannot be archived in its current state")
     case["status"] = "ARCHIVED"
     return _save(case)
 
 
 def _tool(
-    fn, *, read_only: bool, requires_approval: bool, schema: dict, title: str, description: str
+    fn,
+    *,
+    read_only: bool,
+    requires_approval: bool,
+    schema: dict,
+    title: str,
+    description: str,
 ) -> dict[str, Any]:
     return {
         "title": title,
@@ -298,7 +319,7 @@ def _tool(
     }
 
 
-_CASE ={"case_id": {"type": "string", "minLength": 1, "maxLength": 128}}
+_CASE = {"case_id": {"type": "string", "minLength": 1, "maxLength": 128}}
 
 
 def _tool_approved(cfg: Optional[dict[str, Any]]) -> bool:
@@ -309,7 +330,8 @@ def _tool_approved(cfg: Optional[dict[str, Any]]) -> bool:
 def _tool_create(args, cfg=None):
     # Like the HTTP route: a trusted owner wins over a model-supplied user_id.
     return create_case(
-        args.get("case_type") or "IP_REGISTRATION", _current_owner() or args.get("user_id")
+        args.get("case_type") or "IP_REGISTRATION",
+        _current_owner() or args.get("user_id"),
     )
 
 
@@ -380,7 +402,9 @@ GOVERNMENT_TOOLS = {
         _tool_requirements,
         read_only=True,
         requires_approval=False,
-        schema=object_schema({"case_type": {"type": "string", "enum": ["IP_REGISTRATION"]}}, []),
+        schema=object_schema(
+            {"case_type": {"type": "string", "enum": ["IP_REGISTRATION"]}}, []
+        ),
         title="Government Requirements",
         description="Получить контракт данных для открытия ИП.",
     ),
@@ -388,7 +412,9 @@ GOVERNMENT_TOOLS = {
         _tool_collect,
         read_only=False,
         requires_approval=True,
-        schema=object_schema({**_CASE, "data": {"type": "object"}}, ["case_id", "data"]),
+        schema=object_schema(
+            {**_CASE, "data": {"type": "object"}}, ["case_id", "data"]
+        ),
         title="Government Collect Data",
         description="Сохранить данные пользователя в дело.",
     ),
@@ -444,7 +470,9 @@ GOVERNMENT_TOOLS = {
         _tool_process_response,
         read_only=False,
         requires_approval=True,
-        schema=object_schema({**_CASE, "response": {"type": "object"}}, ["case_id", "response"]),
+        schema=object_schema(
+            {**_CASE, "response": {"type": "object"}}, ["case_id", "response"]
+        ),
         title="Government Process Response",
         description="Сохранить ответ ведомства.",
     ),
@@ -506,7 +534,9 @@ def api_create_case():
     data = request.get_json(silent=True) or {}
     owner = _current_owner()
     try:
-        return jsonify({"case": create_case(data.get("case_type", "IP_REGISTRATION"), owner)}), 201
+        return jsonify(
+            {"case": create_case(data.get("case_type", "IP_REGISTRATION"), owner)}
+        ), 201
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 

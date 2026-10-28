@@ -39,7 +39,9 @@ TOOL_CATEGORIES = ["filesystem"]
 MAX_SUMMARY_CHARS = 4000
 
 
-def _capture_provider_state(result: dict[str, Any], response: dict[str, Any]) -> dict[str, Any]:
+def _capture_provider_state(
+    result: dict[str, Any], response: dict[str, Any]
+) -> dict[str, Any]:
     if not isinstance(response, dict):
         raise TypeError("Invalid provider response")
     response_id = response.get("id")
@@ -73,16 +75,23 @@ def _capture_provider_state(result: dict[str, Any], response: dict[str, Any]) ->
 def _capture_response(result: dict[str, Any], response: dict[str, Any]) -> None:
     diagnostics = _capture_provider_state(result, response)
     reply, reply_state = _assistant_reply(response)
-    result.update(reply=reply, reply_state=reply_state, summary=reply.strip()[:MAX_SUMMARY_CHARS])
+    result.update(
+        reply=reply, reply_state=reply_state, summary=reply.strip()[:MAX_SUMMARY_CHARS]
+    )
     result["reply_chars"] = len(reply) if reply_state != "unknown" else None
     result["reply_sha256"] = (
-        hashlib.sha256(reply.encode("utf-8")).hexdigest() if reply_state != "unknown" else None
+        hashlib.sha256(reply.encode("utf-8")).hexdigest()
+        if reply_state != "unknown"
+        else None
     )
     if reply_state != "unknown":
         receipt = {
             "response_id": result["response_id"],
             **diagnostics,
-            **{key: result[key] for key in ("reply", "reply_state", "reply_chars", "reply_sha256")},
+            **{
+                key: result[key]
+                for key in ("reply", "reply_state", "reply_chars", "reply_sha256")
+            },
         }
         if receipt not in result["assistant_replies"]:
             result["assistant_replies"].append(receipt)
@@ -128,7 +137,9 @@ def seed_provider_credential() -> None:
     from provider_accounts.credentials import bootstrap_credential
 
     conn = get_store()
-    bootstrap_credential(conn, api_key, project_id, encrypt_secret, decrypt=decrypt_secret)
+    bootstrap_credential(
+        conn, api_key, project_id, encrypt_secret, decrypt=decrypt_secret
+    )
 
 
 def change_snapshot(repo_root: Path = ROOT) -> dict[str, str]:
@@ -136,7 +147,11 @@ def change_snapshot(repo_root: Path = ROOT) -> dict[str, str]:
     snapshot = {}
     for name in changed_files(repo_root):
         path = repo_root / name
-        snapshot[name] = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else "<absent>"
+        snapshot[name] = (
+            hashlib.sha256(path.read_bytes()).hexdigest()
+            if path.is_file()
+            else "<absent>"
+        )
     return snapshot
 
 
@@ -168,13 +183,21 @@ def _billing_summary(billing: dict[str, Any]) -> dict[str, Any]:
 def _persist_result(
     invocation: Any, trace: Any, result: dict[str, Any], checkpoint_file: Path | None
 ) -> None:
-    from invocation.manager import fail_invocation, finish_invocation, persist_invocation_trace
+    from invocation.manager import (
+        fail_invocation,
+        finish_invocation,
+        persist_invocation_trace,
+    )
     from storage.memory_db import DatabaseError
 
     try:
         finalized = trace.finalize()
         responses = finalized.get("responses") or []
-        raw = responses[-1].get("raw") if responses and isinstance(responses[-1], dict) else None
+        raw = (
+            responses[-1].get("raw")
+            if responses and isinstance(responses[-1], dict)
+            else None
+        )
         if isinstance(raw, dict):
             # Failed polls raise before the response callback. Recover their machine
             # state without overwriting exact checkpoint text with sanitized trace text.
@@ -182,7 +205,11 @@ def _persist_result(
             _capture_provider_state(result, raw)
             if result["response_id"] != previous_id:
                 result.update(
-                    reply="", reply_state="unknown", reply_chars=None, reply_sha256=None, summary=""
+                    reply="",
+                    reply_state="unknown",
+                    reply_chars=None,
+                    reply_sha256=None,
+                    summary="",
                 )
             if result["provider_error_present"]:
                 result.update(status="failed", error="ProviderResponseError")
@@ -220,7 +247,14 @@ def _persist_result(
         if not saved:
             raise RuntimeError("Invocation completion unavailable")
         result["persistence"]["status"] = "stored"
-    except (OSError, RuntimeError, ValueError, TypeError, LookupError, DatabaseError) as exc:
+    except (
+        OSError,
+        RuntimeError,
+        ValueError,
+        TypeError,
+        LookupError,
+        DatabaseError,
+    ) as exc:
         result.update(status="failed", error=type(exc).__name__)
         result["persistence"].update(status="failed", error_type=type(exc).__name__)
     _write_result(checkpoint_file, result)
@@ -327,7 +361,10 @@ def run_issue_task(
             # LogosClient stops instead of running approval-gated tools; never auto-approve.
             result["status"] = "needs_approval"
             result["pending_tools"] = sorted(
-                {call.get("name") or (call.get("function") or {}).get("name") for call in pending}
+                {
+                    call.get("name") or (call.get("function") or {}).get("name")
+                    for call in pending
+                }
             )
         if result["provider_error_present"]:
             result.update(status="failed", error="ProviderResponseError")
@@ -345,7 +382,9 @@ def run_issue_task(
         result["error"] = type(exc).__name__
 
     after = change_snapshot(repo_root)
-    files = sorted(name for name in set(before) | set(after) if before.get(name) != after.get(name))
+    files = sorted(
+        name for name in set(before) | set(after) if before.get(name) != after.get(name)
+    )
     result["changed_files"] = files
     if files:
         result.update(status="failed", error="ReadOnlyScopeViolation")
@@ -364,7 +403,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--issue", type=int, required=True)
     parser.add_argument("--title-file", type=Path, required=True)
     parser.add_argument("--body-file", type=Path, required=True)
-    parser.add_argument("--model", default=env_get("LOGOS_AGENT_MODEL") or DEFAULT_MODEL)
+    parser.add_argument(
+        "--model", default=env_get("LOGOS_AGENT_MODEL") or DEFAULT_MODEL
+    )
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
 
@@ -372,8 +413,14 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if not generation_allowed():
         # Closed by default: no credential, client or model request without owner permission.
-        blocked = {"status": "blocked", "error": GENERATION_BLOCKED, "changed_files": []}
-        args.out.write_text(json.dumps(blocked, ensure_ascii=False, indent=2), encoding="utf-8")
+        blocked = {
+            "status": "blocked",
+            "error": GENERATION_BLOCKED,
+            "changed_files": [],
+        }
+        args.out.write_text(
+            json.dumps(blocked, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         print(json.dumps({"status": blocked["status"], "changed_files": []}))
         return 1
 
@@ -385,7 +432,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         checkpoint_file=args.out,
     )
     _write_result(args.out, result)
-    print(json.dumps({"status": result["status"], "changed_files": result["changed_files"]}))
+    print(
+        json.dumps(
+            {"status": result["status"], "changed_files": result["changed_files"]}
+        )
+    )
     return 1 if result["status"] == "failed" else 0
 
 

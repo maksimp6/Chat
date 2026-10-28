@@ -1,4 +1,5 @@
 """Audit a filesystem subset; inventory the full native profile without invoking it."""
+
 from core.env import env_set
 
 import argparse
@@ -30,7 +31,9 @@ PROBE_ERRORS = (
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--external", action="store_true", help="Also GET public GitHub repository metadata"
+        "--external",
+        action="store_true",
+        help="Also GET public GitHub repository metadata",
     )
     options = parser.parse_args()
     ROOT = Path(__file__).resolve().parents[1]
@@ -65,9 +68,13 @@ if __name__ == "__main__":
         check(Path(filesystem.BASE_DIR).resolve() == ROOT)
         executor = UniversalToolExecutor(registry)
         categories = registry.get_available_categories()
-        report["categories"] = {name: len(names) for name, names in sorted(categories.items())}
+        report["categories"] = {
+            name: len(names) for name, names in sorted(categories.items())
+        }
         native = dialogue_params([DEFAULT_STORE_ID], list(categories))
-        native_definitions = registry.get_definitions(set(native["active_tool_categories"]))
+        native_definitions = registry.get_definitions(
+            set(native["active_tool_categories"])
+        )
         offered_names = {tool["name"] for tool in native_definitions}
         report["native_profile"] = {
             "model": MODEL,
@@ -75,7 +82,10 @@ if __name__ == "__main__":
             "offered_count": len(native_definitions),
             # Registered tools this host or transport cannot execute are not offered.
             "not_offered": sorted(
-                name for names in categories.values() for name in names if name not in offered_names
+                name
+                for names in categories.values()
+                for name in names
+                if name not in offered_names
             ),
             "hosted_enabled": {
                 name: cfg["enabled"] for name, cfg in native["tools_config"].items()
@@ -97,7 +107,9 @@ if __name__ == "__main__":
         report["active_categories"] = active
         report["hosted_enabled"] = dict.fromkeys(native["tools_config"], False)
         report["exposed_count"] = len(exposed)
-        report["head"] = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+        report["head"] = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], text=True
+        ).strip()
         check(
             active == ["filesystem"]
             and len(exposed) == 17
@@ -107,7 +119,10 @@ if __name__ == "__main__":
         def invoke(name, arguments):
             return executor.execute(
                 UniversalToolCall(
-                    tool_name=name, arguments=arguments, transport="responses_api", approved=False
+                    tool_name=name,
+                    arguments=arguments,
+                    transport="responses_api",
+                    approved=False,
                 )
             )
 
@@ -120,9 +135,9 @@ if __name__ == "__main__":
                 report[section][label] = {
                     "s": status,
                     "phase": phase,
-                    "error_sha256": hashlib.sha256(str(result.get("error")).encode()).hexdigest()[
-                        :12
-                    ],
+                    "error_sha256": hashlib.sha256(
+                        str(result.get("error")).encode()
+                    ).hexdigest()[:12],
                 }
                 return None
             try:
@@ -151,19 +166,24 @@ if __name__ == "__main__":
         disposable.mkdir()
         (disposable / "owned.txt").write_text("delete fixture")
 
-        probe("make_directory", {"path": rel(nested)}, lambda data: check(nested.is_dir()))
+        probe(
+            "make_directory", {"path": rel(nested)}, lambda data: check(nested.is_dir())
+        )
         probe(
             "write_file",
             {"path": rel(python_file), "content": code},
             lambda data: check(
-                python_file.read_text() == code and backup_files[0].read_text() == "OLD = 1\n"
+                python_file.read_text() == code
+                and backup_files[0].read_text() == "OLD = 1\n"
             ),
         )
         probe(
             "read_file",
             {"path": rel(text_file), "offset": 1, "length": 4, "whence": "start"},
             lambda data: check(
-                data["content"] == "lpha" and data["bytes_read"] == 4 and data["offset"] == 1
+                data["content"] == "lpha"
+                and data["bytes_read"] == 4
+                and data["offset"] == 1
             ),
         )
         probe(
@@ -202,7 +222,8 @@ if __name__ == "__main__":
             "zip_extract",
             {"archive_path": rel(archive), "target_dir": rel(extraction)},
             lambda data: check(
-                data["extracted_count"] == 1 and (extraction / text_file.name).read_text() == text
+                data["extracted_count"] == 1
+                and (extraction / text_file.name).read_text() == text
             ),
         )
         probe(
@@ -219,7 +240,11 @@ if __name__ == "__main__":
             section="defaults",
             label="copy_or_move_file:move",
         )
-        probe("delete_path", {"path": rel(disposable)}, lambda data: check(not disposable.exists()))
+        probe(
+            "delete_path",
+            {"path": rel(disposable)},
+            lambda data: check(not disposable.exists()),
+        )
         probe(
             "list_directory",
             {"path": rel(fixture)},
@@ -232,7 +257,8 @@ if __name__ == "__main__":
             "glob_search",
             {"pattern": rel(fixture / "*.txt")},
             lambda data: check(
-                rel(text_file) in {item["path"] for item in data["matches"]} and data["count"] >= 1
+                rel(text_file) in {item["path"] for item in data["matches"]}
+                and data["count"] >= 1
             ),
         )
         probe(
@@ -240,7 +266,9 @@ if __name__ == "__main__":
             {"query": marker, "file_pattern": text_file.name, "max_matches": 10},
             lambda data: check(
                 any(
-                    item["file"] == rel(text_file) and item["line"] == 2 and item["text"] == marker
+                    item["file"] == rel(text_file)
+                    and item["line"] == 2
+                    and item["text"] == marker
                     for item in data["matches"]
                 )
             ),
@@ -270,13 +298,17 @@ if __name__ == "__main__":
             "run_command",
             {"command": command, "timeout": 5},
             lambda data: check(
-                data["returncode"] == 0 and data["stdout"] == "alpha" and data["stderr"] == ""
+                data["returncode"] == 0
+                and data["stdout"] == "alpha"
+                and data["stderr"] == ""
             ),
         )
         check(not command_marker.exists())
         check(report["tools"]["run_command"]["s"] == "blocked")
         check(report["tools"]["run_command"]["phase"] == "approval_required")
-        report["command_execution"] = "not_run; approval_required; fixture_effect_absent"
+        report["command_execution"] = (
+            "not_run; approval_required; fixture_effect_absent"
+        )
         probe(
             "get_system_info",
             {},
@@ -289,13 +321,17 @@ if __name__ == "__main__":
         before_patch = python_file.read_bytes()
         probe(
             "apply_patch",
-            {"path": rel(python_file), "search_text": "import math", "replace_text": "replacement"},
+            {
+                "path": rel(python_file),
+                "search_text": "import math",
+                "replace_text": "replacement",
+            },
             lambda data: check(False),
         )
         check(python_file.read_bytes() == before_patch)
-        report["patch_schema_search_text"] = "search_text" in exposed["apply_patch"].get(
-            "properties", {}
-        )
+        report["patch_schema_search_text"] = "search_text" in exposed[
+            "apply_patch"
+        ].get("properties", {})
 
         body = b"logos-loopback-probe"
 
@@ -327,7 +363,10 @@ if __name__ == "__main__":
         check(not default_extract.exists())
         extra_files.append(default_extract)
         defaults = {
-            "read_file": ({"path": rel(text_file)}, lambda data: check(data["content"] == text)),
+            "read_file": (
+                {"path": rel(text_file)},
+                lambda data: check(data["content"] == text),
+            ),
             "calculate_hash": (
                 {"path": rel(text_file)},
                 lambda data: check(
@@ -345,7 +384,9 @@ if __name__ == "__main__":
             ),
             "list_directory": (
                 {},
-                lambda data: check(fixture.name in {item["name"] for item in data["items"]}),
+                lambda data: check(
+                    fixture.name in {item["name"] for item in data["items"]}
+                ),
             ),
             "grep_search": (
                 {"query": "def twice"},
@@ -355,17 +396,23 @@ if __name__ == "__main__":
             ),
             "run_command": (
                 {"command": command},
-                lambda data: check(data["returncode"] == 0 and data["stdout"] == "alpha"),
+                lambda data: check(
+                    data["returncode"] == 0 and data["stdout"] == "alpha"
+                ),
             ),
             "http_fetch": (
                 {"url": url},
-                lambda data: check(data["status"] == 200 and data["body"] == body.decode()),
+                lambda data: check(
+                    data["status"] == 200 and data["body"] == body.decode()
+                ),
             ),
         }
         for name, (arguments, verify) in defaults.items():
             probe(name, arguments, verify, section="defaults")
             original = registry.get_universal_definition(name).input_schema
-            optional = set(original.get("properties", {})) - set(original.get("required", []))
+            optional = set(original.get("properties", {})) - set(
+                original.get("required", [])
+            )
             null_args = {**arguments, **{key: None for key in optional}}
             advertised_valid = not validate_json_schema(null_args, exposed[name])
             result = invoke(name, null_args)
@@ -384,7 +431,8 @@ if __name__ == "__main__":
                 {"url": "https://api.github.com/repos/maksimp6/Chat", "timeout": 10},
                 lambda data: check(
                     data["status"] == 200
-                    and re.search(r'"full_name"\s*:\s*"maksimp6/Chat"', data["body"]) is not None
+                    and re.search(r'"full_name"\s*:\s*"maksimp6/Chat"', data["body"])
+                    is not None
                 ),
                 section="defaults",
                 label="http_fetch:external",
@@ -408,7 +456,9 @@ if __name__ == "__main__":
         if not report["cleanup"]:
             report["status"] = "harness_error"
             report["harness_error"] = "CleanupIncomplete"
-        encoded = json.dumps(report, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        encoded = json.dumps(
+            report, ensure_ascii=True, sort_keys=True, separators=(",", ":")
+        )
         if len(encoded) >= 4000:
             raise RuntimeError("audit output exceeds native trace limit")
         print(encoded)

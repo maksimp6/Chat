@@ -25,7 +25,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from repository_index.provenance import SCHEMA_VERSION, SNAPSHOT_SCHEMA_VERSION, snapshot_revision
+from repository_index.provenance import (
+    SCHEMA_VERSION,
+    SNAPSHOT_SCHEMA_VERSION,
+    snapshot_revision,
+)
 
 PARSER_VERSION = f"python-ast-v1:{sys.implementation.cache_tag}"
 EXCLUDED_PARTS = {
@@ -77,7 +81,11 @@ class _IndexVisitor(ast.NodeVisitor):
         self.scope.pop()
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        kind = "method" if self.scope_kinds and self.scope_kinds[-1] == "class" else "function"
+        kind = (
+            "method"
+            if self.scope_kinds and self.scope_kinds[-1] == "class"
+            else "function"
+        )
         self._add_symbol(node, node.name, kind)
         self.scope.append(node.name)
         self.scope_kinds.append("function")
@@ -272,7 +280,13 @@ def _snapshot_tree(
         raise ValueError("invalid revision")
     try:
         sha = (
-            _git(root, "rev-parse", "--verify", "--end-of-options", f"{revision}^{{commit}}")
+            _git(
+                root,
+                "rev-parse",
+                "--verify",
+                "--end-of-options",
+                f"{revision}^{{commit}}",
+            )
             .decode("ascii")
             .strip()
         )
@@ -283,12 +297,16 @@ def _snapshot_tree(
     files: list[dict[str, Any]] = []
     skipped = {}
     total = 0
-    for record in _git(root, "ls-tree", "--full-tree", "-r", "-l", "-z", sha).split(b"\0"):
+    for record in _git(root, "ls-tree", "--full-tree", "-r", "-l", "-z", sha).split(
+        b"\0"
+    ):
         if not record:
             continue
         header, name = record.split(b"\t", 1)
         relative = Path(name.decode("utf-8"))
-        if relative.suffix != ".py" or any(part in EXCLUDED_PARTS for part in relative.parts):
+        if relative.suffix != ".py" or any(
+            part in EXCLUDED_PARTS for part in relative.parts
+        ):
             continue
         path = relative.as_posix()
         if any(ord(c) < 32 or ord(c) == 127 for c in path):
@@ -299,7 +317,11 @@ def _snapshot_tree(
             continue
         length = int(size)
         total += length
-        if length > max_file_bytes or total > max_total_bytes or len(files) >= max_files:
+        if (
+            length > max_file_bytes
+            or total > max_total_bytes
+            or len(files) >= max_files
+        ):
             raise ValueError("snapshot file/byte limit exceeded")
         files.append({"path": path, "oid": oid, "size": length})
     return sha, sorted(files, key=lambda f: f["path"]), skipped
@@ -311,7 +333,10 @@ def _snapshot_blobs(root: Path, files: list[dict[str, Any]]) -> dict[str, bytes]
         return {}
     stream = io.BytesIO(
         _git(
-            root, "cat-file", "--batch", stdin="".join(oid + "\n" for oid in unique).encode("ascii")
+            root,
+            "cat-file",
+            "--batch",
+            stdin="".join(oid + "\n" for oid in unique).encode("ascii"),
         )
     )
     blobs = {}
@@ -333,10 +358,12 @@ def _validate_cached_ast(item: dict[str, Any]) -> None:
         if (
             not isinstance(symbol, dict)
             or any(
-                not isinstance(symbol.get(key), str) for key in ("name", "qualified_name", "kind")
+                not isinstance(symbol.get(key), str)
+                for key in ("name", "qualified_name", "kind")
             )
             or any(
-                type(symbol.get(key)) is not int or symbol[key] < 1 for key in ("line", "end_line")
+                type(symbol.get(key)) is not int or symbol[key] < 1
+                for key in ("line", "end_line")
             )
         ):
             raise ValueError("incompatible previous index symbol")
@@ -356,7 +383,9 @@ def _validate_cached_entry(item: dict[str, Any]) -> None:
         not isinstance(item.get("module"), str)
         or item["module"] != _module_name(Path(item["path"]))
         or type(item.get("is_test")) is not bool
-        or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", str(item.get("git_blob_oid", "")))
+        or not re.fullmatch(
+            r"[0-9a-f]{40}|[0-9a-f]{64}", str(item.get("git_blob_oid", ""))
+        )
     ):
         raise ValueError("incompatible previous index identity")
     for key in ("symbols", "imports", "calls"):
@@ -367,7 +396,9 @@ def _validate_cached_entry(item: dict[str, Any]) -> None:
     _validate_cached_ast(item)
 
 
-def _previous_files(previous: dict[str, Any] | None, repository: str) -> dict[str, dict[str, Any]]:
+def _previous_files(
+    previous: dict[str, Any] | None, repository: str
+) -> dict[str, dict[str, Any]]:
     if previous is None:
         return {}
     expected = {
@@ -398,14 +429,19 @@ def _previous_files(previous: dict[str, Any] | None, repository: str) -> dict[st
 
 def _require_complete_repository(root: Path) -> None:
     config_names = (
-        _git(root, "config", "--list", "--name-only").decode("utf-8").lower().splitlines()
+        _git(root, "config", "--list", "--name-only")
+        .decode("utf-8")
+        .lower()
+        .splitlines()
     )
     if any(
         name == "extensions.partialclone"
         or (name.startswith("remote.") and name.endswith(".promisor"))
         for name in config_names
     ):
-        raise ValueError("partial clone is not supported; provide a complete local repository")
+        raise ValueError(
+            "partial clone is not supported; provide a complete local repository"
+        )
 
 
 def build_index(
@@ -428,7 +464,9 @@ def build_index(
     if revision is None:
         if repository is not None or previous_index is not None or stats is not None:
             raise ValueError("snapshot options require a revision")
-        return _assemble_index([_index_file(root, path) for path in _iter_python_files(root)])
+        return _assemble_index(
+            [_index_file(root, path) for path in _iter_python_files(root)]
+        )
     if not isinstance(repository, str) or not re.fullmatch(
         r"[A-Za-z0-9_-][A-Za-z0-9_.-]*/[A-Za-z0-9_-][A-Za-z0-9_.-]*", repository
     ):
@@ -453,7 +491,9 @@ def build_index(
         for item in tree
         if previous.get(item["path"], {}).get("git_blob_oid") == item["oid"]
     }
-    blobs = _snapshot_blobs(root, [item for item in tree if item["path"] not in reusable])
+    blobs = _snapshot_blobs(
+        root, [item for item in tree if item["path"] not in reusable]
+    )
     files: list[dict[str, Any]] = []
     for item in tree:
         path = item["path"]
@@ -466,9 +506,13 @@ def build_index(
                 raise ValueError(f"cannot parse Python source: {path}") from None
         entry["git_blob_oid"] = item["oid"]
         entry["source_id"] = f"{repository}:code:{quote(path, safe='/')}"
-        entry["source_ref"] = f"https://github.com/{repository}/blob/{sha}/{quote(path, safe='/')}"
+        entry["source_ref"] = (
+            f"https://github.com/{repository}/blob/{sha}/{quote(path, safe='/')}"
+        )
         for symbol in entry["symbols"]:
-            symbol["source_ref"] = f"{entry['source_ref']}#L{symbol['line']}-L{symbol['end_line']}"
+            symbol["source_ref"] = (
+                f"{entry['source_ref']}#L{symbol['line']}-L{symbol['end_line']}"
+            )
         files.append(entry)
     result = {
         **_assemble_index(files),
@@ -494,7 +538,11 @@ def _write_json(path: Path, text: str) -> None:
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=path.parent, prefix=f".{path.name}.", delete=False
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            delete=False,
         ) as output:
             temporary = Path(output.name)
             output.write(text + "\n")
@@ -512,7 +560,8 @@ def _reverse_dependencies(index: dict[str, Any], direct_modules: set[str]) -> se
         if file_entry["module"] in direct_modules:
             continue
         imported = {
-            str(imp.get("module") or "").lstrip(".") for imp in file_entry.get("imports", [])
+            str(imp.get("module") or "").lstrip(".")
+            for imp in file_entry.get("imports", [])
         }
         if any(
             imp and (imp == module or imp.startswith(module + "."))
@@ -523,7 +572,9 @@ def _reverse_dependencies(index: dict[str, Any], direct_modules: set[str]) -> se
     return reverse_deps
 
 
-def _affected_tests(tests_by_module: dict[str, list[str]], modules: list[str]) -> list[str]:
+def _affected_tests(
+    tests_by_module: dict[str, list[str]], modules: list[str]
+) -> list[str]:
     affected: set[str] = set()
     for module in modules:
         affected.update(tests_by_module.get(module, []))
@@ -543,7 +594,11 @@ def query_affected(
     derived from the pre-built *index*.
     """
     bound_revision = snapshot_revision(index)
-    if bound_revision is not None and git_revision is not None and git_revision != bound_revision:
+    if (
+        bound_revision is not None
+        and git_revision is not None
+        and git_revision != bound_revision
+    ):
         raise ValueError("revision does not match the immutable index")
     by_path: dict[str, dict[str, Any]] = {f["path"]: f for f in index.get("files", [])}
     tests_by_module: dict[str, list[str]] = index.get("tests_by_module", {})
@@ -562,7 +617,9 @@ def query_affected(
                 prov["source_ref"] = entry["source_ref"]
         provenance_files[path] = prov
 
-    affected_modules = sorted(direct_modules | _reverse_dependencies(index, direct_modules))
+    affected_modules = sorted(
+        direct_modules | _reverse_dependencies(index, direct_modules)
+    )
     affected_tests = _affected_tests(tests_by_module, affected_modules)
 
     provenance: dict[str, Any] = {
@@ -608,24 +665,37 @@ def main() -> int:
         help="git revision to embed in --query-affected provenance",
     )
     parser.add_argument(
-        "--revision", help="index this immutable Git commit, ignoring working-tree edits"
+        "--revision",
+        help="index this immutable Git commit, ignoring working-tree edits",
     )
     parser.add_argument(
-        "--repository", help="explicit GitHub owner/name for snapshot namespace/source refs"
+        "--repository",
+        help="explicit GitHub owner/name for snapshot namespace/source refs",
     )
     parser.add_argument(
-        "--previous-index", help="trusted prior snapshot JSON; requires --revision/--repository"
-    )
-    parser.add_argument("--max-files", type=int, default=5000, help="snapshot file limit")
-    parser.add_argument(
-        "--max-file-bytes", type=int, default=1024 * 1024, help="snapshot per-file byte limit"
+        "--previous-index",
+        help="trusted prior snapshot JSON; requires --revision/--repository",
     )
     parser.add_argument(
-        "--max-total-bytes", type=int, default=32 * 1024 * 1024, help="snapshot total byte limit"
+        "--max-files", type=int, default=5000, help="snapshot file limit"
+    )
+    parser.add_argument(
+        "--max-file-bytes",
+        type=int,
+        default=1024 * 1024,
+        help="snapshot per-file byte limit",
+    )
+    parser.add_argument(
+        "--max-total-bytes",
+        type=int,
+        default=32 * 1024 * 1024,
+        help="snapshot total byte limit",
     )
     args = parser.parse_args()
     if args.query_affected is not None and (
-        args.revision is not None or args.repository is not None or args.previous_index is not None
+        args.revision is not None
+        or args.repository is not None
+        or args.previous_index is not None
     ):
         parser.error("snapshot build options cannot be combined with --query-affected")
 

@@ -125,13 +125,19 @@ def mcp_post() -> Response:
     if method == "tools/call":
         params = payload.get("params")
         if not isinstance(params, dict):
-            return _error_response(request_id, -32602, "tools/call params must be an object")
+            return _error_response(
+                request_id, -32602, "tools/call params must be an object"
+            )
         call_meta = params.get("_meta") or {}
         if not isinstance(call_meta, dict):
-            return _error_response(request_id, -32602, "tools/call _meta must be an object")
+            return _error_response(
+                request_id, -32602, "tools/call _meta must be an object"
+            )
         runtime_id = call_meta.get("logos/runtime_id")
         resource_runtime_id = call_meta.get("logos/resource_runtime_id")
-        if runtime_id is not None and (not isinstance(runtime_id, str) or not runtime_id.strip()):
+        if runtime_id is not None and (
+            not isinstance(runtime_id, str) or not runtime_id.strip()
+        ):
             return _error_response(
                 request_id, -32602, "logos/runtime_id must be a non-empty string"
             )
@@ -139,7 +145,9 @@ def mcp_post() -> Response:
             not isinstance(resource_runtime_id, str) or not resource_runtime_id.strip()
         ):
             return _error_response(
-                request_id, -32602, "logos/resource_runtime_id must be a non-empty string"
+                request_id,
+                -32602,
+                "logos/resource_runtime_id must be a non-empty string",
             )
         try:
             result = _handle_call(
@@ -170,8 +178,12 @@ def mcp_post() -> Response:
                 _client_error_message(exc, "Tool input validation failed"),
             )
         except Exception:
-            return _error_response(request_id, -32603, "Tool execution failed", status=500)
+            return _error_response(
+                request_id, -32603, "Tool execution failed", status=500
+            )
 
         return _jsonrpc_result(request_id, result)
 
-    return _error_response(request_id, -32601, f"Method not found: {method}", status=404)
+    return _error_response(
+        request_id, -32601, f"Method not found: {method}", status=404
+    )

@@ -13,7 +13,11 @@ import threading
 import time
 from typing import Callable
 
-from printer_service.printers.bambu_a1mini import PrinterProtocolError, decode_probe, _recv_exact
+from printer_service.printers.bambu_a1mini import (
+    PrinterProtocolError,
+    decode_probe,
+    _recv_exact,
+)
 from printer_service.printers.lan_socket import connect_lan
 
 
@@ -95,7 +99,9 @@ class PrinterSession:
                 or not login.get("model")
             ):
                 raise PrinterProtocolError("invalid detect response")
-            if str(login.get("sequence_id", str(self._sequence))) != str(self._sequence):
+            if str(login.get("sequence_id", str(self._sequence))) != str(
+                self._sequence
+            ):
                 raise PrinterProtocolError("sequence mismatch")
             return {
                 "model": str(login["model"]),

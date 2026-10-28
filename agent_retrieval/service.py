@@ -287,7 +287,9 @@ def _cache_matches_query(lookup: CacheLookup, query: RetrievalQuery) -> bool:
     )
 
 
-def _cache_hits(lookup: CacheLookup | None, query: RetrievalQuery) -> list[RetrievalHit]:
+def _cache_hits(
+    lookup: CacheLookup | None, query: RetrievalQuery
+) -> list[RetrievalHit]:
     if (
         lookup is None
         or lookup.status not in {"hit", "partial"}
@@ -407,12 +409,18 @@ class HybridRetriever:
             cache_status=cache_status,
             source_counts=dict(counts),
             total_chars=sum(len(hit.text) for hit in hits),
-            saved_source_bytes=(cache_lookup.saved_source_bytes if cache_lookup is not None else 0),
-            saved_input_tokens=(cache_lookup.saved_input_tokens if cache_lookup is not None else 0),
+            saved_source_bytes=(
+                cache_lookup.saved_source_bytes if cache_lookup is not None else 0
+            ),
+            saved_input_tokens=(
+                cache_lookup.saved_input_tokens if cache_lookup is not None else 0
+            ),
         )
 
 
-def record_retrieval(trace: Any, bundle: RetrievalBundle, query: RetrievalQuery) -> dict[str, Any]:
+def record_retrieval(
+    trace: Any, bundle: RetrievalBundle, query: RetrievalQuery
+) -> dict[str, Any]:
     entry = {
         "status": bundle.status,
         "cache_status": bundle.cache_status,

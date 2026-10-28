@@ -46,7 +46,9 @@ def walk_value(
             if identity in active:
                 raise error_type("cyclic value structure")
             active.add(identity)
-            descendants = chain(item.keys(), item.values()) if type(item) is dict else iter(item)
+            descendants = (
+                chain(item.keys(), item.values()) if type(item) is dict else iter(item)
+            )
             stack.append((descendants, depth + 1, identity))
 
 

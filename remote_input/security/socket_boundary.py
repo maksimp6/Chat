@@ -59,7 +59,8 @@ class SignedInputSocket:
     def _open_checked_parent(self) -> tuple[int, os.stat_result]:
         """Acquire and verify a single directory inode, closing it on ANY failure."""
         parent_fd = os.open(
-            self.path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+            self.path.parent,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
         )
         try:
             identity = os.fstat(parent_fd)
@@ -92,13 +93,22 @@ class SignedInputSocket:
             server.bind(bound_path)
             # Ownership must be captured BEFORE public-path validation; otherwise
             # an adversarial rename could leave a socket in the old inode.
-            self._inode = os.stat(self.path.name, dir_fd=parent_fd, follow_symlinks=False).st_ino
+            self._inode = os.stat(
+                self.path.name, dir_fd=parent_fd, follow_symlinks=False
+            ).st_ino
             current = self.path.parent.lstat()
-            if (current.st_dev, current.st_ino) != (parent_identity.st_dev, parent_identity.st_ino):
+            if (current.st_dev, current.st_ino) != (
+                parent_identity.st_dev,
+                parent_identity.st_ino,
+            ):
                 raise SocketBoundaryError("socket parent replaced during bind")
             if self.shared_gid is not None:
                 os.chown(
-                    self.path.name, -1, self.shared_gid, dir_fd=parent_fd, follow_symlinks=False
+                    self.path.name,
+                    -1,
+                    self.shared_gid,
+                    dir_fd=parent_fd,
+                    follow_symlinks=False,
                 )
             os.chmod(
                 self.path.name,
@@ -141,7 +151,9 @@ class SignedInputSocket:
         if self._parent_fd is None or self._inode is None:
             return
         try:
-            info = os.stat(self.path.name, dir_fd=self._parent_fd, follow_symlinks=False)
+            info = os.stat(
+                self.path.name, dir_fd=self._parent_fd, follow_symlinks=False
+            )
             if stat.S_ISSOCK(info.st_mode) and info.st_ino == self._inode:
                 os.unlink(self.path.name, dir_fd=self._parent_fd)
         except FileNotFoundError:
@@ -180,7 +192,13 @@ class SignedInputSocket:
                         raise SocketBoundaryError("oversized or empty grant")
                     accepted = self.verifier.accept(packet)
                     conn.sendall(b"OK\n" if accepted else b"DENIED\n")
-                except (GrantError, SocketBoundaryError, OSError, TimeoutError, ValueError):
+                except (
+                    GrantError,
+                    SocketBoundaryError,
+                    OSError,
+                    TimeoutError,
+                    ValueError,
+                ):
                     try:
                         conn.sendall(b"DENIED\n")
                     except OSError:

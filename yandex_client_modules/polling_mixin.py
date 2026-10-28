@@ -8,7 +8,9 @@ from yandex_client_modules.response_poller import poll_delay_cap
 
 
 class YandexPollingMixin:
-    def _wait(self, task_id, timeout=180, execution_trace=None, trace_step=None, headers=None):
+    def _wait(
+        self, task_id, timeout=180, execution_trace=None, trace_step=None, headers=None
+    ):
         start = time.time()
         url = self.responses_url + "/" + task_id
         delay = 0.5
@@ -19,7 +21,9 @@ class YandexPollingMixin:
                 # Polls read a request that ask() already admitted and counted. Charging
                 # a quota unit per poll could deny the result of a task the provider keeps running.
                 self._log_request("GET", url)
-                resp = self._log_response(self.session.get(url, headers=headers, timeout=15))
+                resp = self._log_response(
+                    self.session.get(url, headers=headers, timeout=15)
+                )
                 if resp.status_code == 404:
                     if execution_trace and isinstance(execution_trace, ExecutionTrace):
                         execution_trace.add_event(
@@ -74,7 +78,9 @@ class YandexPollingMixin:
                     and 400 <= status_code < 500
                     and status_code not in {404, 408, 429}
                 ):
-                    raise YandexClientError(error_message, status_code=status_code) from e
+                    raise YandexClientError(
+                        error_message, status_code=status_code
+                    ) from e
                 time.sleep(delay)
                 delay = min(delay * 1.5, poll_delay_cap(time.time() - start))
                 continue
@@ -90,16 +96,24 @@ class YandexPollingMixin:
                 invalid_json = True
 
             poll_end = time.time()
-            snapshot_key = json.dumps(data, sort_keys=True, ensure_ascii=False, default=str)
-            response = data if isinstance(data, dict) else {
-                "id": task_id,
-                "status": "failed",
-                "error": {
-                    "code": "provider_invalid_json" if invalid_json else "provider_invalid_response",
-                    "type": "invalid_response",
-                },
-                "output": [],
-            }
+            snapshot_key = json.dumps(
+                data, sort_keys=True, ensure_ascii=False, default=str
+            )
+            response = (
+                data
+                if isinstance(data, dict)
+                else {
+                    "id": task_id,
+                    "status": "failed",
+                    "error": {
+                        "code": "provider_invalid_json"
+                        if invalid_json
+                        else "provider_invalid_response",
+                        "type": "invalid_response",
+                    },
+                    "output": [],
+                }
+            )
             if (
                 execution_trace
                 and isinstance(execution_trace, ExecutionTrace)
@@ -118,7 +132,9 @@ class YandexPollingMixin:
                     "api_poll_response_received",
                     {
                         "step": trace_step,
-                        "correlation_id": execution_trace.get_step_correlation_id(trace_step or 1),
+                        "correlation_id": execution_trace.get_step_correlation_id(
+                            trace_step or 1
+                        ),
                         "response_id": task_id,
                         "status": response.get("status"),
                         "timing_ms": poll_timing_ms,
@@ -129,7 +145,10 @@ class YandexPollingMixin:
                 last_snapshot = snapshot_key
 
             status = response.get("status")
-            if status in ("completed", "incomplete", "failed", "cancelled") or response.get("error") is not None:
+            if (
+                status in ("completed", "incomplete", "failed", "cancelled")
+                or response.get("error") is not None
+            ):
                 if execution_trace and isinstance(execution_trace, ExecutionTrace):
                     execution_trace.add_event(
                         "api_poll_completed",
@@ -148,14 +167,18 @@ class YandexPollingMixin:
                         "Provider task failed",
                         step=trace_step,
                         error_type="ProviderTaskFailed",
-                    ) if execution_trace and isinstance(execution_trace, ExecutionTrace) else None
+                    ) if execution_trace and isinstance(
+                        execution_trace, ExecutionTrace
+                    ) else None
                 if status == "cancelled":
                     execution_trace.record_error(
                         "yandex_poll",
                         "Task cancelled",
                         step=trace_step,
                         error_type="ProviderTaskCancelled",
-                    ) if execution_trace and isinstance(execution_trace, ExecutionTrace) else None
+                    ) if execution_trace and isinstance(
+                        execution_trace, ExecutionTrace
+                    ) else None
                 # ask() delivers every terminal state to its checkpoint callback
                 # and caller; provider failures use the normal diagnostics path.
                 return response
@@ -167,7 +190,9 @@ class YandexPollingMixin:
                 "api_poll_timeout",
                 {
                     "step": trace_step,
-                    "correlation_id": execution_trace.get_step_correlation_id(trace_step or 1),
+                    "correlation_id": execution_trace.get_step_correlation_id(
+                        trace_step or 1
+                    ),
                     "response_id": task_id,
                     "timeout": timeout,
                 },

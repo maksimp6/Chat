@@ -73,7 +73,9 @@ def generate_private_cases(manifest: Path, gallery: Path, out: Path) -> Path:
                 {
                     "id": f"{case['id']}__{mode}",
                     "image": filename,
-                    "image_sha256": hashlib.sha256(destination.read_bytes()).hexdigest(),
+                    "image_sha256": hashlib.sha256(
+                        destination.read_bytes()
+                    ).hexdigest(),
                     "source_kind": "cad_render",
                     "annotation_status": "provisional",
                     "augmentation": mode,

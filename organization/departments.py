@@ -59,9 +59,14 @@ class DepartmentExistsError(Exception):
 
 
 def upsert_department(
-    data: Mapping[str, Any], department_id: Optional[str] = None, *, create_only: bool = False
+    data: Mapping[str, Any],
+    department_id: Optional[str] = None,
+    *,
+    create_only: bool = False,
 ) -> dict[str, Any]:
-    ident = _validate_id(department_id or data.get("id") or ("dept-" + uuid4().hex[:12]))
+    ident = _validate_id(
+        department_id or data.get("id") or ("dept-" + uuid4().hex[:12])
+    )
     name = str(data.get("name") or "").strip()
     if not name:
         raise ValueError("department name is required")
@@ -85,7 +90,13 @@ def upsert_department(
             "status": str(given("status") or "active"),
             "updated_at": unix_seconds(),
         }
-        for field in ("model_config", "policies", "knowledge_scope", "session_config", "metadata"):
+        for field in (
+            "model_config",
+            "policies",
+            "knowledge_scope",
+            "session_config",
+            "metadata",
+        ):
             value = given(field) or {}
             if not isinstance(value, dict):
                 raise ValueError(f"{field} must be an object")
@@ -180,6 +191,9 @@ def departments_session_status(department_id: str, session_id: str):
     if not department:
         return jsonify({"error": "department_not_found"}), 404
     session = get_session(session_id)
-    if not session or (session.get("metadata") or {}).get("department_id") != department["id"]:
+    if (
+        not session
+        or (session.get("metadata") or {}).get("department_id") != department["id"]
+    ):
         return jsonify({"error": "session_not_found"}), 404
     return jsonify({"session": session, "department_id": department["id"]})

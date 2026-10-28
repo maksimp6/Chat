@@ -55,7 +55,9 @@ class CloudRuIamClient:
             return self._access_token
 
         if not self.key_id or not self.key_secret:
-            raise CloudRuIamError("CLOUDRU_IAM_KEY_ID and CLOUDRU_IAM_KEY_SECRET are required")
+            raise CloudRuIamError(
+                "CLOUDRU_IAM_KEY_ID and CLOUDRU_IAM_KEY_SECRET are required"
+            )
 
         trace = get_current_trace()
         started = datetime.now(timezone.utc)
@@ -74,7 +76,10 @@ class CloudRuIamClient:
             response = requests.post(
                 f"{self.endpoint}{TOKEN_PATH}",
                 json={"keyId": self.key_id, "secret": self.key_secret},
-                headers={"Accept": "application/json", "Content-Type": "application/json"},
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
                 timeout=self.timeout,
             )
             response.raise_for_status()
@@ -90,7 +95,9 @@ class CloudRuIamClient:
                         "path": TOKEN_PATH,
                         "http_status": response.status_code,
                         "timing_ms": round(
-                            (datetime.now(timezone.utc) - started).total_seconds() * 1000, 2
+                            (datetime.now(timezone.utc) - started).total_seconds()
+                            * 1000,
+                            2,
                         ),
                         "success": True,
                     },
@@ -98,7 +105,9 @@ class CloudRuIamClient:
         except (requests.RequestException, ValueError) as exc:
             if trace:
                 trace.record_error(
-                    "cloudru.iam.authenticate", "Cloud.ru IAM authentication failed", exception=exc
+                    "cloudru.iam.authenticate",
+                    "Cloud.ru IAM authentication failed",
+                    exception=exc,
                 )
                 trace.add_event(
                     "provider_api_response",
@@ -108,9 +117,13 @@ class CloudRuIamClient:
                         "operation": "authenticate",
                         "method": "POST",
                         "path": TOKEN_PATH,
-                        "http_status": getattr(getattr(exc, "response", None), "status_code", None),
+                        "http_status": getattr(
+                            getattr(exc, "response", None), "status_code", None
+                        ),
                         "timing_ms": round(
-                            (datetime.now(timezone.utc) - started).total_seconds() * 1000, 2
+                            (datetime.now(timezone.utc) - started).total_seconds()
+                            * 1000,
+                            2,
                         ),
                         "success": False,
                     },
@@ -123,7 +136,9 @@ class CloudRuIamClient:
 
         expires_in = int(body.get("expires_in") or body.get("expiresIn") or 3600)
         self._access_token = str(token)
-        self._access_token_expires_at = now + timedelta(seconds=max(60, expires_in - 60))
+        self._access_token_expires_at = now + timedelta(
+            seconds=max(60, expires_in - 60)
+        )
         return self._access_token
 
     def _request(
@@ -175,7 +190,9 @@ class CloudRuIamClient:
                         "path": path,
                         "http_status": response.status_code,
                         "timing_ms": round(
-                            (datetime.now(timezone.utc) - started).total_seconds() * 1000, 2
+                            (datetime.now(timezone.utc) - started).total_seconds()
+                            * 1000,
+                            2,
                         ),
                         "success": True,
                     },
@@ -194,7 +211,9 @@ class CloudRuIamClient:
                         "path": path,
                         "http_status": status_code,
                         "timing_ms": round(
-                            (datetime.now(timezone.utc) - started).total_seconds() * 1000, 2
+                            (datetime.now(timezone.utc) - started).total_seconds()
+                            * 1000,
+                            2,
                         ),
                         "success": False,
                     },
@@ -205,14 +224,21 @@ class CloudRuIamClient:
                     exception=exc,
                 )
             suffix = f" (HTTP {status_code})" if status_code else ""
-            raise CloudRuIamError(f"Cloud.ru IAM request failed: {method} {path}{suffix}") from exc
+            raise CloudRuIamError(
+                f"Cloud.ru IAM request failed: {method} {path}{suffix}"
+            ) from exc
         if not isinstance(body, dict):
             raise CloudRuIamError("Cloud.ru IAM returned an invalid response")
         return body
 
     def list_service_accounts(self) -> list[dict[str, Any]]:
         body = self._request("GET", SERVICE_ACCOUNTS_PATH)
-        accounts = body.get("service_accounts") or body.get("accounts") or body.get("items") or []
+        accounts = (
+            body.get("service_accounts")
+            or body.get("accounts")
+            or body.get("items")
+            or []
+        )
         return [dict(item) for item in accounts] if isinstance(accounts, list) else []
 
     def create_service_account(
@@ -312,7 +338,9 @@ class CloudRuIamClient:
         """Revoke an API key that was issued but never stored, so no live credential is left behind."""
         if not api_key_id.strip():
             raise ValueError("api_key_id is required")
-        return self._request("DELETE", f"{API_KEYS_PATH}/{quote(api_key_id.strip(), safe='')}")
+        return self._request(
+            "DELETE", f"{API_KEYS_PATH}/{quote(api_key_id.strip(), safe='')}"
+        )
 
 
 __all__ = ["CloudRuIamError", "CloudRuIamClient"]

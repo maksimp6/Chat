@@ -60,7 +60,9 @@ def _path(value: str) -> str:
         "check_suite_id",
         "exclude_pull_requests",
     }
-    if len({key for key, _ in query}) != len(query) or any(key not in allowed for key, _ in query):
+    if len({key for key, _ in query}) != len(query) or any(
+        key not in allowed for key, _ in query
+    ):
         raise ValueError("Unsupported project API query")
     for key, item in query:
         if key in {"page", "per_page"} and (
@@ -158,13 +160,25 @@ class _ProjectReader:
                 break
             url = urljoin(url, response.headers.get("Location", ""))
             if not _redirect_allowed(url, self.api_root):
-                raise ValueError("GitHub redirect destination is not an allowed log source")
-            auth = self.headers if url.startswith(self.api_root) else {"Accept": "text/plain"}
+                raise ValueError(
+                    "GitHub redirect destination is not an allowed log source"
+                )
+            auth = (
+                self.headers
+                if url.startswith(self.api_root)
+                else {"Accept": "text/plain"}
+            )
         try:
             text = response.content.decode("utf-8")
         except UnicodeError:
-            raise ValueError("Binary resource: use an Actions job text-log endpoint") from None
-        value = json.loads(text) if "json" in response.headers.get("Content-Type", "") else text
+            raise ValueError(
+                "Binary resource: use an Actions job text-log endpoint"
+            ) from None
+        value = (
+            json.loads(text)
+            if "json" in response.headers.get("Content-Type", "")
+            else text
+        )
         return self.result(
             value,
             source,
@@ -191,7 +205,8 @@ class _ProjectReader:
     def discussion(self, number, after):
         owner, name = self.repository.split("/")
         repo = self.graphql(
-            _DISCUSSION, {"owner": owner, "name": name, "number": number, "after": after}
+            _DISCUSSION,
+            {"owner": owner, "name": name, "number": number, "after": after},
         )["repository"]
         if (
             not repo

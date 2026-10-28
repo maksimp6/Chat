@@ -62,7 +62,9 @@ class PluginManifest:
 
         plugin_id = str(data["id"]).strip()
         if not re.fullmatch(r"[A-Za-z0-9._-]+", plugin_id):
-            raise PluginError("plugin id must contain only letters, digits, '.', '_' or '-'")
+            raise PluginError(
+                "plugin id must contain only letters, digits, '.', '_' or '-'"
+            )
 
         api_version = int(data.get("api_version", SUPPORTED_MANIFEST_VERSION))
         if api_version != SUPPORTED_MANIFEST_VERSION:
@@ -70,7 +72,9 @@ class PluginManifest:
 
         capabilities = _string_list(data.get("capabilities"), "capabilities")
         permissions = _string_list(data.get("permissions"), "permissions")
-        invalid_permissions = [item for item in permissions if not item.startswith("tool:")]
+        invalid_permissions = [
+            item for item in permissions if not item.startswith("tool:")
+        ]
         if invalid_permissions:
             raise PluginError("permissions must use the 'tool:<name>' namespace")
 
@@ -156,7 +160,9 @@ class PluginManager:
         if isinstance(properties, Mapping):
             unknown = sorted(set(config) - set(properties))
             if unknown:
-                raise PluginError(f"config has keys outside the schema: {', '.join(unknown)}")
+                raise PluginError(
+                    f"config has keys outside the schema: {', '.join(unknown)}"
+                )
         record.config = dict(config)
         return self._public(record)
 

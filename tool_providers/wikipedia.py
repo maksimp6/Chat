@@ -94,7 +94,11 @@ def wikipedia_summary(arguments: dict, cfg: dict = None) -> dict:
     try:
         res = _get(url)
         if res.status_code == 404:
-            return {"success": False, "error": "Статья не найдена (код 404)", "status": 404}
+            return {
+                "success": False,
+                "error": "Статья не найдена (код 404)",
+                "status": 404,
+            }
         if res.status_code != 200:
             return _http_error(res)
         data = res.json()
@@ -118,7 +122,10 @@ TOOL_REGISTRY = {
             "type": "object",
             "properties": {
                 "query": {"type": "string", "description": "Поисковый запрос"},
-                "lang": {"type": "string", "description": "Язык ('ru', 'en'), по умолчанию 'ru'"},
+                "lang": {
+                    "type": "string",
+                    "description": "Язык ('ru', 'en'), по умолчанию 'ru'",
+                },
             },
             "required": ["query"],
         },
@@ -131,7 +138,10 @@ TOOL_REGISTRY = {
             "type": "object",
             "properties": {
                 "title": {"type": "string", "description": "Точное название статьи"},
-                "lang": {"type": "string", "description": "Язык ('ru', 'en'), по умолчанию 'ru'"},
+                "lang": {
+                    "type": "string",
+                    "description": "Язык ('ru', 'en'), по умолчанию 'ru'",
+                },
             },
             "required": ["title"],
         },

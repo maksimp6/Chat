@@ -80,9 +80,16 @@ def restore_session(session_id: str) -> Optional[dict[str, Any]]:
 
 
 def update_session(
-    session_id: str, metadata: Optional[dict[str, Any]] = None, status: Optional[str] = None
+    session_id: str,
+    metadata: Optional[dict[str, Any]] = None,
+    status: Optional[str] = None,
 ) -> Optional[dict[str, Any]]:
-    if status is not None and status not in {"active", "completed", "failed", "cancelled"}:
+    if status is not None and status not in {
+        "active",
+        "completed",
+        "failed",
+        "cancelled",
+    }:
         raise ValueError(f"Unsupported session status: {status}")
     key = _key(session_id)
     with get_memory_client(memory_file_path()).transaction() as tx:

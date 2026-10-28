@@ -87,7 +87,9 @@ def admit(request: Request, approval: Approval) -> Decision:
         ceiling = _limit_values(approval.ceiling)
         if requested is None or ceiling is None:
             decision = Decision.INVALID_LIMIT
-        elif not _valid_capabilities(request.capabilities) or not request.capabilities.issubset(approval.capabilities):
+        elif not _valid_capabilities(
+            request.capabilities
+        ) or not request.capabilities.issubset(approval.capabilities):
             decision = Decision.CAPABILITY_DENIED
         elif any(value > cap for value, cap in zip(requested, ceiling, strict=True)):
             decision = Decision.BUDGET_EXCEEDED

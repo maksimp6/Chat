@@ -16,6 +16,7 @@ Dialog issue format (label `lexical-dialog`):
 Chunk bodies must concatenate (in the declared order, no separators) to exactly
 the source document. Mismatch = FAIL, no report is generalized.
 """
+
 from core.env import env_get, env_require
 
 import hashlib
@@ -113,7 +114,9 @@ def gh_paginated(path: str) -> list[dict[str, object]]:
     out: list[dict[str, object]] = []
     page = 1
     while True:
-        chunk = gh("GET", f"{path}{'&' if '?' in path else '?'}page={page}&per_page=100")
+        chunk = gh(
+            "GET", f"{path}{'&' if '?' in path else '?'}page={page}&per_page=100"
+        )
         if not chunk:
             break
         out.extend(list(chunk))
@@ -271,7 +274,9 @@ def main() -> int:
             try:
                 payload = json.loads(payload_file.read_text(encoding="utf-8"))
                 chunk_props = list(payload["proposals"])
-                chunk_offers = {key: int(count) for key, count in payload["offers"].items()}
+                chunk_offers = {
+                    key: int(count) for key, count in payload["offers"].items()
+                }
                 chunk_questions = len(payload["questions"])
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 print(f"FAIL #{number} chunk #{chunk_number}: bad payload: {exc}")

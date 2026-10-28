@@ -50,7 +50,10 @@ def github_token():
 def api_json(path, token):
     request = urllib.request.Request(
         API + path,
-        headers={"Authorization": "Bearer " + token, "Accept": "application/vnd.github+json"},
+        headers={
+            "Authorization": "Bearer " + token,
+            "Accept": "application/vnd.github+json",
+        },
     )
     with urllib.request.urlopen(request, timeout=30) as response:
         return json.load(response)
@@ -59,7 +62,12 @@ def api_json(path, token):
 def validate_run(run, head):
     if not re.fullmatch(r"[0-9a-f]{40}", head):
         raise ValueError("invalid approved HEAD")
-    expected = {"head_sha": head, "status": "completed", "conclusion": "success", "path": WORKFLOW}
+    expected = {
+        "head_sha": head,
+        "status": "completed",
+        "conclusion": "success",
+        "path": WORKFLOW,
+    }
     if any(run.get(k) != v for k, v in expected.items()):
         raise ValueError("run is not a successful approved exact-head Yorik workflow")
     repo = run.get("head_repository") or {}
@@ -71,7 +79,9 @@ def await_run(head, token, wait_seconds):
     deadline = time.monotonic() + wait_seconds
     while time.monotonic() < deadline:
         runs = api_json("/actions/workflows/yorik-redmi9.yml/runs?per_page=30", token)
-        matches = [r for r in runs.get("workflow_runs", []) if r.get("head_sha") == head]
+        matches = [
+            r for r in runs.get("workflow_runs", []) if r.get("head_sha") == head
+        ]
         if matches:
             run = matches[0]
             if run.get("status") == "completed":
@@ -83,7 +93,9 @@ def await_run(head, token, wait_seconds):
 
 def download_artifact(run_id, token):
     data = api_json(f"/actions/runs/{run_id}/artifacts?per_page=100", token)
-    artifacts = [a for a in data.get("artifacts", []) if a.get("name") == "yorik-a1mini-redmi9"]
+    artifacts = [
+        a for a in data.get("artifacts", []) if a.get("name") == "yorik-a1mini-redmi9"
+    ]
     if len(artifacts) != 1 or artifacts[0].get("expired"):
         raise ValueError("exactly one unexpired Yorik artifact is required")
     artifact_id = int(artifacts[0]["id"])
@@ -133,7 +145,10 @@ def validate_package(blob, audit, head):
     with zipfile.ZipFile(io.BytesIO(blob)) as archive:
         if len(archive.namelist()) != len(set(archive.namelist())):
             raise ValueError("duplicate sliced archive entries")
-        if sum(i.file_size for i in archive.infolist()) > MAX_BYTES or archive.testzip():
+        if (
+            sum(i.file_size for i in archive.infolist()) > MAX_BYTES
+            or archive.testzip()
+        ):
             raise ValueError("oversized or corrupt sliced archive")
         profile = json.loads(archive.read("Metadata/project_settings.config"))
         gcode = archive.read("Metadata/plate_1.gcode").decode("utf-8")
@@ -156,7 +171,9 @@ def validate_package(blob, audit, head):
 def validate_gcode(gcode):
     commands = [line.split(";", 1)[0].strip() for line in gcode.splitlines()]
     for command, target in (("M109", 220), ("M190", 60)):
-        if not any(re.match(rf"^{command}\s+S{target}(?:\s|$)", line) for line in commands):
+        if not any(
+            re.match(rf"^{command}\s+S{target}(?:\s|$)", line) for line in commands
+        ):
             raise ValueError("missing audited temperature commands")
     if not any(
         re.match(r"^G1\s", line) and re.search(r"\sE[0-9]+(?:\.[0-9]+)?(?:\s|$)", line)
@@ -222,7 +239,10 @@ class PinnedContext(ssl.SSLContext):
 
     def wrap_socket(self, *args, **kwargs):
         connection = super().wrap_socket(*args, **kwargs)
-        if hashlib.sha256(connection.getpeercert(binary_form=True)).hexdigest() != self.pin:
+        if (
+            hashlib.sha256(connection.getpeercert(binary_form=True)).hexdigest()
+            != self.pin
+        ):
             connection.close()
             raise ssl.SSLError("printer TLS pin mismatch")
         return connection
@@ -271,7 +291,11 @@ def stage(ftp, blob, digest):
             pass
     if readback(ftp, name) != blob:
         raise ValueError("upload is not verified; manual reconciliation required")
-    return {"state": "STAGED_VERIFIED_NOT_PRINTED", "remote_name": name, "sha256": digest}
+    return {
+        "state": "STAGED_VERIFIED_NOT_PRINTED",
+        "remote_name": name,
+        "sha256": digest,
+    }
 
 
 def main():
@@ -290,11 +314,17 @@ def main():
     if args.run_id is None:
         args.run_id = await_run(args.head, token, args.wait_seconds)
     validate_run(api_json(f"/actions/runs/{args.run_id}", token), args.head)
-    blob, audit, digest = unpack_handoff(download_artifact(args.run_id, token), args.head)
+    blob, audit, digest = unpack_handoff(
+        download_artifact(args.run_id, token), args.head
+    )
     args.spool.mkdir(mode=0o700, parents=True, exist_ok=True)
     (args.spool / FILENAME).write_bytes(blob)
     (args.spool / "audit.json").write_text(json.dumps(audit, indent=2))
-    report = {"state": "DOWNLOADED_VERIFIED_NOT_PRINTED", "sha256": digest, "run_id": args.run_id}
+    report = {
+        "state": "DOWNLOADED_VERIFIED_NOT_PRINTED",
+        "sha256": digest,
+        "run_id": args.run_id,
+    }
     if args.stage:
         if args.config is None:
             raise ValueError("--stage requires an existing trusted printer config")

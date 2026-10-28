@@ -48,7 +48,9 @@ class MemorySource:
         for record in records:
             if query.memory_kinds and record.kind not in query.memory_kinds:
                 continue
-            if record.visibility and (query.role is None or query.role not in record.visibility):
+            if record.visibility and (
+                query.role is None or query.role not in record.visibility
+            ):
                 visibility_filtered += 1
                 continue
             if record.sensitivity == "sensitive" and not query.include_sensitive:
@@ -67,7 +69,11 @@ class MemorySource:
             if repository and repository != query.repository:
                 continue
             payload_text = _compact_json(data["payload"])
-            text = record.text if payload_text == "{}" else f"{record.text}\n{payload_text}"
+            text = (
+                record.text
+                if payload_text == "{}"
+                else f"{record.text}\n{payload_text}"
+            )
             documents.append(
                 RetrievalDocument(
                     document_id=f"memory:{record.memory_id}",
@@ -98,14 +104,18 @@ class MemorySource:
 class AiIndexSource:
     source_type = "code_index"
 
-    def __init__(self, index: dict[str, Any], *, repository: str, head_sha: str) -> None:
+    def __init__(
+        self, index: dict[str, Any], *, repository: str, head_sha: str
+    ) -> None:
         self._index = index
         self._repository = str(repository)
         self._head_sha = str(head_sha)
 
     def collect(self, query: RetrievalQuery) -> SourceBatch:
         if query.repository != self._repository or query.head_sha != self._head_sha:
-            return SourceBatch(documents=(), stale_filtered=len(self._index.get("files", [])))
+            return SourceBatch(
+                documents=(), stale_filtered=len(self._index.get("files", []))
+            )
 
         tests_by_module = self._index.get("tests_by_module") or {}
         documents: list[RetrievalDocument] = []
@@ -169,7 +179,9 @@ class AiIndexSource:
 class StaticSource:
     """Adapter for already-normalized GitHub/CI/trace/doc summaries."""
 
-    def __init__(self, source_type: str, documents: Iterable[RetrievalDocument]) -> None:
+    def __init__(
+        self, source_type: str, documents: Iterable[RetrievalDocument]
+    ) -> None:
         self.source_type = str(source_type)
         self._documents = tuple(documents)
 

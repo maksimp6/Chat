@@ -129,7 +129,12 @@ class A2AClient:
             if payload.get(key) is not None:
                 params[key] = payload[key]
         body = json.dumps(
-            {"jsonrpc": "2.0", "id": request_id, "method": "message/send", "params": params},
+            {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "method": "message/send",
+                "params": params,
+            },
             separators=(",", ":"),
         ).encode()
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
@@ -198,7 +203,9 @@ class RESTAgentClient:
             with urlopen(req, timeout=self.timeout_seconds) as response:
                 raw = _read_bounded(response)
         except HTTPError as exc:
-            raise AgentInvocationError(f"REST HTTP error {exc.code}: {exc.reason}") from exc
+            raise AgentInvocationError(
+                f"REST HTTP error {exc.code}: {exc.reason}"
+            ) from exc
         except (URLError, TimeoutError) as exc:
             raise AgentInvocationError("REST transport error") from exc
         except ValueError as exc:
@@ -363,7 +370,9 @@ class AgentGateway:
         invocation_id = str(uuid4())
         started_at = datetime.now(timezone.utc)
         timeout = (
-            self.default_timeout_seconds if timeout_seconds is None else float(timeout_seconds)
+            self.default_timeout_seconds
+            if timeout_seconds is None
+            else float(timeout_seconds)
         )
         retries = self.default_max_retries if max_retries is None else int(max_retries)
         if timeout <= 0 or retries < 0:
@@ -481,19 +490,27 @@ class AgentGateway:
         candidates = self.list_agents(capability)
         if preferred_agent_id:
             preferred = self.get(preferred_agent_id)
-            candidates = [preferred] + [a for a in candidates if a.agent_id != preferred.agent_id]
+            candidates = [preferred] + [
+                a for a in candidates if a.agent_id != preferred.agent_id
+            ]
         candidates = [a for a in candidates if a.enabled]
         if not candidates:
             raise AgentNotFound(f"no enabled agent for capability: {capability}")
         errors = []
         for descriptor in candidates:
             result = self.invoke(
-                descriptor.agent_id, payload, user_id=user_id, approved=approved, trace=trace
+                descriptor.agent_id,
+                payload,
+                user_id=user_id,
+                approved=approved,
+                trace=trace,
             )
             if result.status == "completed":
                 return result
             errors.append(result.error or "agent invocation failed")
-        raise AgentInvocationError("; ".join(errors) or "no agent completed the request")
+        raise AgentInvocationError(
+            "; ".join(errors) or "no agent completed the request"
+        )
 
 
 __all__ = [

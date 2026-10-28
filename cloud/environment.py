@@ -11,7 +11,9 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 
-class EnvironmentAdapter(Protocol):  # pragma: no cover - structural typing contract only
+class EnvironmentAdapter(
+    Protocol
+):  # pragma: no cover - structural typing contract only
     """Lifecycle contract implemented by each environment backend."""
 
     name: str

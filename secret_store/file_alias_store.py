@@ -63,7 +63,11 @@ class FileSecretAliasStore:
             raw = json.loads(self._path.read_text(encoding="utf-8"))
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             raise ValueError("invalid secret alias store") from exc
-        if not isinstance(raw, dict) or set(raw) != {"schema", "aliases"} or raw["schema"] != 1:
+        if (
+            not isinstance(raw, dict)
+            or set(raw) != {"schema", "aliases"}
+            or raw["schema"] != 1
+        ):
             raise ValueError("invalid secret alias store")
         aliases = raw["aliases"]
         if not isinstance(aliases, list):

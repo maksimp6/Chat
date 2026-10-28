@@ -14,7 +14,14 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import requests
-from flask import Blueprint, Response, copy_current_request_context, jsonify, request, stream_with_context
+from flask import (
+    Blueprint,
+    Response,
+    copy_current_request_context,
+    jsonify,
+    request,
+    stream_with_context,
+)
 
 from core.config import Config, TEXT_MODELS, VOICE_MODELS, get_model_uri
 from chat.mcp_routes import LogosClient, _provider_conversation_id
@@ -22,7 +29,12 @@ from conversations.ownership import check_access
 from economy.treasury_identity import get_current_owner_id
 from provider_accounts.model_discovery import get_model_discovery
 from provider_accounts.quotas import ProviderQuotaExceeded, reserve_request
-from storage.db import add_message, get_conv_settings, get_messages, maybe_update_conversation_title
+from storage.db import (
+    add_message,
+    get_conv_settings,
+    get_messages,
+    maybe_update_conversation_title,
+)
 from yandex_client_modules.realtime import (
     MODEL_UPSTREAMS,
     OUTPUT_RATE,
@@ -31,7 +43,10 @@ from yandex_client_modules.realtime import (
     RealtimeResult,
     generate_realtime,
 )
-from yandex_client_modules.request_mixin import _record_quota_usage, _resolve_global_provider_credential
+from yandex_client_modules.request_mixin import (
+    _record_quota_usage,
+    _resolve_global_provider_credential,
+)
 
 
 voice_bp = Blueprint("voice", __name__)
@@ -50,10 +65,34 @@ _LIVE_VOICES = {
     "irina": {"formal", "support", "narrator", "sales", "neutral"},
 }
 _GENERAL_VOICES = {
-    "lea", "john", "naomi", "amira", "madi", "saule", "zhanar", "filipp",
-    "ermil", "jane", "omazh", "zahar", "dasha", "julia", "lera", "masha",
-    "marina", "alexander", "kirill", "anton", "madi_ru", "saule_ru",
-    "zamira_ru", "zhanar_ru", "yulduz_ru", "nigora", "zamira", "yulduz",
+    "lea",
+    "john",
+    "naomi",
+    "amira",
+    "madi",
+    "saule",
+    "zhanar",
+    "filipp",
+    "ermil",
+    "jane",
+    "omazh",
+    "zahar",
+    "dasha",
+    "julia",
+    "lera",
+    "masha",
+    "marina",
+    "alexander",
+    "kirill",
+    "anton",
+    "madi_ru",
+    "saule_ru",
+    "zamira_ru",
+    "zhanar_ru",
+    "yulduz_ru",
+    "nigora",
+    "zamira",
+    "yulduz",
 }
 
 
@@ -125,8 +164,13 @@ class _PCM16WaveReader(wave.Wave_read):
         header = chunk.read(16)
         if len(header) != 16:
             raise wave.Error("incomplete WAV format header")
-        if int.from_bytes(header[:2], "little") != 1 or int.from_bytes(header[14:16], "little") != 16:
-            raise wave.Error("WAV format must be integer PCM with exactly 16 bits per sample")
+        if (
+            int.from_bytes(header[:2], "little") != 1
+            or int.from_bytes(header[14:16], "little") != 16
+        ):
+            raise wave.Error(
+                "WAV format must be integer PCM with exactly 16 bits per sample"
+            )
         chunk.seek(start)
         super()._read_fmt_chunk(chunk)
 
@@ -168,21 +212,32 @@ def _output_wav(pcm: bytes, sample_rate: int = OUTPUT_RATE) -> bytes:
     return output.getvalue()
 
 
-def _speechkit_turn(session: VoiceSession, credential, pcm: bytes, sample_rate: int,
-                    provider_event) -> RealtimeResult:
+def _speechkit_turn(
+    session: VoiceSession, credential, pcm: bytes, sample_rate: int, provider_event
+) -> RealtimeResult:
     """Explicit text-model microphone transport, preserving its existing tool loop."""
     if sample_rate not in {8000, 16000, 48000} or len(pcm) > sample_rate * 2 * 30:
-        raise RealtimeError("SpeechKit v1 принимает PCM 8/16/48 кГц длительностью не более 30 секунд")
+        raise RealtimeError(
+            "SpeechKit v1 принимает PCM 8/16/48 кГц длительностью не более 30 секунд"
+        )
     headers = {"Authorization": "Api-Key " + credential.api_key}
     recognized = requests.post(
         _STT_URL,
         headers=headers,
-        params={"topic": "general", "lang": "ru-RU", "format": "lpcm",
-                "sampleRateHertz": str(sample_rate), "folderId": credential.project_id},
-        data=pcm, timeout=30,
+        params={
+            "topic": "general",
+            "lang": "ru-RU",
+            "format": "lpcm",
+            "sampleRateHertz": str(sample_rate),
+            "folderId": credential.project_id,
+        },
+        data=pcm,
+        timeout=30,
     )
     if not recognized.ok:
-        raise RealtimeError(f"SpeechKit не распознал запись: HTTP {recognized.status_code}")
+        raise RealtimeError(
+            f"SpeechKit не распознал запись: HTTP {recognized.status_code}"
+        )
     recognized_data = recognized.json()
     if not isinstance(recognized_data, dict) or "error" in recognized_data:
         raise RealtimeError("SpeechKit вернул ошибку распознавания")
@@ -190,7 +245,9 @@ def _speechkit_turn(session: VoiceSession, credential, pcm: bytes, sample_rate: 
     if not isinstance(value, str) or not value.strip():
         raise RealtimeError("SpeechKit не распознал речь")
     transcript = value.strip()
-    provider_event("conversation.item.input_audio_transcription.completed", transcript=transcript)
+    provider_event(
+        "conversation.item.input_audio_transcription.completed", transcript=transcript
+    )
     if session.cancelled.is_set():
         raise RealtimeError("Голосовая сессия отменена")
     client = LogosClient(Config)
@@ -199,46 +256,72 @@ def _speechkit_turn(session: VoiceSession, credential, pcm: bytes, sample_rate: 
     if settings.get("active_tool_categories") is not None:
         params["active_tool_categories"] = settings["active_tool_categories"]
     response = client.ask_with_mcp(
-        message=transcript, model_key=session.model,
-        conversation_id=_provider_conversation_id(client, session.conversation_id, None),
+        message=transcript,
+        model_key=session.model,
+        conversation_id=_provider_conversation_id(
+            client, session.conversation_id, None
+        ),
         settings_conversation_id=session.conversation_id,
-        params=params, trace=None,
+        params=params,
+        trace=None,
     )
     if not isinstance(response, dict):
         raise RealtimeError("Текстовая модель вернула некорректный ответ")
     result = RealtimeResult(
-        transcript=transcript, reply=client.extract_text(response) or "",
-        usage=client.extract_usage(response) or {}, status=str(response.get("status") or "failed"),
+        transcript=transcript,
+        reply=client.extract_text(response) or "",
+        usage=client.extract_usage(response) or {},
+        status=str(response.get("status") or "failed"),
         response_id=response.get("id"),
     )
     if "error" in response:
         result.status = "failed"
-    if any(item.get("type") == "function_call" for item in (response.get("output") or []) if isinstance(item, dict)):
+    if any(
+        item.get("type") == "function_call"
+        for item in (response.get("output") or [])
+        if isinstance(item, dict)
+    ):
         result.status = "incomplete"
-    if session.response_mode != "text" and result.reply and result.status == "completed":
+    if (
+        session.response_mode != "text"
+        and result.reply
+        and result.status == "completed"
+    ):
         # SpeechKit v1 accepts at most 5000 characters per synthesis request.
         # Concatenate raw PCM chunks so a long reply is never silently truncated.
         for offset in range(0, len(result.reply), 5000):
             if session.cancelled.is_set():
                 raise RealtimeError("Голосовая сессия отменена")
             try:
-                synthesis = {"text": result.reply[offset:offset + 5000], "lang": "ru-RU",
-                             "voice": session.voice, "format": "lpcm", "sampleRateHertz": "48000",
-                             "folderId": credential.project_id}
+                synthesis = {
+                    "text": result.reply[offset : offset + 5000],
+                    "lang": "ru-RU",
+                    "voice": session.voice,
+                    "format": "lpcm",
+                    "sampleRateHertz": "48000",
+                    "folderId": credential.project_id,
+                }
                 if session.role:
                     synthesis["emotion"] = session.role
                 spoken = requests.post(
-                    _TTS_URL, headers=headers,
+                    _TTS_URL,
+                    headers=headers,
                     data=synthesis,
                     timeout=30,
                 )
             except requests.RequestException:
-                result.error_message = "Текстовый ответ получен, но SpeechKit недоступен для озвучивания"
+                result.error_message = (
+                    "Текстовый ответ получен, но SpeechKit недоступен для озвучивания"
+                )
                 return result
             if not spoken.ok:
                 result.error_message = f"Текстовый ответ получен, но SpeechKit не синтезировал аудио: HTTP {spoken.status_code}"
                 return result
-            if (spoken.headers.get("Content-Type") or "").lower().startswith("application/json"):
+            if (
+                (spoken.headers.get("Content-Type") or "")
+                .lower()
+                .startswith("application/json")
+            ):
                 result.error_message = "SpeechKit вернул ошибку вместо PCM-аудио"
                 return result
             result.audio.extend(spoken.content)
@@ -252,7 +335,11 @@ def _process(session: VoiceSession) -> None:
     def save_input(value: str) -> None:
         nonlocal transcript, input_saved
         transcript = value
-        if value and not input_saved and check_access(session.conversation_id, session.owner_id):
+        if (
+            value
+            and not input_saved
+            and check_access(session.conversation_id, session.owner_id)
+        ):
             add_message(session.conversation_id, "user", value, source="voice")
             maybe_update_conversation_title(session.conversation_id, value)
             input_saved = True
@@ -265,10 +352,16 @@ def _process(session: VoiceSession) -> None:
     try:
         if not check_access(session.conversation_id, session.owner_id):
             raise RealtimeError("Диалог больше недоступен")
-        history = get_messages(session.conversation_id) if session.model != TTS_MODEL else []
+        history = (
+            get_messages(session.conversation_id) if session.model != TTS_MODEL else []
+        )
         credential = _resolve_global_provider_credential(LogosClient(Config))
         try:
-            input_rate, pcm = (16000, b"") if session.text is not None else _wav_pcm(bytes(session.audio))
+            input_rate, pcm = (
+                (16000, b"")
+                if session.text is not None
+                else _wav_pcm(bytes(session.audio))
+            )
         except ValueError as exc:
             raise RealtimeError(str(exc)) from None
         # Release the WAV container once the provider has its raw PCM input.
@@ -276,29 +369,37 @@ def _process(session: VoiceSession) -> None:
         save_input(transcript)
         _emit(session, "input_audio_buffer.speech_stopped")
         if session.transport == "speechkit_pipeline":
-            result = _speechkit_turn(session, credential, pcm, input_rate, provider_event)
+            result = _speechkit_turn(
+                session, credential, pcm, input_rate, provider_event
+            )
         else:
             # Apply the existing configured quota to the actual Realtime request,
             # once per turn. Unknown network outcomes retain their admission.
             reservation = reserve_request(session.owner_id)
-            result = asyncio.run(generate_realtime(
-                api_key=credential.api_key,
-                folder_id=credential.project_id,
-                model=session.model,
-                voice=session.voice,
-                role=session.role,
-                response_mode=session.response_mode,
-                text=session.text,
-                pcm=pcm,
-                input_rate=input_rate,
-                history=history,
-                instructions=session.instructions,
-                emit=provider_event,
-                cancelled=session.cancelled.is_set,
-                timeout=max(1, session.created_at + _SESSION_TTL_SECONDS - time.time()),
-            ))
+            result = asyncio.run(
+                generate_realtime(
+                    api_key=credential.api_key,
+                    folder_id=credential.project_id,
+                    model=session.model,
+                    voice=session.voice,
+                    role=session.role,
+                    response_mode=session.response_mode,
+                    text=session.text,
+                    pcm=pcm,
+                    input_rate=input_rate,
+                    history=history,
+                    instructions=session.instructions,
+                    emit=provider_event,
+                    cancelled=session.cancelled.is_set,
+                    timeout=max(
+                        1, session.created_at + _SESSION_TTL_SECONDS - time.time()
+                    ),
+                )
+            )
             if result.usage:
-                _record_quota_usage(None, reservation, {"usage": result.usage, "id": result.response_id})
+                _record_quota_usage(
+                    None, reservation, {"usage": result.usage, "id": result.response_id}
+                )
         if session.cancelled.is_set():
             raise RealtimeError("Голосовая сессия отменена")
         if not check_access(session.conversation_id, session.owner_id):
@@ -311,13 +412,28 @@ def _process(session: VoiceSession) -> None:
         if not input_saved and session.text is None:
             # Keep an actual user turn before the assistant even if independent
             # transcription fails after a completed audio response.
-            add_message(session.conversation_id, "user", "[Голосовое сообщение: расшифровка недоступна]",
-                        source="voice_transcription_unavailable",
-                        attachments={"audio": {"bytes": len(pcm), "sample_rate": input_rate,
-                                               "transcription_status": result.transcription_status}})
+            add_message(
+                session.conversation_id,
+                "user",
+                "[Голосовое сообщение: расшифровка недоступна]",
+                source="voice_transcription_unavailable",
+                attachments={
+                    "audio": {
+                        "bytes": len(pcm),
+                        "sample_rate": input_rate,
+                        "transcription_status": result.transcription_status,
+                    }
+                },
+            )
             input_saved = True
             final_status = "incomplete"
-            _emit(session, "error", error={"message": "Ответ получен, но расшифровка вашего аудио недоступна"})
+            _emit(
+                session,
+                "error",
+                error={
+                    "message": "Ответ получен, но расшифровка вашего аудио недоступна"
+                },
+            )
         if result.reply:
             add_message(
                 session.conversation_id,
@@ -326,38 +442,96 @@ def _process(session: VoiceSession) -> None:
                 cost=None,
                 usage=result.usage,
                 source="voice" if final_status == "completed" else "voice_partial",
-                trace={"voice_session_id": session.session_id, "model": session.model,
-                       "provider_response_id": result.response_id, "provider_status": result.status,
-                       "transport": session.transport, "transcription_status": result.transcription_status},
+                trace={
+                    "voice_session_id": session.session_id,
+                    "model": session.model,
+                    "provider_response_id": result.response_id,
+                    "provider_status": result.status,
+                    "transport": session.transport,
+                    "transcription_status": result.transcription_status,
+                },
             )
-            _emit(session, "response.output_text.done", text=result.reply, response_id=result.response_id)
+            _emit(
+                session,
+                "response.output_text.done",
+                text=result.reply,
+                response_id=result.response_id,
+            )
         elif result.audio:
             add_message(
-                session.conversation_id, "assistant", "[Голосовой ответ]", cost=None,
-                usage=result.usage, source="voice_audio",
-                attachments={"audio": {"bytes": len(result.audio), "sample_rate": OUTPUT_RATE}},
-                trace={"voice_session_id": session.session_id, "model": session.model,
-                       "provider_response_id": result.response_id, "provider_status": result.status},
+                session.conversation_id,
+                "assistant",
+                "[Голосовой ответ]",
+                cost=None,
+                usage=result.usage,
+                source="voice_audio",
+                attachments={
+                    "audio": {"bytes": len(result.audio), "sample_rate": OUTPUT_RATE}
+                },
+                trace={
+                    "voice_session_id": session.session_id,
+                    "model": session.model,
+                    "provider_response_id": result.response_id,
+                    "provider_status": result.status,
+                },
             )
-            _emit(session, "response.output_text.done", text="[Голосовой ответ]", response_id=result.response_id)
+            _emit(
+                session,
+                "response.output_text.done",
+                text="[Голосовой ответ]",
+                response_id=result.response_id,
+            )
         if result.audio and session.response_mode != "text":
-            session.output_audio = _output_wav(bytes(result.audio), 48000 if session.transport == "speechkit_pipeline" else OUTPUT_RATE)
-            _emit(session, "response.output_audio.ready", audio_url=f"/api/voice/output?session_id={session.session_id}")
+            session.output_audio = _output_wav(
+                bytes(result.audio),
+                48000 if session.transport == "speechkit_pipeline" else OUTPUT_RATE,
+            )
+            _emit(
+                session,
+                "response.output_audio.ready",
+                audio_url=f"/api/voice/output?session_id={session.session_id}",
+            )
         if result.status != "completed":
-            _emit(session, "error", error={"message": "Модель не завершила ответ", "status": result.status})
+            _emit(
+                session,
+                "error",
+                error={"message": "Модель не завершила ответ", "status": result.status},
+            )
         elif not result.reply and not result.audio:
             raise RealtimeError("Realtime завершился без текста и аудио")
-        _emit(session, "response.done", status=final_status, usage=result.usage, model=session.model,
-              conversation_id=session.conversation_id, response_id=result.response_id)
+        _emit(
+            session,
+            "response.done",
+            status=final_status,
+            usage=result.usage,
+            model=session.model,
+            conversation_id=session.conversation_id,
+            response_id=result.response_id,
+        )
     except ProviderQuotaExceeded as exc:
-        _emit(session, "error", error={**exc.to_dict()["error"], "message": "Достигнут установленный лимит запросов провайдера"})
+        _emit(
+            session,
+            "error",
+            error={
+                **exc.to_dict()["error"],
+                "message": "Достигнут установленный лимит запросов провайдера",
+            },
+        )
         _emit(session, "response.done", status="failed")
     except Exception as exc:
         # Never return raw websocket/credential exceptions: their URL may contain
         # provider metadata and their headers may contain authorization material.
-        message = str(exc) if isinstance(exc, RealtimeError) else "Не удалось выполнить голосовой запрос к провайдеру"
+        message = (
+            str(exc)
+            if isinstance(exc, RealtimeError)
+            else "Не удалось выполнить голосовой запрос к провайдеру"
+        )
         _emit(session, "error", error={"message": message})
-        _emit(session, "response.done", status="cancelled" if session.cancelled.is_set() else "failed")
+        _emit(
+            session,
+            "response.done",
+            status="cancelled" if session.cancelled.is_set() else "failed",
+        )
     finally:
         session.audio.clear()
         session.text = None
@@ -368,7 +542,9 @@ def _start_processing(session: VoiceSession):
         if session.cancelled.is_set():
             return jsonify({"error": "voice_session_cancelled"}), 409
         if session.closed:
-            return jsonify({"status": "completed" if session.finished else "processing"})
+            return jsonify(
+                {"status": "completed" if session.finished else "processing"}
+            )
         if session.text is None and not session.audio:
             return jsonify({"error": "text or PCM WAV audio is required"}), 400
         session.closed = True
@@ -379,7 +555,9 @@ def _start_processing(session: VoiceSession):
     def process_in_context():
         _process(session)
 
-    threading.Thread(target=lambda: context.run(process_in_context), daemon=True).start()
+    threading.Thread(
+        target=lambda: context.run(process_in_context), daemon=True
+    ).start()
     return jsonify({"status": "processing"})
 
 
@@ -391,23 +569,44 @@ def create_voice_session():
     if not isinstance(data, dict):
         return jsonify({"error": "json_body_required"}), 400
     conversation_id = data.get("conversation_id")
-    if not isinstance(conversation_id, str) or not conversation_id or not check_access(conversation_id, owner_id):
+    if (
+        not isinstance(conversation_id, str)
+        or not conversation_id
+        or not check_access(conversation_id, owner_id)
+    ):
         return jsonify({"error": "conversation_not_found"}), 404
     model = data.get("model") or "speech-realtime-deepseek-v4-flash"
     transport = data.get("transport") or "realtime"
-    if not isinstance(transport, str) or transport not in {"realtime", "speechkit_pipeline"}:
+    if not isinstance(transport, str) or transport not in {
+        "realtime",
+        "speechkit_pipeline",
+    }:
         return jsonify({"error": "unsupported_voice_transport"}), 400
     if transport == "speechkit_pipeline":
-        if not isinstance(model, str) or not model or TEXT_MODELS.get(model, {}).get("available") is False:
-            return jsonify({"error": "select_an_available_text_model_for_speechkit_pipeline"}), 400
-    elif not isinstance(model, str) or model not in VOICE_MODELS or model not in MODEL_UPSTREAMS:
+        if (
+            not isinstance(model, str)
+            or not model
+            or TEXT_MODELS.get(model, {}).get("available") is False
+        ):
+            return jsonify(
+                {"error": "select_an_available_text_model_for_speechkit_pipeline"}
+            ), 400
+    elif (
+        not isinstance(model, str)
+        or model not in VOICE_MODELS
+        or model not in MODEL_UPSTREAMS
+    ):
         return jsonify({"error": "select_a_realtime_voice_model"}), 400
     live = transport == "realtime" and model != "speech-realtime-deepseek-v4-flash"
     voice = data.get("voice") or ("sofia" if live else "filipp")
     role = data.get("role")
-    if not isinstance(voice, str) or voice not in (_LIVE_VOICES if live else _GENERAL_VOICES):
+    if not isinstance(voice, str) or voice not in (
+        _LIVE_VOICES if live else _GENERAL_VOICES
+    ):
         return jsonify({"error": "voice_is_not_compatible_with_model"}), 400
-    if role is not None and (not isinstance(role, str) or (live and role not in _LIVE_VOICES[voice])):
+    if role is not None and (
+        not isinstance(role, str) or (live and role not in _LIVE_VOICES[voice])
+    ):
         return jsonify({"error": "role_is_not_compatible_with_voice"}), 400
     mode = data.get("response_mode") or "audio"
     if not isinstance(mode, str) or mode not in {"audio", "both", "text"}:
@@ -431,23 +630,44 @@ def create_voice_session():
             return jsonify({"error": "invalid_text_model_uri"}), 400
         if model not in TEXT_MODELS:
             try:
-                discovered = get_model_discovery().get_models().get("text", {}).get(model)
+                discovered = (
+                    get_model_discovery().get_models().get("text", {}).get(model)
+                )
             except Exception:
                 return jsonify({"error": "text_model_catalog_unavailable"}), 503
             if not discovered or discovered.get("available") is False:
-                return jsonify({"error": "select_an_available_discovered_text_model"}), 400
+                return jsonify(
+                    {"error": "select_an_available_discovered_text_model"}
+                ), 400
     session = VoiceSession(
-        session_id=uuid.uuid4().hex, owner_id=owner_id,
-        conversation_id=conversation_id, model=model, voice=voice, role=role,
-        response_mode=mode, transport=transport, instructions=instructions,
+        session_id=uuid.uuid4().hex,
+        owner_id=owner_id,
+        conversation_id=conversation_id,
+        model=model,
+        voice=voice,
+        role=role,
+        response_mode=mode,
+        transport=transport,
+        instructions=instructions,
     )
     with _sessions_lock:
         _sessions[session.session_id] = session
-    return jsonify({"session_id": session.session_id, "model": model, "voice": voice, "transport": transport,
-                    "input_audio_format": "audio/wav", "input_sample_rate": 16000,
-                    "max_audio_bytes": min(_MAX_AUDIO_BYTES, 16000 * 2 * 30 + 44) if transport == "speechkit_pipeline" else _MAX_AUDIO_BYTES,
-                    "ttl_seconds": _SESSION_TTL_SECONDS,
-                    "audio_input": model != TTS_MODEL, "text_input": transport == "realtime"})
+    return jsonify(
+        {
+            "session_id": session.session_id,
+            "model": model,
+            "voice": voice,
+            "transport": transport,
+            "input_audio_format": "audio/wav",
+            "input_sample_rate": 16000,
+            "max_audio_bytes": min(_MAX_AUDIO_BYTES, 16000 * 2 * 30 + 44)
+            if transport == "speechkit_pipeline"
+            else _MAX_AUDIO_BYTES,
+            "ttl_seconds": _SESSION_TTL_SECONDS,
+            "audio_input": model != TTS_MODEL,
+            "text_input": transport == "realtime",
+        }
+    )
 
 
 @voice_bp.post("/api/voice/audio")
@@ -476,7 +696,12 @@ def append_voice_audio():
         if not chunk:
             return jsonify({"error": "audio_chunk_is_empty"}), 400
         if len(chunk) > room:
-            return jsonify({"error": "audio_exceeds_session_upload_limit", "max_audio_bytes": _MAX_AUDIO_BYTES}), 413
+            return jsonify(
+                {
+                    "error": "audio_exceeds_session_upload_limit",
+                    "max_audio_bytes": _MAX_AUDIO_BYTES,
+                }
+            ), 413
         session.audio.extend(chunk)
         total = len(session.audio)
     return jsonify({"accepted_bytes": len(chunk), "total_bytes": total})
@@ -518,7 +743,10 @@ def voice_events():
     def stream():
         index = start_index
         while True:
-            if time.time() >= session.created_at + _SESSION_TTL_SECONDS or session.cancelled.is_set():
+            if (
+                time.time() >= session.created_at + _SESSION_TTL_SECONDS
+                or session.cancelled.is_set()
+            ):
                 return
             with session.condition:
                 if index >= len(session.events) and not session.finished:
@@ -536,8 +764,11 @@ def voice_events():
                 if event.get("type") == "response.done":
                     return
 
-    return Response(stream(), mimetype="text/event-stream",
-                    headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
+    return Response(
+        stream(),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
 
 
 @voice_bp.get("/api/voice/output")
@@ -548,7 +779,11 @@ def voice_output():
         return jsonify({"error": "voice_session_not_found"}), 404
     if not session.output_audio:
         return jsonify({"error": "voice_output_not_ready"}), 404
-    return Response(session.output_audio, mimetype="audio/wav", headers={"Cache-Control": "no-store"})
+    return Response(
+        session.output_audio,
+        mimetype="audio/wav",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @voice_bp.post("/api/voice/close")

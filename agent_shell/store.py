@@ -69,7 +69,8 @@ def _state(value: Any) -> TaskState:
             or type(task.get("id")) is not int
             or str(task["id"]) != key
             or not 0 < task["id"] < value["next_id"]
-            or task.get("status") not in {"blocked", "queued", "running", "done", "failed"}
+            or task.get("status")
+            not in {"blocked", "queued", "running", "done", "failed"}
             or not isinstance(task.get("role"), str)
             or not ROLE_RE.fullmatch(task["role"])
             or not isinstance(task.get("kind"), str)
@@ -77,7 +78,8 @@ def _state(value: Any) -> TaskState:
             or not isinstance(task.get("title"), str)
             or not 1 <= len(task["title"]) <= MAX_TITLE
             or type(task.get("needs_approval")) is not bool
-            or not {"payload", "result", "error", "created_at", "updated_at"} <= task.keys()
+            or not {"payload", "result", "error", "created_at", "updated_at"}
+            <= task.keys()
         ):
             raise KristallError("invalid task record")
     if set(value["events"]) != set(value["tasks"]):
@@ -94,7 +96,9 @@ def _state(value: Any) -> TaskState:
 
 
 def _event(state: TaskState, task_id: int, stage: str) -> None:
-    state["events"].setdefault(str(task_id), []).append({"stage": stage, "at": time.time()})
+    state["events"].setdefault(str(task_id), []).append(
+        {"stage": stage, "at": time.time()}
+    )
 
 
 class TaskStore:
@@ -149,7 +153,8 @@ class TaskStore:
 
     def list(self) -> builtins.list[TaskRecord]:
         return sorted(
-            _state(self._db.get(_STATE_KEY))["tasks"].values(), key=lambda task: task["id"]
+            _state(self._db.get(_STATE_KEY))["tasks"].values(),
+            key=lambda task: task["id"],
         )
 
     def events(self, task_id: int) -> builtins.list[TaskEvent]:
@@ -171,7 +176,11 @@ class TaskStore:
         with self._db.transaction() as tx:
             state = _state(tx.get(_STATE_KEY))
             queued = sorted(
-                (task for task in state["tasks"].values() if task["status"] == "queued"),
+                (
+                    task
+                    for task in state["tasks"].values()
+                    if task["status"] == "queued"
+                ),
                 key=lambda task: task["id"],
             )
             if queued:

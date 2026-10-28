@@ -27,7 +27,9 @@ INTERACTIVE_ROLES = frozenset(
 
 
 def _stable_json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+    return json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
+    )
 
 
 def _bounded_text(value: Any, limit: int) -> str | None:
@@ -44,7 +46,9 @@ def _bounded_text(value: Any, limit: int) -> str | None:
 def _normalize_states(value: Any) -> tuple[str, ...]:
     if isinstance(value, str):
         values = [value]
-    elif isinstance(value, Iterable) and not isinstance(value, (bytes, bytearray, Mapping)):
+    elif isinstance(value, Iterable) and not isinstance(
+        value, (bytes, bytearray, Mapping)
+    ):
         values = list(value)
     else:
         values = []
@@ -131,7 +135,9 @@ def build_semantic_snapshot(
         raw_nodes = raw.get("elements")
     if raw_nodes is None:
         raw_nodes = []
-    if not isinstance(raw_nodes, Sequence) or isinstance(raw_nodes, (str, bytes, bytearray)):
+    if not isinstance(raw_nodes, Sequence) or isinstance(
+        raw_nodes, (str, bytes, bytearray)
+    ):
         raise ValueError("nodes must be an array")
 
     nodes: list[SemanticNode] = []
@@ -226,8 +232,12 @@ class SemanticDiff:
         }
 
 
-def diff_semantic_snapshots(before: SemanticSnapshot, after: SemanticSnapshot) -> SemanticDiff:
-    if not isinstance(before, SemanticSnapshot) or not isinstance(after, SemanticSnapshot):
+def diff_semantic_snapshots(
+    before: SemanticSnapshot, after: SemanticSnapshot
+) -> SemanticDiff:
+    if not isinstance(before, SemanticSnapshot) or not isinstance(
+        after, SemanticSnapshot
+    ):
         raise TypeError("semantic diff requires SemanticSnapshot values")
 
     before_nodes = {node.node_id: node for node in before.nodes}
@@ -241,7 +251,9 @@ def diff_semantic_snapshots(before: SemanticSnapshot, after: SemanticSnapshot) -
         if before_nodes[node_id] != after_nodes[node_id]
     )
 
-    added_facts = {key: after.facts[key] for key in sorted(set(after.facts) - set(before.facts))}
+    added_facts = {
+        key: after.facts[key] for key in sorted(set(after.facts) - set(before.facts))
+    }
     removed_facts = tuple(sorted(set(before.facts) - set(after.facts)))
     changed_facts = {
         key: {"before": before.facts[key], "after": after.facts[key]}
@@ -287,7 +299,8 @@ class MergedEvidence:
         return {
             "facts": dict(self.facts),
             "conflicts": {
-                field: [dict(item) for item in values] for field, values in self.conflicts.items()
+                field: [dict(item) for item in values]
+                for field, values in self.conflicts.items()
             },
             "sources": {field: list(values) for field, values in self.sources.items()},
         }

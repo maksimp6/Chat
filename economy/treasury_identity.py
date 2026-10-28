@@ -28,11 +28,13 @@ def get_current_owner_id(*, required: bool = True) -> str | None:
         if selected:
             return str(selected)
         # Preserve a lone existing ledger instead of silently showing a fresh zero balance.
-        owners = sorted({
-            str(account["owner_id"])
-            for account in store.items(prefix="treasury/account/").values()
-            if account.get("owner_id")
-        })
+        owners = sorted(
+            {
+                str(account["owner_id"])
+                for account in store.items(prefix="treasury/account/").values()
+                if account.get("owner_id")
+            }
+        )
         selected = owners[0] if len(owners) == 1 else "default"
         tx.set(key, selected)
     return selected

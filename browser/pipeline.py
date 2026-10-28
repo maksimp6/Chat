@@ -57,7 +57,9 @@ class SemanticBrowserWorker:
         mode = str(task.metadata.get("semantic_mode") or "").strip().lower()
         if not mode:
             mode = (
-                "snapshot" if task.role in {"observer", "extractor", "verifier"} else "passthrough"
+                "snapshot"
+                if task.role in {"observer", "extractor", "verifier"}
+                else "passthrough"
             )
         if mode == "passthrough":
             return raw_result
@@ -68,7 +70,9 @@ class SemanticBrowserWorker:
         if not isinstance(data, Mapping):
             raise ValueError("semantic snapshot worker result must be a mapping")
 
-        max_nodes = int(80 if task.metadata.get("max_nodes") is None else task.metadata["max_nodes"])
+        max_nodes = int(
+            80 if task.metadata.get("max_nodes") is None else task.metadata["max_nodes"]
+        )
         max_chars = int(task.metadata.get("max_chars") or task.budget.max_output_chars)
         interactive_only = bool(task.metadata.get("interactive_only", False))
         snapshot = build_semantic_snapshot(
@@ -101,7 +105,9 @@ def _snapshot_from_mapping(raw: Mapping[str, Any]) -> SemanticSnapshot:
     return SemanticSnapshot(
         url=str(raw.get("url")).strip() if raw.get("url") is not None else None,
         title=str(raw.get("title")).strip() if raw.get("title") is not None else None,
-        version=str(raw.get("version")).strip() if raw.get("version") is not None else None,
+        version=str(raw.get("version")).strip()
+        if raw.get("version") is not None
+        else None,
         nodes=nodes,
         facts={str(key): value for key, value in facts.items()},
         truncated=bool(raw.get("truncated", False)),
@@ -156,9 +162,12 @@ class BrowserSynthesisResult:
             "status": self.status,
             "task_statuses": dict(self.task_statuses),
             "snapshots": {
-                task_id: snapshot.to_mapping() for task_id, snapshot in self.snapshots.items()
+                task_id: snapshot.to_mapping()
+                for task_id, snapshot in self.snapshots.items()
             },
-            "diffs": {task_id: diff.to_mapping() for task_id, diff in self.diffs.items()},
+            "diffs": {
+                task_id: diff.to_mapping() for task_id, diff in self.diffs.items()
+            },
             "evidence": self.evidence.to_mapping(),
             "consumed_tokens": self.consumed_tokens,
             "escalation": self.escalation.to_mapping(),
@@ -187,7 +196,9 @@ def _escalation(
     strong = False
 
     non_success = sorted(
-        task_id for task_id, result in dag_result.tasks.items() if result.status != "succeeded"
+        task_id
+        for task_id, result in dag_result.tasks.items()
+        if result.status != "succeeded"
     )
     if non_success:
         reasons.append("task_failures:" + ",".join(non_success))
@@ -201,7 +212,9 @@ def _escalation(
         reasons.append("missing_diff_sources:" + ",".join(sorted(missing_diff_sources)))
         strong = True
 
-    truncated = sorted(task_id for task_id, snapshot in snapshots.items() if snapshot.truncated)
+    truncated = sorted(
+        task_id for task_id, snapshot in snapshots.items() if snapshot.truncated
+    )
     if truncated and policy.escalate_on_truncation:
         reasons.append("truncated_state:" + ",".join(truncated))
 
@@ -289,7 +302,9 @@ def synthesize_browser_dag(
         missing_diff_sources,
         active_policy,
     )
-    task_statuses = {task_id: result.status for task_id, result in sorted(dag_result.tasks.items())}
+    task_statuses = {
+        task_id: result.status for task_id, result in sorted(dag_result.tasks.items())
+    }
     return BrowserSynthesisResult(
         status=dag_result.status,
         task_statuses=task_statuses,

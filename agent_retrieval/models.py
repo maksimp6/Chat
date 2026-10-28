@@ -21,7 +21,9 @@ def _clean(value: Any) -> str:
 
 def _freeze(value: Any) -> Any:
     if isinstance(value, Mapping):
-        return MappingProxyType({str(key): _freeze(item) for key, item in value.items()})
+        return MappingProxyType(
+            {str(key): _freeze(item) for key, item in value.items()}
+        )
     if isinstance(value, (list, tuple)):
         return tuple(_freeze(item) for item in value)
     return value
@@ -65,7 +67,11 @@ class RetrievalQuery:
         object.__setattr__(
             self,
             "selected_skills",
-            tuple(sorted(set(_clean(item) for item in self.selected_skills if _clean(item)))),
+            tuple(
+                sorted(
+                    set(_clean(item) for item in self.selected_skills if _clean(item))
+                )
+            ),
         )
         if not 1 <= int(self.max_results) <= MAX_RESULTS:
             raise ValueError(f"max_results must be between 1 and {MAX_RESULTS}")
@@ -125,7 +131,9 @@ class RetrievalBundle:
         object.__setattr__(
             self,
             "source_counts",
-            _freeze({str(key): int(value) for key, value in self.source_counts.items()}),
+            _freeze(
+                {str(key): int(value) for key, value in self.source_counts.items()}
+            ),
         )
 
     def as_dict(self) -> dict[str, Any]:

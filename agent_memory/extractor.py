@@ -57,7 +57,9 @@ def list_global_memory_facts() -> list[dict[str, Any]]:
     return sorted(facts, key=lambda row: (-row["updated_at"], row["id"]))
 
 
-def save_global_memory_facts(facts: list[dict[str, Any]], *, now: int | None = None) -> int:
+def save_global_memory_facts(
+    facts: list[dict[str, Any]], *, now: int | None = None
+) -> int:
     """Atomically insert unique facts without rewriting unaffected records."""
     if not isinstance(facts, list):
         raise ValueError("facts must be a list")
@@ -89,7 +91,9 @@ def extract_and_save_facts(dialog_messages: list) -> int:
     """Use the provider to extract stable facts, then commit only validated data."""
     if not dialog_messages:
         return 0
-    formatted_chat = "\n".join(f"{msg['role']}: {msg['text']}" for msg in dialog_messages[-12:])
+    formatted_chat = "\n".join(
+        f"{msg['role']}: {msg['text']}" for msg in dialog_messages[-12:]
+    )
     payload = {
         "modelUri": f"gpt://{env_require('YANDEX_PROJECT_ID')}/yandexgpt/latest",
         "completionOptions": {
@@ -117,7 +121,9 @@ def extract_and_save_facts(dialog_messages: list) -> int:
         )
         if response.status_code != 200:
             return 0
-        parsed = json.loads(response.json()["result"]["alternatives"][0]["message"]["text"])
+        parsed = json.loads(
+            response.json()["result"]["alternatives"][0]["message"]["text"]
+        )
         if not isinstance(parsed, dict):
             return 0
         facts = parsed.get("facts", [])
@@ -130,7 +136,9 @@ def extract_and_save_facts(dialog_messages: list) -> int:
 
 def get_global_memory_summary() -> str:
     """Format current native memory facts for the system prompt."""
-    records = sorted(list_global_memory_facts(), key=lambda row: (row["category"], row["fact"]))
+    records = sorted(
+        list_global_memory_facts(), key=lambda row: (row["category"], row["fact"])
+    )
     if not records:
         return ""
     return "\n[ГЛОБАЛЬНАЯ ПАМЯТЬ ПРОЕКТОВ]\n" + "".join(

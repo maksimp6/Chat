@@ -7,6 +7,7 @@ and is already paid for through provider token pricing.
     energy_wh = cpu_seconds * watts_per_core / 3600
     cost      = energy_wh / 1000 * price_per_kwh
 """
+
 from core.env import env_get
 
 import logging
@@ -83,7 +84,10 @@ def build_compute_billing_item(
         item["cpu_utilization"] = round(min(cpu_seconds / wall_seconds, 1.0), 4)
     if price is None:
         item.update(
-            {"cost_status": "not_billed", "cost_reason": "electricity_price_not_configured"}
+            {
+                "cost_status": "not_billed",
+                "cost_reason": "electricity_price_not_configured",
+            }
         )
         return item
     item.update(

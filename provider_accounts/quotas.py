@@ -132,7 +132,12 @@ def upsert_policy(
     enabled: bool = True,
 ) -> None:
     name = str(name or "").strip().lower()
-    if not name or period_seconds < 60 or max_requests < 0 or max_requests_per_minute < 0:
+    if (
+        not name
+        or period_seconds < 60
+        or max_requests < 0
+        or max_requests_per_minute < 0
+    ):
         raise ValueError("invalid quota policy")
     init_quota_tables()
     key = "quota/policy/" + name
@@ -154,7 +159,10 @@ def upsert_policy(
 
 
 def assign_user_policy(user_id: str, policy_name: str) -> None:
-    user_id, policy_name = str(user_id or "").strip(), str(policy_name or "").strip().lower()
+    user_id, policy_name = (
+        str(user_id or "").strip(),
+        str(policy_name or "").strip().lower(),
+    )
     if not user_id or not policy_name:
         raise ValueError("user and policy are required")
     init_quota_tables()
@@ -185,11 +193,15 @@ def release_request(reservation: Optional[QuotaReservation]) -> None:
         usage = tx.get(key)
         if usage is None:
             return
-        if int(usage["period_start"]) == reservation.period_start and int(usage["request_count"]) > 0:
+        if (
+            int(usage["period_start"]) == reservation.period_start
+            and int(usage["request_count"]) > 0
+        ):
             usage["request_count"] = int(usage["request_count"]) - 1
-        if int(usage["rate_window_start"]) == reservation.rate_window_start and int(
-            usage["rate_count"]
-        ) > 0:
+        if (
+            int(usage["rate_window_start"]) == reservation.rate_window_start
+            and int(usage["rate_count"]) > 0
+        ):
             usage["rate_count"] = int(usage["rate_count"]) - 1
         tx.set(key, usage)
 
@@ -259,7 +271,10 @@ def reserve_request(
         current_rate_window = int(usage["rate_window_start"]) == rate_window_start
         used_requests = int(usage["request_count"]) if current_period else 0
         used_rate_requests = int(usage["rate_count"]) if current_rate_window else 0
-        max_requests, max_rate = policy["max_requests"], policy["max_requests_per_minute"]
+        max_requests, max_rate = (
+            policy["max_requests"],
+            policy["max_requests_per_minute"],
+        )
         reason = (
             "period_quota_exhausted"
             if max_requests > 0 and used_requests >= max_requests
@@ -349,10 +364,16 @@ def get_usage(user_id: str, *, now: Optional[int] = None) -> dict[str, Any]:
         used_requests = used_tokens = 0
         used_rate = 0
     else:
-        used_requests = int(row["request_count"]) if int(row["period_start"]) == period_start else 0
-        used_tokens = int(row["token_count"]) if int(row["period_start"]) == period_start else 0
+        used_requests = (
+            int(row["request_count"]) if int(row["period_start"]) == period_start else 0
+        )
+        used_tokens = (
+            int(row["token_count"]) if int(row["period_start"]) == period_start else 0
+        )
         used_rate = (
-            int(row["rate_count"]) if int(row["rate_window_start"]) == rate_window_start else 0
+            int(row["rate_count"])
+            if int(row["rate_window_start"]) == rate_window_start
+            else 0
         )
 
     return {
@@ -361,7 +382,9 @@ def get_usage(user_id: str, *, now: Optional[int] = None) -> dict[str, Any]:
         "usage": {
             "requests": used_requests,
             "tokens": used_tokens,
-            "cost": float(row["cost"]) if row and int(row["period_start"]) == period_start else 0.0,
+            "cost": float(row["cost"])
+            if row and int(row["period_start"]) == period_start
+            else 0.0,
             "rate_requests": used_rate,
         },
         "period_reset_at": period_start + policy["period_seconds"],
@@ -392,5 +415,11 @@ def _policy_for(tx: Any, user_id: str) -> dict[str, Any]:
         raise RuntimeError("quota policy is unavailable")
     return {
         key: row[key]
-        for key in ("name", "period_seconds", "max_requests", "max_requests_per_minute", "enabled")
+        for key in (
+            "name",
+            "period_seconds",
+            "max_requests",
+            "max_requests_per_minute",
+            "enabled",
+        )
     }

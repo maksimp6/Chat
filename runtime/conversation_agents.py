@@ -14,7 +14,9 @@ from runtime.dispatcher import RuntimeDispatcher, RuntimeScopeViolation
 
 def _freeze(value: Any) -> Any:
     if isinstance(value, Mapping):
-        return MappingProxyType({str(key): _freeze(item) for key, item in value.items()})
+        return MappingProxyType(
+            {str(key): _freeze(item) for key, item in value.items()}
+        )
     if isinstance(value, list | tuple):
         return tuple(_freeze(item) for item in value)
     if isinstance(value, set | frozenset):
@@ -60,7 +62,9 @@ class ConversationAgentRouter:
         try:
             agent = self._agents[key]
         except KeyError as exc:
-            raise KeyError("agent is not registered in this runtime and conversation") from exc
+            raise KeyError(
+                "agent is not registered in this runtime and conversation"
+            ) from exc
         trace.add_event(
             "conversation_agent_selected",
             {

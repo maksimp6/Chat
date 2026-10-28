@@ -34,7 +34,9 @@ class ProviderKeyProvider(Protocol):
     def revoke_key(self, provider_key_id: str) -> None:
         """Revoke a previously issued provider key."""
 
-    def reissue_key(self, provider_key_id: str, *, expires_at: datetime) -> tuple[str, str]:
+    def reissue_key(
+        self, provider_key_id: str, *, expires_at: datetime
+    ) -> tuple[str, str]:
         """Reissue an existing provider resource when supported."""
 
 
@@ -83,7 +85,9 @@ def rotate_active_key(
     Cloud.ru reissues the current key in place; its resource ID is intentionally
     unchanged, so revoking the old ID would also revoke the replacement.
     """
-    issued_at, expires_at = issue_window(now, ttl=ttl) if ttl is not None else issue_window(now)
+    issued_at, expires_at = (
+        issue_window(now, ttl=ttl) if ttl is not None else issue_window(now)
+    )
 
     if reissue_existing:
         if not old_provider_key_id:
@@ -163,5 +167,7 @@ def rotate_active_key(
         except Exception:
             # The new key is promoted and durable, so a failed revoke must not fail the rotation.
             # The superseded id is logged so it can be revoked by hand.
-            logger.exception("Could not revoke the superseded provider key %s", old_provider_key_id)
+            logger.exception(
+                "Could not revoke the superseded provider key %s", old_provider_key_id
+            )
     return provider_key_id, issued_at, expires_at

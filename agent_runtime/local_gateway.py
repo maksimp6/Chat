@@ -24,7 +24,12 @@ _PROTOCOL_VERSION = 2
 
 def _protocol_error():
     if request.headers.get("X-Logos-Agent-Protocol") != str(_PROTOCOL_VERSION):
-        return jsonify({"error": "agent_protocol_upgrade_required", "protocol_version": _PROTOCOL_VERSION}), 409
+        return jsonify(
+            {
+                "error": "agent_protocol_upgrade_required",
+                "protocol_version": _PROTOCOL_VERSION,
+            }
+        ), 409
     return None
 
 
@@ -38,9 +43,13 @@ def _uncertain_result(row, reason: str) -> dict[str, Any]:
             "сначала проверьте фактический результат."
         ),
         "metadata": {
-            "job_id": row["id"], "agent_id": row["agent_id"],
-            "claim_attempt": row.get("attempt", 0), "phase": "execution",
-            "outcome": "in_doubt", "uncertain": True, "retry_safe": False,
+            "job_id": row["id"],
+            "agent_id": row["agent_id"],
+            "claim_attempt": row.get("attempt", 0),
+            "phase": "execution",
+            "outcome": "in_doubt",
+            "uncertain": True,
+            "retry_safe": False,
             "reason": reason,
         },
     }
@@ -49,16 +58,30 @@ def _uncertain_result(row, reason: str) -> dict[str, Any]:
 def _expire_job(tx, key: str, row, now: float):
     if row["status"] not in {"claimed", "running"}:
         return row
-    if row.get("claim_token") and row.get("lease_until") is not None and row["lease_until"] > now:
+    if (
+        row.get("claim_token")
+        and row.get("lease_until") is not None
+        and row["lease_until"] > now
+    ):
         return row
     if row["status"] == "running":
         result = _uncertain_result(row, "execution_lease_expired")
-        row = {**row, "status": "in_doubt", "lease_until": None,
-               "result_json": _json(result), "error_json": _json(result["error"])}
+        row = {
+            **row,
+            "status": "in_doubt",
+            "lease_until": None,
+            "result_json": _json(result),
+            "error_json": _json(result["error"]),
+        }
     else:
         # No /start acknowledgement was issued, so this claim cannot have executed.
-        row = {**row, "status": "queued", "claimed_at": None,
-               "lease_until": None, "claim_token": None}
+        row = {
+            **row,
+            "status": "queued",
+            "claimed_at": None,
+            "lease_until": None,
+            "claim_token": None,
+        }
     tx.set(key, row)
     return row
 
@@ -66,19 +89,37 @@ def _expire_job(tx, key: str, row, now: float):
 def _timeout_job(tx, key: str, row):
     if row["status"] == "running":
         result = _uncertain_result(row, "wait_timeout")
-        row = {**row, "status": "in_doubt", "lease_until": None,
-               "result_json": _json(result), "error_json": _json(result["error"])}
+        row = {
+            **row,
+            "status": "in_doubt",
+            "lease_until": None,
+            "result_json": _json(result),
+            "error_json": _json(result["error"]),
+        }
         tx.set(key, row)
     elif row["status"] in {"queued", "claimed"}:
         result = {
-            "success": False, "data": None,
+            "success": False,
+            "data": None,
             "error": "Ожидание локального инструмента истекло до запуска; задание отменено.",
-            "metadata": {"job_id": row["id"], "phase": "waiting", "outcome": "cancelled",
-                         "uncertain": False, "execution_started": False, "retry_safe": True},
+            "metadata": {
+                "job_id": row["id"],
+                "phase": "waiting",
+                "outcome": "cancelled",
+                "uncertain": False,
+                "execution_started": False,
+                "retry_safe": True,
+            },
         }
-        row = {**row, "status": "cancelled", "claim_token": None, "lease_until": None,
-               "completed_at": unix_time(), "result_json": _json(result),
-               "error_json": _json(result["error"])}
+        row = {
+            **row,
+            "status": "cancelled",
+            "claim_token": None,
+            "lease_until": None,
+            "completed_at": unix_time(),
+            "result_json": _json(result),
+            "error_json": _json(result["error"]),
+        }
         tx.set(key, row)
     return row
 
@@ -163,9 +204,7 @@ def enqueue_local_tool_job(
     return job_id
 
 
-def wait_for_local_tool_job(
-    job_id: str, *, timeout_seconds: float = 30.0
-) -> Any:
+def wait_for_local_tool_job(job_id: str, *, timeout_seconds: float = 30.0) -> Any:
     """Wait within a bounded deadline for a persisted local-agent result."""
     timeout = float(timeout_seconds)
     if not math.isfinite(timeout) or timeout < 0 or timeout > 3600:
@@ -189,7 +228,11 @@ def wait_for_local_tool_job(
             error = _parse_json(row.get("error_json"), None)
             if error is None and isinstance(result, Mapping):
                 error = result.get("error")
-            return {"success": False, "data": None, "error": error or "local_agent_job_failed"}
+            return {
+                "success": False,
+                "data": None,
+                "error": error or "local_agent_job_failed",
+            }
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             continue
@@ -259,7 +302,11 @@ def local_agent_heartbeat(agent_id: str):
     if protocol_error is not None:
         return protocol_error
     data = request.get_json(silent=True)
-    if not isinstance(data, dict) or not data.get("job_id") or not data.get("claim_token"):
+    if (
+        not isinstance(data, dict)
+        or not data.get("job_id")
+        or not data.get("claim_token")
+    ):
         return jsonify({"error": "job_id_and_claim_token_required"}), 400
     now = unix_time()
     key = "local-agent/" + agent_id
@@ -271,16 +318,28 @@ def local_agent_heartbeat(agent_id: str):
             if row is None or row["agent_id"] != agent_id:
                 return jsonify({"error": "job_not_found"}), 404
             row = _expire_job(tx, job_key, row, now)
-            if row.get("claim_token") != data["claim_token"] or row["status"] not in {"claimed", "running"}:
+            if row.get("claim_token") != data["claim_token"] or row["status"] not in {
+                "claimed",
+                "running",
+            }:
                 return jsonify({"error": "claim_not_active"}), 409
             tx.set(job_key, {**row, "lease_until": now + _DEFAULT_LEASE_SECONDS})
-            tx.set(key, {**agent, "status": "online", "last_seen": now, "updated_at": now})
+            tx.set(
+                key, {**agent, "status": "online", "last_seen": now, "updated_at": now}
+            )
     except LookupError:
         return jsonify({"error": "agent_not_found"}), 404
 
-    return jsonify({"status": "ok", "protocol_version": _PROTOCOL_VERSION,
-                    "agent_id": agent_id, "job_id": data["job_id"],
-                    "claim_token": data["claim_token"], "last_seen": now})
+    return jsonify(
+        {
+            "status": "ok",
+            "protocol_version": _PROTOCOL_VERSION,
+            "agent_id": agent_id,
+            "job_id": data["job_id"],
+            "claim_token": data["claim_token"],
+            "last_seen": now,
+        }
+    )
 
 
 @local_agent_bp.get("/<agent_id>/poll")
@@ -297,20 +356,39 @@ def local_agent_poll(agent_id: str):
             queued = []
             for key in store.items(prefix="local-job/"):
                 item = tx.get(key)
-                if item is not None and item["agent_id"] == agent_id and item["status"] == "queued":
+                if (
+                    item is not None
+                    and item["agent_id"] == agent_id
+                    and item["status"] == "queued"
+                ):
                     queued.append(item)
             row = min(queued, key=lambda item: item["created_at"]) if queued else None
             agent_key = "local-agent/" + agent_id
-            tx.set(agent_key, {**agent, "status": "online", "last_seen": now, "updated_at": now})
+            tx.set(
+                agent_key,
+                {**agent, "status": "online", "last_seen": now, "updated_at": now},
+            )
             if row is None:
-                return jsonify({"job": None, "protocol_version": _PROTOCOL_VERSION, "poll_after_seconds": 2})
+                return jsonify(
+                    {
+                        "job": None,
+                        "protocol_version": _PROTOCOL_VERSION,
+                        "poll_after_seconds": 2,
+                    }
+                )
             lease_until = now + _DEFAULT_LEASE_SECONDS
             claim_token = uuid4().hex
             attempt = int(row.get("attempt") or 0) + 1
             tx.set(
                 "local-job/" + row["id"],
-                {**row, "status": "claimed", "claimed_at": now, "lease_until": lease_until,
-                 "claim_token": claim_token, "attempt": attempt},
+                {
+                    **row,
+                    "status": "claimed",
+                    "claimed_at": now,
+                    "lease_until": lease_until,
+                    "claim_token": claim_token,
+                    "attempt": attempt,
+                },
             )
     except LookupError:
         return jsonify({"error": "agent_not_found"}), 404
@@ -349,15 +427,25 @@ def local_agent_start(agent_id: str, job_id: str):
             if row is None or row["agent_id"] != agent_id:
                 return jsonify({"error": "job_not_found"}), 404
             row = _expire_job(tx, key, row, unix_time())
-            if row.get("claim_token") != data["claim_token"] or row["status"] not in {"claimed", "running"}:
+            if row.get("claim_token") != data["claim_token"] or row["status"] not in {
+                "claimed",
+                "running",
+            }:
                 return jsonify({"error": "claim_not_active"}), 409
             if row["status"] == "claimed":
                 row = {**row, "status": "running", "started_at": unix_time()}
                 tx.set(key, row)
     except LookupError:
         return jsonify({"error": "agent_not_found"}), 404
-    return jsonify({"status": "running", "protocol_version": _PROTOCOL_VERSION,
-                    "job_id": job_id, "claim_token": row["claim_token"], "attempt": row["attempt"]})
+    return jsonify(
+        {
+            "status": "running",
+            "protocol_version": _PROTOCOL_VERSION,
+            "job_id": job_id,
+            "claim_token": row["claim_token"],
+            "attempt": row["attempt"],
+        }
+    )
 
 
 @local_agent_bp.post("/<agent_id>/jobs/<job_id>/result")
@@ -373,7 +461,9 @@ def local_agent_result(agent_id: str, job_id: str):
     if status not in {"completed", "failed"}:
         return jsonify({"error": "status_must_be_completed_or_failed"}), 400
     result = data.get("result")
-    if not isinstance(result, dict) or result.get("success") is not (status == "completed"):
+    if not isinstance(result, dict) or result.get("success") is not (
+        status == "completed"
+    ):
         return jsonify({"error": "result_success_must_match_status"}), 400
 
     key = "local-job/" + job_id
@@ -387,10 +477,20 @@ def local_agent_result(agent_id: str, job_id: str):
             if row.get("claim_token") != data["claim_token"]:
                 return jsonify({"error": "claim_mismatch"}), 409
             if row["status"] in {"completed", "failed"}:
-                if row["status"] != status or _parse_json(row.get("result_json"), None) != result:
+                if (
+                    row["status"] != status
+                    or _parse_json(row.get("result_json"), None) != result
+                ):
                     return jsonify({"error": "result_conflict"}), 409
-                return jsonify({"status": "ok", "protocol_version": _PROTOCOL_VERSION,
-                                "job_id": job_id, "claim_token": row["claim_token"], "idempotent": True})
+                return jsonify(
+                    {
+                        "status": "ok",
+                        "protocol_version": _PROTOCOL_VERSION,
+                        "job_id": job_id,
+                        "claim_token": row["claim_token"],
+                        "idempotent": True,
+                    }
+                )
             # A late result may resolve uncertainty for the SAME started claim.
             # An expired running job is never offered to another worker.
             if row["status"] not in {"running", "in_doubt"}:
@@ -409,14 +509,22 @@ def local_agent_result(agent_id: str, job_id: str):
     except LookupError:
         return jsonify({"error": "agent_not_found"}), 404
 
-    return jsonify({"status": "ok", "protocol_version": _PROTOCOL_VERSION,
-                    "job_id": job_id, "claim_token": data["claim_token"]})
+    return jsonify(
+        {
+            "status": "ok",
+            "protocol_version": _PROTOCOL_VERSION,
+            "job_id": job_id,
+            "claim_token": data["claim_token"],
+        }
+    )
 
 
 @local_agent_bp.get("/health")
 def local_agent_health():
     cutoff = unix_time() - 90
-    rows = sorted(get_store().items(prefix="local-agent/").values(), key=lambda row: row["id"])
+    rows = sorted(
+        get_store().items(prefix="local-agent/").values(), key=lambda row: row["id"]
+    )
 
     agents = []
     for row in rows:
@@ -435,4 +543,9 @@ def local_agent_health():
     return jsonify({"protocol_version": _PROTOCOL_VERSION, "agents": agents})
 
 
-__all__ = ["enqueue_local_tool_job", "wait_for_local_tool_job", "init_local_agent_tables", "local_agent_bp"]
+__all__ = [
+    "enqueue_local_tool_job",
+    "wait_for_local_tool_job",
+    "init_local_agent_tables",
+    "local_agent_bp",
+]

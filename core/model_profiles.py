@@ -21,7 +21,10 @@ from core.config import ALL_MODELS, canonical_model_key
 logger = logging.getLogger(__name__)
 
 CATALOG_PATH = (
-    Path(__file__).resolve().parents[1] / "config" / "model_profiles" / "ultra-profiles.json"
+    Path(__file__).resolve().parents[1]
+    / "config"
+    / "model_profiles"
+    / "ultra-profiles.json"
 )
 CATALOG_SCHEMA_VERSION = 1
 
@@ -36,11 +39,16 @@ def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def _validated_profiles(catalog: Any) -> dict[str, dict[str, Any]]:
-    if not isinstance(catalog, dict) or catalog.get("schema_version") != CATALOG_SCHEMA_VERSION:
+    if (
+        not isinstance(catalog, dict)
+        or catalog.get("schema_version") != CATALOG_SCHEMA_VERSION
+    ):
         raise ValueError("unsupported Ultra catalog schema")
     profiles = catalog.get("profiles")
     yandex_models = {
-        key for key, model in ALL_MODELS.items() if model.get("provider", "yandex") == "yandex"
+        key
+        for key, model in ALL_MODELS.items()
+        if model.get("provider", "yandex") == "yandex"
     }
     if not isinstance(profiles, dict) or set(profiles) != yandex_models:
         raise ValueError("Ultra catalog does not cover the model registry exactly")
@@ -144,7 +152,9 @@ def annotate_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of a model catalog with registry availability and Ultra summaries."""
     profiles = ultra_profiles()
     completion_keys = {
-        key for key, profile in profiles.items() if profile.get("transport") == "text_generation_async"
+        key
+        for key, profile in profiles.items()
+        if profile.get("transport") == "text_generation_async"
     }
     annotated = deepcopy(catalog)
     for section in ("text", "voice"):
@@ -159,7 +169,9 @@ def annotate_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
     # Completion-API models are listed apart; the chat picker only offers Responses models.
     text = annotated.get("text")
     if isinstance(text, dict):
-        completion = {key: text.pop(key) for key in list(text) if key in completion_keys}
+        completion = {
+            key: text.pop(key) for key in list(text) if key in completion_keys
+        }
         if completion:
             annotated["completion"] = completion
     return annotated

@@ -141,7 +141,9 @@ def _validate_types(record: dict[str, Any], prefix: str) -> list[str]:
     ]
     for field in STRING_ARRAY_FIELDS:
         values = record.get(field)
-        if not isinstance(values, list) or not all(isinstance(item, str) for item in values):
+        if not isinstance(values, list) or not all(
+            isinstance(item, str) for item in values
+        ):
             errors.append(f"{prefix}.{field} must be a string array")
     capabilities = record.get("capabilities")
     expected = {"read", "write", "events"}
@@ -152,7 +154,9 @@ def _validate_types(record: dict[str, Any], prefix: str) -> list[str]:
     return errors
 
 
-def _validate_verification(record: dict[str, Any], prefix: str, as_of: date) -> list[str]:
+def _validate_verification(
+    record: dict[str, Any], prefix: str, as_of: date
+) -> list[str]:
     errors: list[str] = []
     last_verified = record.get("last_verified")
     if last_verified is not None:
@@ -172,7 +176,9 @@ def _validate_verification(record: dict[str, Any], prefix: str, as_of: date) -> 
         errors.append(f"{prefix}: e2e_verified requires logos_implemented")
     supported = provider_exists and implemented and e2e and last_verified is not None
     if status == "supported" and not supported:
-        errors.append(f"{prefix}: supported requires provider + implementation + E2E verification")
+        errors.append(
+            f"{prefix}: supported requires provider + implementation + E2E verification"
+        )
     if status == "partial" and not implemented:
         errors.append(f"{prefix}: partial requires a Logos implementation")
     if status == "planned" and implemented:
@@ -180,7 +186,9 @@ def _validate_verification(record: dict[str, Any], prefix: str, as_of: date) -> 
     return errors
 
 
-def _validate_records(integrations: list[Any], as_of: date) -> tuple[list[str], set[str]]:
+def _validate_records(
+    integrations: list[Any], as_of: date
+) -> tuple[list[str], set[str]]:
     errors: list[str] = []
     ids: set[str] = set()
     for index, record in enumerate(integrations):
@@ -204,10 +212,14 @@ def validate_catalog(data: dict[str, Any]) -> list[str]:
     errors.extend(record_errors)
     forbidden = _find_forbidden_keys(data)
     if forbidden:
-        errors.append("catalog contains forbidden secret-value keys: " + ", ".join(forbidden))
+        errors.append(
+            "catalog contains forbidden secret-value keys: " + ", ".join(forbidden)
+        )
     missing_seeds = SEED_IDS - ids
     if missing_seeds:
-        errors.append("missing bootstrap integrations: " + ", ".join(sorted(missing_seeds)))
+        errors.append(
+            "missing bootstrap integrations: " + ", ".join(sorted(missing_seeds))
+        )
     return errors
 
 
@@ -270,7 +282,9 @@ def render_markdown(data: dict[str, Any]) -> str:
 
 
 def validate_schema_enum(schema: dict[str, Any]) -> list[str]:
-    enum = set(schema["properties"]["integrations"]["items"]["properties"]["status"]["enum"])
+    enum = set(
+        schema["properties"]["integrations"]["items"]["properties"]["status"]["enum"]
+    )
     if enum == ALLOWED_STATUSES:
         return []
     return ["schema status enum differs from validator enum"]

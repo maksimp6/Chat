@@ -21,7 +21,11 @@ from provider_accounts.model_discovery import ModelDiscoveryError, validate_dial
 from yandex_client_modules.request_builder import validate_generation_params
 from yandex_client_modules.request_mixin import _transport_timeout
 from yandex_client_modules.tool_config import normalize_tools_config
-from observability.trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
+from observability.trace_manager import (
+    ExecutionTrace,
+    bind_current_trace,
+    reset_current_trace,
+)
 from invocation.manager import (
     create_invocation,
     start_invocation,
@@ -48,12 +52,23 @@ from storage.db import (
     get_conversation_title,
     normalize_conversation_title,
 )
-from agent_runtime.partial_output import extract_last_response_text, format_partial_output_message
+from agent_runtime.partial_output import (
+    extract_last_response_text,
+    format_partial_output_message,
+)
 from agent_runtime.provider_receipt import capture_provider_diagnostics
 from agent_runtime.responses_tool_loop import run_tool_loop, extract_function_calls
-from economy.billing import aggregate_billing, build_ai_billing_item, settle_billing_to_treasury
+from economy.billing import (
+    aggregate_billing,
+    build_ai_billing_item,
+    settle_billing_to_treasury,
+)
 from provider_accounts.quotas import ProviderQuotaExceeded
-from agent_skills.registry import SkillRegistry, SkillRegistryError, compose_skill_instructions
+from agent_skills.registry import (
+    SkillRegistry,
+    SkillRegistryError,
+    compose_skill_instructions,
+)
 from tool_providers.universal_tool_platform import (
     UniversalToolCall,
     UniversalToolExecutor,
@@ -134,11 +149,15 @@ def _client_params(raw: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("unsupported params: " + ", ".join(sorted(unsupported)))
     params = validate_generation_params(raw)
     if params.get("previous_response_id"):
-        raise ValueError("previous_response_id cannot be combined with this endpoint's conversation; clear it to use /api/chat")
+        raise ValueError(
+            "previous_response_id cannot be combined with this endpoint's conversation; clear it to use /api/chat"
+        )
     params["max_rounds"] = _tool_rounds(params.get("max_rounds"))
     # Validate transport settings before storing a message or starting provider work.
     params["request_timeout"] = _transport_timeout(params, "request_timeout", 90, 900)
-    params["poll_timeout"] = _transport_timeout(params, "poll_timeout", CHAT_POLL_TIMEOUT_SECONDS, 7200)
+    params["poll_timeout"] = _transport_timeout(
+        params, "poll_timeout", CHAT_POLL_TIMEOUT_SECONDS, 7200
+    )
     return params
 
 
@@ -153,8 +172,13 @@ def _record_provider_output(trace, response):
         "provider_output_observed",
         {
             "status": response.get("status"),
-            "output_types": [str(item.get("type"))[:64] for item in output if isinstance(item, dict)][:50],
-            "function_calls": [str(call.get("name") or "")[:128] for call in extract_function_calls(response)][:50],
+            "output_types": [
+                str(item.get("type"))[:64] for item in output if isinstance(item, dict)
+            ][:50],
+            "function_calls": [
+                str(call.get("name") or "")[:128]
+                for call in extract_function_calls(response)
+            ][:50],
         },
     )
 
@@ -162,7 +186,9 @@ def _record_provider_output(trace, response):
 # Models whose registry entry says they read images. A message with photos to any other
 # model is refused instead of being sent without them.
 IMAGE_INPUT_MODEL_KEYS: frozenset[str] = frozenset(
-    key for key, model in TEXT_MODELS.items() if (model.get("capabilities") or {}).get("multimodal") is True
+    key
+    for key, model in TEXT_MODELS.items()
+    if (model.get("capabilities") or {}).get("multimodal") is True
 )
 IMAGE_HISTORY_TURNS = 20
 IMAGE_HISTORY_TEXT_CHARS = 4000
@@ -176,7 +202,9 @@ def _image_turn_history(conv_id):
         turns = turns[:-1]  # the current message is sent separately
     history = []
     for turn in turns[-IMAGE_HISTORY_TURNS:]:
-        text = _MARKDOWN_PICTURE.sub("[картинка]", str(turn.get("text") or ""))[:IMAGE_HISTORY_TEXT_CHARS]
+        text = _MARKDOWN_PICTURE.sub("[картинка]", str(turn.get("text") or ""))[
+            :IMAGE_HISTORY_TEXT_CHARS
+        ]
         if text.strip():
             history.append({"role": turn["role"], "text": text})
     return history
@@ -208,14 +236,20 @@ def _validated_images(raw: Any) -> list[str]:
     if raw is None:
         return []
     if not isinstance(raw, list) or len(raw) > MAX_IMAGES_PER_MESSAGE:
-        raise ValueError(f"attachments must be a list of at most {MAX_IMAGES_PER_MESSAGE} images")
+        raise ValueError(
+            f"attachments must be a list of at most {MAX_IMAGES_PER_MESSAGE} images"
+        )
     data_urls = []
     for item in raw:
         url = item.get("data_url") if isinstance(item, dict) else None
         if not isinstance(url, str):
             raise ValueError("each attachment must have a data_url string")
         header, separator, encoded = url.partition(",")
-        if not separator or not header.startswith("data:") or not header.endswith(";base64"):
+        if (
+            not separator
+            or not header.startswith("data:")
+            or not header.endswith(";base64")
+        ):
             raise ValueError("each attachment must be a base64 data URL")
         if len(encoded) > MAX_IMAGE_BYTES * 4 // 3 + 4:
             raise ValueError("each image must be at most 5 MB")
@@ -277,7 +311,9 @@ class LogosClient(YandexResponsesClient):
         settings_conversation_id=None,
     ):
         policy_kwargs = (
-            {"execution_policy": execution_policy} if execution_policy is not None else {}
+            {"execution_policy": execution_policy}
+            if execution_policy is not None
+            else {}
         )
 
         response = self._ask_provider(
@@ -309,7 +345,8 @@ class LogosClient(YandexResponsesClient):
             initial_input = _response_input(base_params, message)
             continuation_history = (
                 [{"role": "user", "content": initial_input}]
-                if isinstance(initial_input, str) else list(initial_input)
+                if isinstance(initial_input, str)
+                else list(initial_input)
             )
 
             def continue_request(input_items, previous_response):
@@ -322,13 +359,16 @@ class LogosClient(YandexResponsesClient):
                 elif isinstance(choice, dict):
                     continuation_params["tool_choice"] = (
                         {**choice, "mode": "auto"}
-                        if choice.get("type") == "allowed_tools" else "auto"
+                        if choice.get("type") == "allowed_tools"
+                        else "auto"
                     )
                 # The provider conversation already contains the answered calls.
                 if conversation_id:
                     continuation_params["input"] = [
-                        item for item in input_items
-                        if isinstance(item, dict) and item.get("type") == "function_call_output"
+                        item
+                        for item in input_items
+                        if isinstance(item, dict)
+                        and item.get("type") == "function_call_output"
                     ]
                 else:
                     continuation_history.extend(input_items)
@@ -366,7 +406,9 @@ def _turn_cost(billing: dict[str, Any]) -> float | None:
     return float(billing.get("total_cost") or 0)
 
 
-def _settled_turn_cost(billing: dict[str, Any], settlement: dict[str, Any]) -> float | None:
+def _settled_turn_cost(
+    billing: dict[str, Any], settlement: dict[str, Any]
+) -> float | None:
     """Show a cost only when the treasury charged it; a failed or skipped posting charged nothing."""
     cost = _turn_cost(billing)
     if cost and settlement.get("status") not in {"posted", "already_posted"}:
@@ -379,7 +421,12 @@ def _append_post_final_error(trace_data, source, message, error_type):
     import time
 
     trace_data.setdefault("errors", []).append(
-        {"source": source, "error": message, "type": error_type, "timestamp": time.time()}
+        {
+            "source": source,
+            "error": message,
+            "type": error_type,
+            "timestamp": time.time(),
+        }
     )
 
 
@@ -417,21 +464,54 @@ def _validate_chat_payload(conv_id, model_key, message, attachments):
         endpoint = "/api/images/generate"
     elif model_key in EMBEDDING_MODELS or model_key.startswith("emb://"):
         endpoint = "/api/embeddings"
-    elif model_key in CLASSIFIER_MODELS or model_key.startswith("cls://") or "/classifier-" in model_key:
+    elif (
+        model_key in CLASSIFIER_MODELS
+        or model_key.startswith("cls://")
+        or "/classifier-" in model_key
+    ):
         endpoint = "/api/classify"
     if endpoint is not None:
-        return None, None, (jsonify({"error": "model_requires_dedicated_api", "endpoint": endpoint}), 400)
+        return (
+            None,
+            None,
+            (
+                jsonify(
+                    {"error": "model_requires_dedicated_api", "endpoint": endpoint}
+                ),
+                400,
+            ),
+        )
     if isinstance(model_key, str) and model_key in completion_model_keys():
         # These models speak the completion API; sending them through Responses is wrong.
-        return None, None, (jsonify({"error": "model_uses_completion_api", "endpoint": "/api/completion"}), 400)
+        return (
+            None,
+            None,
+            (
+                jsonify(
+                    {
+                        "error": "model_uses_completion_api",
+                        "endpoint": "/api/completion",
+                    }
+                ),
+                400,
+            ),
+        )
     try:
         images = _validated_images(attachments)
     except ValueError as exc:
-        return None, None, (jsonify({"error": "invalid_attachments", "message": str(exc)}), 400)
+        return (
+            None,
+            None,
+            (jsonify({"error": "invalid_attachments", "message": str(exc)}), 400),
+        )
     if message is None and images:
         message = ""
     if not isinstance(message, str) or (not message.strip() and not images):
-        return None, None, (jsonify({"error": "message or attachments are required"}), 400)
+        return (
+            None,
+            None,
+            (jsonify({"error": "message or attachments are required"}), 400),
+        )
     if images and model_key not in IMAGE_INPUT_MODEL_KEYS:
         return None, None, (jsonify({"error": "model_does_not_accept_images"}), 400)
 
@@ -454,12 +534,17 @@ class _ChatReply:
 def _execute_chat_model(message, model_key, invocation, params, trace):
     """Run one provider/tool turn and collect its terminal response."""
     client = LogosClient(Config)
-    provider_conversation_id = _provider_conversation_id(client, invocation.conversation_id, trace)
+    provider_conversation_id = _provider_conversation_id(
+        client, invocation.conversation_id, trace
+    )
 
     if isinstance(trace, ExecutionTrace):
         trace.add_event(
             "turn_limits",
-            {"poll_timeout": params["poll_timeout"], "max_rounds": params["max_rounds"]},
+            {
+                "poll_timeout": params["poll_timeout"],
+                "max_rounds": params["max_rounds"],
+            },
         )
     response = client.ask_with_mcp(
         message=message,
@@ -485,7 +570,9 @@ def _execute_chat_model(message, model_key, invocation, params, trace):
         if isinstance(request_init_timestamp, (int, float)) and isinstance(
             first_api_start, (int, float)
         ):
-            pre_api_ms = round(max(0.0, first_api_start - request_init_timestamp) * 1000, 2)
+            pre_api_ms = round(
+                max(0.0, first_api_start - request_init_timestamp) * 1000, 2
+            )
             trace.trace.setdefault("timings", {})["pre_api_pipeline"] = {
                 "start_timestamp": request_init_timestamp,
                 "end_timestamp": first_api_start,
@@ -512,9 +599,13 @@ def _build_chat_reply(client, response, trace) -> _ChatReply:
     provider_message = None
     invalid_provider_response = not isinstance(response, dict)
     provider_diagnostics = {}
-    capture_provider_diagnostics(provider_diagnostics, {} if invalid_provider_response else response)
+    capture_provider_diagnostics(
+        provider_diagnostics, {} if invalid_provider_response else response
+    )
     provider_status = provider_diagnostics["provider_status"]
-    pending_calls = [] if invalid_provider_response else extract_function_calls(response)
+    pending_calls = (
+        [] if invalid_provider_response else extract_function_calls(response)
+    )
     if invalid_provider_response:
         # Keep the invalid JSON value as evidence too; never convert arbitrary
         # provider data into an assistant reply or replace the last valid raw.
@@ -530,9 +621,12 @@ def _build_chat_reply(client, response, trace) -> _ChatReply:
     provider_error = None
     if provider_failed:
         provider_error = (
-            "provider_invalid_response" if invalid_provider_response
-            else "provider_tool_calls_unresolved" if pending_calls
-            else "provider_error" if provider_diagnostics["provider_error_present"]
+            "provider_invalid_response"
+            if invalid_provider_response
+            else "provider_tool_calls_unresolved"
+            if pending_calls
+            else "provider_error"
+            if provider_diagnostics["provider_error_present"]
             else "provider_" + provider_status
         )
         if invalid_provider_response:
@@ -545,20 +639,31 @@ def _build_chat_reply(client, response, trace) -> _ChatReply:
             provider_message = "Ответ провайдера не завершён: " + provider_status
         if provider_diagnostics.get("provider_reason"):
             provider_message += " (" + provider_diagnostics["provider_reason"] + ")"
-        trace.record_error("provider_response", provider_message, error_type=provider_error)
+        trace.record_error(
+            "provider_response", provider_message, error_type=provider_error
+        )
     trace.add_event(
         "provider_terminal_state",
-        {**provider_diagnostics, "invocation_status": "failed" if provider_failed else "completed"},
+        {
+            **provider_diagnostics,
+            "invocation_status": "failed" if provider_failed else "completed",
+        },
     )
 
-    reasoning, reply = ("", "") if invalid_provider_response else client.extract_reasoning_and_text(response)
+    reasoning, reply = (
+        ("", "")
+        if invalid_provider_response
+        else client.extract_reasoning_and_text(response)
+    )
     partial_output = reply if provider_failed else None
     if provider_failed:
         if not partial_output:
             # Only this request's trace is consulted. The final raw response
             # and its status remain untouched even when an earlier tool round
             # supplied the last available assistant text.
-            partial_output, _ = extract_last_response_text(trace.trace.get("responses", []))
+            partial_output, _ = extract_last_response_text(
+                trace.trace.get("responses", [])
+            )
         reply = format_partial_output_message(partial_output, provider_message)
     elif not reply:
         raise RuntimeError("Модель не вернула текстовый ответ. Повторите запрос.")
@@ -578,8 +683,14 @@ def _build_chat_reply(client, response, trace) -> _ChatReply:
 
 
 def _finalize_chat_turn(
-    invocation, trace, result: _ChatReply, *, total_ms, selected_skill_metadata,
-    conversation_title, user_message_id=None
+    invocation,
+    trace,
+    result: _ChatReply,
+    *,
+    total_ms,
+    selected_skill_metadata,
+    conversation_title,
+    user_message_id=None,
 ):
     """Freeze the trace, settle billing, persist the reply, then finish its invocation."""
     reply = result.reply
@@ -601,11 +712,16 @@ def _finalize_chat_turn(
     except Exception as settlement_error:
         logger.exception("[BILLING] Treasury settlement failed")
         # The full exception stays in the server log above; the trace gets only fixed text and a known code.
-        failure_code = "insufficient_balance" if str(settlement_error) == "insufficient balance" else None
+        failure_code = (
+            "insufficient_balance"
+            if str(settlement_error) == "insufficient balance"
+            else None
+        )
         _append_post_final_error(
             trace_data,
             "treasury_settlement",
-            "treasury settlement failed" + (f": {failure_code}" if failure_code else ""),
+            "treasury settlement failed"
+            + (f": {failure_code}" if failure_code else ""),
             type(settlement_error).__name__,
         )
         settlement = {"status": "failed", "reason": "treasury_settlement_failed"}
@@ -631,7 +747,11 @@ def _finalize_chat_turn(
         cost=cost,
         timings=timings,
         usage=usage,
-        trace={"trace_id": invocation.trace_id, "invocation_id": invocation.invocation_id, "storage": "invocation"},
+        trace={
+            "trace_id": invocation.trace_id,
+            "invocation_id": invocation.invocation_id,
+            "storage": "invocation",
+        },
         total_duration_ms=total_ms,
         source="error" if provider_failed else None,
     )
@@ -671,17 +791,29 @@ def _finalize_chat_turn(
             "trace_id": invocation.trace_id,
             "trace": trace_data,
             "skills": selected_skill_metadata,
-            "title": conversation_title or get_conversation_title(invocation.conversation_id),
+            "title": conversation_title
+            or get_conversation_title(invocation.conversation_id),
             "status": "failed" if provider_failed else "completed",
             **provider_diagnostics,
-            **({"error": provider_error, "partial_output": partial_output or None} if provider_failed else {}),
+            **(
+                {"error": provider_error, "partial_output": partial_output or None}
+                if provider_failed
+                else {}
+            ),
         }
     ), 502 if provider_failed else 200
 
 
 def _chat_error_response(
-    error, *, trace, invocation, conv_id, can_write, error_message, is_temperature_error,
-    user_message_id=None
+    error,
+    *,
+    trace,
+    invocation,
+    conv_id,
+    can_write,
+    error_message,
+    is_temperature_error,
+    user_message_id=None,
 ):
     """Publish an error using only the invocation context established by this request."""
     if trace.finalized:
@@ -727,7 +859,9 @@ def _chat_error_response(
                 "user_message_id": user_message_id,
                 "invocation_id": invocation.invocation_id if invocation else None,
                 "session_id": invocation.session_id if invocation else None,
-                "conversation_id": invocation.conversation_id if invocation else conv_id,
+                "conversation_id": invocation.conversation_id
+                if invocation
+                else conv_id,
                 "trace_id": invocation.trace_id if invocation else trace.trace_id,
                 "trace": trace_data,
             }
@@ -739,7 +873,19 @@ def _chat_error_response(
     if invocation is not None:
         persist_invocation_trace(invocation.invocation_id, trace_data)
     if can_write:
-        add_message(conv_id, "assistant", reply, trace={"trace_id": invocation.trace_id, "invocation_id": invocation.invocation_id, "storage": "invocation"} if invocation else {}, source="error")
+        add_message(
+            conv_id,
+            "assistant",
+            reply,
+            trace={
+                "trace_id": invocation.trace_id,
+                "invocation_id": invocation.invocation_id,
+                "storage": "invocation",
+            }
+            if invocation
+            else {},
+            source="error",
+        )
     if invocation is not None:
         fail_invocation(invocation.invocation_id, error={"message": error_message})
 
@@ -783,15 +929,24 @@ def chat():
         # Only an exact persisted message ID permits omitting a new user record.
         retry = data.get("retry", False)
         if not isinstance(retry, bool):
-            return jsonify({"error": "invalid_params", "message": "retry must be a boolean"}), 400
+            return jsonify(
+                {"error": "invalid_params", "message": "retry must be a boolean"}
+            ), 400
         retry_message_id = data.get("retry_message_id")
         if retry_message_id is not None and (
             type(retry_message_id) is not int or retry_message_id < 1 or not retry
         ):
-            return jsonify({"error": "invalid_params", "message": "retry_message_id requires retry and a positive integer"}), 400
+            return jsonify(
+                {
+                    "error": "invalid_params",
+                    "message": "retry_message_id requires retry and a positive integer",
+                }
+            ), 400
         raw_params = data.get("params")
         if raw_params is not None and not isinstance(raw_params, dict):
-            return jsonify({"error": "invalid_params", "message": "params must be an object"}), 400
+            return jsonify(
+                {"error": "invalid_params", "message": "params must be an object"}
+            ), 400
         params = dict(raw_params or {})
         params_role = params.pop("role", None)
         role = data.get("role") or params_role
@@ -815,7 +970,12 @@ def chat():
             return jsonify({"error": "conversation_not_found"}), 404
         conv_settings = get_conv_settings(conv_id) or {}
         if not isinstance(conv_settings, dict):
-            return jsonify({"error": "invalid_settings", "message": "conversation settings must be an object"}), 400
+            return jsonify(
+                {
+                    "error": "invalid_settings",
+                    "message": "conversation settings must be an object",
+                }
+            ), 400
         try:
             normalize_tools_config(conv_settings.get("tools_config", {}))
         except ValueError as exc:
@@ -828,7 +988,12 @@ def chat():
                 or original.get("content") != (message or "[Фото]")
                 or (original.get("attachments") or {}).get("images", 0) != len(images)
             ):
-                return jsonify({"error": "invalid_retry_message", "message": "The saved user message does not match this retry"}), 409
+                return jsonify(
+                    {
+                        "error": "invalid_retry_message",
+                        "message": "The saved user message does not match this retry",
+                    }
+                ), 409
             user_message_id = retry_message_id
         invocation = create_invocation(
             session_id,
@@ -859,7 +1024,9 @@ def chat():
         try:
             selected_skills = skill_registry.load_many(requested_skills, role=role)
         except SkillRegistryError as exc:
-            trace.record_error("skills", "invalid skill selection", error_type=type(exc).__name__)
+            trace.record_error(
+                "skills", "invalid skill selection", error_type=type(exc).__name__
+            )
             trace_data = trace.finalize()
             persist_invocation_trace(invocation.invocation_id, trace_data)
             public_message = "Selected skills are invalid or unavailable"
@@ -880,7 +1047,9 @@ def chat():
             ), 400
 
         for skill in selected_skills:
-            trace.add_skill(skill.name, source=skill.source, version=skill.version, role=role)
+            trace.add_skill(
+                skill.name, source=skill.source, version=skill.version, role=role
+            )
         selected_skill_metadata = [skill.metadata() for skill in selected_skills]
         if selected_skills:
             params["instructions"] = compose_skill_instructions(
@@ -901,7 +1070,9 @@ def chat():
                 attachments={"images": len(images)} if images else None,
             )
             if user_message_id is None:
-                raise LookupError("Conversation was deleted before the user message was stored")
+                raise LookupError(
+                    "Conversation was deleted before the user message was stored"
+                )
         conversation_title = maybe_update_conversation_title(
             invocation.conversation_id,
             message,
@@ -921,7 +1092,8 @@ def chat():
         logger.exception("[CHAT] Ошибка")
         internal_error_message = str(e)
         is_temperature_error = (
-            isinstance(e, ValueError) and "temperature" in internal_error_message.lower()
+            isinstance(e, ValueError)
+            and "temperature" in internal_error_message.lower()
         )
         error_message = (
             "Некорректное значение temperature"
@@ -1163,8 +1335,10 @@ def execute_approved():
         tool_arguments = dict(arguments or {})
         if func_name == "set_ui_theme":
             current_theme = str(data.get("current_theme") or "").strip().lower()
-            if current_theme and len(current_theme) <= 32 and all(
-                ch.isalnum() or ch in "-_" for ch in current_theme
+            if (
+                current_theme
+                and len(current_theme) <= 32
+                and all(ch.isalnum() or ch in "-_" for ch in current_theme)
             ):
                 tool_arguments["current_theme"] = current_theme
         call = UniversalToolCall(
@@ -1215,7 +1389,11 @@ def execute_approved():
                 provider_diagnostics,
                 synth_response if isinstance(synth_response, dict) else {},
             )
-            followup_reply = client.extract_text(synth_response) if isinstance(synth_response, dict) else ""
+            followup_reply = (
+                client.extract_text(synth_response)
+                if isinstance(synth_response, dict)
+                else ""
+            )
             followup_failed = (
                 provider_diagnostics["provider_status"] != "completed"
                 or provider_diagnostics["provider_error_present"]
@@ -1262,11 +1440,21 @@ def execute_approved():
                 logger.exception("[BILLING] Approval follow-up settlement failed")
             cost = _settled_turn_cost(billing, settlement)
         except Exception:
-            logger.exception("[BILLING] Approval follow-up billing failed after the action ran")
+            logger.exception(
+                "[BILLING] Approval follow-up billing failed after the action ran"
+            )
         try:
-            add_message(conv_id, "assistant", reply, cost=cost, source="error" if followup_failed else None)
+            add_message(
+                conv_id,
+                "assistant",
+                reply,
+                cost=cost,
+                source="error" if followup_failed else None,
+            )
         except Exception:
-            logger.exception("[TOOL_APPROVAL] Could not store the approval reply after the action ran")
+            logger.exception(
+                "[TOOL_APPROVAL] Could not store the approval reply after the action ran"
+            )
         return jsonify(
             {
                 "reply": reply,

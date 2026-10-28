@@ -126,7 +126,8 @@ class UserIdentityStore:
         normalized: IdentityState = {
             "schema": IDENTITY_SCHEMA,
             "users": {
-                user_id: self._user_record(record) for user_id, record in state["users"].items()
+                user_id: self._user_record(record)
+                for user_id, record in state["users"].items()
             },
             "github_accounts": {
                 github_id: self._github_record(record)

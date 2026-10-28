@@ -30,7 +30,9 @@ class GitReadError(ValueError):
 
 
 def _json(value: object) -> bytes:
-    return json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(",", ":")).encode()
+    return json.dumps(
+        value, sort_keys=True, ensure_ascii=True, separators=(",", ":")
+    ).encode()
 
 
 def _git(root: Path, *args: str) -> bytes:
@@ -65,7 +67,9 @@ def _read_object(root: Path, oid: str, kind: str, sink) -> bytes | None:
             return None
         raw = _git(root, "cat-file", kind, oid)
         algorithm = "sha1" if len(oid) == 40 else "sha256"
-        digest = hashlib.new(algorithm, f"{kind} {len(raw)}\0".encode() + raw).hexdigest()
+        digest = hashlib.new(
+            algorithm, f"{kind} {len(raw)}\0".encode() + raw
+        ).hexdigest()
         if digest != oid or size != len(raw):
             sink.gap(kind, source_id, "git_object_hash_mismatch")
             return None
@@ -93,7 +97,9 @@ def _changes(root: Path, sha: str, parent: str | None) -> list[dict]:
         details, path_bytes = fields[index : index + 2]
         if not details.startswith(b":"):
             raise GitReadError("git_changes_invalid")
-        old_mode, new_mode, old_oid, new_oid, status = details[1:].decode("ascii").split()
+        old_mode, new_mode, old_oid, new_oid, status = (
+            details[1:].decode("ascii").split()
+        )
         path = path_bytes.decode("utf-8", errors="replace")
         changes.append(
             {
@@ -118,7 +124,11 @@ def _lfs_payload(root: Path, raw: bytes, sink, url: str, pointer_oid: str) -> No
         return
     oid, expected_size = match[1].decode(), int(match[2])
     source_id = f"git:lfs:{oid}"
-    metadata = {"lfs_oid_sha256": oid, "bytes": expected_size, "pointer_git_oid": pointer_oid}
+    metadata = {
+        "lfs_oid_sha256": oid,
+        "bytes": expected_size,
+        "pointer_git_oid": pointer_oid,
+    }
     # Standard local object store only. Custom storage can point outside the
     # authorized repository and requires a separately verified storage source.
     common = Path(os.fsdecode(_git(root, "rev-parse", "--git-common-dir").strip()))
@@ -158,7 +168,9 @@ def _is_partial_clone(root: Path) -> bool:
     )
 
 
-def _collect_refs(root: Path, sink, base: str) -> tuple[list[bytes], set[str], set[str]]:
+def _collect_refs(
+    root: Path, sink, base: str
+) -> tuple[list[bytes], set[str], set[str]]:
     refs = _git(
         root, "for-each-ref", "--format=%(refname)%00%(objectname)%00%(objecttype)"
     ).splitlines()
@@ -180,9 +192,16 @@ def _collect_refs(root: Path, sink, base: str) -> tuple[list[bytes], set[str], s
         if kind == "tag":
             tags.add(oid)
         try:
-            tips.add(_git(root, "rev-parse", "--verify", oid + "^{commit}").strip().decode())
+            tips.add(
+                _git(root, "rev-parse", "--verify", oid + "^{commit}").strip().decode()
+            )
         except GitReadError:
-            sink.gap("git_ref", f"git:ref:{name}", "ref_does_not_resolve_to_commit", {"oid": oid})
+            sink.gap(
+                "git_ref",
+                f"git:ref:{name}",
+                "ref_does_not_resolve_to_commit",
+                {"oid": oid},
+            )
     return refs, tips, tags
 
 
@@ -213,7 +232,9 @@ def _collect_tags(root: Path, sink, base: str, tags: set[str]) -> None:
             sink.add("git_tag", f"git:tag:{oid}", base + "/tree/" + oid, oid, raw)
             header = raw.split(b"\n\n", 1)[0].splitlines()
             if b"type tag" in header:
-                tags.update(line[7:].decode() for line in header if line.startswith(b"object "))
+                tags.update(
+                    line[7:].decode() for line in header if line.startswith(b"object ")
+                )
 
 
 def _boundary_changes(root: Path, sha: str) -> list[dict]:
@@ -242,7 +263,12 @@ def _boundary_changes(root: Path, sha: str) -> list[dict]:
 
 
 def _register_blob_occurrences(
-    sink, base: str, sha: str, changes: list[dict], blobs: dict, sensitive_oids: set[str]
+    sink,
+    base: str,
+    sha: str,
+    changes: list[dict],
+    blobs: dict,
+    sensitive_oids: set[str],
 ) -> None:
     for change in changes:
         path, oid, mode = change["path"], change["oid"], change["mode"]
@@ -257,7 +283,12 @@ def _register_blob_occurrences(
         }
         if _repository_path_is_sensitive(path):
             sensitive_oids.add(oid)
-            sink.gap("git_blob", f"git:path:{sha}:{path}", "sensitive_path_excluded", metadata)
+            sink.gap(
+                "git_blob",
+                f"git:path:{sha}:{path}",
+                "sensitive_path_excluded",
+                metadata,
+            )
         elif mode == "160000":
             sink.gap(
                 "git_submodule",
@@ -266,7 +297,9 @@ def _register_blob_occurrences(
                 {**metadata, "oid": oid},
             )
         elif mode not in {"100644", "100755", "120000"}:
-            sink.gap("git_blob", f"git:path:{sha}:{path}", "git_mode_unsupported", metadata)
+            sink.gap(
+                "git_blob", f"git:path:{sha}:{path}", "git_mode_unsupported", metadata
+            )
         else:
             blobs.setdefault(oid, []).append(metadata)
 
@@ -279,7 +312,9 @@ def _collect_commit(
         return []
     header = raw.split(b"\n\n", 1)[0].splitlines()
     parents = [line[7:].decode() for line in header if line.startswith(b"parent ")]
-    tree = next((line[5:].decode() for line in header if line.startswith(b"tree ")), None)
+    tree = next(
+        (line[5:].decode() for line in header if line.startswith(b"tree ")), None
+    )
     sink.add(
         "git_commit",
         f"git:commit:{sha}",
@@ -317,7 +352,9 @@ def _collect_commit(
 def _collect_blobs(root: Path, sink, blobs: dict, sensitive_oids: set[str]) -> None:
     for oid, occurrences in sorted(blobs.items()):
         if oid in sensitive_oids:
-            sink.gap("git_blob", f"git:blob:{oid}", "blob_also_present_at_sensitive_path")
+            sink.gap(
+                "git_blob", f"git:blob:{oid}", "blob_also_present_at_sensitive_path"
+            )
             continue
         raw = _read_object(root, oid, "blob", sink)
         if raw is None:
@@ -359,7 +396,9 @@ def collect_git(root: Path, sink) -> None:
         if shallow:
             sink.gap("git_history", "git:history", "shallow_history")
         if _is_partial_clone(root):
-            sink.gap("git_history", "git:history", "partial_clone_requires_explicit_fetch")
+            sink.gap(
+                "git_history", "git:history", "partial_clone_requires_explicit_fetch"
+            )
             return
         refs, tips, tags = _collect_refs(root, sink, base)
         _collect_head(root, sink, base, tips)
@@ -367,7 +406,9 @@ def collect_git(root: Path, sink) -> None:
         if not tips:
             return
         commits = (
-            _git(root, "rev-list", "--topo-order", "--reverse", *sorted(tips)).decode().splitlines()
+            _git(root, "rev-list", "--topo-order", "--reverse", *sorted(tips))
+            .decode()
+            .splitlines()
         )
         commit_set = set(commits)
         blobs: dict[str, list[dict]] = {}

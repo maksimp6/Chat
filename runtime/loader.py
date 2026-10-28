@@ -15,7 +15,9 @@ from runtime.dispatcher import RuntimeDispatcher
 
 
 # Builtins that give revision code the host: files, the terminal, and type introspection.
-_DENIED_BUILTINS = frozenset({"breakpoint", "exit", "help", "input", "open", "quit", "type"})
+_DENIED_BUILTINS = frozenset(
+    {"breakpoint", "exit", "help", "input", "open", "quit", "type"}
+)
 
 
 class RuntimeLoadError(ValueError):
@@ -94,7 +96,9 @@ class RuntimeLoader:
             raise RuntimeLoadError("logos_runtime.py must define create_runtime(host)")
         application = factory(RuntimeHostAPI(self.runtime_id, self._dispatcher))
         if not callable(getattr(application, "invoke", None)):
-            raise RuntimeLoadError("runtime application must define invoke(operation, payload)")
+            raise RuntimeLoadError(
+                "runtime application must define invoke(operation, payload)"
+            )
         self._application = application
         self._digest = hashlib.sha256(source.encode("utf-8")).hexdigest()
         return True
@@ -102,7 +106,9 @@ class RuntimeLoader:
     def invoke(self, operation: str, payload: Mapping[str, Any] | None = None) -> Any:
         if self._application is None:
             raise RuntimeLoadError("revision runtime is not loaded")
-        return self._application.invoke(operation, MappingProxyType(dict(payload or {})))
+        return self._application.invoke(
+            operation, MappingProxyType(dict(payload or {}))
+        )
 
     @staticmethod
     def _validate(source: str, filename: str) -> None:
@@ -129,9 +135,16 @@ class RuntimeLoader:
             }:
                 raise RuntimeLoadError(f"revision use of {node.id} is not supported")
             if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
-                raise RuntimeLoadError("revision access to dunder attributes is not supported")
+                raise RuntimeLoadError(
+                    "revision access to dunder attributes is not supported"
+                )
             # str.format resolves attribute paths such as "{0.__globals__}" at runtime.
-            if isinstance(node, ast.Attribute) and node.attr in {"format", "format_map"}:
+            if isinstance(node, ast.Attribute) and node.attr in {
+                "format",
+                "format_map",
+            }:
                 raise RuntimeLoadError("revision use of str.format is not supported")
             if isinstance(node, ast.Name) and node.id == "__builtins__":
-                raise RuntimeLoadError("revision access to __builtins__ is not supported")
+                raise RuntimeLoadError(
+                    "revision access to __builtins__ is not supported"
+                )

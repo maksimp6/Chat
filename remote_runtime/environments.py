@@ -51,7 +51,9 @@ def _invoke_revision_runtime(context, payload):
         runtime = _RUNTIME_WORKERS.get(context.runtime_id)
     if runtime is None or not runtime.loader.loaded:
         raise RuntimeError("revision runtime is not loaded")
-    return runtime.loader.invoke(str(payload.get("operation") or ""), payload.get("payload"))
+    return runtime.loader.invoke(
+        str(payload.get("operation") or ""), payload.get("payload")
+    )
 
 
 _RUNTIME_DISPATCHER.register_operation("revision.invoke", _invoke_revision_runtime)
@@ -107,7 +109,9 @@ def resolve_commit(branch: str, commit_sha: Optional[str] = None) -> str:
     try:
         resolved = _run_git("rev-parse", "--verify", f"{value}^{{commit}}")
         branch_resolved = (
-            _run_git("rev-parse", "--verify", f"{branch_value}^{{commit}}") if commit_sha else None
+            _run_git("rev-parse", "--verify", f"{branch_value}^{{commit}}")
+            if commit_sha
+            else None
         )
     except ValueError as exc:
         raise ValueError(f"git ref is not available: {value}") from exc
@@ -117,7 +121,9 @@ def resolve_commit(branch: str, commit_sha: Optional[str] = None) -> str:
         except ValueError as exc:
             # The commit exists but is not on this branch, so the reason must not be reported as a missing ref.
             raise ValueError("commit is not reachable from branch") from exc
-    if len(resolved) != 40 or any(ch not in "0123456789abcdef" for ch in resolved.lower()):
+    if len(resolved) != 40 or any(
+        ch not in "0123456789abcdef" for ch in resolved.lower()
+    ):
         raise ValueError("git did not return a commit SHA")
     return resolved
 
@@ -261,7 +267,9 @@ class RuntimeHTTPStream:
                 try:
                     event = self._events.get(timeout=_STREAM_IDLE_SECONDS)
                 except queue.Empty as exc:
-                    raise TimeoutError("environment runtime HTTP stream stalled") from exc
+                    raise TimeoutError(
+                        "environment runtime HTTP stream stalled"
+                    ) from exc
                 kind = event[0]
                 if kind == "chunk":
                     yield event[1]
@@ -477,7 +485,9 @@ class EnvironmentRuntime:
 
         shutil.rmtree(self.worktree.parent, ignore_errors=True)
 
-    def _run_http(self, payload: dict[str, Any], events: queue.Queue, cancel: threading.Event) -> None:
+    def _run_http(
+        self, payload: dict[str, Any], events: queue.Queue, cancel: threading.Event
+    ) -> None:
         source = None
         try:
             base_path = str(payload.get("base_path") or "")
@@ -486,7 +496,9 @@ class EnvironmentRuntime:
                 base_path,
                 data_root=str(self.data_dir),
             ):
-                source = _RUNTIME_DISPATCHER.dispatch(self.runtime_id, "http.request", payload)
+                source = _RUNTIME_DISPATCHER.dispatch(
+                    self.runtime_id, "http.request", payload
+                )
                 status_code = int(source["status_code"])
                 headers = list(source.get("headers") or [])
                 if not _stream_put(events, ("start", status_code, headers), cancel):
@@ -496,7 +508,9 @@ class EnvironmentRuntime:
                         break
                     if isinstance(chunk, str):
                         chunk = chunk.encode("utf-8")
-                    if chunk and not _stream_put(events, ("chunk", bytes(chunk)), cancel):
+                    if chunk and not _stream_put(
+                        events, ("chunk", bytes(chunk)), cancel
+                    ):
                         break
         except Exception as exc:
             _stream_put(events, ("error", exc), cancel)
@@ -524,12 +538,13 @@ class EnvironmentRuntime:
                         "",
                         data_root=str(self.data_dir),
                     ):
-                        value = _RUNTIME_DISPATCHER.dispatch(self.runtime_id, operation, payload)
+                        value = _RUNTIME_DISPATCHER.dispatch(
+                            self.runtime_id, operation, payload
+                        )
                     result.put(("result", value))
                 except Exception as exc:
                     result.put(("error", exc))
                 continue
-
 
 
 def register_runtime_operation(name: str, handler) -> None:
@@ -703,7 +718,9 @@ def start_environment(
     except Exception as exc:
         _persist_environment(environment_id, {"status": "FAILED", "error": str(exc)})
         item.update({"status": "FAILED", "error": str(exc)})
-        _record_trace(item, "START_ENVIRONMENT", "FAILED", context=context, error=str(exc))
+        _record_trace(
+            item, "START_ENVIRONMENT", "FAILED", context=context, error=str(exc)
+        )
         raise
 
 
@@ -721,11 +738,18 @@ def stop_environment(
         except RuntimeError as exc:
             # The worker did not stop, so the environment is not stopped. Record that instead of
             # leaving it RUNNING while its worker is still registered.
-            _persist_environment(environment_id, {"status": "FAILED", "error": str(exc)})
+            _persist_environment(
+                environment_id, {"status": "FAILED", "error": str(exc)}
+            )
             raise
     _persist_environment(
         environment_id,
-        {"status": "STOPPED", "runtime_pid": None, "runtime_port": None, "stopped_at": unix_seconds()},
+        {
+            "status": "STOPPED",
+            "runtime_pid": None,
+            "runtime_port": None,
+            "stopped_at": unix_seconds(),
+        },
     )
     item.update(
         {
@@ -757,7 +781,9 @@ def delete_environment(
     with _RUNTIME_WORKERS_LOCK:
         runtime = _RUNTIME_WORKERS.get(environment_id)
     # A failed stop can leave a worker alive; finish stopping it before removing its data.
-    if item["status"] == "RUNNING" or (runtime is not None and item["status"] == "FAILED"):
+    if item["status"] == "RUNNING" or (
+        runtime is not None and item["status"] == "FAILED"
+    ):
         stop_environment(environment_id, owner_id, context=context)
         item = _require(environment_id, owner_id)
     elif runtime is not None:

@@ -32,7 +32,9 @@ def reconcile(
     for i, action in enumerate(actions, 1):
         # Check approval for production actions
         if action.needs_approval and lane == "production":
-            logger.warning(f"[{i}] Action requires approval: {action.type.value} {action.service}")
+            logger.warning(
+                f"[{i}] Action requires approval: {action.type.value} {action.service}"
+            )
             print(f"  {i}. [PENDING] {action.service}: requires approval")
             continue
 

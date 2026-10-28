@@ -37,7 +37,9 @@ class AliceCloudProvider:
         filters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if resource_type not in {None, "container", "containers"}:
-            raise CloudProviderError("Unsupported resource type", code="unsupported_resource_type")
+            raise CloudProviderError(
+                "Unsupported resource type", code="unsupported_resource_type"
+            )
         items = self.runtime.list_managed()
         if service and service != "*":
             items = [item for item in items if item.get("service") == service]
@@ -53,7 +55,9 @@ class AliceCloudProvider:
         resource_id: str,
         service: str | None = None,
     ) -> dict[str, Any]:
-        resources = self.list_resources(service=service or "*", resource_type=resource_type)["containers"]
+        resources = self.list_resources(
+            service=service or "*", resource_type=resource_type
+        )["containers"]
         for item in resources:
             if item.get("id") == resource_id or item.get("name") == resource_id:
                 return item
@@ -73,7 +77,9 @@ class AliceCloudProvider:
             return self.runtime.update(lane=lane, service=service, config=config)
         if operation == "delete":
             return self.runtime.delete(lane=lane, service=service)
-        raise CloudProviderError("Unsupported reconciliation operation", code="unsupported_operation")
+        raise CloudProviderError(
+            "Unsupported reconciliation operation", code="unsupported_operation"
+        )
 
     def compute(
         self,
@@ -83,7 +89,9 @@ class AliceCloudProvider:
         extra: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if not instance_id:
-            raise CloudProviderError("instance_id is required", code="resource_id_required")
+            raise CloudProviderError(
+                "instance_id is required", code="resource_id_required"
+            )
         return self.runtime.lifecycle(operation=operation, name=instance_id)
 
     def query_logs(
@@ -97,10 +105,14 @@ class AliceCloudProvider:
             raise CloudProviderError("service is required", code="service_required")
         resources = self.list_resources(service=service)["containers"]
         if len(resources) != 1:
-            raise CloudProviderError("Service must resolve to one container", code="ambiguous_service")
+            raise CloudProviderError(
+                "Service must resolve to one container", code="ambiguous_service"
+            )
         text = self.runtime.logs(name=resources[0]["name"], limit=limit)
         if query:
-            lines = [line for line in text.splitlines() if query.lower() in line.lower()]
+            lines = [
+                line for line in text.splitlines() if query.lower() in line.lower()
+            ]
         else:
             lines = text.splitlines()
         return {"provider": self.name, "service": service, "lines": lines[-limit:]}
@@ -117,7 +129,9 @@ class AliceCloudProvider:
             raise CloudProviderError("service is required", code="service_required")
         resources = self.list_resources(service=service)["containers"]
         if len(resources) != 1:
-            raise CloudProviderError("Service must resolve to one container", code="ambiguous_service")
+            raise CloudProviderError(
+                "Service must resolve to one container", code="ambiguous_service"
+            )
         return {
             "provider": self.name,
             "service": service,
@@ -132,7 +146,9 @@ class AliceCloudProvider:
         resource_id: str | None = None,
         options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        raise CloudProviderError("Backups are not implemented in Alice Cloud MVP", code="not_implemented")
+        raise CloudProviderError(
+            "Backups are not implemented in Alice Cloud MVP", code="not_implemented"
+        )
 
     def costs_summary(
         self,

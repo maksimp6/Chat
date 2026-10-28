@@ -8,6 +8,7 @@ Mode open_api_key_form clicks the AI Studio "Создать API-ключ" contro
 open its form and reports the form structure. It never submits the form, so no
 key is created, and it reads no values.
 """
+
 import json
 import os
 from pathlib import Path
@@ -66,7 +67,9 @@ FORM_JS = """JSON.stringify((()=>{
 def aistudio_actor(rdp):
     for tab in rdp.request("root", "listTabs")["tabs"]:
         if urlparse(tab.get("url", "")).hostname == "aistudio.yandex.ru":
-            return rdp.request(tab["actor"], "getTarget")["frame"]["consoleActor"], tab["url"]
+            return rdp.request(tab["actor"], "getTarget")["frame"]["consoleActor"], tab[
+                "url"
+            ]
     raise RuntimeError("No AI Studio tab is open on the phone")
 
 
@@ -80,7 +83,10 @@ def probe(mode):
             actor, url = aistudio_actor(rdp)
             rdp.evaluate(actor, OPEN_FORM_JS)
             time.sleep(2)
-            report = {"url_path": urlparse(url).path, "form": rdp.evaluate(actor, FORM_JS)}
+            report = {
+                "url_path": urlparse(url).path,
+                "form": rdp.evaluate(actor, FORM_JS),
+            }
             print(json.dumps(report, ensure_ascii=False, indent=1))
             return
         report = []
@@ -90,8 +96,13 @@ def probe(mode):
                 continue
             parsed = urlparse(url)
             actor = rdp.request(tab["actor"], "getTarget")["frame"]["consoleActor"]
-            report.append({"host": parsed.hostname, "path": parsed.path,
-                           "page": rdp.evaluate(actor, PROBE_JS)})
+            report.append(
+                {
+                    "host": parsed.hostname,
+                    "path": parsed.path,
+                    "page": rdp.evaluate(actor, PROBE_JS),
+                }
+            )
         print(json.dumps(report, ensure_ascii=False, indent=1))
     finally:
         rdp.s.close()
@@ -102,16 +113,27 @@ def main():
         probe(sys.argv[2])
         return
     required = ("GITHUB_ACTIONS", "RUNNER_TEMP")
-    if os.environ.get("GITHUB_ACTIONS") != "true" or any(not os.environ.get(k) for k in required):
-        raise RuntimeError("Run the browser probe inside the existing GitHub Actions runner")
+    if os.environ.get("GITHUB_ACTIONS") != "true" or any(
+        not os.environ.get(k) for k in required
+    ):
+        raise RuntimeError(
+            "Run the browser probe inside the existing GitHub Actions runner"
+        )
     mode = os.environ.get("PROBE_MODE", "read")
     if mode not in ("read", "open_api_key_form"):
         raise RuntimeError("Unknown probe mode")
     argv = [sys.executable, str(Path(__file__).resolve()), "_probe", mode]
-    safe_env = {"PATH": os.environ.get("PATH", "/system/bin"), "TMPDIR": os.environ["RUNNER_TEMP"]}
-    result = subprocess.run(["su", "-c", shlex.join(argv)], env=safe_env, capture_output=True, timeout=120)
+    safe_env = {
+        "PATH": os.environ.get("PATH", "/system/bin"),
+        "TMPDIR": os.environ["RUNNER_TEMP"],
+    }
+    result = subprocess.run(
+        ["su", "-c", shlex.join(argv)], env=safe_env, capture_output=True, timeout=120
+    )
     if result.returncode:
-        raise RuntimeError(result.stderr.decode(errors="replace")[-1200:] or "Probe failed")
+        raise RuntimeError(
+            result.stderr.decode(errors="replace")[-1200:] or "Probe failed"
+        )
     print(result.stdout.decode().strip())
 
 

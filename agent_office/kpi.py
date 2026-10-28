@@ -67,7 +67,9 @@ def compute_kpis(
             merged_at = _merged_at(thread)
             if merged_at and merged_at >= since:
                 kpi.merged += 1
-                kpi.lead_hours.append((merged_at - thread.created_at).total_seconds() / 3600)
+                kpi.lead_hours.append(
+                    (merged_at - thread.created_at).total_seconds() / 3600
+                )
                 kpi.reviews_per_merge.append(
                     sum(event.kind == "reviewed" for event in thread.events)
                 )

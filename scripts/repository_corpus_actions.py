@@ -22,7 +22,9 @@ INVENTORY_KEY = "actions_run:/actions/runs"
 
 
 def _encoded(value):
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    return json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode()
 
 
 def _hash(raw):
@@ -168,7 +170,9 @@ class _Windows:
         except (OSError, ValueError, TypeError, AttributeError, KeyError):
             self.rows = {}
             self.cross_gaps = []
-            self.collector.gap("actions_run", "/actions/runs", "actions_inventory_state_invalid")
+            self.collector.gap(
+                "actions_run", "/actions/runs", "actions_inventory_state_invalid"
+            )
 
     def _restore_page(self, page, record):
         digest = page.get("sha256")
@@ -208,7 +212,9 @@ class _Windows:
     def _observe(self, row):
         previous = self.rows.get(row["id"])
         if previous is not None and previous != row:
-            self.cross_gaps.append({"reason": "actions_run_changed_during_epoch", "id": row["id"]})
+            self.cross_gaps.append(
+                {"reason": "actions_run_changed_during_epoch", "id": row["id"]}
+            )
         self.rows[row["id"]] = row
 
     def _page(self, record, per_page, page):
@@ -252,7 +258,12 @@ class _Windows:
         for page in range(1, min(self.collector.max_pages, 10) + 1):
             total, rows = self._page(record, 100, page)
             if total != expected:
-                _gap(record, "inventory_changed_during_collection", before=expected, after=total)
+                _gap(
+                    record,
+                    "inventory_changed_during_collection",
+                    before=expected,
+                    after=total,
+                )
             valid = []
             for row in rows:
                 try:
@@ -272,7 +283,12 @@ class _Windows:
             _gap(record, "pagination_limit_exceeded")
         record["count"] = len(identities)
         if expected != len(identities):
-            _gap(record, "inventory_count_mismatch", expected=expected, collected=len(identities))
+            _gap(
+                record,
+                "inventory_count_mismatch",
+                expected=expected,
+                collected=len(identities),
+            )
         record["status"] = "partial" if record.get("gaps") else "collected"
 
     def _visit(self, record):
@@ -319,15 +335,22 @@ class _Windows:
         pending = self.state["pending"]
         deferred = []
         while (
-            pending and len(self.state["windows"]) + len(deferred) + len(pending) + 2 <= MAX_WINDOWS
+            pending
+            and len(self.state["windows"]) + len(deferred) + len(pending) + 2
+            <= MAX_WINDOWS
         ):
-            record = {**pending.pop(0), "observed_at": datetime.now(timezone.utc).isoformat()}
+            record = {
+                **pending.pop(0),
+                "observed_at": datetime.now(timezone.utc).isoformat(),
+            }
             try:
                 children = self._visit(record)
                 pending[:0] = children
             except (CollectionError, ValueError) as error:
                 record["status"] = (
-                    "deferred" if getattr(self.collector.reader, "stop_reason", None) else "partial"
+                    "deferred"
+                    if getattr(self.collector.reader, "stop_reason", None)
+                    else "partial"
                 )
                 _gap(record, str(error))
             if record["status"] in {"partial", "deferred"}:
@@ -349,7 +372,11 @@ class _Windows:
                     "actions_run",
                     "/actions/runs",
                     gap["reason"],
-                    {"lower": _utc(record["lo"]), "upper": _utc(record["hi"]), **gap["metadata"]},
+                    {
+                        "lower": _utc(record["lo"]),
+                        "upper": _utc(record["hi"]),
+                        **gap["metadata"],
+                    },
                 )
         for gap in self.cross_gaps:
             collector.gap("actions_run", str(gap["id"]), gap["reason"])
@@ -376,7 +403,10 @@ class _Windows:
                 "actions_run",
                 "/actions/runs",
                 "actions_inventory_reconciliation_failed",
-                {"leaf_reported_count": expected, "observed_unique_count": len(self.rows)},
+                {
+                    "leaf_reported_count": expected,
+                    "observed_unique_count": len(self.rows),
+                },
             )
         complete = (
             not self.state["pending"]
@@ -399,7 +429,9 @@ class _Windows:
             "pending_windows": self.state["pending"],
             "frontier_advanced_this_pass": self.frontier_before != self._frontier(),
         }
-        return sorted(self.rows.values(), key=lambda row: (row["created_at"], row["id"]))
+        return sorted(
+            self.rows.values(), key=lambda row: (row["created_at"], row["id"])
+        )
 
 
 def collect_actions_runs(collector, repository_metadata, epoch):
@@ -410,7 +442,9 @@ def collect_actions_runs(collector, repository_metadata, epoch):
         if not 0 <= lower <= cutoff:
             raise ValueError("actions_inventory_bounds_invalid")
     except (TypeError, ValueError, OverflowError):
-        collector.gap("actions_run", "/actions/runs", "actions_inventory_bounds_unverified")
+        collector.gap(
+            "actions_run", "/actions/runs", "actions_inventory_bounds_unverified"
+        )
         rows = collector.pages("actions_run", "/actions/runs", key="workflow_runs")
         collector.inventory[INVENTORY_KEY].update(
             complete=False,

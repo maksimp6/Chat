@@ -65,14 +65,24 @@ def calculate_provider_storage_cost(
     write_operations: int = 0,
 ) -> dict[str, Any]:
     """Calculate provider-backed storage cost with documented free tiers."""
-    gb_months = max(0.0, bytes_stored / (1024**3)) * max(0.0, lifetime_days) / max(1, days_in_month)
+    gb_months = (
+        max(0.0, bytes_stored / (1024**3))
+        * max(0.0, lifetime_days)
+        / max(1, days_in_month)
+    )
     billable_storage = max(0.0, gb_months - tariff.free_storage_gb_month)
     storage_cost = billable_storage * tariff.storage_per_gb_month
     billable_gets = max(0, int(get_operations) - tariff.free_get_per_month)
-    get_cost = None if tariff.get_per_10k is None else billable_gets / 10_000 * tariff.get_per_10k
+    get_cost = (
+        None
+        if tariff.get_per_10k is None
+        else billable_gets / 10_000 * tariff.get_per_10k
+    )
     billable_writes = max(0, int(write_operations) - tariff.free_write_per_month)
     write_cost = (
-        None if tariff.write_per_10k is None else billable_writes / 10_000 * tariff.write_per_10k
+        None
+        if tariff.write_per_10k is None
+        else billable_writes / 10_000 * tariff.write_per_10k
     )
     components = {
         "storage": round(storage_cost, 6),
@@ -111,13 +121,15 @@ def calculate_knowledge_cost(
         "text": _cost(config.text_per_kb, text_bytes / 1024),
         "embedding": _cost(config.embedding_per_1k_tokens, embedding_tokens / 1000),
         "vector_storage": _cost(
-            config.vector_storage_per_mb_day, vector_bytes / (1024 * 1024) * max(0.0, lifetime_days)
+            config.vector_storage_per_mb_day,
+            vector_bytes / (1024 * 1024) * max(0.0, lifetime_days),
         ),
         "metadata": _cost(
             config.metadata_per_kb_day, metadata_bytes / 1024 * max(0.0, lifetime_days)
         ),
         "backup": _cost(
-            config.backup_per_mb_day, backup_bytes / (1024 * 1024) * max(0.0, lifetime_days)
+            config.backup_per_mb_day,
+            backup_bytes / (1024 * 1024) * max(0.0, lifetime_days),
         ),
         "retrieval": _cost(config.retrieval_per_1k_items, retrieval_count / 1000),
     }
@@ -129,7 +141,9 @@ def calculate_knowledge_cost(
         "components": components,
         "known_cost": round(sum(known), 6),
         "unknown_components": unknown_components,
-        "cost_status": "unknown" if not known else ("partial" if unknown_components else "known"),
+        "cost_status": "unknown"
+        if not known
+        else ("partial" if unknown_components else "known"),
     }
 
 
@@ -152,7 +166,9 @@ def record_knowledge_operation(
         "invocation_id": str(invocation_id) if invocation_id is not None else None,
         "trace_id": str(trace_id or getattr(trace, "trace_id", "")),
         "session_id": str(session_id) if session_id is not None else None,
-        "conversation_id": str(conversation_id) if conversation_id is not None else None,
+        "conversation_id": str(conversation_id)
+        if conversation_id is not None
+        else None,
         "cost": cost,
         "value": value,
         "quality": quality,
@@ -165,7 +181,9 @@ def record_knowledge_operation(
             "operation": operation,
             "invocation_id": entry["invocation_id"],
             "trace_id": entry["trace_id"],
-            "cost_status": (cost or {}).get("cost_status") if isinstance(cost, dict) else None,
+            "cost_status": (cost or {}).get("cost_status")
+            if isinstance(cost, dict)
+            else None,
         },
     )
     return entry

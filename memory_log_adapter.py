@@ -35,7 +35,9 @@ class LogEvent:
 
 
 def redact(value: str) -> str:
-    return _SECRET.sub(lambda match: (match.group(1) or match.group(2)) + "[REDACTED]", value)
+    return _SECRET.sub(
+        lambda match: (match.group(1) or match.group(2)) + "[REDACTED]", value
+    )
 
 
 class MemoryLogAdapter:
@@ -45,7 +47,13 @@ class MemoryLogAdapter:
         self._writer = writer
 
     def append(
-        self, *, trace_id: str, source: str, level: str, message: str, event_id: str | None = None
+        self,
+        *,
+        trace_id: str,
+        source: str,
+        level: str,
+        message: str,
+        event_id: str | None = None,
     ) -> LogEvent:
         if not trace_id or not source:
             raise ValueError("trace_id and source are required")
@@ -57,7 +65,9 @@ class MemoryLogAdapter:
             timestamp=datetime.now(timezone.utc).isoformat(),
             message=redact(message),
         )
-        payload = json.dumps(event.__dict__, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        payload = json.dumps(event.__dict__, ensure_ascii=False, sort_keys=True).encode(
+            "utf-8"
+        )
         if len(payload) > MAX_EVENT_BYTES:
             raise ValueError("log event exceeds maximum frame size")
         self._writer.append("execution_logs", event.event_id, payload)

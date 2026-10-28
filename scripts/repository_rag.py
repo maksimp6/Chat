@@ -72,7 +72,9 @@ def digest(raw: bytes) -> str:
 
 
 def canonical(value: object) -> bytes:
-    return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()
+    return json.dumps(
+        value, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    ).encode()
 
 
 def atomic(path: Path, raw: bytes) -> None:
@@ -126,7 +128,9 @@ def _mask_text(text: str) -> tuple[str, int]:
         ):
             return match.group(0)
         count += 1
-        return match.group(1) + match.group("quote") + "[REDACTED]" + match.group("quote")
+        return (
+            match.group(1) + match.group("quote") + "[REDACTED]" + match.group("quote")
+        )
 
     text = JSON_SECRET.sub(secret, text)
     text, auth_count = AUTH_SECRET.subn(lambda m: m.group(1) + "[REDACTED]", text)
@@ -176,8 +180,15 @@ class CorpusArchive:
         self.captured_at = datetime.now(timezone.utc).isoformat()
         self.expanded_bytes = 0
 
-    def gap(self, kind: str, source_id: str, reason: str, metadata: dict | None = None) -> None:
-        item = {"kind": kind, "source_id": source_id, "reason": reason, "metadata": metadata or {}}
+    def gap(
+        self, kind: str, source_id: str, reason: str, metadata: dict | None = None
+    ) -> None:
+        item = {
+            "kind": kind,
+            "source_id": source_id,
+            "reason": reason,
+            "metadata": metadata or {},
+        }
         # Error strings and URLs from upstream are data, never printed verbatim.
         item = json.loads(safe_text(canonical(item).decode())[0])
         self.gaps.append(item)
@@ -227,7 +238,9 @@ class CorpusArchive:
             entry["text_sha256"] = digest(text.encode())
             document = (
                 "# Repository evidence\n\n"
-                + canonical({k: v for k, v in identity.items() if k != "metadata"}).decode()
+                + canonical(
+                    {k: v for k, v in identity.items() if k != "metadata"}
+                ).decode()
                 + "\n\nSource text (untrusted evidence):\n\n"
                 + text
                 + "\n"
@@ -243,7 +256,9 @@ class CorpusArchive:
                     + "\n"
                 ).encode()
                 provenance_hash = digest(provenance)
-                atomic(self.directory / "documents" / (provenance_hash + ".md"), provenance)
+                atomic(
+                    self.directory / "documents" / (provenance_hash + ".md"), provenance
+                )
                 entry["provenance_document_sha256"] = provenance_hash
         else:
             entry["index"] = "not_text"
@@ -256,7 +271,9 @@ class CorpusArchive:
                     self.gap(kind, source_id, "binary_text_extraction_unavailable")
         self.entries[key] = entry
         with (self.directory / "observations.jsonl").open("ab") as stream:
-            stream.write(canonical({"source": key, "captured_at": self.captured_at}) + b"\n")
+            stream.write(
+                canonical({"source": key, "captured_at": self.captured_at}) + b"\n"
+            )
         if len(self.observed) % 1000 == 0:
             self.checkpoint()
 
@@ -267,14 +284,19 @@ class CorpusArchive:
         elif digest(original.read_bytes()) != raw_hash:
             raise ValueError("archive_object_corrupt")
 
-    def _zip(self, raw: bytes, kind: str, source_id: str, url: str, version: str, depth: int):
+    def _zip(
+        self, raw: bytes, kind: str, source_id: str, url: str, version: str, depth: int
+    ):
         try:
             with zipfile.ZipFile(io.BytesIO(raw)) as archive:
                 for index, member in enumerate(archive.infolist()):
                     member_id = source_id + "!/" + member.filename
                     if member.is_dir():
                         continue
-                    if index >= 10000 or self.expanded_bytes + member.file_size > 1024**3:
+                    if (
+                        index >= 10000
+                        or self.expanded_bytes + member.file_size > 1024**3
+                    ):
                         self.gap(kind, source_id, "archive_expansion_limit")
                         break
                     if (
@@ -305,7 +327,9 @@ class CorpusArchive:
         atomic(self.directory / "gaps.json", canonical(self.gaps))
 
     def summary(self) -> dict:
-        originals = sum(item.get("archive") == "saved_private" for item in self.entries.values())
+        originals = sum(
+            item.get("archive") == "saved_private" for item in self.entries.values()
+        )
         return {
             "repository": self.repository,
             "captured_at": self.captured_at,
@@ -313,8 +337,12 @@ class CorpusArchive:
             "source_versions_archived": len(self.entries),
             "raw_originals_available": originals,
             "raw_originals_missing": len(self.entries) - originals,
-            "documents_prepared": len(list((self.directory / "documents").glob("*.md"))),
-            "source_counts": dict(Counter(item["kind"] for item in self.entries.values())),
+            "documents_prepared": len(
+                list((self.directory / "documents").glob("*.md"))
+            ),
+            "source_counts": dict(
+                Counter(item["kind"] for item in self.entries.values())
+            ),
             "gap_count": len(self.gaps),
             "gap_reasons": dict(Counter(item["reason"] for item in self.gaps)),
             "coverage": "partial" if self.gaps else "collected_declared_scope",
@@ -392,7 +420,9 @@ def _validate_store(store_id: str, project: str, key: str) -> str:
     store = semantic.yandex_json_request("GET", store_path, project, key)
     if (
         store.get("id") != store_id
-        or not str(store.get("name", "")).startswith(("chat-repo-", "chat-task-history-"))
+        or not str(store.get("name", "")).startswith(
+            ("chat-repo-", "chat-task-history-")
+        )
         or store.get("status") in {"failed", "expired", "cancelled"}
     ):
         raise ValueError("knowledge_existing_project_store_invalid")
@@ -400,7 +430,13 @@ def _validate_store(store_id: str, project: str, key: str) -> str:
 
 
 def _read_pack(
-    archive, item, prefix, project, key, *, max_response_bytes=semantic.MAX_VECTOR_FILE_BYTES
+    archive,
+    item,
+    prefix,
+    project,
+    key,
+    *,
+    max_response_bytes=semantic.MAX_VECTOR_FILE_BYTES,
 ):
     if not isinstance(item, dict):
         raise ValueError("vector_store_file_record_invalid")
@@ -429,7 +465,9 @@ def _read_pack(
 
 def _existing_packs(archive, store_path, prefix, required, project, key):
     available = semantic.list_yandex_objects("/files", project, key, ("files",))
-    attached = semantic.list_yandex_objects(store_path + "/files", project, key, ("files",))
+    attached = semantic.list_yandex_objects(
+        store_path + "/files", project, key, ("files",)
+    )
     attached_ids = {semantic._attached_file_id(item) for item in attached}
     known = set()
     pack_records = []
@@ -491,7 +529,9 @@ def _send_pack(archive, pending, prefix, project, key):
     }
 
 
-def _upload_new_packs(archive, documents_to_upload, known, prefix, pack_records, project, key):
+def _upload_new_packs(
+    archive, documents_to_upload, known, prefix, pack_records, project, key
+):
     pending = []
     pending_bytes = 0
     for sha, path in sorted(documents_to_upload.items()):
@@ -500,7 +540,9 @@ def _upload_new_packs(archive, documents_to_upload, known, prefix, pack_records,
             continue
         if pending and pending_bytes + len(raw) > PACK_BYTES:
             pack_records.append(_send_pack(archive, pending, prefix, project, key))
-            atomic(archive.directory / "upload-checkpoint.json", canonical(pack_records))
+            atomic(
+                archive.directory / "upload-checkpoint.json", canonical(pack_records)
+            )
             pending, pending_bytes = [], 0
         pending.append(raw)
         pending_bytes += len(raw)
@@ -553,7 +595,9 @@ def _attachment_states(rows, store_path, project, key):
         if state["status"] in INDEX_TERMINAL_STATES:
             error = item.get("last_error")
             if not isinstance(error, dict) or error.get("code") is None:
-                error, lookup = _read_attachment_error(file_id, store_path, project, key, remaining)
+                error, lookup = _read_attachment_error(
+                    file_id, store_path, project, key, remaining
+                )
                 state["last_error_lookup"] = lookup
             code = _safe_index_error_code(error)
             if code is not None:
@@ -568,7 +612,10 @@ def _attachment_states(rows, store_path, project, key):
 
 def _diagnose_index_targets(by_id, target_ids, store_path, project, key):
     rows = [item for file_id, item in by_id.items() if file_id in target_ids]
-    return {item["file_id"]: item for item in _attachment_states(rows, store_path, project, key)}
+    return {
+        item["file_id"]: item
+        for item in _attachment_states(rows, store_path, project, key)
+    }
 
 
 def _attach_pending(store_path, pending, capacity, project, key):
@@ -598,25 +645,34 @@ def _attach_pending(store_path, pending, capacity, project, key):
 
 
 def _index_progress(target_ids, by_id, submitted, checkpoint_path):
-    states = {item: by_id.get(item, {}).get("status", "not_visible") for item in sorted(target_ids)}
+    states = {
+        item: by_id.get(item, {}).get("status", "not_visible")
+        for item in sorted(target_ids)
+    }
     progress = {
         "files": len(target_ids),
         "submitted": len(target_ids & submitted),
         "completed": sum(state == "completed" for state in states.values()),
         "in_progress": sum(state == "in_progress" for state in states.values()),
         "terminal_errors": [
-            by_id[item] for item in sorted(target_ids) if states[item] in INDEX_TERMINAL_STATES
+            by_id[item]
+            for item in sorted(target_ids)
+            if states[item] in INDEX_TERMINAL_STATES
         ],
     }
     if checkpoint_path:
         atomic(
             checkpoint_path,
-            canonical({"progress": progress, "files": states, "generation_requests": 0}),
+            canonical(
+                {"progress": progress, "files": states, "generation_requests": 0}
+            ),
         )
     return states, progress
 
 
-def _attach_and_wait(store_path, selected, attached_ids, project, key, *, checkpoint_path=None):
+def _attach_and_wait(
+    store_path, selected, attached_ids, project, key, *, checkpoint_path=None
+):
     if any(
         not item.get("attachment_allowed", True) and item["file_id"] not in attached_ids
         for item in selected
@@ -630,9 +686,13 @@ def _attach_and_wait(store_path, selected, attached_ids, project, key, *, checkp
     next_report = 0.0
     while True:
         by_id = _index_rows(store_path, project, key)
-        by_id.update(_diagnose_index_targets(by_id, target_ids, store_path, project, key))
+        by_id.update(
+            _diagnose_index_targets(by_id, target_ids, store_path, project, key)
+        )
         submitted.update(by_id)
-        states, progress = _index_progress(target_ids, by_id, submitted, checkpoint_path)
+        states, progress = _index_progress(
+            target_ids, by_id, submitted, checkpoint_path
+        )
         if progress != previous_progress or time.monotonic() >= next_report:
             print(json.dumps({"indexing_progress": progress}), flush=True)
             previous_progress, next_report = progress, time.monotonic() + 60
@@ -660,7 +720,9 @@ def _attach_and_wait(store_path, selected, attached_ids, project, key, *, checkp
         time.sleep(30 if error else 10)
 
 
-def upload_archive(archive: CorpusArchive, store_id: str, project: str, key: str) -> dict:
+def upload_archive(
+    archive: CorpusArchive, store_id: str, project: str, key: str
+) -> dict:
     """Reuse verified packs; append only previously unrepresented documents."""
     if not project or not key:
         raise ValueError("knowledge_provider_credentials_missing")
@@ -669,12 +731,18 @@ def upload_archive(archive: CorpusArchive, store_id: str, project: str, key: str
     if not required:
         raise ValueError("empty_repository_corpus")
     store_path = _validate_store(store_id, project, key)
-    prefix = "chat-repository-archive-v1-" + digest(archive.repository.encode())[:16] + "-"
+    prefix = (
+        "chat-repository-archive-v1-" + digest(archive.repository.encode())[:16] + "-"
+    )
     attached_ids, known, pack_records = _existing_packs(
         archive, store_path, prefix, required, project, key
     )
-    _upload_new_packs(archive, documents_to_upload, known, prefix, pack_records, project, key)
-    selected = [item for item in pack_records if required.intersection(item["documents"])]
+    _upload_new_packs(
+        archive, documents_to_upload, known, prefix, pack_records, project, key
+    )
+    selected = [
+        item for item in pack_records if required.intersection(item["documents"])
+    ]
     _attach_and_wait(
         store_path,
         selected,
@@ -697,7 +765,9 @@ def provider_inventory(repository: str, store_id: str, project: str, key: str) -
     store_path = _validate_store(store_id, project, key)
     prefix = "chat-repository-archive-v1-" + digest(repository.encode())[:16] + "-"
     files = semantic.list_yandex_objects("/files", project, key, ("files",))
-    attached = semantic.list_yandex_objects(store_path + "/files", project, key, ("files",))
+    attached = semantic.list_yandex_objects(
+        store_path + "/files", project, key, ("files",)
+    )
     candidates = [
         {field: item.get(field) for field in ("id", "filename", "bytes")}
         for item in files
@@ -756,13 +826,17 @@ def _snippet_candidates(archive, document_hashes, file_id, snippet):
     return candidates
 
 
-def verify_search(archive: CorpusArchive, upload: dict, query: str, project: str, key: str) -> dict:
+def verify_search(
+    archive: CorpusArchive, upload: dict, query: str, project: str, key: str
+) -> dict:
     """Search without generation; bind returned text to indexed file and document."""
     from scripts.repository_rag_verify import direct_search
 
     packs = {item["file_id"]: set(item["documents"]) for item in upload["packs"]}
     matches = []
-    for item in direct_search(upload["store_id"], query, project, key, sys.modules[__name__]):
+    for item in direct_search(
+        upload["store_id"], query, project, key, sys.modules[__name__]
+    ):
         file_id = item.get("file_id")
         if file_id not in packs:
             continue
@@ -771,18 +845,28 @@ def verify_search(archive: CorpusArchive, upload: dict, query: str, project: str
             if candidates:
                 maximum = max(len(candidate["quote"]) for candidate in candidates)
                 candidates = [
-                    candidate for candidate in candidates if len(candidate["quote"]) == maximum
+                    candidate
+                    for candidate in candidates
+                    if len(candidate["quote"]) == maximum
                 ]
                 if len(candidates) == 1:
                     matches.append({**candidates[0], "attribution": "unique"})
                 else:
                     matches.append(
-                        {"file_id": file_id, "attribution": "ambiguous", "candidates": candidates}
+                        {
+                            "file_id": file_id,
+                            "attribution": "ambiguous",
+                            "candidates": candidates,
+                        }
                     )
     marker = "REPOSITORY_RAG_ABSENT_" + os.urandom(16).hex()
-    absent = direct_search(upload["store_id"], marker, project, key, sys.modules[__name__])
+    absent = direct_search(
+        upload["store_id"], marker, project, key, sys.modules[__name__]
+    )
     fabricated = any(
-        marker in text for item in absent for text in semantic._vector_result_texts(item)
+        marker in text
+        for item in absent
+        for text in semantic._vector_result_texts(item)
     )
     return {
         "status": "verified_fragments"
@@ -836,10 +920,14 @@ def _github_stop(reader, new_sources, before, after, window_progress=False):
     if reader.stop_reason in reasons:
         return reader.stop_reason, reasons[reader.stop_reason]
     previous_ids = {
-        name: state.get("last_id") for name, state in before.items() if isinstance(state, dict)
+        name: state.get("last_id")
+        for name, state in before.items()
+        if isinstance(state, dict)
     }
     current_ids = {
-        name: state.get("last_id") for name, state in after.items() if isinstance(state, dict)
+        name: state.get("last_id")
+        for name, state in after.items()
+        if isinstance(state, dict)
     }
     if not new_sources and previous_ids == current_ids and not window_progress:
         return "no_collection_progress", "no_progress"
@@ -852,12 +940,18 @@ def _github_pass(args, archive, reader, number, epoch):
     before = _github_progress(reader, args.repository)
     source_count, gap_count = len(archive.entries), len(archive.gaps)
     started_at = datetime.now(timezone.utc).isoformat()
-    collection = collect_github(args.repository, reader.token, archive, reader=reader, epoch=epoch)
+    collection = collect_github(
+        args.repository, reader.token, archive, reader=reader, epoch=epoch
+    )
     after = _github_progress(reader, args.repository)
     new_sources = len(archive.entries) - source_count
     windows = collection.get("inventories", {}).get("actions_run:/actions/runs", {})
     stop_reason, stop_kind = _github_stop(
-        reader, new_sources, before, after, windows.get("frontier_advanced_this_pass") is True
+        reader,
+        new_sources,
+        before,
+        after,
+        windows.get("frontier_advanced_this_pass") is True,
     )
     return {
         "pass": number,
@@ -967,8 +1061,12 @@ def _run(args, archive: CorpusArchive, result: dict) -> None:
     if not args.resume_receipt and (args.upload or args.upload_only):
         result["upload"] = upload_archive(archive, args.store_id, project, key)
     if "upload" in result:
-        result["retrieval"] = verify_search(archive, result["upload"], args.query, project, key)
-        result["status"] = "indexed_partial" if archive.gaps else "indexed_declared_scope"
+        result["retrieval"] = verify_search(
+            archive, result["upload"], args.query, project, key
+        )
+        result["status"] = (
+            "indexed_partial" if archive.gaps else "indexed_declared_scope"
+        )
         if result["retrieval"]["status"] != "verified_fragments":
             result["status"] = "retrieval_verification_failed"
 
@@ -981,7 +1079,9 @@ def main(argv: list[str] | None = None) -> int:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
         lock.close()
-        print('{"status":"blocked","error_code":"archive_writer_active","generation_requests":0}')
+        print(
+            '{"status":"blocked","error_code":"archive_writer_active","generation_requests":0}'
+        )
         return 1
     archive = CorpusArchive(args.archive_dir, args.repository)
     result = {"status": "collecting", "generation_requests": 0}
@@ -1009,7 +1109,11 @@ def main(argv: list[str] | None = None) -> int:
         lock.close()
     print(
         json.dumps(
-            {key: value for key, value in result.items() if key not in {"upload", "retrieval"}},
+            {
+                key: value
+                for key, value in result.items()
+                if key not in {"upload", "retrieval"}
+            },
             ensure_ascii=False,
         )
     )

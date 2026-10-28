@@ -77,7 +77,9 @@ def list_owned_conversations(user_id: str) -> list[ConversationView]:
     return _conversation_rows()
 
 
-def get_owned_conversation(conversation_id: str, user_id: str) -> Optional[ConversationView]:
+def get_owned_conversation(
+    conversation_id: str, user_id: str
+) -> Optional[ConversationView]:
     if not check_access(conversation_id, user_id):
         return None
     conversation_id = str(conversation_id)

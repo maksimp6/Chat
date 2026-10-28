@@ -39,7 +39,9 @@ class AuthorizedAndroidBridge(Protocol):
     def discover(self, request: DiscoveryRequest) -> DiscoveryResult: ...
 
 
-def discover_via_android(bridge: AuthorizedAndroidBridge | None, hostname: str) -> DiscoveryResult:
+def discover_via_android(
+    bridge: AuthorizedAndroidBridge | None, hostname: str
+) -> DiscoveryResult:
     """Fail closed if the authorized native bridge has not been provided."""
     if bridge is None:
         raise AndroidBridgeUnavailable("Android Network.bindSocket bridge unavailable")

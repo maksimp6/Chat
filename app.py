@@ -89,8 +89,10 @@ def _static_asset_version(root=None):
     """Fingerprint the served UI bytes, independently of file timestamps or overrides."""
     root = Path(root) if root is not None else Path(__file__).resolve().parent
     paths = sorted(
-        path for path in (root / "static").rglob("*")
-        if path.is_file() and path.suffix in {".js", ".css", ".svg", ".png", ".woff", ".woff2"}
+        path
+        for path in (root / "static").rglob("*")
+        if path.is_file()
+        and path.suffix in {".js", ".css", ".svg", ".png", ".woff", ".woff2"}
     )
     paths.extend(sorted((root / "templates").rglob("*.html")))
     digest = hashlib.sha256()
@@ -108,8 +110,18 @@ def _runtime_revision():
         return configured
     try:
         result = subprocess.run(
-            ["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "--verify", "HEAD"],
-            capture_output=True, text=True, timeout=2, check=False,
+            [
+                "git",
+                "-C",
+                str(Path(__file__).resolve().parent),
+                "rev-parse",
+                "--verify",
+                "HEAD",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
         )
         value = result.stdout.strip()
         if result.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", value):
@@ -250,7 +262,9 @@ def readyz():
     except Exception:
         app.logger.exception("Storage readiness failed")
         return jsonify({"status": "unavailable", "scope": "storage_read"}), 503
-    return jsonify({"status": "ok", "scope": "storage_read", "chat_write_verified": False})
+    return jsonify(
+        {"status": "ok", "scope": "storage_read", "chat_write_verified": False}
+    )
 
 
 @app.route("/api/version", methods=["GET"])
@@ -272,7 +286,9 @@ MODEL_DISCOVERY = get_model_discovery()
 def list_models():
     force_refresh = request.args.get("refresh", "").lower() in {"1", "true", "yes"}
     try:
-        catalog = annotate_catalog(MODEL_DISCOVERY.get_models(force_refresh=force_refresh))
+        catalog = annotate_catalog(
+            MODEL_DISCOVERY.get_models(force_refresh=force_refresh)
+        )
         catalog["degraded"] = False
         return jsonify(catalog)
     except ModelDiscoveryError:
@@ -366,7 +382,11 @@ def save_dialog_settings(conv_id):
         return jsonify({"error": "invalid_params", "message": message}), 400
     try:
         validate_generation_params(
-            {key: value for key, value in settings.items() if key != "previous_response_id"}
+            {
+                key: value
+                for key, value in settings.items()
+                if key != "previous_response_id"
+            }
         )
     except ValueError as exc:
         return jsonify({"error": "invalid_params", "message": str(exc)}), 400
@@ -384,7 +404,11 @@ def save_dialog_settings(conv_id):
     return jsonify({"status": "ok"})
 
 
-from agent_memory.manager import load_memory_config, save_memory_config, clear_global_memory
+from agent_memory.manager import (
+    load_memory_config,
+    save_memory_config,
+    clear_global_memory,
+)
 from agent_memory.extractor import list_global_memory_facts
 
 
@@ -423,7 +447,9 @@ def treasury_account():
 @app.route("/api/treasury/accounts", methods=["GET"])
 def treasury_accounts():
     """Keep all pre-existing ledgers discoverable without combining their balances."""
-    return jsonify({"accounts": list(get_store().items(prefix="treasury/account/").values())})
+    return jsonify(
+        {"accounts": list(get_store().items(prefix="treasury/account/").values())}
+    )
 
 
 @app.route("/api/treasury/top-up", methods=["POST"])
@@ -431,7 +457,9 @@ def treasury_top_up():
     data = request.get_json(silent=True) or {}
     try:
         owner_id = get_current_owner_id()
-        account = demo_top_up(owner_id, data.get("amount"), data.get("description", "Demo top-up"))
+        account = demo_top_up(
+            owner_id, data.get("amount"), data.get("description", "Demo top-up")
+        )
         return jsonify({"demo": True, "account": account}), 201
     except TreasuryIdentityError as exc:
         return jsonify({"error": str(exc)}), 401

@@ -81,7 +81,9 @@ class RdcTask(Generic[T]):
             self._calls += 1
             return callback()
 
-    def observe(self, observation_id: str, capture: Callable[[], T], *, max_age_s: float = 2) -> T:
+    def observe(
+        self, observation_id: str, capture: Callable[[], T], *, max_age_s: float = 2
+    ) -> T:
         """Capture only on demand; coalesce the same short-lived observation.
 
         A new explicit observation ID always requests fresh evidence. Cached
@@ -148,4 +150,6 @@ class RdcTask(Generic[T]):
                     self._completed = (operation_id, current)
                     return current
                 delay = min(delay * 2, 60)
-            raise ResultPending("existing RDC operation remains pending; keep its handle")
+            raise ResultPending(
+                "existing RDC operation remains pending; keep its handle"
+            )

@@ -20,7 +20,9 @@ from typing import Any, Protocol
 
 MAX_VIDEO_BYTES = 10 * 1024 * 1024 * 1024
 MIN_FREE_RESERVE = 512 * 1024 * 1024
-VALID_VIDEO = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,150}\.(mp4|avi|mkv)$", re.IGNORECASE)
+VALID_VIDEO = re.compile(
+    r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,150}\.(mp4|avi|mkv)$", re.IGNORECASE
+)
 JOB_ID = re.compile(r"^[a-f0-9]{32}$")
 FOLDER_ID = re.compile(r"^[A-Za-z0-9_-]{8,128}$")
 
@@ -41,8 +43,12 @@ class MediaProof:
 
 class DriveClient(Protocol):
     def quota(self) -> tuple[int | None, int | None]: ...
-    def lookup(self, filename: str, sha256: str, parent_id: str) -> dict[str, Any] | None: ...
-    def upload(self, source: Path, proof: MediaProof, parent_id: str) -> dict[str, Any]: ...
+    def lookup(
+        self, filename: str, sha256: str, parent_id: str
+    ) -> dict[str, Any] | None: ...
+    def upload(
+        self, source: Path, proof: MediaProof, parent_id: str
+    ) -> dict[str, Any]: ...
 
 
 def _check_video(source: Path, root: Path, owner: str, job_id: str) -> MediaProof:
@@ -71,7 +77,9 @@ def _check_video(source: Path, root: Path, owner: str, job_id: str) -> MediaProo
                 md5.update(block)
         if os.fstat(fd).st_size != size:
             raise ArchiveError("video changed while validating")
-        return MediaProof(filename, size, sha.hexdigest(), md5.hexdigest(), owner_hash, job_id)
+        return MediaProof(
+            filename, size, sha.hexdigest(), md5.hexdigest(), owner_hash, job_id
+        )
     finally:
         os.close(fd)
 
@@ -94,13 +102,17 @@ class VideoArchive:
             return self._verify(existing, proof, remote_name)
 
         limit, usage = self.drive.quota()
-        if limit is not None and (usage is None or limit - usage < proof.bytes + MIN_FREE_RESERVE):
+        if limit is not None and (
+            usage is None or limit - usage < proof.bytes + MIN_FREE_RESERVE
+        ):
             raise ArchiveError("Google Drive quota is too low; local video preserved")
         remote = self.drive.upload(video, proof, self.folder_id)
         return self._verify(remote, proof, remote_name)
 
     @staticmethod
-    def _verify(remote: dict[str, Any], proof: MediaProof, remote_name: str) -> dict[str, Any]:
+    def _verify(
+        remote: dict[str, Any], proof: MediaProof, remote_name: str
+    ) -> dict[str, Any]:
         if (
             not isinstance(remote, dict)
             or not isinstance(remote.get("id"), str)
@@ -165,11 +177,17 @@ class GoogleDriveResumableClient:
             )
             try:
                 with self._opener.open(request, timeout=60) as response:
-                    return response.status, dict(response.headers), response.read(1024 * 1024)
+                    return (
+                        response.status,
+                        dict(response.headers),
+                        response.read(1024 * 1024),
+                    )
             except urllib.error.HTTPError as error:
                 if error.code == 308:
                     return error.code, dict(error.headers), b""
-                raise ArchiveError("Drive API rejected request: HTTP " + str(error.code)) from None
+                raise ArchiveError(
+                    "Drive API rejected request: HTTP " + str(error.code)
+                ) from None
         except ArchiveError:
             raise
         except (OSError, ValueError, urllib.error.URLError):
@@ -185,10 +203,17 @@ class GoogleDriveResumableClient:
         quota = data.get("storageQuota", {})
         limit = quota.get("limit")
         used = quota.get("usage")
-        return (int(limit) if limit is not None else None, int(used) if used is not None else None)
+        return (
+            int(limit) if limit is not None else None,
+            int(used) if used is not None else None,
+        )
 
-    def lookup(self, filename: str, sha256: str, parent_id: str) -> dict[str, Any] | None:
-        if not FOLDER_ID.fullmatch(parent_id) or not re.fullmatch(r"[a-f0-9]{64}", sha256):
+    def lookup(
+        self, filename: str, sha256: str, parent_id: str
+    ) -> dict[str, Any] | None:
+        if not FOLDER_ID.fullmatch(parent_id) or not re.fullmatch(
+            r"[a-f0-9]{64}", sha256
+        ):
             raise ArchiveError("invalid Drive parent/hash")
         escaped = filename.replace("\\", "\\\\").replace("'", "\\'")
         query = f"'{parent_id}' in parents and name = '{escaped}' and trashed = false"
@@ -208,7 +233,9 @@ class GoogleDriveResumableClient:
             raise ArchiveError("Drive listing failed")
         data = json.loads(raw)
         files = data.get("files", [])
-        matching = [f for f in files if f.get("appProperties", {}).get("sha256") == sha256]
+        matching = [
+            f for f in files if f.get("appProperties", {}).get("sha256") == sha256
+        ]
         if len(matching) > 1 or (files and not matching):
             raise ArchiveError("conflicting or ambiguous Drive video metadata")
         return matching[0] if matching else None
@@ -273,15 +300,21 @@ class GoogleDriveResumableClient:
                 )
                 if code in (200, 201):
                     if end != proof.bytes - 1:
-                        raise ArchiveError("Drive completed before entire recording was uploaded")
+                        raise ArchiveError(
+                            "Drive completed before entire recording was uploaded"
+                        )
                     output = json.loads(result)
                     if not isinstance(output, dict):
                         raise ArchiveError("invalid Drive upload metadata")
                     return output
                 if code != 308:
                     raise ArchiveError("Drive upload returned an unexpected status")
-                received = response_headers.get("Range") or response_headers.get("range")
+                received = response_headers.get("Range") or response_headers.get(
+                    "range"
+                )
                 if received != f"bytes=0-{end}":
-                    raise ArchiveError("ambiguous resumable upload offset; do not retry blindly")
+                    raise ArchiveError(
+                        "ambiguous resumable upload offset; do not retry blindly"
+                    )
                 offset = end + 1
         raise ArchiveError("video upload ended without remote verification")

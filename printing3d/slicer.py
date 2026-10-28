@@ -106,7 +106,10 @@ def _read_ascii_stl(data: bytes) -> list[Triangle]:
                 raise SliceError("invalid vertex coordinate in ASCII STL") from exc
     if not vertices or len(vertices) % 3:
         raise SliceError("ASCII STL has no complete triangles")
-    return [(vertices[i], vertices[i + 1], vertices[i + 2]) for i in range(0, len(vertices), 3)]
+    return [
+        (vertices[i], vertices[i + 1], vertices[i + 2])
+        for i in range(0, len(vertices), 3)
+    ]
 
 
 def _slice_triangle(triangle: Triangle, z: float) -> tuple[Point, Point] | None:
@@ -157,7 +160,9 @@ def _chain_loops(segments: Sequence[tuple[Point, Point]]) -> list[list[Point]]:
 
 
 def _slice_layer(triangles: Sequence[Triangle], z: float) -> list[list[Point]]:
-    segments = [seg for tri in triangles if (seg := _slice_triangle(tri, z)) is not None]
+    segments = [
+        seg for tri in triangles if (seg := _slice_triangle(tri, z)) is not None
+    ]
     return _chain_loops(segments) if segments else []
 
 
@@ -288,7 +293,9 @@ def slice_stl(data: bytes, options: SliceOptions | None = None) -> SliceResult:
         "filament_volume_mm3": round(writer.volume_mm3, 3),
         "filament_grams": round(writer.volume_mm3 / 1000 * FILAMENT_DENSITY_G_CM3, 3),
         "print_time_s": round(
-            writer.extrude_mm / options.print_speed + writer.travel_mm / options.travel_speed, 1
+            writer.extrude_mm / options.print_speed
+            + writer.travel_mm / options.travel_speed,
+            1,
         ),
     }
     return SliceResult(gcode="\n".join(writer.lines) + "\n", stats=stats)
@@ -312,7 +319,9 @@ def _header(options: SliceOptions) -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     if not args or len(args) > 2:
-        print("usage: python -m printing3d.slicer MODEL.stl [OUT.gcode]", file=sys.stderr)
+        print(
+            "usage: python -m printing3d.slicer MODEL.stl [OUT.gcode]", file=sys.stderr
+        )
         return 2
     source = Path(args[0])
     result = slice_stl(source.read_bytes())

@@ -192,9 +192,15 @@ TRACE = _object(
 CONTRACTS = {
     "runtime.profile.list.response": _object({"profiles": _list(SESSION_PROFILE)}),
     "runtime.profile.response": SESSION_PROFILE,
-    "runtime.profile.clone.request": _object(optional={"name": _nullable(NONEMPTY_STRING)}),
-    "runtime.profile.clone.response": _object({"session": SESSION, "profile": SESSION_PROFILE}),
-    "runtime.session.create.request": _object(optional={"metadata": _nullable(JSON_OBJECT)}),
+    "runtime.profile.clone.request": _object(
+        optional={"name": _nullable(NONEMPTY_STRING)}
+    ),
+    "runtime.profile.clone.response": _object(
+        {"session": SESSION, "profile": SESSION_PROFILE}
+    ),
+    "runtime.session.create.request": _object(
+        optional={"metadata": _nullable(JSON_OBJECT)}
+    ),
     "runtime.session.response": SESSION,
     "runtime.session.detail.response": SESSION_DETAIL,
     "runtime.invocation.create.request": _object(
@@ -206,7 +212,9 @@ CONTRACTS = {
     "runtime.invocation.status.response": INVOCATION_STATUS,
     "runtime.invocation.trace.response": TRACE,
     "runtime.error.basic": _object({"error": NONEMPTY_STRING}),
-    "runtime.error.message": _object({"error": NONEMPTY_STRING, "message": NONEMPTY_STRING}),
+    "runtime.error.message": _object(
+        {"error": NONEMPTY_STRING, "message": NONEMPTY_STRING}
+    ),
     "runtime.error.invalid_request": _object(
         {
             "error": _enum("invalid_request"),
@@ -247,42 +255,56 @@ def _validate(spec: Mapping[str, Any], value: Any, path: str) -> None:
 
     if kind == "string":
         if not isinstance(value, str):
-            raise ContractViolation(f"{path}: expected string, got {type(value).__name__}")
+            raise ContractViolation(
+                f"{path}: expected string, got {type(value).__name__}"
+            )
         if spec.get("min_length") and len(value.strip()) < spec["min_length"]:
             raise ContractViolation(f"{path}: string must not be empty")
         return
 
     if kind == "integer":
         if isinstance(value, bool) or not isinstance(value, int):
-            raise ContractViolation(f"{path}: expected integer, got {type(value).__name__}")
+            raise ContractViolation(
+                f"{path}: expected integer, got {type(value).__name__}"
+            )
         return
 
     if kind == "number":
         if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise ContractViolation(f"{path}: expected number, got {type(value).__name__}")
+            raise ContractViolation(
+                f"{path}: expected number, got {type(value).__name__}"
+            )
         return
 
     if kind == "boolean":
         if not isinstance(value, bool):
-            raise ContractViolation(f"{path}: expected boolean, got {type(value).__name__}")
+            raise ContractViolation(
+                f"{path}: expected boolean, got {type(value).__name__}"
+            )
         return
 
     if kind == "array":
         if not isinstance(value, list):
-            raise ContractViolation(f"{path}: expected array, got {type(value).__name__}")
+            raise ContractViolation(
+                f"{path}: expected array, got {type(value).__name__}"
+            )
         for index, item in enumerate(value):
             _validate(spec["items"], item, f"{path}[{index}]")
         return
 
     if kind == "object":
         if not isinstance(value, dict):
-            raise ContractViolation(f"{path}: expected object, got {type(value).__name__}")
+            raise ContractViolation(
+                f"{path}: expected object, got {type(value).__name__}"
+            )
 
         required = spec.get("required", {})
         optional = spec.get("optional", {})
         missing = sorted(set(required) - set(value))
         if missing:
-            raise ContractViolation(f"{path}: missing required fields: {', '.join(missing)}")
+            raise ContractViolation(
+                f"{path}: missing required fields: {', '.join(missing)}"
+            )
 
         known = set(required) | set(optional)
         extras = sorted(set(value) - known)
@@ -320,4 +342,6 @@ def _validate_json(value: Any, path: str) -> None:
                 raise ContractViolation(f"{path}: JSON object keys must be strings")
             _validate_json(item, f"{path}.{key}")
         return
-    raise ContractViolation(f"{path}: value is not JSON-compatible: {type(value).__name__}")
+    raise ContractViolation(
+        f"{path}: value is not JSON-compatible: {type(value).__name__}"
+    )

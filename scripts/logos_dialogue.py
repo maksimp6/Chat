@@ -34,7 +34,12 @@ from invocation.manager import (
 from invocation.trace import create_invocation_trace
 from storage.memory_db import DatabaseError
 from yandex_client_modules.errors import YandexClientError
-from scripts.logos_quality import MODEL, OWNER_DIRECTIVE, capability_receipt, dialogue_params
+from scripts.logos_quality import (
+    MODEL,
+    OWNER_DIRECTIVE,
+    capability_receipt,
+    dialogue_params,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MODEL = MODEL
@@ -59,7 +64,9 @@ RUNTIME_ERRORS = (
 )
 
 
-def build_prompt(question: str, repo_root: Path, context_packet: dict | None = None) -> str:
+def build_prompt(
+    question: str, repo_root: Path, context_packet: dict | None = None
+) -> str:
     if context_packet is not None:
         from scripts.logos_context import render_context
 
@@ -130,7 +137,9 @@ def _ask(client, prompt: str, trace, result: dict[str, Any], params: dict) -> No
     if response.get("id") and response["id"] not in result["response_ids"]:
         result["response_ids"].append(response["id"])
     pending = extract_function_calls(response)
-    result["pending_tools"] = sorted({call.get("name") or "unknown" for call in pending})
+    result["pending_tools"] = sorted(
+        {call.get("name") or "unknown" for call in pending}
+    )
     result["provider_status"] = "unknown"
     _provider_diagnostics(result, response)
     if result["provider_error_present"]:
@@ -145,7 +154,9 @@ def _ask(client, prompt: str, trace, result: dict[str, Any], params: dict) -> No
         raise RuntimeError("Provider returned no answer")
 
 
-def _checkpoint_response(result: dict[str, Any], response: dict, path: Path | None) -> None:
+def _checkpoint_response(
+    result: dict[str, Any], response: dict, path: Path | None
+) -> None:
     """Persist known response identity before a long poll, never retry a generation."""
     response_id = response.get("id")
     if isinstance(response_id, str) and response_id not in result["response_ids"]:
@@ -156,7 +167,9 @@ def _checkpoint_response(result: dict[str, Any], response: dict, path: Path | No
     if path is not None:
         snapshot = {**result, "status": "running"}
         temporary = path.with_suffix(path.suffix + ".tmp")
-        temporary.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+        temporary.write_text(
+            json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         os.replace(temporary, path)
 
 
@@ -198,7 +211,11 @@ def _response_evidence(responses: list[dict], result: dict[str, Any]) -> None:
                 "file_search_call",
                 "code_interpreter_call",
             }:
-                evidence = {key: output[key] for key in ("type", "id", "status") if key in output}
+                evidence = {
+                    key: output[key]
+                    for key in ("type", "id", "status")
+                    if key in output
+                }
                 if evidence not in result["hosted_tool_calls"]:
                     result["hosted_tool_calls"].append(evidence)
         _provider_echo(result, raw)
@@ -208,7 +225,9 @@ def _finish(invocation, trace, result: dict[str, Any]) -> None:
     finalized = trace.finalize()
     # Export independent runtime evidence before any durable write. A storage
     # failure must never erase completed provider/tool execution from the report.
-    result["tool_calls"] = [_tool_evidence(entry) for entry in finalized.get("tool_calls", [])]
+    result["tool_calls"] = [
+        _tool_evidence(entry) for entry in finalized.get("tool_calls", [])
+    ]
     result["approval_refused_tools"] = sorted(
         {item["name"] for item in result["tool_calls"] if item.get("approval_required")}
     )
@@ -220,7 +239,9 @@ def _finish(invocation, trace, result: dict[str, Any]) -> None:
         _provider_diagnostics(result, responses[-1]["raw"])
         if result["provider_error_present"] and result["status"] != "retrieved":
             result.update(status="failed", error="ProviderResponseError")
-    response_ids = [item["response_id"] for item in responses if item.get("response_id")]
+    response_ids = [
+        item["response_id"] for item in responses if item.get("response_id")
+    ]
     result["response_ids"] = list(dict.fromkeys(response_ids + result["response_ids"]))
     if any((item.get("raw") or {}).get("usage") for item in responses):
         billing = finalized.get("billing") or {}
@@ -248,7 +269,9 @@ def _finish(invocation, trace, result: dict[str, Any]) -> None:
                 "verification_scope": "provider_reply_and_invocation_persistence",
             }
         if result["status"] in {"failed", "incomplete"}:
-            saved = fail_invocation(invocation.invocation_id, error={"type": result["error"]})
+            saved = fail_invocation(
+                invocation.invocation_id, error={"type": result["error"]}
+            )
         else:
             saved = finish_invocation(invocation.invocation_id, result=result)
         if not saved:
@@ -270,7 +293,9 @@ def _finish(invocation, trace, result: dict[str, Any]) -> None:
             reason=reasons.get(str(exc), "unclassified"),
         )
         if "checkpoint" in result:
-            result["checkpoint"].update(state="finalization_failed", reply_verified=False)
+            result["checkpoint"].update(
+                state="finalization_failed", reply_verified=False
+            )
         raise
 
 
@@ -304,7 +329,9 @@ def _safe_validation_fields(error: dict) -> dict:
             re.IGNORECASE,
         )
         if hints:
-            fields["constraint_hints"] = {key.lower(): int(value) for key, value in hints}
+            fields["constraint_hints"] = {
+                key.lower(): int(value) for key, value in hints
+            }
     return fields
 
 
@@ -324,7 +351,9 @@ def run_dialogue(
         enforce_native_launch_hold()
         if not question.strip():
             raise ValueError("The question must not be empty")
-        if not isinstance(context_packet, dict) or not isinstance(knowledge_receipt, dict):
+        if not isinstance(context_packet, dict) or not isinstance(
+            knowledge_receipt, dict
+        ):
             raise ValueError("Native dialogue requires full context and prepared RAG")
         from scripts.logos_context import verify_checkout
 
@@ -342,7 +371,9 @@ def run_dialogue(
 
         if knowledge_receipt.get("status") != "indexed":
             raise ValueError("Knowledge preparation is incomplete")
-        if knowledge_receipt.get("context_sha256") != context_packet.get("packet_sha256"):
+        if knowledge_receipt.get("context_sha256") != context_packet.get(
+            "packet_sha256"
+        ):
             raise ValueError("Knowledge and initial context must be the same snapshot")
         vector_ids = knowledge_receipt["vector_store_ids"]
         params = dialogue_params(vector_ids, list(registry.get_available_categories()))
@@ -355,7 +386,9 @@ def run_dialogue(
             "context_manifest": (context_packet or {}).get("manifest"),
             "context_status": "complete" if context_packet else "local_rules_only",
         }
-        result["capability_receipt"]["knowledge"] = knowledge_receipt or {"status": "not_prepared"}
+        result["capability_receipt"]["knowledge"] = knowledge_receipt or {
+            "status": "not_prepared"
+        }
         params["on_provider_response"] = lambda response: _checkpoint_response(
             result, response, checkpoint_file
         )
@@ -378,7 +411,9 @@ def run_dialogue(
         if isinstance(exc, NativeLogosLaunchBlocked):
             result["launch_hold"] = hold_receipt()
         if trace is not None:
-            trace.record_error("logos_dialogue", "Dialogue failed", error_type=type(exc).__name__)
+            trace.record_error(
+                "logos_dialogue", "Dialogue failed", error_type=type(exc).__name__
+            )
     if trace is not None and invocation is not None:
         try:
             _finish(invocation, trace, result)
@@ -402,7 +437,10 @@ def _stored_reply(result: dict[str, Any], response: dict[str, Any]) -> None:
         )
         receipt = {
             "response_id": response.get("id"),
-            **{key: result[key] for key in ("reply", "reply_state", "reply_chars", "reply_sha256")},
+            **{
+                key: result[key]
+                for key in ("reply", "reply_state", "reply_chars", "reply_sha256")
+            },
         }
         replies = result.setdefault("assistant_replies", [])
         if receipt not in replies:
@@ -424,7 +462,9 @@ def inspect_response(
         response_id = str(uuid.UUID(response_id))
         result["response_ids"] = [response_id]
         import app  # noqa: F401 -- initialize the native credential and invocation store
-        from yandex_client_modules.request_mixin import _resolve_global_provider_credential
+        from yandex_client_modules.request_mixin import (
+            _resolve_global_provider_credential,
+        )
 
         session_id = "github-response-" + str(uuid.uuid4())
         invocation = create_invocation(
@@ -440,7 +480,9 @@ def inspect_response(
         client = (client_factory or _native_client)()
         _resolve_global_provider_credential(client, trace)
         result["retrieval_requests"] = 1
-        response = client.session.get(client.responses_url + "/" + response_id, timeout=15)
+        response = client.session.get(
+            client.responses_url + "/" + response_id, timeout=15
+        )
         result["http_status"] = response.status_code
         response.raise_for_status()
         data = response.json()
@@ -487,19 +529,25 @@ def main(argv: list[str] | None = None) -> int:
             result.update(status="blocked", error=GENERATION_BLOCKED)
         else:
             if args.context_file is None or args.knowledge_file is None:
-                raise ValueError("Native dialogue requires full context and prepared RAG")
+                raise ValueError(
+                    "Native dialogue requires full context and prepared RAG"
+                )
             from scripts.logos_context import load_context
 
             result = run_dialogue(
                 args.question_file.read_text(encoding="utf-8"),
                 context_packet=load_context(args.context_file),
-                knowledge_receipt=json.loads(args.knowledge_file.read_text(encoding="utf-8")),
+                knowledge_receipt=json.loads(
+                    args.knowledge_file.read_text(encoding="utf-8")
+                ),
                 checkpoint_file=args.out,
             )
     except RUNTIME_ERRORS as exc:
         result = _new_result()
         result["error"] = type(exc).__name__
-    args.out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    args.out.write_text(
+        json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     print("LOGOS_RESULT=" + json.dumps(result, ensure_ascii=False))
     return 0 if result["status"] in {"completed", "retrieved"} else 1
 

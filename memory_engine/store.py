@@ -18,7 +18,11 @@ from pathlib import Path
 from threading import RLock, get_ident
 from typing import Any, Iterator, Protocol, TypeVar
 
-from kristall.value_validation import walk_value, validate_json_values, validate_journal_changes
+from kristall.value_validation import (
+    walk_value,
+    validate_json_values,
+    validate_journal_changes,
+)
 
 
 MAX_JOURNAL_FRAME_BYTES = 1024 * 1024  # 1 MiB including newline
@@ -139,7 +143,9 @@ def _open_directory_nofollow(directory: Path, *, trusted: bool | None = None) ->
             _verify_trusted_ancestor(fd)
             previous_mount = _trusted_mount_id(fd)
         for part in absolute.parts[1:]:
-            next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            next_fd = os.open(
+                part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd
+            )
             try:
                 if trusted:
                     _verify_trusted_ancestor(next_fd)
@@ -238,13 +244,17 @@ class _JournalStore:
 
     def __init__(self, path: str | Path, *, trusted: bool | None = None) -> None:
         self._trusted = (
-            (env_get("LOGOS_MEMORY_TRUSTED_ROOT") == "1") if trusted is None else trusted
+            (env_get("LOGOS_MEMORY_TRUSTED_ROOT") == "1")
+            if trusted is None
+            else trusted
         )
         self._pid = os.getpid()
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            self._directory_fd = _open_directory_nofollow(self.path.parent, trusted=self._trusted)
+            self._directory_fd = _open_directory_nofollow(
+                self.path.parent, trusted=self._trusted
+            )
             if self._trusted:
                 _verify_trusted_root(self._directory_fd)
             self._journal_name = self.path.name
@@ -409,7 +419,9 @@ class _JournalStore:
 
     def _encode_frame(self, changes: list[dict[str, Any]]) -> tuple[bytes, str]:
         for change in changes:
-            if not isinstance(change["namespace"], str) or not isinstance(change["key"], str):
+            if not isinstance(change["namespace"], str) or not isinstance(
+                change["key"], str
+            ):
                 raise StoreError("namespace and key must be strings")
             if change["op"] == "set":
                 _validate_value(change["value"])
@@ -454,7 +466,10 @@ class _JournalStore:
                 self._journal_name, dir_fd=self._directory_fd, follow_symlinks=False
             )
             opened_stat = os.fstat(fd)
-            if (path_stat.st_dev, path_stat.st_ino) != (opened_stat.st_dev, opened_stat.st_ino):
+            if (path_stat.st_dev, path_stat.st_ino) != (
+                opened_stat.st_dev,
+                opened_stat.st_ino,
+            ):
                 raise StoreError("journal path replaced; recovery required")
             if os.write(fd, frame) != len(frame):
                 raise OSError("short journal write")
@@ -462,7 +477,10 @@ class _JournalStore:
             path_stat = os.stat(
                 self._journal_name, dir_fd=self._directory_fd, follow_symlinks=False
             )
-            if (path_stat.st_dev, path_stat.st_ino) != (opened_stat.st_dev, opened_stat.st_ino):
+            if (path_stat.st_dev, path_stat.st_ino) != (
+                opened_stat.st_dev,
+                opened_stat.st_ino,
+            ):
                 raise StoreError("journal path replaced; recovery required")
             os.fsync(self._directory_fd)
         except (OSError, StoreError) as exc:
@@ -507,7 +525,14 @@ class _JournalStore:
                 raise StoreError("direct mutation during transaction is forbidden")
             _validate_value_shape(value)
             self._commit_changes(
-                [{"op": "set", "namespace": namespace, "key": key, "value": deepcopy(value)}]
+                [
+                    {
+                        "op": "set",
+                        "namespace": namespace,
+                        "key": key,
+                        "value": deepcopy(value),
+                    }
+                ]
             )
 
     def delete(self, namespace: str, key: str) -> None:
@@ -561,17 +586,25 @@ class _JournalStore:
             )
             temp_name = ".logos-copy-" + os.urandom(16).hex()
             temp_fd = _open_journal_nofollow(
-                target_dir, temp_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, trusted=trusted
+                target_dir,
+                temp_name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                trusted=trusted,
             )
             with os.fdopen(source_fd, "rb") as existing:
                 with os.fdopen(temp_fd, "wb") as output:
                     shutil.copyfileobj(existing, output)
                     output.flush()
                     os.fsync(output.fileno())
-            verify_fd = _open_journal_nofollow(target_dir, temp_name, os.O_RDONLY, trusted=trusted)
+            verify_fd = _open_journal_nofollow(
+                target_dir, temp_name, os.O_RDONLY, trusted=trusted
+            )
             with os.fdopen(verify_fd, "rb") as verified:
                 actual_state, sequence, digest = _JournalStore._inspect_stream(verified)
-                if actual_state != expected_state or Commit(sequence, digest) != expected_commit:
+                if (
+                    actual_state != expected_state
+                    or Commit(sequence, digest) != expected_commit
+                ):
                     raise StoreError("backup integrity mismatch")
                 # Linux procfs names the already-verified open inode, not the
                 # attacker-replaceable temporary basename. Fail closed if procfs
@@ -582,9 +615,14 @@ class _JournalStore:
                     dst_dir_fd=target_dir,
                     follow_symlinks=True,
                 )
-                published = os.stat(destination.name, dir_fd=target_dir, follow_symlinks=False)
+                published = os.stat(
+                    destination.name, dir_fd=target_dir, follow_symlinks=False
+                )
                 pinned = os.fstat(verified.fileno())
-                if (published.st_dev, published.st_ino) != (pinned.st_dev, pinned.st_ino):
+                if (published.st_dev, published.st_ino) != (
+                    pinned.st_dev,
+                    pinned.st_ino,
+                ):
                     raise StoreError("published backup inode mismatch")
                 os.fsync(target_dir)
         except FileExistsError as exc:
@@ -622,7 +660,11 @@ class _JournalStore:
             self._ensure_open()
             if self._failed or self._active_transaction:
                 raise StoreError("restore requires a healthy idle store")
-            if self._sequence or self._state or (self.path.exists() and self.path.stat().st_size):
+            if (
+                self._sequence
+                or self._state
+                or (self.path.exists() and self.path.stat().st_size)
+            ):
                 raise StoreError("restore destination is not empty")
             origin = Path(source)
             if origin.resolve() == self.path.resolve():
@@ -632,7 +674,11 @@ class _JournalStore:
             state, sequence, digest = self._inspect_log(origin, trusted=self._trusted)
             try:
                 self._copy_verified_file(
-                    origin, self.path, state, Commit(sequence, digest), trusted=self._trusted
+                    origin,
+                    self.path,
+                    state,
+                    Commit(sequence, digest),
+                    trusted=self._trusted,
                 )
             except OSError as exc:
                 self._failed = True
@@ -784,7 +830,9 @@ class Transaction:
     def get(self, name: str) -> Any | None:
         self._ensure_open()
         _validate_name(name)
-        return deepcopy(self._pending[name] if name in self._pending else self._committed.get(name))
+        return deepcopy(
+            self._pending[name] if name in self._pending else self._committed.get(name)
+        )
 
     def set(self, name: str, value: Any) -> None:
         self._ensure_open()
@@ -837,9 +885,12 @@ class _JournalTransaction:
     def delete(self, namespace: str, key: str) -> None:
         """Stage a key deletion without changing committed RAM state."""
         self._ensure_open()
-        self._changes[(namespace, key)] = {"op": "delete", "namespace": namespace, "key": key}
+        self._changes[(namespace, key)] = {
+            "op": "delete",
+            "namespace": namespace,
+            "key": key,
+        }
 
     def _pending_changes(self) -> list[dict[str, Any]]:
         self._ensure_open()
         return [self._changes[key] for key in sorted(self._changes)]
-

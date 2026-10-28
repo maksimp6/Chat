@@ -1,4 +1,5 @@
 """Runner-side IAM issuance and local app delivery. Never invokes a model."""
+
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
@@ -33,9 +34,15 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def request_json(method, url, headers=None, payload=None):
     data = json.dumps(payload).encode() if payload is not None else None
-    req = urllib.request.Request(url, data=data, headers={
-        "Content-Type": "application/json", **(headers or {}),
-    }, method=method)
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={
+            "Content-Type": "application/json",
+            **(headers or {}),
+        },
+        method=method,
+    )
     # Loopback delivery must not pass through an inherited proxy.
     handlers = [NoRedirect()]
     if url.startswith(APP):
@@ -58,7 +65,9 @@ def request_json(method, url, headers=None, payload=None):
 def _expired(credential):
     """True when the stored provider key has passed its expiry, so a new key may replace it."""
     try:
-        expires = datetime.fromisoformat(str((credential or {}).get("expires_at")).replace("Z", "+00:00"))
+        expires = datetime.fromisoformat(
+            str((credential or {}).get("expires_at")).replace("Z", "+00:00")
+        )
     except ValueError:
         return False
     return expires.tzinfo is not None and expires <= datetime.now(timezone.utc)
@@ -76,7 +85,9 @@ def issue_and_deliver(env, pending, call=request_json):
         raise Failed("previous_issuance_requires_review")
     local_headers = {}
     if env.get("LOGOS_PROVIDER_CREDENTIALS_TOKEN"):
-        local_headers["Authorization"] = "Bearer " + env["LOGOS_PROVIDER_CREDENTIALS_TOKEN"]
+        local_headers["Authorization"] = (
+            "Bearer " + env["LOGOS_PROVIDER_CREDENTIALS_TOKEN"]
+        )
     status = call("GET", APP + "/issuance-status", local_headers)
     if status.get("encryption_ready") is not True:
         raise Failed("app_encryption_not_ready")
@@ -93,13 +104,20 @@ def issue_and_deliver(env, pending, call=request_json):
     with pending.open("x") as f:
         os.chmod(pending, 0o600)
         json.dump({"state": "issuance_started", "at": now.isoformat()}, f)
-        f.flush(); os.fsync(f.fileno())
+        f.flush()
+        os.fsync(f.fileno())
     try:
-        result = call("POST", IAM + "/apiKeys", headers, {
-            "serviceAccountId": env[names[1]], "scopes": [SCOPE],
-            "description": "Logos Redmi 9 runner-issued model key",
-            "expiresAt": expires.isoformat().replace("+00:00", "Z"),
-        })
+        result = call(
+            "POST",
+            IAM + "/apiKeys",
+            headers,
+            {
+                "serviceAccountId": env[names[1]],
+                "scopes": [SCOPE],
+                "description": "Logos Redmi 9 runner-issued model key",
+                "expiresAt": expires.isoformat().replace("+00:00", "Z"),
+            },
+        )
     except HTTPFailure as exc:
         if exc.status in (400, 401, 403, 404, 429):
             pending.unlink()
@@ -112,19 +130,24 @@ def issue_and_deliver(env, pending, call=request_json):
         raise Failed("iam_response_missing_key_id")
     with pending.open("w") as f:
         json.dump({"state": "issued_pending_delivery", "provider_key_id": key_id}, f)
-        f.flush(); os.fsync(f.fileno())
+        f.flush()
+        os.fsync(f.fileno())
     if not isinstance(secret, str) or not secret:
         raise Failed("iam_response_missing_secret")
     try:
         actual_expiry = datetime.fromisoformat(meta["expiresAt"].replace("Z", "+00:00"))
-        if (meta.get("serviceAccountId") != env[names[1]]
-                or meta.get("scopes") != [SCOPE]
-                or actual_expiry != expires):
+        if (
+            meta.get("serviceAccountId") != env[names[1]]
+            or meta.get("scopes") != [SCOPE]
+            or actual_expiry != expires
+        ):
             raise ValueError()
     except (KeyError, TypeError, ValueError):
         raise Failed("iam_key_metadata_mismatch") from None
     payload = {
-        "api_key": secret, "project_id": env[names[2]], "provider_key_id": key_id,
+        "api_key": secret,
+        "project_id": env[names[2]],
+        "provider_key_id": key_id,
         "issued_at": meta.get("createdAt", now.isoformat()),
         "expires_at": meta["expiresAt"],
     }
@@ -140,22 +163,31 @@ def issue_and_deliver(env, pending, call=request_json):
         raise Failed("app_delivery_outcome_unknown") from None
     except Failed:
         raise Failed("app_delivery_outcome_unknown") from None
-    if (receipt.get("storage_verified") is not True
-            or receipt.get("fingerprint") != fingerprint
-            or receipt.get("provider_key_id") != key_id
-            or receipt.get("authorization_ok") is not False):
+    if (
+        receipt.get("storage_verified") is not True
+        or receipt.get("fingerprint") != fingerprint
+        or receipt.get("provider_key_id") != key_id
+        or receipt.get("authorization_ok") is not False
+    ):
         raise Failed("app_receipt_mismatch")
     current = call("GET", APP + "/issuance-status", local_headers)
     stored = current.get("credential") or {}
-    if (current.get("configured") is not True or stored.get("fingerprint") != fingerprint
-            or stored.get("provider_key_id") != key_id
-            or stored.get("project_id") != env[names[2]]):
+    if (
+        current.get("configured") is not True
+        or stored.get("fingerprint") != fingerprint
+        or stored.get("provider_key_id") != key_id
+        or stored.get("project_id") != env[names[2]]
+    ):
         raise Failed("app_readback_mismatch")
     pending.unlink()
     return {
-        "status": "stored", "provider": "yandex", "provider_key_id": key_id,
-        "fingerprint": fingerprint, "expires_at": receipt.get("expires_at"),
-        "storage_verified": True, "model_request_sent": False,
+        "status": "stored",
+        "provider": "yandex",
+        "provider_key_id": key_id,
+        "fingerprint": fingerprint,
+        "expires_at": receipt.get("expires_at"),
+        "storage_verified": True,
+        "model_request_sent": False,
     }
 
 
@@ -165,11 +197,23 @@ def main():
     try:
         result = issue_and_deliver(os.environ, pending)
     except Failed as exc:
-        print(json.dumps({"status": "blocked", "error": exc.code, "model_request_sent": False}))
+        print(
+            json.dumps(
+                {"status": "blocked", "error": exc.code, "model_request_sent": False}
+            )
+        )
         return 1
     except Exception:
         # Never print a traceback containing request bodies or authentication headers.
-        print(json.dumps({"status": "blocked", "error": "issuance_failed", "model_request_sent": False}))
+        print(
+            json.dumps(
+                {
+                    "status": "blocked",
+                    "error": "issuance_failed",
+                    "model_request_sent": False,
+                }
+            )
+        )
         return 1
     print(json.dumps(result))
     return 0

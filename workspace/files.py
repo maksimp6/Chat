@@ -72,7 +72,11 @@ class YandexFileManagerMixin:
                     )
                     api_logger.warning(
                         "[FILES/VS] %s attempt %s/%s on %s %s",
-                        message, len(retry.history) + 1, retries + 1, method, url,
+                        message,
+                        len(retry.history) + 1,
+                        retries + 1,
+                        method,
+                        url,
                     )
                     try:
                         # The adapter never retries internally: each attempt,
@@ -81,7 +85,11 @@ class YandexFileManagerMixin:
                     except MaxRetryError:
                         # A provider that does not answer in time is a gateway timeout (504), so the
                         # client can say that the file may already have been saved.
-                        status = 504 if isinstance(exc, requests.exceptions.Timeout) else None
+                        status = (
+                            504
+                            if isinstance(exc, requests.exceptions.Timeout)
+                            else None
+                        )
                         raise YandexClientError(message, status_code=status) from exc
                     retry.sleep()
         finally:
@@ -109,9 +117,13 @@ class YandexFileManagerMixin:
                 f"{context}: File too large (max 128 MB) (413)", status_code=413
             )
         if status in (401, 403):
-            raise YandexClientError(f"{context}: Auth failed ({status})", status_code=502)
+            raise YandexClientError(
+                f"{context}: Auth failed ({status})", status_code=502
+            )
         if status == 429:
-            raise YandexClientError(f"{context}: Rate limit (429): {err_msg}", status_code=429)
+            raise YandexClientError(
+                f"{context}: Rate limit (429): {err_msg}", status_code=429
+            )
         raise YandexClientError(
             f"{context} failed (HTTP {status}): {err_msg}",
             status_code=502 if status >= 500 else 400,
@@ -145,7 +157,9 @@ class YandexFileManagerMixin:
         if resp.status_code >= 400:
             self._fm_handle_error(resp, "Upload file")
         result = resp.json()
-        api_logger.info(f"[FILES] Uploaded: id={result.get('id')}, bytes={result.get('bytes')}")
+        api_logger.info(
+            f"[FILES] Uploaded: id={result.get('id')}, bytes={result.get('bytes')}"
+        )
         return result
 
     def delete_file(self, file_id):
@@ -174,12 +188,16 @@ class YandexFileManagerMixin:
 
     def list_vector_stores(self, limit=100):
         api_logger.info(f"[VS] List (limit={limit})")
-        resp = self._fm_request("GET", f"{self.base_url}/vector_stores", params={"limit": limit})
+        resp = self._fm_request(
+            "GET", f"{self.base_url}/vector_stores", params={"limit": limit}
+        )
         if resp.status_code >= 400:
             self._fm_handle_error(resp, "List VS")
         return resp.json()
 
-    def create_vector_store(self, name, file_ids=None, chunking_strategy=None, expires_after=None):
+    def create_vector_store(
+        self, name, file_ids=None, chunking_strategy=None, expires_after=None
+    ):
         api_logger.info(f"[VS] Create: {name}")
         payload = {"name": name}
         if file_ids:
@@ -235,7 +253,9 @@ class YandexFileManagerMixin:
 
     def remove_file_from_vs(self, vs_id, file_id):
         api_logger.info(f"[VS] Remove file {file_id} from {vs_id}")
-        resp = self._fm_request("DELETE", f"{self.base_url}/vector_stores/{vs_id}/files/{file_id}")
+        resp = self._fm_request(
+            "DELETE", f"{self.base_url}/vector_stores/{vs_id}/files/{file_id}"
+        )
         if resp.status_code >= 400:
             self._fm_handle_error(resp, "Remove file from VS")
         return resp.json()

@@ -46,7 +46,9 @@ def _reject_constant(_value):
 
 
 def _json(raw: bytes):
-    return json.loads(raw, object_pairs_hook=_unique_object, parse_constant=_reject_constant)
+    return json.loads(
+        raw, object_pairs_hook=_unique_object, parse_constant=_reject_constant
+    )
 
 
 def _zero(value) -> bool:
@@ -116,7 +118,10 @@ def _reconcile_files(candidates: list[dict], project: str, key: str, rag) -> Non
     for item in rag.semantic.list_yandex_objects("/files", project, key, ("files",)):
         if not isinstance(item, dict):
             raise ValueError("resume_current_inventory_invalid")
-        if item.get("id") not in selected_ids and item.get("filename") not in selected_names:
+        if (
+            item.get("id") not in selected_ids
+            and item.get("filename") not in selected_names
+        ):
             continue
         if item.get("id") in current or item.get("filename") in names:
             raise ValueError("resume_current_inventory_ambiguous")
@@ -125,7 +130,8 @@ def _reconcile_files(candidates: list[dict], project: str, key: str, rag) -> Non
     for expected in candidates:
         actual = current.get(expected["id"])
         if actual is None or any(
-            actual.get(field) != expected[field] for field in ("id", "filename", "bytes")
+            actual.get(field) != expected[field]
+            for field in ("id", "filename", "bytes")
         ):
             raise ValueError("resume_current_file_mismatch")
         if type(actual.get("bytes")) is not int:
@@ -170,7 +176,11 @@ def _document(raw: bytes, sha: str, repository: str, rag) -> dict:
         _identity(identity, repository, rag)
         text = source[:-1]
         text.decode("utf-8")
-        return {"kind": "evidence", "identity": identity, "text_sha256": rag.digest(text)}
+        return {
+            "kind": "evidence",
+            "identity": identity,
+            "text_sha256": rag.digest(text),
+        }
     if raw.startswith(_PROVENANCE):
         encoded = raw[len(_PROVENANCE) :]
         payload = _json(encoded)
@@ -223,7 +233,9 @@ def _stage_packs(archive, candidates, stage: Path, prefix, project, key, rag):
     return documents, packs
 
 
-def _entry(identity, metadata, document_sha, text_sha, provenance_sha, rag) -> tuple[str, dict]:
+def _entry(
+    identity, metadata, document_sha, text_sha, provenance_sha, rag
+) -> tuple[str, dict]:
     source = {**identity, "metadata": metadata}
     entry = {
         **source,
@@ -249,7 +261,12 @@ def _entries(documents: dict, rag) -> dict:
         if item["identity"] != target["identity"]:
             raise ValueError("resume_provenance_content_mismatch")
         entry_key, entry = _entry(
-            item["identity"], item["metadata"], item["target"], target["text_sha256"], sha, rag
+            item["identity"],
+            item["metadata"],
+            item["target"],
+            target["text_sha256"],
+            sha,
+            rag,
         )
         if entry_key in entries and entries[entry_key] != entry:
             raise ValueError("resume_entry_identity_conflict")
@@ -257,7 +274,9 @@ def _entries(documents: dict, rag) -> dict:
         paired.add(item["target"])
     for sha, item in documents.items():
         if item["kind"] == "evidence" and sha not in paired:
-            entry_key, entry = _entry(item["identity"], {}, sha, item["text_sha256"], None, rag)
+            entry_key, entry = _entry(
+                item["identity"], {}, sha, item["text_sha256"], None, rag
+            )
             if entry_key in entries and entries[entry_key] != entry:
                 raise ValueError("resume_entry_identity_conflict")
             entries[entry_key] = entry
@@ -265,7 +284,13 @@ def _entries(documents: dict, rag) -> dict:
 
 
 def _restore(
-    archive, stage: Path, documents: dict, entries: dict, receipt_sha: str, store_id: str, rag
+    archive,
+    stage: Path,
+    documents: dict,
+    entries: dict,
+    receipt_sha: str,
+    store_id: str,
+    rag,
 ) -> None:
     if any(entries.get(key) != entry for key, entry in archive.entries.items()):
         raise ValueError("resume_archive_entries_conflict")
@@ -278,11 +303,15 @@ def _restore(
             raise ValueError("resume_archive_documents_conflict")
     for sha in documents:
         rag.atomic(
-            archive.directory / "documents" / (sha + ".md"), (stage / (sha + ".md")).read_bytes()
+            archive.directory / "documents" / (sha + ".md"),
+            (stage / (sha + ".md")).read_bytes(),
         )
     archive.entries = entries
     archive.observed.update(entries)
-    for reason in ("raw_originals_not_recovered", "resumed_corpus_completeness_not_established"):
+    for reason in (
+        "raw_originals_not_recovered",
+        "resumed_corpus_completeness_not_established",
+    ):
         if not any(
             item.get("source_id") == archive.repository and item.get("reason") == reason
             for item in archive.gaps
@@ -311,26 +340,42 @@ def _restore(
 
 
 def _attached_ids(store_path: str, project: str, key: str, rag) -> set[str]:
-    rows = rag.semantic.list_yandex_objects(store_path + "/files", project, key, ("files",))
+    rows = rag.semantic.list_yandex_objects(
+        store_path + "/files", project, key, ("files",)
+    )
     ids = [rag.semantic._attached_file_id(item) for item in rows]
-    if any(not isinstance(value, str) or not value for value in ids) or len(set(ids)) != len(ids):
+    if any(not isinstance(value, str) or not value for value in ids) or len(
+        set(ids)
+    ) != len(ids):
         raise ValueError("resume_attachment_inventory_invalid")
     return set(ids)
 
 
-def resume_from_receipt(archive, receipt_path: Path, store_id: str, project: str, key: str) -> dict:
+def resume_from_receipt(
+    archive, receipt_path: Path, store_id: str, project: str, key: str
+) -> dict:
     """Verify and attach only the existing Files objects named by the receipt."""
     from scripts import repository_rag as rag
 
-    prefix = "chat-repository-archive-v1-" + rag.digest(archive.repository.encode())[:16] + "-"
+    prefix = (
+        "chat-repository-archive-v1-"
+        + rag.digest(archive.repository.encode())[:16]
+        + "-"
+    )
     receipt_raw, candidates = _receipt(receipt_path, store_id, prefix, rag)
     store_path = rag._validate_store(store_id, project, key)
     _reconcile_files(candidates, project, key, rag)
-    with tempfile.TemporaryDirectory(prefix=".resume-", dir=archive.directory) as directory:
+    with tempfile.TemporaryDirectory(
+        prefix=".resume-", dir=archive.directory
+    ) as directory:
         stage = Path(directory)
-        documents, packs = _stage_packs(archive, candidates, stage, prefix, project, key, rag)
+        documents, packs = _stage_packs(
+            archive, candidates, stage, prefix, project, key, rag
+        )
         entries = _entries(documents, rag)
-        _restore(archive, stage, documents, entries, rag.digest(receipt_raw), store_id, rag)
+        _restore(
+            archive, stage, documents, entries, rag.digest(receipt_raw), store_id, rag
+        )
     attached_ids = _attached_ids(store_path, project, key, rag)
     rag._attach_and_wait(
         store_path,

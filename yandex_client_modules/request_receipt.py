@@ -14,10 +14,20 @@ from typing import Any
 
 CANONICALIZATION = "python-json-sorted-utf8-compact-v1"
 # Provider model URIs may include an explicit version segment.
-_MODEL_URI = re.compile(r"gpt://[A-Za-z0-9_.-]{1,128}/[A-Za-z0-9_.:-]{1,128}(?:/[A-Za-z0-9_.-]{1,64})?")
-_CREDENTIAL_MARKER = re.compile(r"gh[pousr]_|github_pat_|sk-|AQVN|-----BEGIN", re.IGNORECASE)
+_MODEL_URI = re.compile(
+    r"gpt://[A-Za-z0-9_.-]{1,128}/[A-Za-z0-9_.:-]{1,128}(?:/[A-Za-z0-9_.-]{1,64})?"
+)
+_CREDENTIAL_MARKER = re.compile(
+    r"gh[pousr]_|github_pat_|sk-|AQVN|-----BEGIN", re.IGNORECASE
+)
 _BOOLEANS = ("background", "store", "stream", "parallel_tool_calls")
-_NUMBERS = ("temperature", "top_p", "top_logprobs", "max_output_tokens", "max_tool_calls")
+_NUMBERS = (
+    "temperature",
+    "top_p",
+    "top_logprobs",
+    "max_output_tokens",
+    "max_tool_calls",
+)
 _ENUMS = {
     "truncation": {"auto", "disabled"},
     "service_tier": {"auto", "default", "flex", "scale", "priority"},
@@ -25,10 +35,18 @@ _ENUMS = {
 }
 _EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh"}
 _INPUT_TYPES = {"message", "function_call", "function_call_output", "reasoning"}
-_CONTENT_TYPES = {"input_text", "input_image", "input_audio", "input_file", "output_text"}
+_CONTENT_TYPES = {
+    "input_text",
+    "input_image",
+    "input_audio",
+    "input_file",
+    "output_text",
+}
 _TOOL_TYPES = {"function", "mcp", "file_search", "web_search", "code_interpreter"}
 _FUNCTION_NAME = re.compile(r"[A-Za-z0-9_.:-]{1,128}\Z")
-_FUNCTION_NAME_CREDENTIAL = re.compile(r"gh[pousr]_|github_pat_|sk-|AQVN|BEGIN", re.IGNORECASE)
+_FUNCTION_NAME_CREDENTIAL = re.compile(
+    r"gh[pousr]_|github_pat_|sk-|AQVN|BEGIN", re.IGNORECASE
+)
 # Both dimensions stay below the generic trace sanitizer's 50-item boundary.
 # This bounds receipt metadata only; it never changes the provider's tool list.
 _FUNCTION_NAMES_PER_BATCH = 40
@@ -37,7 +55,11 @@ _FUNCTION_NAME_BATCHES = 50
 
 def _fingerprint(value: Any) -> dict[str, Any]:
     encoded = json.dumps(
-        value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
     ).encode("utf-8")
     return {
         "canonical_sha256": hashlib.sha256(encoded).hexdigest(),
@@ -52,7 +74,9 @@ def _field(payload: dict[str, Any], name: str) -> dict[str, Any]:
 
 
 def _outgoing_settings(payload: dict[str, Any]) -> dict[str, Any]:
-    settings = {name: _field(payload, name) for name in (*_BOOLEANS, *_NUMBERS, *_ENUMS)}
+    settings = {
+        name: _field(payload, name) for name in (*_BOOLEANS, *_NUMBERS, *_ENUMS)
+    }
     for name in _BOOLEANS:
         if type(payload.get(name)) is bool:
             settings[name]["value"] = payload[name]
@@ -93,11 +117,18 @@ def _input_manifest(payload: dict[str, Any]) -> dict[str, Any]:
         if kind == "message":
             content = item.get("content")
             if isinstance(content, str):
-                content_counts["output_text" if item.get("role") == "assistant" else "input_text"] += 1
+                content_counts[
+                    "output_text" if item.get("role") == "assistant" else "input_text"
+                ] += 1
             elif isinstance(content, list):
                 for part in content:
                     content_type = part.get("type") if isinstance(part, dict) else None
-                    content_type = content_type if isinstance(content_type, str) and content_type in _CONTENT_TYPES else "other"
+                    content_type = (
+                        content_type
+                        if isinstance(content_type, str)
+                        and content_type in _CONTENT_TYPES
+                        else "other"
+                    )
                     content_counts[content_type] += 1
         if kind in {"function_call", "function_call_output"} and "call_id" in item:
             call_links.append({"type": kind, "call_id": item["call_id"]})
@@ -125,9 +156,14 @@ def _tools_manifest(payload: dict[str, Any]) -> dict[str, Any]:
         if kind != "function":
             continue
         function = tool.get("function")
-        name = tool.get("name") or (function.get("name") if isinstance(function, dict) else None)
-        if (not isinstance(name, str) or not _FUNCTION_NAME.fullmatch(name)
-                or _FUNCTION_NAME_CREDENTIAL.search(name)):
+        name = tool.get("name") or (
+            function.get("name") if isinstance(function, dict) else None
+        )
+        if (
+            not isinstance(name, str)
+            or not _FUNCTION_NAME.fullmatch(name)
+            or _FUNCTION_NAME_CREDENTIAL.search(name)
+        ):
             names_complete = False
             continue
         if len(names) >= _FUNCTION_NAMES_PER_BATCH * _FUNCTION_NAME_BATCHES:
@@ -135,11 +171,14 @@ def _tools_manifest(payload: dict[str, Any]) -> dict[str, Any]:
             continue
         names.append(name)
     result.update(
-        count=len(tools), types=counts,
+        count=len(tools),
+        types=counts,
         function_name_count=counts["function"],
         function_names_complete=names_complete,
-        function_name_batches=[names[index:index + _FUNCTION_NAMES_PER_BATCH]
-                               for index in range(0, len(names), _FUNCTION_NAMES_PER_BATCH)],
+        function_name_batches=[
+            names[index : index + _FUNCTION_NAMES_PER_BATCH]
+            for index in range(0, len(names), _FUNCTION_NAMES_PER_BATCH)
+        ],
     )
     return result
 
@@ -174,4 +213,3 @@ def build_request_manifest(payload: dict[str, Any]) -> dict[str, Any]:
             for name in ("conversation", "previous_response_id", "prompt_cache_key")
         },
     }
-

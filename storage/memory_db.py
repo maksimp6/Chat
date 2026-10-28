@@ -59,7 +59,9 @@ class Table:
 
         row = {
             column.name: (
-                values[column.name] if column.name in values else deepcopy(column.default)
+                values[column.name]
+                if column.name in values
+                else deepcopy(column.default)
             )
             for column in self.columns
         }
@@ -80,7 +82,9 @@ class Table:
                 continue
             for old in self.rows:
                 if old is not existing and old[column.name] == row[column.name]:
-                    raise ConstraintError(f"unique constraint failed: {self.name}.{column.name}")
+                    raise ConstraintError(
+                        f"unique constraint failed: {self.name}.{column.name}"
+                    )
         return row
 
     def insert(self, values: dict[str, Any]) -> dict[str, Any]:

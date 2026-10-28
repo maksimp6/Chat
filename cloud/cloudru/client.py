@@ -120,7 +120,9 @@ class CloudRuClient:
             response.raise_for_status()
         except requests.RequestException as exc:
             status = getattr(getattr(exc, "response", None), "status_code", None)
-            elapsed_ms = round((datetime.now(timezone.utc) - started).total_seconds() * 1000, 2)
+            elapsed_ms = round(
+                (datetime.now(timezone.utc) - started).total_seconds() * 1000, 2
+            )
             if trace:
                 trace.add_event(
                     "provider_api_response",
@@ -141,14 +143,20 @@ class CloudRuClient:
                     f"Cloud.ru API request failed: {method} {service}{path}",
                     error_type=type(exc).__name__,
                 )
-            code = "authorization_failed" if status in {401, 403} else "provider_http_error"
+            code = (
+                "authorization_failed"
+                if status in {401, 403}
+                else "provider_http_error"
+            )
             raise CloudProviderError(
                 f"Cloud.ru API request failed: {method} {service}{path}",
                 code=code,
                 http_status=status,
             ) from exc
 
-        elapsed_ms = round((datetime.now(timezone.utc) - started).total_seconds() * 1000, 2)
+        elapsed_ms = round(
+            (datetime.now(timezone.utc) - started).total_seconds() * 1000, 2
+        )
         if trace:
             trace.add_event(
                 "provider_api_response",

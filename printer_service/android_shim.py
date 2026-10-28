@@ -55,7 +55,10 @@ class SimulatedAndroid:
     def swipe(self, x1: int, y1: int, x2: int, y2: int) -> bool:
         if self.keyguard != Keyguard.UNLOCKED or "transport_failure" in self.faults:
             return False
-        if not all((0 <= x < self.width and 0 <= y < self.height) for x, y in ((x1, y1), (x2, y2))):
+        if not all(
+            (0 <= x < self.width and 0 <= y < self.height)
+            for x, y in ((x1, y1), (x2, y2))
+        ):
             return False
         self.events.append({"action": "swipe", "start": [x1, y1], "end": [x2, y2]})
         return True
@@ -169,7 +172,9 @@ def validate_png(data: bytes) -> bool:
 
 class AndroidShim:
     def __init__(
-        self, backend: Backend = Backend.SIMULATED, transport: AndroidTransport | None = None
+        self,
+        backend: Backend = Backend.SIMULATED,
+        transport: AndroidTransport | None = None,
     ):
         self.backend = Backend(backend)
         self.transport = (
@@ -204,14 +209,19 @@ class AndroidShim:
             self.backend,
             result.keyguard,
             False,
-            "simulation" if self.backend == Backend.SIMULATED else "unverified_transport",
+            "simulation"
+            if self.backend == Backend.SIMULATED
+            else "unverified_transport",
         )
         self._record("observe", result.keyguard.value)
         return result
 
     def tap(self, x: int, y: int) -> bool:
         with self._lock:
-            if self.backend != Backend.SIMULATED or self.observe().keyguard != Keyguard.UNLOCKED:
+            if (
+                self.backend != Backend.SIMULATED
+                or self.observe().keyguard != Keyguard.UNLOCKED
+            ):
                 self._record("tap", "denied_keyguard")
                 return False
             ok = self.transport.tap(x, y)
@@ -220,7 +230,10 @@ class AndroidShim:
 
     def swipe(self, x1: int, y1: int, x2: int, y2: int) -> bool:
         with self._lock:
-            if self.backend != Backend.SIMULATED or self.observe().keyguard != Keyguard.UNLOCKED:
+            if (
+                self.backend != Backend.SIMULATED
+                or self.observe().keyguard != Keyguard.UNLOCKED
+            ):
                 self._record("swipe", "denied_keyguard")
                 return False
             ok = self.transport.swipe(x1, y1, x2, y2)

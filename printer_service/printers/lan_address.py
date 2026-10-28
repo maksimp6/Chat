@@ -5,7 +5,9 @@ import ipaddress
 import socket
 from pathlib import Path
 
-_RFC1918 = tuple(map(ipaddress.IPv4Network, ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")))
+_RFC1918 = tuple(
+    map(ipaddress.IPv4Network, ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"))
+)
 
 
 def private_ipv4(value: str) -> str:
@@ -42,12 +44,18 @@ def _route_is_local(ip: str, interface: str, routes: str) -> bool:
     return selected_iface == interface and selected_gateway == 0
 
 
-def resolve_lan(host: str, *, interface: str = "wlan0", route_table: str | None = None) -> str:
+def resolve_lan(
+    host: str, *, interface: str = "wlan0", route_table: str | None = None
+) -> str:
     """Resolve once, validate every result, then return the pinned IP literal.
 
     Caller must connect only to the returned IP, never resolve the hostname again.
     """
-    if not isinstance(host, str) or not host or any(x in host for x in ("/", "@", ":", "\\", " ")):
+    if (
+        not isinstance(host, str)
+        or not host
+        or any(x in host for x in ("/", "@", ":", "\\", " "))
+    ):
         raise ValueError("invalid LAN hostname")
     try:
         addresses = [private_ipv4(host)]
@@ -61,7 +69,9 @@ def resolve_lan(host: str, *, interface: str = "wlan0", route_table: str | None 
             )
         ):
             raise ValueError("invalid DNS hostname") from None
-        records = socket.getaddrinfo(host, 3000, family=socket.AF_INET, type=socket.SOCK_STREAM)
+        records = socket.getaddrinfo(
+            host, 3000, family=socket.AF_INET, type=socket.SOCK_STREAM
+        )
         addresses = [private_ipv4(str(item[4][0])) for item in records]
         if not addresses:
             raise ValueError("empty DNS response") from None

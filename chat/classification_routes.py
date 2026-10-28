@@ -10,7 +10,12 @@ from flask import Blueprint, jsonify, request
 
 from core.config import CLASSIFIER_MODELS, Config
 from observability.trace_manager import get_current_trace, traced_operation
-from provider_accounts.quotas import ProviderQuotaExceeded, record_usage, release_request, reserve_request
+from provider_accounts.quotas import (
+    ProviderQuotaExceeded,
+    record_usage,
+    release_request,
+    reserve_request,
+)
 from yandex_client_modules.request_mixin import (
     _resolve_global_provider_credential,
     _resolve_quota_user_id,
@@ -19,7 +24,9 @@ from yandex_client_modules.request_mixin import (
 
 classification_bp = Blueprint("classification", __name__)
 
-UPSTREAM_URL = "https://ai.api.cloud.yandex.net/foundationModels/v1/fewShotTextClassification"
+UPSTREAM_URL = (
+    "https://ai.api.cloud.yandex.net/foundationModels/v1/fewShotTextClassification"
+)
 UPSTREAM_TIMEOUT_SECONDS = 60
 MAX_LABELS = 20  # Documented limit of the prompt-based classification API.
 DEFAULT_MODEL = "classifier-yandexgpt-lite"
@@ -52,7 +59,9 @@ def _classification_payload(body: dict) -> tuple[str, dict]:
         raise _BadInput("labels must be unique")
     payload = {
         "text": _nonempty_string(body.get("text"), "text"),
-        "taskDescription": _nonempty_string(body.get("taskDescription"), "taskDescription"),
+        "taskDescription": _nonempty_string(
+            body.get("taskDescription"), "taskDescription"
+        ),
         "labels": labels,
     }
     if "samples" in body:
@@ -84,7 +93,9 @@ def _classification_result(data, labels: list[str]) -> dict:
         label, confidence = prediction.get("label"), prediction.get("confidence")
         if not isinstance(label, str) or label not in labels or label in seen:
             raise ValueError("invalid classification label")
-        if isinstance(confidence, bool) or not isinstance(confidence, (int, float, str)):
+        if isinstance(confidence, bool) or not isinstance(
+            confidence, (int, float, str)
+        ):
             raise ValueError("invalid classification confidence")
         confidence = float(confidence)
         if not math.isfinite(confidence) or not 0 <= confidence <= 1:
@@ -116,10 +127,14 @@ def classify_text():
     try:
         model, payload = _classification_payload(body)
     except _BadInput as exc:
-        return jsonify({"error": "invalid_classification_request", "detail": str(exc)}), 400
+        return jsonify(
+            {"error": "invalid_classification_request", "detail": str(exc)}
+        ), 400
 
     try:
-        credential = _resolve_global_provider_credential(SimpleNamespace(_config=Config))
+        credential = _resolve_global_provider_credential(
+            SimpleNamespace(_config=Config)
+        )
         upstream = CLASSIFIER_MODELS[model]["upstream"]
         payload["modelUri"] = f"cls://{credential.project_id}/{upstream}"
         headers = provider_request_headers(credential)
@@ -142,13 +157,18 @@ def classify_text():
     except requests.RequestException:
         # A timed-out POST can still complete at the provider. Do not retry it or
         # return its admission reservation as though non-execution were proven.
-        return jsonify({"error": "classification_upstream_failed", "outcome": "unknown"}), 502
+        return jsonify(
+            {"error": "classification_upstream_failed", "outcome": "unknown"}
+        ), 502
     if not 200 <= response.status_code < 300:
         if response.status_code in {400, 401, 403, 404, 429}:
             release_request(reservation)
-        return jsonify({
-            "error": "classification_upstream_failed", "upstream_status": response.status_code,
-        }), 502
+        return jsonify(
+            {
+                "error": "classification_upstream_failed",
+                "upstream_status": response.status_code,
+            }
+        ), 502
     try:
         result = _classification_result(response.json(), payload["labels"])
     except (ValueError, TypeError, OverflowError):
@@ -157,11 +177,14 @@ def classify_text():
         record_usage(reservation, token_count=result["inputTokens"])
     trace = get_current_trace()
     if trace is not None:
-        trace.add_event("classification_usage", {
-            "model": model,
-            "labels": len(payload["labels"]),
-            "samples": len(payload.get("samples", [])),
-            "input_tokens": result.get("inputTokens"),
-            "model_version": result.get("modelVersion"),
-        })
+        trace.add_event(
+            "classification_usage",
+            {
+                "model": model,
+                "labels": len(payload["labels"]),
+                "samples": len(payload.get("samples", [])),
+                "input_tokens": result.get("inputTokens"),
+                "model_version": result.get("modelVersion"),
+            },
+        )
     return jsonify({"model": payload["modelUri"], **result})

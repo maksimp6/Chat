@@ -41,7 +41,9 @@ def _validate_no_plaintext_secrets(
             # Secret refs are OK: {"ref": "logos/prod/..."}
             if "ref" in value and isinstance(value.get("ref"), str):
                 if not value["ref"].startswith("logos/"):
-                    raise ConfigError(f"Invalid secret ref pattern at {path}.{key}: {value['ref']}")
+                    raise ConfigError(
+                        f"Invalid secret ref pattern at {path}.{key}: {value['ref']}"
+                    )
                 # The ref is the only secret field; the other keys still get the plaintext check.
                 value = {k: v for k, v in value.items() if k != "ref"}
 
@@ -50,10 +52,16 @@ def _validate_no_plaintext_secrets(
         elif isinstance(value, list):
             for i, item in enumerate(value):
                 if isinstance(item, dict):
-                    _validate_no_plaintext_secrets(item, f"{path}.{key}[{i}]", is_secrets_file)
+                    _validate_no_plaintext_secrets(
+                        item, f"{path}.{key}[{i}]", is_secrets_file
+                    )
         elif isinstance(value, str):
             # In secrets section, only refs are allowed
-            if is_secrets_file and not value.startswith("logos/") or _is_secret_pattern(value):
+            if (
+                is_secrets_file
+                and not value.startswith("logos/")
+                or _is_secret_pattern(value)
+            ):
                 raise ConfigError(f"Plaintext secret detected at {path}.{key}")
 
 
@@ -69,7 +77,9 @@ def _validate_no_cycles(services: dict[str, dict[str, Any]]) -> None:
         # Check all dependencies exist
         for dep in deps:
             if not isinstance(dep, str):
-                raise ConfigError(f"Service '{service_name}': depends_on entries must be strings")
+                raise ConfigError(
+                    f"Service '{service_name}': depends_on entries must be strings"
+                )
             if dep not in services:
                 raise ConfigError(
                     f"Service '{service_name}' depends on nonexistent service '{dep}'"
@@ -99,7 +109,9 @@ def _validate_scaling(service_name: str, service_config: dict[str, Any]) -> None
             continue
         if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
             qualifier = "non-negative" if minimum == 0 else "positive"
-            raise ConfigError(f"Service '{service_name}': {field} must be a {qualifier} integer")
+            raise ConfigError(
+                f"Service '{service_name}': {field} must be a {qualifier} integer"
+            )
 
     if (
         isinstance(min_instances, int)
@@ -108,7 +120,9 @@ def _validate_scaling(service_name: str, service_config: dict[str, Any]) -> None
         and not isinstance(max_instances, bool)
         and min_instances > max_instances
     ):
-        raise ConfigError(f"Service '{service_name}': min_instances cannot exceed max_instances")
+        raise ConfigError(
+            f"Service '{service_name}': min_instances cannot exceed max_instances"
+        )
 
 
 def _validate_schema(data: dict[str, Any]) -> None:
@@ -167,7 +181,9 @@ def validate_schema(data: dict[str, Any]) -> None:
     _validate_schema(data)
 
 
-def validate_no_http_in_production(domains: dict[str, Any], lanes: dict[str, Any]) -> None:
+def validate_no_http_in_production(
+    domains: dict[str, Any], lanes: dict[str, Any]
+) -> None:
     """Exported function for testing."""
     validate_http_in_production(domains, lanes)
 
@@ -181,7 +197,9 @@ def validate_service_references(
         if isinstance(domain_config, dict):
             service = domain_config.get("service")
             if service and service not in services:
-                raise ConfigError(f"Domain '{domain}' references nonexistent service '{service}'")
+                raise ConfigError(
+                    f"Domain '{domain}' references nonexistent service '{service}'"
+                )
 
     # Check all services are deployed in at least one lane
     deployed_services: set[str] = set()
@@ -211,7 +229,9 @@ def validate_http_in_production(domains: dict[str, Any], lanes: dict[str, Any]) 
 
 def validate_lane_invariants(lanes: dict[str, dict[str, Any]]) -> None:
     """Validate lane-specific rules."""
-    lane_secret_refs: dict[str, set[str]] = {}  # Track which lanes reference which secrets
+    lane_secret_refs: dict[
+        str, set[str]
+    ] = {}  # Track which lanes reference which secrets
 
     for lane_name, lane_config in lanes.items():
         if not isinstance(lane_config, dict):
@@ -221,7 +241,9 @@ def validate_lane_invariants(lanes: dict[str, dict[str, Any]]) -> None:
         if lane_name == "production":
             sign_in = lane_config.get("sign_in")
             if sign_in != "github":
-                raise ConfigError(f"Production lane must use 'sign_in: github', got '{sign_in}'")
+                raise ConfigError(
+                    f"Production lane must use 'sign_in: github', got '{sign_in}'"
+                )
 
         # Collect all secret references in this lane
         lane_secret_refs[lane_name] = set()

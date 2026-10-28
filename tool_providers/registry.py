@@ -15,25 +15,54 @@ import shutil
 from importlib import import_module
 from typing import Any, Mapping, Optional
 
-from tool_providers.universal_tool_platform import UniversalToolDefinition, validate_json_schema
+from tool_providers.universal_tool_platform import (
+    UniversalToolDefinition,
+    validate_json_schema,
+)
 
 logger = logging.getLogger("tool_registry")
 
 _GIT_READ_TOOLS = frozenset({"git_status", "git_log", "git_diff", "git_branches"})
-_GIT_WRITE_TOOLS = frozenset({"git_add", "git_commit", "git_remote", "git_push", "git_pull", "git_fetch"})
+_GIT_WRITE_TOOLS = frozenset(
+    {"git_add", "git_commit", "git_remote", "git_push", "git_pull", "git_fetch"}
+)
 
 # (category, module, attribute, log label, exception logged instead of raised)
 _TOOL_SOURCES: tuple[tuple[str, str, str, str, type[BaseException]], ...] = (
     ("git", "tool_providers.git", "GIT_TOOLS", "Git", Exception),
     ("termux", "tool_providers.termux", "TERMUX_TOOLS", "Termux", Exception),
     ("system", "tool_providers.termux_system", "SYSTEM_TOOLS", "System", Exception),
-    ("filesystem", "tool_providers.filesystem", "FILESYSTEM_TOOLS", "Filesystem", Exception),
-    ("wikipedia", "tool_providers.wikipedia", "WIKIPEDIA_TOOLS", "Wikipedia", Exception),
+    (
+        "filesystem",
+        "tool_providers.filesystem",
+        "FILESYSTEM_TOOLS",
+        "Filesystem",
+        Exception,
+    ),
+    (
+        "wikipedia",
+        "tool_providers.wikipedia",
+        "WIKIPEDIA_TOOLS",
+        "Wikipedia",
+        Exception,
+    ),
     ("profiler", "tool_providers.profiler", "PROFILER_TOOLS", "Profiler", Exception),
     ("theme", "tool_providers.theme", "THEME_TOOLS", "Theme", Exception),
     ("runtime", "tool_providers.runtime_tools", "RUNTIME_TOOLS", "Runtime", Exception),
-    ("government", "organization.government", "GOVERNMENT_TOOLS", "Government", Exception),
-    ("partner", "organization.partner_relations", "PARTNER_TOOLS", "Partner Relations", Exception),
+    (
+        "government",
+        "organization.government",
+        "GOVERNMENT_TOOLS",
+        "Government",
+        Exception,
+    ),
+    (
+        "partner",
+        "organization.partner_relations",
+        "PARTNER_TOOLS",
+        "Partner Relations",
+        Exception,
+    ),
     ("3d", "forge.tools", "PRINTING3D_TOOLS", "3D Printing", Exception),
     ("3d", "model_editor.tools", "MODEL_EDITOR_TOOLS", "Model Editor", ImportError),
     ("cloud", "cloud.tools", "CLOUD_TOOLS", "Cloud tools", Exception),
@@ -69,7 +98,9 @@ class ToolRegistry:
         self._load_all()
 
     @staticmethod
-    def _normalize_cfg(category: str, name: str, cfg: Mapping[str, Any]) -> dict[str, Any]:
+    def _normalize_cfg(
+        category: str, name: str, cfg: Mapping[str, Any]
+    ) -> dict[str, Any]:
         # Registry presentation/category defaults enrich the shared definition;
         # schema aliases and type/default normalization have a single owner.
         result = dict(cfg)
@@ -137,7 +168,9 @@ class ToolRegistry:
             return False
         if ToolRegistry._is_open_object(schema):
             return True
-        children = list((schema.get("properties") or {}).values()) + list(schema.get("anyOf") or [])
+        children = list((schema.get("properties") or {}).values()) + list(
+            schema.get("anyOf") or []
+        )
         if isinstance(schema.get("items"), dict):
             children.append(schema["items"])
         return any(ToolRegistry._has_open_object(child) for child in children)
@@ -224,13 +257,17 @@ class ToolRegistry:
                 tools_list.append(self._function_definition(name, cfg))
         return tools_list
 
-    def get_universal_definition(self, tool_name: str) -> Optional[UniversalToolDefinition]:
+    def get_universal_definition(
+        self, tool_name: str
+    ) -> Optional[UniversalToolDefinition]:
         cfg = self._tools.get(tool_name)
         if cfg is None:
             return None
         return UniversalToolDefinition.from_mapping(tool_name, cfg)
 
-    def get_universal_definitions(self, transport: Optional[str] = None) -> list[dict[str, Any]]:
+    def get_universal_definitions(
+        self, transport: Optional[str] = None
+    ) -> list[dict[str, Any]]:
         definitions = []
         for name in sorted(self._tools):
             definition = self.get_universal_definition(name)
@@ -294,4 +331,3 @@ class ToolRegistry:
 registry = ToolRegistry()
 
 __all__ = ["ToolRegistry", "registry"]
-

@@ -237,7 +237,9 @@ def analyze_repository(repo_root: Path, *, commits: int = 200) -> dict:
         else:
             candidate_kind = "watch"
         row["candidate_kind"] = candidate_kind
-        row["score_components"] = {key: round(value, 4) for key, value in components.items()}
+        row["score_components"] = {
+            key: round(value, 4) for key, value in components.items()
+        }
 
     rows.sort(key=lambda row: (-row["score"], row["path"]))
     return {
@@ -279,11 +281,13 @@ def _append_table(lines: list[str], rows: list[dict]) -> None:
 
 def render_markdown(report: dict, *, top: int = 20) -> str:
     limit = max(1, int(top))
-    split_rows = [row for row in report["files"] if row["candidate_kind"] == "split_candidate"][
-        :limit
-    ]
+    split_rows = [
+        row for row in report["files"] if row["candidate_kind"] == "split_candidate"
+    ][:limit]
     shared_rows = [
-        row for row in report["files"] if row["candidate_kind"] == "extract_shared_logic"
+        row
+        for row in report["files"]
+        if row["candidate_kind"] == "extract_shared_logic"
     ][: min(limit, 10)]
 
     lines = [

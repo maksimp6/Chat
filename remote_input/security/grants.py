@@ -90,7 +90,9 @@ class SessionAuthority:
         # object is recreated while this authenticated authority stays alive.
         self._claimed_provision: tuple[str, str] | None = None
 
-    def authorize(self, principal: AuthenticatedPrincipal, lease_ns: int = 10_000_000_000) -> str:
+    def authorize(
+        self, principal: AuthenticatedPrincipal, lease_ns: int = 10_000_000_000
+    ) -> str:
         if (
             type(principal) is not AuthenticatedPrincipal
             or (principal.owner, principal.device, principal.role)
@@ -168,7 +170,9 @@ class TrustedSigner:
                 "payload": grant.payload,
             }
             raw = _canonical(data)
-            packet = _canonical({"grant": data, "mac": hmac.digest(self._key, raw, "sha256").hex()})
+            packet = _canonical(
+                {"grant": data, "mac": hmac.digest(self._key, raw, "sha256").hex()}
+            )
             if len(packet) > MAX_PACKET:
                 raise GrantError("packet too large")
             return packet
@@ -322,7 +326,9 @@ class ProtectedVerifier:
         self._last_shutdown_epoch: str | None = None
         self._shutdown_generation = 0
 
-    def provision(self, authority: SessionAuthority, principal: AuthenticatedPrincipal) -> None:
+    def provision(
+        self, authority: SessionAuthority, principal: AuthenticatedPrincipal
+    ) -> None:
         """Lab-only direct handoff; production requires authenticated root channel."""
         if not authority.active(principal):
             raise GrantError("cannot provision unauthenticated session")
@@ -331,7 +337,10 @@ class ProtectedVerifier:
             # acquisition of the two locks. Never provision stale identity.
             if not authority.active(principal):
                 raise GrantError("controller lease changed during provisioning")
-            if self.shutdown_requested.is_set() and authority.epoch == self._last_shutdown_epoch:
+            if (
+                self.shutdown_requested.is_set()
+                and authority.epoch == self._last_shutdown_epoch
+            ):
                 raise GrantError("fresh epoch required after shutdown")
             current_session = authority.session
             if current_session is None:

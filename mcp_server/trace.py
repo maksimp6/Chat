@@ -29,9 +29,12 @@ def _walk_mcp_items(value: Any) -> Iterable[dict[str, Any]]:
 def _activity_key(item: dict[str, Any], response_id: Any, step: Any) -> str:
     call_id = item.get("call_id") or item.get("id") or item.get("tool_call_id")
     name = item.get("name") or item.get("tool_name")
-    server = item.get("server_label") or item.get("server_name") or item.get("server_url")
+    server = (
+        item.get("server_label") or item.get("server_name") or item.get("server_url")
+    )
     return "|".join(
-        str(value or "") for value in (step, response_id, call_id, server, name, item.get("type"))
+        str(value or "")
+        for value in (step, response_id, call_id, server, name, item.get("type"))
     )
 
 

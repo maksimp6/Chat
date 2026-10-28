@@ -44,7 +44,9 @@ def seed(path: str) -> dict[str, str]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Seed one confirmed Logos Board incident")
+    parser = argparse.ArgumentParser(
+        description="Seed one confirmed Logos Board incident"
+    )
     parser.add_argument("--db", default=env_get("PROJECT_BOARD_DB"))
     arguments = parser.parse_args()
     if not arguments.db:

@@ -1,6 +1,7 @@
 """
 sdk.py - Минимальный SDK для работы с Yandex AI Studio
 """
+
 from core.env import env_require
 
 import requests
@@ -11,7 +12,9 @@ from core.config import get_model_uri
 class LogosSDK:
     """SDK для работы с Yandex AI Studio API"""
 
-    def __init__(self, api_key, project_id, base_url="https://ai.api.cloud.yandex.net/v1"):
+    def __init__(
+        self, api_key, project_id, base_url="https://ai.api.cloud.yandex.net/v1"
+    ):
         self.api_key = api_key
         self.project_id = project_id
         self.base_url = base_url.rstrip("/")
@@ -55,7 +58,6 @@ class LogosSDK:
 
 # Пример использования
 if __name__ == "__main__":
-
     sdk = LogosSDK(env_require("YANDEX_API_KEY"), env_require("YANDEX_PROJECT_ID"))
 
     # Создать диалог

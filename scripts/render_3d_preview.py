@@ -65,7 +65,9 @@ def _point(values: Iterable[object]) -> Vec3:
         coords = tuple(float(v) for v in values)
     except (TypeError, ValueError, OverflowError) as exc:
         raise PreviewError("invalid 3D vertex coordinates") from exc
-    if len(coords) != 3 or any(not math.isfinite(v) or abs(v) > 1_000_000 for v in coords):
+    if len(coords) != 3 or any(
+        not math.isfinite(v) or abs(v) > 1_000_000 for v in coords
+    ):
         raise PreviewError("unsafe or nonfinite mesh vertex")
     return coords  # type: ignore[return-value]
 
@@ -105,7 +107,11 @@ def _ascii_stl(data: bytes) -> list[Face]:
     except UnicodeDecodeError as exc:
         raise PreviewError("invalid ASCII STL encoding") from exc
     lines = [line.strip() for line in decoded.splitlines() if line.strip()]
-    if not lines or not lines[0].startswith("solid") or not lines[-1].startswith("endsolid"):
+    if (
+        not lines
+        or not lines[0].startswith("solid")
+        or not lines[-1].startswith("endsolid")
+    ):
         raise PreviewError("truncated ASCII STL solid")
     triangles: list[Face] = []
     body = lines[1:-1]
@@ -213,11 +219,16 @@ def _triangles_for_mesh(mesh: ET.Element) -> list[Face]:
     faces_node = mesh.find(f"{{{CORE_NS}}}triangles")
     if vertices_node is None or faces_node is None:
         raise PreviewError("3MF object lacks mesh vertices or triangles")
-    if not 0 < len(vertices_node) <= MAX_VERTICES or not 0 < len(faces_node) <= MAX_TRIANGLES:
+    if (
+        not 0 < len(vertices_node) <= MAX_VERTICES
+        or not 0 < len(faces_node) <= MAX_TRIANGLES
+    ):
         raise PreviewError("3MF mesh exceeds vertex/triangle limits")
     if any(node.tag != VERTEX_TAG for node in vertices_node):
         raise PreviewError("unexpected 3MF vertex element")
-    vertices = [_point((node.get("x"), node.get("y"), node.get("z"))) for node in vertices_node]
+    vertices = [
+        _point((node.get("x"), node.get("y"), node.get("z"))) for node in vertices_node
+    ]
     triangles: list[Face] = []
     for node in faces_node:
         if node.tag != TRIANGLE_TAG:
@@ -296,7 +307,9 @@ def _validate_package(archive: ZipFile) -> None:
             raise PreviewError("unsafe 3MF package entry")
 
 
-def _build_faces(archive: ZipFile, root: ET.Element, cache: dict[str, ET.Element]) -> list[Face]:
+def _build_faces(
+    archive: ZipFile, root: ET.Element, cache: dict[str, ET.Element]
+) -> list[Face]:
     unit = root.get("unit", "millimeter")
     if unit not in UNIT_SCALE_MM:
         raise PreviewError("unsupported 3MF units")
@@ -357,12 +370,18 @@ def _projection(p: Vec3, camera: str) -> tuple[float, float, float]:
     if camera == "SIDE":
         return x, z, -y
     # Unit isometric axes with elevation close to 30 degrees.
-    return 0.70710678 * (x - y), 0.40824829 * (x + y) + 0.81649658 * z, 0.57735027 * (x + y - z)
+    return (
+        0.70710678 * (x - y),
+        0.40824829 * (x + y) + 0.81649658 * z,
+        0.57735027 * (x + y - z),
+    )
 
 
 def _card(draw: ImageDraw.ImageDraw, mesh: Mesh, view: str, left: int) -> None:
     outer = (left, 64, left + 392, 420)
-    draw.rounded_rectangle(outer, radius=12, fill=(255, 255, 255), outline=(221, 229, 237), width=2)
+    draw.rounded_rectangle(
+        outer, radius=12, fill=(255, 255, 255), outline=(221, 229, 237), width=2
+    )
     draw.text((left + 18, 78), view, fill=(48, 65, 84))
     geom = [(_projection(v, view) for v in face) for face in mesh.triangles]
     projected = [tuple(face) for face in geom]
@@ -371,17 +390,28 @@ def _card(draw: ImageDraw.ImageDraw, mesh: Mesh, view: str, left: int) -> None:
     center_x, center_y = (min(xx) + max(xx)) / 2, (min(yy) + max(yy)) / 2
     span_x, span_y = max(xx) - min(xx), max(yy) - min(yy)
     scale = min(338 / max(span_x, 0.00001), 280 / max(span_y, 0.00001))
-    triangles = sorted(projected, key=lambda face: sum(vertex[2] for vertex in face) / 3)
+    triangles = sorted(
+        projected, key=lambda face: sum(vertex[2] for vertex in face) / 3
+    )
     for p, q, r in triangles:
         u = (q[0] - p[0], q[1] - p[1], q[2] - p[2])
         v = (r[0] - p[0], r[1] - p[1], r[2] - p[2])
-        normal = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+        normal = (
+            u[1] * v[2] - u[2] * v[1],
+            u[2] * v[0] - u[0] * v[2],
+            u[0] * v[1] - u[1] * v[0],
+        )
         mag = math.sqrt(sum(component * component for component in normal))
         diffuse = abs(normal[2]) / mag if mag > 0 else 0.4
         strength = 0.53 + 0.47 * diffuse
-        color = tuple(max(0, min(255, int(component * strength))) for component in (150, 176, 204))
+        color = tuple(
+            max(0, min(255, int(component * strength))) for component in (150, 176, 204)
+        )
         polygon = [
-            (left + 196 + (vertex[0] - center_x) * scale, 264 - (vertex[1] - center_y) * scale)
+            (
+                left + 196 + (vertex[0] - center_x) * scale,
+                264 - (vertex[1] - center_y) * scale,
+            )
             for vertex in (p, q, r)
         ]
         draw.polygon(polygon, fill=color)

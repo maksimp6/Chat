@@ -40,6 +40,8 @@ def _command_code(line: bytes) -> bytes | None:
     if label is None:
         return None
     return label.group(1) + str(int(label.group(2))).encode("ascii")
+
+
 S_VALUE = re.compile(rb"(?:^|\s)S(-?\d+(?:\.\d+)?)\b")
 E_VALUE = re.compile(rb"(?:^|\s)E([+-]?(?:\d+(?:\.\d*)?|\.\d+))")
 SINGLE_PLATE = re.compile(r"^Metadata/plate_\d+\.gcode$")
@@ -98,7 +100,9 @@ def _validated_wall_loops(value: object) -> int | None:
     return count
 
 
-def _configuration(archive: ZipFile, names: dict[str, object]) -> tuple[str, float, int | None]:
+def _configuration(
+    archive: ZipFile, names: dict[str, object]
+) -> tuple[str, float, int | None]:
     if CONFIG_NAME not in names or MODEL_NAME not in names:
         raise PlateError("missing 3MF model or project configuration")
     info = archive.getinfo(CONFIG_NAME)
@@ -108,7 +112,10 @@ def _configuration(archive: ZipFile, names: dict[str, object]) -> tuple[str, flo
         settings = json.loads(archive.read(CONFIG_NAME))
     except (ValueError, UnicodeError) as exc:
         raise PlateError("invalid project configuration") from exc
-    if not isinstance(settings, dict) or settings.get("printer_model") != "Bambu Lab A1 mini":
+    if (
+        not isinstance(settings, dict)
+        or settings.get("printer_model") != "Bambu Lab A1 mini"
+    ):
         raise PlateError("printer profile is not Bambu Lab A1 mini")
     materials = settings.get("filament_type")
     if (
@@ -150,7 +157,9 @@ def _parse_temperature(command: bytes, material: str) -> tuple[str, float] | Non
     return code.decode("ascii"), value
 
 
-def _sliced_plate_info(archive: ZipFile, names: dict[str, object]) -> tuple[ZipInfo, bytes]:
+def _sliced_plate_info(
+    archive: ZipFile, names: dict[str, object]
+) -> tuple[ZipInfo, bytes]:
     if GCODE_NAME not in names or GCODE_MD5_NAME not in names:
         raise PlateError("missing sliced G-code or integrity checksum")
     if len([name for name in names if SINGLE_PLATE.fullmatch(name)]) != 1:
@@ -167,7 +176,9 @@ def _sliced_plate_info(archive: ZipFile, names: dict[str, object]) -> tuple[ZipI
     return info, expected
 
 
-def _scan_line(line: bytes, material: str, temperatures: dict[str, float]) -> tuple[int, int]:
+def _scan_line(
+    line: bytes, material: str, temperatures: dict[str, float]
+) -> tuple[int, int]:
     physical = line.split(b";", 1)[0].strip().upper()
     if not physical:
         return 0, 0
@@ -199,7 +210,9 @@ def _heat_targets(material: str, temperatures: dict[str, float]) -> tuple[float,
     return nozzle_target, bed_target
 
 
-def _gcode(archive: ZipFile, names: dict[str, object], material: str) -> dict[str, object]:
+def _gcode(
+    archive: ZipFile, names: dict[str, object], material: str
+) -> dict[str, object]:
     info, expected = _sliced_plate_info(archive, names)
     checksum = hashlib.md5(usedforsecurity=False)
     digest = hashlib.sha256()
@@ -233,12 +246,20 @@ def _gcode(archive: ZipFile, names: dict[str, object], material: str) -> dict[st
 def inspect_archive(stream: BinaryIO, filename: str) -> dict[str, object]:
     """Read an existing artifact without extraction, network or printer control."""
     if not filename.endswith(".3mf"):
-        return {"status": "blocked", "reason": "expected a .3mf artifact", "filename": filename}
+        return {
+            "status": "blocked",
+            "reason": "expected a .3mf artifact",
+            "filename": filename,
+        }
     stream.seek(0, 2)
     size = stream.tell()
     stream.seek(0)
     if not 0 < size <= MAX_FILE_BYTES:
-        return {"status": "blocked", "reason": "3MF file exceeds size limit", "filename": filename}
+        return {
+            "status": "blocked",
+            "reason": "3MF file exceeds size limit",
+            "filename": filename,
+        }
     sha = hashlib.sha256()
     while block := stream.read(65536):
         sha.update(block)
@@ -302,7 +323,9 @@ def inspect_path(path: Path) -> dict[str, object]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Read-only Bambu A1 mini single-file preflight")
+    parser = argparse.ArgumentParser(
+        description="Read-only Bambu A1 mini single-file preflight"
+    )
     parser.add_argument("artifact", type=Path)
     args = parser.parse_args()
     result = inspect_path(args.artifact)

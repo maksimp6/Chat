@@ -5,7 +5,9 @@ from typing import Any
 
 
 def assess_quality(
-    passport: dict[str, Any], capability: dict[str, Any], measurements: dict[str, Any] | None = None
+    passport: dict[str, Any],
+    capability: dict[str, Any],
+    measurements: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compare purpose and tolerances against measured printer/material capability.
 
@@ -37,7 +39,9 @@ def assess_quality(
             raise ValueError("invalid requirement threshold")
         record = measurements.get(name) or capability.get(name)
         if not isinstance(record, dict) or not record.get("evidence_id"):
-            results.append({"metric": name, "status": "UNKNOWN", "reason": "no measured evidence"})
+            results.append(
+                {"metric": name, "status": "UNKNOWN", "reason": "no measured evidence"}
+            )
             continue
         if (
             record.get("material") != passport["material"]
@@ -53,16 +57,30 @@ def assess_quality(
             continue
         if record.get("profile_id") != passport.get("process_profile_id"):
             results.append(
-                {"metric": name, "status": "UNKNOWN", "reason": "process profile not calibrated"}
+                {
+                    "metric": name,
+                    "status": "UNKNOWN",
+                    "reason": "process profile not calibrated",
+                }
             )
             continue
         value = record.get("value")
-        if not isinstance(value, (int, float)) or isinstance(value, bool) or not isfinite(value):
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or not isfinite(value)
+        ):
             results.append(
-                {"metric": name, "status": "UNKNOWN", "reason": "no numeric measurement"}
+                {
+                    "metric": name,
+                    "status": "UNKNOWN",
+                    "reason": "no numeric measurement",
+                }
             )
             continue
-        ok = (maximum is None or value <= maximum) and (minimum is None or value >= minimum)
+        ok = (maximum is None or value <= maximum) and (
+            minimum is None or value >= minimum
+        )
         results.append(
             {
                 "metric": name,

@@ -39,7 +39,9 @@ def _sanitize_memory_value(value: Any) -> Any:
         for key, item in sanitized.items():
             normalized = str(key).lower().replace("-", "_")
             result[str(key)] = (
-                "<redacted>" if normalized in _MEMORY_SECRET_KEYS else _sanitize_memory_value(item)
+                "<redacted>"
+                if normalized in _MEMORY_SECRET_KEYS
+                else _sanitize_memory_value(item)
             )
         return result
     if isinstance(sanitized, (list, tuple, set)):
@@ -55,7 +57,9 @@ def _clean_text(value: Any) -> str:
 
 def _freeze(value: Any) -> Any:
     if isinstance(value, Mapping):
-        return MappingProxyType({str(key): _freeze(item) for key, item in value.items()})
+        return MappingProxyType(
+            {str(key): _freeze(item) for key, item in value.items()}
+        )
     if isinstance(value, (list, tuple)):
         return tuple(_freeze(item) for item in value)
     return value
@@ -118,7 +122,10 @@ class MemoryRecord:
         refs = provenance.get("refs")
         if not source_type or not isinstance(refs, list | tuple) or not refs:
             raise ValueError("provenance requires source_type and non-empty refs")
-        if source_type == "github" and not str(provenance.get("repository") or "").strip():
+        if (
+            source_type == "github"
+            and not str(provenance.get("repository") or "").strip()
+        ):
             raise ValueError("GitHub provenance requires repository")
         object.__setattr__(self, "provenance", _freeze(provenance))
 
@@ -132,7 +139,11 @@ class MemoryRecord:
         object.__setattr__(
             self,
             "visibility",
-            tuple(sorted(set(_clean_text(item).strip() for item in self.visibility if item))),
+            tuple(
+                sorted(
+                    set(_clean_text(item).strip() for item in self.visibility if item)
+                )
+            ),
         )
 
         for name in ("created_at", "updated_at"):

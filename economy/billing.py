@@ -22,7 +22,9 @@ def extract_cached_tokens(usage: dict[str, Any]) -> int:
     # The raw provider usage nests the count in the input details; the normalized usage that the
     # parser returns carries it at the top level. Both are read, so a cached input is never billed
     # at the full price.
-    details = usage.get("input_token_details") or usage.get("input_tokens_details") or {}
+    details = (
+        usage.get("input_token_details") or usage.get("input_tokens_details") or {}
+    )
     value = details.get("cached_tokens") if isinstance(details, dict) else None
     if value is None:
         value = usage.get("cached_tokens")
@@ -58,12 +60,18 @@ def build_ai_billing_item(
         "total_tokens": total_tokens,
     }
     # A retired model keeps its own prices for accounting; only legacy keys resolve to a successor.
-    pricing = (ALL_MODELS.get(model_key) or ALL_MODELS.get(canonical_model_key(model_key))) if model_key else None
+    pricing = (
+        (ALL_MODELS.get(model_key) or ALL_MODELS.get(canonical_model_key(model_key)))
+        if model_key
+        else None
+    )
     if usage_missing or pricing is None or pricing.get("pricing_status") == "unknown":
         item.update(
             {
                 "cost_status": "unknown",
-                "cost_reason": "usage_missing" if usage_missing else "pricing_not_configured",
+                "cost_reason": "usage_missing"
+                if usage_missing
+                else "pricing_not_configured",
                 "input_cost": None,
                 "output_cost": None,
                 "cached_input_cost": None,
@@ -77,9 +85,13 @@ def build_ai_billing_item(
     input_cost = billable_input * pricing["input"] / 1000
     cached_input_cost = cached_tokens * pricing.get("cached", pricing["input"]) / 1000
     output_cost = output_tokens * pricing.get("output", pricing["input"]) / 1000
-    audio_cost = audio_stt * AUDIO_STT_PRICE_PER_SEC + audio_tts * AUDIO_TTS_PRICE_PER_SEC
+    audio_cost = (
+        audio_stt * AUDIO_STT_PRICE_PER_SEC + audio_tts * AUDIO_TTS_PRICE_PER_SEC
+    )
     cache_savings = (
-        cached_tokens * max(pricing["input"] - pricing.get("cached", pricing["input"]), 0) / 1000
+        cached_tokens
+        * max(pricing["input"] - pricing.get("cached", pricing["input"]), 0)
+        / 1000
     )
     total_cost = input_cost + cached_input_cost + output_cost + audio_cost
     item.update(
@@ -96,13 +108,19 @@ def build_ai_billing_item(
     return item
 
 
-def aggregate_billing(items, context: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+def aggregate_billing(
+    items, context: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     known = [item for item in items if item.get("cost_status") == "calculated"]
     total = round(sum(float(item.get("total_cost") or 0) for item in known), 6)
     input_cost = round(sum(float(item.get("input_cost") or 0) for item in known), 6)
     output_cost = round(sum(float(item.get("output_cost") or 0) for item in known), 6)
-    cached_cost = round(sum(float(item.get("cached_input_cost") or 0) for item in known), 6)
-    cache_savings = round(sum(float(item.get("cache_savings") or 0) for item in known), 6)
+    cached_cost = round(
+        sum(float(item.get("cached_input_cost") or 0) for item in known), 6
+    )
+    cache_savings = round(
+        sum(float(item.get("cache_savings") or 0) for item in known), 6
+    )
     unknown = sum(1 for item in items if item.get("cost_status") == "unknown")
     compute = [item for item in items if item.get("type") == "compute"]
     compute_cost = round(
@@ -119,15 +137,21 @@ def aggregate_billing(items, context: Optional[dict[str, Any]] = None) -> dict[s
         "pricing_version": PRICING_VERSION,
         "input_tokens": sum(int(item.get("input_tokens") or 0) for item in items),
         "output_tokens": sum(int(item.get("output_tokens") or 0) for item in items),
-        "cached_input_tokens": sum(int(item.get("cached_input_tokens") or 0) for item in items),
+        "cached_input_tokens": sum(
+            int(item.get("cached_input_tokens") or 0) for item in items
+        ),
         "total_tokens": sum(int(item.get("total_tokens") or 0) for item in items),
         "input_cost": input_cost,
         "output_cost": output_cost,
         "cached_input_cost": cached_cost,
         "tool_cost": 0.0,
         "compute_cost": compute_cost,
-        "cpu_seconds": round(sum(float(item.get("cpu_seconds") or 0) for item in compute), 6),
-        "energy_wh": round(sum(float(item.get("energy_wh") or 0) for item in compute), 9),
+        "cpu_seconds": round(
+            sum(float(item.get("cpu_seconds") or 0) for item in compute), 6
+        ),
+        "energy_wh": round(
+            sum(float(item.get("energy_wh") or 0) for item in compute), 9
+        ),
         "total_cost": total,
         "cache_savings": cache_savings,
         "cost_status": "partial" if unknown else "calculated",
@@ -138,13 +162,21 @@ def aggregate_billing(items, context: Optional[dict[str, Any]] = None) -> dict[s
     if unknown and not any(item.get("type") == "ai" for item in known):
         result["total_cost"] = None
     if context:
-        for key in ("invocation_id", "session_id", "conversation_id", "trace_id", "owner_id"):
+        for key in (
+            "invocation_id",
+            "session_id",
+            "conversation_id",
+            "trace_id",
+            "owner_id",
+        ):
             if context.get(key) is not None:
                 result[key] = str(context[key])
     return result
 
 
-def settle_billing_to_treasury(billing: dict[str, Any], owner_id: Optional[str]) -> dict[str, Any]:
+def settle_billing_to_treasury(
+    billing: dict[str, Any], owner_id: Optional[str]
+) -> dict[str, Any]:
     """Post a fully calculated trace billing aggregate exactly once."""
     if not isinstance(billing, dict) or billing.get("cost_status") != "calculated":
         return {"status": "skipped", "reason": "billing_not_fully_calculated"}

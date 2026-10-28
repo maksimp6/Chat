@@ -94,7 +94,9 @@ def create_invocation(
     if session is None:
         if not create_missing_session:
             raise ValueError(f"Session not found: {session_id}")
-        legacy_owner = str(user_id).strip() if user_id and str(user_id).strip() else None
+        legacy_owner = (
+            str(user_id).strip() if user_id and str(user_id).strip() else None
+        )
         try:
             create_session(
                 session_id,
@@ -185,9 +187,14 @@ def _prepare_value(
     store = get_memory_client(memory_file_path())
     try:
         for index in range(count):
-            part = encoded[index * _VALUE_CHUNK_BYTES : (index + 1) * _VALUE_CHUNK_BYTES]
+            part = encoded[
+                index * _VALUE_CHUNK_BYTES : (index + 1) * _VALUE_CHUNK_BYTES
+            ]
             with store.transaction() as tx:
-                tx.set(prefix + str(index), {"data": base64.b64encode(part).decode("ascii")})
+                tx.set(
+                    prefix + str(index),
+                    {"data": base64.b64encode(part).decode("ascii")},
+                )
     except Exception:
         _discard_prepared_chunks(invocation_id, field, manifest)
         raise
@@ -224,7 +231,9 @@ def _publish_invocation_values(
     key = _key(invocation_id)
     store = get_memory_client(memory_file_path())
     record = store.get(key)
-    if record is None or (status is not None and record["status"] not in {"created", "running"}):
+    if record is None or (
+        status is not None and record["status"] not in {"created", "running"}
+    ):
         return False
     force_chunks = False
     while True:
@@ -299,7 +308,8 @@ def _read_chunked_value(invocation_id: str, field: str, manifest: Any) -> Any:
         or type(manifest.get("chunks")) is not int
         or type(manifest.get("bytes")) is not int
         or manifest["bytes"] < 1
-        or manifest["chunks"] != (manifest["bytes"] + _VALUE_CHUNK_BYTES - 1) // _VALUE_CHUNK_BYTES
+        or manifest["chunks"]
+        != (manifest["bytes"] + _VALUE_CHUNK_BYTES - 1) // _VALUE_CHUNK_BYTES
         or not isinstance(manifest.get("sha256"), str)
         or not re.fullmatch(r"[0-9a-f]{64}", manifest["sha256"])
     ):
@@ -315,7 +325,9 @@ def _read_chunked_value(invocation_id: str, field: str, manifest: Any) -> Any:
             part = base64.b64decode(chunk["data"], validate=True)
         except (ValueError, UnicodeEncodeError) as exc:
             raise KristallError("invalid invocation value chunk") from exc
-        expected = min(_VALUE_CHUNK_BYTES, manifest["bytes"] - index * _VALUE_CHUNK_BYTES)
+        expected = min(
+            _VALUE_CHUNK_BYTES, manifest["bytes"] - index * _VALUE_CHUNK_BYTES
+        )
         if len(part) != expected:
             raise KristallError("invalid invocation value chunk size")
         pieces.append(part)
@@ -340,7 +352,9 @@ def cancel_invocation(invocation_id: str, reason: Any = None) -> bool:
     return _complete(invocation_id, "cancelled", error=reason)
 
 
-def _complete(invocation_id: str, status: str, result: Any = None, error: Any = None) -> bool:
+def _complete(
+    invocation_id: str, status: str, result: Any = None, error: Any = None
+) -> bool:
     return _publish_invocation_values(
         invocation_id, {"result": result, "error": error}, status=status
     )
@@ -362,6 +376,7 @@ def get_invocation(invocation_id: str) -> Optional[dict[str, Any]]:
         raise ValueError("invalid invocation record")
     for field in ("trace", "result", "error"):
         if field + "_chunks" in value:
-            value[field] = _read_chunked_value(invocation_id, field, value.pop(field + "_chunks"))
+            value[field] = _read_chunked_value(
+                invocation_id, field, value.pop(field + "_chunks")
+            )
     return value
-

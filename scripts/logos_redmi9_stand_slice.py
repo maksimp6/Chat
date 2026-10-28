@@ -29,7 +29,9 @@ def _collect_geometry(data: bytes, count: int):
     edges = Counter()
     for i in range(count):
         values = struct.unpack_from("<12f", data, 84 + 50 * i)
-        points = [tuple(round(values[3 + 3 * j + a], 4) for a in range(3)) for j in range(3)]
+        points = [
+            tuple(round(values[3 + 3 * j + a], 4) for a in range(3)) for j in range(3)
+        ]
         if not all(math.isfinite(v) for p in points for v in p) or len(set(points)) < 3:
             raise ValueError("invalid STL triangle")
         for point in points:
@@ -66,7 +68,9 @@ def validate_stl(path: Path, variant: str = "v3") -> dict[str, object]:
     }
 
 
-def inspect_sliced(path: Path, result_path: Path, variant: str = "v3") -> dict[str, object]:
+def inspect_sliced(
+    path: Path, result_path: Path, variant: str = "v3"
+) -> dict[str, object]:
     settings, gcode = _read_sliced_archive(path)
     _validate_profile(settings)
     layers = _validate_gcode(gcode)
@@ -139,7 +143,9 @@ def main() -> int:
         str(out),
         str(args.model.resolve()),
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True, cwd=out, env=env, timeout=330)
+    res = subprocess.run(
+        cmd, capture_output=True, text=True, cwd=out, env=env, timeout=330
+    )
     print("SLICER_EXIT", res.returncode, flush=True)
     print("SLICER_LOG_TAIL", (res.stdout + res.stderr)[-1500:], flush=True)
     if res.returncode:

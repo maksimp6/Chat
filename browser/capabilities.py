@@ -127,13 +127,16 @@ class BrowserAction:
     target: str
     value: str | None = None
 
+
 def validate_browser_action(action: BrowserAction) -> list[str]:
     contract = BROWSER_CAPABILITY_CONTRACTS.get(action.capability)
     if contract is None:
         return [f"unknown browser capability: {action.capability}"]
     errors: list[str] = []
     if action.action not in contract.actions:
-        errors.append(f"action is not supported by {action.capability}: {action.action}")
+        errors.append(
+            f"action is not supported by {action.capability}: {action.action}"
+        )
     if not action.target.strip():
         errors.append("browser action target is required")
     return errors
@@ -165,7 +168,9 @@ def sanitize_browser_value(value: Any) -> Any:
     """Redact credentials and cookies before traces, logs or issue comments."""
     if isinstance(value, Mapping):
         return {
-            str(key): "<redacted>" if _sensitive_key(str(key)) else sanitize_browser_value(item)
+            str(key): "<redacted>"
+            if _sensitive_key(str(key))
+            else sanitize_browser_value(item)
             for key, item in value.items()
         }
     if isinstance(value, list):

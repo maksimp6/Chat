@@ -114,10 +114,16 @@ class ModelDiscovery:
             # SDK. Both identify the same active credential's folder.
             headers["OpenAI-Project"] = project_id
             headers["x-project"] = project_id
-        identity = (source, project_id or "", hashlib.sha256(api_key.encode()).hexdigest())
+        identity = (
+            source,
+            project_id or "",
+            hashlib.sha256(api_key.encode()).hexdigest(),
+        )
         return headers, project_id, identity
 
-    def _fetch(self, *, headers: dict[str, str], project_id: str | None) -> dict[str, Any]:
+    def _fetch(
+        self, *, headers: dict[str, str], project_id: str | None
+    ) -> dict[str, Any]:
         response = self.session.get(
             f"{self.base_url}/models",
             headers=headers,
@@ -152,7 +158,9 @@ class ModelDiscovery:
         return catalog
 
     @staticmethod
-    def _normalize_model(item: Any, *, project_id: str | None = None) -> dict[str, Any] | None:
+    def _normalize_model(
+        item: Any, *, project_id: str | None = None
+    ) -> dict[str, Any] | None:
         if not isinstance(item, dict):
             return None
         raw_id = item.get("id") or item.get("model") or item.get("name")
@@ -178,7 +186,12 @@ class ModelDiscovery:
                 "cls": "classifier",
                 "art": "image",
             }.get(parsed.scheme)
-            if kind is None or not parsed.netloc or "@" in parsed.netloc or ":" in parsed.netloc:
+            if (
+                kind is None
+                or not parsed.netloc
+                or "@" in parsed.netloc
+                or ":" in parsed.netloc
+            ):
                 return None
             if project_id is not None and parsed.netloc != project_id:
                 return None
@@ -208,11 +221,16 @@ class ModelDiscovery:
                 if declared_type in {"audio", "voice", "realtime", "stt", "tts"}:
                     kind = "voice"
                 elif declared_type in {
-                    "image", "embedding", "embeddings", "classifier", "classification"
+                    "image",
+                    "embedding",
+                    "embeddings",
+                    "classifier",
+                    "classification",
                 }:
-                    kind = {"embeddings": "embedding", "classification": "classifier"}.get(
-                        declared_type, declared_type
-                    )
+                    kind = {
+                        "embeddings": "embedding",
+                        "classification": "classifier",
+                    }.get(declared_type, declared_type)
 
         registries = {
             "text": TEXT_MODELS,
@@ -225,7 +243,11 @@ class ModelDiscovery:
         registry_key = registry_key_for_upstream(model_id) if kind == "text" else None
         if registry_key is None:
             registry_key = next(
-                (key for key, info in registry.items() if model_id in {key, info.get("upstream", key)}),
+                (
+                    key
+                    for key, info in registry.items()
+                    if model_id in {key, info.get("upstream", key)}
+                ),
                 None,
             )
         existing = registry.get(registry_key, {}) if registry_key is not None else {}
@@ -243,7 +265,10 @@ class ModelDiscovery:
             # single-turn audio adapter. Publish its effective capabilities.
             capabilities = {**capabilities, **(existing.get("capabilities") or {})}
         # Photos are accepted only for registry models (chat/mcp_routes.py), so the catalog takes that flag from the registry.
-        capabilities = {**capabilities, "multimodal": (existing.get("capabilities") or {}).get("multimodal")}
+        capabilities = {
+            **capabilities,
+            "multimodal": (existing.get("capabilities") or {}).get("multimodal"),
+        }
 
         result: dict[str, Any] = {
             **deepcopy(existing),
@@ -251,7 +276,8 @@ class ModelDiscovery:
             "type": kind,
             "capabilities": capabilities,
             "id": registry_key,
-            "available": existing.get("available") is not False and item.get("available") is not False,
+            "available": existing.get("available") is not False
+            and item.get("available") is not False,
             "provider_model_id": raw_id,
         }
         if not existing:
@@ -275,7 +301,9 @@ class ModelDiscovery:
 
 def build_model_discovery() -> ModelDiscovery:
     ttl = int(env_get("MODEL_DISCOVERY_TTL_SECONDS", str(DEFAULT_TTL_SECONDS)))
-    timeout = float(env_get("MODEL_DISCOVERY_TIMEOUT_SECONDS", str(DEFAULT_TIMEOUT_SECONDS)))
+    timeout = float(
+        env_get("MODEL_DISCOVERY_TIMEOUT_SECONDS", str(DEFAULT_TIMEOUT_SECONDS))
+    )
     return ModelDiscovery(
         base_url=env_get("YANDEX_BASE_URL", "https://ai.api.cloud.yandex.net/v1"),
         credential_resolver=_active_provider_credential,
@@ -352,7 +380,8 @@ def validate_dialog_model(model_key: str) -> str:
     if entry is None:
         entry = next(
             (
-                item for item in text_models.values()
+                item
+                for item in text_models.values()
                 if item.get("provider_model_id") == model_key
             ),
             None,

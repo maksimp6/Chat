@@ -8,7 +8,9 @@ from typing import Any
 
 
 def provider_token(value: Any) -> str | None:
-    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]{0,63}", value):
+    if not isinstance(value, str) or not re.fullmatch(
+        r"[A-Za-z][A-Za-z0-9_.-]{0,63}", value
+    ):
         return None
     if value.startswith(("ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_", "sk-")):
         return None
@@ -22,7 +24,9 @@ def provider_echo(response: dict[str, Any]) -> dict[str, Any]:
     if (
         isinstance(model, str)
         and re.fullmatch(r"[A-Za-z0-9_.:/-]{1,256}", model)
-        and not model.startswith(("ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_", "sk-"))
+        and not model.startswith(
+            ("ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_", "sk-")
+        )
     ):
         echo["model"] = model
     for key in ("max_output_tokens", "max_tool_calls"):
@@ -48,7 +52,9 @@ def provider_echo(response: dict[str, Any]) -> dict[str, Any]:
     return echo
 
 
-def capture_provider_diagnostics(result: dict[str, Any], response: dict[str, Any]) -> None:
+def capture_provider_diagnostics(
+    result: dict[str, Any], response: dict[str, Any]
+) -> None:
     """Replace per-response fields so a prior refusal never contaminates a later ID."""
     error = response.get("error")
     result["provider_error_present"] = error is not None

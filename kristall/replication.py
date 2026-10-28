@@ -57,7 +57,9 @@ class ReplicaSink:
     recent transaction can be retried; stale history needs an explicit resync.
     """
 
-    def __init__(self, store: MemoryStore, *, source: str, epoch: int, key: bytes) -> None:
+    def __init__(
+        self, store: MemoryStore, *, source: str, epoch: int, key: bytes
+    ) -> None:
         if not isinstance(source, str) or not source or len(source) > 128:
             raise ReplicationError("invalid source identity")
         if type(epoch) is not int or epoch < 1:
@@ -117,11 +119,21 @@ class ReplicaSink:
             raise ReplicationError("invalid transaction size")
         names: set[str] = set()
         for change in changes:
-            if not isinstance(change, dict) or change.get("op") not in ("set", "delete"):
+            if not isinstance(change, dict) or change.get("op") not in (
+                "set",
+                "delete",
+            ):
                 raise ReplicationError("invalid operation")
-            expected = {"op", "name", "value"} if change["op"] == "set" else {"op", "name"}
+            expected = (
+                {"op", "name", "value"} if change["op"] == "set" else {"op", "name"}
+            )
             name = change.get("name")
-            if set(change) != expected or not isinstance(name, str) or not name or name in names:
+            if (
+                set(change) != expected
+                or not isinstance(name, str)
+                or not name
+                or name in names
+            ):
                 raise ReplicationError("invalid transaction name")
             names.add(name)
 
@@ -140,7 +152,9 @@ class ReplicaSink:
                 self._store.confirm_durable()
                 receipt = Receipt(
                     "DURABLY_APPLIED",
-                    Cursor(self._source, self._epoch, prior["sequence"], prior["digest"]),
+                    Cursor(
+                        self._source, self._epoch, prior["sequence"], prior["digest"]
+                    ),
                     prior["local_commit"],
                 )
                 return prior["sequence"], prior["digest"], receipt
@@ -167,7 +181,10 @@ class ReplicaSink:
                 sequence, previous, retry = self._admit(prior, payload, digest)
                 if retry is not None:
                     return retry
-                if payload["sequence"] != sequence + 1 or payload["previous"] != previous:
+                if (
+                    payload["sequence"] != sequence + 1
+                    or payload["previous"] != previous
+                ):
                     raise ReplicationError("history gap or divergence")
                 local_commit = engine.last_commit.sequence + 1
                 for change in payload["changes"]:

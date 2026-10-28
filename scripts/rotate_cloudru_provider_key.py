@@ -63,12 +63,16 @@ def main() -> int:
 
         management = get_cloudru_iam_credentials(conn, decrypt_secret)
         if not management:
-            logger.error("Cloud.ru rotation unavailable: IAM credentials are not configured")
+            logger.error(
+                "Cloud.ru rotation unavailable: IAM credentials are not configured"
+            )
             return 2
         if management.get("expires_at"):
             from datetime import datetime, timezone
 
-            master_expires = datetime.fromisoformat(management["expires_at"].replace("Z", "+00:00"))
+            master_expires = datetime.fromisoformat(
+                management["expires_at"].replace("Z", "+00:00")
+            )
             # A timestamp without an offset is read as UTC; comparing it with an aware time would raise.
             if master_expires.tzinfo is None:
                 master_expires = master_expires.replace(tzinfo=timezone.utc)

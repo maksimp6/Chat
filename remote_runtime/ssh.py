@@ -64,7 +64,9 @@ class SSHRuntime:
             try:
                 parsed = json.loads(text)
             except json.JSONDecodeError as exc:
-                raise SSHRuntimeError("LOGOS_SSH_TARGETS_JSON is not valid JSON") from exc
+                raise SSHRuntimeError(
+                    "LOGOS_SSH_TARGETS_JSON is not valid JSON"
+                ) from exc
             if not isinstance(parsed, dict):
                 raise SSHRuntimeError("LOGOS_SSH_TARGETS_JSON must be an object")
             raw: Mapping[str, Mapping[str, Any]] = parsed
@@ -106,25 +108,39 @@ class SSHRuntime:
             try:
                 max_output = int(cfg.get("max_output_bytes", 1048576))
             except (TypeError, ValueError) as exc:
-                raise SSHRuntimeError(f"SSH target '{name}' has invalid max_output_bytes") from exc
+                raise SSHRuntimeError(
+                    f"SSH target '{name}' has invalid max_output_bytes"
+                ) from exc
             if not 4096 <= max_output <= 10 * 1024 * 1024:
-                raise SSHRuntimeError(f"SSH target '{name}' has invalid max_output_bytes")
+                raise SSHRuntimeError(
+                    f"SSH target '{name}' has invalid max_output_bytes"
+                )
 
             result[str(name)] = SSHTarget(
                 name=str(name),
                 host=host,
                 port=port,
                 default_user=(
-                    str(cfg["default_user"]).strip() if cfg.get("default_user") else None
+                    str(cfg["default_user"]).strip()
+                    if cfg.get("default_user")
+                    else None
                 ),
-                allowed_users=tuple(str(user).strip() for user in allowed if str(user).strip()),
+                allowed_users=tuple(
+                    str(user).strip() for user in allowed if str(user).strip()
+                ),
                 identity_file=(
-                    str(cfg["identity_file"]).strip() if cfg.get("identity_file") else None
+                    str(cfg["identity_file"]).strip()
+                    if cfg.get("identity_file")
+                    else None
                 ),
-                known_hosts=(str(cfg["known_hosts"]).strip() if cfg.get("known_hosts") else None),
+                known_hosts=(
+                    str(cfg["known_hosts"]).strip() if cfg.get("known_hosts") else None
+                ),
                 identity_map=tuple(normalized_identity_map),
                 workspace_root=(
-                    str(cfg["workspace_root"]).strip() if cfg.get("workspace_root") else None
+                    str(cfg["workspace_root"]).strip()
+                    if cfg.get("workspace_root")
+                    else None
                 ),
                 connect_timeout_seconds=float(cfg.get("connect_timeout_seconds", 10.0)),
                 command_timeout_seconds=float(cfg.get("command_timeout_seconds", 30.0)),
@@ -138,7 +154,8 @@ class SSHRuntime:
         if not value or len(value) > 64:
             raise SSHRuntimeError("Linux user is required and must be <= 64 characters")
         if any(
-            ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
+            ch
+            not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
             for ch in value
         ):
             raise SSHRuntimeError("Linux user contains unsupported characters")
@@ -159,7 +176,9 @@ class SSHRuntime:
             configured_user = target.identity_map[0][1]
         user = self._validate_linux_user(configured_user or "")
         if target.allowed_users and user not in target.allowed_users:
-            raise SSHRuntimeError(f"Linux user is not allowed for SSH target '{target.name}'")
+            raise SSHRuntimeError(
+                f"Linux user is not allowed for SSH target '{target.name}'"
+            )
         return target, user
 
     @staticmethod
@@ -177,8 +196,12 @@ class SSHRuntime:
         if not workspace_root:
             return normalized
         root = posixpath.normpath(workspace_root)
-        if root != "/" and not PurePosixPath(normalized).is_relative_to(PurePosixPath(root)):
-            raise SSHRuntimeError("Remote file path is outside the configured workspace")
+        if root != "/" and not PurePosixPath(normalized).is_relative_to(
+            PurePosixPath(root)
+        ):
+            raise SSHRuntimeError(
+                "Remote file path is outside the configured workspace"
+            )
         return normalized
 
     @staticmethod
@@ -203,7 +226,9 @@ class SSHRuntime:
     ) -> list[str]:
         known_hosts = target.known_hosts or self._default_known_hosts
         if not known_hosts:
-            raise SSHRuntimeError("SSH host-key verification requires configured known_hosts")
+            raise SSHRuntimeError(
+                "SSH host-key verification requires configured known_hosts"
+            )
 
         command = [
             "ssh",
@@ -367,7 +392,9 @@ class SSHRuntime:
                 timeout=timeout + 10,
             )
         except subprocess.TimeoutExpired as exc:
-            raise SSHRuntimeError(f"SSH file write timed out after {timeout:g}s") from exc
+            raise SSHRuntimeError(
+                f"SSH file write timed out after {timeout:g}s"
+            ) from exc
         except OSError as exc:
             raise SSHRuntimeError(f"Unable to start ssh: {exc}") from exc
 

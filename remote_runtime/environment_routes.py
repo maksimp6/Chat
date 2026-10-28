@@ -33,7 +33,9 @@ def environments_create():
     if not branch:
         return jsonify({"error": "branch is required"}), 400
     try:
-        return jsonify(create_environment(branch, commit_sha, get_current_owner_id())), 201
+        return jsonify(
+            create_environment(branch, commit_sha, get_current_owner_id())
+        ), 201
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except GitUnavailable:
@@ -115,7 +117,9 @@ def _runtime_http_request(context, payload):
     return {
         "status_code": response.status_code,
         "headers": [
-            (key, value) for key, value in response.headers.items() if key.lower() not in excluded
+            (key, value)
+            for key, value in response.headers.items()
+            if key.lower() not in excluded
         ],
         "body": response.iter_encoded(),
         "close": response.close,

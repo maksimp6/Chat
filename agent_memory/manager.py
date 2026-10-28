@@ -50,7 +50,9 @@ def _validated_config_update(new_config: dict) -> dict:
             if not isinstance(value, list) or not all(
                 isinstance(item, str) and item.strip() for item in value
             ):
-                raise ValueError("categories_allowed must be a list of non-empty strings")
+                raise ValueError(
+                    "categories_allowed must be a list of non-empty strings"
+                )
         elif type(value) is not _CONFIG_TYPES[key]:
             raise ValueError(f"{key} must be a {_CONFIG_TYPES[key].__name__}")
         clean[key] = value
@@ -82,7 +84,9 @@ def get_controlled_memory_summary() -> str:
     if not isinstance(allowed, list):
         raise ValueError("categories_allowed must be a list")
     facts = [
-        item for item in list_global_memory_facts() if not allowed or item["category"] in allowed
+        item
+        for item in list_global_memory_facts()
+        if not allowed or item["category"] in allowed
     ][:limit]
     if not facts:
         return ""

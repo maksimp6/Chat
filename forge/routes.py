@@ -30,7 +30,11 @@ def list_orders():
     owner = _owner_id()
     try:
         return jsonify(
-            {"orders": service.list_orders(_store(), owner, status=request.args.get("status"))}
+            {
+                "orders": service.list_orders(
+                    _store(), owner, status=request.args.get("status")
+                )
+            }
         )
     except (ArithmeticError, ValueError):
         return jsonify({"error": "invalid order status"}), 400
@@ -119,6 +123,8 @@ def set_financing_plan():
 def get_finance_status():
     owner = _owner_id()
     try:
-        return jsonify(finance.get_payback_status(_store(), owner, month=request.args.get("month")))
+        return jsonify(
+            finance.get_payback_status(_store(), owner, month=request.args.get("month"))
+        )
     except (ArithmeticError, ValueError):
         return jsonify({"error": "invalid finance status request"}), 400

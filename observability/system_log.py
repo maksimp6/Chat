@@ -81,7 +81,11 @@ class TraceMirrorHandler(logging.Handler):
         try:
             trace.add_event(
                 "system_log",
-                {"level": record.levelname, "logger": record.name, "message": record.getMessage()},
+                {
+                    "level": record.levelname,
+                    "logger": record.name,
+                    "message": record.getMessage(),
+                },
             )
         except Exception:
             pass
@@ -89,7 +93,9 @@ class TraceMirrorHandler(logging.Handler):
             _mirroring.active = False
 
 
-def configure(level: int | str | None = None, *, directory: Path | None = None) -> logging.Logger:
+def configure(
+    level: int | str | None = None, *, directory: Path | None = None
+) -> logging.Logger:
     """Install file, console and trace handlers once; safe to call repeatedly."""
     root = logging.getLogger(ROOT_LOGGER_NAME)
     with _lock:

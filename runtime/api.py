@@ -46,7 +46,9 @@ def api_list_session_profiles():
 def api_get_session_profile(profile_id):
     profile = get_profile(profile_id)
     if not profile:
-        return _contract_response("runtime.error.basic", {"error": "profile_not_found"}, 404)
+        return _contract_response(
+            "runtime.error.basic", {"error": "profile_not_found"}, 404
+        )
     return _contract_response("runtime.profile.response", profile)
 
 
@@ -61,7 +63,9 @@ def api_clone_session_profile(profile_id):
     try:
         payload = clone_profile(profile_id, name.strip() if name else None)
     except KeyError:
-        return _contract_response("runtime.error.basic", {"error": "profile_not_found"}, 404)
+        return _contract_response(
+            "runtime.error.basic", {"error": "profile_not_found"}, 404
+        )
     return _contract_response("runtime.profile.clone.response", payload, 201)
 
 
@@ -83,7 +87,9 @@ def api_create_session():
 def api_get_session(session_id):
     session = get_session(session_id)
     if not session:
-        return _contract_response("runtime.error.basic", {"error": "session_not_found"}, 404)
+        return _contract_response(
+            "runtime.error.basic", {"error": "session_not_found"}, 404
+        )
     response = dict(session)
     response["profile"] = session_profile(session_id)
     return _contract_response("runtime.session.detail.response", response)
@@ -106,7 +112,9 @@ def api_create_invocation(session_id):
         )
     conversation_id = str(data.get("conversation_id") or "")
     if not conversation_id or not check_access(conversation_id, owner):
-        return _contract_response("runtime.error.basic", {"error": "conversation_not_found"}, 404)
+        return _contract_response(
+            "runtime.error.basic", {"error": "conversation_not_found"}, 404
+        )
     try:
         context = create_invocation(
             session_id=session_id,
@@ -121,14 +129,18 @@ def api_create_invocation(session_id):
             {"error": "session_not_found", "message": "session not found"},
             404,
         )
-    return _contract_response("runtime.invocation.create.response", context.as_dict(), 201)
+    return _contract_response(
+        "runtime.invocation.create.response", context.as_dict(), 201
+    )
 
 
 @runtime_bp.get("/invocations/<invocation_id>")
 def api_get_invocation(invocation_id):
     invocation = get_invocation_status(invocation_id)
     if not invocation:
-        return _contract_response("runtime.error.basic", {"error": "invocation_not_found"}, 404)
+        return _contract_response(
+            "runtime.error.basic", {"error": "invocation_not_found"}, 404
+        )
     return _contract_response("runtime.invocation.response", invocation)
 
 
@@ -136,7 +148,9 @@ def api_get_invocation(invocation_id):
 def api_get_invocation_status(invocation_id):
     invocation = get_invocation_status(invocation_id)
     if not invocation:
-        return _contract_response("runtime.error.basic", {"error": "invocation_not_found"}, 404)
+        return _contract_response(
+            "runtime.error.basic", {"error": "invocation_not_found"}, 404
+        )
     payload = {
         "id": invocation["id"],
         "session_id": invocation["session_id"],
@@ -155,5 +169,7 @@ def api_get_invocation_status(invocation_id):
 def api_get_invocation_trace(invocation_id):
     trace = get_invocation_trace(invocation_id)
     if not trace:
-        return _contract_response("runtime.error.basic", {"error": "invocation_not_found"}, 404)
+        return _contract_response(
+            "runtime.error.basic", {"error": "invocation_not_found"}, 404
+        )
     return _contract_response("runtime.invocation.trace.response", trace)

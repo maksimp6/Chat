@@ -11,7 +11,11 @@ import logging
 
 from secret_store.credential_crypto import encrypt_secret
 from storage.db import get_store
-from provider_accounts.credentials import list_provider_credentials, create_schema, rotation_needed
+from provider_accounts.credentials import (
+    list_provider_credentials,
+    create_schema,
+    rotation_needed,
+)
 from provider_accounts.key_rotation import rotate_active_key
 from yandex_client_modules.api_key_provider import YandexApiKeyProvider
 
@@ -35,7 +39,9 @@ def main() -> int:
             logger.error("No active global provider key to rotate")
             return 2
         if not rotation_needed(row["expires_at"]):
-            logger.info("Global provider key is not inside the one-hour rotation window")
+            logger.info(
+                "Global provider key is not inside the one-hour rotation window"
+            )
             return 0
 
         # Re-read the active key before rotating. Nothing here takes a lock: a concurrent rotation is

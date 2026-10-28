@@ -46,7 +46,9 @@ def run(
         argv = ["su", "-c", shlex.join(cmd)]
     else:
         argv = cmd
-    result = subprocess.run(argv, capture_output=True, text=True, timeout=30, check=False)
+    result = subprocess.run(
+        argv, capture_output=True, text=True, timeout=30, check=False
+    )
     if check and result.returncode != 0:
         print(f"FAIL {' '.join(argv)}: rc={result.returncode} {result.stderr.strip()}")
     return result
@@ -98,7 +100,16 @@ def find_packages(word: str) -> list[str]:
 def launch_package(pkg: str) -> bool:
     """Start the launcher activity of a resolved package."""
     res = run(
-        ["monkey", "--user", "0", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1"],
+        [
+            "monkey",
+            "--user",
+            "0",
+            "-p",
+            pkg,
+            "-c",
+            "android.intent.category.LAUNCHER",
+            "1",
+        ],
         as_root=True,
         check=False,
     )
@@ -115,7 +126,9 @@ def open_app(word: str) -> bool:
         )
         return False
     if len(found) > 1:
-        print(f"OPEN: ambiguous, candidates: {', '.join(found)} — re-run with a package name")
+        print(
+            f"OPEN: ambiguous, candidates: {', '.join(found)} — re-run with a package name"
+        )
         return False
     return launch_package(found[0])
 

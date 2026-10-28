@@ -25,7 +25,11 @@ def memory_file_path() -> Path:
             "memory path is not configured: set LOGOS_MEMORY_PATH or LOGOS_DB_PATH"
         )
     configured = Path(DB_PATH).expanduser().resolve()
-    return configured if configured.suffix == ".memory" else configured.with_name("logos.memory")
+    return (
+        configured
+        if configured.suffix == ".memory"
+        else configured.with_name("logos.memory")
+    )
 
 
 def get_store() -> Kristall:
@@ -54,7 +58,9 @@ def get_conversations() -> list[dict[str, Any]]:
     return sorted(records, key=lambda record: record["updated_at"], reverse=True)
 
 
-def create_conversation(conv_id: str, title: str, model: str, provider_pending: bool = False) -> None:
+def create_conversation(
+    conv_id: str, title: str, model: str, provider_pending: bool = False
+) -> None:
     now = int(time.time())
     with get_store().transaction() as tx:
         tx.set(
@@ -95,14 +101,17 @@ def _update_conversation(conv_id: str, changes: dict[str, Any]) -> None:
             tx.set(key, {**record, **changes, "updated_at": int(time.time())})
 
 
-def update_conversation_title(conv_id: str, title: Any, owner_id: str | None = None) -> None:
+def update_conversation_title(
+    conv_id: str, title: Any, owner_id: str | None = None
+) -> None:
     """Update the title of a shared local conversation."""
     _update_conversation(conv_id, {"title": normalize_conversation_title(title)})
 
 
 def maybe_update_conversation_title(conv_id: str, source_text: Any) -> Any:
     first_line = next(
-        (line.strip() for line in str(source_text or "").splitlines() if line.strip()), ""
+        (line.strip() for line in str(source_text or "").splitlines() if line.strip()),
+        "",
     )
     key = "chat/conversation/" + conv_id
     with get_store().transaction() as tx:
@@ -111,7 +120,8 @@ def maybe_update_conversation_title(conv_id: str, source_text: Any) -> Any:
             return None
         if first_line and record["title"] in ("Новый чат", "Новый диалог"):
             record.update(
-                title=normalize_conversation_title(first_line), updated_at=int(time.time())
+                title=normalize_conversation_title(first_line),
+                updated_at=int(time.time()),
             )
             tx.set(key, record)
         return record["title"]
@@ -184,7 +194,12 @@ def add_message(
     if deduplicate_source:
         if not isinstance(source, str) or not source:
             raise ValueError("deduplicated messages require a source")
-        source_key = "chat/message-source/" + conv_id + "/" + hashlib.sha256(source.encode()).hexdigest()
+        source_key = (
+            "chat/message-source/"
+            + conv_id
+            + "/"
+            + hashlib.sha256(source.encode()).hexdigest()
+        )
     with get_store().transaction() as tx:
         record = tx.get(key)
         if source_key is not None and tx.get(source_key) is not None:
@@ -272,5 +287,3 @@ def get_config(key: str, default: Any = None) -> Any:
 def set_config(key: str, value: Any) -> None:
     with get_store().transaction() as tx:
         tx.set("config/" + key, {"value": value})
-
-

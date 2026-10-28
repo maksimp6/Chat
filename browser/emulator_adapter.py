@@ -80,7 +80,9 @@ class EmulatorBrowserAdapter:
             # A minimal environment: the emulator needs no secrets from the parent process.
             env = {
                 "PATH": os.environ.get("PATH", ""),
-                "LOGOS_EMULATOR_ALLOW_NON_PUBLIC": "1" if self._allow_non_public_hosts else "0",
+                "LOGOS_EMULATOR_ALLOW_NON_PUBLIC": "1"
+                if self._allow_non_public_hosts
+                else "0",
             }
             self._process = subprocess.Popen(
                 [self._node, str(SERVER_SCRIPT)],

@@ -52,7 +52,9 @@ def run_dialogue_command(
             time.sleep(1)
 
 
-def run_native(root: Path, temporary: Path, environ: dict[str, str]) -> tuple[dict[str, Any], int]:
+def run_native(
+    root: Path, temporary: Path, environ: dict[str, str]
+) -> tuple[dict[str, Any], int]:
     """Check admission before dependencies/context/provider work, then reuse native CLIs."""
     result: dict[str, Any] = {
         "status": "failed",
@@ -65,7 +67,9 @@ def run_native(root: Path, temporary: Path, environ: dict[str, str]) -> tuple[di
         question = environ.get("LOGOS_QUESTION", "")
         issue = environ.get("LOGOS_CASE_ISSUE", "1413")
         pr = environ.get("LOGOS_CASE_PR", "1435")
-        if not question.strip() or not all(re.fullmatch(r"[1-9][0-9]*", x) for x in (issue, pr)):
+        if not question.strip() or not all(
+            re.fullmatch(r"[1-9][0-9]*", x) for x in (issue, pr)
+        ):
             raise ValueError("A question and positive case IDs are required")
 
         phase = "admission"
@@ -87,7 +91,9 @@ def run_native(root: Path, temporary: Path, environ: dict[str, str]) -> tuple[di
             )
             return result, 1
         if not generation_allowed(environ):
-            result.update(status="blocked", error="GenerationNotPermitted", generation_requests=0)
+            result.update(
+                status="blocked", error="GenerationNotPermitted", generation_requests=0
+            )
             return result, 1
 
         temporary.mkdir(parents=True, exist_ok=True)
@@ -170,7 +176,9 @@ def run_native(root: Path, temporary: Path, environ: dict[str, str]) -> tuple[di
             stage_env = {
                 key: value
                 for key, value in child_env.items()
-                if not re.search(r"TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY", key, re.IGNORECASE)
+                if not re.search(
+                    r"TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY", key, re.IGNORECASE
+                )
                 and key != "YANDEX_PROJECT_ID"
             }
             allowed_credentials = {
@@ -190,7 +198,9 @@ def run_native(root: Path, temporary: Path, environ: dict[str, str]) -> tuple[di
             if phase == "dialogue":
                 run_dialogue_command(command, root, stage_env, answer)
             else:
-                subprocess.run(command, cwd=root, env=stage_env, check=True, capture_output=True)
+                subprocess.run(
+                    command, cwd=root, env=stage_env, check=True, capture_output=True
+                )
         candidate = json.loads(answer.read_text(encoding="utf-8"))
         if not isinstance(candidate, dict):
             raise TypeError("Native result must be an object")
@@ -213,7 +223,9 @@ def run_native(root: Path, temporary: Path, environ: dict[str, str]) -> tuple[di
                     result["native_status"] = result.get("status")
             except (OSError, ValueError):
                 pass
-        result.update(status="failed", runner_error=type(exc).__name__, runner_phase=phase)
+        result.update(
+            status="failed", runner_error=type(exc).__name__, runner_phase=phase
+        )
         return result, 1
 
 
@@ -234,9 +246,17 @@ def emit_result(
         flush=True,
     )
     if summary is not None:
-        text = "Execution status: " + html.escape(str(result.get("status", "unknown"))) + "\n\n"
+        text = (
+            "Execution status: "
+            + html.escape(str(result.get("status", "unknown")))
+            + "\n\n"
+        )
         if result.get("launch_hold"):
-            text += "Court hold: " + html.escape(str(result["launch_hold"]["case"])) + "\n\n"
+            text += (
+                "Court hold: "
+                + html.escape(str(result["launch_hold"]["case"]))
+                + "\n\n"
+            )
         reply = result.get("reply")
         if isinstance(reply, str):
             rendered = "<pre>" + html.escape(reply) + "</pre>\n"

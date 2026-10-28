@@ -3,7 +3,12 @@
 from __future__ import annotations
 from flask import Blueprint, jsonify, request
 
-from provider_accounts.quotas import assign_user_policy, get_usage, get_user_policy, upsert_policy
+from provider_accounts.quotas import (
+    assign_user_policy,
+    get_usage,
+    get_user_policy,
+    upsert_policy,
+)
 from economy.treasury_identity import get_current_owner_id
 
 
@@ -70,7 +75,9 @@ def quota_assign_policy(user_id: str):
     data = request.get_json(silent=True) or {}
     try:
         assign_user_policy(user_id, str(data.get("policy") or ""))
-        return jsonify({"status": "ok", "user_id": user_id, "policy": get_user_policy(user_id)})
+        return jsonify(
+            {"status": "ok", "user_id": user_id, "policy": get_user_policy(user_id)}
+        )
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 

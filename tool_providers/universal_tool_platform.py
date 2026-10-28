@@ -47,7 +47,9 @@ class UniversalToolDefinition:
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_mapping(cls, name: str, cfg: Mapping[str, Any]) -> "UniversalToolDefinition":
+    def from_mapping(
+        cls, name: str, cfg: Mapping[str, Any]
+    ) -> "UniversalToolDefinition":
         return cls(
             name=name,
             title=str(cfg.get("title") or name),
@@ -55,16 +57,25 @@ class UniversalToolDefinition:
             input_schema=_contract_schema(
                 cfg,
                 ("inputSchema", "input_schema", "parameters"),
-                {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+                {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                    "additionalProperties": False,
+                },
             ),
-            output_schema=_contract_schema(cfg, ("outputSchema", "output_schema"), {"type": "object"}),
+            output_schema=_contract_schema(
+                cfg, ("outputSchema", "output_schema"), {"type": "object"}
+            ),
             capabilities=tuple(str(x) for x in (cfg.get("capabilities") or ())),
             risk_level=str(cfg.get("risk_level") or "medium"),
             read_only=bool(cfg.get("read_only", False)),
             requires_approval=bool(cfg.get("requires_approval", True)),
             supported_transports=tuple(
                 str(x)
-                for x in (cfg.get("supported_transports") or ("responses_api", "local_agent"))
+                for x in (
+                    cfg.get("supported_transports") or ("responses_api", "local_agent")
+                )
             ),
             executor=dict(cfg.get("executor") or {"type": "local"}),
             metadata=dict(cfg.get("metadata") or {}),
@@ -133,7 +144,9 @@ class ReadOnlyToolPolicy:
             and str(definition.executor.get("type") or "local") == "local"
         )
 
-    def __call__(self, definition: UniversalToolDefinition, call: UniversalToolCall) -> bool:
+    def __call__(
+        self, definition: UniversalToolDefinition, call: UniversalToolCall
+    ) -> bool:
         return self.allows_tool(definition)
 
 
@@ -179,7 +192,9 @@ def _json_data_errors(value: Any, path: str) -> list[str]:
                         stack.append((_value_path(current_path, (key,)), child, False))
             else:
                 for index in range(len(item) - 1, -1, -1):
-                    stack.append((_value_path(current_path, (index,)), item[index], False))
+                    stack.append(
+                        (_value_path(current_path, (index,)), item[index], False)
+                    )
         elif item is not None and not isinstance(item, (str, bool, int, float)):
             errors.append(f"{current_path}: value is not JSON data")
     return errors
@@ -195,7 +210,14 @@ def _schema_runtime():
     from referencing import Registry
     from referencing.exceptions import Unresolvable
 
-    return Draft202012Validator, SchemaError, extend, validator_for, Registry, Unresolvable
+    return (
+        Draft202012Validator,
+        SchemaError,
+        extend,
+        validator_for,
+        Registry,
+        Unresolvable,
+    )
 
 
 def validate_json_schema(
@@ -216,7 +238,9 @@ def validate_json_schema(
     if schema_errors:
         return [f"{path}: schema is not JSON data"]
     try:
-        default, SchemaError, extend, validator_for, Registry, Unresolvable = _schema_runtime()
+        default, SchemaError, extend, validator_for, Registry, Unresolvable = (
+            _schema_runtime()
+        )
     except ImportError:
         return [f"{path}: jsonschema validation dependency is unavailable"]
     try:
@@ -230,7 +254,9 @@ def validate_json_schema(
         type_checker = validator_type.TYPE_CHECKER.redefine(
             "object", lambda _checker, instance: isinstance(instance, Mapping)
         )
-        validator = extend(validator_type, type_checker=type_checker)(schema, registry=Registry())
+        validator = extend(validator_type, type_checker=type_checker)(
+            schema, registry=Registry()
+        )
         errors = []
         for error in validator.iter_errors(value):
             error_path = _value_path(path, error.absolute_path)
@@ -261,7 +287,9 @@ def tool_call_requires_approval(
         metadata = dict(definition_or_cfg.get("metadata") or {})
 
     approval_actions = {
-        str(action) for action in (metadata.get("approval_actions") or ()) if str(action)
+        str(action)
+        for action in (metadata.get("approval_actions") or ())
+        if str(action)
     }
     if approval_actions:
         action = str((arguments or {}).get("action") or "")
@@ -301,7 +329,9 @@ def _normalize_responses_arguments(value: Any, schema: Mapping[str, Any] | bool)
             ):
                 normalized.pop(name)
             else:
-                normalized[name] = _normalize_responses_arguments(value[name], item_schema)
+                normalized[name] = _normalize_responses_arguments(
+                    value[name], item_schema
+                )
         return normalized
     item_schema = schema.get("items")
     if isinstance(value, list) and isinstance(item_schema, (Mapping, bool)):
@@ -351,14 +381,22 @@ class UniversalToolExecutor:
             return UniversalToolResult(
                 False,
                 error="Tool arguments must be an object with string keys",
-                metadata={"tool": call.tool_name, "phase": "validation", "call_id": call.call_id},
+                metadata={
+                    "tool": call.tool_name,
+                    "phase": "validation",
+                    "call_id": call.call_id,
+                },
             ).to_mapping()
 
         if not isinstance(call.metadata, Mapping):
             return UniversalToolResult(
                 False,
                 error="Tool metadata must be an object",
-                metadata={"tool": call.tool_name, "phase": "validation", "call_id": call.call_id},
+                metadata={
+                    "tool": call.tool_name,
+                    "phase": "validation",
+                    "call_id": call.call_id,
+                },
             ).to_mapping()
 
         raw_definition = self.registry.get_universal_definition(call.tool_name)
@@ -383,7 +421,10 @@ class UniversalToolExecutor:
             "started_at": self.clock(),
         }
 
-        if call.transport not in definition.supported_transports and call.transport != "internal":
+        if (
+            call.transport not in definition.supported_transports
+            and call.transport != "internal"
+        ):
             return UniversalToolResult(
                 False,
                 error=f"Tool '{call.tool_name}' does not support transport '{call.transport}'",
@@ -393,14 +434,20 @@ class UniversalToolExecutor:
         if call.transport == "responses_api":
             call = replace(
                 call,
-                arguments=_normalize_responses_arguments(call.arguments, definition.input_schema),
+                arguments=_normalize_responses_arguments(
+                    call.arguments, definition.input_schema
+                ),
             )
         errors = validate_json_schema(call.arguments, definition.input_schema)
         if errors:
             return UniversalToolResult(
                 False,
                 error="Input validation failed: " + "; ".join(errors[:8]),
-                metadata={**base_meta, "phase": "validation", "validation_errors": errors},
+                metadata={
+                    **base_meta,
+                    "phase": "validation",
+                    "validation_errors": errors,
+                },
             ).to_mapping()
 
         started = self.clock()
@@ -417,7 +464,11 @@ class UniversalToolExecutor:
                 raw_result = self.registry.execute(
                     call.tool_name,
                     dict(call.arguments),
-                    **({"server_configs": server_configs} if server_configs is not None else {}),
+                    **(
+                        {"server_configs": server_configs}
+                        if server_configs is not None
+                        else {}
+                    ),
                     context={
                         "call": call,
                         "tool": definition,
@@ -478,10 +529,18 @@ class UniversalToolExecutor:
             return self.execute(call, server_configs=server_configs, **legacy_hooks)
 
         definition = self.registry.get_universal_definition(call.tool_name)
-        arguments = dict(call.arguments) if isinstance(call.arguments, Mapping) else call.arguments
-        trace_arguments = dict(arguments) if isinstance(arguments, Mapping) else arguments
+        arguments = (
+            dict(call.arguments)
+            if isinstance(call.arguments, Mapping)
+            else call.arguments
+        )
+        trace_arguments = (
+            dict(arguments) if isinstance(arguments, Mapping) else arguments
+        )
         if definition is not None and isinstance(trace_arguments, Mapping):
-            redact = set(dict(definition.metadata or {}).get("trace_redact_arguments") or ())
+            redact = set(
+                dict(definition.metadata or {}).get("trace_redact_arguments") or ()
+            )
             for key in redact:
                 if key in trace_arguments:
                     trace_arguments[key] = "<redacted>"
@@ -497,7 +556,9 @@ class UniversalToolExecutor:
         result = trace.track_tool_execution(
             call.tool_name,
             arguments,
-            lambda: self.execute(traced_call, server_configs=server_configs, **legacy_hooks),
+            lambda: self.execute(
+                traced_call, server_configs=server_configs, **legacy_hooks
+            ),
             call_id=call.call_id,
             step=None,
             trace_arguments=trace_arguments,
@@ -512,7 +573,9 @@ class UniversalToolExecutor:
         def redact_fields(value):
             if isinstance(value, dict):
                 return {
-                    key: "<redacted>" if key in redact_result_fields else redact_fields(item)
+                    key: "<redacted>"
+                    if key in redact_result_fields
+                    else redact_fields(item)
                     for key, item in value.items()
                 }
             if isinstance(value, list):
@@ -532,9 +595,14 @@ class UniversalToolExecutor:
         call: UniversalToolCall,
         target: Mapping[str, Any],
     ) -> Any:
-        from agent_runtime.local_gateway import enqueue_local_tool_job, wait_for_local_tool_job
+        from agent_runtime.local_gateway import (
+            enqueue_local_tool_job,
+            wait_for_local_tool_job,
+        )
 
-        agent_id = str(target.get("agent_id") or target.get("target_agent") or "").strip()
+        agent_id = str(
+            target.get("agent_id") or target.get("target_agent") or ""
+        ).strip()
         if not agent_id:
             raise ValueError(f"Tool '{definition.name}' has no remote agent target")
 
@@ -569,7 +637,9 @@ class UniversalToolExecutor:
         call: UniversalToolCall,
     ) -> dict[str, Any]:
         if isinstance(raw_result, Mapping) and "success" in raw_result:
-            has_error = raw_result.get("error") is not None or raw_result.get("isError") is True
+            has_error = (
+                raw_result.get("error") is not None or raw_result.get("isError") is True
+            )
             success = raw_result.get("success") is True and not has_error
             if success and "data" not in raw_result:
                 data = {
@@ -583,7 +653,11 @@ class UniversalToolExecutor:
                 None
                 if success
                 else raw_result.get("error")
-                or (raw_result.get("content") if raw_result.get("isError") is True else None)
+                or (
+                    raw_result.get("content")
+                    if raw_result.get("isError") is True
+                    else None
+                )
                 or "Tool execution failed"
             )
             if not isinstance(raw_result.get("success"), bool) and not has_error:
@@ -594,7 +668,11 @@ class UniversalToolExecutor:
         ):
             success = False
             data = None
-            error = str(raw_result.get("error") or raw_result.get("content") or "Tool execution failed")
+            error = str(
+                raw_result.get("error")
+                or raw_result.get("content")
+                or "Tool execution failed"
+            )
             metadata = {"phase": "execution"}
         else:
             success = True
@@ -623,4 +701,3 @@ __all__ = [
     "tool_call_requires_approval",
     "validate_json_schema",
 ]
-

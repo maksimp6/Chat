@@ -39,7 +39,9 @@ def direct_search(
     if not isinstance(data, dict):
         raise ValueError("vector_store_search_response_invalid")
     results = data.get("data", data.get("results", data.get("hits")))
-    if not isinstance(results, list) or any(not isinstance(item, dict) for item in results):
+    if not isinstance(results, list) or any(
+        not isinstance(item, dict) for item in results
+    ):
         raise ValueError("vector_store_search_response_invalid")
     return results[: rag.semantic.MAX_VECTOR_SEARCH_RESULTS]
 
@@ -58,7 +60,11 @@ def _selection(
         or not isinstance(inventory.get("attachments"), list)
     ):
         raise ValueError("verify_inventory_invalid")
-    prefix = "chat-repository-archive-v1-" + rag.digest(archive.repository.encode())[:16] + "-"
+    prefix = (
+        "chat-repository-archive-v1-"
+        + rag.digest(archive.repository.encode())[:16]
+        + "-"
+    )
     files, names = {}, set()
     for item in inventory["candidate_pack_files"]:
         resume._file_record(item, prefix, rag)
@@ -73,7 +79,9 @@ def _selection(
         if item["file_id"] in states or not isinstance(item.get("status"), str):
             raise ValueError("verify_attachment_invalid")
         states[item["file_id"]] = item["status"]
-    return prefix, {key: value for key, value in files.items() if states.get(key) == "completed"}
+    return prefix, {
+        key: value for key, value in files.items() if states.get(key) == "completed"
+    }
 
 
 def _download_hits(
@@ -95,14 +103,26 @@ def _download_hits(
             continue
         attempted.add(file_id)
         if file_id not in eligible:
-            omissions.append({"file_id": file_id, "reason": "not_a_completed_candidate_pack"})
+            omissions.append(
+                {"file_id": file_id, "reason": "not_a_completed_candidate_pack"}
+            )
             continue
         item = eligible[file_id]
-        if len(packs) >= MAX_HIT_PACKS or item["bytes"] > MAX_DOWNLOAD_BYTES - downloaded:
-            omissions.append({"file_id": file_id, "reason": "verification_download_limit"})
+        if (
+            len(packs) >= MAX_HIT_PACKS
+            or item["bytes"] > MAX_DOWNLOAD_BYTES - downloaded
+        ):
+            omissions.append(
+                {"file_id": file_id, "reason": "verification_download_limit"}
+            )
             continue
         record = rag._read_pack(
-            archive, item, prefix, project, key, max_response_bytes=MAX_DOWNLOAD_BYTES - downloaded
+            archive,
+            item,
+            prefix,
+            project,
+            key,
+            max_response_bytes=MAX_DOWNLOAD_BYTES - downloaded,
         )
         if record is None:
             raise ValueError("verify_pack_not_selected")
@@ -152,7 +172,9 @@ def _matches(
             continue
         file_id = hit["file_id"]
         for snippet in rag.semantic._vector_result_texts(hit):
-            candidates = rag._snippet_candidates(stage, packs[file_id], file_id, snippet)
+            candidates = rag._snippet_candidates(
+                stage, packs[file_id], file_id, snippet
+            )
             if not candidates:
                 continue
             maximum = max(len(item["quote"]) for item in candidates)
@@ -168,7 +190,11 @@ def _matches(
                 matches.append({**candidates[0], "attribution": "unique"})
             else:
                 matches.append(
-                    {"file_id": file_id, "attribution": "ambiguous", "candidates": candidates}
+                    {
+                        "file_id": file_id,
+                        "attribution": "ambiguous",
+                        "candidates": candidates,
+                    }
                 )
     return matches
 
@@ -189,7 +215,9 @@ def verify_available(
     with tempfile.TemporaryDirectory(
         prefix="verified-hit-packs-", dir=archive.directory
     ) as directory:
-        stage = SimpleNamespace(directory=Path(directory), repository=archive.repository)
+        stage = SimpleNamespace(
+            directory=Path(directory), repository=archive.repository
+        )
         (stage.directory / "documents").mkdir(mode=0o700)
         packs, documents, omissions, downloaded = _download_hits(
             archive, hits, eligible, prefix, project, key, rag, stage
@@ -197,10 +225,14 @@ def verify_available(
         matches = _matches(stage, hits, packs, documents, rag)
     marker = "REPOSITORY_RAG_ABSENT_" + os.urandom(16).hex()
     absent = direct_search(inventory["store_id"], marker, project, key, rag)
-    if not isinstance(absent, list) or not all(isinstance(item, dict) for item in absent):
+    if not isinstance(absent, list) or not all(
+        isinstance(item, dict) for item in absent
+    ):
         raise ValueError("verify_search_response_invalid")
     fabricated = any(
-        marker in text for item in absent for text in rag.semantic._vector_result_texts(item)
+        marker in text
+        for item in absent
+        for text in rag.semantic._vector_result_texts(item)
     )
     return {
         "status": "verified_fragments"

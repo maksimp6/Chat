@@ -17,7 +17,11 @@ from pathlib import Path
 from threading import RLock, get_ident
 from typing import Any, Iterator, Protocol, TypeVar
 
-from kristall.value_validation import walk_value, validate_json_values, validate_journal_changes
+from kristall.value_validation import (
+    walk_value,
+    validate_json_values,
+    validate_journal_changes,
+)
 
 
 MAX_JOURNAL_FRAME_BYTES = 1024 * 1024  # 1 MiB including newline
@@ -179,7 +183,9 @@ class _JournalStore:
         with self._lock:
             self._ensure_open()
             if not self._ram_valid:
-                raise KristallError("recovery required; RAM publication was interrupted")
+                raise KristallError(
+                    "recovery required; RAM publication was interrupted"
+                )
             return Commit(self._sequence, self._digest)
 
     @staticmethod
@@ -273,12 +279,16 @@ class _JournalStore:
         with self._lock:
             self._ensure_open()
             if not self._ram_valid:
-                raise KristallError("recovery required; RAM publication was interrupted")
+                raise KristallError(
+                    "recovery required; RAM publication was interrupted"
+                )
             return deepcopy(self._state.get(namespace, {}).get(key))
 
     def _encode_frame(self, changes: list[dict[str, Any]]) -> tuple[bytes, str]:
         for change in changes:
-            if not isinstance(change["namespace"], str) or not isinstance(change["key"], str):
+            if not isinstance(change["namespace"], str) or not isinstance(
+                change["key"], str
+            ):
                 raise KristallError("namespace and key must be strings")
             if change["op"] == "set":
                 _validate_value(change["value"])
@@ -362,7 +372,14 @@ class _JournalStore:
                 raise KristallError("direct mutation during transaction is forbidden")
             _validate_value_shape(value)
             self._commit_changes(
-                [{"op": "set", "namespace": namespace, "key": key, "value": deepcopy(value)}]
+                [
+                    {
+                        "op": "set",
+                        "namespace": namespace,
+                        "key": key,
+                        "value": deepcopy(value),
+                    }
+                ]
             )
 
     def delete(self, namespace: str, key: str) -> None:
@@ -407,7 +424,9 @@ class _JournalStore:
         import tempfile
 
         destination.parent.mkdir(parents=True, exist_ok=True)
-        fd, temp_name = tempfile.mkstemp(prefix=".kristall-copy-", dir=destination.parent)
+        fd, temp_name = tempfile.mkstemp(
+            prefix=".kristall-copy-", dir=destination.parent
+        )
         temporary = Path(temp_name)
         try:
             # Build and fsync the copy before publishing the destination path.
@@ -419,7 +438,10 @@ class _JournalStore:
                 output.flush()
                 os.fsync(output.fileno())
             actual_state, sequence, digest = _JournalStore._inspect_log(temporary)
-            if actual_state != expected_state or Commit(sequence, digest) != expected_commit:
+            if (
+                actual_state != expected_state
+                or Commit(sequence, digest) != expected_commit
+            ):
                 raise KristallError("backup integrity mismatch")
             try:
                 if destination_must_be_new:
@@ -427,7 +449,9 @@ class _JournalStore:
                 else:
                     os.replace(temporary, destination)
             except FileExistsError as exc:
-                raise KristallError("backup destination was created concurrently") from exc
+                raise KristallError(
+                    "backup destination was created concurrently"
+                ) from exc
             _fsync_directory(destination.parent)
         finally:
             temporary.unlink(missing_ok=True)
@@ -438,7 +462,9 @@ class _JournalStore:
             state, sequence, digest = self._inspect_log(self.path)
         except KristallError as exc:
             self._failed = True
-            raise KristallError("checkpoint source is corrupt; recovery required") from exc
+            raise KristallError(
+                "checkpoint source is corrupt; recovery required"
+            ) from exc
         if state != self._state or Commit(sequence, digest) != self.last_commit:
             self._failed = True
             raise KristallError("checkpoint source changed; recovery required")
@@ -495,7 +521,11 @@ class _JournalStore:
                     stream.flush()
                     os.fsync(stream.fileno())
                 state, seq, verified_digest = self._inspect_log(temporary)
-                if state != self._state or seq != self._sequence or verified_digest != digest:
+                if (
+                    state != self._state
+                    or seq != self._sequence
+                    or verified_digest != digest
+                ):
                     raise KristallError("checkpoint verification failed")
                 # Cancellation can arrive inside replace, after the path changed
                 # but before the return/assignment. Treat publication as uncertain
@@ -541,7 +571,11 @@ class _JournalStore:
             self._ensure_open()
             if self._failed or self._active_transaction:
                 raise KristallError("restore requires a healthy idle store")
-            if self._sequence or self._state or (self.path.exists() and self.path.stat().st_size):
+            if (
+                self._sequence
+                or self._state
+                or (self.path.exists() and self.path.stat().st_size)
+            ):
                 raise KristallError("restore destination is not empty")
             origin = Path(source)
             if origin.resolve() == self.path.resolve():
@@ -550,7 +584,9 @@ class _JournalStore:
             if not origin.exists():
                 raise KristallError("backup source does not exist")
             try:
-                self._copy_verified_file(origin, self.path, state, Commit(sequence, digest))
+                self._copy_verified_file(
+                    origin, self.path, state, Commit(sequence, digest)
+                )
                 self._ram_valid = False
                 self._state = state
                 self._sequence = sequence
@@ -618,7 +654,9 @@ class Kristall:
                 _fsync_directory(self._engine.path.parent)
             except OSError as exc:
                 self._engine._failed = True
-                raise KristallError("durability confirmation failed; recovery required") from exc
+                raise KristallError(
+                    "durability confirmation failed; recovery required"
+                ) from exc
             except BaseException:
                 # Cancellation leaves the recovered durability barrier uncertain.
                 # Fence the writer while preserving the original exception.
@@ -738,7 +776,9 @@ class Kristall:
             values = self._engine._state.get(self._NAMESPACE, {})
             names = set(values) | set(self._pending)
             return {
-                name: deepcopy(self._pending[name] if name in self._pending else values[name])
+                name: deepcopy(
+                    self._pending[name] if name in self._pending else values[name]
+                )
                 for name in sorted(names)
                 if name.startswith(prefix)
             }
@@ -765,7 +805,9 @@ class Transaction:
         _validate_name(name)
         if name in self._deleted:
             return None
-        return deepcopy(self._pending[name] if name in self._pending else self._committed.get(name))
+        return deepcopy(
+            self._pending[name] if name in self._pending else self._committed.get(name)
+        )
 
     def set(self, name: str, value: Any) -> None:
         self._ensure_open()
@@ -781,7 +823,8 @@ class Transaction:
             for name, value in self._pending.items()
         ]
         changes.extend(
-            {"op": "delete", "namespace": "values", "key": name} for name in self._deleted
+            {"op": "delete", "namespace": "values", "key": name}
+            for name in self._deleted
         )
         return sorted(changes, key=lambda change: change["key"])
 
@@ -831,9 +874,12 @@ class _JournalTransaction:
     def delete(self, namespace: str, key: str) -> None:
         """Stage a key deletion without changing committed RAM state."""
         self._ensure_open()
-        self._changes[(namespace, key)] = {"op": "delete", "namespace": namespace, "key": key}
+        self._changes[(namespace, key)] = {
+            "op": "delete",
+            "namespace": namespace,
+            "key": key,
+        }
 
     def _pending_changes(self) -> list[dict[str, Any]]:
         self._ensure_open()
         return [self._changes[key] for key in sorted(self._changes)]
-

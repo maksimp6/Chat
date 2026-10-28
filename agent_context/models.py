@@ -36,7 +36,9 @@ def _canonical_hash(payload: Mapping[str, Any]) -> str:
 
 def _freeze_value(value: Any) -> Any:
     if isinstance(value, Mapping):
-        return MappingProxyType({key: _freeze_value(item) for key, item in value.items()})
+        return MappingProxyType(
+            {key: _freeze_value(item) for key, item in value.items()}
+        )
     if isinstance(value, (list, tuple)):
         return tuple(_freeze_value(item) for item in value)
     return value
@@ -110,7 +112,9 @@ class EvidenceVersion:
 
     def changed_components(self, other: "EvidenceVersion") -> tuple[str, ...]:
         return tuple(
-            name for name in _EVIDENCE_COMPONENTS if getattr(self, name) != getattr(other, name)
+            name
+            for name in _EVIDENCE_COMPONENTS
+            if getattr(self, name) != getattr(other, name)
         )
 
 
@@ -205,8 +209,12 @@ class TaskPacket:
         object.__setattr__(self, "objective", objective)
         object.__setattr__(self, "expected_deliverable", deliverable)
         object.__setattr__(self, "known_facts", _clean_text_tuple(self.known_facts))
-        object.__setattr__(self, "open_questions", _clean_text_tuple(self.open_questions))
-        object.__setattr__(self, "failed_attempts", _clean_text_tuple(self.failed_attempts))
+        object.__setattr__(
+            self, "open_questions", _clean_text_tuple(self.open_questions)
+        )
+        object.__setattr__(
+            self, "failed_attempts", _clean_text_tuple(self.failed_attempts)
+        )
         object.__setattr__(self, "evidence_refs", tuple(self.evidence_refs))
         object.__setattr__(self, "slices", tuple(self.slices))
         object.__setattr__(self, "changed_files", _clean_text_tuple(self.changed_files))

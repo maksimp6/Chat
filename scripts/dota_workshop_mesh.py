@@ -50,7 +50,11 @@ def read_glb(path: Path) -> tuple[dict, bytes]:
 
 def _item(items: list, index, label: str) -> dict:
     # Untrusted JSON: report a bad reference as MeshError, never IndexError.
-    if not isinstance(items, list) or not isinstance(index, int) or isinstance(index, bool):
+    if (
+        not isinstance(items, list)
+        or not isinstance(index, int)
+        or isinstance(index, bool)
+    ):
         raise MeshError(f"Unknown {label} index")
     if not 0 <= index < len(items) or not isinstance(items[index], dict):
         raise MeshError(f"Unknown {label} index")
@@ -87,11 +91,15 @@ def accessor(
         raise MeshError("Invalid accessor shape")
     if count and (
         offset < 0
-        or offset + (count - 1) * stride + unit > view.get("byteOffset", 0) + byte_length
+        or offset + (count - 1) * stride + unit
+        > view.get("byteOffset", 0) + byte_length
         or offset + (count - 1) * stride + unit > len(binary)
     ):
         raise MeshError("Accessor outside binary buffer")
-    return [struct.unpack_from("<" + fmt * dims, binary, offset + k * stride) for k in range(count)]
+    return [
+        struct.unpack_from("<" + fmt * dims, binary, offset + k * stride)
+        for k in range(count)
+    ]
 
 
 def select_mesh(doc: dict, binary: bytes, name: str) -> tuple[list, list]:
@@ -108,7 +116,8 @@ def select_mesh(doc: dict, binary: bytes, name: str) -> tuple[list, list]:
         raise MeshError("Non-indexed primitive is unsupported")
     points = accessor(doc, binary, attributes["POSITION"], "VEC3")
     indices = [
-        index[0] for index in accessor(doc, binary, primitive["indices"], "SCALAR", integer=True)
+        index[0]
+        for index in accessor(doc, binary, primitive["indices"], "SCALAR", integer=True)
     ]
     if not points or len(indices) % 3:
         raise MeshError("Empty mesh or invalid triangle indices")
@@ -142,7 +151,9 @@ def topology(faces: list) -> tuple[dict, list]:
             directed[tuple(sorted((u, v)))].append((u, v))
     boundary = [pairs[0] for pairs in directed.values() if len(pairs) == 1]
     extra = sum(len(pairs) > 2 for pairs in directed.values())
-    winding = sum(len(pairs) == 2 and pairs[0] == pairs[1] for pairs in directed.values())
+    winding = sum(
+        len(pairs) == 2 and pairs[0] == pairs[1] for pairs in directed.values()
+    )
     return {
         "open_edges": len(boundary),
         "nonmanifold_edges": extra,
@@ -200,7 +211,8 @@ def cap_loop(points: list, original_direction: list[int]) -> list:
         return (y[0] - x[0]) * (z[1] - x[1]) - (y[1] - x[1]) * (z[0] - x[0])
 
     signed = sum(
-        flat[i][0] * flat[(i + 1) % len(flat)][1] - flat[(i + 1) % len(flat)][0] * flat[i][1]
+        flat[i][0] * flat[(i + 1) % len(flat)][1]
+        - flat[(i + 1) % len(flat)][0] * flat[i][1]
         for i in range(len(flat))
     )
     if abs(signed) < 1e-12:
@@ -234,16 +246,21 @@ def cap_loop(points: list, original_direction: list[int]) -> list:
             # Tiny twisted seams may self-overlap in every 2D projection.
             # Preserve the 3D ring with a centroid fan; flag all caps for review.
             center = tuple(
-                sum(points[index][axis] for index in loop) / len(loop) for axis in range(3)
+                sum(points[index][axis] for index in loop) / len(loop)
+                for axis in range(3)
             )
             if any(
-                sum((points[loop[k]][axis] - center[axis]) ** 2 for axis in range(3)) < 1e-16
+                sum((points[loop[k]][axis] - center[axis]) ** 2 for axis in range(3))
+                < 1e-16
                 for k in range(len(loop))
             ):
                 raise MeshError("Boundary fan would contain degenerate faces")
             center_id = len(points)
             points.append(center)
-            return [(loop[k], loop[(k + 1) % len(loop)], center_id) for k in range(len(loop))]
+            return [
+                (loop[k], loop[(k + 1) % len(loop)], center_id)
+                for k in range(len(loop))
+            ]
     triangles.append(tuple(loop[i] for i in remaining))
     return triangles
 
@@ -284,7 +301,11 @@ def signed_volume(points: list, faces: list) -> float:
         ax, ay, az = points[a][:3]
         bx, by, bz = points[b][:3]
         cx, cy, cz = points[c][:3]
-        total += ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)
+        total += (
+            ax * (by * cz - bz * cy)
+            - ay * (bx * cz - bz * cx)
+            + az * (bx * cy - by * cx)
+        )
     return total / 6.0
 
 

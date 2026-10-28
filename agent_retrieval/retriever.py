@@ -151,9 +151,7 @@ class HybridRetriever:
                 matched.append(term)
                 df = document_frequency[term]
                 idf = math.log(1.0 + (len(documents) - df + 0.5) / (df + 0.5))
-                denominator = frequency + 1.2 * (
-                    0.25 + 0.75 * len(tokens) / avg_length
-                )
+                denominator = frequency + 1.2 * (0.25 + 0.75 * len(tokens) / avg_length)
                 score += idf * (frequency * 2.2) / denominator
 
             metadata_tokens = set(_tokens(_metadata_text(document)))

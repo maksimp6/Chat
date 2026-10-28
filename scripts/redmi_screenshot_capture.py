@@ -45,11 +45,18 @@ def require_ram_disk(path):
             if len(fields) < 3:
                 continue
             target = fields[1].replace("\\040", " ")
-            if (path == Path(target) or Path(target) in path.parents) and len(target) >= len(best_target):
+            if (path == Path(target) or Path(target) in path.parents) and len(
+                target
+            ) >= len(best_target):
                 best_target, best_type = target, fields[2]
     if best_type != "tmpfs":
-        raise CaptureSafetyError("Capture refused: " + str(path) + " is on " + (best_type or "unknown")
-                                 + ", media may only be written to the RAM disk (scripts/redmi_media_ram.sh)")
+        raise CaptureSafetyError(
+            "Capture refused: "
+            + str(path)
+            + " is on "
+            + (best_type or "unknown")
+            + ", media may only be written to the RAM disk (scripts/redmi_media_ram.sh)"
+        )
 
 
 def capture_storage_guard():
@@ -62,15 +69,25 @@ def capture_storage_guard():
     # A native runner uses work/<job UUID> for each job. Include every job's
     # capture directories when enforcing the shared temporary-media budget.
     if root.name == "work" and root.parent.name == "github-python-runner":
-        workspaces = [path for path in root.iterdir()
-                      if path.is_dir() and not path.is_symlink()]
+        workspaces = [
+            path for path in root.iterdir() if path.is_dir() and not path.is_symlink()
+        ]
     else:
         workspaces = [root]
     for folder in (path for workspace in workspaces for path in workspace.iterdir()):
-        if folder.is_symlink() or not folder.is_dir() or not folder.name.startswith((
-            ".logos-screenshots-", ".logos-tools-check-", ".logos-candidate-tools-",
-            ".logos-screenshot-verification-", ".logos-tools-tests-",
-        )):
+        if (
+            folder.is_symlink()
+            or not folder.is_dir()
+            or not folder.name.startswith(
+                (
+                    ".logos-screenshots-",
+                    ".logos-tools-check-",
+                    ".logos-candidate-tools-",
+                    ".logos-screenshot-verification-",
+                    ".logos-tools-tests-",
+                )
+            )
+        ):
             continue
         for directory, dirs, names in os.walk(folder, followlinks=False):
             dirs[:] = [name for name in dirs if not Path(directory, name).is_symlink()]
@@ -79,7 +96,9 @@ def capture_storage_guard():
                 if not path.is_symlink() and path.suffix.lower() in {".mp4", ".png"}:
                     total += path.stat().st_size
                     if total >= MAX_TEMP_CAPTURE_BYTES:
-                        raise CaptureSafetyError("Capture stopped: temporary media reached 256 MiB")
+                        raise CaptureSafetyError(
+                            "Capture stopped: temporary media reached 256 MiB"
+                        )
 
 
 def limit_recording_file():
@@ -128,7 +147,9 @@ def native_focus_is_logos():
     if not focus or PACKAGE not in focus[-1]:
         # Name what has focus, so a failed run shows which window is on top of the application.
         shown = focus[-1].strip()[:300] if focus else "no focused window reported"
-        raise CaptureSafetyError("A native window has focus above the application: " + shown)
+        raise CaptureSafetyError(
+            "A native window has focus above the application: " + shown
+        )
 
 
 def android_state():
@@ -136,7 +157,9 @@ def android_state():
     power = command(ROOT + "dumpsys", "power").decode()
     display = command(ROOT + "dumpsys", "display").decode()
     activity = command(ROOT + "dumpsys", "activity", "activities").decode()
-    resumed = re.findall(r"(?m)^.*(?:mResumedActivity|topResumedActivity):.*$", activity)
+    resumed = re.findall(
+        r"(?m)^.*(?:mResumedActivity|topResumedActivity):.*$", activity
+    )
 
     def flag(name):
         found = re.search(r"(?m)^\s*" + re.escape(name) + r"=(true|false)\s*$", policy)
@@ -149,20 +172,33 @@ def android_state():
     wakefulness = field(r"^\s*mWakefulness=(Awake|Asleep|Dozing|Dreaming)\s*$", power)
     display_power = field(r"^\s*Display Power:\s*state=([A-Z_]+)\s*$", power)
     global_display = field(r"^\s*mGlobalDisplayState=([A-Z_]+)\s*$", display)
-    return {"screen_on": display_power == "ON" and global_display == "ON",
-            "interactive": wakefulness == "Awake",
-            "power_wakefulness": wakefulness, "power_display_state": display_power,
-            "global_display_state": global_display,
-            "window_policy_screen_on": bool(re.search(r"(?m)^\s*screenState=SCREEN_STATE_ON\s*$", policy)),
-            "window_policy_interactive": bool(re.search(r"(?m)^\s*interactiveState=INTERACTIVE_STATE_AWAKE\s*$", policy)),
-            "keyguard_showing": flag("showing"), "input_restricted": flag("mInputRestricted"),
-            "keyguard_secure": flag("secure"),
-            "browser_foreground": bool(resumed) and all(PACKAGE + "/" in line for line in resumed)}
+    return {
+        "screen_on": display_power == "ON" and global_display == "ON",
+        "interactive": wakefulness == "Awake",
+        "power_wakefulness": wakefulness,
+        "power_display_state": display_power,
+        "global_display_state": global_display,
+        "window_policy_screen_on": bool(
+            re.search(r"(?m)^\s*screenState=SCREEN_STATE_ON\s*$", policy)
+        ),
+        "window_policy_interactive": bool(
+            re.search(r"(?m)^\s*interactiveState=INTERACTIVE_STATE_AWAKE\s*$", policy)
+        ),
+        "keyguard_showing": flag("showing"),
+        "input_restricted": flag("mInputRestricted"),
+        "keyguard_secure": flag("secure"),
+        "browser_foreground": bool(resumed)
+        and all(PACKAGE + "/" in line for line in resumed),
+    }
 
 
 def unlocked_screen(state):
-    return (state["screen_on"] and state["interactive"] and
-            state["keyguard_showing"] is False and state["input_restricted"] is False)
+    return (
+        state["screen_on"]
+        and state["interactive"]
+        and state["keyguard_showing"] is False
+        and state["input_restricted"] is False
+    )
 
 
 def device_guard():
@@ -172,7 +208,9 @@ def device_guard():
     except CaptureSafetyError:
         raise
     except Exception:
-        raise CaptureSafetyError("Android screen and foreground state could not be verified") from None
+        raise CaptureSafetyError(
+            "Android screen and foreground state could not be verified"
+        ) from None
 
 
 def checked_device_guard():
@@ -197,13 +235,17 @@ def input_node(expected_name, key_label):
         except OSError:
             continue
     if len(candidates) != 1:
-        raise CaptureSafetyError("The expected Redmi 9 kernel input device is unavailable")
+        raise CaptureSafetyError(
+            "The expected Redmi 9 kernel input device is unavailable"
+        )
     node = candidates[0]
     if not stat.S_ISCHR(node.stat().st_mode):
         raise CaptureSafetyError("The selected input path is not a character device")
     capabilities = command(ROOT + "getevent", "-pl", str(node)).decode(errors="replace")
     if not re.search(r"\b" + re.escape(key_label) + r"\b", capabilities):
-        raise CaptureSafetyError("The expected wake key is not supported by its input device")
+        raise CaptureSafetyError(
+            "The expected wake key is not supported by its input device"
+        )
     return node
 
 
@@ -223,7 +265,9 @@ def kernel_key_pulse(node, key_code):
         # Releasing a key must not be skipped because the capture deadline expired.
         try:
             if os.write(fd, release) != len(release):
-                raise CaptureSafetyError("The kernel wake key release was not fully written")
+                raise CaptureSafetyError(
+                    "The kernel wake key release was not fully written"
+                )
         finally:
             os.close(fd)
 
@@ -233,8 +277,11 @@ def awake_screen(state):
 
 
 def strictly_asleep(state):
-    return (state["power_wakefulness"] == "Asleep" and state["power_display_state"] == "OFF" and
-            state["global_display_state"] == "OFF")
+    return (
+        state["power_wakefulness"] == "Asleep"
+        and state["power_display_state"] == "OFF"
+        and state["global_display_state"] == "OFF"
+    )
 
 
 def wait_awake(seconds):
@@ -255,24 +302,42 @@ def prepare_browser(metadata):
     wake_attempts = []
     command(ROOT + "input", "keyevent", "KEYCODE_WAKEUP")
     awake = wait_awake(2)
-    wake_attempts.append({"method": "Android KEYCODE_WAKEUP", "awake": awake_screen(awake)})
+    wake_attempts.append(
+        {"method": "Android KEYCODE_WAKEUP", "awake": awake_screen(awake)}
+    )
     if not awake_screen(awake):
         node = input_node("fpc_irq@fingerprint", "KEY_WAKEUP")
         kernel_key_pulse(node, 143)
         awake = wait_awake(4)
-        wake_attempts.append({"method": "atomic evdev KEY_WAKEUP", "device": node.name,
-                              "device_name": "fpc_irq@fingerprint", "awake": awake_screen(awake)})
+        wake_attempts.append(
+            {
+                "method": "atomic evdev KEY_WAKEUP",
+                "device": node.name,
+                "device_name": "fpc_irq@fingerprint",
+                "awake": awake_screen(awake),
+            }
+        )
     if not awake_screen(awake):
         node = input_node("mtk-kpd", "KEY_POWER")
         fresh = android_state()
         if not strictly_asleep(fresh):
-            raise CaptureSafetyError("Refusing a POWER pulse because Redmi 9 is not confirmed Asleep and OFF")
+            raise CaptureSafetyError(
+                "Refusing a POWER pulse because Redmi 9 is not confirmed Asleep and OFF"
+            )
         kernel_key_pulse(node, 116)
         awake = wait_awake(10)
-        wake_attempts.append({"method": "single atomic evdev KEY_POWER from confirmed Asleep/OFF",
-                              "device": node.name, "device_name": "mtk-kpd", "awake": awake_screen(awake)})
+        wake_attempts.append(
+            {
+                "method": "single atomic evdev KEY_POWER from confirmed Asleep/OFF",
+                "device": node.name,
+                "device_name": "mtk-kpd",
+                "awake": awake_screen(awake),
+            }
+        )
     if not awake_screen(awake):
-        raise RuntimeError("Redmi 9 did not wake through its validated kernel input devices")
+        raise RuntimeError(
+            "Redmi 9 did not wake through its validated kernel input devices"
+        )
     if awake["keyguard_secure"] is False:
         command(ROOT + "wm", "dismiss-keyguard")
     deadline = time.monotonic() + 8
@@ -281,18 +346,37 @@ def prepare_browser(metadata):
         if unlocked_screen(awake):
             break
         if awake["keyguard_secure"] is not False:
-            raise RuntimeError("Redmi 9 requires an existing secure unlock method; automatic dismissal is unavailable")
+            raise RuntimeError(
+                "Redmi 9 requires an existing secure unlock method; automatic dismissal is unavailable"
+            )
         command(ROOT + "wm", "dismiss-keyguard")
         if time.monotonic() >= deadline:
             raise RuntimeError("Redmi 9 did not reach an awake, unlocked screen")
         time.sleep(0.3)
-    navigation_tag = metadata["github_run_id"] + "-" + metadata["github_run_attempt"] + "-" + str(time.time_ns())
+    navigation_tag = (
+        metadata["github_run_id"]
+        + "-"
+        + metadata["github_run_attempt"]
+        + "-"
+        + str(time.time_ns())
+    )
     if not re.fullmatch(r"[0-9]+-[0-9]+-[0-9]+", navigation_tag):
         raise RuntimeError("Invalid capture navigation tag")
     fresh_url = LOGOS_URL + "?logos_capture_run=" + navigation_tag
     launch_requested_ms = time.time() * 1000
-    launched = command(ROOT + "am", "start", "-W", "--user", "0", "-a",
-                       "android.intent.action.VIEW", "-d", fresh_url, "-p", PACKAGE)
+    launched = command(
+        ROOT + "am",
+        "start",
+        "-W",
+        "--user",
+        "0",
+        "-a",
+        "android.intent.action.VIEW",
+        "-d",
+        fresh_url,
+        "-p",
+        PACKAGE,
+    )
     if b"Error:" in launched or b"Exception" in launched:
         raise RuntimeError("Android could not open the local Logos URL in Iceraven")
     deadline = time.monotonic() + 40
@@ -305,25 +389,48 @@ def prepare_browser(metadata):
             rdp = RDP(deadline=deadline)
             actor = rdp.find_logos()
             state = rdp.state(actor)
-            fresh = (state.get("navigation_tag") == navigation_tag and
-                     state.get("time_origin_ms", 0) >= launch_requested_ms - 1000)
+            fresh = (
+                state.get("navigation_tag") == navigation_tag
+                and state.get("time_origin_ms", 0) >= launch_requested_ms - 1000
+            )
             if not fresh:
                 if not forced_navigation:
-                    rdp.evaluate(actor, "JSON.stringify((()=>{setTimeout(()=>location.replace(" +
-                                 json.dumps(fresh_url) + "),100);return {scheduled:true};})())")
+                    rdp.evaluate(
+                        actor,
+                        "JSON.stringify((()=>{setTimeout(()=>location.replace("
+                        + json.dumps(fresh_url)
+                        + "),100);return {scheduled:true};})())",
+                    )
                     forced_navigation = True
-                raise RuntimeError("Waiting for a fresh Logos document instead of reusing an old browser tab")
-            if (state["title"] != "Logos" or state["document_ready_state"] != "complete" or
-                    not state["sidebar"] or not state["menu"] or
-                    not isinstance(state.get("template_revision"), str) or
-                    not re.fullmatch(r"[0-9a-f]{40}", state["template_revision"])):
+                raise RuntimeError(
+                    "Waiting for a fresh Logos document instead of reusing an old browser tab"
+                )
+            if (
+                state["title"] != "Logos"
+                or state["document_ready_state"] != "complete"
+                or not state["sidebar"]
+                or not state["menu"]
+                or not isinstance(state.get("template_revision"), str)
+                or not re.fullmatch(r"[0-9a-f]{40}", state["template_revision"])
+            ):
                 raise RuntimeError("Local Logos has not finished loading")
             rdp.deadline = CAPTURE_DEADLINE
-            return rdp, actor, {"method": "Android/kernel wakeup, insecure keyguard dismissal, browser VIEW intent",
-                                "before": before, "wake_attempts": wake_attempts, "ready": android_state(),
-                                "navigation": {"tag": navigation_tag, "requested_at_ms": launch_requested_ms,
-                                               "document_time_origin_ms": state["time_origin_ms"],
-                                               "rdp_location_replace_used": forced_navigation}}
+            return (
+                rdp,
+                actor,
+                {
+                    "method": "Android/kernel wakeup, insecure keyguard dismissal, browser VIEW intent",
+                    "before": before,
+                    "wake_attempts": wake_attempts,
+                    "ready": android_state(),
+                    "navigation": {
+                        "tag": navigation_tag,
+                        "requested_at_ms": launch_requested_ms,
+                        "document_time_origin_ms": state["time_origin_ms"],
+                        "rdp_location_replace_used": forced_navigation,
+                    },
+                },
+            )
         except (OSError, RuntimeError, KeyError) as error:
             if rdp is not None:
                 rdp.s.close()
@@ -382,7 +489,9 @@ class RDP:
         raise RuntimeError("Missing DevTools reply")
 
     def evaluate(self, actor, code):
-        self.send({"to": actor, "type": "evaluateJSAsync", "text": code, "eager": False})
+        self.send(
+            {"to": actor, "type": "evaluateJSAsync", "text": code, "eager": False}
+        )
         for _ in range(200):
             result = self.receive()
             if result.get("type") == "evaluationResult":
@@ -402,8 +511,13 @@ class RDP:
         # Firefox returns large evaluation strings by actor reference. Read the
         # immutable value through the RDP substring API, never truncate a trace.
         actor, length = grip.get("actor"), grip.get("length")
-        if (not isinstance(actor, str) or not actor or type(length) is not int
-                or length < 0 or length > 8 * 1024 * 1024):
+        if (
+            not isinstance(actor, str)
+            or not actor
+            or type(length) is not int
+            or length < 0
+            or length > 8 * 1024 * 1024
+        ):
             raise RuntimeError("Invalid or oversized DevTools long string")
         chunks = []
         for start in range(0, length, 32768):
@@ -439,7 +553,9 @@ class RDP:
         return candidates[0]
 
     def state(self, actor):
-        return self.evaluate(actor, r"""JSON.stringify((()=>{
+        return self.evaluate(
+            actor,
+            r"""JSON.stringify((()=>{
           const s=document.getElementById('sidebar');
           const box=e=>e?{x:e.getBoundingClientRect().x,y:e.getBoundingClientRect().y,
             width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height,
@@ -482,7 +598,8 @@ class RDP:
             unexpectedModal:[...document.querySelectorAll('.modal.visible')].some(e=>e.id!=='model-modal'&&visible(e))||
               [...document.querySelectorAll('.logos-trace-window')].some(visible),
             modalOpen:[...document.querySelectorAll('.modal.visible,#settings-modal-custom,.logos-trace-window,#logos-system-status:not([hidden])')].some(visible)};
-        })())""")
+        })())""",
+        )
 
     def set_open(self, actor, wanted):
         state = self.state(actor)
@@ -500,45 +617,66 @@ class RDP:
         raise RuntimeError("Sidebar did not reach its requested visible state")
 
     def click(self, actor, selector):
-        self.evaluate(actor, "JSON.stringify((()=>{const b=document.querySelector(" + json.dumps(selector) +
-                      ");if(!b||b.disabled)throw Error('Unavailable control');"
-                      "b.scrollIntoView({block:'nearest',inline:'nearest'});"
-                      "const r=b.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2;"
-                      "const h=document.elementFromPoint(x,y);"
-                      "if(r.width<=0||r.height<=0||x<0||y<0||x>=innerWidth||y>=innerHeight||"
-                      "!(h===b||b.contains(h)))throw Error('Control is obscured');"
-                      "b.click();return {clicked:true};})())")
+        self.evaluate(
+            actor,
+            "JSON.stringify((()=>{const b=document.querySelector("
+            + json.dumps(selector)
+            + ");if(!b||b.disabled)throw Error('Unavailable control');"
+            "b.scrollIntoView({block:'nearest',inline:'nearest'});"
+            "const r=b.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2;"
+            "const h=document.elementFromPoint(x,y);"
+            "if(r.width<=0||r.height<=0||x<0||y<0||x>=innerWidth||y>=innerHeight||"
+            "!(h===b||b.contains(h)))throw Error('Control is obscured');"
+            "b.click();return {clicked:true};})())",
+        )
 
     def scroll(self, actor, selector, where):
-        return self.evaluate(actor, "JSON.stringify((()=>{const el=document.querySelector(" + json.dumps(selector) +
-                             ");if(!el)throw Error('Scroll container missing');"
-                             "el.scrollTop=" + ("0" if where == "top" else "el.scrollHeight") + ";"
-                             "return {scrollTop:el.scrollTop,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight};})())")
+        return self.evaluate(
+            actor,
+            "JSON.stringify((()=>{const el=document.querySelector("
+            + json.dumps(selector)
+            + ");if(!el)throw Error('Scroll container missing');"
+            "el.scrollTop=" + ("0" if where == "top" else "el.scrollHeight") + ";"
+            "return {scrollTop:el.scrollTop,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight};})())",
+        )
 
     def chat_candidates(self, actor):
-        return self.evaluate(actor, "JSON.stringify([...document.querySelectorAll('#conv-list .conv-item')].map((el,i)=>{"
-                                    "const a=el.querySelector('.conv-link');"
-                                    "return {index:i,"
-                                    "id:a?new URL(a.href,location.href).searchParams.get('conversation_id'):null,"
-                                    "title:((el.querySelector('.conv-title')||el).textContent||'').trim(),"
-                                    "active:el.classList.contains('active')};}))")
+        return self.evaluate(
+            actor,
+            "JSON.stringify([...document.querySelectorAll('#conv-list .conv-item')].map((el,i)=>{"
+            "const a=el.querySelector('.conv-link');"
+            "return {index:i,"
+            "id:a?new URL(a.href,location.href).searchParams.get('conversation_id'):null,"
+            "title:((el.querySelector('.conv-title')||el).textContent||'').trim(),"
+            "active:el.classList.contains('active')};}))",
+        )
 
     def open_conversation(self, actor, index):
-        self.evaluate(actor, "JSON.stringify((()=>{const el=document.querySelectorAll('#conv-list .conv-item')[" + str(int(index)) +
-                      "];if(!el)throw Error('Conversation missing');el.click();return {opened:true};})())")
+        self.evaluate(
+            actor,
+            "JSON.stringify((()=>{const el=document.querySelectorAll('#conv-list .conv-item')["
+            + str(int(index))
+            + "];if(!el)throw Error('Conversation missing');el.click();return {opened:true};})())",
+        )
 
     def wait_surface(self, actor, surface, tab=None):
         for _ in range(40):
             state = self.state(actor)
-            if (state["surfaces"] == ([surface] if surface else []) and
-                    (tab is None or (state["settingsTab"] == tab and state["settingsPanels"] == [tab]))):
+            if state["surfaces"] == ([surface] if surface else []) and (
+                tab is None
+                or (state["settingsTab"] == tab and state["settingsPanels"] == [tab])
+            ):
                 time.sleep(0.15)
                 return self.state(actor)
             time.sleep(0.1)
-        raise RuntimeError("The requested application surface did not become visible: " + str(surface))
+        raise RuntimeError(
+            "The requested application surface did not become visible: " + str(surface)
+        )
 
     def conversation_state(self, actor):
-        return self.evaluate(actor, r"""JSON.stringify((()=>{
+        return self.evaluate(
+            actor,
+            r"""JSON.stringify((()=>{
           const ids=typeof conversations!=='undefined'&&Array.isArray(conversations)?
             conversations.map(c=>c&&c.id).filter(id=>typeof id==='string'):[];
           const active=[...document.querySelectorAll('#conv-list .conv-item.active')];
@@ -555,88 +693,116 @@ class RDP:
             empty_state:!!document.querySelector('#chatbox .empty-state'),
             error_state:!!document.querySelector('#chatbox .error-state'),ready_state:document.readyState,
             date_ms:Date.now(),performance_ms:performance.now(),time_origin_ms:performance.timeOrigin};
-        })())""")
+        })())""",
+        )
 
     def message_counts(self, actor):
-        return self.evaluate(actor, "JSON.stringify({user:document.querySelectorAll('#chatbox .msg.user').length,"
-                                    "bot:document.querySelectorAll('#chatbox .msg.bot').length,"
-                                    "error:document.querySelectorAll('#chatbox .msg.error').length})")
+        return self.evaluate(
+            actor,
+            "JSON.stringify({user:document.querySelectorAll('#chatbox .msg.user').length,"
+            "bot:document.querySelectorAll('#chatbox .msg.bot').length,"
+            "error:document.querySelectorAll('#chatbox .msg.error').length})",
+        )
 
     def send_chat_message(self, actor, text):
-        self.evaluate(actor, "JSON.stringify((()=>{const input=document.getElementById('msg-input');"
-                      "input.focus();input.value=" + json.dumps(text) + ";"
-                      "input.dispatchEvent(new Event('input',{bubbles:true}));return {typed:true};})())")
+        self.evaluate(
+            actor,
+            "JSON.stringify((()=>{const input=document.getElementById('msg-input');"
+            "input.focus();input.value=" + json.dumps(text) + ";"
+            "input.dispatchEvent(new Event('input',{bubbles:true}));return {typed:true};})())",
+        )
         self.click(actor, "#send-btn")
 
     def persisted_messages(self, actor, conversation_id):
-        return self.evaluate(actor, "JSON.stringify((()=>{const x=new XMLHttpRequest();"
-                             "x.open('GET','/api/conversations/'+encodeURIComponent(" + json.dumps(conversation_id) +
-                             ")+'/messages',false);x.send();if(x.status!==200)return {status:x.status,messages:[]};"
-                             "return {status:x.status,messages:(JSON.parse(x.responseText).messages||[]).map(m=>({role:m.role,"
-                             "text:String(m.text||'').slice(0,10000000),"
-                             "invocation_id:(m.trace&&m.trace.invocation_id)||null,"
-                             "errors:((m.trace&&m.trace.errors)||[]).slice(0,10).map(e=>({source:String(e.source||'').slice(0,80),"
-                             "type:String(e.type||'').slice(0,80),error:String(e.error||'').slice(0,300)}))}))};})())")
+        return self.evaluate(
+            actor,
+            "JSON.stringify((()=>{const x=new XMLHttpRequest();"
+            "x.open('GET','/api/conversations/'+encodeURIComponent("
+            + json.dumps(conversation_id)
+            + ")+'/messages',false);x.send();if(x.status!==200)return {status:x.status,messages:[]};"
+            "return {status:x.status,messages:(JSON.parse(x.responseText).messages||[]).map(m=>({role:m.role,"
+            "text:String(m.text||'').slice(0,10000000),"
+            "invocation_id:(m.trace&&m.trace.invocation_id)||null,"
+            "errors:((m.trace&&m.trace.errors)||[]).slice(0,10).map(e=>({source:String(e.source||'').slice(0,80),"
+            "type:String(e.type||'').slice(0,80),error:String(e.error||'').slice(0,300)}))}))};})())",
+        )
 
     def reply_receipt(self, actor, invocation_id):
         # Billing carries token counts and prices only; tool arguments and results stay out of the evidence.
-        return self.evaluate(actor, "JSON.stringify((()=>{const x=new XMLHttpRequest();"
-                             "x.open('GET','/api/invocations/'+encodeURIComponent(" + json.dumps(invocation_id) +
-                             ")+'/trace',false);x.send();if(x.status!==200)return {http_status:x.status,errors:[]};"
-                             "const t=JSON.parse(x.responseText),b=t.billing||{};"
-                             "const pick=(o,keys)=>Object.fromEntries(keys.filter(k=>k in o).map(k=>[k,o[k]]));"
-                             "return {http_status:x.status,"
-                             "billing:pick(b,['input_tokens','cached_input_tokens','output_tokens','total_tokens',"
-                             "'compute_cost','total_cost','cost_status']),"
-                             "items:(b.items||[]).map(i=>pick(i,['type','step','model','input_tokens','cached_input_tokens',"
-                             "'output_tokens','total_tokens','total_cost','cost_status'])),"
-                             "tool_calls:(t.tool_calls||[]).map(c=>c.name||c.tool_name),"
-                             "errors:(t.errors||[]).slice(0,50).map(e=>({source:String(e.source||'').slice(0,80),"
-                             "type:String(e.type||'').slice(0,80),error:String(e.error||'').slice(0,300)})),"
-                             "events:(t.events||[]).filter(e=>e.type==='api_request_manifest'||e.event==='api_request_manifest')};})())")
+        return self.evaluate(
+            actor,
+            "JSON.stringify((()=>{const x=new XMLHttpRequest();"
+            "x.open('GET','/api/invocations/'+encodeURIComponent("
+            + json.dumps(invocation_id)
+            + ")+'/trace',false);x.send();if(x.status!==200)return {http_status:x.status,errors:[]};"
+            "const t=JSON.parse(x.responseText),b=t.billing||{};"
+            "const pick=(o,keys)=>Object.fromEntries(keys.filter(k=>k in o).map(k=>[k,o[k]]));"
+            "return {http_status:x.status,"
+            "billing:pick(b,['input_tokens','cached_input_tokens','output_tokens','total_tokens',"
+            "'compute_cost','total_cost','cost_status']),"
+            "items:(b.items||[]).map(i=>pick(i,['type','step','model','input_tokens','cached_input_tokens',"
+            "'output_tokens','total_tokens','total_cost','cost_status'])),"
+            "tool_calls:(t.tool_calls||[]).map(c=>c.name||c.tool_name),"
+            "errors:(t.errors||[]).slice(0,50).map(e=>({source:String(e.source||'').slice(0,80),"
+            "type:String(e.type||'').slice(0,80),error:String(e.error||'').slice(0,300)})),"
+            "events:(t.events||[]).filter(e=>e.type==='api_request_manifest'||e.event==='api_request_manifest')};})())",
+        )
 
     def reply_details(self, actor):
         # The one-line details of the latest reply, as the user reads it: tokens, rubles and seconds.
-        return self.evaluate(actor, "JSON.stringify((()=>{const m=[...document.querySelectorAll('#chatbox .msg.bot')].pop();"
-                             "const d=m&&m.querySelector('.msg-details');const s=d&&(d.querySelector('summary')||d);"
-                             "return {text:s?s.textContent.trim():null};})())")
+        return self.evaluate(
+            actor,
+            "JSON.stringify((()=>{const m=[...document.querySelectorAll('#chatbox .msg.bot')].pop();"
+            "const d=m&&m.querySelector('.msg-details');const s=d&&(d.querySelector('summary')||d);"
+            "return {text:s?s.textContent.trim():null};})())",
+        )
 
     def tools_inventory(self, actor, conversation_id):
-        return self.evaluate(actor, "JSON.stringify((()=>{const get=p=>{const x=new XMLHttpRequest();"
-                             "x.open('GET',p,false);x.send();if(x.status!==200)throw Error('Tool inventory unavailable');"
-                             "return JSON.parse(x.responseText);};return {categories:get('/api/tools/categories').categories,"
-                             "active_categories:get('/api/conversations/'+encodeURIComponent(" + json.dumps(conversation_id) +
-                             ")+'/tools').active_tool_categories};})())")
+        return self.evaluate(
+            actor,
+            "JSON.stringify((()=>{const get=p=>{const x=new XMLHttpRequest();"
+            "x.open('GET',p,false);x.send();if(x.status!==200)throw Error('Tool inventory unavailable');"
+            "return JSON.parse(x.responseText);};return {categories:get('/api/tools/categories').categories,"
+            "active_categories:get('/api/conversations/'+encodeURIComponent("
+            + json.dumps(conversation_id)
+            + ")+'/tools').active_tool_categories};})())",
+        )
 
     def tools_trace(self, actor, invocation_id):
         # Publish only execution outcomes and the existing secret-free request receipt.
         # Tool arguments and results can contain personal files or credentials.
-        return self.evaluate(actor, "JSON.stringify((()=>{const x=new XMLHttpRequest();"
-                             "x.open('GET','/api/invocations/'+encodeURIComponent(" + json.dumps(invocation_id) +
-                             ")+'/trace',false);x.send();if(x.status!==200)return {http_status:x.status};"
-                             "const t=JSON.parse(x.responseText);const id=v=>typeof v==='string'&&"
-                             "/^[-A-Za-z0-9_:]{1,180}$/.test(v)&&!/gh[pousr]_|github_pat_|sk-|AQVN|BEGIN/i.test(v)?v:null;"
-                             "const state=v=>v==null?null:['completed','incomplete','failed','cancelled','queued','in_progress'].includes(v)?v:'UNKNOWN';"
-                             "const out=r=>(r.output||[]).flatMap(i=>"
-                             "i.type==='function_call'?[i]:i.type==='message'&&(i.status==null||i.status==='completed')?"
-                             "(i.content||[]).filter(c=>c.type==='function_call'):[])"
-                             ".map(i=>({type:'function_call',name:id(i.name),call_id:id(i.call_id),status:state(i.status)}));"
-                             "return {context:{invocation_id:t.context?.invocation_id},"
-                             "errors:(t.errors||[]).map(e=>({type:e.type||'unknown'})),"
-                             "responses:(t.responses||[]).map(r=>({step:r.step,response_id:id(r.response_id),raw:{"
-                             "id:id(r.raw?.id),status:state(r.raw?.status),incomplete_details:{reason:"
-                             "['max_output_tokens','content_filter'].includes(r.raw?.incomplete_details?.reason)?"
-                             "r.raw.incomplete_details.reason:null},"
-                             "error:r.raw?.error!=null?{present:true}:null,output:out(r.raw||{})}})),"
-                             "api_requests:(t.api_requests||[]).map(r=>({step:r.step,payload:{tools:(r.payload?.tools||[])"
-                             ".map(i=>({type:i.type,name:i.name||i.function?.name}))}})),"
-                             "tool_calls:(t.tool_calls||[]).map(c=>({name:id(c.name||c.tool_name),call_id:id(c.call_id),"
-                             "step:c.step,error:!!c.error,result:{success:c.result?.success,"
-                             "metadata:{phase:c.result?.metadata?.phase}},status:c.status})),"
-                             "events:(t.events||[]).filter(e=>e.type==='api_request_manifest'||e.event==='api_request_manifest')};})())")
+        return self.evaluate(
+            actor,
+            "JSON.stringify((()=>{const x=new XMLHttpRequest();"
+            "x.open('GET','/api/invocations/'+encodeURIComponent("
+            + json.dumps(invocation_id)
+            + ")+'/trace',false);x.send();if(x.status!==200)return {http_status:x.status};"
+            "const t=JSON.parse(x.responseText);const id=v=>typeof v==='string'&&"
+            "/^[-A-Za-z0-9_:]{1,180}$/.test(v)&&!/gh[pousr]_|github_pat_|sk-|AQVN|BEGIN/i.test(v)?v:null;"
+            "const state=v=>v==null?null:['completed','incomplete','failed','cancelled','queued','in_progress'].includes(v)?v:'UNKNOWN';"
+            "const out=r=>(r.output||[]).flatMap(i=>"
+            "i.type==='function_call'?[i]:i.type==='message'&&(i.status==null||i.status==='completed')?"
+            "(i.content||[]).filter(c=>c.type==='function_call'):[])"
+            ".map(i=>({type:'function_call',name:id(i.name),call_id:id(i.call_id),status:state(i.status)}));"
+            "return {context:{invocation_id:t.context?.invocation_id},"
+            "errors:(t.errors||[]).map(e=>({type:e.type||'unknown'})),"
+            "responses:(t.responses||[]).map(r=>({step:r.step,response_id:id(r.response_id),raw:{"
+            "id:id(r.raw?.id),status:state(r.raw?.status),incomplete_details:{reason:"
+            "['max_output_tokens','content_filter'].includes(r.raw?.incomplete_details?.reason)?"
+            "r.raw.incomplete_details.reason:null},"
+            "error:r.raw?.error!=null?{present:true}:null,output:out(r.raw||{})}})),"
+            "api_requests:(t.api_requests||[]).map(r=>({step:r.step,payload:{tools:(r.payload?.tools||[])"
+            ".map(i=>({type:i.type,name:i.name||i.function?.name}))}})),"
+            "tool_calls:(t.tool_calls||[]).map(c=>({name:id(c.name||c.tool_name),call_id:id(c.call_id),"
+            "step:c.step,error:!!c.error,result:{success:c.result?.success,"
+            "metadata:{phase:c.result?.metadata?.phase}},status:c.status})),"
+            "events:(t.events||[]).filter(e=>e.type==='api_request_manifest'||e.event==='api_request_manifest')};})())",
+        )
 
     def start_creation_observer(self, actor):
-        return self.evaluate(actor, r"""JSON.stringify((()=>{
+        return self.evaluate(
+            actor,
+            r"""JSON.stringify((()=>{
           const key='__logosCaptureCreationObserver';if(window[key])throw Error('Capture observer already present');
           const original=window.fetch,requests=[];let counter=0;
           const observer={requests,active:true,expired:false,original,wrapped:null,timer:null,samples:[],sample_overflow:false};
@@ -691,20 +857,33 @@ class RDP:
           observer.timer=setTimeout(()=>{if(window.fetch===wrapped)window.fetch=original;
             observer.active=false;observer.mutations.disconnect();observer.expired=true;},60000);
           return {installed:window.fetch===wrapped,date_ms:Date.now(),performance_ms:performance.now(),time_origin_ms:performance.timeOrigin};
-        })())""")
+        })())""",
+        )
 
     def creation_observer(self, actor, stop=False):
-        return self.evaluate(actor, "JSON.stringify((()=>{const key='__logosCaptureCreationObserver',o=window[key];"
-                             "if(!o)return {available:false,requests:[]};"
-                             "const result={available:true,intact:window.fetch===o.wrapped,expired:o.expired,requests:o.requests,"
-                             "samples:o.samples,sample_overflow:o.sample_overflow};" +
-                             ("o.active=false;if(window.fetch===o.wrapped)window.fetch=o.original;o.mutations.disconnect();clearTimeout(o.timer);delete window[key];" if stop else "") +
-                             "return result;})())")
+        return self.evaluate(
+            actor,
+            "JSON.stringify((()=>{const key='__logosCaptureCreationObserver',o=window[key];"
+            "if(!o)return {available:false,requests:[]};"
+            "const result={available:true,intact:window.fetch===o.wrapped,expired:o.expired,requests:o.requests,"
+            "samples:o.samples,sample_overflow:o.sample_overflow};"
+            + (
+                "o.active=false;if(window.fetch===o.wrapped)window.fetch=o.original;o.mutations.disconnect();clearTimeout(o.timer);delete window[key];"
+                if stop
+                else ""
+            )
+            + "return result;})())",
+        )
 
     def request_creation_reads(self, actor, conversation_id):
-        self.evaluate(actor, "JSON.stringify((()=>{for(const path of ['/api/conversations',"
-                      "'/api/conversations/'+encodeURIComponent(" + json.dumps(conversation_id) + ")+ '/messages'])"
-                      "fetch(path,{cache:'no-store'}).catch(()=>{});return {requested:true};})())")
+        self.evaluate(
+            actor,
+            "JSON.stringify((()=>{for(const path of ['/api/conversations',"
+            "'/api/conversations/'+encodeURIComponent("
+            + json.dumps(conversation_id)
+            + ")+ '/messages'])"
+            "fetch(path,{cache:'no-store'}).catch(()=>{});return {requested:true};})())",
+        )
 
 
 def version():
@@ -722,10 +901,22 @@ def start_screenrecord(video_path, time_limit, bit_rate):
     capture_storage_guard()
     if not Path(ROOT + "screenrecord").is_file():
         return None
-    return subprocess.Popen([ROOT + "screenrecord", "--bugreport", "--size", "720x1560",
-                             "--bit-rate", str(bit_rate), "--time-limit", str(time_limit), str(video_path)],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                            preexec_fn=limit_recording_file)
+    return subprocess.Popen(
+        [
+            ROOT + "screenrecord",
+            "--bugreport",
+            "--size",
+            "720x1560",
+            "--bit-rate",
+            str(bit_rate),
+            "--time-limit",
+            str(time_limit),
+            str(video_path),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        preexec_fn=limit_recording_file,
+    )
 
 
 def finish_screenrecord(recorder, video_path, uid, gid, max_bytes, *, event_sink=None):
@@ -754,6 +945,7 @@ def finish_screenrecord(recorder, video_path, uid, gid, max_bytes, *, event_sink
     video["exit_code"] = recorder.returncode
     if video_path.is_file() and 16 <= video_path.stat().st_size <= max_bytes:
         from publish_redmi_screenshots import validate_mp4
+
         try:
             validate_mp4(video_path)
         except Exception:
@@ -763,7 +955,11 @@ def finish_screenrecord(recorder, video_path, uid, gid, max_bytes, *, event_sink
             video["available"] = True
             video_path.chmod(0o600)
             os.chown(video_path, uid, gid)
-            artifact = {"path": video_path.name, "sha256": hashlib.sha256(content).hexdigest(), "size": len(content)}
+            artifact = {
+                "path": video_path.name,
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "size": len(content),
+            }
     if not video["available"]:
         failures.append("native_video_artifact_unavailable")
     return video, artifact, failures
@@ -792,8 +988,12 @@ def tools_self_check(rdp, actor, conversation_id):
     # The question is a text request with tool calls. An image model refuses it (its prompt limit is
     # 1000 characters), so the chat is moved to the text model whose documented example calls functions.
     if rdp.conversation_state(actor)["current_model"] != TOOLS_CHECK_MODEL:
-        rdp.evaluate(actor, "JSON.stringify((()=>{window.changeModel(" + json.dumps(TOOLS_CHECK_MODEL) +
-                     ", false);return {changed:true};})())")
+        rdp.evaluate(
+            actor,
+            "JSON.stringify((()=>{window.changeModel("
+            + json.dumps(TOOLS_CHECK_MODEL)
+            + ", false);return {changed:true};})())",
+        )
         for _ in range(30):
             device_guard()
             if rdp.conversation_state(actor)["current_model"] == TOOLS_CHECK_MODEL:
@@ -804,8 +1004,14 @@ def tools_self_check(rdp, actor, conversation_id):
     # #msg-input is input[type=text]; it removes line breaks before sending.
     nonce = uuid.uuid4().hex
     folder = "tmp/logos-tools-check-" + nonce
-    candidate_root = str(Path(__file__).resolve().parents[1]) if LOGOS_URL.endswith(":8081/") else None
-    question = build_self_check_question(inventory, nonce, folder, project_root=candidate_root)
+    candidate_root = (
+        str(Path(__file__).resolve().parents[1])
+        if LOGOS_URL.endswith(":8081/")
+        else None
+    )
+    question = build_self_check_question(
+        inventory, nonce, folder, project_root=candidate_root
+    )
     rdp.send_chat_message(actor, question)
     # Leave time to finalize the recording and publish even when the app times out.
     deadline = time.monotonic() + max(0, remaining(120) - 15)
@@ -815,27 +1021,57 @@ def tools_self_check(rdp, actor, conversation_id):
         after = rdp.persisted_messages(actor, conversation_id)
         if after["status"] != 200:
             break
-        fresh = after["messages"][len(before["messages"]):]
-        question_positions = [i for i, m in enumerate(fresh) if m["role"] == "user" and m["text"] == question]
-        old_invocations = {m["invocation_id"] for m in before["messages"] if m["invocation_id"]}
-        replies = fresh[question_positions[-1] + 1:] if question_positions else []
-        if any(m["role"] == "assistant" and m["text"].strip() and m["invocation_id"]
-               and m["invocation_id"] not in old_invocations for m in replies):
+        fresh = after["messages"][len(before["messages"]) :]
+        question_positions = [
+            i
+            for i, m in enumerate(fresh)
+            if m["role"] == "user" and m["text"] == question
+        ]
+        old_invocations = {
+            m["invocation_id"] for m in before["messages"] if m["invocation_id"]
+        }
+        replies = fresh[question_positions[-1] + 1 :] if question_positions else []
+        if any(
+            m["role"] == "assistant"
+            and m["text"].strip()
+            and m["invocation_id"]
+            and m["invocation_id"] not in old_invocations
+            for m in replies
+        ):
             for m in replies:
-                if m["role"] == "assistant" and m["invocation_id"] and m["invocation_id"] not in old_invocations:
-                    traces[m["invocation_id"]] = rdp.tools_trace(actor, m["invocation_id"])
+                if (
+                    m["role"] == "assistant"
+                    and m["invocation_id"]
+                    and m["invocation_id"] not in old_invocations
+                ):
+                    traces[m["invocation_id"]] = rdp.tools_trace(
+                        actor, m["invocation_id"]
+                    )
             break
         time.sleep(1)
-    report = evaluate_tool_evidence(inventory["categories"], inventory["active_categories"],
-                                    before["messages"], after["messages"], traces, question)
+    report = evaluate_tool_evidence(
+        inventory["categories"],
+        inventory["active_categories"],
+        before["messages"],
+        after["messages"],
+        traces,
+        question,
+    )
     report["question"] = question
-    report["file_fixture"] = {"nonce": nonce, "folder": folder, "extended": candidate_root is not None}
+    report["file_fixture"] = {
+        "nonce": nonce,
+        "folder": folder,
+        "extended": candidate_root is not None,
+    }
     report["execution_traces"] = traces
-    report["browser_observation"] = rdp.evaluate(actor, "JSON.stringify({"
+    report["browser_observation"] = rdp.evaluate(
+        actor,
+        "JSON.stringify({"
         "tool_summaries:[...document.querySelectorAll('.msg-technical-summary')]"
         ".map(e=>e.textContent),zero_calls_visible:[...document.querySelectorAll('.msg-technical-label')]"
         ".some(e=>e.textContent.includes('Вызовы инструментов: 0')),"
-        "error_messages:document.querySelectorAll('#chatbox .msg.error').length})")
+        "error_messages:document.querySelectorAll('#chatbox .msg.error').length})",
+    )
     # The original reply remains in the app conversation. Do not publish free text from
     # a model with filesystem tools; the evidence report contains only structured facts.
     return report
@@ -848,31 +1084,56 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
     video_path = out / "15-conversation-create.mp4"
     video_seconds = 180
     video_deadline = None
-    video = {"path": video_path.name, "available": False, "time_limit_seconds": video_seconds,
-             "clock_note": "Process timestamps bound recording; they do not identify the exact first video frame."}
+    video = {
+        "path": video_path.name,
+        "available": False,
+        "time_limit_seconds": video_seconds,
+        "clock_note": "Process timestamps bound recording; they do not identify the exact first video frame.",
+    }
     observer = {"available": False, "requests": []}
     reload_observer = {"available": False, "requests": []}
-    checkpoints = {"new_conversation_postconditions": {"status": "NOT_RUN", "reason": "creation_not_confirmed"},
-                   "reload_persistence": {"status": "NOT_RUN", "reason": "creation_not_confirmed"},
-                   "message_send": {"status": "NOT_RUN", "reason": "creation_not_confirmed"}}
+    checkpoints = {
+        "new_conversation_postconditions": {
+            "status": "NOT_RUN",
+            "reason": "creation_not_confirmed",
+        },
+        "reload_persistence": {"status": "NOT_RUN", "reason": "creation_not_confirmed"},
+        "message_send": {"status": "NOT_RUN", "reason": "creation_not_confirmed"},
+    }
     if tools_check:
-        checkpoints["tools_self_check"] = {"status": "NOT_RUN", "reason": "new_chat_not_ready"}
+        checkpoints["tools_self_check"] = {
+            "status": "NOT_RUN",
+            "reason": "new_chat_not_ready",
+        }
     else:
-        checkpoints["poets_dialogue"] = {"status": "NOT_RUN", "reason": "message_not_answered"}
+        checkpoints["poets_dialogue"] = {
+            "status": "NOT_RUN",
+            "reason": "message_not_answered",
+        }
     before = after = reloaded = None
 
     def mark(name, browser=None):
-        event = {"event": name, "wall_utc": datetime.now(timezone.utc).isoformat(),
-                 "monotonic_ns": time.monotonic_ns()}
+        event = {
+            "event": name,
+            "wall_utc": datetime.now(timezone.utc).isoformat(),
+            "monotonic_ns": time.monotonic_ns(),
+        }
         if browser is not None:
             event["browser"] = browser
         if recorder is not None:
             event["recorder_running"] = recorder.poll() is None
-        if name in ("new_chat_button_clicked", "current_model_choice_started", "current_model_choice_clicked",
-                    "creation_result_observed", "reload_result_observed", "native_screencap_finished:14-conversation-after-reload.png",
-                    "message_send_clicked", "message_reply_observed",
-                    "screenshot_finished:22-poets-dialogue-top.png",
-                    "screenshot_finished:23-poets-dialogue-bottom.png"):
+        if name in (
+            "new_chat_button_clicked",
+            "current_model_choice_started",
+            "current_model_choice_clicked",
+            "creation_result_observed",
+            "reload_result_observed",
+            "native_screencap_finished:14-conversation-after-reload.png",
+            "message_send_clicked",
+            "message_reply_observed",
+            "screenshot_finished:22-poets-dialogue-top.png",
+            "screenshot_finished:23-poets-dialogue-bottom.png",
+        ):
             if not event.get("recorder_running"):
                 failures.append("native_video_ended_before_scenario_complete")
         events.append(event)
@@ -880,32 +1141,57 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
     def app_state():
         device_guard()
         state = rdp.state(actor)
-        if (state["visibility"] != "visible" or state["title"] != "Logos" or state["url"] != LOGOS_URL or
-                state["unsafeModal"] or state["unexpectedModal"] or
-                state["surfaces"] not in ([], ["model"])):
-            raise CaptureSafetyError("The conversation recording left the clean local Logos view")
+        if (
+            state["visibility"] != "visible"
+            or state["title"] != "Logos"
+            or state["url"] != LOGOS_URL
+            or state["unsafeModal"]
+            or state["unexpectedModal"]
+            or state["surfaces"] not in ([], ["model"])
+        ):
+            raise CaptureSafetyError(
+                "The conversation recording left the clean local Logos view"
+            )
         return state
 
     def frame(filename):
         state = app_state()
         mark("screenshot_started:" + filename)
-        snapshot(filename, surface="model" if state["surfaces"] else None, capture_actor=actor, event_sink=mark)
+        snapshot(
+            filename,
+            surface="model" if state["surfaces"] else None,
+            capture_actor=actor,
+            event_sink=mark,
+        )
         mark("screenshot_finished:" + filename)
 
     def check_created(baseline, result, new_id, phase):
         if not new_id or new_id == baseline["current_id"]:
             failures.append("new_conversation_id_missing_" + phase)
             return
-        if (result["current_id"] != new_id or result["url_id"] != new_id or result["stored_id"] != new_id or
-                result["active_ids"] != [new_id] or result["active_rows"] != 1):
+        if (
+            result["current_id"] != new_id
+            or result["url_id"] != new_id
+            or result["stored_id"] != new_id
+            or result["active_ids"] != [new_id]
+            or result["active_rows"] != 1
+        ):
             failures.append("conversation_selection_incoherent_" + phase)
         expected = set(baseline["conversation_ids"]) | {new_id}
         actual = result["conversation_ids"]
-        if set(actual) != expected or len(actual) != len(set(actual)) or new_id in baseline["conversation_ids"]:
+        if (
+            set(actual) != expected
+            or len(actual) != len(set(actual))
+            or new_id in baseline["conversation_ids"]
+        ):
             failures.append("conversation_list_incoherent_" + phase)
         if result["current_model"] != baseline["current_model"]:
             failures.append("current_model_changed_" + phase)
-        if result["message_count"] != 0 or not result["empty_state"] or result["error_state"]:
+        if (
+            result["message_count"] != 0
+            or not result["empty_state"]
+            or result["error_state"]
+        ):
             failures.append("new_conversation_not_empty_" + phase)
 
     try:
@@ -944,14 +1230,27 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
             failures.append("new_chat_model_picker_did_not_open")
         choice = rdp.conversation_state(actor)
         picker_observer = rdp.creation_observer(actor)
-        premature_posts = [r for r in picker_observer["requests"] if r["method"] == "POST"]
+        premature_posts = [
+            r for r in picker_observer["requests"] if r["method"] == "POST"
+        ]
         if premature_posts:
             failures.append("creation_request_before_model_choice")
-        if (choice["current_id"] != before["current_id"] or choice["conversation_ids"] != before["conversation_ids"] or
-                choice["active_ids"] != before["active_ids"]):
+        if (
+            choice["current_id"] != before["current_id"]
+            or choice["conversation_ids"] != before["conversation_ids"]
+            or choice["active_ids"] != before["active_ids"]
+        ):
             failures.append("conversation_changed_before_model_choice")
-        mark("model_picker_phase_observed", {"conversation": choice, "network": picker_observer})
-        if not picker_open or premature_posts or choice["model_choices"] != 1 or choice["current_model"] != before["current_model"]:
+        mark(
+            "model_picker_phase_observed",
+            {"conversation": choice, "network": picker_observer},
+        )
+        if (
+            not picker_open
+            or premature_posts
+            or choice["model_choices"] != 1
+            or choice["current_model"] != before["current_model"]
+        ):
             failures.append("same_current_model_choice_unavailable")
         else:
             mark("current_model_choice_started", choice)
@@ -963,11 +1262,20 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                 app_state()
                 observer = rdp.creation_observer(actor)
                 after = rdp.conversation_state(actor)
-                posts = [r for r in observer["requests"] if r["path"] == "/api/conversations" and r["method"] == "POST"]
+                posts = [
+                    r
+                    for r in observer["requests"]
+                    if r["path"] == "/api/conversations" and r["method"] == "POST"
+                ]
                 finished = posts and all(r["finished"] is not None for r in posts)
-                quiet = finished and all(r["finished"] is not None and r["body_done"] for r in observer["requests"])
+                quiet = finished and all(
+                    r["finished"] is not None and r["body_done"]
+                    for r in observer["requests"]
+                )
                 if quiet:
-                    settled_since = settled_since if settled_since is not None else time.monotonic()
+                    settled_since = (
+                        settled_since if settled_since is not None else time.monotonic()
+                    )
                     if time.monotonic() - settled_since >= 0.5:
                         break
                 else:
@@ -975,8 +1283,17 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                 time.sleep(0.2)
             mark("creation_result_observed", after)
             observer = rdp.creation_observer(actor, stop=True)
-            posts = [r for r in observer["requests"] if r["path"] == "/api/conversations" and r["method"] == "POST"]
-            if not observer.get("available") or not observer.get("intact") or observer.get("expired") or not posts:
+            posts = [
+                r
+                for r in observer["requests"]
+                if r["path"] == "/api/conversations" and r["method"] == "POST"
+            ]
+            if (
+                not observer.get("available")
+                or not observer.get("intact")
+                or observer.get("expired")
+                or not posts
+            ):
                 failures.append("creation_network_observer_unavailable")
             elif len(posts) != 1:
                 failures.append("creation_request_count_not_one")
@@ -987,26 +1304,62 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
             if any(r["path"] == "/api/chat" for r in observer["requests"]):
                 failures.append("unexpected_message_generation_request")
             post = posts[0] if len(posts) == 1 else None
-            confirmed_response = (post is not None and post["status"] == 201 and post["error"] is None and post["body_done"])
+            confirmed_response = (
+                post is not None
+                and post["status"] == 201
+                and post["error"] is None
+                and post["body_done"]
+            )
             response_id = post["response_id"] if confirmed_response else None
-            new_id = response_id if (isinstance(response_id, str) and response_id and
-                                     response_id != before["current_id"] and response_id not in before["conversation_ids"]) else None
+            new_id = (
+                response_id
+                if (
+                    isinstance(response_id, str)
+                    and response_id
+                    and response_id != before["current_id"]
+                    and response_id not in before["conversation_ids"]
+                )
+                else None
+            )
             if confirmed_response and new_id is None:
                 failures.append("creation_response_id_not_new")
-            rejected = (post is not None and post["finished"] is not None and
-                        isinstance(post["status"], int) and 400 <= post["status"] <= 599)
-            not_run_reason = "creation_request_rejected" if rejected else "creation_not_confirmed"
+            rejected = (
+                post is not None
+                and post["finished"] is not None
+                and isinstance(post["status"], int)
+                and 400 <= post["status"] <= 599
+            )
+            not_run_reason = (
+                "creation_request_rejected" if rejected else "creation_not_confirmed"
+            )
             if rejected:
-                preserved_fields = ("current_id", "current_model", "conversation_ids", "active_ids", "active_rows",
-                                    "url_id", "stored_id", "message_count", "empty_state", "error_state")
+                preserved_fields = (
+                    "current_id",
+                    "current_model",
+                    "conversation_ids",
+                    "active_ids",
+                    "active_rows",
+                    "url_id",
+                    "stored_id",
+                    "message_count",
+                    "empty_state",
+                    "error_state",
+                )
                 changed = [key for key in preserved_fields if after[key] != before[key]]
                 checkpoints["existing_conversation_view_after_rejection"] = {
-                    "status": "FAIL" if changed else "PASS", "changed_fields": changed, "http_status": post["status"]}
+                    "status": "FAIL" if changed else "PASS",
+                    "changed_fields": changed,
+                    "http_status": post["status"],
+                }
                 if changed:
-                    failures.append("rejected_creation_changed_existing_conversation_view")
-            checkpoints["creation_response"] = {"status": "PASS" if new_id else "FAIL",
-                                                  "http_status": post["status"] if post else None,
-                                                  "confirmed_new_id": new_id}
+                    failures.append(
+                        "rejected_creation_changed_existing_conversation_view"
+                    )
+            checkpoints["creation_response"] = {
+                "status": "PASS" if new_id else "FAIL",
+                "http_status": post["status"] if post else None,
+                "confirmed_new_id": new_id,
+            }
             if any(r["method"] == "PATCH" for r in observer["requests"]):
                 failures.append("existing_conversation_patched_during_creation")
             if observer.get("sample_overflow") or not observer.get("samples"):
@@ -1016,17 +1369,27 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                 validation_start = len(failures)
                 if after["current_id"] != new_id:
                     failures.append("created_response_id_differs_from_selected_id")
-                message_reads = [r for r in observer["requests"] if
-                                 r["path"] == "/api/conversations/" + new_id + "/messages" and r["method"] == "GET"]
-                if (not message_reads or any(r["status"] != 200 or not r["body_done"] or
-                                             r["response_message_count"] != 0 for r in message_reads)):
+                message_reads = [
+                    r
+                    for r in observer["requests"]
+                    if r["path"] == "/api/conversations/" + new_id + "/messages"
+                    and r["method"] == "GET"
+                ]
+                if not message_reads or any(
+                    r["status"] != 200
+                    or not r["body_done"]
+                    or r["response_message_count"] != 0
+                    for r in message_reads
+                ):
                     failures.append("new_conversation_empty_history_not_verified")
                 seen_new = False
                 for sample in observer.get("samples", []):
                     if sample["current_id"] == new_id:
                         seen_new = True
                         if sample["message_count"]:
-                            failures.append("old_messages_visible_under_new_conversation")
+                            failures.append(
+                                "old_messages_visible_under_new_conversation"
+                            )
                     elif seen_new:
                         failures.append("new_conversation_selection_reverted")
                 check_created(before, after, new_id, "after_create")
@@ -1034,16 +1397,27 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                     failures.append("created_chat_view_obscured_after_create")
                 if state["expanded"] != ("true" if state["open"] else "false"):
                     failures.append("sidebar_aria_mismatch_after_create")
-                checkpoints["new_conversation_postconditions"] = {"status": "FAIL" if len(failures) > validation_start else "PASS"}
+                checkpoints["new_conversation_postconditions"] = {
+                    "status": "FAIL" if len(failures) > validation_start else "PASS"
+                }
             else:
-                checkpoints["new_conversation_postconditions"] = {"status": "NOT_RUN", "reason": not_run_reason}
-            mark("sidebar_after_creation", {"open": state["open"], "expanded": state["expanded"]})
+                checkpoints["new_conversation_postconditions"] = {
+                    "status": "NOT_RUN",
+                    "reason": not_run_reason,
+                }
+            mark(
+                "sidebar_after_creation",
+                {"open": state["open"], "expanded": state["expanded"]},
+            )
             frame("13-conversation-created.png")
             if new_id:
                 reload_validation_start = len(failures)
                 origin_before = after["time_origin_ms"]
                 mark("reload_requested", rdp.conversation_state(actor))
-                rdp.evaluate(actor, "JSON.stringify((()=>{setTimeout(()=>location.reload(),100);return {scheduled:true};})())")
+                rdp.evaluate(
+                    actor,
+                    "JSON.stringify((()=>{setTimeout(()=>location.reload(),100);return {scheduled:true};})())",
+                )
                 deadline = time.monotonic() + 15
                 while time.monotonic() < deadline:
                     device_guard()
@@ -1051,10 +1425,17 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                         actor = rdp.find_logos()
                         app_state()
                         candidate = rdp.conversation_state(actor)
-                        if candidate["time_origin_ms"] != origin_before and candidate["ready_state"] == "complete":
+                        if (
+                            candidate["time_origin_ms"] != origin_before
+                            and candidate["ready_state"] == "complete"
+                        ):
                             reloaded = candidate
-                            if (candidate["current_id"] == new_id and candidate["active_ids"] == [new_id] and
-                                    candidate["empty_state"] and not candidate["error_state"]):
+                            if (
+                                candidate["current_id"] == new_id
+                                and candidate["active_ids"] == [new_id]
+                                and candidate["empty_state"]
+                                and not candidate["error_state"]
+                            ):
                                 break
                     except CaptureSafetyError:
                         raise
@@ -1069,7 +1450,11 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                         failures.append("new_conversation_not_selected_after_reload")
                     check_created(before, reloaded, new_id, "after_reload")
                     state = app_state()
-                    if state["surfaces"] or state["open"] or not state["reachable"]["menu"]:
+                    if (
+                        state["surfaces"]
+                        or state["open"]
+                        or not state["reachable"]["menu"]
+                    ):
                         failures.append("created_chat_view_obscured_after_reload")
                     rdp.start_creation_observer(actor)
                     mark("reload_server_reads_requested", reloaded)
@@ -1079,43 +1464,89 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                         app_state()
                         reload_observer = rdp.creation_observer(actor)
                         records = reload_observer["requests"]
-                        if len(records) >= 2 and all(r["finished"] is not None and r["body_done"] for r in records):
+                        if len(records) >= 2 and all(
+                            r["finished"] is not None and r["body_done"]
+                            for r in records
+                        ):
                             break
                         time.sleep(0.2)
                     reload_observer = rdp.creation_observer(actor, stop=True)
-                    server_lists = [r for r in reload_observer["requests"] if r["path"] == "/api/conversations" and r["method"] == "GET"]
-                    server_messages = [r for r in reload_observer["requests"] if r["path"] == "/api/conversations/" + new_id + "/messages" and r["method"] == "GET"]
+                    server_lists = [
+                        r
+                        for r in reload_observer["requests"]
+                        if r["path"] == "/api/conversations" and r["method"] == "GET"
+                    ]
+                    server_messages = [
+                        r
+                        for r in reload_observer["requests"]
+                        if r["path"] == "/api/conversations/" + new_id + "/messages"
+                        and r["method"] == "GET"
+                    ]
                     expected_server_ids = set(before["conversation_ids"]) | {new_id}
-                    if (not server_lists or any(r["status"] != 200 or not r["body_done"] or
-                                               r["response_ids"] is None or set(r["response_ids"]) != expected_server_ids or
-                                               len(r["response_ids"]) != len(set(r["response_ids"])) for r in server_lists)):
-                        failures.append("new_conversation_not_verified_in_server_list_after_reload")
-                    if (not server_messages or any(r["status"] != 200 or not r["body_done"] or
-                                                  r["response_message_count"] != 0 for r in server_messages)):
-                        failures.append("empty_history_not_verified_on_server_after_reload")
+                    if not server_lists or any(
+                        r["status"] != 200
+                        or not r["body_done"]
+                        or r["response_ids"] is None
+                        or set(r["response_ids"]) != expected_server_ids
+                        or len(r["response_ids"]) != len(set(r["response_ids"]))
+                        for r in server_lists
+                    ):
+                        failures.append(
+                            "new_conversation_not_verified_in_server_list_after_reload"
+                        )
+                    if not server_messages or any(
+                        r["status"] != 200
+                        or not r["body_done"]
+                        or r["response_message_count"] != 0
+                        for r in server_messages
+                    ):
+                        failures.append(
+                            "empty_history_not_verified_on_server_after_reload"
+                        )
                     mark("reload_server_reads_observed", reload_observer)
-                    if (not reload_observer.get("available") or not reload_observer.get("intact") or
-                            reload_observer.get("expired") or reload_observer.get("sample_overflow")):
+                    if (
+                        not reload_observer.get("available")
+                        or not reload_observer.get("intact")
+                        or reload_observer.get("expired")
+                        or reload_observer.get("sample_overflow")
+                    ):
                         failures.append("reload_network_observer_unavailable")
-                    if any(r["path"] == "/api/chat" or r["method"] != "GET" for r in reload_observer["requests"]):
+                    if any(
+                        r["path"] == "/api/chat" or r["method"] != "GET"
+                        for r in reload_observer["requests"]
+                    ):
                         failures.append("unexpected_mutating_request_after_reload")
                     reloaded = rdp.conversation_state(actor)
                     if reloaded["current_id"] != new_id:
                         failures.append("new_conversation_not_selected_after_reload")
                     check_created(before, reloaded, new_id, "after_reload")
                     state = app_state()
-                    if state["surfaces"] or state["open"] or not state["reachable"]["menu"]:
+                    if (
+                        state["surfaces"]
+                        or state["open"]
+                        or not state["reachable"]["menu"]
+                    ):
                         failures.append("created_chat_view_obscured_after_reload")
                     if state["expanded"] != ("true" if state["open"] else "false"):
                         failures.append("sidebar_aria_mismatch_after_reload")
                     frame("14-conversation-after-reload.png")
-                checkpoints["reload_persistence"] = {"status": "FAIL" if len(failures) > reload_validation_start else "PASS"}
+                checkpoints["reload_persistence"] = {
+                    "status": "FAIL"
+                    if len(failures) > reload_validation_start
+                    else "PASS"
+                }
             else:
-                checkpoints["reload_persistence"] = {"status": "NOT_RUN", "reason": not_run_reason}
+                checkpoints["reload_persistence"] = {
+                    "status": "NOT_RUN",
+                    "reason": not_run_reason,
+                }
             if checkpoints["reload_persistence"]["status"] == "PASS" and tools_check:
                 # The requested self-check is the only model request in this mode.
                 mark("tools_self_check_requested")
-                checkpoints["tools_self_check"] = {"status": "ERROR", "reason": "check_interrupted"}
+                checkpoints["tools_self_check"] = {
+                    "status": "ERROR",
+                    "reason": "check_interrupted",
+                }
                 checkpoints["tools_self_check"] = tools_self_check(rdp, actor, new_id)
                 mark("tools_self_check_observed", checkpoints["tools_self_check"])
                 if checkpoints["tools_self_check"]["status"] != "PASS":
@@ -1126,10 +1557,16 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
             elif checkpoints["reload_persistence"]["status"] == "PASS":
                 send_validation_start = len(failures)
                 if recorder is None or recorder.poll() is not None:
-                    raise RuntimeError("The poets dialogue requires an active native recording")
-                reply_budget = min(120, remaining(135) - 15, video_deadline - time.monotonic() - 15)
+                    raise RuntimeError(
+                        "The poets dialogue requires an active native recording"
+                    )
+                reply_budget = min(
+                    120, remaining(135) - 15, video_deadline - time.monotonic() - 15
+                )
                 if reply_budget <= 0:
-                    raise RuntimeError("No recording time remains for the poets dialogue")
+                    raise RuntimeError(
+                        "No recording time remains for the poets dialogue"
+                    )
                 counts_before = rdp.message_counts(actor)
                 rdp.send_chat_message(actor, POETS_DIALOGUE_PROMPT)
                 mark("message_send_clicked", rdp.conversation_state(actor))
@@ -1148,11 +1585,19 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                 mark("message_reply_observed", {"reply_status": reply_status})
                 if reply_status != "answered":
                     failures.append("message_reply_" + reply_status)
-                details = rdp.reply_details(actor) if reply_status == "answered" else {"text": None}
+                details = (
+                    rdp.reply_details(actor)
+                    if reply_status == "answered"
+                    else {"text": None}
+                )
                 persisted = rdp.persisted_messages(actor, new_id)
                 roles = [m["role"] for m in persisted["messages"]]
-                replies = [m["text"] for m in persisted["messages"] if m["role"] == "assistant"]
-                assistant_messages = [m for m in persisted["messages"] if m["role"] == "assistant"]
+                replies = [
+                    m["text"] for m in persisted["messages"] if m["role"] == "assistant"
+                ]
+                assistant_messages = [
+                    m for m in persisted["messages"] if m["role"] == "assistant"
+                ]
                 reply_errors = [e for m in assistant_messages for e in m["errors"]]
                 receipt = None
                 for m in assistant_messages:
@@ -1160,14 +1605,25 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                     if not m["invocation_id"]:
                         failures.append("reply_invocation_missing")
                         continue
-                    receipt = {"invocation_id": m["invocation_id"], **rdp.reply_receipt(actor, m["invocation_id"])}
+                    receipt = {
+                        "invocation_id": m["invocation_id"],
+                        **rdp.reply_receipt(actor, m["invocation_id"]),
+                    }
                     if receipt["http_status"] != 200:
                         failures.append("reply_trace_unavailable")
                     reply_errors.extend(receipt["errors"])
                 # The details line must show the turn the trace billed: every model call's tokens and the calculated cost.
-                details_check = {"status": "NOT_RUN",
-                                 "reason": "reply_not_answered" if reply_status != "answered" else "reply_trace_unavailable"}
-                if reply_status == "answered" and receipt and receipt["http_status"] == 200:
+                details_check = {
+                    "status": "NOT_RUN",
+                    "reason": "reply_not_answered"
+                    if reply_status != "answered"
+                    else "reply_trace_unavailable",
+                }
+                if (
+                    reply_status == "answered"
+                    and receipt
+                    and receipt["http_status"] == 200
+                ):
                     billing = receipt["billing"]
                     # A reply without a details line shows no tokens and no cost, which is compared like any other.
                     shown = details["text"] or ""
@@ -1175,67 +1631,124 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
                     shown_rub = re.search(r"≈ (\d+(?:\.\d+)?) ₽", shown)
                     # The line leaves out a zero count and a zero or uncalculated cost, so those are expected absent.
                     expected_tokens = billing.get("total_tokens") or None
-                    expected_rub = billing.get("total_cost") if billing.get("cost_status") == "calculated" else None
+                    expected_rub = (
+                        billing.get("total_cost")
+                        if billing.get("cost_status") == "calculated"
+                        else None
+                    )
                     expected_rub = expected_rub or None
                     shown_count = int(shown_tokens.group(1)) if shown_tokens else None
                     shown_cost = float(shown_rub.group(1)) if shown_rub else None
                     # Without billed model calls the line shows the provider's usage, which the trace does not total.
-                    tokens_match = not receipt["items"] or shown_count == expected_tokens
-                    rub_match = (shown_cost is None if expected_rub is None else
-                                 shown_cost is not None and abs(shown_cost - expected_rub) <= 0.005 + 1e-9)
-                    details_check = {"status": "PASS" if tokens_match and rub_match else "FAIL",
-                                     "shown_tokens": shown_count, "trace_total_tokens": expected_tokens,
-                                     "shown_rub": shown_cost, "trace_total_cost": expected_rub}
+                    tokens_match = (
+                        not receipt["items"] or shown_count == expected_tokens
+                    )
+                    rub_match = (
+                        shown_cost is None
+                        if expected_rub is None
+                        else shown_cost is not None
+                        and abs(shown_cost - expected_rub) <= 0.005 + 1e-9
+                    )
+                    details_check = {
+                        "status": "PASS" if tokens_match and rub_match else "FAIL",
+                        "shown_tokens": shown_count,
+                        "trace_total_tokens": expected_tokens,
+                        "shown_rub": shown_cost,
+                        "trace_total_cost": expected_rub,
+                    }
                     if details_check["status"] == "FAIL":
                         failures.append("reply_details_mismatch_trace")
-                prompt_persisted = any(m["role"] == "user" and m["text"] == POETS_DIALOGUE_PROMPT
-                                       for m in persisted["messages"])
+                prompt_persisted = any(
+                    m["role"] == "user" and m["text"] == POETS_DIALOGUE_PROMPT
+                    for m in persisted["messages"]
+                )
                 if persisted["status"] != 200 or not prompt_persisted:
                     failures.append("user_message_not_persisted")
                 if "assistant" not in roles:
                     failures.append("reply_not_persisted")
                 if reply_errors:
                     failures.append("reply_trace_errors")
-                checkpoints["message_send"] = {"status": "FAIL" if len(failures) > send_validation_start else "PASS",
-                                               "reply_status": reply_status,
-                                               "reply_text": replies[-1] if replies else None,
-                                               "reply_trace_errors": reply_errors,
-                                               "reply_receipt": receipt,
-                                               "browser_details": details["text"],
-                                               "details_vs_trace": details_check,
-                                               "question": POETS_DIALOGUE_PROMPT,
-                                               "user_message_persisted": prompt_persisted,
-                                               "reply_persisted": "assistant" in roles}
+                checkpoints["message_send"] = {
+                    "status": "FAIL"
+                    if len(failures) > send_validation_start
+                    else "PASS",
+                    "reply_status": reply_status,
+                    "reply_text": replies[-1] if replies else None,
+                    "reply_trace_errors": reply_errors,
+                    "reply_receipt": receipt,
+                    "browser_details": details["text"],
+                    "details_vs_trace": details_check,
+                    "question": POETS_DIALOGUE_PROMPT,
+                    "user_message_persisted": prompt_persisted,
+                    "reply_persisted": "assistant" in roles,
+                }
                 if checkpoints["message_send"]["status"] == "PASS":
                     reply_text = replies[-1] if replies else ""
-                    labels = list(re.finditer(r"(?m)^\s*[*_#> -]*(Пушкин|Есенин)[*_]*\s*[:—–-]", reply_text))
+                    labels = list(
+                        re.finditer(
+                            r"(?m)^\s*[*_#> -]*(Пушкин|Есенин)[*_]*\s*[:—–-]",
+                            reply_text,
+                        )
+                    )
                     speakers = [label.group(1) for label in labels]
                     # A turn is the text from its label to the next label; a label with nothing said is not a turn.
-                    spoken = [bool(re.search(r"\w", reply_text[label.end():(labels[i + 1].start() if i + 1 < len(labels)
-                                                                           else len(reply_text))]))
-                              for i, label in enumerate(labels)]
-                    counts = {name: sum(1 for who, said in zip(speakers, spoken) if who == name and said)
-                              for name in ("Пушкин", "Есенин")}
+                    spoken = [
+                        bool(
+                            re.search(
+                                r"\w",
+                                reply_text[
+                                    label.end() : (
+                                        labels[i + 1].start()
+                                        if i + 1 < len(labels)
+                                        else len(reply_text)
+                                    )
+                                ],
+                            )
+                        )
+                        for i, label in enumerate(labels)
+                    ]
+                    counts = {
+                        name: sum(
+                            1
+                            for who, said in zip(speakers, spoken)
+                            if who == name and said
+                        )
+                        for name in ("Пушкин", "Есенин")
+                    }
                     empty_turns = spoken.count(False)
-                    alternating = all(left != right for left, right in zip(speakers, speakers[1:]))
+                    alternating = all(
+                        left != right for left, right in zip(speakers, speakers[1:])
+                    )
                     # The prompt asks for six turns, three each, starting with Pushkin.
                     expected_speakers = ["Пушкин", "Есенин"] * 3
                     dialogue_ok = speakers == expected_speakers and not empty_turns
                     checkpoints["poets_dialogue"] = {
-                        "status": "PASS" if dialogue_ok else "FAIL", "speakers": speakers,
+                        "status": "PASS" if dialogue_ok else "FAIL",
+                        "speakers": speakers,
                         "expected_speakers": expected_speakers,
-                        "turn_counts": counts, "empty_turns": empty_turns, "alternating": alternating,
-                        "scope": "spoken turns, speaker labels and alternation, not literary quality or independent agents"}
+                        "turn_counts": counts,
+                        "empty_turns": empty_turns,
+                        "alternating": alternating,
+                        "scope": "spoken turns, speaker labels and alternation, not literary quality or independent agents",
+                    }
                     if not dialogue_ok:
                         failures.append("poets_dialogue_missing_or_not_alternating")
                     mark("poets_dialogue_observed", checkpoints["poets_dialogue"])
-                    for where, filename in (("top", "22-poets-dialogue-top.png"),
-                                            ("bottom", "23-poets-dialogue-bottom.png")):
+                    for where, filename in (
+                        ("top", "22-poets-dialogue-top.png"),
+                        ("bottom", "23-poets-dialogue-bottom.png"),
+                    ):
                         app_state()
-                        mark("poets_dialogue_scrolled", {"where": where, **rdp.scroll(actor, "#chatbox", where)})
+                        mark(
+                            "poets_dialogue_scrolled",
+                            {"where": where, **rdp.scroll(actor, "#chatbox", where)},
+                        )
                         frame(filename)
             else:
-                checkpoints["message_send"] = {"status": "NOT_RUN", "reason": "creation_not_confirmed"}
+                checkpoints["message_send"] = {
+                    "status": "NOT_RUN",
+                    "reason": "creation_not_confirmed",
+                }
     except CaptureSafetyError:
         raise
     except Exception as error:
@@ -1258,10 +1771,18 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
         try:
             app_state()
         except Exception:
-            safety_error = CaptureSafetyError("The final recording view could not be verified as clean local Logos")
+            safety_error = CaptureSafetyError(
+                "The final recording view could not be verified as clean local Logos"
+            )
         if recorder is not None:
             finished_video, artifact, recording_failures = finish_screenrecord(
-                recorder, video_path, uid, gid, max_bytes=MAX_VIDEO_BYTES, event_sink=mark)
+                recorder,
+                video_path,
+                uid,
+                gid,
+                max_bytes=MAX_VIDEO_BYTES,
+                event_sink=mark,
+            )
             video.update(finished_video)
             failures.extend(recording_failures)
             if artifact is not None:
@@ -1269,17 +1790,42 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
         if safety_error is not None:
             raise safety_error
     failures = list(dict.fromkeys(failures))
-    scenario = {"verdict": "FAIL" if failures else "PASS", "failures": failures, "checkpoints": checkpoints,
-                "before": before, "after_create": after, "after_reload": reloaded,
-                "network": observer, "reload_network": reload_observer, "video": video}
+    scenario = {
+        "verdict": "FAIL" if failures else "PASS",
+        "failures": failures,
+        "checkpoints": checkpoints,
+        "before": before,
+        "after_create": after,
+        "after_reload": reloaded,
+        "network": observer,
+        "reload_network": reload_observer,
+        "video": video,
+    }
     mark("scenario_finished", {"verdict": scenario["verdict"], "failures": failures})
     timeline = out / "events.json"
-    timeline.write_text(json.dumps({"schema_version": 1, "scenario": "create_conversation",
-                                   "events": events, "result": scenario}, ensure_ascii=False, indent=2) + "\n")
+    timeline.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "scenario": "create_conversation",
+                "events": events,
+                "result": scenario,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n"
+    )
     timeline.chmod(0o600)
     os.chown(timeline, uid, gid)
     content = timeline.read_bytes()
-    artifacts.append({"path": timeline.name, "sha256": hashlib.sha256(content).hexdigest(), "size": len(content)})
+    artifacts.append(
+        {
+            "path": timeline.name,
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "size": len(content),
+        }
+    )
     return actor, scenario, artifacts
 
 
@@ -1292,28 +1838,49 @@ def capture(out, uid, gid, metadata):
     initial = rdp.state(actor)
     native_focus_is_logos()
     runtime = version()
-    if not isinstance(initial.get("revision"), str) or not re.fullmatch(r"[0-9a-f]{40}", initial["revision"]):
+    if not isinstance(initial.get("revision"), str) or not re.fullmatch(
+        r"[0-9a-f]{40}", initial["revision"]
+    ):
         raise RuntimeError("The browser revision is unknown")
     if initial["title"] != "Logos" or initial["unsafeModal"] or initial["modalOpen"]:
         raise RuntimeError("A clean Logos application view is required")
     files = []
 
-    def snapshot(filename, surface=None, sidebar=None, tab=None, capture_actor=None, event_sink=None):
+    def snapshot(
+        filename,
+        surface=None,
+        sidebar=None,
+        tab=None,
+        capture_actor=None,
+        event_sink=None,
+    ):
         target = capture_actor if capture_actor is not None else actor
         device_guard()
         state = rdp.state(target)
         if state["revision"] != initial["revision"] or state["visibility"] != "visible":
             raise CaptureSafetyError("Application changed during capture")
-        if (state["unsafeModal"] or state["unexpectedModal"] or
-                state["surfaces"] != ([surface] if surface else [])):
+        if (
+            state["unsafeModal"]
+            or state["unexpectedModal"]
+            or state["surfaces"] != ([surface] if surface else [])
+        ):
             raise CaptureSafetyError("An unexpected dialog appeared")
         native_focus_is_logos()
         if sidebar is not None:
-            if state["open"] != sidebar or not state["reachable"]["newChat" if sidebar else "menu"]:
-                raise RuntimeError("The requested sidebar control is obscured on screen")
+            if (
+                state["open"] != sidebar
+                or not state["reachable"]["newChat" if sidebar else "menu"]
+            ):
+                raise RuntimeError(
+                    "The requested sidebar control is obscured on screen"
+                )
             if state["expanded"] != ("true" if sidebar else "false"):
-                raise RuntimeError("Sidebar accessibility state differs from its visible state")
-        if tab is not None and (state["settingsTab"] != tab or state["settingsPanels"] != [tab]):
+                raise RuntimeError(
+                    "Sidebar accessibility state differs from its visible state"
+                )
+        if tab is not None and (
+            state["settingsTab"] != tab or state["settingsPanels"] != [tab]
+        ):
             raise RuntimeError("The requested settings tab is not visible")
         device_guard()
         if event_sink is not None:
@@ -1330,9 +1897,17 @@ def capture(out, uid, gid, metadata):
         path.write_bytes(png)
         path.chmod(0o600)
         os.chown(path, uid, gid)
-        files.append({"path": filename, "sha256": hashlib.sha256(png).hexdigest(),
-                      "size": len(png), "width": width, "height": height,
-                      "captured_at": datetime.now(timezone.utc).isoformat(), "browser": state})
+        files.append(
+            {
+                "path": filename,
+                "sha256": hashlib.sha256(png).hexdigest(),
+                "size": len(png),
+                "width": width,
+                "height": height,
+                "captured_at": datetime.now(timezone.utc).isoformat(),
+                "browser": state,
+            }
+        )
 
     matrix_failures = []
     if initial["boot_global_missing"]:
@@ -1346,14 +1921,20 @@ def capture(out, uid, gid, metadata):
     def reload_app():
         nonlocal actor
         origin_before = rdp.conversation_state(actor)["time_origin_ms"]
-        rdp.evaluate(actor, "JSON.stringify((()=>{setTimeout(()=>location.reload(),100);return {scheduled:true};})())")
+        rdp.evaluate(
+            actor,
+            "JSON.stringify((()=>{setTimeout(()=>location.reload(),100);return {scheduled:true};})())",
+        )
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
             device_guard()
             try:
                 actor = rdp.find_logos()
                 candidate = rdp.conversation_state(actor)
-                if candidate["time_origin_ms"] != origin_before and candidate["ready_state"] == "complete":
+                if (
+                    candidate["time_origin_ms"] != origin_before
+                    and candidate["ready_state"] == "complete"
+                ):
                     time.sleep(1.0)
                     return
             except CaptureSafetyError:
@@ -1390,12 +1971,16 @@ def capture(out, uid, gid, metadata):
         state = rdp.state(actor)
         surfaces = state["surfaces"]
         if surfaces not in ([], ["model"], ["status"], ["settings"]):
-            raise CaptureSafetyError("The observed application surfaces cannot be captured safely")
+            raise CaptureSafetyError(
+                "The observed application surfaces cannot be captured safely"
+            )
         surface = surfaces[0] if surfaces else None
         snapshot(filename, surface=surface)
         return files[-1]["browser"]
 
-    def matrix_step(name, filename, action, surface=None, sidebar=None, tab=None, opener=None):
+    def matrix_step(
+        name, filename, action, surface=None, sidebar=None, tab=None, opener=None
+    ):
         failures = matrix_action(name, action, opener)
         state = observed_snapshot(filename)
         if state["surfaces"] != ([surface] if surface else []):
@@ -1403,32 +1988,68 @@ def capture(out, uid, gid, metadata):
         if sidebar is not None:
             box = state["sidebar"]
             settled = box and (abs(box["x"]) < 1 if sidebar else box["right"] < 1)
-            if state["open"] != sidebar or not settled or not state["reachable"]["newChat" if sidebar else "menu"]:
+            if (
+                state["open"] != sidebar
+                or not settled
+                or not state["reachable"]["newChat" if sidebar else "menu"]
+            ):
                 failures.append(name + "_sidebar_not_reached")
             if state["expanded"] != ("true" if sidebar else "false"):
                 failures.append(name + "_sidebar_aria_mismatch")
-        if tab is not None and (state["settingsTab"] != tab or state["settingsPanels"] != [tab]):
+        if tab is not None and (
+            state["settingsTab"] != tab or state["settingsPanels"] != [tab]
+        ):
             failures.append(name + "_tab_not_reached")
         # Every status row must carry a known state; rows of «undefined» are a broken panel, not a ready one.
-        if surface == "status" and (not state["statusCounts"] or state["statusCounts"].get("unknown")):
+        if surface == "status" and (
+            not state["statusCounts"] or state["statusCounts"].get("unknown")
+        ):
             failures.append(name + "_status_rows_unknown")
         matrix_failures.extend(failures)
-        files[-1]["matrix_expectation"] = {"state": name, "surface": surface, "sidebar": sidebar,
-                                           "tab": tab, "verdict": "FAIL" if failures else "PASS",
-                                           "failures": list(dict.fromkeys(failures)),
-                                           "retried_after_reload": name in retried_steps}
+        files[-1]["matrix_expectation"] = {
+            "state": name,
+            "surface": surface,
+            "sidebar": sidebar,
+            "tab": tab,
+            "verdict": "FAIL" if failures else "PASS",
+            "failures": list(dict.fromkeys(failures)),
+            "retried_after_reload": name in retried_steps,
+        }
 
     def close_surface(name, selector):
         if name in rdp.state(actor)["surfaces"]:
-            matrix_action("close_" + name, lambda: (rdp.click(actor, selector), rdp.wait_surface(actor, None)))
+            matrix_action(
+                "close_" + name,
+                lambda: (rdp.click(actor, selector), rdp.wait_surface(actor, None)),
+            )
 
     surface_openers = {
-        "model": lambda: (rdp.set_open(actor, False), rdp.click(actor, "#model-btn"), rdp.wait_surface(actor, "model")),
-        "status": lambda: (rdp.click(actor, "#system-status-btn"), rdp.wait_surface(actor, "status")),
-        "settings": lambda: (rdp.click(actor, "#settings-btn"), rdp.wait_surface(actor, "settings")),
+        "model": lambda: (
+            rdp.set_open(actor, False),
+            rdp.click(actor, "#model-btn"),
+            rdp.wait_surface(actor, "model"),
+        ),
+        "status": lambda: (
+            rdp.click(actor, "#system-status-btn"),
+            rdp.wait_surface(actor, "status"),
+        ),
+        "settings": lambda: (
+            rdp.click(actor, "#settings-btn"),
+            rdp.wait_surface(actor, "settings"),
+        ),
     }
 
-    def scroll_step(name, filename, selector, where, surface, opener, tab=None, before=None, note=None):
+    def scroll_step(
+        name,
+        filename,
+        selector,
+        where,
+        surface,
+        opener,
+        tab=None,
+        before=None,
+        note=None,
+    ):
         """Scroll one container to its top or bottom and check that the position really changed."""
         measured = {}
 
@@ -1437,13 +2058,22 @@ def capture(out, uid, gid, metadata):
                 before()
             measured.update(rdp.scroll(actor, selector, where))
             limit = measured["scrollHeight"] - measured["clientHeight"]
-            if limit > 2 and (measured["scrollTop"] < limit - 2 if where == "bottom" else measured["scrollTop"] > 0):
+            if limit > 2 and (
+                measured["scrollTop"] < limit - 2
+                if where == "bottom"
+                else measured["scrollTop"] > 0
+            ):
                 raise RuntimeError("scroll did not reach the " + where)
 
         matrix_step(name, filename, action, surface=surface, tab=tab, opener=opener)
-        files[-1]["scroll"] = {"where": where, "selector": selector, **measured,
-                               "scrollable": measured.get("scrollHeight", 0) > measured.get("clientHeight", 0) + 2,
-                               **(note or {})}
+        files[-1]["scroll"] = {
+            "where": where,
+            "selector": selector,
+            **measured,
+            "scrollable": measured.get("scrollHeight", 0)
+            > measured.get("clientHeight", 0) + 2,
+            **(note or {}),
+        }
 
     chat = {}
 
@@ -1453,7 +2083,11 @@ def capture(out, uid, gid, metadata):
         rdp.open_conversation(actor, index)
         for _ in range(16):
             state = rdp.conversation_state(actor)
-            if state["current_id"] == conv_id and state["ready_state"] == "complete" and state["message_count"]:
+            if (
+                state["current_id"] == conv_id
+                and state["ready_state"] == "complete"
+                and state["message_count"]
+            ):
                 return state["message_count"]
             time.sleep(0.5)
         return 0
@@ -1469,49 +2103,130 @@ def capture(out, uid, gid, metadata):
         for candidate in candidates:
             count = load_conversation(candidate["index"], candidate["id"])
             if best is None or count > best["message_count"]:
-                best = {"index": candidate["index"], "id": candidate["id"], "title": candidate["title"],
-                        "message_count": count}
+                best = {
+                    "index": candidate["index"],
+                    "id": candidate["id"],
+                    "title": candidate["title"],
+                    "message_count": count,
+                }
         if best is None or best["message_count"] < 1:
             raise RuntimeError("no existing conversation has messages")
         chat.update(best)
         reopen_chat()
 
-    dialogs_recorder = start_screenrecord(out / DIALOGS_VIDEO_NAME, time_limit=180, bit_rate=1000000)
-    for filename, wanted in (("01-sidebar-open.png", True), ("02-sidebar-closed.png", False),
-                             ("03-sidebar-reopened.png", True)):
-        matrix_step(filename[:-4], filename, lambda wanted=wanted: rdp.set_open(actor, wanted), sidebar=wanted,
-                    opener=lambda wanted=wanted: rdp.set_open(actor, wanted))
-    matrix_step("model_picker", "04-model-picker.png", surface_openers["model"], surface="model",
-                opener=surface_openers["model"])
-    scroll_step("model_picker_bottom", "19-model-picker-bottom.png", "#model-modal .modal-content", "bottom",
-                surface="model", opener=surface_openers["model"])
+    dialogs_recorder = start_screenrecord(
+        out / DIALOGS_VIDEO_NAME, time_limit=180, bit_rate=1000000
+    )
+    for filename, wanted in (
+        ("01-sidebar-open.png", True),
+        ("02-sidebar-closed.png", False),
+        ("03-sidebar-reopened.png", True),
+    ):
+        matrix_step(
+            filename[:-4],
+            filename,
+            lambda wanted=wanted: rdp.set_open(actor, wanted),
+            sidebar=wanted,
+            opener=lambda wanted=wanted: rdp.set_open(actor, wanted),
+        )
+    matrix_step(
+        "model_picker",
+        "04-model-picker.png",
+        surface_openers["model"],
+        surface="model",
+        opener=surface_openers["model"],
+    )
+    scroll_step(
+        "model_picker_bottom",
+        "19-model-picker-bottom.png",
+        "#model-modal .modal-content",
+        "bottom",
+        surface="model",
+        opener=surface_openers["model"],
+    )
     close_surface("model", "#close-modal")
-    matrix_step("system_status", "05-system-status.png", surface_openers["status"], surface="status",
-                opener=surface_openers["status"])
-    scroll_step("system_status_bottom", "20-system-status-bottom.png", ".logos-system-status-content", "bottom",
-                surface="status", opener=surface_openers["status"])
+    matrix_step(
+        "system_status",
+        "05-system-status.png",
+        surface_openers["status"],
+        surface="status",
+        opener=surface_openers["status"],
+    )
+    scroll_step(
+        "system_status_bottom",
+        "20-system-status-bottom.png",
+        ".logos-system-status-content",
+        "bottom",
+        surface="status",
+        opener=surface_openers["status"],
+    )
     close_surface("status", "#logos-system-status .logos-system-status-close")
     matrix_action("open_settings", surface_openers["settings"])
     for number, tab in enumerate(("gen", "output", "routing", "adv", "theme"), start=6):
         panel = "tab-" + tab
-        matrix_step("settings_" + tab, str(number).zfill(2) + "-settings-" + tab + ".png",
-                    lambda panel=panel: (rdp.click(actor, '#settings-modal-custom .llm-tab-btn[data-tab="' + panel + '"]'),
-                                         rdp.wait_surface(actor, "settings", tab=panel)), surface="settings", tab=panel,
-                    opener=surface_openers["settings"])
-    scroll_step("settings_gen_bottom", "21-settings-gen-bottom.png", "#settings-modal-custom .settings-modal-panel", "bottom",
-                surface="settings", opener=surface_openers["settings"], tab="tab-gen",
-                before=lambda: rdp.click(actor, '#settings-modal-custom .llm-tab-btn[data-tab="tab-gen"]'))
+        matrix_step(
+            "settings_" + tab,
+            str(number).zfill(2) + "-settings-" + tab + ".png",
+            lambda panel=panel: (
+                rdp.click(
+                    actor,
+                    '#settings-modal-custom .llm-tab-btn[data-tab="' + panel + '"]',
+                ),
+                rdp.wait_surface(actor, "settings", tab=panel),
+            ),
+            surface="settings",
+            tab=panel,
+            opener=surface_openers["settings"],
+        )
+    scroll_step(
+        "settings_gen_bottom",
+        "21-settings-gen-bottom.png",
+        "#settings-modal-custom .settings-modal-panel",
+        "bottom",
+        surface="settings",
+        opener=surface_openers["settings"],
+        tab="tab-gen",
+        before=lambda: rdp.click(
+            actor, '#settings-modal-custom .llm-tab-btn[data-tab="tab-gen"]'
+        ),
+    )
     close_surface("settings", "#set-close-btn")
-    matrix_action("chat_select", choose_conversation, opener=lambda: rdp.set_open(actor, True))
-    scroll_step("chat_top", "17-chat-top.png", "#chatbox", "top", surface=None, opener=reopen_chat, note=chat)
-    scroll_step("chat_bottom", "18-chat-bottom.png", "#chatbox", "bottom", surface=None, opener=reopen_chat, note=chat)
+    matrix_action(
+        "chat_select", choose_conversation, opener=lambda: rdp.set_open(actor, True)
+    )
+    scroll_step(
+        "chat_top",
+        "17-chat-top.png",
+        "#chatbox",
+        "top",
+        surface=None,
+        opener=reopen_chat,
+        note=chat,
+    )
+    scroll_step(
+        "chat_bottom",
+        "18-chat-bottom.png",
+        "#chatbox",
+        "bottom",
+        surface=None,
+        opener=reopen_chat,
+        note=chat,
+    )
     matrix_action("restore_sidebar", lambda: rdp.set_open(actor, True))
     if dialogs_recorder is None:
         dialogs_video, dialogs_artifact, dialogs_failures = (
-            {"path": DIALOGS_VIDEO_NAME, "available": False}, None, ["native_screenrecord_unavailable"])
+            {"path": DIALOGS_VIDEO_NAME, "available": False},
+            None,
+            ["native_screenrecord_unavailable"],
+        )
     else:
         dialogs_video, dialogs_artifact, dialogs_failures = finish_screenrecord(
-            dialogs_recorder, out / DIALOGS_VIDEO_NAME, uid, gid, max_bytes=24 * 1024 * 1024)
+            dialogs_recorder,
+            out / DIALOGS_VIDEO_NAME,
+            uid,
+            gid,
+            max_bytes=24 * 1024 * 1024,
+        )
     dialogs_artifacts = [dialogs_artifact] if dialogs_artifact else []
     matrix_failures.extend(dialogs_failures)
     device_guard()
@@ -1520,16 +2235,43 @@ def capture(out, uid, gid, metadata):
         matrix_failures.append("final_sidebar_state_not_restored")
     if final["surfaces"] in ([], ["model"]):
         actor, creation_scenario, artifacts = record_creation(
-            rdp, actor, out, uid, gid, snapshot, tools_check=metadata.get("tools_self_check", False))
+            rdp,
+            actor,
+            out,
+            uid,
+            gid,
+            snapshot,
+            tools_check=metadata.get("tools_self_check", False),
+        )
     else:
-        creation_scenario = {"verdict": "FAIL", "failures": ["creation_not_run_because_clean_view_unavailable"]}
+        creation_scenario = {
+            "verdict": "FAIL",
+            "failures": ["creation_not_run_because_clean_view_unavailable"],
+        }
         timeline = out / "events.json"
-        timeline.write_text(json.dumps({"schema_version": 1, "scenario": "create_conversation", "events": [],
-                                       "result": creation_scenario}, ensure_ascii=False, indent=2) + "\n")
+        timeline.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "scenario": "create_conversation",
+                    "events": [],
+                    "result": creation_scenario,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n"
+        )
         timeline.chmod(0o600)
         os.chown(timeline, uid, gid)
         content = timeline.read_bytes()
-        artifacts = [{"path": timeline.name, "sha256": hashlib.sha256(content).hexdigest(), "size": len(content)}]
+        artifacts = [
+            {
+                "path": timeline.name,
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "size": len(content),
+            }
+        ]
     artifacts = dialogs_artifacts + artifacts
     try:
         final_sidebar_open = rdp.state(actor)["open"]
@@ -1537,34 +2279,61 @@ def capture(out, uid, gid, metadata):
         final_sidebar_open = None
     rdp.s.close()
     by_name = {entry["path"]: entry for entry in files}
-    if by_name["01-sidebar-open.png"]["sha256"] == by_name["02-sidebar-closed.png"]["sha256"]:
+    if (
+        by_name["01-sidebar-open.png"]["sha256"]
+        == by_name["02-sidebar-closed.png"]["sha256"]
+    ):
         matrix_failures.append("sidebar_open_closed_native_screenshots_identical")
     matrix_failures = list(dict.fromkeys(matrix_failures))
     # The verdicts describe the installed app. They prove the workflow revision only when that is what runs.
     deployment_acceptance = {
-        "status": "CURRENT" if runtime["runtime_revision"] == metadata.get("workflow_revision") else "STALE_RUNTIME",
-        "runtime_revision": runtime["runtime_revision"], "workflow_revision": metadata.get("workflow_revision"),
-        "scope": "matrix and creation verdicts describe the installed runtime; they prove the workflow revision only when CURRENT"}
-    manifest = {"schema_version": 2, "device": "Redmi 9", "browser": "Iceraven",
-                "capture_method": "Android screencap", "interaction_method": "Firefox DevTools button click",
-                "runtime_revision": runtime["runtime_revision"], "browser_revision": initial["revision"],
-                "revision_match": initial["revision"] == runtime["runtime_revision"],
-                "deployment_acceptance": deployment_acceptance,
-                "ui_version": runtime.get("ui_version"),
-                "application_process_id": runtime.get("process_id"),
-                "preparation": preparation,
-                "captured_at": files[0]["captured_at"], "initial_sidebar_open": initial["open"],
-                "final_sidebar_open": final_sidebar_open, "files": files,
-                "matrix_scenario": {"verdict": "FAIL" if matrix_failures else "PASS", "failures": matrix_failures},
-                "creation_scenario": creation_scenario, "dialogs_video": dialogs_video,
-                "artifacts": artifacts, **metadata}
+        "status": "CURRENT"
+        if runtime["runtime_revision"] == metadata.get("workflow_revision")
+        else "STALE_RUNTIME",
+        "runtime_revision": runtime["runtime_revision"],
+        "workflow_revision": metadata.get("workflow_revision"),
+        "scope": "matrix and creation verdicts describe the installed runtime; they prove the workflow revision only when CURRENT",
+    }
+    manifest = {
+        "schema_version": 2,
+        "device": "Redmi 9",
+        "browser": "Iceraven",
+        "capture_method": "Android screencap",
+        "interaction_method": "Firefox DevTools button click",
+        "runtime_revision": runtime["runtime_revision"],
+        "browser_revision": initial["revision"],
+        "revision_match": initial["revision"] == runtime["runtime_revision"],
+        "deployment_acceptance": deployment_acceptance,
+        "ui_version": runtime.get("ui_version"),
+        "application_process_id": runtime.get("process_id"),
+        "preparation": preparation,
+        "captured_at": files[0]["captured_at"],
+        "initial_sidebar_open": initial["open"],
+        "final_sidebar_open": final_sidebar_open,
+        "files": files,
+        "matrix_scenario": {
+            "verdict": "FAIL" if matrix_failures else "PASS",
+            "failures": matrix_failures,
+        },
+        "creation_scenario": creation_scenario,
+        "dialogs_video": dialogs_video,
+        "artifacts": artifacts,
+        **metadata,
+    }
     path = out / "manifest.json"
     path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
     path.chmod(0o600)
     os.chown(path, uid, gid)
     os.chown(out, uid, gid)
-    print(json.dumps({"captured": len(files), "runtime_revision": runtime["runtime_revision"],
-                      "deployment_acceptance": deployment_acceptance["status"]}))
+    print(
+        json.dumps(
+            {
+                "captured": len(files),
+                "runtime_revision": runtime["runtime_revision"],
+                "deployment_acceptance": deployment_acceptance["status"],
+            }
+        )
+    )
 
 
 def restore_clean_page(target_url=None):
@@ -1574,8 +2343,12 @@ def restore_clean_page(target_url=None):
         rdp = RDP(deadline=time.monotonic() + 15)
         try:
             actor = rdp.find_logos()
-            rdp.evaluate(actor, "JSON.stringify((()=>{setTimeout(()=>location.replace(" +
-                         json.dumps(target_url or LOGOS_URL) + "),100);return {scheduled:true};})())")
+            rdp.evaluate(
+                actor,
+                "JSON.stringify((()=>{setTimeout(()=>location.replace("
+                + json.dumps(target_url or LOGOS_URL)
+                + "),100);return {scheduled:true};})())",
+            )
         finally:
             rdp.s.close()
     except Exception as error:
@@ -1601,31 +2374,66 @@ def main():
         try:
             capture(Path(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), metadata)
         finally:
-            restore_clean_page("http://127.0.0.1:8080/" if LOGOS_URL.endswith(":8081/") else LOGOS_URL)
+            restore_clean_page(
+                "http://127.0.0.1:8080/" if LOGOS_URL.endswith(":8081/") else LOGOS_URL
+            )
         return
-    required = ("GITHUB_ACTIONS", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "RUNNER_NAME", "RUNNER_TEMP", "GITHUB_SHA")
-    if os.environ.get("GITHUB_ACTIONS") != "true" or any(not os.environ.get(k) for k in required):
-        raise RuntimeError("Run screenshot capture inside the existing GitHub Actions runner")
+    required = (
+        "GITHUB_ACTIONS",
+        "GITHUB_RUN_ID",
+        "GITHUB_RUN_ATTEMPT",
+        "RUNNER_NAME",
+        "RUNNER_TEMP",
+        "GITHUB_SHA",
+    )
+    if os.environ.get("GITHUB_ACTIONS") != "true" or any(
+        not os.environ.get(k) for k in required
+    ):
+        raise RuntimeError(
+            "Run screenshot capture inside the existing GitHub Actions runner"
+        )
     if len(sys.argv) != 2:
         raise RuntimeError("Usage: redmi_screenshot_capture.py OUTPUT_DIRECTORY")
     output = Path(sys.argv[1]).resolve()
     runner_temp = Path(os.environ["RUNNER_TEMP"]).resolve()
     if runner_temp not in output.parents:
         raise RuntimeError("Capture output must be within RUNNER_TEMP")
-    metadata = {"github_run_id": os.environ["GITHUB_RUN_ID"],
-                "github_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
-                "workflow_revision": os.environ["GITHUB_SHA"], "runner_name": os.environ["RUNNER_NAME"],
-                "github_run_url": "https://github.com/maksimp6/Chat/actions/runs/" + os.environ["GITHUB_RUN_ID"]}
+    metadata = {
+        "github_run_id": os.environ["GITHUB_RUN_ID"],
+        "github_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+        "workflow_revision": os.environ["GITHUB_SHA"],
+        "runner_name": os.environ["RUNNER_NAME"],
+        "github_run_url": "https://github.com/maksimp6/Chat/actions/runs/"
+        + os.environ["GITHUB_RUN_ID"],
+    }
     metadata["tools_self_check"] = os.environ.get("LOGOS_TOOLS_SELF_CHECK") == "1"
-    metadata["capture_url"] = capture_url(os.environ.get("LOGOS_CAPTURE_URL", LOGOS_URL))
+    metadata["capture_url"] = capture_url(
+        os.environ.get("LOGOS_CAPTURE_URL", LOGOS_URL)
+    )
     # -B: the root child must not write root-owned __pycache__ that the runner user cannot delete.
-    argv = [sys.executable, "-B", str(Path(__file__).resolve()), "_capture", str(output),
-            str(os.getuid()), str(os.getgid()), json.dumps(metadata)]
-    safe_env = {"PATH": os.environ.get("PATH", "/system/bin"), "TMPDIR": os.environ.get("TMPDIR", str(runner_temp)), "PYTHONDONTWRITEBYTECODE": "1"}
-    result = subprocess.run(["su", "-c", shlex.join(argv)], env=safe_env, capture_output=True, timeout=300)
+    argv = [
+        sys.executable,
+        "-B",
+        str(Path(__file__).resolve()),
+        "_capture",
+        str(output),
+        str(os.getuid()),
+        str(os.getgid()),
+        json.dumps(metadata),
+    ]
+    safe_env = {
+        "PATH": os.environ.get("PATH", "/system/bin"),
+        "TMPDIR": os.environ.get("TMPDIR", str(runner_temp)),
+        "PYTHONDONTWRITEBYTECODE": "1",
+    }
+    result = subprocess.run(
+        ["su", "-c", shlex.join(argv)], env=safe_env, capture_output=True, timeout=300
+    )
     if result.returncode:
         # No job token is in the capture child's environment or argv.
-        raise RuntimeError(result.stderr.decode(errors="replace")[-1800:] or "Capture failed")
+        raise RuntimeError(
+            result.stderr.decode(errors="replace")[-1800:] or "Capture failed"
+        )
     if result.stderr:
         # Forward non-fatal child messages, such as a failed return to the clean page.
         print(result.stderr.decode(errors="replace")[-1800:], file=sys.stderr)
@@ -1638,4 +2446,3 @@ if __name__ == "__main__":
     except Exception as error:
         print("Screenshot capture failed: " + str(error), file=sys.stderr)
         sys.exit(1)
-

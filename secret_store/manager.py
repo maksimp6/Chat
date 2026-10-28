@@ -101,7 +101,9 @@ class SecretManager:
         admin = self._require_admin()
         result = admin.create(purpose=secret_purpose, value=value)
         try:
-            entry = SecretAlias(alias=alias, ref=result.ref, allowed_purposes=allowed_purposes)
+            entry = SecretAlias(
+                alias=alias, ref=result.ref, allowed_purposes=allowed_purposes
+            )
             self._store.put(entry)
         except Exception:
             # Without its alias the new secret can never be used, so remove it instead of orphaning it.
@@ -126,7 +128,10 @@ class SecretManager:
                 secret_purpose=secret_purpose,
                 allowed_purposes=allowed_purposes,
             )
-        if entry.ref.purpose != secret_purpose or entry.allowed_purposes != allowed_purposes:
+        if (
+            entry.ref.purpose != secret_purpose
+            or entry.allowed_purposes != allowed_purposes
+        ):
             raise SecretAliasError("secret alias policy mismatch")
         return self.rotate(alias, value)
 

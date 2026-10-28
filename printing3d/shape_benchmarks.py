@@ -26,14 +26,20 @@ def _subtract(a: Point, b: Point) -> Point:
 
 
 def _cross(a: Point, b: Point) -> Point:
-    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+    return (
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    )
 
 
 def _dot(a: Point, b: Point) -> float:
     return sum(x * y for x, y in zip(a, b))
 
 
-def _triangles_for_prism(profile: list[tuple[float, float]], height: float) -> list[Triangle]:
+def _triangles_for_prism(
+    profile: list[tuple[float, float]], height: float
+) -> list[Triangle]:
     if len(profile) < 3 or height <= 0:
         raise ValueError("invalid prism")
     area2 = sum(
@@ -47,7 +53,9 @@ def _triangles_for_prism(profile: list[tuple[float, float]], height: float) -> l
     top = [(x, y, height) for x, y in profile]
     result: list[Triangle] = []
     for i in range(1, len(profile) - 1):
-        result.extend([(bottom[0], bottom[i + 1], bottom[i]), (top[0], top[i], top[i + 1])])
+        result.extend(
+            [(bottom[0], bottom[i + 1], bottom[i]), (top[0], top[i], top[i + 1])]
+        )
     for i in range(len(profile)):
         j = (i + 1) % len(profile)
         result.extend([(bottom[i], bottom[j], top[j]), (bottom[i], top[j], top[i])])
@@ -58,11 +66,17 @@ def _ring(outer: float, inner: float, height: float, segments: int) -> list[Tria
     if not (outer > inner > 0 and height > 0 and segments >= 12):
         raise ValueError("invalid ring")
     o = [
-        (outer * math.cos(2 * math.pi * i / segments), outer * math.sin(2 * math.pi * i / segments))
+        (
+            outer * math.cos(2 * math.pi * i / segments),
+            outer * math.sin(2 * math.pi * i / segments),
+        )
         for i in range(segments)
     ]
     h = [
-        (inner * math.cos(2 * math.pi * i / segments), inner * math.sin(2 * math.pi * i / segments))
+        (
+            inner * math.cos(2 * math.pi * i / segments),
+            inner * math.sin(2 * math.pi * i / segments),
+        )
         for i in range(segments)
     ]
     triangles: list[Triangle] = []
@@ -104,7 +118,8 @@ def _translate_to_positive(triangles: list[Triangle]) -> list[Triangle]:
 def _samples() -> dict[str, Coupon]:
     n = 96
     circle = [
-        (10 * math.cos(2 * math.pi * i / n), 10 * math.sin(2 * math.pi * i / n)) for i in range(n)
+        (10 * math.cos(2 * math.pi * i / n), 10 * math.sin(2 * math.pi * i / n))
+        for i in range(n)
     ]
     triangle = [(0.0, 12.0), (-6 * math.sqrt(3), -6.0), (6 * math.sqrt(3), -6.0)]
     upright = _triangles_for_prism(circle, 12)
@@ -142,7 +157,11 @@ def _samples() -> dict[str, Coupon]:
             (20, 24, 20),
             "bottom arc, support scars; requires dedicated orientation review",
         ),
-        "inclined_wedge": (wedge, (12, 30, 15), "inclined top surface, staircase effect and warp"),
+        "inclined_wedge": (
+            wedge,
+            (12, 30, 15),
+            "inclined top surface, staircase effect and warp",
+        ),
     }
 
 
@@ -174,7 +193,11 @@ def _read_facets(data: bytes) -> list[Triangle]:
     if not 84 <= len(data) <= BYTE_LIMIT:
         raise ValueError("STL truncated or exceeds fixture limit")
     facets = struct.unpack_from("<I", data, 80)[0]
-    if facets < 4 or facets > FACET_LIMIT or len(data) != 84 + facets * TRIANGLE_STRUCT.size:
+    if (
+        facets < 4
+        or facets > FACET_LIMIT
+        or len(data) != 84 + facets * TRIANGLE_STRUCT.size
+    ):
         raise ValueError("STL triangle count/length mismatch")
     triangles: list[Triangle] = []
     unique_faces: set[tuple[Point, Point, Point]] = set()
@@ -248,7 +271,9 @@ def _validate_extents(
     tolerance_mm: float,
 ) -> tuple[float, float, float]:
     vertices = [point for tri in triangles for point in tri]
-    spans = [(min(v[d] for v in vertices), max(v[d] for v in vertices)) for d in range(3)]
+    spans = [
+        (min(v[d] for v in vertices), max(v[d] for v in vertices)) for d in range(3)
+    ]
     extents: Point = (
         round(spans[0][1] - spans[0][0], 4),
         round(spans[1][1] - spans[1][0], 4),
@@ -264,8 +289,13 @@ def _validate_extents(
             or any(not math.isfinite(e) or e <= 0 for e in expected_mm)
         ):
             raise ValueError("invalid nominal dimensions/tolerance")
-        if any(abs(got - expected) > tolerance_mm for got, expected in zip(extents, expected_mm)):
-            raise ValueError("STL dimensions differ from independent design specification")
+        if any(
+            abs(got - expected) > tolerance_mm
+            for got, expected in zip(extents, expected_mm)
+        ):
+            raise ValueError(
+                "STL dimensions differ from independent design specification"
+            )
     return extents
 
 
@@ -341,7 +371,8 @@ def build_coupons(out_dir: Path) -> dict[str, Any]:
         "models": models,
     }
     (out_dir / "manifest.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
     )
     return manifest
 

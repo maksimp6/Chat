@@ -129,7 +129,9 @@ class BrowserDagResult:
             "status": self.status,
             "consumed_tokens": self.consumed_tokens,
             "duration_ms": self.duration_ms,
-            "tasks": {task_id: result.to_mapping() for task_id, result in self.tasks.items()},
+            "tasks": {
+                task_id: result.to_mapping() for task_id, result in self.tasks.items()
+            },
         }
 
 
@@ -241,7 +243,9 @@ class BrowserRoleDag:
         running_tasks: Mapping[str, BrowserRoleTask],
     ) -> bool:
         same_session = [
-            running for running in running_tasks.values() if running.session_id == task.session_id
+            running
+            for running in running_tasks.values()
+            if running.session_id == task.session_id
         ]
         if not same_session:
             return True
@@ -267,7 +271,10 @@ class BrowserRoleDag:
                     consumed_tokens=consumed_tokens,
                     duration_ms=round(duration * 1000, 2),
                 )
-            if task.budget.max_tokens is not None and consumed_tokens > task.budget.max_tokens:
+            if (
+                task.budget.max_tokens is not None
+                and consumed_tokens > task.budget.max_tokens
+            ):
                 return BrowserTaskResult(
                     task.task_id,
                     "failed",
@@ -278,7 +285,9 @@ class BrowserRoleDag:
                     duration_ms=round(duration * 1000, 2),
                 )
 
-            compacted, output_chars = _compact_output(data, task.budget.max_output_chars)
+            compacted, output_chars = _compact_output(
+                data, task.budget.max_output_chars
+            )
             return BrowserTaskResult(
                 task.task_id,
                 "succeeded",
@@ -316,7 +325,9 @@ class BrowserRoleDag:
                     changed = False
                     for task_id in sorted(tuple(pending)):
                         task = self._task_map[task_id]
-                        dependency_results = [results.get(dep) for dep in task.dependencies]
+                        dependency_results = [
+                            results.get(dep) for dep in task.dependencies
+                        ]
                         if any(
                             result is not None
                             and result.status in {"failed", "blocked", "cancelled"}
@@ -355,8 +366,12 @@ class BrowserRoleDag:
 
                 timeout = None
                 if running:
-                    timeout = max(0.0, min(deadlines[f] for f in running) - time.monotonic())
-                done, _ = wait(tuple(running), timeout=timeout, return_when=FIRST_COMPLETED)
+                    timeout = max(
+                        0.0, min(deadlines[f] for f in running) - time.monotonic()
+                    )
+                done, _ = wait(
+                    tuple(running), timeout=timeout, return_when=FIRST_COMPLETED
+                )
                 for future in done:
                     task = running.pop(future)
                     deadlines.pop(future)
@@ -397,7 +412,9 @@ class BrowserRoleDag:
                     task = running.pop(future)
                     deadlines.pop(future)
                     future.cancel()
-                    suffix = "; writes may already have happened" if task.is_write else ""
+                    suffix = (
+                        "; writes may already have happened" if task.is_write else ""
+                    )
                     results[task.task_id] = BrowserTaskResult(
                         task.task_id,
                         "failed",

@@ -51,7 +51,9 @@ STYLESHEET_RE = re.compile(
 def _resolve(relative_name: str) -> Path:
     path = STATIC_ROOT / relative_name
     if not path.is_file():
-        raise FileNotFoundError(f"Referenced static resource is missing: {relative_name}")
+        raise FileNotFoundError(
+            f"Referenced static resource is missing: {relative_name}"
+        )
     return path
 
 
@@ -68,10 +70,13 @@ def discover_critical_files() -> list[tuple[str, Path]]:
     files.append((f"static/{name}", _resolve(name)))
 
     boot_match = re.search(
-        r'<script\b[^>]*\bid="logos-boot"[^>]*\bsrc="\{\{ static_root \}\}/([^"?]+)\?', html
+        r'<script\b[^>]*\bid="logos-boot"[^>]*\bsrc="\{\{ static_root \}\}/([^"?]+)\?',
+        html,
     )
     if not boot_match:
-        raise RuntimeError('No script with id="logos-boot" found in templates/index.html')
+        raise RuntimeError(
+            'No script with id="logos-boot" found in templates/index.html'
+        )
     boot_name = boot_match.group(1)
     files.append((f"static/{boot_name}", _resolve(boot_name)))
 
@@ -95,7 +100,9 @@ def discover_full_page_files() -> list[tuple[str, Path]]:
     files: list[tuple[str, Path]] = [("templates/index.html", TEMPLATE_PATH)]
 
     seen: set[str] = set()
-    resource_re = re.compile(r'\{\{ static_root \}\}/([^"?]+)\?v=\{\{ static_version \}\}')
+    resource_re = re.compile(
+        r'\{\{ static_root \}\}/([^"?]+)\?v=\{\{ static_version \}\}'
+    )
     for match in resource_re.finditer(html):
         name = match.group(1)
         if name in seen:

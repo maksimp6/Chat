@@ -84,12 +84,18 @@ class Github:
 
 def safe_model_path(path: object) -> bool:
     """Explicit GitHub-owned models directory, simple regular names only."""
-    if not isinstance(path, str) or not path.startswith(INPUT_PREFIXES) or len(path) > 240:
+    if (
+        not isinstance(path, str)
+        or not path.startswith(INPUT_PREFIXES)
+        or len(path) > 240
+    ):
         return False
     if PurePosixPath(path).as_posix() != path:
         return False
     pieces = PurePosixPath(path).parts
-    prefix_parts = PurePosixPath(next(p for p in INPUT_PREFIXES if path.startswith(p))).parts
+    prefix_parts = PurePosixPath(
+        next(p for p in INPUT_PREFIXES if path.startswith(p))
+    ).parts
     if pieces[: len(prefix_parts)] != prefix_parts:
         return False
     remainder = pieces[len(prefix_parts) :]
@@ -98,7 +104,8 @@ def safe_model_path(path: object) -> bool:
     if any(not PATH_RE.fullmatch(chunk) for chunk in remainder[:-1]):
         return False
     return bool(
-        NAME_RE.fullmatch(remainder[-1]) and remainder[-1].lower().endswith((".stl", ".3mf"))
+        NAME_RE.fullmatch(remainder[-1])
+        and remainder[-1].lower().endswith((".stl", ".3mf"))
     )
 
 
@@ -145,7 +152,9 @@ def _blob(api: Github, sha: str) -> bytes:
         raise PublishError("invalid GitHub blob data") from exc
     if len(raw) != reported_size:
         raise PublishError("GitHub model blob length mismatch")
-    object_hash = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw, usedforsecurity=False).hexdigest()
+    object_hash = hashlib.sha1(
+        b"blob " + str(len(raw)).encode() + b"\0" + raw, usedforsecurity=False
+    ).hexdigest()
     if object_hash != sha:
         raise PublishError("GitHub model blob SHA mismatch")
     return raw
@@ -186,7 +195,11 @@ def publish_images(api: Github, artifacts: list[tuple[str, bytes]]) -> str:
     tree = api.json(
         "POST",
         api.prefix + "/git/trees",
-        ({"base_tree": prior_tree, "tree": elements} if prior_tree else {"tree": elements}),
+        (
+            {"base_tree": prior_tree, "tree": elements}
+            if prior_tree
+            else {"tree": elements}
+        ),
     )
     if not isinstance(tree, dict):
         raise PublishError("GitHub did not create preview tree")
@@ -225,7 +238,9 @@ def _store_preview_blobs(api: Github, artifacts: list[tuple[str, bytes]]) -> lis
     elements = []
     for target, png in artifacts:
         if (
-            not re.fullmatch(r"printing3d/previews/pr-[0-9]+/[A-Za-z0-9_.-]+\.png", target)
+            not re.fullmatch(
+                r"printing3d/previews/pr-[0-9]+/[A-Za-z0-9_.-]+\.png", target
+            )
             or len(png) > 1_200_000
             or not png.startswith(b"\x89PNG\r\n\x1a\n")
         ):
@@ -238,7 +253,12 @@ def _store_preview_blobs(api: Github, artifacts: list[tuple[str, bytes]]) -> lis
         if not isinstance(blob, dict):
             raise PublishError("GitHub did not store preview blob")
         elements.append(
-            {"path": target, "mode": "100644", "type": "blob", "sha": _sha(blob.get("sha"))}
+            {
+                "path": target,
+                "mode": "100644",
+                "type": "blob",
+                "sha": _sha(blob.get("sha")),
+            }
         )
     return elements
 
@@ -248,7 +268,12 @@ def _url(repo: str, sha: str, path: str) -> str:
 
 
 def render_report(
-    api: Github, pr_number: int, sha: str, models: list[dict], *, omitted: list[dict] | None = None
+    api: Github,
+    pr_number: int,
+    sha: str,
+    models: list[dict],
+    *,
+    omitted: list[dict] | None = None,
 ) -> str:
     """Publish successful PNGs and return the bot-owned Markdown comment body."""
     summary = [
@@ -275,14 +300,17 @@ def render_report(
         images.append((path, destination, mesh["sha256"], mesh))
     preview_sha = publish_images(api, artifact_pngs) if artifact_pngs else None
     for path, rendered, digest_or_error, mesh in images:
-        source_url = f"https://github.com/{api.repo}/blob/{sha}/{parse.quote(path, safe='/.-_')}"
+        source_url = (
+            f"https://github.com/{api.repo}/blob/{sha}/{parse.quote(path, safe='/.-_')}"
+        )
         source_name = PurePosixPath(path).name
         summary.append(f"\n**[{source_name}]({source_url})**")
         if rendered is None:
             summary.append(rf"Preview unavailable: `{digest_or_error[:140]}`.")
             continue
         dimensions = tuple(
-            round(mesh["maximum"][index] - mesh["minimum"][index], 2) for index in range(3)
+            round(mesh["maximum"][index] - mesh["minimum"][index], 2)
+            for index in range(3)
         )
         summary.extend(
             [
@@ -298,7 +326,9 @@ def render_report(
             f"- `{item['filename']}`: preview unavailable (per-PR budget: {MAX_MODELS} meshes)."
             for item in omitted
         )
-        summary.append("The remaining models will not be rendered automatically on this head.")
+        summary.append(
+            "The remaining models will not be rendered automatically on this head."
+        )
     summary.append(
         "\n*These images are derived from triangle geometry. They do not verify slicer settings, "
         "manifoldness, tolerances, mechanical strength, filament or finished-print quality.*"
@@ -310,12 +340,16 @@ def _bot_comment(api: Github, pr: int) -> dict | None:
     """Find only our GitHub Actions bot's marker across bounded pagination."""
     existing = None
     for page in range(1, 11):
-        comments = api.json("GET", api.prefix + f"/issues/{pr}/comments?per_page=100&page={page}")
+        comments = api.json(
+            "GET", api.prefix + f"/issues/{pr}/comments?per_page=100&page={page}"
+        )
         if not isinstance(comments, list):
             raise PublishError("invalid PR comments response")
         for comment in comments:
             user = comment.get("user") or {}
-            if user.get("login") == "github-actions[bot]" and MARKER in comment.get("body", ""):
+            if user.get("login") == "github-actions[bot]" and MARKER in comment.get(
+                "body", ""
+            ):
                 existing = comment
                 break
         if existing or len(comments) < 100:
@@ -330,14 +364,22 @@ def upsert_comment(api: Github, pr: int, body: str) -> str:
     if existing:
         if existing.get("body") == body:
             return "unchanged"
-        api.json("PATCH", api.prefix + "/issues/comments/" + str(existing["id"]), {"body": body})
+        api.json(
+            "PATCH",
+            api.prefix + "/issues/comments/" + str(existing["id"]),
+            {"body": body},
+        )
         return "updated"
     api.json("POST", api.prefix + f"/issues/{pr}/comments", {"body": body})
     return "created"
 
 
 def run(
-    api: Github, pr_number: int, *, refresh: bool = False, expected_head: str | None = None
+    api: Github,
+    pr_number: int,
+    *,
+    refresh: bool = False,
+    expected_head: str | None = None,
 ) -> str:
     if not 1 <= pr_number <= 1_000_000_000:
         raise PublishError("invalid PR number")
@@ -358,7 +400,9 @@ def run(
     if not isinstance(changed, list):
         raise PublishError("invalid PR files response")
     if len(changed) != changed_files:
-        raise PublishError("PR file listing incomplete; not publishing partial previews")
+        raise PublishError(
+            "PR file listing incomplete; not publishing partial previews"
+        )
     models = _model_candidates(changed)
     if not models:
         return "no_model_changes"
@@ -403,7 +447,9 @@ def _open_pr_catalog(api: Github) -> list[dict]:
         suffix = "" if page == 1 else f"&page={page}"
         batch = api.json(
             "GET",
-            api.prefix + "/pulls?state=open&sort=updated&direction=desc&per_page=100" + suffix,
+            api.prefix
+            + "/pulls?state=open&sort=updated&direction=desc&per_page=100"
+            + suffix,
         )
         if not isinstance(batch, list) or len(batch) > 100:
             raise PublishError("invalid open-PR catalog page")
@@ -449,20 +495,28 @@ def scan_open_prs(api: Github) -> str:
     if time.monotonic() >= deadline:
         raise PublishError("scan incomplete: total time budget exhausted")
     if blocked:
-        raise PublishError(f"{len(blocked)} preview publication(s) failed; first PR #{blocked[0]}")
+        raise PublishError(
+            f"{len(blocked)} preview publication(s) failed; first PR #{blocked[0]}"
+        )
     return f"scan_checked={checked} preview_comments_changed={changed}"
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Trusted GitHub PR 3D preview publisher")
+    parser = argparse.ArgumentParser(
+        description="Trusted GitHub PR 3D preview publisher"
+    )
     parser.add_argument("--repo", required=True)
     selection = parser.add_mutually_exclusive_group(required=True)
     selection.add_argument("--pr", type=int)
     selection.add_argument("--scan-open", action="store_true")
     parser.add_argument(
-        "--refresh", action="store_true", help="rebuild previews even on unchanged PR head"
+        "--refresh",
+        action="store_true",
+        help="rebuild previews even on unchanged PR head",
     )
-    parser.add_argument("--expected-head", default=None, help="reject a stale manual PR head")
+    parser.add_argument(
+        "--expected-head", default=None, help="reject a stale manual PR head"
+    )
     options = parser.parse_args()
     try:
         api = Github(options.repo, env_get("GH_TOKEN", ""))

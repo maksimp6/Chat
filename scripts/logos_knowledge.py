@@ -35,7 +35,12 @@ def _scope(owner: str | None, access: str | None, project: str, store_id: str) -
         for value in (owner, access)
     ):
         raise ValueError("knowledge_cache_scope_missing")
-    return {"owner": owner, "access_scope": access, "project": project, "store_id": store_id}
+    return {
+        "owner": owner,
+        "access_scope": access,
+        "project": project,
+        "store_id": store_id,
+    }
 
 
 @contextmanager
@@ -57,7 +62,9 @@ def _preparation_lock(project: str, store_id: str) -> Iterator[None]:
             or stat.S_IMODE(info.st_mode) != 0o700
         ):
             raise ValueError("knowledge_lock_directory_unsafe")
-        identity = hashlib.sha256(_canonical_json([project, store_id]).encode()).hexdigest()
+        identity = hashlib.sha256(
+            _canonical_json([project, store_id]).encode()
+        ).hexdigest()
         fd = os.open(
             identity + ".lock",
             os.O_CREAT | os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW,
@@ -94,14 +101,20 @@ def prepare_knowledge(
     cache_access_scope: str | None = None,
 ) -> dict:
     """Preserve existing knowledge and add this verified, unabridged case once."""
-    if not isinstance(store_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,200}", store_id):
+    if not isinstance(store_id, str) or not re.fullmatch(
+        r"[A-Za-z0-9_-]{1,200}", store_id
+    ):
         raise ValueError("knowledge_store_id_invalid")
     if not all(isinstance(value, str) and value.strip() for value in (project, key)):
         raise ValueError("knowledge_provider_credentials_missing")
     scope = _scope(cache_owner, cache_access_scope, project, store_id)
     packet = load_context(context_file)
     captured_at = packet.get("captured_at")
-    if not isinstance(captured_at, str) or not captured_at.strip() or len(captured_at) > 100:
+    if (
+        not isinstance(captured_at, str)
+        or not captured_at.strip()
+        or len(captured_at) > 100
+    ):
         raise ValueError("knowledge_context_capture_metadata_invalid")
     reusable = knowledge_content(packet)
     cache_policy = {
@@ -125,14 +138,18 @@ def prepare_knowledge(
         **result,
         "context_sha256": packet["packet_sha256"],
         "captured_at": captured_at,
-        "context_content_sha256": hashlib.sha256(_canonical_json(reusable).encode()).hexdigest(),
+        "context_content_sha256": hashlib.sha256(
+            _canonical_json(reusable).encode()
+        ).hexdigest(),
         "cache_policy": cache_policy,
         "checkout_sha": packet["checkout_sha"],
         "sources": len(packet["sources"]) + 1,
     }
 
 
-def _index_context(content: bytes, digest: str, project: str, key: str, store_id: str) -> dict:
+def _index_context(
+    content: bytes, digest: str, project: str, key: str, store_id: str
+) -> dict:
     """Verify existing provider state inside the local preparation lock."""
     store = semantic.yandex_json_request(
         "GET", "/vector_stores/" + quote(store_id, safe=""), project, key
@@ -147,15 +164,22 @@ def _index_context(content: bytes, digest: str, project: str, key: str, store_id
         raise ValueError("knowledge_existing_project_store_invalid")
     filename = f"chat-task-history-context-{digest}.md"
     file_id, _metadata = semantic.ensure_yandex_file(filename, content, project, key)
-    attached = semantic.ensure_vector_store_files_attached(store_id, [file_id], project, key)
+    attached = semantic.ensure_vector_store_files_attached(
+        store_id, [file_id], project, key
+    )
     semantic.wait_for_vector_store_index(store_id, file_id, project, key)
     # A completed store does not establish the target file's status. Require
     # positive file-level evidence even when a legacy waiter accepts omissions.
     records = semantic.list_yandex_objects(
-        "/vector_stores/" + quote(store_id, safe="") + "/files", project, key, ("files",)
+        "/vector_stores/" + quote(store_id, safe="") + "/files",
+        project,
+        key,
+        ("files",),
     )
     target = [
-        record for record in records if (record.get("file_id") or record.get("id")) == file_id
+        record
+        for record in records
+        if (record.get("file_id") or record.get("id")) == file_id
     ]
     if len(target) != 1 or target[0].get("status") != "completed":
         raise ValueError("knowledge_target_file_index_not_completed")
@@ -193,13 +217,19 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError, TypeError) as exc:
         # Do not publish arbitrary transport messages or context text. A failed
         # receipt blocks the dialogue rather than silently disabling its RAG.
-        result = {"status": "failed", "error": type(exc).__name__, "generation_requests": 0}
+        result = {
+            "status": "failed",
+            "error": type(exc).__name__,
+            "generation_requests": 0,
+        }
         if re.fullmatch(r"[a-z][a-z0-9_]{1,100}", str(exc)):
             result["error_code"] = str(exc)
         if isinstance(exc, semantic.YandexHTTPError):
             result["http_status"] = exc.status
             result["provider_code"] = exc.provider_code
-    args.out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    args.out.write_text(
+        json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     print("LOGOS_KNOWLEDGE=" + json.dumps(result, ensure_ascii=False))
     return 0 if result["status"] == "indexed" else 1
 

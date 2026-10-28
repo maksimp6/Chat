@@ -17,7 +17,9 @@ def _run_termux_cmd(cmd: list, timeout: int = 10) -> dict:
             "в Termux с пакетом termux-api и приложением Termux:API",
         }
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+        res = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout, check=False
+        )
         out = res.stdout.strip()
         err = res.stderr.strip()
         if res.returncode == 0:
@@ -25,7 +27,10 @@ def _run_termux_cmd(cmd: list, timeout: int = 10) -> dict:
                 return {"success": True, "data": json.loads(out)}
             except Exception:
                 return {"success": True, "output": out or "OK"}
-        return {"success": False, "error": err or f"Process exited with code {res.returncode}"}
+        return {
+            "success": False,
+            "error": err or f"Process exited with code {res.returncode}",
+        }
     except subprocess.TimeoutExpired:
         return {"success": False, "error": f"Timeout executing {cmd[0]}"}
     except Exception as e:
@@ -69,7 +74,9 @@ def termux_tts_speak(args: dict, cfg: dict) -> dict:
 def termux_notification(args: dict, cfg: dict) -> dict:
     title = args.get("title", "Logos")
     content = args.get("content", "")
-    return _run_termux_cmd(["termux-notification", "--title", title, "--content", content])
+    return _run_termux_cmd(
+        ["termux-notification", "--title", title, "--content", content]
+    )
 
 
 def termux_camera_photo(args: dict, cfg: dict) -> dict:
@@ -78,7 +85,9 @@ def termux_camera_photo(args: dict, cfg: dict) -> dict:
     camera_id = str(args.get("camera_id", 0))
     file_name = args.get("file_name") or f"photo_{int(time.time())}.jpg"
     file_path = os.path.abspath(file_name)
-    res = _run_termux_cmd(["termux-camera-photo", "-c", camera_id, file_path], timeout=25)
+    res = _run_termux_cmd(
+        ["termux-camera-photo", "-c", camera_id, file_path], timeout=25
+    )
     if res.get("success"):
         return {
             "success": True,
@@ -103,7 +112,12 @@ def termux_open_app_settings(args: dict, cfg: dict) -> dict:
             f"package:{pkg}",
         ]
     elif screen == "battery":
-        cmd = ["am", "start", "-a", "android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS"]
+        cmd = [
+            "am",
+            "start",
+            "-a",
+            "android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS",
+        ]
     else:  # "app_details" — общая карточка приложения и список разрешений
         cmd = [
             "am",
@@ -140,7 +154,10 @@ def remove_file(args: dict, cfg: dict) -> dict:
                 deleted.append(f)
         except Exception as e:
             return {"success": False, "error": f"Ошибка при удалении {f}: {str(e)}"}
-    return {"success": True, "message": f"Удалено файлов: {len(deleted)} ({', '.join(deleted)})"}
+    return {
+        "success": True,
+        "message": f"Удалено файлов: {len(deleted)} ({', '.join(deleted)})",
+    }
 
 
 TERMUX_TOOLS = {
@@ -209,7 +226,10 @@ TERMUX_TOOLS = {
         "parameters": {
             "type": "object",
             "properties": {
-                "message": {"type": "string", "description": "Текст всплывающего уведомления"}
+                "message": {
+                    "type": "string",
+                    "description": "Текст всплывающего уведомления",
+                }
             },
             "required": ["message"],
         },
@@ -267,7 +287,9 @@ TERMUX_TOOLS = {
         "description": "Озвучить текст голосом через системный движок Android TTS.",
         "parameters": {
             "type": "object",
-            "properties": {"text": {"type": "string", "description": "Текст для воспроизведения"}},
+            "properties": {
+                "text": {"type": "string", "description": "Текст для воспроизведения"}
+            },
             "required": ["text"],
         },
     },
@@ -278,7 +300,10 @@ TERMUX_TOOLS = {
             "type": "object",
             "properties": {
                 "title": {"type": "string", "description": "Заголовок уведомления"},
-                "content": {"type": "string", "description": "Основной текст уведомления"},
+                "content": {
+                    "type": "string",
+                    "description": "Основной текст уведомления",
+                },
             },
             "required": ["content"],
         },

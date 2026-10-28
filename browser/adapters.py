@@ -31,7 +31,9 @@ _MAX_ERROR_CHARS = 500
 def _sanitize_error(value: str | None) -> str | None:
     if value is None:
         return None
-    text = _CREDENTIAL_ASSIGNMENT.sub(lambda match: match.group(1) + "=<redacted>", str(value))
+    text = _CREDENTIAL_ASSIGNMENT.sub(
+        lambda match: match.group(1) + "=<redacted>", str(value)
+    )
     return text[:_MAX_ERROR_CHARS]
 
 
@@ -85,7 +87,10 @@ class BrowserAdapterRegistry:
             return BrowserAdapterResult(
                 False,
                 error=f"Browser adapter unavailable: {action.capability}",
-                metadata={"phase": "adapter_unavailable", "capability": action.capability},
+                metadata={
+                    "phase": "adapter_unavailable",
+                    "capability": action.capability,
+                },
             ).to_mapping()
 
         try:
@@ -101,7 +106,10 @@ class BrowserAdapterRegistry:
             return BrowserAdapterResult(
                 False,
                 error="Browser adapter returned a non-mapping result",
-                metadata={"phase": "result_validation", "capability": action.capability},
+                metadata={
+                    "phase": "result_validation",
+                    "capability": action.capability,
+                },
             ).to_mapping()
 
         return BrowserAdapterResult(
@@ -115,12 +123,16 @@ class BrowserAdapterRegistry:
         ).to_mapping()
 
 
-def register_browser_tools(tool_registry: Any, adapters: BrowserAdapterRegistry) -> None:
+def register_browser_tools(
+    tool_registry: Any, adapters: BrowserAdapterRegistry
+) -> None:
     """Opt in browser contracts to a ToolRegistry through one dispatcher boundary."""
 
     for name, contract in BROWSER_CAPABILITY_CONTRACTS.items():
 
-        def execute(arguments: Mapping[str, Any], _config: Mapping[str, Any], *, _name=name):
+        def execute(
+            arguments: Mapping[str, Any], _config: Mapping[str, Any], *, _name=name
+        ):
             action = BrowserAction(
                 capability=_name,
                 action=str(arguments.get("action") or ""),

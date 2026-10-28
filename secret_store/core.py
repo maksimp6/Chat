@@ -24,7 +24,11 @@ class SecretRef:
     purpose: str = ""
 
     def __post_init__(self) -> None:
-        if not self.provider.strip() or not self.secret_id.strip() or not self.version_id.strip():
+        if (
+            not self.provider.strip()
+            or not self.secret_id.strip()
+            or not self.version_id.strip()
+        ):
             raise ValueError("provider, secret_id and version_id are required")
 
     def metadata(self) -> dict[str, str]:

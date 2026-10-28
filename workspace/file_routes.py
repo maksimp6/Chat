@@ -1,4 +1,5 @@
 """Flask routes for Files and Vector Stores API"""
+
 from core.env import env_get
 
 import os
@@ -13,7 +14,17 @@ from yandex_client_modules.errors import YandexClientError
 logger = logging.getLogger(__name__)
 file_bp = Blueprint("file_manager", __name__)
 
-ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".csv", ".md", ".html", ".json", ".jsonl", ".txt"}
+ALLOWED_EXTENSIONS = {
+    ".pdf",
+    ".docx",
+    ".xlsx",
+    ".csv",
+    ".md",
+    ".html",
+    ".json",
+    ".jsonl",
+    ".txt",
+}
 MAX_FILE_SIZE = 128 * 1024 * 1024  # 128 MB
 
 
@@ -68,7 +79,9 @@ def upload_file():
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         return jsonify(
-            {"error": f"File type not allowed. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"}
+            {
+                "error": f"File type not allowed. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
+            }
         ), 400
     content_length = request.content_length
     if content_length and content_length > MAX_FILE_SIZE:
@@ -211,7 +224,9 @@ def add_file_to_vs(vs_id):
             return jsonify({"error": "file_id is required"}), 400
         chunking_strategy = data.get("chunking_strategy")
         client = get_client()
-        result = client.add_file_to_vs(vs_id, file_id, chunking_strategy=chunking_strategy)
+        result = client.add_file_to_vs(
+            vs_id, file_id, chunking_strategy=chunking_strategy
+        )
         return jsonify(result), 201
     except YandexClientError as e:
         return _err_response(e)

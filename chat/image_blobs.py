@@ -33,7 +33,11 @@ def save_image(data_url: str, conversation_id: str) -> str:
     header, _, payload = data_url.partition(",")
     mime = header.removeprefix("data:").split(";", 1)[0]
     subtype = mime.removeprefix("image/")
-    if not mime.startswith("image/") or ";base64" not in header or not _SUBTYPE_PATTERN.fullmatch(subtype):
+    if (
+        not mime.startswith("image/")
+        or ";base64" not in header
+        or not _SUBTYPE_PATTERN.fullmatch(subtype)
+    ):
         raise ValueError("unsupported image data URL")
     blob_id = uuid.uuid4().hex
     image_bytes = base64.b64decode(payload, validate=True)
@@ -61,6 +65,8 @@ def load_image(blob_id: str, conversation_id: str) -> tuple[str, bytes] | None:
     if not _BLOB_ID_PATTERN.fullmatch(blob_id or ""):
         return None
     for path in _conversation_dir(conversation_id).glob(f"{blob_id}.*"):
-        mime = mimetypes.types_map.get(path.suffix, f"image/{path.suffix.removeprefix('.')}")
+        mime = mimetypes.types_map.get(
+            path.suffix, f"image/{path.suffix.removeprefix('.')}"
+        )
         return mime, path.read_bytes()
     return None

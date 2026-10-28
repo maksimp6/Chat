@@ -188,10 +188,14 @@ class ExecutionTrace:
 
     def _redact_registered_values(self, value: Any) -> Any:
         with self._sensitive_values_lock:
-            sensitive_values = tuple(sorted(self._sensitive_values, key=len, reverse=True))
+            sensitive_values = tuple(
+                sorted(self._sensitive_values, key=len, reverse=True)
+            )
         if not sensitive_values:
             return value
-        substring_values = tuple(secret for secret in sensitive_values if len(secret) >= 4)
+        substring_values = tuple(
+            secret for secret in sensitive_values if len(secret) >= 4
+        )
         substring_pattern = (
             re.compile("|".join(re.escape(secret) for secret in substring_values))
             if substring_values
@@ -311,7 +315,13 @@ class ExecutionTrace:
             if value is not None:
                 context[key] = str(value)
         billing = self.trace.setdefault("billing", {})
-        for key in ("invocation_id", "session_id", "conversation_id", "trace_id", "owner_id"):
+        for key in (
+            "invocation_id",
+            "session_id",
+            "conversation_id",
+            "trace_id",
+            "owner_id",
+        ):
             if key in context:
                 billing[key] = context[key]
 
@@ -347,7 +357,11 @@ class ExecutionTrace:
         self.trace["request"] = clean_payload
         self.add_event(
             "request_initialized",
-            {"keys": list(clean_payload.keys()) if isinstance(clean_payload, dict) else []},
+            {
+                "keys": list(clean_payload.keys())
+                if isinstance(clean_payload, dict)
+                else []
+            },
         )
 
     @classmethod
@@ -362,7 +376,13 @@ class ExecutionTrace:
             for name, value in frame.f_locals.items():
                 if name.lower() in self._SENSITIVE_KEYS or any(
                     secret in name.lower()
-                    for secret in ("api_key", "password", "secret", "token", "credential")
+                    for secret in (
+                        "api_key",
+                        "password",
+                        "secret",
+                        "token",
+                        "credential",
+                    )
                 ):
                     locals_snapshot[name] = "<redacted>"
                 else:
@@ -384,7 +404,9 @@ class ExecutionTrace:
                 "exception_message": redact_text(str(exc)),
                 "traceback": [
                     redact_text(line)
-                    for line in traceback.format_exception(type(exc), exc, exc.__traceback__)
+                    for line in traceback.format_exception(
+                        type(exc), exc, exc.__traceback__
+                    )
                 ],
                 "frames": frames,
             }
@@ -393,7 +415,9 @@ class ExecutionTrace:
     def _request_timing_for_step(self, step_index: int) -> Optional[float]:
         return request_timing_for_step(self.trace, step_index)
 
-    def _infer_response_start(self, step_index: int, end_timestamp: float) -> Optional[float]:
+    def _infer_response_start(
+        self, step_index: int, end_timestamp: float
+    ) -> Optional[float]:
         return infer_response_start(self.trace, step_index, end_timestamp)
 
     def get_step_correlation_id(self, step_index: int) -> str:
@@ -409,12 +433,16 @@ class ExecutionTrace:
         provider_key_id: Optional[str] = None,
     ) -> int:
         self._ensure_mutable()
-        provider_key_id = provider_key_id or (self.trace.get("provider_key") or {}).get("key_id")
+        provider_key_id = provider_key_id or (self.trace.get("provider_key") or {}).get(
+            "key_id"
+        )
         correlation_id = self.get_step_correlation_id(step_index)
         request_entry = {
             "step": step_index,
             "correlation_id": correlation_id,
-            "timestamp": start_timestamp if start_timestamp is not None else time.time(),
+            "timestamp": start_timestamp
+            if start_timestamp is not None
+            else time.time(),
             "payload": self._sanitize_trace_value(payload),
         }
         if provider_key_id is not None:
@@ -444,7 +472,9 @@ class ExecutionTrace:
 
             # The chat turn's internal model key is the billing key. The provider echoes its own
             # model id, which may not be a registry key (for example `name/latest`).
-            model = (self.trace.get("request") or {}).get("model") or clean_raw.get("model")
+            model = (self.trace.get("request") or {}).get("model") or clean_raw.get(
+                "model"
+            )
             if not model:
                 for request in reversed(self.trace.get("api_requests", [])):
                     if request.get("step") == step_index:
@@ -457,7 +487,9 @@ class ExecutionTrace:
                                 else model_uri
                             )
                         break
-            item = build_ai_billing_item(model, clean_raw.get("usage"), step_index, response_id)
+            item = build_ai_billing_item(
+                model, clean_raw.get("usage"), step_index, response_id
+            )
             items = self.trace.setdefault("billing", {}).setdefault("items", [])
             key = (item.get("step"), item.get("response_id"))
             existing = next(
@@ -470,7 +502,10 @@ class ExecutionTrace:
             )
             if existing is None:
                 items.append(item)
-            elif items[existing].get("cost_status") == "calculated" and item.get("cost_reason") == "usage_missing":
+            elif (
+                items[existing].get("cost_status") == "calculated"
+                and item.get("cost_reason") == "usage_missing"
+            ):
                 # A later snapshot without usage must not erase a priced charge.
                 return
             else:
@@ -496,7 +531,9 @@ class ExecutionTrace:
         """Store one logical Responses API operation; polling snapshots stay nested in it."""
         self._ensure_mutable()
         idx = step_index or kwargs.get("call_index", 1)
-        provider_key_id = provider_key_id or (self.trace.get("provider_key") or {}).get("key_id")
+        provider_key_id = provider_key_id or (self.trace.get("provider_key") or {}).get(
+            "key_id"
+        )
         clean_raw = self._sanitize_trace_value(raw_json)
         response_id = clean_raw.get("id") if isinstance(clean_raw, dict) else None
         request_start = self._request_timing_for_step(idx)
@@ -513,7 +550,10 @@ class ExecutionTrace:
         if response_id:
             for i in range(len(self.trace["responses"]) - 1, -1, -1):
                 candidate = self.trace["responses"][i]
-                if candidate.get("step") == idx and candidate.get("response_id") == response_id:
+                if (
+                    candidate.get("step") == idx
+                    and candidate.get("response_id") == response_id
+                ):
                     existing_index = i
                     break
 
@@ -583,7 +623,9 @@ class ExecutionTrace:
                 "correlation_id": correlation_id,
                 "kind": kind,
                 "response_id": response_id,
-                "status": clean_raw.get("status") if isinstance(clean_raw, dict) else None,
+                "status": clean_raw.get("status")
+                if isinstance(clean_raw, dict)
+                else None,
                 "has_output": bool(clean_raw.get("output"))
                 if isinstance(clean_raw, dict)
                 else False,
@@ -686,8 +728,12 @@ class ExecutionTrace:
         self.add_event(
             "plan_created",
             {
-                "plan_id": clean_plan.get("plan_id") if isinstance(clean_plan, dict) else None,
-                "plan_type": clean_plan.get("plan_type") if isinstance(clean_plan, dict) else None,
+                "plan_id": clean_plan.get("plan_id")
+                if isinstance(clean_plan, dict)
+                else None,
+                "plan_type": clean_plan.get("plan_type")
+                if isinstance(clean_plan, dict)
+                else None,
                 "step_count": len(clean_plan.get("steps", []))
                 if isinstance(clean_plan, dict)
                 else 0,
@@ -715,12 +761,16 @@ class ExecutionTrace:
         self.add_event(event_type, self._sanitize_trace_value(payload or {}))
 
     @_guarded
-    def add_event(self, event_type: str, payload: Optional[dict[str, Any]] = None) -> None:
+    def add_event(
+        self, event_type: str, payload: Optional[dict[str, Any]] = None
+    ) -> None:
         self._ensure_mutable()
         if event_type in self._INTERNAL_EVENT_TYPES:
             return
         redacted_payload = self._redact_registered_values(payload or {})
-        safe_payload = self._redact_registered_values(self._sanitize_trace_value(redacted_payload))
+        safe_payload = self._redact_registered_values(
+            self._sanitize_trace_value(redacted_payload)
+        )
         self.trace["events"].append(
             {"type": event_type, "timestamp": time.time(), "payload": safe_payload}
         )
@@ -774,7 +824,9 @@ class ExecutionTrace:
     ) -> None:
         self._ensure_mutable()
         redacted_message = self._redact_registered_values(message)
-        safe_message = self._redact_registered_values(self._sanitize_trace_value(redacted_message))
+        safe_message = self._redact_registered_values(
+            self._sanitize_trace_value(redacted_message)
+        )
         entry = {"source": source, "error": safe_message, "timestamp": time.time()}
         if error_type:
             entry["type"] = error_type

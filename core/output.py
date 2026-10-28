@@ -6,7 +6,11 @@ from __future__ import annotations
 def limit_output(value: str | bytes | None, max_bytes: int = 1048576) -> str:
     if value is None:
         return ""
-    text = value.decode("utf-8", errors="replace") if isinstance(value, bytes) else str(value)
+    text = (
+        value.decode("utf-8", errors="replace")
+        if isinstance(value, bytes)
+        else str(value)
+    )
     raw = text.encode("utf-8", errors="replace")
     if len(raw) <= max_bytes:
         return text

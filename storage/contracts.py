@@ -44,7 +44,9 @@ class StorageProvider(Protocol):
         self, object_id: str, content: bytes, *, credentials: object | None
     ) -> StorageObject: ...
     def download(self, object_id: str, *, credentials: object | None) -> bytes: ...
-    def list(self, prefix: str, *, credentials: object | None) -> list[StorageObject]: ...
+    def list(
+        self, prefix: str, *, credentials: object | None
+    ) -> list[StorageObject]: ...
 
 
 def _safe_relative_path(value: str, *, allow_empty: bool = False) -> PurePosixPath:
@@ -55,7 +57,11 @@ def _safe_relative_path(value: str, *, allow_empty: bool = False) -> PurePosixPa
     if not value and allow_empty:
         return PurePosixPath(".")
     path = PurePosixPath(value)
-    if not value or path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+    if (
+        not value
+        or path.is_absolute()
+        or any(part in {"", ".", ".."} for part in path.parts)
+    ):
         raise StorageError("Invalid storage object name")
     return path
 
@@ -101,13 +107,17 @@ class LocalDirectoryStorage:
         except FileNotFoundError as exc:
             raise StorageObjectNotFound("Storage object was not found") from exc
 
-    def list(self, prefix: str = "", *, credentials: object | None = None) -> list[StorageObject]:
+    def list(
+        self, prefix: str = "", *, credentials: object | None = None
+    ) -> list[StorageObject]:
         relative = _safe_relative_path(prefix, allow_empty=True)
         base = self._root if relative == PurePosixPath(".") else self._path(prefix)[1]
         if not base.exists():
             return []
         files = (
-            [base] if base.is_file() else sorted(path for path in base.rglob("*") if path.is_file())
+            [base]
+            if base.is_file()
+            else sorted(path for path in base.rglob("*") if path.is_file())
         )
         return [
             self._object(PurePosixPath(path.relative_to(self._root).as_posix()), path)
@@ -125,7 +135,11 @@ def storage_provider_from_env(
     env = env_snapshot() if env is None else env
     name = str(env.get("LOGOS_STORAGE_PROVIDER", "") or "").strip().lower() or "local"
     if name == "local":
-        root = env.get("LOGOS_STORAGE_LOCAL_ROOT") or local_root or DEFAULT_LOCAL_STORAGE_ROOT
+        root = (
+            env.get("LOGOS_STORAGE_LOCAL_ROOT")
+            or local_root
+            or DEFAULT_LOCAL_STORAGE_ROOT
+        )
         return LocalDirectoryStorage(root)
     if name == "cloudru":
         from cloud.cloudru.object_storage import CloudRuObjectStorage

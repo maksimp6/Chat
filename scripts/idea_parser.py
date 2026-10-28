@@ -66,7 +66,14 @@ PROPOSAL_HINTS = [
     "обязательно",
     "почему бы не",
 ]
-QUESTION_HINTS = ["почему я", "почему когда", "почему алиса", "это эго", "чувствую", "чувству"]
+QUESTION_HINTS = [
+    "почему я",
+    "почему когда",
+    "почему алиса",
+    "это эго",
+    "чувствую",
+    "чувству",
+]
 
 OPENING_OFFER = re.compile(r"^если (нужно|хочешь|хотите)")
 OPENING_ACTION = re.compile(r"^(как |что если |зачем |сделай|судите?|перечитай)")
@@ -110,11 +117,17 @@ def split_sentences(text: str) -> list[str]:
             sents.append(sent)
         else:
             # over-long segment: split by line breaks, then by length, so no text is dropped
-            sents += [piece for line in sent.splitlines() for piece in textwrap.wrap(line, 599)]
+            sents += [
+                piece
+                for line in sent.splitlines()
+                for piece in textwrap.wrap(line, 599)
+            ]
     return [p.strip().strip("*`") for p in sents if 10 < len(p)]
 
 
-def parse_deeplink_json(data: dict[str, Any]) -> Generator[tuple[str, str, str], None, None]:
+def parse_deeplink_json(
+    data: dict[str, Any],
+) -> Generator[tuple[str, str, str], None, None]:
     """Yield (role, timestamp, value) triples from a GigaChat deeplink export."""
     for m in data.get("chatMessages", []):
         role = "OWNER" if m.get("role") == "USER" else "MODEL"
@@ -166,7 +179,9 @@ def _report_lines(
         "",
     ]
     for n, it in enumerate(proposals, 1):
-        lines.append(f"{n}. [{it['ts']}] {it['quote']} (source: {it['source'] or name})")
+        lines.append(
+            f"{n}. [{it['ts']}] {it['quote']} (source: {it['source'] or name})"
+        )
     lines += ["", "## Offer counts", ""]
     for key, count in offers.most_common():
         lines.append(f"- `{key}`: {count} повторов")
@@ -175,7 +190,9 @@ def _report_lines(
     return lines
 
 
-def run_parser(input_path: Path, out_dir: Path, src: str) -> tuple[int, Counter[str], int]:
+def run_parser(
+    input_path: Path, out_dir: Path, src: str
+) -> tuple[int, Counter[str], int]:
     """Parse the input file and write reports; return counters."""
     text = input_path.read_text(encoding="utf-8")
     if input_path.suffix == ".json":
@@ -198,7 +215,9 @@ def run_parser(input_path: Path, out_dir: Path, src: str) -> tuple[int, Counter[
                 questions.append({"role": role, "ts": ts, "quote": sent, "source": src})
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    report = "\n".join(_report_lines(proposals, offers, questions, src, input_path.name))
+    report = "\n".join(
+        _report_lines(proposals, offers, questions, src, input_path.name)
+    )
     (out_dir / "ideas_report.md").write_text(report, encoding="utf-8")
     payload = {
         "generated": src or input_path.name,

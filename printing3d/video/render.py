@@ -64,7 +64,11 @@ def render_turntable(
         fig = plt.figure(figsize=(6, 6))
         ax = fig.add_subplot(111, projection="3d")
         collection = Poly3DCollection(
-            triangles, alpha=1, facecolor="#8bb6d9", edgecolor="#29465d", linewidths=0.08
+            triangles,
+            alpha=1,
+            facecolor="#8bb6d9",
+            edgecolor="#29465d",
+            linewidths=0.08,
         )
         ax.add_collection3d(collection)
         ax.set(xlim=(-radius, radius), ylim=(-radius, radius), zlim=(-radius, radius))

@@ -67,7 +67,9 @@ def _install_tls_pin(client: Any, expected_fingerprint: bytes) -> None:
         if not isinstance(sock, ssl.SSLSocket):
             raise ssl.SSLError("printer MQTT socket is not TLS")
         cert = sock.getpeercert(binary_form=True)
-        if not cert or not hmac.compare_digest(hashlib.sha256(cert).digest(), expected_fingerprint):
+        if not cert or not hmac.compare_digest(
+            hashlib.sha256(cert).digest(), expected_fingerprint
+        ):
             raise ssl.SSLError("printer TLS peer differs from trusted certificate")
 
     client.suppress_exceptions = False
@@ -83,24 +85,32 @@ def _install_callbacks(
     received: list[dict[str, Any]],
     failures: list[str],
 ) -> None:
-    def on_connect(client: Any, _userdata: Any, _flags: Any, reason: Any, _props: Any) -> None:
+    def on_connect(
+        client: Any, _userdata: Any, _flags: Any, reason: Any, _props: Any
+    ) -> None:
         if reason.is_failure:
             failures.append("MQTT authentication failed")
         else:
             client.subscribe(topic, qos=0)
 
-    def on_subscribe(_client: Any, _userdata: Any, _mid: Any, reasons: Any, _props: Any) -> None:
+    def on_subscribe(
+        _client: Any, _userdata: Any, _mid: Any, reasons: Any, _props: Any
+    ) -> None:
         if any(reason.is_failure for reason in reasons):
             failures.append("MQTT subscription rejected")
         else:
             from .bambu_requests import encode_pushall, request_topic
 
-            _client.publish(request_topic(serial), encode_pushall("logos_status_1"), qos=0)
+            _client.publish(
+                request_topic(serial), encode_pushall("logos_status_1"), qos=0
+            )
 
     def on_message(_client: Any, _userdata: Any, message: Any) -> None:
         try:
             decoded = json.loads(message.payload)
-            if not isinstance(decoded, dict) or not isinstance(decoded.get("print"), dict):
+            if not isinstance(decoded, dict) or not isinstance(
+                decoded.get("print"), dict
+            ):
                 return
             if "gcode_state" not in decoded["print"]:
                 return  # Partial reports/ACKs are not evidence of state changes.

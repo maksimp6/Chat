@@ -113,7 +113,9 @@ class BoardHandler(BaseHTTPRequestHandler):
         }
         if path in asset_names:
             name, mime = asset_names[path]
-            return self._handle(lambda: self._send(200, (ASSETS / name).read_bytes(), mime))
+            return self._handle(
+                lambda: self._send(200, (ASSETS / name).read_bytes(), mime)
+            )
 
         def handle() -> None:
             if path == "/api/threads":
@@ -162,7 +164,9 @@ class BoardHandler(BaseHTTPRequestHandler):
                     allowed={"request_id", "title", "depends_on"},
                     required={"request_id", "title", "depends_on"},
                 )
-                task = self._store.create_task(data["title"], data["depends_on"], request_id)
+                task = self._store.create_task(
+                    data["title"], data["depends_on"], request_id
+                )
                 return self._json(201, task)
             if match := STATUS_ROUTE.fullmatch(path):
                 _fields(
@@ -171,7 +175,10 @@ class BoardHandler(BaseHTTPRequestHandler):
                     required={"request_id", "status", "accepted_by_owner"},
                 )
                 task = self._store.set_status(
-                    match.group(1), data["status"], data["accepted_by_owner"], request_id
+                    match.group(1),
+                    data["status"],
+                    data["accepted_by_owner"],
+                    request_id,
                 )
                 return self._json(200, task)
             if match := EVIDENCE_ROUTE.fullmatch(path):
@@ -190,7 +197,11 @@ class BoardHandler(BaseHTTPRequestHandler):
 
 
 def create_server(
-    store: BoardStore, token: str | None = None, *, host: str = "127.0.0.1", port: int = 0
+    store: BoardStore,
+    token: str | None = None,
+    *,
+    host: str = "127.0.0.1",
+    port: int = 0,
 ) -> ThreadingHTTPServer:
     """Create a single-process board API; never expose it to a network interface."""
     if host != "127.0.0.1":

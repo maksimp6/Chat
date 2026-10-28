@@ -16,6 +16,7 @@ from secret_store.key_manager import secret_storage_ready, store_secret
 logger = logging.getLogger("cloudru_iam_routes")
 cloudru_iam_bp = Blueprint("cloudru_iam", __name__, url_prefix="/api/cloudru/iam")
 
+
 def _enabled() -> bool:
     return env_get("CLOUDRU_IAM_WIZARD_ENABLED", "false").strip().lower() == "true"
 
@@ -25,7 +26,10 @@ def _revoke_unstored_key(client: CloudRuIamClient, key_id: str) -> None:
     try:
         client.delete_api_key(api_key_id=key_id)
     except Exception:
-        logger.error("Cloud.ru API key %s was issued but could not be revoked after a storage failure", key_id)
+        logger.error(
+            "Cloud.ru API key %s was issued but could not be revoked after a storage failure",
+            key_id,
+        )
 
 
 def _guard():

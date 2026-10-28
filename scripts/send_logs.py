@@ -62,7 +62,10 @@ def send_logs():
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     try:
         response = requests.post(
-            "https://api.yandex-ai-studio.ru/v1/logs", json=data, headers=headers, timeout=30
+            "https://api.yandex-ai-studio.ru/v1/logs",
+            json=data,
+            headers=headers,
+            timeout=30,
         )
         print(f"Status: {response.status_code}")
         if response.status_code >= 400:

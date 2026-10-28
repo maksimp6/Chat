@@ -1,4 +1,5 @@
 """Slice the reviewed Yorik mesh using the pinned PR1101 Bambu profiles."""
+
 from core.env import env_require, env_snapshot
 
 import argparse
@@ -66,7 +67,11 @@ def preview_mesh(source, destination):
         values = struct.unpack("<12fH", record)
         a, b, c = values[3:6], values[6:9], values[9:12]
         u, v = [b[j] - a[j] for j in range(3)], [c[j] - a[j] for j in range(3)]
-        cross = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+        cross = (
+            u[1] * v[2] - u[2] * v[1],
+            u[2] * v[0] - u[0] * v[2],
+            u[0] * v[1] - u[1] * v[0],
+        )
         if sum(x * x for x in cross) >= 1e-14:
             faces.append(record)
     if not faces:
@@ -166,4 +171,6 @@ if __name__ == "__main__":
     parser.add_argument("--mesh", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
-    slice_model(args.slicer_root.resolve(), args.mesh.resolve(), args.output_dir.resolve())
+    slice_model(
+        args.slicer_root.resolve(), args.mesh.resolve(), args.output_dir.resolve()
+    )

@@ -24,7 +24,9 @@ def label_changes(thread: Thread) -> tuple[list[str], list[str]]:
         return [], []
     wanted = agent_label(thread.owner_agent)
     add = [] if wanted in thread.labels else [wanted]
-    remove = [label for label in thread.labels if label.startswith(PREFIX) and label != wanted]
+    remove = [
+        label for label in thread.labels if label.startswith(PREFIX) and label != wanted
+    ]
     return add, remove
 
 
@@ -35,15 +37,25 @@ def apply_agent_labels(gh: GitHub, threads: list[Thread]) -> list[str]:
     if not plans:
         return []
     for agent in AGENTS:
-        ensure_label(gh, agent_label(agent), COLORS[agent], f"Work owned by {AGENT_LABELS[agent]}")
+        ensure_label(
+            gh,
+            agent_label(agent),
+            COLORS[agent],
+            f"Work owned by {AGENT_LABELS[agent]}",
+        )
     changes = []
     for thread, add, remove in plans:
         if add:
-            gh.request("POST", gh.repo_path(f"/issues/{thread.number}/labels"), {"labels": add})
+            gh.request(
+                "POST", gh.repo_path(f"/issues/{thread.number}/labels"), {"labels": add}
+            )
         for label in remove:
             quoted = urllib.parse.quote(label, safe="")
-            gh.request("DELETE", gh.repo_path(f"/issues/{thread.number}/labels/{quoted}"))
+            gh.request(
+                "DELETE", gh.repo_path(f"/issues/{thread.number}/labels/{quoted}")
+            )
         changes.append(
-            f"#{thread.number}: " + ", ".join([f"+{a}" for a in add] + [f"-{r}" for r in remove])
+            f"#{thread.number}: "
+            + ", ".join([f"+{a}" for a in add] + [f"-{r}" for r in remove])
         )
     return changes

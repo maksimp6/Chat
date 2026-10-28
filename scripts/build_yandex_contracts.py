@@ -45,7 +45,11 @@ def sections(text: str) -> list[dict[str, Any]]:
     for index, match in enumerate(matches):
         title = match[1]
         anchor = re.search(r"\{#([^}]+)\}", title)
-        body = text[match.end() : matches[index + 1].start() if index + 1 < len(matches) else None]
+        body = text[
+            match.end() : matches[index + 1].start()
+            if index + 1 < len(matches)
+            else None
+        ]
         result.append(
             {
                 "title": re.sub(r"\s*\{#[^}]+\}", "", title).strip(),
@@ -106,7 +110,10 @@ def field_schema(field: dict[str, str], aliases: dict[str, str]) -> dict[str, An
         if map_type[1] != "string" or map_type[2] not in primitive:
             spec = unknown("unresolved map key/value type")
         else:
-            spec = {"type": "object", "additionalProperties": {"type": primitive[map_type[2]]}}
+            spec = {
+                "type": "object",
+                "additionalProperties": {"type": primitive[map_type[2]]},
+            }
     if field["name"].endswith("[]"):
         spec = {"type": "array", "items": spec}
     spec["description"] = description
@@ -137,7 +144,9 @@ def table_schema(section: dict[str, Any], aliases: dict[str, str]) -> dict[str, 
     if len(re.findall(r"(?m)^#\|", section["documentation"])) != 1:
         return unknown("multiple tables/union branches require explicit schema review")
     if re.search(r'```json\s*\{\s*"<(?:anyOf|allOf|oneOf)>"', section["documentation"]):
-        return unknown("root composition cannot be reconstructed from a flat field table")
+        return unknown(
+            "root composition cannot be reconstructed from a flat field table"
+        )
     properties = {}
     required = []
     for field in section["fields"]:
@@ -168,7 +177,9 @@ def normalize_schema(spec: Any) -> Any:
     # Traverse schema positions, never interpret data inside enum/default/examples.
     for key in ("properties", "definitions", "patternProperties"):
         if isinstance(result.get(key), dict):
-            result[key] = {name: normalize_schema(value) for name, value in result[key].items()}
+            result[key] = {
+                name: normalize_schema(value) for name, value in result[key].items()
+            }
     for key in ("items", "additionalProperties", "propertyNames", "not"):
         if key in result:
             result[key] = normalize_schema(result[key])
@@ -200,8 +211,14 @@ def compile_document(relative: str, text: str, digest: str) -> dict[str, Any]:
     aliases = {s["anchor"]: s["anchor"] for s in parts if s["anchor"]}
     definitions = {s["anchor"]: table_schema(s, aliases) for s in parts if s["anchor"]}
 
-    def package(spec: dict[str, Any], defs: dict[str, Any] | None = None) -> dict[str, Any]:
-        return {"$schema": SCHEMA, **spec, "definitions": definitions if defs is None else defs}
+    def package(
+        spec: dict[str, Any], defs: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        return {
+            "$schema": SCHEMA,
+            **spec,
+            "definitions": definitions if defs is None else defs,
+        }
 
     requests = {}
     for location, heading in (
@@ -223,7 +240,8 @@ def compile_document(relative: str, text: str, digest: str) -> dict[str, Any]:
                 requests[key] = package(normalize_schema(api[key]), defs)
 
     rpc = re.search(
-        r"rpc (\w+) \((stream )?\[([^]]+)\]\(#([^)]+)\)\) returns \((.*)\)\*\*", markdown
+        r"rpc (\w+) \((stream )?\[([^]]+)\]\(#([^)]+)\)\) returns \((.*)\)\*\*",
+        markdown,
     )
     if "## gRPC request" in markdown:
         if not rpc:
@@ -248,11 +266,17 @@ def compile_document(relative: str, text: str, digest: str) -> dict[str, Any]:
         )
         if not endpoint:
             raise ValueError("unparsed HTTP binding: " + relative)
-        transport = {"kind": "http", "method": endpoint[1], "url_template": endpoint[2].strip()}
+        transport = {
+            "kind": "http",
+            "method": endpoint[1],
+            "url_template": endpoint[2].strip(),
+        }
         if "clientEvents/" in relative or "serverEvents/" in relative:
             transport["kind"] = "realtime-event"
             transport["direction"] = (
-                "client-to-server" if "clientEvents/" in relative else "server-to-client"
+                "client-to-server"
+                if "clientEvents/" in relative
+                else "server-to-client"
             )
             transport["binding_note"] = (
                 "vendor reference binding; not proof of callable standalone HTTP endpoint"
@@ -271,7 +295,9 @@ def compile_document(relative: str, text: str, digest: str) -> dict[str, Any]:
     bindings = {"request": {}, "responses": {}}
     for group, schemas in (("request", requests), ("responses", responses)):
         for location, schema in schemas.items():
-            prefix = "playground." if playgrounds and group == "request" else "markdown."
+            prefix = (
+                "playground." if playgrounds and group == "request" else "markdown."
+            )
 
             def rebind(value: Any, prefix: str = prefix) -> Any:
                 if isinstance(value, list):
@@ -279,8 +305,12 @@ def compile_document(relative: str, text: str, digest: str) -> dict[str, Any]:
                 if not isinstance(value, dict):
                     return value
                 return {
-                    key: ("#/definitions/" + prefix + item.removeprefix("#/definitions/"))
-                    if key == "$ref" and isinstance(item, str) and item.startswith("#/definitions/")
+                    key: (
+                        "#/definitions/" + prefix + item.removeprefix("#/definitions/")
+                    )
+                    if key == "$ref"
+                    and isinstance(item, str)
+                    and item.startswith("#/definitions/")
                     else rebind(item)
                     for key, item in value.items()
                 }
@@ -289,7 +319,11 @@ def compile_document(relative: str, text: str, digest: str) -> dict[str, Any]:
                 pool[prefix + name] = rebind(definition)
             name = group + "." + location
             pool[name] = rebind(
-                {key: item for key, item in schema.items() if key not in ("definitions", "$schema")}
+                {
+                    key: item
+                    for key, item in schema.items()
+                    if key not in ("definitions", "$schema")
+                }
             )
             bindings[group][location] = "#/definitions/" + name
     return {
@@ -315,7 +349,8 @@ def compile_document(relative: str, text: str, digest: str) -> dict[str, Any]:
             else ["error response schema absent from this method reference"]
         ),
         "sections": [
-            {key: value for key, value in part.items() if key != "fields"} for part in parts
+            {key: value for key, value in part.items() if key != "fields"}
+            for part in parts
         ],
     }
 
@@ -335,7 +370,8 @@ def build(root: Path = ROOT) -> dict[str, Any]:
         digest = hashlib.sha256(data).hexdigest()
         if not entry or digest != entry["sha256"] or len(data) != entry["bytes"]:
             raise ValueError(
-                "source missing from manifest, modified or still an LFS pointer: " + relative
+                "source missing from manifest, modified or still an LFS pointer: "
+                + relative
             )
         text = data.decode()
         if re.search(r"(?m)^## (?:HTTP|gRPC) request", text):
@@ -344,9 +380,15 @@ def build(root: Path = ROOT) -> dict[str, Any]:
             )
         else:
             excluded.append(
-                {"path": relative, "sha256": digest, "reason": "no API method/event binding"}
+                {
+                    "path": relative,
+                    "sha256": digest,
+                    "reason": "no API method/event binding",
+                }
             )
-    expected = {p for p in entries if p.startswith(str(SOURCE) + "/") and p.endswith(".md")}
+    expected = {
+        p for p in entries if p.startswith(str(SOURCE) + "/") and p.endswith(".md")
+    }
     actual = {p.relative_to(root).as_posix() for p in source_root.rglob("*.md")}
     if expected != actual:
         raise ValueError("source inventory differs from manifest")
@@ -387,7 +429,8 @@ def main() -> int:
     if args.check:
         if not output.exists() or output.read_text() != rendered:
             parser.exit(
-                1, "Yandex contracts are stale; run python scripts/build_yandex_contracts.py\n"
+                1,
+                "Yandex contracts are stale; run python scripts/build_yandex_contracts.py\n",
             )
     else:
         output.parent.mkdir(parents=True, exist_ok=True)

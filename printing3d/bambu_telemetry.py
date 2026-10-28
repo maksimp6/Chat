@@ -82,6 +82,8 @@ def period_summaries(
         busy = seconds["PRINTING"]
         summary["period_start"] = start.isoformat()
         summary["period_end"] = end.isoformat()
-        summary["utilization_percent"] = round(100 * busy / covered, 2) if covered else None
+        summary["utilization_percent"] = (
+            round(100 * busy / covered, 2) if covered else None
+        )
         buckets.append(summary)
     return buckets

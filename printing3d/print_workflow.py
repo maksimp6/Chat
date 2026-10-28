@@ -92,7 +92,9 @@ class FileJobStore:
 
     @staticmethod
     def _write(path: Path, data: dict[str, Any]) -> None:
-        payload = json.dumps(data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        payload = json.dumps(
+            data, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+        )
         fd, name = tempfile.mkstemp(prefix=".print-", dir=path.parent)
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as stream:
@@ -173,7 +175,9 @@ class FileJobStore:
             os.close(fd)
 
 
-def _event(data: dict[str, Any], state: str, proof: Mapping[str, object] | None = None) -> None:
+def _event(
+    data: dict[str, Any], state: str, proof: Mapping[str, object] | None = None
+) -> None:
     data["state"] = state
     # Only sanitized evidence is recorded: never include full credentials or tokens.
     evidence = {
@@ -205,7 +209,9 @@ class PrintWorkflow:
         return self.store.mutate(owner, job_id, transition)
 
     @staticmethod
-    def _verify_transition(data: dict[str, Any], target: str, proof: Mapping[str, object]) -> None:
+    def _verify_transition(
+        data: dict[str, Any], target: str, proof: Mapping[str, object]
+    ) -> None:
         validators = {
             "GEOMETRY_VERIFIED": PrintWorkflow._geometry_proof,
             "SLICED": PrintWorkflow._sliced_proof,
@@ -227,7 +233,10 @@ class PrintWorkflow:
     def _sliced_proof(data: dict[str, Any], proof: Mapping[str, object]) -> None:
         name = _basename(proof.get("filename"), sliced=True)
         artifact_sha = _sha(proof.get("artifact_sha256"))
-        if proof.get("material") != data["material"] or proof.get("machine") != data["machine"]:
+        if (
+            proof.get("material") != data["material"]
+            or proof.get("machine") != data["machine"]
+        ):
             raise PrintGateError("wrong printer/material")
         if proof.get("nozzle_mm") != 0.4:
             raise PrintGateError("nozzle mismatch")
@@ -248,7 +257,8 @@ class PrintWorkflow:
         if (
             proof.get("readback_verified") is not True
             or _sha(proof.get("remote_sha256")) != data["artifact"]["sha256"]
-            or _basename(proof.get("filename"), sliced=True) != data["artifact"]["filename"]
+            or _basename(proof.get("filename"), sliced=True)
+            != data["artifact"]["filename"]
         ):
             raise PrintGateError("FTPS readback has not proved matching bytes")
 
@@ -300,7 +310,9 @@ class PrintWorkflow:
             x: grant.get(x)
             for x in ("job_id", "artifact_sha256", "operator_id", "expires_at", "nonce")
         }
-        payload = json.dumps(payload_data, sort_keys=True, separators=(",", ":")).encode()
+        payload = json.dumps(
+            payload_data, sort_keys=True, separators=(",", ":")
+        ).encode()
         signature = hmac.new(key, payload, hashlib.sha256).hexdigest()
         signed = grant.get("signature")
         # Compare bytes: compare_digest rejects non-ASCII str, which would raise TypeError instead of a refusal.
@@ -311,14 +323,18 @@ class PrintWorkflow:
         expiry = grant.get("expires_at")
         if not isinstance(expiry, int) or not time.time() < expiry:
             raise PrintGateError("expired start approval")
-        if grant.get("job_id") != job_id or not JOB_ID.fullmatch(str(grant.get("nonce"))):
+        if grant.get("job_id") != job_id or not JOB_ID.fullmatch(
+            str(grant.get("nonce"))
+        ):
             raise PrintGateError("approval refers to another print job")
 
         def transition(data: dict[str, Any]) -> None:
-            if data["state"] != "READY_FOR_USER" or data["artifact"]["sha256"] != grant.get(
-                "artifact_sha256"
-            ):
-                raise PrintGateError("approval replay, model mismatch or wrong job stage")
+            if data["state"] != "READY_FOR_USER" or data["artifact"][
+                "sha256"
+            ] != grant.get("artifact_sha256"):
+                raise PrintGateError(
+                    "approval replay, model mismatch or wrong job stage"
+                )
             data["start_grant_digest"] = hashlib.sha256(payload).hexdigest()
             _event(data, "START_PENDING")
 
@@ -336,7 +352,9 @@ class PrintWorkflow:
 
         return self.store.mutate(owner, job_id, change)
 
-    def finish(self, owner: str, job_id: str, *, telemetry_finished: bool) -> dict[str, Any]:
+    def finish(
+        self, owner: str, job_id: str, *, telemetry_finished: bool
+    ) -> dict[str, Any]:
         if not telemetry_finished:
             raise PrintGateError("printer has not confirmed finished job")
 
@@ -347,7 +365,9 @@ class PrintWorkflow:
 
         return self.store.mutate(owner, job_id, change)
 
-    def add_video(self, owner: str, job_id: str, video: Mapping[str, object]) -> dict[str, Any]:
+    def add_video(
+        self, owner: str, job_id: str, video: Mapping[str, object]
+    ) -> dict[str, Any]:
         def change(data: dict[str, Any]) -> None:
             if data["state"] != "COMPLETE":
                 raise PrintGateError("video can be linked only to a finished print")

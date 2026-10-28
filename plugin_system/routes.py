@@ -42,6 +42,8 @@ def disable_plugin(plugin_id: str):
 @plugin_bp.put("/<plugin_id>/config")
 def configure_plugin(plugin_id: str):
     try:
-        return jsonify(plugin_manager.configure(plugin_id, request.get_json(silent=True) or {}))
+        return jsonify(
+            plugin_manager.configure(plugin_id, request.get_json(silent=True) or {})
+        )
     except PluginError as exc:
         return _error(exc)

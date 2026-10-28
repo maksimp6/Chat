@@ -4,6 +4,7 @@ The browser clicks the create-key control with a 90-day lifetime. The secret is
 read inside the page, returned only to this runner process in memory, and posted
 to the local import endpoint. Nothing secret is printed, logged or screenshotted.
 """
+
 import json
 import os
 from pathlib import Path
@@ -70,7 +71,8 @@ def post_import(payload, token):
     if token:
         headers["Authorization"] = "Bearer " + token
     request = urllib.request.Request(
-        IMPORT_URL, data=json.dumps(payload).encode(), method="POST", headers=headers)
+        IMPORT_URL, data=json.dumps(payload).encode(), method="POST", headers=headers
+    )
     with urllib.request.urlopen(request, timeout=30) as response:
         return json.loads(response.read().decode())
 
@@ -86,8 +88,13 @@ def main():
     if not re.fullmatch(r"[a-z0-9]{20}", folder):
         raise RuntimeError("YANDEX_FOLDER_ID must be the 20-character folder id")
     argv = [sys.executable, str(Path(__file__).resolve()), "_issue", folder]
-    safe_env = {"PATH": os.environ.get("PATH", "/system/bin"), "TMPDIR": os.environ["RUNNER_TEMP"]}
-    result = subprocess.run(["su", "-c", shlex.join(argv)], env=safe_env, capture_output=True, timeout=120)
+    safe_env = {
+        "PATH": os.environ.get("PATH", "/system/bin"),
+        "TMPDIR": os.environ["RUNNER_TEMP"],
+    }
+    result = subprocess.run(
+        ["su", "-c", shlex.join(argv)], env=safe_env, capture_output=True, timeout=120
+    )
     if result.returncode:
         raise RuntimeError("Browser issuance failed before a key was read")
     found = json.loads(result.stdout.decode())
@@ -96,14 +103,27 @@ def main():
         raise RuntimeError("No API key was found in the create-key result")
     candidates = [c for c in found.get("id_candidates", []) if c != folder]
     if len(candidates) != 1:
-        raise RuntimeError("Key id not unique on the page: %d candidates" % len(candidates))
+        raise RuntimeError(
+            "Key id not unique on the page: %d candidates" % len(candidates)
+        )
     now = datetime.now(timezone.utc)
-    payload = {"project_id": folder, "provider_key_id": candidates[0], "api_key": secret,
-               "issued_at": now.isoformat().replace("+00:00", "Z"),
-               "expires_at": (now + LIFETIME).isoformat().replace("+00:00", "Z")}
+    payload = {
+        "project_id": folder,
+        "provider_key_id": candidates[0],
+        "api_key": secret,
+        "issued_at": now.isoformat().replace("+00:00", "Z"),
+        "expires_at": (now + LIFETIME).isoformat().replace("+00:00", "Z"),
+    }
     response = post_import(payload, token)
-    print(json.dumps({k: response.get(k) for k in ("status", "fingerprint", "expires_at", "storage_verified")},
-                     ensure_ascii=False))
+    print(
+        json.dumps(
+            {
+                k: response.get(k)
+                for k in ("status", "fingerprint", "expires_at", "storage_verified")
+            },
+            ensure_ascii=False,
+        )
+    )
 
 
 if __name__ == "__main__":

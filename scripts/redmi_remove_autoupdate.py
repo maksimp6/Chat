@@ -32,7 +32,9 @@ def supervisor_arguments(pid):
         # Read only this PID's command; never process environments or credentials.
         result = subprocess.run(
             ["/system/bin/su", "-c", f"cat /proc/{pid}/cmdline"],
-            capture_output=True, timeout=5, check=False,
+            capture_output=True,
+            timeout=5,
+            check=False,
         )
         if result.returncode:
             raise RuntimeError("autoupdate_identity_unavailable") from None
@@ -41,8 +43,11 @@ def supervisor_arguments(pid):
 
 def main():
     model = subprocess.run(
-        ["/system/bin/getprop", "ro.product.model"], capture_output=True,
-        text=True, timeout=3, check=True,
+        ["/system/bin/getprop", "ro.product.model"],
+        capture_output=True,
+        text=True,
+        timeout=3,
+        check=True,
     ).stdout.strip()
     if model != "Redmi 9" or os.environ.get("GITHUB_ACTIONS") != "true":
         raise RuntimeError("redmi9_runner_required")
@@ -86,8 +91,12 @@ def main():
                     str(state / "app-autoupdate-boot.sh").encode(),
                     str(app / "scripts/redmi_app_autoupdate_boot.sh").encode(),
                 }
-                if (len(arguments) != 3 or Path(os.fsdecode(arguments[0])).name != "bash"
-                        or arguments[1] not in expected or arguments[2] != b"run"):
+                if (
+                    len(arguments) != 3
+                    or Path(os.fsdecode(arguments[0])).name != "bash"
+                    or arguments[1] not in expected
+                    or arguments[2] != b"run"
+                ):
                     raise RuntimeError("autoupdate_supervisor_identity_mismatch")
                 # Signal this validated supervisor only, never its process group,
                 # the backend, runner, or the independent RDC connection.
@@ -103,7 +112,9 @@ def main():
                 target = archive / (source.name + ".txt")
                 os.replace(source, target)
                 target.chmod(0o600)
-                retired.append({"path": str(source), "sha256": hashlib.sha256(content).hexdigest()})
+                retired.append(
+                    {"path": str(source), "sha256": hashlib.sha256(content).hexdigest()}
+                )
             after = pid_path.read_text().strip() if pid_path.exists() else None
             result = {
                 "result": "removed" if present else "already_removed",
@@ -112,7 +123,8 @@ def main():
                 "supervisor_lock_free_before_removal": True,
                 "retired": retired,
                 "archive": str(archive) if archive else None,
-                "backend_pid_before": before, "backend_pid_after": after,
+                "backend_pid_before": before,
+                "backend_pid_after": after,
                 "boot_entry_absent": not boot.exists(),
             }
             if present or stopped_pid:

@@ -128,7 +128,9 @@ def sign_v4(
     key = _hmac(("AWS4" + credentials.secret_access_key).encode("utf-8"), date)
     for part in (region, service, "aws4_request"):
         key = _hmac(key, part)
-    signature = hmac.new(key, string_to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
+    signature = hmac.new(
+        key, string_to_sign.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
     result = dict(headers)
     result["x-amz-date"] = amz_date
     result["x-amz-content-sha256"] = payload_sha256
@@ -213,7 +215,8 @@ class CloudRuObjectStorage:
         url = self._endpoint + path
         if query:
             url += "?" + "&".join(
-                f"{_uri_encode(name)}={_uri_encode(value)}" for name, value in sorted(query.items())
+                f"{_uri_encode(name)}={_uri_encode(value)}"
+                for name, value in sorted(query.items())
             )
         headers = sign_v4(
             method,
@@ -230,12 +233,16 @@ class CloudRuObjectStorage:
             )
         except requests.RequestException:
             # ``from None``: request exceptions may echo URLs or headers into tracebacks.
-            raise StorageProviderUnavailable("Storage provider is unavailable") from None
+            raise StorageProviderUnavailable(
+                "Storage provider is unavailable"
+            ) from None
         status = int(response.status_code)
         if status == 404:
             raise StorageObjectNotFound("Storage object was not found")
         if status in _CREDENTIAL_ERRORS:
-            raise StorageCredentialsMissing("Storage provider credentials were rejected")
+            raise StorageCredentialsMissing(
+                "Storage provider credentials were rejected"
+            )
         if status >= 500:
             raise StorageProviderUnavailable("Storage provider is unavailable")
         if status >= 300:
@@ -263,7 +270,9 @@ class CloudRuObjectStorage:
         _, key = self._key(object_id)
         return bytes(self._request("GET", key=key, credentials=credentials).content)
 
-    def list(self, prefix: str = "", *, credentials: object | None) -> list[StorageObject]:
+    def list(
+        self, prefix: str = "", *, credentials: object | None
+    ) -> list[StorageObject]:
         relative = _safe_relative_path(prefix, allow_empty=True)
         wanted = "" if relative == PurePosixPath(".") else relative.as_posix()
         root = f"{self._prefix}/" if self._prefix else ""
@@ -286,7 +295,11 @@ class CloudRuObjectStorage:
                 if not key.startswith(root) or key.endswith("/"):
                     continue
                 object_id = key[len(root) :]
-                if wanted and object_id != wanted and not object_id.startswith(wanted + "/"):
+                if (
+                    wanted
+                    and object_id != wanted
+                    and not object_id.startswith(wanted + "/")
+                ):
                     continue
                 try:
                     relative = _safe_relative_path(object_id)

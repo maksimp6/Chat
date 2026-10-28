@@ -103,7 +103,9 @@ class CloudRuSecretManagementClient:
             # directly instead of passed through the constructor - passing an
             # empty/None value there would itself trigger the same fallback.
             self.iam_client = CloudRuIamClient()
-            self.iam_client.key_id = key_id or env_get("CLOUDRU_SECRET_MANAGEMENT_KEY_ID") or None
+            self.iam_client.key_id = (
+                key_id or env_get("CLOUDRU_SECRET_MANAGEMENT_KEY_ID") or None
+            )
             self.iam_client.key_secret = (
                 key_secret or env_get("CLOUDRU_SECRET_MANAGEMENT_KEY_SECRET") or None
             )
@@ -162,7 +164,9 @@ class CloudRuSecretManagementClient:
             "secret_management", "GET", VERSIONS_PATH.format(secret_id=secret_id)
         )
         versions = payload.get("versions") or payload.get("items") or []
-        if not isinstance(versions, list) or any(not isinstance(v, dict) for v in versions):
+        if not isinstance(versions, list) or any(
+            not isinstance(v, dict) for v in versions
+        ):
             raise CloudProviderError(
                 "Cloud.ru Secret Management versions payload is invalid",
                 code="invalid_response",
@@ -201,13 +205,20 @@ class CloudRuSecretManagementClient:
             try:
                 response = requests.get(
                     url,
-                    headers={"Accept": "application/json", "Authorization": f"Bearer {token}"},
+                    headers={
+                        "Accept": "application/json",
+                        "Authorization": f"Bearer {token}",
+                    },
                     timeout=self.timeout,
                 )
             except requests.RequestException as exc:
                 last_exc = exc
                 self._trace_value_response(
-                    trace, secret_id=secret_id, started=started, status=None, success=False
+                    trace,
+                    secret_id=secret_id,
+                    started=started,
+                    status=None,
+                    success=False,
                 )
                 continue
 

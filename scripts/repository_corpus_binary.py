@@ -58,7 +58,11 @@ def _safe_member(name: str) -> bool:
 
 
 def _charge(sink, size: int, kind: str, source_id: str) -> bool:
-    if size < 0 or size > MAX_MEMBER_BYTES or sink.expanded_bytes + size > MAX_EXPANDED_BYTES:
+    if (
+        size < 0
+        or size > MAX_MEMBER_BYTES
+        or sink.expanded_bytes + size > MAX_EXPANDED_BYTES
+    ):
         sink.gap(kind, source_id, "archive_expansion_limit", {"bytes": size})
         return False
     sink.expanded_bytes += size
@@ -105,7 +109,9 @@ def _tar_member(sink, archive, member, index, context) -> None:
     )
 
 
-def _tar(sink, raw: bytes, kind, source_id, url, version, depth, container_hash) -> bool:
+def _tar(
+    sink, raw: bytes, kind, source_id, url, version, depth, container_hash
+) -> bool:
     try:
         archive = tarfile.open(fileobj=io.BytesIO(raw), mode="r:")
     except tarfile.ReadError:
@@ -144,7 +150,11 @@ def _gzip(sink, raw, kind, source_id, url, version, depth) -> None:
         url,
         version,
         expanded,
-        {"container_sha256": container_hash, "member": "gzip-payload", "extractor": "gzip-v1"},
+        {
+            "container_sha256": container_hash,
+            "member": "gzip-payload",
+            "extractor": "gzip-v1",
+        },
         _depth=depth + 1,
     )
 
@@ -187,7 +197,9 @@ def _pdf_text(raw: bytes, executable: str) -> tuple[bytes, str]:
         if len(version) > 4096 or not version.startswith(b"pdftotext version "):
             raise ValueError("pdf_extractor_version_invalid")
         _run_pdf_command(
-            executable, ["-layout", "-enc", "UTF-8", str(input_path), str(output_path)], directory
+            executable,
+            ["-layout", "-enc", "UTF-8", str(input_path), str(output_path)],
+            directory,
         )
         with output_path.open("rb") as stream:
             text = stream.read(MAX_PDF_TEXT_BYTES + 1)
@@ -208,7 +220,9 @@ def _pdf(sink, raw, kind, source_id, url, version, depth) -> None:
         sink.gap(kind, source_id, "pdf_extraction_timeout")
         return
     except subprocess.CalledProcessError as exc:
-        sink.gap(kind, source_id, "pdf_extractor_failed", {"returncode": exc.returncode})
+        sink.gap(
+            kind, source_id, "pdf_extractor_failed", {"returncode": exc.returncode}
+        )
         return
     except ValueError as exc:
         reason = (
@@ -219,7 +233,12 @@ def _pdf(sink, raw, kind, source_id, url, version, depth) -> None:
         sink.gap(kind, source_id, reason)
         return
     except OSError as exc:
-        sink.gap(kind, source_id, "pdf_extractor_io_failed", {"error_type": type(exc).__name__})
+        sink.gap(
+            kind,
+            source_id,
+            "pdf_extractor_io_failed",
+            {"error_type": type(exc).__name__},
+        )
         return
     if not text.strip():
         sink.gap(kind, source_id, "pdf_text_layer_empty")

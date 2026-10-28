@@ -49,7 +49,9 @@ def gh_paginated(path: str) -> list[dict[str, object]]:
     out: list[dict[str, object]] = []
     page = 1
     while True:
-        chunk = gh("GET", f"{path}{'&' if '?' in path else '?'}page={page}&per_page=100")
+        chunk = gh(
+            "GET", f"{path}{'&' if '?' in path else '?'}page={page}&per_page=100"
+        )
         if not chunk:
             break
         out.extend(list(chunk))
@@ -73,7 +75,15 @@ def parse_body(text: str, out_dir: Path, source: str) -> str:
     tmp = out_dir / "input.md"
     tmp.write_text(text, encoding="utf-8")
     result = subprocess.run(
-        [sys.executable, str(PARSER), str(tmp), "--out-dir", str(out_dir), "--source", source],
+        [
+            sys.executable,
+            str(PARSER),
+            str(tmp),
+            "--out-dir",
+            str(out_dir),
+            "--source",
+            source,
+        ],
         capture_output=True,
         text=True,
         timeout=60,
@@ -81,7 +91,9 @@ def parse_body(text: str, out_dir: Path, source: str) -> str:
     )
     report = out_dir / "ideas_report.md"
     if result.returncode != 0 or not report.exists():
-        raise RuntimeError(f"parser failed: rc={result.returncode} {result.stderr[:200]}")
+        raise RuntimeError(
+            f"parser failed: rc={result.returncode} {result.stderr[:200]}"
+        )
     return report.read_text(encoding="utf-8")
 
 
@@ -129,7 +141,11 @@ def main() -> int:
         except RuntimeError as exc:
             print(f"FAIL #{number}: {exc}")
             continue
-        gh("POST", f"issues/{number}/comments", {"body": comment_body(report, number, source)})
+        gh(
+            "POST",
+            f"issues/{number}/comments",
+            {"body": comment_body(report, number, source)},
+        )
         (out_dir / f"issue-{number}.report.md").write_text(report, encoding="utf-8")
         processed += 1
         print(f"DONE #{number}")

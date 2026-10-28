@@ -33,7 +33,10 @@ def connect_lan_impl(
         raise ValueError("invalid port")
     if not isinstance(interface, str) or not interface or len(interface) > 15:
         raise ValueError("invalid interface")
-    if not interface.isascii() or not interface.replace("_", "").replace("-", "").isalnum():
+    if (
+        not interface.isascii()
+        or not interface.replace("_", "").replace("-", "").isalnum()
+    ):
         raise ValueError("invalid interface")
     if not 0 < timeout <= 15:
         raise ValueError("invalid timeout")
@@ -46,9 +49,13 @@ def connect_lan_impl(
         if option is None:
             raise LanBindingError("SO_BINDTODEVICE unavailable")
         try:
-            sock.setsockopt(socket.SOL_SOCKET, option, interface.encode("ascii") + b"\x00")
+            sock.setsockopt(
+                socket.SOL_SOCKET, option, interface.encode("ascii") + b"\x00"
+            )
         except OSError as exc:
-            raise LanBindingError("cannot bind printer socket to LAN interface") from exc
+            raise LanBindingError(
+                "cannot bind printer socket to LAN interface"
+            ) from exc
         sock.connect((pinned_ip, port))
         if sock.getpeername()[0] != pinned_ip:
             raise LanBindingError("connected peer differs from pinned IP")

@@ -21,7 +21,9 @@ class CloudRuEnvironmentAdapter:
 
     name = "cloudru"
 
-    def __init__(self, environment: Dict[str, Any], *, provider: Optional[CloudRuProvider] = None):
+    def __init__(
+        self, environment: Dict[str, Any], *, provider: Optional[CloudRuProvider] = None
+    ):
         self.environment = environment
         self._provider = provider
 
@@ -46,7 +48,9 @@ class CloudRuEnvironmentAdapter:
             branch=self.environment.get("branch_name"),
             ttl_seconds=self.environment.get("ttl_seconds"),
         )
-        resource = result.get("resource") if isinstance(result.get("resource"), dict) else {}
+        resource = (
+            result.get("resource") if isinstance(result.get("resource"), dict) else {}
+        )
         remote_id = resource.get("id")
         if not remote_id:
             raise CloudProviderError(
@@ -60,7 +64,9 @@ class CloudRuEnvironmentAdapter:
 
     def execute(self, command: str, *, timeout_seconds: float = 30.0) -> Dict[str, Any]:
         result = self._provider_instance().environment_exec(
-            remote_id=self._remote_id(), command=command, timeout_seconds=timeout_seconds
+            remote_id=self._remote_id(),
+            command=command,
+            timeout_seconds=timeout_seconds,
         )
         payload = result.get("result")
         payload = payload if isinstance(payload, dict) else {}

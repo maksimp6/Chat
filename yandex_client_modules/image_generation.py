@@ -42,7 +42,9 @@ def build_generation_payload(
     return payload
 
 
-def generate_image(headers: dict[str, str], payload: dict[str, Any]) -> tuple[bytes, str]:
+def generate_image(
+    headers: dict[str, str], payload: dict[str, Any]
+) -> tuple[bytes, str]:
     # Generation is paid and non-idempotent. Never retry this POST automatically.
     response = requests.post(
         GENERATE_URL, json=payload, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS

@@ -33,7 +33,11 @@ class CloudRuSecretResolver:
             raise SecretResolutionError(SecretErrorCode.INVALID_REFERENCE, ref)
 
         try:
-            status = self._client.get_version_status(ref.secret_id, ref.version_id).strip().lower()
+            status = (
+                self._client.get_version_status(ref.secret_id, ref.version_id)
+                .strip()
+                .lower()
+            )
             if status not in _ACTIVE_STATUSES:
                 raise SecretResolutionError(SecretErrorCode.VERSION_INACTIVE, ref)
             value = self._client.get_secret_value(ref.secret_id, ref.version_id)

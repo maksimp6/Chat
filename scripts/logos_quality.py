@@ -26,10 +26,16 @@ OWNER_DIRECTIVE = (
 )
 
 
-def dialogue_params(vector_store_ids: list[str], categories: list[str]) -> dict[str, Any]:
+def dialogue_params(
+    vector_store_ids: list[str], categories: list[str]
+) -> dict[str, Any]:
     """Build the full profile without per-adapter read/write or round caps."""
-    if not vector_store_ids or any(not isinstance(x, str) or not x for x in vector_store_ids):
-        raise ValueError("A prepared Vector Store is required; RAG cannot be silently disabled")
+    if not vector_store_ids or any(
+        not isinstance(x, str) or not x for x in vector_store_ids
+    ):
+        raise ValueError(
+            "A prepared Vector Store is required; RAG cannot be silently disabled"
+        )
     return {
         "active_tool_categories": list(categories),
         "tools_config": {

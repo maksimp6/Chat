@@ -10,6 +10,7 @@
 - Управление файлами и папками (os, shutil): copy, move, delete, mkdir
 - Запуск команд через shell текущей ОС (subprocess) и сбор сведений о системе
 """
+
 from core.env import env_require, env_snapshot
 from core.restrictions import restrictions_lifted
 from core.wikifunctions import clamp_integer
@@ -41,7 +42,9 @@ logger = logging.getLogger("filesystem_mcp")
 BASE_DIR = os.path.realpath(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BACKUP_DIR = os.path.join(BASE_DIR, ".safe_backups")
 # Basenames of credential and memory stores that no tool may read or write, whatever their directory.
-_PROTECTED_NAME_RE = re.compile(r"(?:\.memory(?:\.lock)?|\.pem|\.key|\.p12)$|^id_(?:rsa|ed25519|ecdsa)")
+_PROTECTED_NAME_RE = re.compile(
+    r"(?:\.memory(?:\.lock)?|\.pem|\.key|\.p12)$|^id_(?:rsa|ed25519|ecdsa)"
+)
 
 
 def _refuse_protected(target: str) -> None:
@@ -49,10 +52,12 @@ def _refuse_protected(target: str) -> None:
     if restrictions_lifted():
         return
     parts = os.path.relpath(target, BASE_DIR).split(os.sep)
-    if any(part.startswith(".") and part != "." for part in parts) or _PROTECTED_NAME_RE.search(
-        parts[-1]
-    ):
-        raise PermissionError("Доступ запрещен: служебные и секретные файлы недоступны инструментам")
+    if any(
+        part.startswith(".") and part != "." for part in parts
+    ) or _PROTECTED_NAME_RE.search(parts[-1]):
+        raise PermissionError(
+            "Доступ запрещен: служебные и секретные файлы недоступны инструментам"
+        )
 
 
 def _get_abs_path(path: str) -> str:
@@ -61,13 +66,17 @@ def _get_abs_path(path: str) -> str:
         return BASE_DIR
     if restrictions_lifted():
         # Unrestricted: absolute paths and paths outside the project are accepted as given.
-        return os.path.realpath(path if os.path.isabs(path) else os.path.join(BASE_DIR, path))
+        return os.path.realpath(
+            path if os.path.isabs(path) else os.path.join(BASE_DIR, path)
+        )
     clean = os.path.normpath(path).lstrip("/")
     target = os.path.realpath(os.path.join(BASE_DIR, clean))
     try:
         common = os.path.commonpath([BASE_DIR, target])
         if common != BASE_DIR:
-            raise PermissionError("Доступ запрещен: выход за пределы директории проекта")
+            raise PermissionError(
+                "Доступ запрещен: выход за пределы директории проекта"
+            )
     except ValueError:
         raise PermissionError("Доступ запрещен: недопустимый путь к файлу") from None
     _refuse_protected(target)
@@ -123,7 +132,9 @@ def read_file(args: dict) -> dict:
         with open(abs_path, "rb") as f:
             if whence == os.SEEK_END:
                 read_bytes = (
-                    length if (length is not None and length > 0) else min(file_size, max_chunk)
+                    length
+                    if (length is not None and length > 0)
+                    else min(file_size, max_chunk)
                 )
                 seek_delta = -abs(offset) if offset != 0 else -read_bytes
                 f.seek(max(-file_size, seek_delta), os.SEEK_END)
@@ -156,7 +167,11 @@ def read_file(args: dict) -> dict:
 def write_file(args: dict) -> dict:
     """Безопасная запись файла с валидацией синтаксиса Python и автобэкапом."""
     path = args.get("path") or args.get("file_path") or args.get("filename")
-    content = args.get("content") if "content" in args else (args.get("text") or args.get("code"))
+    content = (
+        args.get("content")
+        if "content" in args
+        else (args.get("text") or args.get("code"))
+    )
     if not path:
         return {"error": "Параметр 'path' обязателен"}
     if content is None:
@@ -167,7 +182,11 @@ def write_file(args: dict) -> dict:
         abs_path = _get_abs_path(path)
         target_dir = os.path.dirname(abs_path)
         os.makedirs(target_dir, exist_ok=True)
-        existing_mode = stat.S_IMODE(os.stat(abs_path).st_mode) if os.path.exists(abs_path) else None
+        existing_mode = (
+            stat.S_IMODE(os.stat(abs_path).st_mode)
+            if os.path.exists(abs_path)
+            else None
+        )
 
         with tempfile.NamedTemporaryFile(
             "w",
@@ -220,7 +239,10 @@ def write_file(args: dict) -> dict:
             except Exception as be:
                 logger.warning(f"[FS] Не удалось создать бэкап {path}: {be}")
 
-        if existing_mode is not None and stat.S_IMODE(os.stat(tmp_path).st_mode) != existing_mode:
+        if (
+            existing_mode is not None
+            and stat.S_IMODE(os.stat(tmp_path).st_mode) != existing_mode
+        ):
             os.chmod(tmp_path, existing_mode)
 
         try:
@@ -263,7 +285,10 @@ def apply_patch(args: dict, cfg: dict = None) -> dict:
     search_text = args.get("search_text")
     replace_text = args.get("replace_text") or args.get("patch") or args.get("diff")
     if not path or not search_text:
-        return {"success": False, "error": "Параметры 'path' и 'search_text' обязательны"}
+        return {
+            "success": False,
+            "error": "Параметры 'path' и 'search_text' обязательны",
+        }
     try:
         abs_path = _get_abs_path(path)
         if not os.path.isfile(abs_path):
@@ -273,10 +298,16 @@ def apply_patch(args: dict, cfg: dict = None) -> dict:
             with open(abs_path, encoding="utf-8", newline="") as f:
                 content = f.read()
         except UnicodeDecodeError:
-            return {"success": False, "error": "Файл не в кодировке UTF-8: патч не применен"}
+            return {
+                "success": False,
+                "error": "Файл не в кодировке UTF-8: патч не применен",
+            }
 
         if search_text not in content:
-            return {"success": False, "error": "Искомый текст (search_text) не найден в файле."}
+            return {
+                "success": False,
+                "error": "Искомый текст (search_text) не найден в файле.",
+            }
 
         content = content.replace(search_text, replace_text or "", 1)
 
@@ -317,7 +348,9 @@ def python_ast_outline(args: dict) -> dict:
                 for sub in node.body:
                     if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef)):
                         args_list = [a.arg for a in sub.args.args]
-                        methods.append({"name": sub.name, "line": sub.lineno, "args": args_list})
+                        methods.append(
+                            {"name": sub.name, "line": sub.lineno, "args": args_list}
+                        )
                 classes.append(
                     {
                         "name": node.name,
@@ -404,9 +437,14 @@ def zip_compress(args: dict) -> dict:
             return {"error": "Исходный путь и путь архива должны различаться"}
 
         os.makedirs(os.path.dirname(abs_out), exist_ok=True)
-        output_mode = stat.S_IMODE(os.stat(abs_out).st_mode) if os.path.exists(abs_out) else None
+        output_mode = (
+            stat.S_IMODE(os.stat(abs_out).st_mode) if os.path.exists(abs_out) else None
+        )
         with tempfile.NamedTemporaryFile(
-            dir=os.path.dirname(abs_out), prefix=".tmp_archive_", suffix=".zip", delete=False
+            dir=os.path.dirname(abs_out),
+            prefix=".tmp_archive_",
+            suffix=".zip",
+            delete=False,
         ) as tmp:
             tmp_path = tmp.name
         # Build beside the destination so failures leave an existing archive
@@ -435,7 +473,10 @@ def zip_compress(args: dict) -> dict:
                         zf.write(full_f, arcname=rel_f)
                         count += 1
 
-        if output_mode is not None and stat.S_IMODE(os.stat(tmp_path).st_mode) != output_mode:
+        if (
+            output_mode is not None
+            and stat.S_IMODE(os.stat(tmp_path).st_mode) != output_mode
+        ):
             os.chmod(tmp_path, output_mode)
         os.replace(tmp_path, abs_out)
         tmp_path = None
@@ -511,7 +552,9 @@ class _LinkLocalGuardRedirect(urllib.request.HTTPRedirectHandler):
     """Checks every redirect target, so a public URL cannot bounce the fetch to a link-local address."""
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        if not newurl.startswith(("http://", "https://")) or _resolves_to_link_local(newurl):
+        if not newurl.startswith(("http://", "https://")) or _resolves_to_link_local(
+            newurl
+        ):
             raise urllib.error.URLError("redirect to a blocked address")
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
@@ -554,7 +597,11 @@ def http_fetch(args: dict) -> dict:
                 "body": text[:2000],
             }
     except urllib.error.HTTPError as he:
-        return {"success": False, "status": he.code, "error": f"HTTP Error {he.code}: {he.reason}"}
+        return {
+            "success": False,
+            "status": he.code,
+            "error": f"HTTP Error {he.code}: {he.reason}",
+        }
     except Exception as e:
         return {"success": False, "error": f"Ошибка сетевого запроса: {str(e)}"}
 
@@ -567,7 +614,11 @@ def make_directory(args: dict) -> dict:
     try:
         abs_path = _get_abs_path(path)
         os.makedirs(abs_path, exist_ok=True)
-        return {"success": True, "path": path, "message": f"Директория '{path}' создана."}
+        return {
+            "success": True,
+            "path": path,
+            "message": f"Директория '{path}' создана.",
+        }
     except Exception as e:
         return {"error": f"Ошибка создания папки: {str(e)}"}
 
@@ -630,7 +681,11 @@ def delete_path(args: dict) -> dict:
             os.remove(abs_path)
             kind = "файл"
 
-        return {"success": True, "path": path, "message": f"{kind.capitalize()} '{path}' удален."}
+        return {
+            "success": True,
+            "path": path,
+            "message": f"{kind.capitalize()} '{path}' удален.",
+        }
     except Exception as e:
         return {"error": f"Ошибка удаления: {str(e)}"}
 
@@ -686,7 +741,12 @@ def glob_search(args: dict) -> dict:
                         "size": os.path.getsize(p) if os.path.isfile(p) else 0,
                     }
                 )
-        return {"success": True, "pattern": pattern, "count": len(results), "matches": results}
+        return {
+            "success": True,
+            "pattern": pattern,
+            "count": len(results),
+            "matches": results,
+        }
     except Exception as e:
         return {"error": f"Ошибка поиска по маске: {str(e)}"}
 
@@ -712,7 +772,11 @@ def grep_search(args: dict) -> dict:
     results = []
     try:
         for root, dirs, files in os.walk(BASE_DIR):
-            dirs[:] = [d for d in dirs if not d.startswith((".", "__pycache__", "node_modules"))]
+            dirs[:] = [
+                d
+                for d in dirs
+                if not d.startswith((".", "__pycache__", "node_modules"))
+            ]
             for file in files:
                 if not glob.fnmatch.fnmatch(file, file_pattern):
                     continue
@@ -724,7 +788,11 @@ def grep_search(args: dict) -> dict:
                         for line_num, line in enumerate(f, start=1):
                             if regex.search(line):
                                 results.append(
-                                    {"file": rel_path, "line": line_num, "text": line.strip()[:200]}
+                                    {
+                                        "file": rel_path,
+                                        "line": line_num,
+                                        "text": line.strip()[:200],
+                                    }
                                 )
                                 if len(results) >= max_matches:
                                     return {
@@ -784,7 +852,9 @@ def run_command(args: dict) -> dict:
         return {"error": "Параметр 'command' обязателен"}
     # A guard against the obvious paths to secrets, not a sandbox: the shell can still spell them out.
     if _PROTECTED_COMMAND_RE.search(str(command)) and not restrictions_lifted():
-        return {"error": "Команда обращается к служебным или секретным файлам и не выполняется"}
+        return {
+            "error": "Команда обращается к служебным или секретным файлам и не выполняется"
+        }
     try:
         timeout = clamp_integer(1, int(args.get("timeout", 30)), 300)
     except (TypeError, ValueError):
@@ -802,7 +872,11 @@ def run_command(args: dict) -> dict:
                 "PATH": os.defpath,
                 "LANG": "C.UTF-8",
                 "LC_ALL": "C.UTF-8",
-                **{key: env_require(key) for key in ("SystemRoot", "WINDIR") if key in env_snapshot()},
+                **{
+                    key: env_require(key)
+                    for key in ("SystemRoot", "WINDIR")
+                    if key in env_snapshot()
+                },
             },
         ) as proc:
             try:
@@ -825,7 +899,10 @@ def run_command(args: dict) -> dict:
             "stderr": err.strip(),
         }
     except subprocess.TimeoutExpired:
-        return {"success": False, "error": f"Превышено время ожидания команды ({timeout} сек)"}
+        return {
+            "success": False,
+            "error": f"Превышено время ожидания команды ({timeout} сек)",
+        }
     except Exception:
         return {"success": False, "error": "Не удалось выполнить команду"}
 
@@ -906,7 +983,10 @@ TOOL_REGISTRY = {
         "parameters": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "Путь к .py файлу для анализа структуры"}
+                "path": {
+                    "type": "string",
+                    "description": "Путь к .py файлу для анализа структуры",
+                }
             },
             "required": ["path"],
         },
@@ -935,8 +1015,14 @@ TOOL_REGISTRY = {
         "parameters": {
             "type": "object",
             "properties": {
-                "source_path": {"type": "string", "description": "Исходный файл или папка"},
-                "archive_path": {"type": "string", "description": "Путь к создаваемому .zip файлу"},
+                "source_path": {
+                    "type": "string",
+                    "description": "Исходный файл или папка",
+                },
+                "archive_path": {
+                    "type": "string",
+                    "description": "Путь к создаваемому .zip файлу",
+                },
             },
             "required": ["source_path", "archive_path"],
         },
@@ -979,7 +1065,9 @@ TOOL_REGISTRY = {
         "description": "Создать новую директорию в проекте (включая промежуточные папки).",
         "parameters": {
             "type": "object",
-            "properties": {"path": {"type": "string", "description": "Путь к создаваемой папке"}},
+            "properties": {
+                "path": {"type": "string", "description": "Путь к создаваемой папке"}
+            },
             "required": ["path"],
         },
         "requires_approval": True,
@@ -1008,7 +1096,10 @@ TOOL_REGISTRY = {
         "parameters": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "Путь к удаляемому файлу или директории"}
+                "path": {
+                    "type": "string",
+                    "description": "Путь к удаляемому файлу или директории",
+                }
             },
             "required": ["path"],
         },
@@ -1020,7 +1111,10 @@ TOOL_REGISTRY = {
         "parameters": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "Путь к директории ('.' по умолчанию)"}
+                "path": {
+                    "type": "string",
+                    "description": "Путь к директории ('.' по умолчанию)",
+                }
             },
             "required": [],
         },
@@ -1032,7 +1126,10 @@ TOOL_REGISTRY = {
         "parameters": {
             "type": "object",
             "properties": {
-                "pattern": {"type": "string", "description": "Шаблон поиска (например '*.py')"}
+                "pattern": {
+                    "type": "string",
+                    "description": "Шаблон поиска (например '*.py')",
+                }
             },
             "required": ["pattern"],
         },
@@ -1044,7 +1141,10 @@ TOOL_REGISTRY = {
         "parameters": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Текст или regex для поиска"},
+                "query": {
+                    "type": "string",
+                    "description": "Текст или regex для поиска",
+                },
                 "file_pattern": {
                     "type": "string",
                     "description": "Маска файлов (по умолчанию '*.py')",
@@ -1108,4 +1208,3 @@ for _read_tool_name in READ_ONLY_TOOL_NAMES:
     TOOL_REGISTRY[_read_tool_name]["read_only"] = True
 
 FILESYSTEM_TOOLS = TOOL_REGISTRY
-

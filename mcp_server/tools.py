@@ -3,7 +3,11 @@ from __future__ import annotations
 from typing import Any, Callable, Optional
 
 from agent_runtime.gateway import AgentGateway
-from conversations.ownership import check_access, get_owned_conversation, list_owned_conversations
+from conversations.ownership import (
+    check_access,
+    get_owned_conversation,
+    list_owned_conversations,
+)
 from storage.db import get_messages
 from tool_providers.filesystem import grep_search, list_directory, read_file
 from invocation.api import get_invocation_status, get_invocation_trace
@@ -148,7 +152,9 @@ def _conversation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, A
     return {"conversation": conversation}
 
 
-def _conversation_messages(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+def _conversation_messages(
+    arguments: dict[str, Any], user: Optional[str]
+) -> dict[str, Any]:
     owner = _require_conversation_user(user)
     conversation_id = str(arguments.get("conversation_id") or "").strip()
     if not conversation_id:
@@ -281,7 +287,12 @@ def _register_conversation_tools() -> None:
             "logos_list_conversations",
             "List conversations",
             "List conversations in the local Logos application.",
-            {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+            {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": False,
+            },
             _conversations,
         ),
         (
@@ -362,14 +373,24 @@ def _register_bridge_tools() -> None:
             "logos_get_system_status",
             "System status",
             "Read-only Logos runtime, MCP, model and local-tool status.",
-            {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+            {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": False,
+            },
             _system_status,
         ),
         (
             "logos_list_agents",
             "List agents",
             "List AI agents currently registered in the Logos Agent Gateway.",
-            {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+            {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": False,
+            },
             _agents,
         ),
         (
@@ -444,7 +465,9 @@ def _tools_list() -> list[dict[str, Any]]:
             "name": definition["name"],
             "title": definition.get("title") or definition["name"],
             "description": definition.get("description", ""),
-            "inputSchema": definition.get("inputSchema") or definition.get("input_schema") or {},
+            "inputSchema": definition.get("inputSchema")
+            or definition.get("input_schema")
+            or {},
             "outputSchema": definition.get("outputSchema")
             or definition.get("output_schema")
             or {"type": "object"},

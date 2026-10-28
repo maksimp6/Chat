@@ -34,7 +34,9 @@ def install(bin_dir: Path) -> None:
     bin_dir.mkdir(parents=True, exist_ok=True)
     staged: Path | None = None
     try:
-        with tempfile.NamedTemporaryFile(dir=bin_dir, prefix=".eds-", delete=False) as out:
+        with tempfile.NamedTemporaryFile(
+            dir=bin_dir, prefix=".eds-", delete=False
+        ) as out:
             staged = Path(out.name)
             digest = hashlib.sha256()
             with urllib.request.urlopen(url, timeout=30) as response:

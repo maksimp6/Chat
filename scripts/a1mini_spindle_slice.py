@@ -1,4 +1,5 @@
 """Slice hash-pinned OEM spindle source plate for A1 mini PLA fit prototype only."""
+
 from core.env import env_snapshot
 
 import argparse
@@ -59,10 +60,22 @@ def _read_meshes(objects):
             tuple(int(t.get(a)) for a in ("v1", "v2", "v3"))
             for t in mesh.findall("{*}triangles/{*}triangle")
         ]
-        if not verts or not faces or not all(math.isfinite(c) for v in verts for c in v):
+        if (
+            not verts
+            or not faces
+            or not all(math.isfinite(c) for v in verts for c in v)
+        ):
             raise ValueError("invalid mesh")
         meshes[obj.get("id")] = (verts, faces)
-    if sorted(len(v[1]) for v in meshes.values()) != [668, 986, 986, 986, 986, 2524, 2524]:
+    if sorted(len(v[1]) for v in meshes.values()) != [
+        668,
+        986,
+        986,
+        986,
+        986,
+        2524,
+        2524,
+    ]:
         raise ValueError("unexpected geometry")
     return meshes
 
@@ -120,7 +133,9 @@ def make_stl(src: Path, out: Path):
         if min(coords) < -0.01 or max(coords) > 180:
             raise ValueError("outside A1 mini bed")
     out.write_bytes(blob)
-    print("SOURCE_STL_VERIFIED", len(blob), hashlib.sha256(blob).hexdigest(), flush=True)
+    print(
+        "SOURCE_STL_VERIFIED", len(blob), hashlib.sha256(blob).hexdigest(), flush=True
+    )
 
 
 def main():
@@ -162,7 +177,9 @@ def main():
         str(out),
         str(stl),
     ]
-    result = subprocess.run(command, cwd=out, env=env, text=True, capture_output=True, timeout=240)
+    result = subprocess.run(
+        command, cwd=out, env=env, text=True, capture_output=True, timeout=240
+    )
     print(
         "SLICER_EXIT",
         result.returncode,
@@ -176,7 +193,10 @@ def main():
     settings, gcode = _read_sliced_archive(dest)
     _validate_profile(settings)
     _validate_gcode(gcode)
-    if settings.get("wall_loops") != "4" or settings.get("sparse_infill_density") != "35%":
+    if (
+        settings.get("wall_loops") != "4"
+        or settings.get("sparse_infill_density") != "35%"
+    ):
         raise ValueError("wrong wall/infill")
     if not any(
         line.startswith("G1 ") and " E" in line
@@ -187,7 +207,11 @@ def main():
     report = json.loads((out / "result.json").read_text())
     plates = report.get("sliced_plates") or []
     print("SPINDLE_RESULT", json.dumps(report, sort_keys=True)[:6500], flush=True)
-    if report.get("return_code") != 0 or len(plates) != 1 or plates[0].get("warning_message"):
+    if (
+        report.get("return_code") != 0
+        or len(plates) != 1
+        or plates[0].get("warning_message")
+    ):
         raise ValueError("slicer result/warning")
     objs = plates[0].get("objects") or []
     if len(objs) != 1 or int(objs[0].get("triangle_count", -1)) != 9660:
@@ -214,7 +238,9 @@ def main():
         status="SLICED_NOT_PRINTED",
         estimated_seconds=plates[0].get("total_predication"),
     )
-    (out / "spindle_audit.json").write_text(json.dumps(audit, indent=2, sort_keys=True) + "\n")
+    (out / "spindle_audit.json").write_text(
+        json.dumps(audit, indent=2, sort_keys=True) + "\n"
+    )
     print("SPINDLE_SLICED_VERIFIED", json.dumps(audit), flush=True)
 
 

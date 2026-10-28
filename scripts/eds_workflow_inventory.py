@@ -10,7 +10,15 @@ import time
 from uuid import UUID
 
 PAGE_SIZE = 50
-STATUSES = {"for_create", "publishing", "running", "error", "deleted", "deleting", "stopped"}
+STATUSES = {
+    "for_create",
+    "publishing",
+    "running",
+    "error",
+    "deleted",
+    "deleting",
+    "stopped",
+}
 
 
 def identifier(value):
@@ -20,9 +28,13 @@ def identifier(value):
 
 
 def label(value, secrets):
-    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_./ -]{0,99}", value):
+    if not isinstance(value, str) or not re.fullmatch(
+        r"[A-Za-z0-9][A-Za-z0-9_./ -]{0,99}", value
+    ):
         return "[omitted]"
-    return "[omitted]" if any(secret and secret in value for secret in secrets) else value
+    return (
+        "[omitted]" if any(secret and secret in value for secret in secrets) else value
+    )
 
 
 def inventory(query, *, clock=time.monotonic, secrets=()):
@@ -71,7 +83,9 @@ def inventory(query, *, clock=time.monotonic, secrets=()):
         offset += len(applications)
         if expected_total is not None and offset > expected_total:
             raise ValueError("inconsistent total")
-        if expected_total == offset or (expected_total is None and len(applications) < PAGE_SIZE):
+        if expected_total == offset or (
+            expected_total is None and len(applications) < PAGE_SIZE
+        ):
             return {"complete": True, "count": len(rows), "applications": rows}
         if not applications:
             raise ValueError("incomplete inventory")
@@ -108,7 +122,9 @@ def main():
     try:
         report = inventory(query_page, secrets=(secret,))
     except Exception:  # noqa: BLE001 - never publish secret-bearing CLI errors
-        print("EDS Workflow inventory failed or exceeded 30 seconds; no partial result published.")
+        print(
+            "EDS Workflow inventory failed or exceeded 30 seconds; no partial result published."
+        )
         return 1
     print(json.dumps(report))
     return 0

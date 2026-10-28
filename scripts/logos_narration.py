@@ -29,10 +29,14 @@ def digest(data: bytes) -> str:
 def safe_reply(text: str) -> str:
     # Remove known bootstrap values before truncating or sending text externally.
     for name, value in os.environ.items():
-        if value and re.search(r"TOKEN|SECRET|PASSWORD|PRIVATE_KEY|API_KEY", name, re.IGNORECASE):
+        if value and re.search(
+            r"TOKEN|SECRET|PASSWORD|PRIVATE_KEY|API_KEY", name, re.IGNORECASE
+        ):
             text = text.replace(value, "<redacted>")
     text = sanitize_trace_value(text)
-    text = re.sub(r"\b(?:gh[pousr]_|github_pat_|sk-)[A-Za-z0-9_\-]+", "<redacted>", text)
+    text = re.sub(
+        r"\b(?:gh[pousr]_|github_pat_|sk-)[A-Za-z0-9_\-]+", "<redacted>", text
+    )
     return " ".join(text.split())
 
 
@@ -52,11 +56,15 @@ def build_story(result: dict, max_chars: int = MAX_CHARS) -> tuple[str, bool]:
     elif result.get("provider_error_present") is True or status == "failed":
         lines.append("Запуск завершился ошибкой. Выполнение задачи не подтверждено.")
     elif status == "running" or provider in {"queued", "in_progress"}:
-        lines.append("Сохранён промежуточный результат. Завершение запуска не подтверждено.")
+        lines.append(
+            "Сохранён промежуточный результат. Завершение запуска не подтверждено."
+        )
     elif provider in {"failed", "incomplete", "cancelled"} or status == "incomplete":
         lines.append("Ответ провайдера не завершён. Выполнение задачи не подтверждено.")
     elif status == "needs_approval":
-        lines.append("Я остановился: запрошенные инструменты требуют разрешения владельца.")
+        lines.append(
+            "Я остановился: запрошенные инструменты требуют разрешения владельца."
+        )
     elif status in {"changed", "no_changes", "completed", "retrieved"}:
         lines.append(
             "Раннер сохранил результат. Это ещё не проверка качества и не приёмка владельца."
@@ -68,7 +76,9 @@ def build_story(result: dict, max_chars: int = MAX_CHARS) -> tuple[str, bool]:
         lines.append(f"Квитанция отмечает изменённых файлов: {len(files)}.")
     reply = result.get("reply")
     if isinstance(reply, str) and reply.strip():
-        lines.append("Далее мои слова из ответа модели; их утверждения требуют проверки.")
+        lines.append(
+            "Далее мои слова из ответа модели; их утверждения требуют проверки."
+        )
         lines.append(safe_reply(reply))
     else:
         lines.append("Текстового ответа модели в квитанции нет.")
@@ -124,7 +134,9 @@ def synthesize(text: str, voice: str) -> bytes:
     return audio
 
 
-def narrate(source: Path, output: Path, *, speak: bool, max_chars: int, voice: str) -> dict:
+def narrate(
+    source: Path, output: Path, *, speak: bool, max_chars: int, voice: str
+) -> dict:
     # A separate directory prevents reuse of old audio after a failed attempt.
     output.mkdir(parents=True, exist_ok=False)
     receipt = {
@@ -159,7 +171,14 @@ def narrate(source: Path, output: Path, *, speak: bool, max_chars: int, voice: s
                     {"file": name, "sha256": digest(audio), "characters": len(chunk)}
                 )
             receipt.update(status="audio_ready", audio_status="ready")
-    except (OSError, RuntimeError, ValueError, TypeError, ImportError, LookupError) as exc:
+    except (
+        OSError,
+        RuntimeError,
+        ValueError,
+        TypeError,
+        ImportError,
+        LookupError,
+    ) as exc:
         # Error types only: exceptions from transports may contain credentials/body.
         receipt.update(status="failed", error_type=type(exc).__name__)
     (output / "receipt.json").write_text(
@@ -177,7 +196,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--voice", choices=sorted(VOICES), default="filipp")
     args = parser.parse_args(argv)
     receipt = narrate(
-        args.result, args.out, speak=args.synthesize, max_chars=args.max_chars, voice=args.voice
+        args.result,
+        args.out,
+        speak=args.synthesize,
+        max_chars=args.max_chars,
+        voice=args.voice,
     )
     print(json.dumps(receipt, ensure_ascii=False))
     return int(receipt["status"] == "failed")

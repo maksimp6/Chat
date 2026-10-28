@@ -95,7 +95,11 @@ class PrinterStorage:
         secret_provider: Callable[[], str],
         connector: Callable[..., FTP_TLS] = ImplicitPinnedFTPS,
     ):
-        if not isinstance(hostname, str) or not hostname or any(c.isspace() for c in hostname):
+        if (
+            not isinstance(hostname, str)
+            or not hostname
+            or any(c.isspace() for c in hostname)
+        ):
             raise PrinterTransferError("invalid printer hostname")
         if not HEX64.fullmatch(fingerprint):
             raise PrinterTransferError("missing pinned printer certificate")
@@ -123,7 +127,9 @@ class PrinterStorage:
             return ftp
         except (OSError, EOFError, ValueError, Error, PrinterTransferError):
             self._close(ftp)
-            raise PrinterTransferError("FTPS connection or authorization rejected") from None
+            raise PrinterTransferError(
+                "FTPS connection or authorization rejected"
+            ) from None
 
     @staticmethod
     def _name(filename: str, *, video: bool = False) -> str:
@@ -152,7 +158,9 @@ class PrinterStorage:
         return hasher.hexdigest(), total
 
     @staticmethod
-    def _validate_source(filename: str, source: Path, expected: str) -> tuple[int, str, bytes]:
+    def _validate_source(
+        filename: str, source: Path, expected: str
+    ) -> tuple[int, str, bytes]:
         if not HEX64.fullmatch(expected) or source.is_symlink() or not source.is_file():
             raise PrinterTransferError("untrusted staging path or hash")
         if source.name != filename:
@@ -181,7 +189,9 @@ class PrinterStorage:
     ) -> dict[str, Any]:
         """Stage one bounded G-code plate and prove the bytes match readback."""
         self._name(filename)
-        size, actual, blob = self._validate_source(filename, local_file, expected_sha256)
+        size, actual, blob = self._validate_source(
+            filename, local_file, expected_sha256
+        )
         ftp = self._connect()
         try:
             ftp.cwd("/model")
@@ -200,7 +210,9 @@ class PrinterStorage:
         except PrinterTransferError:
             raise
         except (OSError, EOFError, Error):
-            raise PrinterTransferError("FTPS staging uncertain; no blind retry") from None
+            raise PrinterTransferError(
+                "FTPS staging uncertain; no blind retry"
+            ) from None
         finally:
             self._close(ftp)
 

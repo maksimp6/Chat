@@ -36,4 +36,6 @@ def normalize_resources(
     resource_type: str,
     items: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    return [normalize_resource(provider, service, resource_type, item) for item in items]
+    return [
+        normalize_resource(provider, service, resource_type, item) for item in items
+    ]

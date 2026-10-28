@@ -11,7 +11,11 @@ TraceSink = Callable[[str, Mapping[str, Any]], None]
 
 class RuntimeStorage:
     def __init__(
-        self, dispatcher: RuntimeDispatcher, runtime_id: str, *, trace: TraceSink | None = None
+        self,
+        dispatcher: RuntimeDispatcher,
+        runtime_id: str,
+        *,
+        trace: TraceSink | None = None,
     ) -> None:
         self._dispatcher = dispatcher
         self._runtime_id = runtime_id
@@ -22,7 +26,9 @@ class RuntimeStorage:
         if self._trace:
             self._trace("storage.started", event)
         try:
-            result = self._dispatcher.dispatch_storage(self._runtime_id, provider, action, payload)
+            result = self._dispatcher.dispatch_storage(
+                self._runtime_id, provider, action, payload
+            )
         except Exception:
             if self._trace:
                 self._trace("storage.failed", event)
@@ -32,7 +38,9 @@ class RuntimeStorage:
         return result
 
     def upload(self, provider: str, object_id: str, content: bytes):
-        return self._call("upload", provider, {"object_id": object_id, "content": content})
+        return self._call(
+            "upload", provider, {"object_id": object_id, "content": content}
+        )
 
     def download(self, provider: str, object_id: str) -> bytes:
         return self._call("download", provider, {"object_id": object_id})

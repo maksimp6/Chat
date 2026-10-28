@@ -69,7 +69,9 @@ class RuntimeDispatcher:
         self._operations: dict[str, RuntimeHandler] = {}
         self._tool_boundaries: dict[str, UniversalToolExecutor] = {}
         self._storage_providers: dict[tuple[str, str | None, str], StorageProvider] = {}
-        self._storage_credentials: Callable[[RuntimeContext, str], object | None] | None = None
+        self._storage_credentials: (
+            Callable[[RuntimeContext, str], object | None] | None
+        ) = None
         self._local = local()
         self.register_operation(FILESYSTEM_READ_TEXT, self._read_runtime_text)
         self.register_operation(FILESYSTEM_WRITE_TEXT, self._write_runtime_text)
@@ -80,7 +82,9 @@ class RuntimeDispatcher:
         """Resolve a relative path without permitting escape from the data root."""
 
         if not context.root:
-            raise RuntimeScopeViolation(f"runtime {context.runtime_id!r} has no filesystem root")
+            raise RuntimeScopeViolation(
+                f"runtime {context.runtime_id!r} has no filesystem root"
+            )
         relative = Path(str(value or ""))
         if not value or relative.is_absolute():
             raise RuntimeScopeViolation("runtime filesystem paths must be relative")
@@ -93,11 +97,15 @@ class RuntimeDispatcher:
             )
         return target
 
-    def _read_runtime_text(self, context: RuntimeContext, payload: Mapping[str, Any]) -> str:
+    def _read_runtime_text(
+        self, context: RuntimeContext, payload: Mapping[str, Any]
+    ) -> str:
         path = self._runtime_path(context, payload.get("path"))
         return path.read_text(encoding="utf-8")
 
-    def _write_runtime_text(self, context: RuntimeContext, payload: Mapping[str, Any]) -> None:
+    def _write_runtime_text(
+        self, context: RuntimeContext, payload: Mapping[str, Any]
+    ) -> None:
         path = self._runtime_path(context, payload.get("path"))
         content = payload.get("content")
         if not isinstance(content, str):
@@ -177,9 +185,13 @@ class RuntimeDispatcher:
         context = self.context(runtime_id)
         scoped_owner = context.owner_id if owner_id is None else owner_id
         if scoped_owner != context.owner_id:
-            raise RuntimeScopeViolation("Storage provider owner does not match runtime owner")
+            raise RuntimeScopeViolation(
+                "Storage provider owner does not match runtime owner"
+            )
         with self._lock:
-            self._storage_providers[(runtime_id, scoped_owner, provider.name)] = provider
+            self._storage_providers[(runtime_id, scoped_owner, provider.name)] = (
+                provider
+            )
 
     def dispatch_storage(
         self,
@@ -194,14 +206,20 @@ class RuntimeDispatcher:
         if (resource_runtime_id or runtime_id) != runtime_id:
             raise RuntimeScopeViolation("Storage resources cannot cross runtime scopes")
         with self._lock:
-            provider = self._storage_providers.get((runtime_id, context.owner_id, provider_name))
+            provider = self._storage_providers.get(
+                (runtime_id, context.owner_id, provider_name)
+            )
         if provider is None:
             raise StorageProviderUnavailable("Storage provider is not configured")
         credentials = (
-            self._storage_credentials(context, provider_name) if self._storage_credentials else None
+            self._storage_credentials(context, provider_name)
+            if self._storage_credentials
+            else None
         )
         if provider.requires_credentials and credentials is None:
-            raise StorageCredentialsMissing("Storage provider credentials are not configured")
+            raise StorageCredentialsMissing(
+                "Storage provider credentials are not configured"
+            )
         values = dict(payload or {})
         try:
             if action == "upload":
@@ -271,7 +289,9 @@ class RuntimeDispatcher:
             else:
                 self._local.runtime_id = previous
 
-    def _execute_tool(self, context: RuntimeContext, payload: Mapping[str, Any]) -> dict[str, Any]:
+    def _execute_tool(
+        self, context: RuntimeContext, payload: Mapping[str, Any]
+    ) -> dict[str, Any]:
         with self._lock:
             executor = self._tool_boundaries.get(context.runtime_id)
         if executor is None:
@@ -310,4 +330,3 @@ class RuntimeDispatcher:
         )
 
         return executor.execute(call)
-

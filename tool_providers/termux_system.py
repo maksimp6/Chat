@@ -22,12 +22,17 @@ def _run_termux_cmd(cmd: list, timeout: int = 15) -> dict:
             "error": f"Утилита '{binary}' не найдена. Убедитесь, что установлены пакеты 'termux-api' в Termux и приложение Termux:API в Android.",
         }
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout, check=False
+        )
         stdout = proc.stdout.strip()
         stderr = proc.stderr.strip()
 
         if proc.returncode != 0:
-            return {"success": False, "error": stderr or f"Код возврата {proc.returncode}"}
+            return {
+                "success": False,
+                "error": stderr or f"Код возврата {proc.returncode}",
+            }
 
         if not stdout:
             return {"success": True, "output": "(успешно / вывод пуст)"}
@@ -97,7 +102,9 @@ def send_notification(args: dict, cfg: dict = None) -> dict:
     if args.get("id"):
         cmd.extend(["--id", str(args["id"])])
     if args.get("priority"):
-        cmd.extend(["--priority", str(args["priority"])])  # high, low, max, min, default
+        cmd.extend(
+            ["--priority", str(args["priority"])]
+        )  # high, low, max, min, default
     return _run_termux_cmd(cmd)
 
 
@@ -189,7 +196,9 @@ def send_sms(args: dict, cfg: dict = None) -> dict:
     text = args.get("message") or args.get("text")
     if not number or not text:
         return {"error": "Параметры 'phone_number' и 'message' обязательны"}
-    return _run_termux_cmd(["termux-sms-send", "-n", str(number), str(text)], timeout=15)
+    return _run_termux_cmd(
+        ["termux-sms-send", "-n", str(number), str(text)], timeout=15
+    )
 
 
 def take_photo(args: dict, cfg: dict = None) -> dict:
@@ -209,7 +218,9 @@ def take_photo(args: dict, cfg: dict = None) -> dict:
     )
     os.makedirs(photo_dir, exist_ok=True)
     out_file = os.path.join(photo_dir, name)
-    return _run_termux_cmd(["termux-camera-photo", "-c", camera_id, out_file], timeout=25)
+    return _run_termux_cmd(
+        ["termux-camera-photo", "-c", camera_id, out_file], timeout=25
+    )
 
 
 # --- Реестр инструментов для Yandex AI Studio и MCP Routes ---
@@ -254,7 +265,9 @@ TOOL_REGISTRY = {
         "description": "Поместить текст в системный буфер обмена Android.",
         "parameters": {
             "type": "object",
-            "properties": {"text": {"type": "string", "description": "Текст для копирования"}},
+            "properties": {
+                "text": {"type": "string", "description": "Текст для копирования"}
+            },
             "required": ["text"],
         },
         "requires_approval": False,
@@ -266,7 +279,10 @@ TOOL_REGISTRY = {
             "type": "object",
             "properties": {
                 "title": {"type": "string", "description": "Заголовок уведомления"},
-                "content": {"type": "string", "description": "Основной текст уведомления"},
+                "content": {
+                    "type": "string",
+                    "description": "Основной текст уведомления",
+                },
             },
             "required": ["content"],
         },
@@ -278,7 +294,10 @@ TOOL_REGISTRY = {
         "parameters": {
             "type": "object",
             "properties": {
-                "message": {"type": "string", "description": "Текст всплывающего сообщения"}
+                "message": {
+                    "type": "string",
+                    "description": "Текст всплывающего сообщения",
+                }
             },
             "required": ["message"],
         },
@@ -289,7 +308,9 @@ TOOL_REGISTRY = {
         "description": "Озвучить текст голосом через системный движок Android TTS.",
         "parameters": {
             "type": "object",
-            "properties": {"text": {"type": "string", "description": "Текст для воспроизведения"}},
+            "properties": {
+                "text": {"type": "string", "description": "Текст для воспроизведения"}
+            },
             "required": ["text"],
         },
         "requires_approval": False,
@@ -338,10 +359,20 @@ TOOL_REGISTRY = {
             "properties": {
                 "stream": {
                     "type": "string",
-                    "enum": ["music", "call", "system", "ring", "alarm", "notification"],
+                    "enum": [
+                        "music",
+                        "call",
+                        "system",
+                        "ring",
+                        "alarm",
+                        "notification",
+                    ],
                     "description": "Канал аудио",
                 },
-                "volume": {"type": "integer", "description": "Уровень громкости (обычно 0-15)"},
+                "volume": {
+                    "type": "integer",
+                    "description": "Уровень громкости (обычно 0-15)",
+                },
             },
             "required": ["stream", "volume"],
         },
@@ -352,7 +383,9 @@ TOOL_REGISTRY = {
         "description": "Изменить яркость экрана смартфона (значение от 0 до 255).",
         "parameters": {
             "type": "object",
-            "properties": {"level": {"type": "integer", "description": "Уровень яркости (0-255)"}},
+            "properties": {
+                "level": {"type": "integer", "description": "Уровень яркости (0-255)"}
+            },
             "required": ["level"],
         },
         "requires_approval": False,
@@ -369,7 +402,10 @@ TOOL_REGISTRY = {
         "parameters": {
             "type": "object",
             "properties": {
-                "limit": {"type": "integer", "description": "Количество SMS (по умолчанию 10)"},
+                "limit": {
+                    "type": "integer",
+                    "description": "Количество SMS (по умолчанию 10)",
+                },
                 "offset": {"type": "integer", "description": "Смещение"},
             },
             "required": [],
@@ -439,7 +475,12 @@ SYSTEM_TOOLS = {name: TOOL_REGISTRY[name] for name in _REQUIRED_EXECUTABLES}
 
 # Алиасы для обратной совместимости
 # Reads and captures of private data (location, contacts, SMS, camera) need the owner's approval.
-for _private_tool in ("get_device_location", "list_contacts", "list_sms", "take_camera_photo"):
+for _private_tool in (
+    "get_device_location",
+    "list_contacts",
+    "list_sms",
+    "take_camera_photo",
+):
     TOOL_REGISTRY[_private_tool]["requires_approval"] = True
 
 TOOL_REGISTRY["termux_battery_status"] = TOOL_REGISTRY["get_system_battery"]

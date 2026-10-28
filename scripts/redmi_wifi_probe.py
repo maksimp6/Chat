@@ -1,4 +1,5 @@
 """Read-only readiness through the server's Wi-Fi address; no model requests."""
+
 import argparse
 import hashlib
 import ipaddress
@@ -23,7 +24,12 @@ def address(value):
         parsed = ipaddress.IPv4Address(value)
     except ipaddress.AddressValueError:
         raise ProbeFailure("invalid_wifi_address") from None
-    if parsed.is_loopback or parsed.is_unspecified or parsed.is_multicast or str(parsed) == "255.255.255.255":
+    if (
+        parsed.is_loopback
+        or parsed.is_unspecified
+        or parsed.is_multicast
+        or str(parsed) == "255.255.255.255"
+    ):
         raise ProbeFailure("wifi_address_is_not_unicast_lan")
     return str(parsed)
 
@@ -37,8 +43,10 @@ def parse_wifi_ip(output):
 
 
 def discover():
-    for command in (["/system/bin/ip", "-o", "-4", "addr", "show", "wlan0"],
-                    ["su", "-c", "/system/bin/ip -o -4 addr show wlan0"]):
+    for command in (
+        ["/system/bin/ip", "-o", "-4", "addr", "show", "wlan0"],
+        ["su", "-c", "/system/bin/ip -o -4 addr show wlan0"],
+    ):
         try:
             result = subprocess.run(command, capture_output=True, text=True, timeout=5)
             if result.returncode == 0:
@@ -72,9 +80,16 @@ def check_base(base, assets, timeout=3):
     for name in ("chat.js", "style.css"):
         if bodies["/static/" + name] != (Path(assets) / name).read_bytes():
             raise ProbeFailure("static_asset_mismatch")
-    return {"status": "ready", "scope": "server_wifi_address", "external_peer_verified": False,
-            "checks": paths, "static_sha256": {name: hashlib.sha256(bodies["/static/" + name]).hexdigest()
-                                                for name in ("chat.js", "style.css")}}
+    return {
+        "status": "ready",
+        "scope": "server_wifi_address",
+        "external_peer_verified": False,
+        "checks": paths,
+        "static_sha256": {
+            name: hashlib.sha256(bodies["/static/" + name]).hexdigest()
+            for name in ("chat.js", "style.css")
+        },
+    }
 
 
 def main():
@@ -96,7 +111,16 @@ def main():
         print(json.dumps(result))
         return 0
     except (ProbeFailure, OSError) as exc:
-        print(json.dumps({"status": "failed", "error": str(exc) if isinstance(exc, ProbeFailure) else "local_assets_unavailable"}))
+        print(
+            json.dumps(
+                {
+                    "status": "failed",
+                    "error": str(exc)
+                    if isinstance(exc, ProbeFailure)
+                    else "local_assets_unavailable",
+                }
+            )
+        )
         return 1
 
 

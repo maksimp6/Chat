@@ -46,7 +46,11 @@ def _required(value: Any, name: str, limit: int) -> str:
 
 def _sha(kind: str, payload: dict[str, Any]) -> str:
     blob = json.dumps(
-        [kind, payload], sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False
+        [kind, payload],
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(blob).hexdigest()
 
@@ -139,7 +143,8 @@ class BoardStore:
         try:
             self._db = _EventJournal(self.path)
             if self.path.exists() and (
-                self.path.stat().st_mode & 0o077 or self.path.stat().st_uid != os.getuid()
+                self.path.stat().st_mode & 0o077
+                or self.path.stat().st_uid != os.getuid()
             ):
                 raise BoardUnavailable("database permissions are too broad")
             self._load_events()
@@ -153,7 +158,9 @@ class BoardStore:
         if any(not key.startswith(PREFIX) for key in entries):
             raise BoardUnavailable("unexpected key in dedicated board database")
         try:
-            ordered = sorted(entries.items(), key=lambda row: int(row[0][len(PREFIX) :]))
+            ordered = sorted(
+                entries.items(), key=lambda row: int(row[0][len(PREFIX) :])
+            )
         except ValueError as exc:
             raise BoardUnavailable("invalid event key") from exc
         self._events: list[dict[str, Any]] = []
@@ -188,7 +195,9 @@ class BoardStore:
 
     def _check(self, *, write: bool = False) -> None:
         if self._closed or self._pid != os.getpid():
-            raise BoardUnavailable("board handle is closed or belongs to another process")
+            raise BoardUnavailable(
+                "board handle is closed or belongs to another process"
+            )
         if write and self._poisoned:
             raise BoardUnavailable("uncertain write; reopen board after recovery")
 
@@ -206,7 +215,14 @@ class BoardStore:
                         "title": p["title"],
                         "category": p["category"],
                         "created_at": at,
-                        "posts": [{"id": eid, "actor": e["actor"], "body": p["body"], "at": at}],
+                        "posts": [
+                            {
+                                "id": eid,
+                                "actor": e["actor"],
+                                "body": p["body"],
+                                "at": at,
+                            }
+                        ],
                     }
                 elif kind == "thread.posted":
                     threads[p["thread_id"]]["posts"].append(
@@ -258,7 +274,12 @@ class BoardStore:
         return True
 
     def _append(
-        self, kind: str, payload: dict[str, Any], request_id: str, *, actor: str = "owner"
+        self,
+        kind: str,
+        payload: dict[str, Any],
+        request_id: str,
+        *,
+        actor: str = "owner",
     ) -> dict[str, Any]:
         with self._mutex:
             self._check(write=True)
@@ -282,7 +303,13 @@ class BoardStore:
                 confirmed = self._db.put(f"{PREFIX}{seq:09d}", event)
                 if confirmed != seq:
                     raise BoardUnavailable("unexpected Memory DB commit sequence")
-            except (OSError, FileMemoryError, ValueError, TypeError, BoardUnavailable) as exc:
+            except (
+                OSError,
+                FileMemoryError,
+                ValueError,
+                TypeError,
+                BoardUnavailable,
+            ) as exc:
                 self._poisoned = True
                 raise BoardUnavailable("uncertain write; recovery required") from exc
             self._events.append(event)
@@ -308,7 +335,13 @@ class BoardStore:
             return deepcopy(threads[thread_id])
 
     def create_thread(
-        self, title: str, body: str, category: str, request_id: str, *, actor: str = "owner"
+        self,
+        title: str,
+        body: str,
+        category: str,
+        request_id: str,
+        *,
+        actor: str = "owner",
     ) -> dict[str, Any]:
         title = _required(title, "title", 160)
         body = _required(body, "body", 12000)
@@ -347,15 +380,17 @@ class BoardStore:
                 raise BoardError("task not found")
             return deepcopy(tasks[task_id])
 
-    def create_task(self, title: str, depends_on: list[str], request_id: str) -> dict[str, Any]:
+    def create_task(
+        self, title: str, depends_on: list[str], request_id: str
+    ) -> dict[str, Any]:
         title = _required(title, "title", 160)
         if not isinstance(depends_on, list) or len(depends_on) > 20:
             raise BoardError("invalid dependencies")
         with self._mutex:
             existing = {task["id"] for task in self.tasks()}
-            if any(not isinstance(d, str) or d not in existing for d in depends_on) or len(
-                set(depends_on)
-            ) != len(depends_on):
+            if any(
+                not isinstance(d, str) or d not in existing for d in depends_on
+            ) or len(set(depends_on)) != len(depends_on):
                 raise BoardError("invalid task dependency")
             event = self._append(
                 "task.created",
@@ -397,9 +432,15 @@ class BoardStore:
             self._append("task.status", payload, request_id)
             return self.task(task_id)
 
-    def add_evidence(self, task_id: str, summary: str, url: str, request_id: str) -> dict[str, Any]:
+    def add_evidence(
+        self, task_id: str, summary: str, url: str, request_id: str
+    ) -> dict[str, Any]:
         summary = _required(summary, "summary", 400)
-        if not isinstance(url, str) or len(url) > 1000 or (url and not url.startswith("https://")):
+        if (
+            not isinstance(url, str)
+            or len(url) > 1000
+            or (url and not url.startswith("https://"))
+        ):
             raise BoardError("invalid evidence URL")
         with self._mutex:
             self.task(task_id)

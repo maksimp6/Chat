@@ -79,13 +79,19 @@ class DockerRuntime:
         ]
 
     def _ensure_owned(self, name: str) -> dict[str, str]:
-        output = self._run("inspect", "--format", "{{json .Config.Labels}}", name).strip()
+        output = self._run(
+            "inspect", "--format", "{{json .Config.Labels}}", name
+        ).strip()
         try:
             labels = json.loads(output)
         except json.JSONDecodeError as exc:
-            raise CloudProviderError("Invalid runtime response", code="invalid_runtime_response") from exc
+            raise CloudProviderError(
+                "Invalid runtime response", code="invalid_runtime_response"
+            ) from exc
         if not isinstance(labels, dict) or labels.get(_MANAGED_LABEL) != "1":
-            raise CloudProviderError("Resource is not owned by Alice Cloud", code="resource_not_owned")
+            raise CloudProviderError(
+                "Resource is not owned by Alice Cloud", code="resource_not_owned"
+            )
         return {str(key): str(value) for key, value in labels.items()}
 
     def list_managed(self) -> list[dict[str, str]]:
@@ -130,10 +136,14 @@ class DockerRuntime:
     def create(self, *, lane: str, service: str, config: dict) -> dict[str, str]:
         image = str(config.get("image") or "").strip()
         if not image:
-            raise CloudProviderError("Container image is required", code="image_required")
+            raise CloudProviderError(
+                "Container image is required", code="image_required"
+            )
         scale = int(config.get("scale", 1))
         if scale not in {0, 1}:
-            raise CloudProviderError("Alice Cloud MVP supports scale 0 or 1", code="invalid_scale")
+            raise CloudProviderError(
+                "Alice Cloud MVP supports scale 0 or 1", code="invalid_scale"
+            )
         name = self.container_name(lane, service)
         self._run(
             "create",
@@ -144,16 +154,28 @@ class DockerRuntime:
         )
         if scale == 1:
             self._run("start", name)
-        return {"name": name, "lane": lane, "service": service, "state": "running" if scale else "stopped"}
+        return {
+            "name": name,
+            "lane": lane,
+            "service": service,
+            "state": "running" if scale else "stopped",
+        }
 
     def update(self, *, lane: str, service: str, config: dict) -> dict[str, str]:
         name = self.container_name(lane, service)
         self._ensure_owned(name)
         scale = int(config.get("scale", 1))
         if scale not in {0, 1}:
-            raise CloudProviderError("Alice Cloud MVP supports scale 0 or 1", code="invalid_scale")
+            raise CloudProviderError(
+                "Alice Cloud MVP supports scale 0 or 1", code="invalid_scale"
+            )
         self._run("start" if scale else "stop", name)
-        return {"name": name, "lane": lane, "service": service, "state": "running" if scale else "stopped"}
+        return {
+            "name": name,
+            "lane": lane,
+            "service": service,
+            "state": "running" if scale else "stopped",
+        }
 
     def delete(self, *, lane: str, service: str) -> dict[str, str]:
         name = self.container_name(lane, service)
@@ -163,7 +185,9 @@ class DockerRuntime:
 
     def lifecycle(self, *, operation: str, name: str) -> dict[str, str]:
         if operation not in {"start", "stop", "restart"}:
-            raise CloudProviderError("Unsupported compute operation", code="unsupported_operation")
+            raise CloudProviderError(
+                "Unsupported compute operation", code="unsupported_operation"
+            )
         self._ensure_owned(name)
         self._run(operation, name)
         return {"name": name, "operation": operation, "status": "accepted"}
@@ -175,11 +199,17 @@ class DockerRuntime:
 
     def stats(self, *, name: str) -> dict:
         self._ensure_owned(name)
-        output = self._run("stats", "--no-stream", "--format", "{{json .}}", name).strip()
+        output = self._run(
+            "stats", "--no-stream", "--format", "{{json .}}", name
+        ).strip()
         try:
             value = json.loads(output)
         except json.JSONDecodeError as exc:
-            raise CloudProviderError("Invalid runtime response", code="invalid_runtime_response") from exc
+            raise CloudProviderError(
+                "Invalid runtime response", code="invalid_runtime_response"
+            ) from exc
         if not isinstance(value, dict):
-            raise CloudProviderError("Invalid runtime response", code="invalid_runtime_response")
+            raise CloudProviderError(
+                "Invalid runtime response", code="invalid_runtime_response"
+            )
         return value

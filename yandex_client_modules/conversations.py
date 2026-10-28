@@ -19,17 +19,23 @@ class YandexConversationMixin:
             headers = provider_request_headers(credential)
             self._log_request("POST", self.conversations_url, json={})
             resp = self._log_response(
-                self.session.post(self.conversations_url, json={}, headers=headers, timeout=10)
+                self.session.post(
+                    self.conversations_url, json={}, headers=headers, timeout=10
+                )
             )
             resp.raise_for_status()
             data = resp.json()
             provider_id = data.get("id") if isinstance(data, dict) else None
             if not isinstance(provider_id, str) or not provider_id.strip():
-                raise YandexClientError("Yandex conversation creation returned no provider ID")
+                raise YandexClientError(
+                    "Yandex conversation creation returned no provider ID"
+                )
             try:
                 provider_id = str(uuid.UUID(provider_id))
             except (ValueError, AttributeError) as exc:
-                raise YandexClientError("Yandex conversation ID is not a valid UUID") from exc
+                raise YandexClientError(
+                    "Yandex conversation ID is not a valid UUID"
+                ) from exc
             data["id"] = provider_id
             if execution_trace is not None:
                 execution_trace.add_event(
@@ -49,4 +55,6 @@ class YandexConversationMixin:
         try:
             return str(uuid.UUID(str(conv_id)))
         except (ValueError, TypeError, AttributeError) as exc:
-            raise YandexClientError("Conversation ID must be the Yandex provider UUID") from exc
+            raise YandexClientError(
+                "Conversation ID must be the Yandex provider UUID"
+            ) from exc

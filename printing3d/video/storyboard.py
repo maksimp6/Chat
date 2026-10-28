@@ -23,14 +23,19 @@ def load_storyboard(path: Path) -> dict[str, Any]:
     duration = data.get("duration_seconds")
     if type(duration) is not int or not 1 <= duration <= 30:
         raise ValueError("Duration must be an integer from 1 to 30 seconds")
-    if data["shot"] in {"exploded", "assembly"} and data.get("assembly_verified") is not True:
+    if (
+        data["shot"] in {"exploded", "assembly"}
+        and data.get("assembly_verified") is not True
+    ):
         raise ValueError("Assembly video requires verified assembly")
     if data.get("source_verified") is not True:
         raise ValueError("Video requires verified model source")
     return data
 
 
-def ffmpeg_command(frames_pattern: str, output: str, format_name: str, fps: int = 24) -> list[str]:
+def ffmpeg_command(
+    frames_pattern: str, output: str, format_name: str, fps: int = 24
+) -> list[str]:
     if format_name not in FORMATS:
         raise ValueError("Unsupported format")
     if fps not in (24, 30):

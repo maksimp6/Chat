@@ -31,7 +31,9 @@ class YandexApiKeyProvider:
         timeout: float = 30.0,
     ) -> None:
         self.iam_token = iam_token or env_get("YANDEX_IAM_TOKEN")
-        self.service_account_id = service_account_id or env_get("YANDEX_SERVICE_ACCOUNT_ID")
+        self.service_account_id = service_account_id or env_get(
+            "YANDEX_SERVICE_ACCOUNT_ID"
+        )
         raw_scopes = (
             list(scopes)
             if scopes is not None

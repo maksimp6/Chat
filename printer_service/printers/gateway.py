@@ -35,7 +35,10 @@ class PrinterGateway:
     """Explicit routing. Never silently falls back between LAN and cloud."""
 
     def __init__(
-        self, *, lan: PrinterBackend | None = None, cloud_api: PrinterBackend | None = None
+        self,
+        *,
+        lan: PrinterBackend | None = None,
+        cloud_api: PrinterBackend | None = None,
     ) -> None:
         self._backends = {Transport.LAN: lan, Transport.CLOUD_API: cloud_api}
 

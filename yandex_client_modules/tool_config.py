@@ -44,7 +44,10 @@ def _entries(value: Any, path: str) -> list[str]:
     entries = (
         part.strip()
         for item in values
-        for part in item.replace("\\r\\n", "\n").replace("\\n", "\n").replace(",", "\n").splitlines()
+        for part in item.replace("\\r\\n", "\n")
+        .replace("\\n", "\n")
+        .replace(",", "\n")
+        .splitlines()
     )
     return list(dict.fromkeys(entry for entry in entries if entry))
 
@@ -69,7 +72,11 @@ def normalize_tools_config(raw: Any) -> dict[str, Any]:
         if "enabled" in config:
             normalized["enabled"] = _enabled(config["enabled"], f"{path}.enabled")
         if name == "web_search":
-            if "context_size" in config and config["context_size"] not in ("low", "medium", "high"):
+            if "context_size" in config and config["context_size"] not in (
+                "low",
+                "medium",
+                "high",
+            ):
                 raise ValueError(f"{path}.context_size must be low, medium or high")
             for field in ("allowed_domains", "blocked_domains"):
                 if field in config:

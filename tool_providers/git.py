@@ -42,18 +42,24 @@ def write_op(func):
     return wrapper
 
 
-PROJECT_DIR = os.path.realpath(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PROJECT_DIR = os.path.realpath(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
 
 
 def _allowed_roots(cfg: dict) -> list[str]:
     # The same roots that relative repository names are searched under.
     base_dir = cfg.get("repos_base_dir") or "/sdcard/repo"
-    return [os.path.realpath(p) for p in (base_dir, "/sdcard/repo", "/sdcard", os.getcwd())]
+    return [
+        os.path.realpath(p) for p in (base_dir, "/sdcard/repo", "/sdcard", os.getcwd())
+    ]
 
 
 def _inside(path: str, roots: list[str]) -> bool:
     real = os.path.realpath(path)
-    return any(real == root or real.startswith(root.rstrip(os.sep) + os.sep) for root in roots)
+    return any(
+        real == root or real.startswith(root.rstrip(os.sep) + os.sep) for root in roots
+    )
 
 
 def _resolve_repo_path(repo_name: str = None, cfg: dict = None) -> str:
@@ -104,13 +110,18 @@ def _is_bare_repo(repo_path: str) -> bool:
         return False
 
 
-def _run_git(args: list, cfg: dict = None, repo_name: str = None, is_read: bool = False) -> dict:
+def _run_git(
+    args: list, cfg: dict = None, repo_name: str = None, is_read: bool = False
+) -> dict:
     cfg = cfg or {}
     repo_path = _resolve_repo_path(repo_name, cfg)
     timeout = cfg.get("timeout", 25)
 
     if not repo_path:
-        return {"success": False, "error": "Репозиторий не задан: укажите repo или repo_path"}
+        return {
+            "success": False,
+            "error": "Репозиторий не задан: укажите repo или repo_path",
+        }
     if not os.path.isdir(repo_path):
         return {"success": False, "error": f"Каталог не найден: {repo_path}"}
 
@@ -139,13 +150,17 @@ def _run_git(args: list, cfg: dict = None, repo_name: str = None, is_read: bool 
     cmd.extend(["-C", repo_path] + args)
 
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+        res = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout, check=False
+        )
         rel_name = os.path.basename(repo_path)
         out = res.stdout.strip()
         err = res.stderr.strip()
 
         # Если статус коммита "nothing to commit" — это не фатальный сбой, а информационный ответ
-        if res.returncode != 0 and ("nothing to commit" in out or "nothing to commit" in err):
+        if res.returncode != 0 and (
+            "nothing to commit" in out or "nothing to commit" in err
+        ):
             return {
                 "success": True,
                 "repo": rel_name,
@@ -178,7 +193,9 @@ def git_status(args: dict, cfg: dict) -> dict:
     repo_path = _resolve_repo_path(args.get("repo") or args.get("repo_path"), cfg)
     if _is_bare_repo(repo_path) and not args.get("work_tree"):
         branches = _run_git(["branch", "-a"], cfg, repo_path, is_read=True)
-        head = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], cfg, repo_path, is_read=True)
+        head = _run_git(
+            ["rev-parse", "--abbrev-ref", "HEAD"], cfg, repo_path, is_read=True
+        )
         return {
             "success": True,
             "is_bare": True,
@@ -190,7 +207,9 @@ def git_status(args: dict, cfg: dict) -> dict:
     status_args = ["status", "--short", "--branch"]
     if args.get("work_tree"):
         status_args = ["--work-tree", args["work_tree"]] + status_args
-    return _run_git(status_args, cfg, args.get("repo") or args.get("repo_path"), is_read=True)
+    return _run_git(
+        status_args, cfg, args.get("repo") or args.get("repo_path"), is_read=True
+    )
 
 
 @read_op
@@ -218,7 +237,9 @@ def git_diff(args: dict, cfg: dict) -> dict:
 
 @read_op
 def git_branches(args: dict, cfg: dict) -> dict:
-    return _run_git(["branch", "-a"], cfg, args.get("repo") or args.get("repo_path"), is_read=True)
+    return _run_git(
+        ["branch", "-a"], cfg, args.get("repo") or args.get("repo_path"), is_read=True
+    )
 
 
 # --- Запись ---
@@ -229,7 +250,10 @@ def git_add(args: dict, cfg: dict) -> dict:
     target = args.get("path") or args.get("files") or "."
     # "--" ends the options, so a path can never be read as one.
     return _run_git(
-        ["add", "--", target], cfg, args.get("repo") or args.get("repo_path"), is_read=False
+        ["add", "--", target],
+        cfg,
+        args.get("repo") or args.get("repo_path"),
+        is_read=False,
     )
 
 
@@ -357,7 +381,10 @@ TOOL_REGISTRY = {
         "description": "Получить diff изменений.",
         "parameters": {
             "type": "object",
-            "properties": {"file_path": {"type": "string"}, "repo_path": {"type": "string"}},
+            "properties": {
+                "file_path": {"type": "string"},
+                "repo_path": {"type": "string"},
+            },
             "required": [],
         },
     },
@@ -401,7 +428,10 @@ TOOL_REGISTRY = {
         "parameters": {
             "type": "object",
             "properties": {
-                "action": {"type": "string", "enum": ["list", "add", "set_url", "remove", "show"]},
+                "action": {
+                    "type": "string",
+                    "enum": ["list", "add", "set_url", "remove", "show"],
+                },
                 "name": {"type": "string"},
                 "url": {"type": "string"},
                 "repo_path": {"type": "string"},

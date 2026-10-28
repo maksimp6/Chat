@@ -66,10 +66,17 @@ class PricingRegistry:
                 existing.service,
                 existing.operation,
                 existing.model,
-            ) == (snapshot.provider, snapshot.service, snapshot.operation, snapshot.model)
+            ) == (
+                snapshot.provider,
+                snapshot.service,
+                snapshot.operation,
+                snapshot.model,
+            )
             # An overlapping window would make resolve() pick a tariff by accident.
             if same_price_line and _windows_overlap(existing, snapshot):
-                raise ValueError("pricing snapshot effective window overlaps an existing one")
+                raise ValueError(
+                    "pricing snapshot effective window overlaps an existing one"
+                )
         self._snapshots.append(snapshot)
 
     def resolve(
@@ -89,7 +96,9 @@ class PricingRegistry:
             and snapshot.operation == operation
             and snapshot.model == model
             and snapshot.effective_from <= effective_date
-            and (snapshot.effective_to is None or effective_date < snapshot.effective_to)
+            and (
+                snapshot.effective_to is None or effective_date < snapshot.effective_to
+            )
         ]
         if not candidates:
             raise KeyError("no applicable pricing snapshot")

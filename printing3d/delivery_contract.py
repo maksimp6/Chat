@@ -37,7 +37,9 @@ class UploadTransport(Protocol):
     def verify(self, remote_name: str, size: int) -> bool: ...
 
 
-def validate_job(path: Path, *, printer_model: str, approved_profile: str) -> ApprovedJob:
+def validate_job(
+    path: Path, *, printer_model: str, approved_profile: str
+) -> ApprovedJob:
     if printer_model != "A1 mini" or not approved_profile:
         raise InvalidPrintJob("printer model or approved profile missing")
     if path.suffix.lower() != ".3mf" or not path.name.endswith(".gcode.3mf"):
@@ -60,7 +62,8 @@ def validate_job(path: Path, *, printer_model: str, approved_profile: str) -> Ap
             if len(set(names)) != len(names):
                 raise InvalidPrintJob("duplicate archive members")
             if any(
-                name.startswith("/") or "\\" in name or ".." in Path(name).parts for name in names
+                name.startswith("/") or "\\" in name or ".." in Path(name).parts
+                for name in names
             ):
                 raise InvalidPrintJob("unsafe archive path")
             if "[Content_Types].xml" not in names:

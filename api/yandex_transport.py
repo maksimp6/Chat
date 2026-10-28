@@ -38,13 +38,17 @@ def _routes() -> tuple[tuple[str, str, re.Pattern[str], str], ...]:
         binding = entry["transport"]
         if binding["kind"] != "http":
             continue
-        template = binding["url_template"].replace("{{ api-host }}", "api.cloud.yandex.net")
+        template = binding["url_template"].replace(
+            "{{ api-host }}", "api.cloud.yandex.net"
+        )
         parsed = urlsplit(template)
         if parsed.scheme != "https" or "{{" in template:
             continue
         fields = re.split(r"(\{[^}]+\})", parsed.path)
         pattern = "".join(
-            "(?P<" + field[1:-1] + ">[^/]+)" if field.startswith("{") else re.escape(field)
+            "(?P<" + field[1:-1] + ">[^/]+)"
+            if field.startswith("{")
+            else re.escape(field)
             for field in fields
         )
         routes.append((binding["method"], parsed.netloc, re.compile(pattern), name))
@@ -79,7 +83,11 @@ def _file_size(file: Any) -> int:
 
 def _multipart(data: Any, files: Any, content_type: str) -> dict[str, Any]:
     if files is not None:
-        if not isinstance(files, dict) or set(files) != {"file"} or not isinstance(data, dict):
+        if (
+            not isinstance(files, dict)
+            or set(files) != {"file"}
+            or not isinstance(data, dict)
+        ):
             raise YandexRequestBlocked("invalid multipart file fields")
         file = files["file"]
         if isinstance(file, tuple):
@@ -114,9 +122,13 @@ def _multipart(data: Any, files: Any, content_type: str) -> dict[str, Any]:
                 size = len(part.get_payload(decode=True) or b"")
             elif name != "file" and name not in metadata:
                 try:
-                    metadata[name] = (part.get_payload(decode=True) or b"").decode("utf-8")
+                    metadata[name] = (part.get_payload(decode=True) or b"").decode(
+                        "utf-8"
+                    )
                 except UnicodeDecodeError:
-                    raise YandexRequestBlocked("invalid multipart metadata encoding") from None
+                    raise YandexRequestBlocked(
+                        "invalid multipart metadata encoding"
+                    ) from None
             else:
                 raise YandexRequestBlocked("duplicate multipart field")
     if size is None or not 0 < size <= 128 * 1024 * 1024:
@@ -131,14 +143,25 @@ def _multipart(data: Any, files: Any, content_type: str) -> dict[str, Any]:
 
 def _target(method: str, url: str, base_url: str | None) -> tuple[str, dict[str, str]]:
     parsed = urlsplit(url)
-    if parsed.scheme != "https" or parsed.username or parsed.password or parsed.fragment:
+    if (
+        parsed.scheme != "https"
+        or parsed.username
+        or parsed.password
+        or parsed.fragment
+    ):
         raise YandexRequestBlocked("invalid Yandex API target")
     host = parsed.netloc
     path = parsed.path
     if base_url is not None:
         base = urlsplit(base_url.rstrip("/"))
-        if base.scheme != "https" or host != base.netloc or not path.startswith(base.path + "/"):
-            raise YandexRequestBlocked("request is outside the configured Yandex API base")
+        if (
+            base.scheme != "https"
+            or host != base.netloc
+            or not path.startswith(base.path + "/")
+        ):
+            raise YandexRequestBlocked(
+                "request is outside the configured Yandex API base"
+            )
         # The configured AI Studio reverse proxy replaces the documented /v1 base.
         host = "ai.api.cloud.yandex.net"
         path = "/v1" + path[len(base.path) :]
@@ -154,7 +177,9 @@ def _target(method: str, url: str, base_url: str | None) -> tuple[str, dict[str,
             ):
                 raise YandexRequestBlocked("invalid Yandex API path parameter")
             return name, values
-    raise IncompleteYandexContract("no documented contract for outbound Yandex API route")
+    raise IncompleteYandexContract(
+        "no documented contract for outbound Yandex API route"
+    )
 
 
 def _query_schema(contract: dict[str, Any]) -> dict[str, Any]:
@@ -168,12 +193,18 @@ def _query_schema(contract: dict[str, Any]) -> dict[str, Any]:
 
 def _query_values(url: str, params: Any, properties: dict[str, Any]) -> dict[str, Any]:
     try:
-        pairs = parse_qsl(urlsplit(url).query, keep_blank_values=True, strict_parsing=True)
+        pairs = parse_qsl(
+            urlsplit(url).query, keep_blank_values=True, strict_parsing=True
+        )
         if params is not None:
             encoded = (
-                urlencode(params, doseq=True) if not isinstance(params, (str, bytes)) else params
+                urlencode(params, doseq=True)
+                if not isinstance(params, (str, bytes))
+                else params
             )
-            pairs.extend(parse_qsl(encoded, keep_blank_values=True, strict_parsing=True))
+            pairs.extend(
+                parse_qsl(encoded, keep_blank_values=True, strict_parsing=True)
+            )
     except (ValueError, TypeError, UnicodeDecodeError):
         raise YandexRequestBlocked("invalid query encoding") from None
     grouped: dict[str, list[str]] = {}
@@ -186,7 +217,9 @@ def _query_values(url: str, params: Any, properties: dict[str, Any]) -> dict[str
             result[name] = values
         elif len(values) != 1:
             raise YandexRequestBlocked("duplicate scalar query parameter")
-        elif spec.get("type") == "integer" and re.fullmatch(r"-?[0-9]{1,20}", values[0]):
+        elif spec.get("type") == "integer" and re.fullmatch(
+            r"-?[0-9]{1,20}", values[0]
+        ):
             result[name] = int(values[0])
         elif spec.get("type") == "boolean" and values[0] in ("true", "false"):
             result[name] = values[0] == "true"
@@ -220,7 +253,12 @@ def validate_yandex_request(
             raise YandexRequestBlocked("undocumented request location: " + part)
     mode = contract.get("body_format", "json")
     content_type = next(
-        (value for key, value in (headers or {}).items() if key.lower() == "content-type"), ""
+        (
+            value
+            for key, value in (headers or {}).items()
+            if key.lower() == "content-type"
+        ),
+        "",
     )
     if mode == "audio":
         if (
@@ -229,7 +267,9 @@ def validate_yandex_request(
             or not isinstance(data, bytes)
             or not 0 < len(data) <= 1024 * 1024
         ):
-            raise YandexRequestBlocked("audio request must contain 1..1048576 binary bytes")
+            raise YandexRequestBlocked(
+                "audio request must contain 1..1048576 binary bytes"
+            )
         return name
     if mode in ("multipart", "form"):
         if json_body is not None:
@@ -237,8 +277,13 @@ def validate_yandex_request(
         body = _multipart(data, files, content_type) if mode == "multipart" else data
         if mode == "form":
             if not isinstance(data, dict) or len(urlencode(data).encode()) > 15 * 1024:
-                raise YandexRequestBlocked("form body exceeds contract or has invalid encoding")
-            if any(not isinstance(value, (str, int, float, bool)) for value in data.values()):
+                raise YandexRequestBlocked(
+                    "form body exceeds contract or has invalid encoding"
+                )
+            if any(
+                not isinstance(value, (str, int, float, bool))
+                for value in data.values()
+            ):
                 raise YandexRequestBlocked(
                     "form values must be scalar; omitted values are not text"
                 )
@@ -256,7 +301,9 @@ def validate_yandex_request(
             not isinstance(data, (bytes, str))
             or content_type.split(";", 1)[0].strip().lower() != "application/json"
         ):
-            raise IncompleteYandexContract("non-JSON request body has no executable contract")
+            raise IncompleteYandexContract(
+                "non-JSON request body has no executable contract"
+            )
         try:
             body = json.loads(data)
             has_body = True
@@ -305,7 +352,9 @@ class _NoRedirect(HTTPRedirectHandler):
     def redirect_request(
         self, req: Any, fp: Any, code: int, msg: str, headers: Any, newurl: str
     ) -> None:
-        raise YandexRequestBlocked("Yandex API redirects require a separate validated request")
+        raise YandexRequestBlocked(
+            "Yandex API redirects require a separate validated request"
+        )
 
 
 def yandex_urlopen(request: Request, *, timeout: float) -> BinaryIO:
@@ -320,11 +369,19 @@ def yandex_urlopen(request: Request, *, timeout: float) -> BinaryIO:
 
 
 def yandex_connection_request(
-    connection: Any, host: str, method: str, path: str, *, body: Any = None, headers: Any = None
+    connection: Any,
+    host: str,
+    method: str,
+    path: str,
+    *,
+    body: Any = None,
+    headers: Any = None,
 ) -> None:
     """http.client adapter: validation runs before connection.request can open a socket."""
     actual_host = getattr(connection, "host", host)
     if isinstance(actual_host, str) and actual_host != host:
         raise YandexRequestBlocked("connection host differs from validated API target")
-    validate_yandex_request(method, "https://" + host + path, data=body, headers=headers)
+    validate_yandex_request(
+        method, "https://" + host + path, data=body, headers=headers
+    )
     connection.request(method, path, body=body, headers=headers or {})

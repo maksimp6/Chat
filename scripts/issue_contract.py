@@ -43,10 +43,16 @@ def _sections(body: str) -> dict[str, str]:
 def validate_issue_body(body: str) -> list[str]:
     """Return the problems found, in a stable order; an empty list means admitted."""
     sections = _sections(body or "")
-    problems = [f"missing section: {name}" for name in REQUIRED_SECTIONS if name not in sections]
+    problems = [
+        f"missing section: {name}" for name in REQUIRED_SECTIONS if name not in sections
+    ]
     role_section = sections.get("Role")
     if role_section is not None:
-        selected = [text for mark, text in _CHECKBOX.findall(role_section) if mark.lower() == "x"]
+        selected = [
+            text
+            for mark, text in _CHECKBOX.findall(role_section)
+            if mark.lower() == "x"
+        ]
         if not selected:
             problems.append("role is not selected")
         elif not any(text in ROLES for text in selected):

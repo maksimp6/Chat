@@ -68,7 +68,9 @@ async def generate_realtime(
     tts_only = model == TTS_MODEL
     if tts_only and not text:
         raise RealtimeError("Speech TTS Live принимает текст для озвучивания")
-    result = RealtimeResult(transcript=text or "", transcription_status="completed" if text else "pending")
+    result = RealtimeResult(
+        transcript=text or "", transcription_status="completed" if text else "pending"
+    )
     modalities = ["text"] if response_mode == "text" else ["audio"]
     audio_options = {
         "output": {
@@ -103,6 +105,7 @@ async def generate_realtime(
         close_timeout=5,
         max_size=None,
     ) as websocket:
+
         async def send(event: dict) -> None:
             if cancelled():
                 raise RealtimeError("Голосовая сессия отменена")
@@ -122,15 +125,21 @@ async def generate_realtime(
                 try:
                     event = json.loads(raw)
                 except (ValueError, TypeError):
-                    raise RealtimeError("Realtime вернул некорректное событие") from None
+                    raise RealtimeError(
+                        "Realtime вернул некорректное событие"
+                    ) from None
                 if not isinstance(event, dict):
                     raise RealtimeError("Realtime вернул некорректное событие")
                 if event.get("type") == "error":
                     # Provider messages may echo request material. Only expose the
                     # structural error code and keep credentials out of exceptions.
                     error = event.get("error") or {}
-                    code = str(error.get("code") or error.get("type") or "provider_error")
-                    safe_code = "".join(c for c in code if c.isalnum() or c in "_-")[:80]
+                    code = str(
+                        error.get("code") or error.get("type") or "provider_error"
+                    )
+                    safe_code = "".join(c for c in code if c.isalnum() or c in "_-")[
+                        :80
+                    ]
                     raise RealtimeError("Realtime отклонил запрос: " + safe_code)
                 return event
 
@@ -143,36 +152,52 @@ async def generate_realtime(
             for message in history:
                 message_role = message.get("role")
                 message_text = message.get("text")
-                if message_role not in {"system", "user", "assistant"} or not isinstance(message_text, str):
+                if message_role not in {
+                    "system",
+                    "user",
+                    "assistant",
+                } or not isinstance(message_text, str):
                     continue
                 if not message_text:
                     continue
-                await send({
+                await send(
+                    {
+                        "type": "conversation.item.create",
+                        "item": {
+                            "type": "message",
+                            "role": message_role,
+                            "content": [
+                                {
+                                    "type": "output_text"
+                                    if message_role == "assistant"
+                                    else "input_text",
+                                    "text": message_text,
+                                }
+                            ],
+                        },
+                    }
+                )
+        if text:
+            await send(
+                {
                     "type": "conversation.item.create",
                     "item": {
                         "type": "message",
-                        "role": message_role,
-                        "content": [{
-                            "type": "output_text" if message_role == "assistant" else "input_text",
-                            "text": message_text,
-                        }],
+                        "role": "user",
+                        "content": [{"type": "input_text", "text": text}],
                     },
-                })
-        if text:
-            await send({
-                "type": "conversation.item.create",
-                "item": {
-                    "type": "message",
-                    "role": "user",
-                    "content": [{"type": "input_text", "text": text}],
-                },
-            })
+                }
+            )
         else:
             for offset in range(0, len(pcm), 32768):
-                await send({
-                    "type": "input_audio_buffer.append",
-                    "audio": base64.b64encode(pcm[offset:offset + 32768]).decode("ascii"),
-                })
+                await send(
+                    {
+                        "type": "input_audio_buffer.append",
+                        "audio": base64.b64encode(pcm[offset : offset + 32768]).decode(
+                            "ascii"
+                        ),
+                    }
+                )
             await send({"type": "input_audio_buffer.commit"})
         await send({"type": "response.create"})
 
@@ -193,8 +218,14 @@ async def generate_realtime(
             event_type = event.get("type")
             if event_type == "conversation.item.input_audio_transcription.completed":
                 result.transcript = str(event.get("transcript") or "").strip()
-                result.transcription_status = "completed" if result.transcript else "empty"
-                emit(event_type, transcript=result.transcript, item_id=event.get("item_id"))
+                result.transcription_status = (
+                    "completed" if result.transcript else "empty"
+                )
+                emit(
+                    event_type,
+                    transcript=result.transcript,
+                    item_id=event.get("item_id"),
+                )
                 if response_finished:
                     return result
             elif event_type == "conversation.item.input_audio_transcription.failed":
@@ -211,12 +242,16 @@ async def generate_realtime(
                 result.reply = str(event.get("transcript") or result.reply)
             elif event_type == "response.output_audio.delta":
                 try:
-                    result.audio.extend(base64.b64decode(event.get("delta") or "", validate=True))
+                    result.audio.extend(
+                        base64.b64decode(event.get("delta") or "", validate=True)
+                    )
                 except (ValueError, TypeError):
                     raise RealtimeError("Realtime вернул некорректное аудио") from None
                 # Never retain more audio than the session can play within its TTL.
                 if len(result.audio) > OUTPUT_RATE * 2 * timeout:
-                    raise RealtimeError("Аудио превышает время хранения голосовой сессии")
+                    raise RealtimeError(
+                        "Аудио превышает время хранения голосовой сессии"
+                    )
             elif event_type == "response.done":
                 response_finished = True
                 response = event.get("response") or {}
@@ -224,7 +259,9 @@ async def generate_realtime(
                     raise RealtimeError("Realtime вернул некорректный итог ответа")
                 result.status = str(response.get("status") or "failed")
                 details = response.get("status_details")
-                if "error" in response or (isinstance(details, dict) and "error" in details):
+                if "error" in response or (
+                    isinstance(details, dict) and "error" in details
+                ):
                     result.status = "failed"
                 result.response_id = response.get("id")
                 usage = response.get("usage")
@@ -234,7 +271,9 @@ async def generate_realtime(
                 if not result.reply:
                     for item in response.get("output") or []:
                         for part in item.get("content") or []:
-                            result.reply += str(part.get("text") or part.get("transcript") or "")
+                            result.reply += str(
+                                part.get("text") or part.get("transcript") or ""
+                            )
                 if tts_only and not result.reply:
                     result.reply = text or ""
                 if result.transcription_status != "pending":

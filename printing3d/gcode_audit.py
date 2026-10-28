@@ -86,8 +86,13 @@ def audit_job(path: str | Path, passport: dict[str, Any]) -> dict[str, Any]:
         if archive.testzip() is not None or not REQUIRED.issubset(archive.namelist()):
             raise ValueError("invalid sliced archive")
         gcode_bytes = archive.read("Metadata/plate_1.gcode")
-        expected_md5 = archive.read("Metadata/plate_1.gcode.md5").decode("ascii").strip()
-        if hashlib.md5(gcode_bytes, usedforsecurity=False).hexdigest().lower() != expected_md5.lower():
+        expected_md5 = (
+            archive.read("Metadata/plate_1.gcode.md5").decode("ascii").strip()
+        )
+        if (
+            hashlib.md5(gcode_bytes, usedforsecurity=False).hexdigest().lower()
+            != expected_md5.lower()
+        ):
             raise ValueError("G-code MD5 mismatch")
         settings = json.loads(archive.read("Metadata/project_settings.config"))
         plate = json.loads(archive.read("Metadata/plate_1.json"))
@@ -106,7 +111,10 @@ def audit_job(path: str | Path, passport: dict[str, Any]) -> dict[str, Any]:
     if not (0 <= x0 < x1 <= bed[0] and 0 <= y0 < y1 <= bed[1]):
         raise ValueError("print area outside bed")
     gcode = gcode_bytes.decode("utf-8")
-    if not gcode.startswith("; HEADER_BLOCK_START") or "; EXECUTABLE_BLOCK_END" not in gcode:
+    if (
+        not gcode.startswith("; HEADER_BLOCK_START")
+        or "; EXECUTABLE_BLOCK_END" not in gcode
+    ):
         raise ValueError("incomplete Bambu G-code")
     count, extrusion = _verify_toolpaths(gcode, bed)
     return {
@@ -120,7 +128,9 @@ def audit_job(path: str | Path, passport: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def audit_passport(passport: dict[str, Any], job_path: str | Path | None = None) -> dict[str, Any]:
+def audit_passport(
+    passport: dict[str, Any], job_path: str | Path | None = None
+) -> dict[str, Any]:
     if not passport.get("id") or passport.get("schema_version") != 1:
         raise ValueError("invalid model passport")
     if not passport.get("source_sha256") or not re.fullmatch(
@@ -149,13 +159,20 @@ def verify_target_printer(
     model names or a matching source G-code hash alone cannot approve printing.
     """
     target = passport["target_printer"]
-    if observed.get("host") != target["host"] or observed.get("model") != target["model"]:
+    if (
+        observed.get("host") != target["host"]
+        or observed.get("model") != target["model"]
+    ):
         raise ValueError("wrong physical printer")
-    if not observed.get("authenticated_mqtt") or not observed.get("ftps_certificate_pin_verified"):
+    if not observed.get("authenticated_mqtt") or not observed.get(
+        "ftps_certificate_pin_verified"
+    ):
         raise ValueError("device authentication not verified")
     if not observed.get("serial_match_verified"):
         raise ValueError("device serial not independently matched")
-    if not observed.get("firmware_version") or not observed.get("firmware_compatibility_verified"):
+    if not observed.get("firmware_version") or not observed.get(
+        "firmware_compatibility_verified"
+    ):
         raise ValueError("firmware compatibility unknown")
     if job_sha256 is not None:
         if not re.fullmatch("[0-9a-f]{64}", job_sha256):

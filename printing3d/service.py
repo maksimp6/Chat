@@ -36,17 +36,29 @@ def calculate_quote(data: dict) -> dict:
         raise ValueError("quote input must be an object")
 
     grams = decimal_field(data.get("material_grams", 0), "material_grams")
-    material_cost_per_kg = decimal_field(data.get("material_cost_per_kg", 0), "material_cost_per_kg")
+    material_cost_per_kg = decimal_field(
+        data.get("material_cost_per_kg", 0), "material_cost_per_kg"
+    )
     print_hours = decimal_field(data.get("print_hours", 0), "print_hours")
-    power_watts = decimal_field(data.get("printer_power_watts", 120), "printer_power_watts")
+    power_watts = decimal_field(
+        data.get("printer_power_watts", 120), "printer_power_watts"
+    )
     electricity_per_kwh = decimal_field(
         data.get("electricity_cost_per_kwh", 0), "electricity_cost_per_kwh"
     )
-    depreciation_per_hour = decimal_field(data.get("depreciation_per_hour", 0), "depreciation_per_hour")
+    depreciation_per_hour = decimal_field(
+        data.get("depreciation_per_hour", 0), "depreciation_per_hour"
+    )
     packaging_cost = decimal_field(data.get("packaging_cost", 0), "packaging_cost")
-    failure_rate = decimal_field(data.get("failure_rate_percent", 10), "failure_rate_percent")
-    platform_fee = decimal_field(data.get("platform_fee_percent", 0), "platform_fee_percent")
-    margin = decimal_field(data.get("target_margin_percent", 30), "target_margin_percent")
+    failure_rate = decimal_field(
+        data.get("failure_rate_percent", 10), "failure_rate_percent"
+    )
+    platform_fee = decimal_field(
+        data.get("platform_fee_percent", 0), "platform_fee_percent"
+    )
+    margin = decimal_field(
+        data.get("target_margin_percent", 30), "target_margin_percent"
+    )
 
     if failure_rate >= 100:
         raise ValueError("failure_rate_percent must be < 100")
@@ -146,7 +158,9 @@ def get_order(store: PrintStore, owner_id: str, order_id: str) -> dict | None:
     return _row_to_order(row) if row is not None else None
 
 
-def list_orders(store: PrintStore, owner_id: str, *, status: str | None = None) -> list[dict]:
+def list_orders(
+    store: PrintStore, owner_id: str, *, status: str | None = None
+) -> list[dict]:
     if status and status not in ORDER_STATUSES:
         raise ValueError("invalid order status")
     rows = [
@@ -172,7 +186,14 @@ def update_order_status(
             # other status would drop its revenue and profit from the totals.
             if row.get("settled_at"):
                 raise ValueError("settled order status cannot change")
-            tx.set(key, {**row, "status": status, "updated_at": datetime.now(UTC).replace(tzinfo=None).isoformat()})
+            tx.set(
+                key,
+                {
+                    **row,
+                    "status": status,
+                    "updated_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
+                },
+            )
     return get_order(store, owner_id, order_id)
 
 
@@ -278,7 +299,12 @@ def get_financial_summary(store: PrintStore, owner_id: str) -> dict:
 
 
 def _publish_settlement(
-    store: PrintStore, owner_id: str, order_id: str, revenue: float, cost: float, now: str
+    store: PrintStore,
+    owner_id: str,
+    order_id: str,
+    revenue: float,
+    cost: float,
+    now: str,
 ) -> None:
     key = "printing/order/" + order_id
     with store.transaction() as tx:
@@ -324,7 +350,9 @@ def record_printer_downtime(
     key = "printing/downtime/" + owner_id + "/" + printer_id
     with get_store().transaction() as tx:
         snapshot = tx.get(key)
-        tracker = DowntimeTracker.from_snapshot(snapshot) if snapshot else DowntimeTracker()
+        tracker = (
+            DowntimeTracker.from_snapshot(snapshot) if snapshot else DowntimeTracker()
+        )
         changed = tracker.observe(state, timestamp, reason=reason, event_id=event_id)
         if changed:
             tx.set(key, tracker.snapshot())
@@ -381,8 +409,12 @@ def expire_printer_telemetry(
     key = "printing/downtime/" + owner_id + "/" + printer_id
     with get_store().transaction() as tx:
         snapshot = tx.get(key)
-        tracker = DowntimeTracker.from_snapshot(snapshot) if snapshot else DowntimeTracker()
-        changed = expire_telemetry(tracker, last_seen=last_seen, now=now, timeout=timeout)
+        tracker = (
+            DowntimeTracker.from_snapshot(snapshot) if snapshot else DowntimeTracker()
+        )
+        changed = expire_telemetry(
+            tracker, last_seen=last_seen, now=now, timeout=timeout
+        )
         if changed:
             tx.set(key, tracker.snapshot())
     return changed

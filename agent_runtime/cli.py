@@ -27,8 +27,12 @@ class CliClient:
         timeout: float = DEFAULT_TIMEOUT,
         session: requests.Session | None = None,
     ) -> None:
-        self.base_url = (base_url or env_get("LOGOS_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
-        self.model = (model or env_get("LOGOS_MODEL") or DEFAULT_MODEL).strip() or DEFAULT_MODEL
+        self.base_url = (
+            base_url or env_get("LOGOS_BASE_URL") or DEFAULT_BASE_URL
+        ).rstrip("/")
+        self.model = (
+            model or env_get("LOGOS_MODEL") or DEFAULT_MODEL
+        ).strip() or DEFAULT_MODEL
         self.timeout = float(timeout)
         self.http = session or requests.Session()
 
@@ -57,7 +61,9 @@ class CliClient:
             data = response.json()
         except ValueError as exc:
             if response.status_code >= 400:
-                raise CliError(f"Logos HTTP {response.status_code}: request failed") from exc
+                raise CliError(
+                    f"Logos HTTP {response.status_code}: request failed"
+                ) from exc
             raise CliError("Logos backend returned invalid JSON") from exc
 
         if response.status_code >= 400:

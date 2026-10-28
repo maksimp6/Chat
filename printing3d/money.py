@@ -17,10 +17,14 @@ def decimal_field(
 
 
 @overload
-def decimal_field(value: Any, name: str, *, minimum: str = "0", nullable: Literal[True]) -> Decimal | None: ...
+def decimal_field(
+    value: Any, name: str, *, minimum: str = "0", nullable: Literal[True]
+) -> Decimal | None: ...
 
 
-def decimal_field(value: Any, name: str, *, minimum: str = "0", nullable: bool = False) -> Decimal | None:
+def decimal_field(
+    value: Any, name: str, *, minimum: str = "0", nullable: bool = False
+) -> Decimal | None:
     if value is None and nullable:
         return None
     try:

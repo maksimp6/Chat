@@ -35,7 +35,9 @@ from provider_accounts.quotas import (
 )
 
 
-def _transport_timeout(params: dict[str, Any], key: str, default: float, maximum: float) -> float:
+def _transport_timeout(
+    params: dict[str, Any], key: str, default: float, maximum: float
+) -> float:
     """Validate local transport limits without sending them as provider fields."""
     value = params.get(key, default)
     if (
@@ -59,7 +61,9 @@ def _capture_request_input(
         return
     manifest = build_request_manifest(payload)
     correlation_id = (
-        execution_trace.get_step_correlation_id(step) if traced and step is not None else None
+        execution_trace.get_step_correlation_id(step)
+        if traced and step is not None
+        else None
     )
     if traced:
         execution_trace.add_event(
@@ -246,7 +250,9 @@ class YandexRequestMixin:
         url = self.responses_url
         # Photos share Responses input and the existing conversation/tool loop.
         if isinstance(execution_trace, ExecutionTrace):
-            execution_trace.add_event("ultra_profile_applied", ultra_applied_event(model_key, params, payload))
+            execution_trace.add_event(
+                "ultra_profile_applied", ultra_applied_event(model_key, params, payload)
+            )
 
         # Reserved after the payload is built, so a request rejected for its parameters uses no quota.
         quota_reservation = None
@@ -254,8 +260,12 @@ class YandexRequestMixin:
             quota_reservation = reserve_request(quota_user_id)
         except ProviderQuotaExceeded as exc:
             if execution_trace and isinstance(execution_trace, ExecutionTrace):
-                execution_trace.add_event("provider_quota_denied", exc.to_dict()["error"])
-                execution_trace.record_error("provider_quota", str(exc), error_type=exc.code)
+                execution_trace.add_event(
+                    "provider_quota_denied", exc.to_dict()["error"]
+                )
+                execution_trace.record_error(
+                    "provider_quota", str(exc), error_type=exc.code
+                )
             raise
         if (
             execution_trace
@@ -277,7 +287,9 @@ class YandexRequestMixin:
             trace_step_number = len(execution_trace.trace.get("api_requests", [])) + 1
 
         self._log_request("POST", url, json=payload)
-        _capture_request_input(execution_trace, payload, trace_step_number, on_provider_input)
+        _capture_request_input(
+            execution_trace, payload, trace_step_number, on_provider_input
+        )
         request_start_timestamp = time.time()
         request_start_perf = time.perf_counter()
         if execution_trace and isinstance(execution_trace, ExecutionTrace):
@@ -293,7 +305,9 @@ class YandexRequestMixin:
                     "method": "POST",
                     "url": url,
                     "step": trace_step_number,
-                    "correlation_id": execution_trace.get_step_correlation_id(trace_step_number),
+                    "correlation_id": execution_trace.get_step_correlation_id(
+                        trace_step_number
+                    ),
                     "payload": _sanitize_for_log(payload),
                 },
             )
@@ -339,14 +353,18 @@ class YandexRequestMixin:
                         "detail": error_detail,
                         "start_timestamp": request_start_timestamp,
                         "end_timestamp": error_timestamp,
-                        "timing_ms": round((time.perf_counter() - request_start_perf) * 1000, 2),
+                        "timing_ms": round(
+                            (time.perf_counter() - request_start_perf) * 1000, 2
+                        ),
                     },
                 )
 
             raise YandexClientError(error_message, status_code=status_code) from e
 
         request_end_timestamp = time.time()
-        request_duration_ms = round((time.perf_counter() - request_start_perf) * 1000, 2)
+        request_duration_ms = round(
+            (time.perf_counter() - request_start_perf) * 1000, 2
+        )
 
         try:
             data = resp.json()
@@ -404,14 +422,20 @@ class YandexRequestMixin:
             # and checkpoints receive a safe failure object, never a scalar.
             data = {
                 "status": "failed",
-                "error": {"code": "provider_invalid_response", "type": "invalid_response"},
+                "error": {
+                    "code": "provider_invalid_response",
+                    "type": "invalid_response",
+                },
                 "output": [],
             }
         if on_provider_response is not None:
             on_provider_response(data)
         task_id = data.get("id")
         status = data.get("status")
-        if status in ("completed", "incomplete", "failed", "cancelled") or data.get("error") is not None:
+        if (
+            status in ("completed", "incomplete", "failed", "cancelled")
+            or data.get("error") is not None
+        ):
             _record_quota_usage(execution_trace, quota_reservation, data)
             return data
         if not task_id:
@@ -428,4 +452,3 @@ class YandexRequestMixin:
             on_provider_response(result)
         _record_quota_usage(execution_trace, quota_reservation, result)
         return result
-

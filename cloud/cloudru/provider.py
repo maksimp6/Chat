@@ -21,7 +21,9 @@ def _resource_id(value: Any) -> str:
     """A resource id goes into a request path, so only a plain identifier is accepted."""
     text = str(value or "").strip()
     if not _RESOURCE_ID.fullmatch(text):
-        raise CloudProviderError("resource id is not a valid identifier", code="validation_error")
+        raise CloudProviderError(
+            "resource id is not a valid identifier", code="validation_error"
+        )
     return text
 
 
@@ -40,7 +42,9 @@ class CloudRuProvider:
     }
 
     def __init__(
-        self, client: CloudRuClient | None = None, iam_client: CloudRuIamClient | None = None
+        self,
+        client: CloudRuClient | None = None,
+        iam_client: CloudRuIamClient | None = None,
     ) -> None:
         self.client = client or CloudRuClient(iam_client=iam_client, api_key_auth=False)
         self.iam_client = iam_client
@@ -85,13 +89,16 @@ class CloudRuProvider:
                     "CLOUDRU_OBSERVABILITY_ENDPOINT", "CLOUDRU_OBSERVABILITY_LOGS_PATH"
                 )
                 or self._service_enabled(
-                    "CLOUDRU_OBSERVABILITY_ENDPOINT", "CLOUDRU_OBSERVABILITY_METRICS_PATH"
+                    "CLOUDRU_OBSERVABILITY_ENDPOINT",
+                    "CLOUDRU_OBSERVABILITY_METRICS_PATH",
                 ),
                 "operations": ["logs_query", "metrics_query"],
                 "notes": "Set CLOUDRU_OBSERVABILITY_* endpoint/path values.",
             },
             "backup": {
-                "enabled": self._service_enabled("CLOUDRU_BACKUP_ENDPOINT", "CLOUDRU_BACKUP_PATH"),
+                "enabled": self._service_enabled(
+                    "CLOUDRU_BACKUP_ENDPOINT", "CLOUDRU_BACKUP_PATH"
+                ),
                 "operations": ["create", "list", "restore", "delete"],
                 "notes": "Set CLOUDRU_BACKUP_ENDPOINT and CLOUDRU_BACKUP_PATH.",
             },
@@ -161,7 +168,9 @@ class CloudRuProvider:
             requested = str(resource_type or "service_account").strip().lower()
             if requested in {"service_account", "service_accounts"}:
                 items = iam.list_service_accounts()
-                normalized = normalize_resources(self.name, "iam", "service_account", items)
+                normalized = normalize_resources(
+                    self.name, "iam", "service_account", items
+                )
                 return {
                     "provider": self.name,
                     "service": "iam",
@@ -170,7 +179,9 @@ class CloudRuProvider:
                     "raw_count": len(items),
                 }
             if requested in {"api_key", "api_keys"}:
-                service_account_id = str((filters or {}).get("service_account_id") or "").strip()
+                service_account_id = str(
+                    (filters or {}).get("service_account_id") or ""
+                ).strip()
                 if not service_account_id:
                     raise CloudProviderError(
                         "service_account_id filter is required for IAM api_key inventory",
@@ -198,7 +209,9 @@ class CloudRuProvider:
                         "enabled filter must be a boolean value",
                         code="validation_error",
                     )
-                items = iam.list_api_keys(service_account_id=service_account_id, enabled=enabled)
+                items = iam.list_api_keys(
+                    service_account_id=service_account_id, enabled=enabled
+                )
                 normalized = normalize_resources(self.name, "iam", "api_key", items)
                 return {
                     "provider": self.name,
@@ -234,7 +247,12 @@ class CloudRuProvider:
             path,
             params=dict(filters or {}),
         )
-        raw_items = payload.get("items") or payload.get("resources") or payload.get("data") or []
+        raw_items = (
+            payload.get("items")
+            or payload.get("resources")
+            or payload.get("data")
+            or []
+        )
         if not isinstance(raw_items, list):
             raise CloudProviderError(
                 f"Cloud.ru {service_name} list payload is invalid",
@@ -251,7 +269,10 @@ class CloudRuProvider:
             "service": service_name,
             "resource_type": normalized_type,
             "resources": normalize_resources(
-                self.name, service_name, normalized_type, [dict(item) for item in raw_items]
+                self.name,
+                service_name,
+                normalized_type,
+                [dict(item) for item in raw_items],
             ),
             "raw_count": len(raw_items),
         }
@@ -278,7 +299,9 @@ class CloudRuProvider:
                                 self.name, "iam", "service_account", account
                             ),
                         }
-                raise CloudProviderError("IAM service account not found", code="not_found")
+                raise CloudProviderError(
+                    "IAM service account not found", code="not_found"
+                )
             if requested in {"api_key", "api_keys"}:
                 raise CloudProviderError(
                     "IAM api_key lookup requires service_account_id context; use cloud.resources.list",
@@ -303,7 +326,9 @@ class CloudRuProvider:
                 code="unsupported_capability",
             )
         safe_id = quote(_resource_id(resource_id), safe="")
-        payload = self.client.request(service_name, "GET", f"{base_path.rstrip('/')}/{safe_id}")
+        payload = self.client.request(
+            service_name, "GET", f"{base_path.rstrip('/')}/{safe_id}"
+        )
         return {
             "provider": self.name,
             "service": service_name,
@@ -331,25 +356,37 @@ class CloudRuProvider:
             )
 
         if op == "list":
-            return self.list_resources(service="compute", resource_type="instance", filters=extra)
+            return self.list_resources(
+                service="compute", resource_type="instance", filters=extra
+            )
         if op == "status":
             if not instance_id:
-                raise CloudProviderError("instance_id is required", code="validation_error")
+                raise CloudProviderError(
+                    "instance_id is required", code="validation_error"
+                )
             safe_id = quote(_resource_id(instance_id), safe="")
-            payload = self.client.request("compute", "GET", f"{path.rstrip('/')}/{safe_id}")
+            payload = self.client.request(
+                "compute", "GET", f"{path.rstrip('/')}/{safe_id}"
+            )
             return {
                 "provider": self.name,
                 "operation": op,
-                "resource": normalize_resource(self.name, "compute", "instance", payload),
+                "resource": normalize_resource(
+                    self.name, "compute", "instance", payload
+                ),
             }
         if op in {"start", "stop", "reboot"}:
             if not instance_id:
-                raise CloudProviderError("instance_id is required", code="validation_error")
+                raise CloudProviderError(
+                    "instance_id is required", code="validation_error"
+                )
             instance_id = _resource_id(instance_id)
             action_template = env_get("CLOUDRU_COMPUTE_ACTION_PATH", "").strip()
             if action_template:
                 try:
-                    action_path = action_template.format(instance_id=instance_id, operation=op)
+                    action_path = action_template.format(
+                        instance_id=instance_id, operation=op
+                    )
                 except Exception as exc:
                     raise CloudProviderError(
                         "CLOUDRU_COMPUTE_ACTION_PATH template is invalid",
@@ -367,7 +404,11 @@ class CloudRuProvider:
                 "POST",
                 action_path,
                 # The fields this operation sets come last, so caller extras cannot change them.
-                json_body={**dict(extra or {}), "instance_id": instance_id, "operation": op},
+                json_body={
+                    **dict(extra or {}),
+                    "instance_id": instance_id,
+                    "operation": op,
+                },
             )
             return {
                 "provider": self.name,
@@ -395,7 +436,11 @@ class CloudRuProvider:
             "observability",
             "POST",
             path,
-            json_body={"query": query, "service": service, "limit": clamp_integer(1, int(limit), 1000)},
+            json_body={
+                "query": query,
+                "service": service,
+                "limit": clamp_integer(1, int(limit), 1000),
+            },
         )
         entries = payload.get("items") or payload.get("logs") or []
         return {
@@ -449,7 +494,9 @@ class CloudRuProvider:
         options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         path = env_get("CLOUDRU_BACKUP_PATH", "").strip()
-        if not path.startswith("/") or not self._path_enabled("backup", "CLOUDRU_BACKUP_PATH"):
+        if not path.startswith("/") or not self._path_enabled(
+            "backup", "CLOUDRU_BACKUP_PATH"
+        ):
             raise CloudProviderError(
                 "Cloud.ru backup endpoint/path is not configured",
                 code="unsupported_capability",
@@ -467,8 +514,14 @@ class CloudRuProvider:
             "backup",
             method,
             path,
-            params={"resource_id": resource_id} if method == "GET" and resource_id else None,
-            json_body={**dict(options or {}), "operation": op, "resource_id": resource_id}
+            params={"resource_id": resource_id}
+            if method == "GET" and resource_id
+            else None,
+            json_body={
+                **dict(options or {}),
+                "operation": op,
+                "resource_id": resource_id,
+            }
             if method == "POST"
             else None,
         )
@@ -494,7 +547,9 @@ class CloudRuProvider:
             "billing",
             "GET",
             path,
-            params={k: v for k, v in {"period": period, "group_by": group_by}.items() if v},
+            params={
+                k: v for k, v in {"period": period, "group_by": group_by}.items() if v
+            },
         )
         totals = parse_consumption_total(payload)
         total_cost = totals["total_cost"]

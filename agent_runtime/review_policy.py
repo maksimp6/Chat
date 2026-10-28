@@ -1,4 +1,5 @@
 """Trusted source-file scope for the headless read-only Issue worker."""
+
 from core.env import env_get
 
 from dataclasses import dataclass, field
@@ -16,8 +17,12 @@ ISSUE_READ_TOOLS = frozenset(
     {"read_file", "python_ast_outline", "calculate_hash", "file_stat", "list_directory"}
 )
 ISSUE_REVIEW_POLICY = ReadOnlyToolPolicy(ISSUE_READ_TOOLS, name="issue-review-v1")
-SENSITIVE_SUFFIXES = frozenset({".pem", ".key", ".jks", ".keystore", ".p12", ".pfx", ".memory"})
-SENSITIVE_NAMES = frozenset({"credentials.json", "service_account.json", "id_rsa", "id_ed25519"})
+SENSITIVE_SUFFIXES = frozenset(
+    {".pem", ".key", ".jks", ".keystore", ".p12", ".pfx", ".memory"}
+)
+SENSITIVE_NAMES = frozenset(
+    {"credentials.json", "service_account.json", "id_rsa", "id_ed25519"}
+)
 
 
 def _is_source_path(path: Path) -> bool:
@@ -39,7 +44,9 @@ class RepositoryReviewPolicy(ReadOnlyToolPolicy):
         object.__setattr__(self, "root", self.root.resolve())
         object.__setattr__(self, "source_files", frozenset(self.source_files))
 
-    def __call__(self, definition: UniversalToolDefinition, call: UniversalToolCall) -> bool:
+    def __call__(
+        self, definition: UniversalToolDefinition, call: UniversalToolCall
+    ) -> bool:
         if not self.allows_tool(definition):
             return False
         from tool_providers import filesystem
@@ -51,7 +58,9 @@ class RepositoryReviewPolicy(ReadOnlyToolPolicy):
         if not isinstance(raw_path, str) or Path(raw_path).is_absolute():
             return False
         try:
-            relative = (self.root / raw_path).resolve().relative_to(self.root).as_posix()
+            relative = (
+                (self.root / raw_path).resolve().relative_to(self.root).as_posix()
+            )
         except (OSError, ValueError, RuntimeError):
             return False
         if definition.name == "list_directory":
@@ -69,19 +78,28 @@ def require_external_review_store(repo_root: Path) -> None:
         raise PermissionError("Issue review cannot inherit an active runtime context")
     configured = env_get("LOGOS_MEMORY_PATH", "").strip()
     if not configured:
-        raise PermissionError("Issue review requires an explicit external LOGOS_MEMORY_PATH")
+        raise PermissionError(
+            "Issue review requires an explicit external LOGOS_MEMORY_PATH"
+        )
     root = repo_root.resolve()
     location = Path(configured).expanduser().resolve()
     if location == root or root in location.parents:
-        raise PermissionError("Issue review storage must be outside the permitted checkout")
+        raise PermissionError(
+            "Issue review storage must be outside the permitted checkout"
+        )
 
 
 def build_review_policy(repo_root: Path) -> RepositoryReviewPolicy:
     root = repo_root.resolve()
     output = subprocess.check_output(["git", "ls-files", "--cached", "-z"], cwd=root)
     source_files = frozenset(
-        path for path in output.decode("utf-8").split("\0") if path and _is_source_path(Path(path))
+        path
+        for path in output.decode("utf-8").split("\0")
+        if path and _is_source_path(Path(path))
     )
     return RepositoryReviewPolicy(
-        ISSUE_READ_TOOLS, name=ISSUE_REVIEW_POLICY.name, root=root, source_files=source_files
+        ISSUE_READ_TOOLS,
+        name=ISSUE_REVIEW_POLICY.name,
+        root=root,
+        source_files=source_files,
     )

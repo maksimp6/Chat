@@ -2,6 +2,7 @@
 
 The device owns PKCE and polling. This module never receives provider tokens.
 """
+
 from core.env import env_get
 
 import json
@@ -26,12 +27,15 @@ def verification_url(path, now=None):
     if not now < expires <= now + 600:
         raise ValueError("expired handoff")
     url = value["verification_uri_complete"]
-    if not isinstance(url, str) or any(ord(char) <= 32 or ord(char) == 127 for char in url):
+    if not isinstance(url, str) or any(
+        ord(char) <= 32 or ord(char) == 127 for char in url
+    ):
         raise ValueError("invalid URL")
     parsed = urlsplit(url)
     if (
         parsed.scheme != "https"
-        or parsed.hostname not in {"mcp.desktopcommander.app", "auth.desktopcommander.app"}
+        or parsed.hostname
+        not in {"mcp.desktopcommander.app", "auth.desktopcommander.app"}
         or parsed.username is not None
         or parsed.password is not None
         or parsed.port not in {None, 443}
@@ -50,7 +54,9 @@ def install_rdc_pairing(app):
                 raise ValueError("handoff not configured")
             response = redirect(verification_url(path), code=303)
         except (OSError, ValueError, KeyError, TypeError):
-            response = jsonify({"error": "RDC verification link unavailable or expired"})
+            response = jsonify(
+                {"error": "RDC verification link unavailable or expired"}
+            )
             response.status_code = 503
         response.headers["Cache-Control"] = "no-store"
         response.headers["Referrer-Policy"] = "no-referrer"

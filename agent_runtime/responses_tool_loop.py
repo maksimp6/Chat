@@ -56,8 +56,12 @@ def build_continuation_input(
     calls = extract_function_calls(response)
     values = list(results)
     if len(calls) != len(values):
-        raise ValueError(f"tool call/result count mismatch: {len(calls)} != {len(values)}")
-    return [make_function_call_output(call, result) for call, result in zip(calls, values)]
+        raise ValueError(
+            f"tool call/result count mismatch: {len(calls)} != {len(values)}"
+        )
+    return [
+        make_function_call_output(call, result) for call, result in zip(calls, values)
+    ]
 
 
 def run_tool_loop(
@@ -80,7 +84,9 @@ def run_tool_loop(
     become implicit after the initial request.
     """
     if max_rounds is not None and (
-        isinstance(max_rounds, bool) or not isinstance(max_rounds, int) or max_rounds < 0
+        isinstance(max_rounds, bool)
+        or not isinstance(max_rounds, int)
+        or max_rounds < 0
     ):
         raise ValueError("max_rounds must be a non-negative integer or None")
     response = initial_response

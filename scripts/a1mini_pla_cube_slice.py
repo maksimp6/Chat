@@ -152,7 +152,9 @@ def _validate_profile(settings: dict[str, object]) -> None:
     for key, wanted in expected.items():
         actual = settings.get(key)
         if actual != wanted:
-            raise RuntimeError(f"unsafe profile: {key}: expected {wanted!r}, got {actual!r}")
+            raise RuntimeError(
+                f"unsafe profile: {key}: expected {wanted!r}, got {actual!r}"
+            )
 
 
 def _layer_count(gcode: str) -> int:
@@ -176,8 +178,12 @@ def _validate_gcode(gcode: str) -> int:
         if line.strip() and not line.lstrip().startswith(";")
     ]
     for command, target in (("M109", NOZZLE_C), ("M190", BED_C)):
-        if not any(re.match(rf"^{command}\s+S{target}(?:\s|;|$)", line) for line in commands):
-            raise RuntimeError(f"G-code missing verified {command} S{target} temperature")
+        if not any(
+            re.match(rf"^{command}\s+S{target}(?:\s|;|$)", line) for line in commands
+        ):
+            raise RuntimeError(
+                f"G-code missing verified {command} S{target} temperature"
+            )
     if not gcode.startswith("; HEADER_BLOCK_START"):
         raise RuntimeError("not a Bambu Studio G-code header")
     if len(gcode) < 5000:

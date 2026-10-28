@@ -192,7 +192,9 @@ def edit_primitive(
         ]
     elif operation == "scale":
         factors = vector3(values, "values", 0.05, 20)
-        obj["scale"] = vector3([a * b for a, b in zip(obj["scale"], factors)], "scale", 0.05, 20)
+        obj["scale"] = vector3(
+            [a * b for a, b in zip(obj["scale"], factors)], "scale", 0.05, 20
+        )
     else:
         raise ValueError("unsupported edit operation")
     updated["parent_revision"] = parent_revision
@@ -331,7 +333,11 @@ def export_stl(scene: dict[str, Any]) -> bytes:
     for a, b, c in faces:
         u = [b[i] - a[i] for i in range(3)]
         v = [c[i] - a[i] for i in range(3)]
-        normal = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+        normal = (
+            u[1] * v[2] - u[2] * v[1],
+            u[2] * v[0] - u[0] * v[2],
+            u[0] * v[1] - u[1] * v[0],
+        )
         mag = math.sqrt(sum(q * q for q in normal))
         if mag < 1e-12:
             raise ValueError("degenerate triangle")

@@ -20,7 +20,10 @@ from runtime import (
     RuntimeScopeViolation,
 )
 from tool_providers.registry import registry
-from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_providers.universal_tool_platform import (
+    UniversalToolCall,
+    UniversalToolExecutor,
+)
 
 
 # Runtime-scoped MCP calls enter the same dispatcher boundary as preview code.
@@ -29,8 +32,12 @@ from tool_providers.universal_tool_platform import UniversalToolCall, UniversalT
 mcp_runtime_dispatcher = RuntimeDispatcher()
 
 
-def _execute_mcp_tool(_runtime_context: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
-    return UniversalToolExecutor(registry).execute_with_trace(payload["call"], payload["trace"])
+def _execute_mcp_tool(
+    _runtime_context: Any, payload: Mapping[str, Any]
+) -> dict[str, Any]:
+    return UniversalToolExecutor(registry).execute_with_trace(
+        payload["call"], payload["trace"]
+    )
 
 
 mcp_runtime_dispatcher.register_operation("mcp.tool.call", _execute_mcp_tool)
@@ -117,11 +124,15 @@ def _handle_call(
             )
             phase = (result.get("metadata") or {}).get("phase")
             if phase == "transport":
-                raise LookupError(result.get("error") or "Tool transport is not supported")
+                raise LookupError(
+                    result.get("error") or "Tool transport is not supported"
+                )
             if phase == "validation":
                 raise ValueError(result.get("error") or "Tool input validation failed")
             if phase == "authorization":
-                raise PermissionError(result.get("error") or "Tool authorization denied")
+                raise PermissionError(
+                    result.get("error") or "Tool authorization denied"
+                )
             if phase == "approval_required":
                 raise PermissionError(result.get("error") or "Tool approval required")
             if phase == "execution":
@@ -155,7 +166,9 @@ def _handle_call(
         trace.add_event("mcp_runtime_access_denied", {"reason": type(exc).__name__})
         trace.record_error("mcp_runtime_dispatch", type(exc).__name__)
         persist_invocation_trace(context.invocation_id, trace.finalize())
-        fail_invocation(context.invocation_id, error={"tool": name, "error": "runtime unavailable"})
+        fail_invocation(
+            context.invocation_id, error={"tool": name, "error": "runtime unavailable"}
+        )
         raise PermissionError("Runtime scope is unavailable") from exc
     except (LookupError, PermissionError, ValueError, RuntimeError):
         raise

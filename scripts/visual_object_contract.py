@@ -162,14 +162,18 @@ def evaluate(
             ]
         )
     assignments: dict[int, int] = {}
-    for truth_index in sorted(range(len(expected)), key=lambda i: (len(candidates[i]), i)):
+    for truth_index in sorted(
+        range(len(expected)), key=lambda i: (len(candidates[i]), i)
+    ):
         _augment(truth_index, candidates, assignments, set())
     matches = [
         {
             "label": expected[i]["label"],
             "truth_index": i,
             "prediction_index": j,
-            "iou": round(intersection_over_union(expected[i]["bbox"], predicted[j]["bbox"]), 4),
+            "iou": round(
+                intersection_over_union(expected[i]["bbox"], predicted[j]["bbox"]), 4
+            ),
         }
         for j, i in sorted(assignments.items())
     ]
@@ -197,13 +201,19 @@ def verify_case(case: dict, prediction: dict) -> dict:
         raise TypeError("recognizer must return a JSON object")
     objects = _validate_objects(prediction.get("objects"))
     claims = prediction.get("claims", [])
-    if not isinstance(claims, list) or len(claims) > 64 or any(not _valid_name(c) for c in claims):
+    if (
+        not isinstance(claims, list)
+        or len(claims) > 64
+        or any(not _valid_name(c) for c in claims)
+    ):
         raise ValueError("recognizer claims must be canonical names")
     report = evaluate(case["objects"], objects)
     report["forbidden_found"] = sorted(
         {obj["label"] for obj in objects} & set(case.get("forbidden_labels", []))
     )
-    report["unsupported_claims"] = sorted(set(claims) & set(case.get("forbidden_claims", [])))
+    report["unsupported_claims"] = sorted(
+        set(claims) & set(case.get("forbidden_claims", []))
+    )
     report["passed"] = (
         report["fn"] == 0
         and report["fp"] == 0

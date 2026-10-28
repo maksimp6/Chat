@@ -8,7 +8,9 @@ from pathlib import Path
 from typing import Any
 
 
-def _read_mesh_bounds_and_edges(data: bytes) -> tuple[list[float], list[float], list[float]]:
+def _read_mesh_bounds_and_edges(
+    data: bytes,
+) -> tuple[list[float], list[float], list[float]]:
     # Merge exact shared vertex coordinates for manifold-edge checks.
     points: dict[tuple[float, float, float], int] = {}
     edges: Counter[tuple[int, ...]] = Counter()
@@ -34,7 +36,9 @@ def _read_mesh_bounds_and_edges(data: bytes) -> tuple[list[float], list[float], 
 
 
 def validate_stl(
-    path: str | Path, record: dict[str, Any], bed: tuple[int, int, int] = (180, 180, 180)
+    path: str | Path,
+    record: dict[str, Any],
+    bed: tuple[int, int, int] = (180, 180, 180),
 ) -> dict[str, Any]:
     """Validate original binary STL, indexed topology and per-part dimensions."""
     path = Path(path)
@@ -79,15 +83,23 @@ def verify_inventory_sources(
 
 
 def require_upload_preflight(
-    passport: dict[str, Any], source_evidence: list[dict[str, Any]], gcode_evidence: dict[str, Any]
+    passport: dict[str, Any],
+    source_evidence: list[dict[str, Any]],
+    gcode_evidence: dict[str, Any],
 ) -> dict[str, Any]:
     """Fail closed for missing evidence; do not equate static checks with fit."""
     if not source_evidence or not gcode_evidence:
         raise ValueError("source and sliced G-code verification required")
-    if gcode_evidence.get("status") not in ("GCODE_STATIC_VERIFIED", "GCODE_VERIFIED_FIT_BLOCKED"):
+    if gcode_evidence.get("status") not in (
+        "GCODE_STATIC_VERIFIED",
+        "GCODE_VERIFIED_FIT_BLOCKED",
+    ):
         raise ValueError("G-code has not passed independent audit")
     if not all(e.get("topology") == "closed_edge_manifold" for e in source_evidence):
         raise ValueError("source geometry verification failed")
     if passport["target_printer"].get("firmware_compatibility_verified") is not True:
         raise ValueError("target printer firmware acceptance not verified")
-    return {"status": "UPLOAD_PREFLIGHT_PASSED", "printer": passport["target_printer"]["device_id"]}
+    return {
+        "status": "UPLOAD_PREFLIGHT_PASSED",
+        "printer": passport["target_printer"]["device_id"],
+    }

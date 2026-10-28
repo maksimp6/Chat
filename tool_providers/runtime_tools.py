@@ -51,7 +51,11 @@ def _trusted_identity(cfg: dict | None) -> str | None:
     context = _universal_context(cfg)
     call = context.get("call") if isinstance(context, dict) else None
     identity = getattr(call, "user_id", None) if call is not None else None
-    return str(identity).strip() if identity is not None and str(identity).strip() else None
+    return (
+        str(identity).strip()
+        if identity is not None and str(identity).strip()
+        else None
+    )
 
 
 def _runtime_args(args: dict, cfg: dict | None) -> dict:
@@ -62,12 +66,24 @@ def _runtime_args(args: dict, cfg: dict | None) -> dict:
     }
 
 
-_COMMAND_ENV_NAMES = ("PATH", "HOME", "LANG", "LC_ALL", "TERM", "TMPDIR", "USER", "LOGNAME", "SHELL")
+_COMMAND_ENV_NAMES = (
+    "PATH",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "TERM",
+    "TMPDIR",
+    "USER",
+    "LOGNAME",
+    "SHELL",
+)
 
 
 def _command_environment() -> dict[str, str]:
     """Only what a shell needs. The backend's own environment holds provider and deployment secrets."""
-    return {name: env_require(name) for name in _COMMAND_ENV_NAMES if name in env_snapshot()}
+    return {
+        name: env_require(name) for name in _COMMAND_ENV_NAMES if name in env_snapshot()
+    }
 
 
 def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
@@ -279,7 +295,9 @@ def ssh_runtime_write_file(args: dict, cfg: dict | None = None) -> dict[str, Any
         },
     )
     try:
-        result = _runtime_for_operation("write_file", approved=_approved(cfg)).write_file(
+        result = _runtime_for_operation(
+            "write_file", approved=_approved(cfg)
+        ).write_file(
             path=str(args.get("path") or ""),
             content=str(args.get("content") or ""),
             **runtime_args,

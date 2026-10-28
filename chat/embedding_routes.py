@@ -23,7 +23,9 @@ embedding_bp = Blueprint("embeddings", __name__)
 logger = system_log.get_logger("embeddings")
 
 UPSTREAM_URL = "https://ai.api.cloud.yandex.net/v1/embeddings"
-MAX_BATCH = 64  # same cap as scripts/rag_pipeline.py: the server key pays for every text
+MAX_BATCH = (
+    64  # same cap as scripts/rag_pipeline.py: the server key pays for every text
+)
 # The provider enforces its model-specific token limit. Character counts cannot
 # stand in for the provider tokenizer and must not truncate or reject valid text.
 UPSTREAM_TIMEOUT_SECONDS = 30
@@ -93,12 +95,18 @@ def _embed_one(
     data = response.json()
     usage = data.get("usage") if isinstance(data, dict) else None
     tokens = _token_count(usage.get("prompt_tokens")) if isinstance(usage, dict) else 0
-    records = data.get("data") if isinstance(data, dict) and "error" not in data else None
+    records = (
+        data.get("data") if isinstance(data, dict) and "error" not in data else None
+    )
     record = records[0] if isinstance(records, list) and len(records) == 1 else None
     vector = record.get("embedding") if isinstance(record, dict) else None
     try:
-        valid = isinstance(vector, list) and len(vector) == (dimensions or 256) and all(
-            type(value) in (int, float) and math.isfinite(value) for value in vector
+        valid = (
+            isinstance(vector, list)
+            and len(vector) == (dimensions or 256)
+            and all(
+                type(value) in (int, float) and math.isfinite(value) for value in vector
+            )
         )
     except OverflowError:
         valid = False
@@ -127,14 +135,21 @@ def create_embeddings():
         return jsonify({"error": "json_body_required"}), 400
     unknown = set(body) - ALLOWED_FIELDS
     if unknown:
-        return jsonify({"error": "unknown_parameters", "parameters": sorted(unknown)}), 400
+        return jsonify(
+            {"error": "unknown_parameters", "parameters": sorted(unknown)}
+        ), 400
     if "model" in body and "mode" in body:
         return jsonify({"error": "send model or mode, not both"}), 400
     if "model" in body:
         model_name = body["model"]
         if not isinstance(model_name, str) or model_name not in EMBEDDING_MODELS:
             return (
-                jsonify({"error": "unknown embedding model", "models": sorted(EMBEDDING_MODELS)}),
+                jsonify(
+                    {
+                        "error": "unknown embedding model",
+                        "models": sorted(EMBEDDING_MODELS),
+                    }
+                ),
                 400,
             )
     else:
@@ -147,7 +162,9 @@ def create_embeddings():
         if not model_name.startswith("text-embeddings-v2-"):
             return jsonify({"error": "dimensions requires an embedding v2 model"}), 400
         if type(dimensions) is not int or dimensions not in V2_DIMENSIONS:
-            return jsonify({"error": "invalid_dimensions", "dimensions": sorted(V2_DIMENSIONS)}), 400
+            return jsonify(
+                {"error": "invalid_dimensions", "dimensions": sorted(V2_DIMENSIONS)}
+            ), 400
     try:
         items, single = _texts_from_body(body)
     except _BadInput as exc:
@@ -182,7 +199,9 @@ def create_embeddings():
             )
         try:
             vector, tokens = _embed_one(
-                headers, model_uri, text,
+                headers,
+                model_uri,
+                text,
                 dimensions=dimensions,
                 timeout=min(UPSTREAM_TIMEOUT_SECONDS, remaining),
             )
@@ -200,21 +219,30 @@ def create_embeddings():
                 502,
             )
         if vectors and len(vector) != len(vectors[0]):
-            return jsonify({
-                "error": "embedding_upstream_failed",
-                "detail": "Embedding provider returned inconsistent vector dimensions",
-                "completed": len(vectors),
-                "tokens_spent": total_tokens + tokens,
-            }), 502
+            return jsonify(
+                {
+                    "error": "embedding_upstream_failed",
+                    "detail": "Embedding provider returned inconsistent vector dimensions",
+                    "completed": len(vectors),
+                    "tokens_spent": total_tokens + tokens,
+                }
+            ), 502
         vectors.append(vector)
         total_tokens += tokens
 
     trace = get_current_trace()
     if trace is not None:
-        trace.add_event("embedding_usage", {
-            "model": model_name, "texts": len(items), "tokens": total_tokens,
-        })
-    logger.info("embeddings model=%s texts=%d tokens=%d", model_name, len(items), total_tokens)
+        trace.add_event(
+            "embedding_usage",
+            {
+                "model": model_name,
+                "texts": len(items),
+                "tokens": total_tokens,
+            },
+        )
+    logger.info(
+        "embeddings model=%s texts=%d tokens=%d", model_name, len(items), total_tokens
+    )
     payload = {
         "model": model_uri,
         "tokens": total_tokens,

@@ -20,7 +20,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from scripts.semantic_pipeline import _redact_repository_text, _repository_path_is_sensitive
+from scripts.semantic_pipeline import (
+    _redact_repository_text,
+    _repository_path_is_sensitive,
+)
 
 SCHEMA_VERSION = 1
 CONTENT_VIEW_VERSION = 1
@@ -56,7 +59,9 @@ def _canonical_json(value: Any) -> str:
 
 
 def _repository_name(value: str) -> str:
-    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", value):
+    if not isinstance(value, str) or not re.fullmatch(
+        r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", value
+    ):
         raise ContextError("Expected a GitHub owner/repository name")
     return value
 
@@ -90,12 +95,16 @@ def github_reader(token: str | None = None) -> Callable[[str], Any]:
     def get_json(path: str) -> Any:
         if not path.startswith("/repos/") or path.startswith("//"):
             raise ContextError("Context transport accepts repository API paths only")
-        request = urllib.request.Request("https://api.github.com" + path, headers=headers)
+        request = urllib.request.Request(
+            "https://api.github.com" + path, headers=headers
+        )
         try:
             with urllib.request.urlopen(request, timeout=60) as response:
                 return json.load(response)
         except urllib.error.HTTPError as exc:
-            raise ContextError(f"GitHub context read failed for {path} (HTTP {exc.code})") from None
+            raise ContextError(
+                f"GitHub context read failed for {path} (HTTP {exc.code})"
+            ) from None
         except (urllib.error.URLError, OSError, ValueError):
             # Provider error bodies and credential-bearing request objects must
             # not be copied into the runtime context or logs.
@@ -155,7 +164,9 @@ def _source(
     }
 
 
-def _local_source(repo_root: Path, repository: str, sha: str, name: str) -> dict[str, Any]:
+def _local_source(
+    repo_root: Path, repository: str, sha: str, name: str
+) -> dict[str, Any]:
     path = repo_root / name
     if _repository_path_is_sensitive(name):
         raise ContextError(f"Credential files cannot enter context: {name}")
@@ -167,7 +178,10 @@ def _local_source(repo_root: Path, repository: str, sha: str, name: str) -> dict
     if not text.strip():
         raise ContextError(f"Required context file is empty: {name}")
     tracked = subprocess.run(
-        ["git", "show", f"{sha}:{name}"], cwd=repo_root, check=False, capture_output=True
+        ["git", "show", f"{sha}:{name}"],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
     )
     version = sha
     if tracked.returncode != 0 or tracked.stdout != text.encode("utf-8"):
@@ -199,12 +213,23 @@ def _remote_source(
     if type(identity) is not int or identity < 1:
         raise ContextError("GitHub source is missing its numeric identity")
     url = item.get("html_url") or fallback_url
-    if not isinstance(url, str) or not url.startswith(f"https://github.com/{repository}/"):
-        raise ContextError("GitHub source URL does not belong to the requested repository")
+    if not isinstance(url, str) or not url.startswith(
+        f"https://github.com/{repository}/"
+    ):
+        raise ContextError(
+            "GitHub source URL does not belong to the requested repository"
+        )
     author = item.get("user") or {}
     metadata = {
         key: item[key]
-        for key in ("state", "state_reason", "path", "line", "in_reply_to_id", "commit_id")
+        for key in (
+            "state",
+            "state_reason",
+            "path",
+            "line",
+            "in_reply_to_id",
+            "commit_id",
+        )
         if key in item
     }
     metadata["author"] = author.get("login") if isinstance(author, dict) else None
@@ -212,7 +237,10 @@ def _remote_source(
         f"github:{kind}:{identity}",
         kind,
         url,
-        item.get("updated_at") or item.get("submitted_at") or item.get("created_at") or "unknown",
+        item.get("updated_at")
+        or item.get("submitted_at")
+        or item.get("created_at")
+        or "unknown",
         _record_text(item),
         **metadata,
     )
@@ -253,7 +281,9 @@ def _github_sources(
         ("inline_comment", inline_comments, f"{web}/pull/{pr_number}"),
     )
     for kind, items, fallback in collections:
-        sources.extend(_remote_source(repository, kind, item, fallback) for item in items)
+        sources.extend(
+            _remote_source(repository, kind, item, fallback) for item in items
+        )
     return sources, {
         "issue_number": issue_number,
         "pr_number": pr_number,
@@ -291,7 +321,16 @@ def _seal(packet: dict[str, Any]) -> dict[str, Any]:
 
 
 def _manifest(owner: dict[str, Any], sources: list[dict[str, Any]]) -> dict[str, Any]:
-    fields = ("id", "kind", "url", "version", "content_sha256", "characters", "bytes", "redactions")
+    fields = (
+        "id",
+        "kind",
+        "url",
+        "version",
+        "content_sha256",
+        "characters",
+        "bytes",
+        "redactions",
+    )
     entries = [{key: source[key] for key in fields} for source in [owner, *sources]]
     return {
         "sources": entries,
@@ -321,7 +360,10 @@ def build_context(
     if type(require_pr_head) is not bool:
         raise ContextError("require_pr_head must be an explicit boolean")
     repository = _repository_name(repository)
-    issue_number, pr_number = _positive_number(issue_number), _positive_number(pr_number)
+    issue_number, pr_number = (
+        _positive_number(issue_number),
+        _positive_number(pr_number),
+    )
     repo_root = Path(repo_root)
     sha = _head(repo_root)
     optional_files = tuple(
@@ -337,7 +379,9 @@ def build_context(
         raise ContextError(
             "Pull request HEAD differs from checkout; rebuild context on current HEAD"
         )
-    case["revision_mode"] = "current_pr_head" if require_pr_head else "historical_reference"
+    case["revision_mode"] = (
+        "current_pr_head" if require_pr_head else "historical_reference"
+    )
     sources.extend(remote)
     owner = _source(
         "owner:current-invocation",
@@ -370,7 +414,10 @@ def validate_context(packet: Any) -> dict[str, Any]:
     """Check persisted completeness and integrity; do not claim source authenticity."""
     if not isinstance(packet, dict) or packet.get("schema_version") != SCHEMA_VERSION:
         raise ContextError("Unsupported context packet schema")
-    if packet.get("complete") is not True or packet.get("evidence_notice") != EVIDENCE_NOTICE:
+    if (
+        packet.get("complete") is not True
+        or packet.get("evidence_notice") != EVIDENCE_NOTICE
+    ):
         raise ContextError("Incomplete context packet or missing evidence boundary")
     expected = packet.get("packet_sha256")
     unsigned = {key: value for key, value in packet.items() if key != "packet_sha256"}
@@ -380,7 +427,10 @@ def validate_context(packet: Any) -> dict[str, Any]:
     owner = packet.get("owner_context")
     if not isinstance(sources, list) or not isinstance(owner, dict):
         raise ContextError("Missing context sources or owner directives")
-    if owner.get("id") != "owner:current-invocation" or not owner.get("text", "").strip():
+    if (
+        owner.get("id") != "owner:current-invocation"
+        or not owner.get("text", "").strip()
+    ):
         raise ContextError("Missing current owner directives")
     identities = _validate_sources([owner, *sources])
     if not set(REQUIRED_FILES).issubset(packet.get("required_files", [])):
@@ -413,7 +463,9 @@ def _validate_source(source: Any) -> None:
         source.get("content_sha256") != _digest(text)
         or source.get("characters") != len(text)
         or source.get("bytes") != len(text.encode("utf-8"))
-        or not all(isinstance(source.get(key), str) for key in ("id", "kind", "url", "version"))
+        or not all(
+            isinstance(source.get(key), str) for key in ("id", "kind", "url", "version")
+        )
     ):
         raise ContextError("Context source digest or metadata mismatch")
 
@@ -476,11 +528,15 @@ def _validate_case_links(packet: dict[str, Any], sources: list[dict[str, Any]]) 
         if kind in fragments:
             permitted_urls.add(roots[kind] + "#" + fragments[kind] + match.group(1))
         if source["url"] not in permitted_urls:
-            raise ContextError("Context source URL does not belong to the declared case")
+            raise ContextError(
+                "Context source URL does not belong to the declared case"
+            )
         if kind == "pull_request" and any(
             source.get(key) != case.get(key) for key in ("head_sha", "base_sha")
         ):
-            raise ContextError("Context pull request source revisions differ from the case")
+            raise ContextError(
+                "Context pull request source revisions differ from the case"
+            )
 
 
 def _validate_case_revision(case: dict[str, Any], checkout_sha: Any) -> None:

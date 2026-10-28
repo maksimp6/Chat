@@ -43,7 +43,11 @@ def _int64(value: Any) -> bool:
             and bool(re.fullmatch(r"-?(?:0|[1-9][0-9]*)", value))
             and -(2**63) <= int(value) < 2**63
         )
-    return isinstance(value, int) and not isinstance(value, bool) and -(2**63) <= value < 2**63
+    return (
+        isinstance(value, int)
+        and not isinstance(value, bool)
+        and -(2**63) <= value < 2**63
+    )
 
 
 @FORMATS.checks("double")
@@ -146,12 +150,16 @@ def validate_yandex_contract[PayloadT](
     """
     contract = get_yandex_contract(name)
     if contract["availability"] == "unsupported_in_snapshot":
-        raise IncompleteYandexContract("API/event is marked unsupported in this snapshot")
+        raise IncompleteYandexContract(
+            "API/event is marked unsupported in this snapshot"
+        )
     if direction not in ("request", "responses"):
         raise ContractViolation("direction must be request or responses")
     reference = contract[direction].get(part)
     if reference is None:
-        raise IncompleteYandexContract("no documented schema for " + direction + "." + part)
+        raise IncompleteYandexContract(
+            "no documented schema for " + direction + "." + part
+        )
     document = contract["schema"]
     gaps = schema_gaps(document, reference)
     if gaps:
@@ -159,13 +167,19 @@ def validate_yandex_contract[PayloadT](
         raise IncompleteYandexContract("source schema is incomplete: " + gaps[0])
     _require_json(payload)
     schema = {**document, "$ref": reference}
-    error = next(Draft7Validator(schema, format_checker=FORMATS).iter_errors(payload), None)
+    error = next(
+        Draft7Validator(schema, format_checker=FORMATS).iter_errors(payload), None
+    )
     if error is not None:
         # jsonschema's default message includes the rejected value: do not expose it.
         raise ContractViolation(
             "Yandex payload violates " + name + " (" + str(error.validator) + ")"
         )
-    if name.startswith("yandex.runtime.") and part == "body" and isinstance(payload, dict):
+    if (
+        name.startswith("yandex.runtime.")
+        and part == "body"
+        and isinstance(payload, dict)
+    ):
         chunking = payload.get("chunking_strategy")
         if isinstance(chunking, dict) and chunking.get("type") == "static":
             static = chunking["static"]

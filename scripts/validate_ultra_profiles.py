@@ -24,7 +24,9 @@ def _unique_object(pairs):
 
 
 def read_json(path):
-    return json.loads(Path(path).read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
+    return json.loads(
+        Path(path).read_text(encoding="utf-8"), object_pairs_hook=_unique_object
+    )
 
 
 def read_registry(path):
@@ -74,7 +76,9 @@ def validate_catalog(catalog, registry, root):
     for key, profile in profiles.items():
         _require(profile["model_key"] == key, f"{key}: identity mismatch")
         expected_upstream = registry[key].get("upstream", key)
-        _require(profile["upstream_id"] == expected_upstream, f"{key}: upstream mismatch")
+        _require(
+            profile["upstream_id"] == expected_upstream, f"{key}: upstream mismatch"
+        )
         _require(profile["kind"] == registry[key]["type"], f"{key}: kind mismatch")
         suffix = "" if profile["transport"] != "responses" else "/latest"
         expected_uri = "gpt://${YANDEX_PROJECT_ID}/" + expected_upstream + suffix
@@ -93,7 +97,9 @@ def validate_catalog(catalog, registry, root):
         )
         for section in ("lifecycle", "output", "reasoning", "tools"):
             for source in profile[section].get("evidence", []):
-                _require(source in catalog["sources"], f"{key}: unknown evidence source")
+                _require(
+                    source in catalog["sources"], f"{key}: unknown evidence source"
+                )
         wire = profile["wire_parameters"]
         if profile["status"] == "blocked_retired":
             _require(not wire, f"{key}: retired model must not have a wire request")
@@ -108,7 +114,12 @@ def validate_catalog(catalog, registry, root):
             _require(session["max_output_tokens"] == "inf", key)
             _require(session["output_modalities"] in (["audio"], ["text"]), key)
             _require(session["yc_timeout_seconds"] == 3600, key)
-            forbidden = {"truncation", "max_response_output_tokens", "model", "background"}
+            forbidden = {
+                "truncation",
+                "max_response_output_tokens",
+                "model",
+                "background",
+            }
             _require(not (forbidden & set(session)), f"{key}: foreign API fields")
         elif profile["transport"] == "text_generation_async":
             _require(profile["reasoning"]["supported"] is False, key)
@@ -117,7 +128,9 @@ def validate_catalog(catalog, registry, root):
             _require(not ({"tools", "reasoning", "service_tier"} & set(wire)), key)
             original = read_json(Path(root) / profile["existing_profile_ref"])
             expected = original["request"]["body"]["completionOptions"]
-            _require(wire["completionOptions"] == expected, f"{key}: async profile drift")
+            _require(
+                wire["completionOptions"] == expected, f"{key}: async profile drift"
+            )
             _require(profile["output"]["requested"] == expected["maxTokens"], key)
         else:
             _require(profile["transport"] == "responses", key)
@@ -143,14 +156,20 @@ def require_executable_profile(catalog, model_key, as_of=None):
     if boundary and today >= date.fromisoformat(boundary):
         raise ProfileError(f"{model_key}: lifecycle boundary reached; stop and recheck")
     if profile["status"] != "active" or profile["blockers"]:
-        raise ProfileError(f"{model_key}: prepared only: {', '.join(profile['blockers'])}")
+        raise ProfileError(
+            f"{model_key}: prepared only: {', '.join(profile['blockers'])}"
+        )
     return deepcopy(profile)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
-    parser.add_argument("--model", help="inspect one exact registry key; never generate")
+    parser.add_argument(
+        "--root", type=Path, default=Path(__file__).resolve().parents[1]
+    )
+    parser.add_argument(
+        "--model", help="inspect one exact registry key; never generate"
+    )
     args = parser.parse_args()
     catalog = read_json(args.root / "config/model_profiles/ultra-profiles.json")
     registry = read_registry(args.root / "core/config.py")

@@ -11,7 +11,15 @@ from pathlib import Path
 from unidiff import PatchSet
 from unidiff.errors import UnidiffParseError
 
-REQUIRED = {"claim", "rule_quote", "path", "line", "source_quote", "reason", "reproduction"}
+REQUIRED = {
+    "claim",
+    "rule_quote",
+    "path",
+    "line",
+    "source_quote",
+    "reason",
+    "reproduction",
+}
 OPTIONAL = {"side", "severity", "consequence"}
 SEVERITY_CRITERIA = {
     "P0": "Immediate loss of service, evidence, access control or data integrity",
@@ -51,7 +59,10 @@ def changed_lines(patch: str) -> dict[str, dict[int, str]]:
     for number, line in enumerate(io.StringIO(patch, newline="\n"), start=1):
         if line.startswith("@@ "):
             header_count += 1
-        elif number not in covered and line.removesuffix("\n") != "\\ No newline at end of file":
+        elif (
+            number not in covered
+            and line.removesuffix("\n") != "\\ No newline at end of file"
+        ):
             # unidiff permits extra patch metadata outside hunks. A GitHub
             # fragment has none, so never accept ignored trailing source data.
             raise ValueError("Unexpected data outside diff hunks")
@@ -68,7 +79,9 @@ def added_lines(patch: str) -> dict[int, str]:
 def validate_judgment(text: str, rules: str, files: list) -> dict:
     """Check line citations only; this function cannot establish a violation."""
     # Accept one complete Markdown code fence, never surrounding prose or partial JSON.
-    fenced = re.fullmatch(r"```(?:json)?[ \t]*\r?\n(.*?)\r?\n```", text.strip(), re.DOTALL)
+    fenced = re.fullmatch(
+        r"```(?:json)?[ \t]*\r?\n(.*?)\r?\n```", text.strip(), re.DOTALL
+    )
     data = json.loads(fenced[1] if fenced else text)
     if not isinstance(data, dict) or set(data) != {"findings", "limitations"}:
         raise ValueError("Expected findings and limitations, not a prose verdict")
@@ -95,9 +108,12 @@ def validate_judgment(text: str, rules: str, files: list) -> dict:
             or not REQUIRED <= set(finding)
             or set(finding) - REQUIRED - OPTIONAL
         ):
-            raise ValueError("Each allegation needs a rule, source citation and reproduction")
+            raise ValueError(
+                "Each allegation needs a rule, source citation and reproduction"
+            )
         if any(
-            not isinstance(finding[k], str) or not finding[k].strip() for k in REQUIRED - {"line"}
+            not isinstance(finding[k], str) or not finding[k].strip()
+            for k in REQUIRED - {"line"}
         ):
             raise ValueError("Empty allegation evidence")
         quote = finding["rule_quote"]
@@ -111,7 +127,9 @@ def validate_judgment(text: str, rules: str, files: list) -> dict:
         if type(line) is not int or key not in sources:
             raise ValueError("Invented source path or line")
         if sources[key].get(line) != finding["source_quote"]:
-            raise ValueError("Source quote does not match the changed line at claimed location")
+            raise ValueError(
+                "Source quote does not match the changed line at claimed location"
+            )
         severity = finding.get("severity")
         consequence = finding.get("consequence")
         if "severity" in finding and (
@@ -120,7 +138,9 @@ def validate_judgment(text: str, rules: str, files: list) -> dict:
             or not isinstance(consequence, str)
             or not consequence.strip()
         ):
-            raise ValueError("Severity proposal needs P0/P1/P2 and a concrete consequence")
+            raise ValueError(
+                "Severity proposal needs P0/P1/P2 and a concrete consequence"
+            )
         if "consequence" in finding and (
             not isinstance(consequence, str) or not consequence.strip()
         ):
@@ -139,7 +159,9 @@ def validate_judgment(text: str, rules: str, files: list) -> dict:
         )
         candidates.append(candidate)
     return {
-        "status": "CANDIDATES_REQUIRE_REVIEW" if findings else "NO_CANDIDATES_NOT_APPROVAL",
+        "status": "CANDIDATES_REQUIRE_REVIEW"
+        if findings
+        else "NO_CANDIDATES_NOT_APPROVAL",
         "citation_integrity": "CHECKED",
         "context_sufficiency": "NOT_VERIFIED",
         "semantic_quality": "NOT_VERIFIED",

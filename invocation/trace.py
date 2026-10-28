@@ -16,4 +16,3 @@ def create_invocation_trace(context: InvocationContext) -> ExecutionTrace:
         runtime_id=context.runtime_id,
     )
     return trace
-

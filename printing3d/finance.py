@@ -47,7 +47,9 @@ def _plan_row(row) -> dict[str, Any]:
     }
 
 
-def set_financing_plan(store: PrintStore, owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
+def set_financing_plan(
+    store: PrintStore, owner_id: str, data: dict[str, Any]
+) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("finance plan must be an object")
 
@@ -58,7 +60,9 @@ def set_financing_plan(store: PrintStore, owner_id: str, data: dict[str, Any]) -
     equipment_price = decimal_field(data.get("equipment_price"), "equipment_price")
     setup_cost = decimal_field(data.get("setup_cost", 0), "setup_cost")
     down_payment = decimal_field(data.get("down_payment", 0), "down_payment")
-    credit_principal = decimal_field(data.get("credit_principal", 0), "credit_principal")
+    credit_principal = decimal_field(
+        data.get("credit_principal", 0), "credit_principal"
+    )
     total_repayment = decimal_field(
         data.get("credit_total_repayment"),
         "credit_total_repayment",
@@ -91,8 +95,12 @@ def set_financing_plan(store: PrintStore, owner_id: str, data: dict[str, Any]) -
         "setup_cost": money_float(setup_cost),
         "down_payment": money_float(down_payment),
         "credit_principal": money_float(credit_principal),
-        "credit_total_repayment": money_float(total_repayment) if total_repayment is not None else None,
-        "monthly_payment": money_float(monthly_payment) if monthly_payment is not None else None,
+        "credit_total_repayment": money_float(total_repayment)
+        if total_repayment is not None
+        else None,
+        "monthly_payment": money_float(monthly_payment)
+        if monthly_payment is not None
+        else None,
         "term_months": term_months,
         "psk_percent": money_float(psk_percent) if psk_percent is not None else None,
         "currency": currency,
@@ -112,7 +120,9 @@ def get_financing_plan(store: PrintStore, owner_id: str) -> dict[str, Any] | Non
     return max(plans, key=lambda row: row["updated_at"]) if plans else None
 
 
-def _month_profit(store: PrintStore, owner_id: str, currency: str, month: str) -> Decimal:
+def _month_profit(
+    store: PrintStore, owner_id: str, currency: str, month: str
+) -> Decimal:
     from printing3d.service import list_orders
 
     profit = Decimal("0")
@@ -186,20 +196,28 @@ def get_payback_status(
         "month": selected_month,
         "cost_basis_status": "complete" if financing_cost_known else "partial",
         "known_cost_basis": money_float(known_cost_basis),
-        "credit_overpayment": money_float(financing_cost) if financing_cost_known else None,
+        "credit_overpayment": money_float(financing_cost)
+        if financing_cost_known
+        else None,
         "cumulative_realized_profit": money_float(cumulative_profit),
         "month_realized_profit": money_float(month_profit),
         "remaining_to_known_cost_basis": money_float(remaining),
-        "payback_progress_percent": money_float(progress) if progress is not None else None,
+        "payback_progress_percent": money_float(progress)
+        if progress is not None
+        else None,
         "monthly_payment_coverage_ratio": (
-            money_float(payment_coverage_ratio) if payment_coverage_ratio is not None else None
+            money_float(payment_coverage_ratio)
+            if payment_coverage_ratio is not None
+            else None
         ),
         "monthly_payment_covered": payment_covered,
         "break_even_reached": break_even_reached,
     }
 
 
-def assess_financing(store: PrintStore, owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
+def assess_financing(
+    store: PrintStore, owner_id: str, data: dict[str, Any]
+) -> dict[str, Any]:
     """Assess sparse candidate terms without persisting or choosing a lender."""
     if not isinstance(data, dict):
         raise ValueError("finance assessment must be an object")
@@ -230,7 +248,8 @@ def assess_financing(store: PrintStore, owner_id: str, data: dict[str, Any]) -> 
     # A saved total repayment belongs to the saved loan. It is reused only while the loan terms it was
     # computed from are unchanged; otherwise it is recomputed from the new terms.
     loan_terms_given = any(
-        data.get(name) is not None for name in ("credit_principal", "monthly_payment", "term_months")
+        data.get(name) is not None
+        for name in ("credit_principal", "monthly_payment", "term_months")
     )
     if data.get("credit_total_repayment") is not None:
         credit_total_repayment = data.get("credit_total_repayment")
@@ -329,7 +348,9 @@ def assess_financing(store: PrintStore, owner_id: str, data: dict[str, Any]) -> 
     result["resolved_terms"]["down_payment"] = money_float(down)
 
     if psk_percent is not None:
-        result["resolved_terms"]["psk_percent"] = money_float(decimal_field(psk_percent, "psk_percent"))
+        result["resolved_terms"]["psk_percent"] = money_float(
+            decimal_field(psk_percent, "psk_percent")
+        )
 
     coverage_target = decimal_field(target_coverage, "target_payment_coverage")
     if coverage_target < 1:
@@ -375,9 +396,15 @@ def assess_financing(store: PrintStore, owner_id: str, data: dict[str, Any]) -> 
         "financing_cost": money_float(financing_cost),
         "target_payment_coverage": money_float(coverage_target),
         "required_monthly_profit": money_float(required_monthly_profit),
-        "payment_coverage_ratio": money_float(coverage_ratio) if coverage_ratio is not None else None,
+        "payment_coverage_ratio": money_float(coverage_ratio)
+        if coverage_ratio is not None
+        else None,
         "payment_coverage_ok": coverage_ok,
-        "estimated_payback_months": money_float(payback_months) if payback_months is not None else None,
-        "profit_evidence_status": "available" if profit_basis is not None else "not_available",
+        "estimated_payback_months": money_float(payback_months)
+        if payback_months is not None
+        else None,
+        "profit_evidence_status": "available"
+        if profit_basis is not None
+        else "not_available",
     }
     return result

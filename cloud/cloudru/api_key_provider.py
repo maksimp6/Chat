@@ -102,8 +102,12 @@ class CloudRuApiKeyProvider:
                     exception=exc,
                 )
             if status in (401, 403):
-                raise PermissionError("Cloud.ru Foundation Models authorization failed") from exc
-            raise RuntimeError("Cloud.ru Foundation Models health check failed") from exc
+                raise PermissionError(
+                    "Cloud.ru Foundation Models authorization failed"
+                ) from exc
+            raise RuntimeError(
+                "Cloud.ru Foundation Models health check failed"
+            ) from exc
 
     def _management_client(self) -> CloudRuIamClient:
         if self.iam_client is not None:
@@ -143,7 +147,9 @@ class CloudRuApiKeyProvider:
         key_id = body.get("id") or body.get("key_id")
         secret = body.get("secret")
         if not key_id or not secret:
-            raise RuntimeError("Cloud.ru reissue response did not include key ID and Key Secret")
+            raise RuntimeError(
+                "Cloud.ru reissue response did not include key ID and Key Secret"
+            )
         return str(key_id), str(secret)
 
     def create_key(self, *, expires_at: datetime) -> tuple[str, str]:

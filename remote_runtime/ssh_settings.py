@@ -86,7 +86,12 @@ def validate_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
     result = copy.deepcopy(_DEFAULTS)
     result.update(dict(settings))
 
-    for key in ("enabled", "read_only", "allow_command_execution", "allow_write_operations"):
+    for key in (
+        "enabled",
+        "read_only",
+        "allow_command_execution",
+        "allow_write_operations",
+    ):
         if not isinstance(result.get(key), bool):
             raise SSHRuntimeError(f"SSH Runtime setting '{key}' must be boolean")
 
@@ -116,7 +121,9 @@ def validate_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
 
             re.compile(value)
         except re.error as exc:
-            raise SSHRuntimeError(f"Invalid command_allowlist pattern: {value}") from exc
+            raise SSHRuntimeError(
+                f"Invalid command_allowlist pattern: {value}"
+            ) from exc
         normalized_allowlist.append(value)
     result["command_allowlist"] = normalized_allowlist
 
@@ -138,7 +145,9 @@ def validate_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
         result["allow_write_operations"] = False
 
     if result["enabled"] and not result["targets"]:
-        raise SSHRuntimeError("At least one SSH target is required when Runtime is enabled")
+        raise SSHRuntimeError(
+            "At least one SSH target is required when Runtime is enabled"
+        )
 
     if result["enabled"]:
         try:
@@ -149,7 +158,9 @@ def validate_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
             raise SSHRuntimeError(f"Invalid SSH Runtime targets: {exc}") from exc
 
         for name, target in result["targets"].items():
-            target_known_hosts = target.get("known_hosts") if isinstance(target, Mapping) else None
+            target_known_hosts = (
+                target.get("known_hosts") if isinstance(target, Mapping) else None
+            )
             if not (result["known_hosts"] or target_known_hosts):
                 raise SSHRuntimeError(
                     f"SSH target '{name}' requires known_hosts for strict host-key verification"
@@ -157,11 +168,17 @@ def validate_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(target, Mapping):
                 try:
                     for field in ("connect_timeout_seconds", "command_timeout_seconds"):
-                        value = float(target.get(field, 30 if "command" in field else 10))
+                        value = float(
+                            target.get(field, 30 if "command" in field else 10)
+                        )
                         if value <= 0 or value > 3600:
-                            raise SSHRuntimeError(f"SSH target '{name}' has invalid {field}")
+                            raise SSHRuntimeError(
+                                f"SSH target '{name}' has invalid {field}"
+                            )
                 except (TypeError, ValueError) as exc:
-                    raise SSHRuntimeError(f"SSH target '{name}' has invalid timeout") from exc
+                    raise SSHRuntimeError(
+                        f"SSH target '{name}' has invalid timeout"
+                    ) from exc
 
     return result
 
@@ -230,7 +247,8 @@ def is_privileged_command(command: str) -> bool:
     value = str(command or "").strip()
     # Every pipeline stage counts: a privileged stage after "|" is still privileged.
     return any(
-        re.match(r"^(?:sudo|su|doas|pkexec)(?:\s|$)", stage.strip()) for stage in value.split("|")
+        re.match(r"^(?:sudo|su|doas|pkexec)(?:\s|$)", stage.strip())
+        for stage in value.split("|")
     )
 
 
@@ -243,14 +261,18 @@ def assert_operation_allowed(
 
     if operation == "execute":
         if not settings["allow_command_execution"]:
-            raise SSHRuntimeError("SSH command execution is disabled in SSH Runtime settings")
+            raise SSHRuntimeError(
+                "SSH command execution is disabled in SSH Runtime settings"
+            )
         if command is None:
             raise SSHRuntimeError(
                 "SSH command is not permitted by the configured command allowlist"
             )
         if not restrictions_lifted():
             if _SHELL_CONTROL_RE.search(command):
-                raise SSHRuntimeError("SSH command must not contain shell control operators")
+                raise SSHRuntimeError(
+                    "SSH command must not contain shell control operators"
+                )
             if not command_matches_allowlist(command, settings["command_allowlist"]):
                 raise SSHRuntimeError(
                     "SSH command is not permitted by the configured command allowlist"
@@ -261,10 +283,14 @@ def assert_operation_allowed(
                         "Privileged SSH commands are disabled in SSH Runtime settings"
                     )
                 if settings["approval_required_for_privileged"] and not approved:
-                    raise SSHRuntimeError("Approval is required for privileged SSH commands")
+                    raise SSHRuntimeError(
+                        "Approval is required for privileged SSH commands"
+                    )
     if operation == "write_file":
         if not settings["allow_write_operations"]:
-            raise SSHRuntimeError("SSH file write operations are disabled in SSH Runtime settings")
+            raise SSHRuntimeError(
+                "SSH file write operations are disabled in SSH Runtime settings"
+            )
     if settings["read_only"] and operation != "read_file":
         raise SSHRuntimeError("SSH Runtime is configured as read-only")
 

@@ -35,7 +35,11 @@ class CloudProvider(Protocol):
     ) -> dict[str, Any]: ...
 
     def compute(
-        self, *, operation: str, instance_id: str | None = None, extra: dict[str, Any] | None = None
+        self,
+        *,
+        operation: str,
+        instance_id: str | None = None,
+        extra: dict[str, Any] | None = None,
     ) -> dict[str, Any]: ...
 
     def query_logs(
@@ -43,7 +47,12 @@ class CloudProvider(Protocol):
     ) -> dict[str, Any]: ...
 
     def query_metrics(
-        self, *, query: str, service: str | None = None, window: str | None = None, limit: int = 100
+        self,
+        *,
+        query: str,
+        service: str | None = None,
+        window: str | None = None,
+        limit: int = 100,
     ) -> dict[str, Any]: ...
 
     def backup(

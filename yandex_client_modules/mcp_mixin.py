@@ -10,7 +10,10 @@ from storage.db import get_conv_settings
 
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_client_modules.api_logger import api_logger
-from yandex_client_modules.tool_config import file_search_max_results, normalize_tools_config
+from yandex_client_modules.tool_config import (
+    file_search_max_results,
+    normalize_tools_config,
+)
 from tool_providers.universal_tool_platform import (
     ReadOnlyToolPolicy,
     UniversalToolCall,
@@ -34,7 +37,9 @@ FILE_SEARCH_OFF_NOTE = (
 
 
 class YandexMcpMixin:
-    def _execute_single_tool(self, tc, all_servers, trace=None, *, execution_policy=None):
+    def _execute_single_tool(
+        self, tc, all_servers, trace=None, *, execution_policy=None
+    ):
         import time as _t
 
         function = tc.get("function")
@@ -67,7 +72,9 @@ class YandexMcpMixin:
                     try:
                         args = json.loads(args)
                     except ValueError:
-                        raise ValueError("Invalid tool arguments: expected a valid JSON object") from None
+                        raise ValueError(
+                            "Invalid tool arguments: expected a valid JSON object"
+                        ) from None
                 if not isinstance(args, dict):
                     raise ValueError("Invalid tool arguments: expected a JSON object")
             except ValueError as exc:
@@ -86,7 +93,10 @@ class YandexMcpMixin:
                 trace_id=trace_id,
                 invocation_id=invocation_id,
                 user_id=user_id,
-                metadata={"source": "yandex_responses", "server_count": len(all_servers or [])},
+                metadata={
+                    "source": "yandex_responses",
+                    "server_count": len(all_servers or []),
+                },
             )
             executor = UniversalToolExecutor(registry)
             if isinstance(trace, ExecutionTrace):
@@ -94,9 +104,7 @@ class YandexMcpMixin:
                     call, trace, server_configs=all_servers
                 )
             else:
-                universal_result = executor.execute(
-                    call, server_configs=all_servers
-                )
+                universal_result = executor.execute(call, server_configs=all_servers)
 
             if universal_result.get("success"):
                 result = universal_result.get("data")
@@ -181,7 +189,9 @@ class YandexMcpMixin:
                 enabled_servers = []
 
         for s in enabled_servers if execution_policy is None else []:
-            if s.get("server_url") or (s.get("connector_id") or "").startswith("connector_"):
+            if s.get("server_url") or (s.get("connector_id") or "").startswith(
+                "connector_"
+            ):
                 mcp_tools.append(
                     {
                         "type": "mcp",
@@ -217,7 +227,9 @@ class YandexMcpMixin:
             conv_settings = {}
         if not isinstance(conv_settings, dict):
             raise ValueError("Conversation settings must be a JSON object")
-        raw_tools_config = conv_settings.get("tools_config", params.get("tools_config", {}))
+        raw_tools_config = conv_settings.get(
+            "tools_config", params.get("tools_config", {})
+        )
         tools_config = normalize_tools_config(raw_tools_config)
 
         raw_web_cfg = tools_config.get("web_search")
@@ -233,17 +245,24 @@ class YandexMcpMixin:
             # A project-wide exclusion is not removable through conversation settings.
             required_blocks = tuple(getattr(self, "mandatory_blocked_web_domains", ()))
             if required_blocks:
-                normalized_blocks = {domain.casefold().rstrip(".") for domain in required_blocks}
+                normalized_blocks = {
+                    domain.casefold().rstrip(".") for domain in required_blocks
+                }
                 allowed_domains = [
                     domain
                     for domain in allowed_domains
                     if not any(
                         domain.casefold().removeprefix("*.").rstrip(".") == block
-                        or domain.casefold().removeprefix("*.").rstrip(".").endswith("." + block)
+                        or domain.casefold()
+                        .removeprefix("*.")
+                        .rstrip(".")
+                        .endswith("." + block)
                         for block in normalized_blocks
                     )
                 ]
-                seen_blocks = {domain.casefold().rstrip(".") for domain in blocked_domains}
+                seen_blocks = {
+                    domain.casefold().rstrip(".") for domain in blocked_domains
+                }
                 for domain in required_blocks:
                     if domain not in seen_blocks:
                         blocked_domains.append(domain)
@@ -268,10 +287,14 @@ class YandexMcpMixin:
                     }
                 )
 
-        file_search_active = bool(file_cfg.get("enabled") and file_cfg.get("vector_store_ids"))
+        file_search_active = bool(
+            file_cfg.get("enabled") and file_cfg.get("vector_store_ids")
+        )
         code_cfg = tools_config.get("code_interpreter") or {}
         if code_cfg.get("enabled"):
-            hosted_tools.append({"type": "code_interpreter", "container": {"type": "auto"}})
+            hosted_tools.append(
+                {"type": "code_interpreter", "container": {"type": "auto"}}
+            )
 
         tools = mcp_tools + hosted_tools if execution_policy is None else []
 
@@ -285,7 +308,11 @@ class YandexMcpMixin:
                         for tool in category_tools
                         if execution_policy is None
                         or (
-                            (definition := registry.get_universal_definition(tool["name"]))
+                            (
+                                definition := registry.get_universal_definition(
+                                    tool["name"]
+                                )
+                            )
                             is not None
                             and execution_policy.allows_tool(definition)
                         )
@@ -308,15 +335,19 @@ class YandexMcpMixin:
                 api_logger.exception("[MEMORY] Память не подключена к ответу")
                 memory_summary = ""
             if memory_summary:
-                ask_params["instructions"] = (ask_params.get("instructions") or "") + memory_summary
+                ask_params["instructions"] = (
+                    ask_params.get("instructions") or ""
+                ) + memory_summary
         if settings_id and execution_policy is None and not file_search_active:
-            ask_params["instructions"] = (ask_params.get("instructions") or "") + FILE_SEARCH_OFF_NOTE
+            ask_params["instructions"] = (
+                ask_params.get("instructions") or ""
+            ) + FILE_SEARCH_OFF_NOTE
         if tools or execution_policy is not None:
             ask_params["tools"] = tools
 
         if trace is not None and isinstance(trace, ExecutionTrace):
             ask_params["execution_trace"] = trace
 
-        return self.ask(message, model_key, conversation_id, ask_params, execution_trace=trace)
-
-
+        return self.ask(
+            message, model_key, conversation_id, ask_params, execution_trace=trace
+        )

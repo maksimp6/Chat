@@ -30,7 +30,9 @@ def _store(cfg: dict[str, Any] | None = None) -> ModelStore:
             raise ValueError("trusted owner identity is required")
         owner = resolved_owner
     metadata = getattr(call, "metadata", {}) if call is not None else {}
-    runtime_id = metadata.get("runtime_id", "host") if isinstance(metadata, dict) else "host"
+    runtime_id = (
+        metadata.get("runtime_id", "host") if isinstance(metadata, dict) else "host"
+    )
     return ModelStore(storage_provider_from_env(), owner, str(runtime_id))
 
 
@@ -60,7 +62,9 @@ def _saved_result(
     return summary
 
 
-def model_create(arguments: dict[str, Any], cfg: dict[str, Any] | None = None) -> dict[str, Any]:
+def model_create(
+    arguments: dict[str, Any], cfg: dict[str, Any] | None = None
+) -> dict[str, Any]:
     store = _store(cfg)
     scene, rev = store.create(
         "Untitled model" if arguments.get("name") is None else arguments["name"]
@@ -68,7 +72,9 @@ def model_create(arguments: dict[str, Any], cfg: dict[str, Any] | None = None) -
     return store.summary(scene, rev)
 
 
-def model_addcube(arguments: dict[str, Any], cfg: dict[str, Any] | None = None) -> dict[str, Any]:
+def model_addcube(
+    arguments: dict[str, Any], cfg: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Create or extend an editable scene; default cube is 20 mm."""
     store = _store(cfg)
     size = number(
@@ -96,7 +102,9 @@ def model_addcylinder(
     """Create a bounded printable cylindrical primitive."""
     store = _store(cfg)
     diameter = number(
-        arguments.get("diameter_mm") if arguments.get("diameter_mm") is not None else 20,
+        arguments.get("diameter_mm")
+        if arguments.get("diameter_mm") is not None
+        else 20,
         "diameter_mm",
         0.4,
         500,
@@ -110,7 +118,11 @@ def model_addcylinder(
     segments = arguments.get("segments")
     if segments is None:
         segments = 64
-    if isinstance(segments, bool) or not isinstance(segments, int) or not 12 <= segments <= 128:
+    if (
+        isinstance(segments, bool)
+        or not isinstance(segments, int)
+        or not 12 <= segments <= 128
+    ):
         raise ValueError("segments must be an integer from 12 to 128")
     if arguments.get("translation_mm") is not None:
         vector3(arguments["translation_mm"], "translation_mm", -1000, 1000)
@@ -125,7 +137,9 @@ def model_addcylinder(
     return _saved_result(store, updated, object_id=object_id)
 
 
-def model_edit(arguments: dict[str, Any], cfg: dict[str, Any] | None = None) -> dict[str, Any]:
+def model_edit(
+    arguments: dict[str, Any], cfg: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Non-destructive move/rotate/scale/delete of one object in a scene."""
     store = _store(cfg)
     scene = store.load(arguments["model_id"], arguments["revision"])
@@ -139,13 +153,17 @@ def model_edit(arguments: dict[str, Any], cfg: dict[str, Any] | None = None) -> 
     return _saved_result(store, updated, object_id=arguments["object_id"])
 
 
-def model_inspect(arguments: dict[str, Any], cfg: dict[str, Any] | None = None) -> dict[str, Any]:
+def model_inspect(
+    arguments: dict[str, Any], cfg: dict[str, Any] | None = None
+) -> dict[str, Any]:
     store = _store(cfg)
     scene = store.load(arguments["model_id"], arguments["revision"])
     return store.summary(scene, arguments["revision"])
 
 
-def model_export(arguments: dict[str, Any], cfg: dict[str, Any] | None = None) -> dict[str, Any]:
+def model_export(
+    arguments: dict[str, Any], cfg: dict[str, Any] | None = None
+) -> dict[str, Any]:
     store = _store(cfg)
     scene = store.load(arguments["model_id"], arguments["revision"])
     return {
@@ -155,7 +173,7 @@ def model_export(arguments: dict[str, Any], cfg: dict[str, Any] | None = None) -
     }
 
 
-_ID ={"type": "string", "description": "UUID of an existing model."}
+_ID = {"type": "string", "description": "UUID of an existing model."}
 _REV = {
     "type": "string",
     "minLength": 64,
@@ -179,7 +197,9 @@ MODEL_EDITOR_TOOLS: dict[str, dict[str, Any]] = {
     "model.create": {
         "title": "Create 3D model",
         "description": "Создать пустую 3D-сцену Logos. Возвращает model_id и revision; ничего не печатает.",
-        "parameters": object_schema({"name": {"type": "string", "minLength": 1, "maxLength": 120}}, []),
+        "parameters": object_schema(
+            {"name": {"type": "string", "minLength": 1, "maxLength": 120}}, []
+        ),
         "func": model_create,
     },
     "model.addcube": {
@@ -221,7 +241,10 @@ MODEL_EDITOR_TOOLS: dict[str, dict[str, Any]] = {
             {
                 **_EXISTING,
                 "object_id": _ID,
-                "operation": {"type": "string", "enum": ["move", "rotate", "scale", "delete"]},
+                "operation": {
+                    "type": "string",
+                    "enum": ["move", "rotate", "scale", "delete"],
+                },
                 "values": {
                     "anyOf": [
                         {
@@ -265,7 +288,9 @@ for _definition in MODEL_EDITOR_TOOLS.values():
     # Writes change the owner's scenes and export files, so they need approval like other writes.
     _definition.setdefault("requires_approval", not _definition["read_only"])
     _definition.setdefault("executor", {"type": "local"})
-    _definition.setdefault("supported_transports", ["responses_api", "local_agent", "mcp"])
+    _definition.setdefault(
+        "supported_transports", ["responses_api", "local_agent", "mcp"]
+    )
 
 
 __all__ = ["MODEL_EDITOR_TOOLS"]

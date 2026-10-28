@@ -62,7 +62,10 @@ def redact(value: object, secrets: tuple[str, ...]) -> object:
     if isinstance(value, list):
         return [redact(item, secrets) for item in value]
     if isinstance(value, dict):
-        return {str(redact(key, secrets)): redact(item, secrets) for key, item in value.items()}
+        return {
+            str(redact(key, secrets)): redact(item, secrets)
+            for key, item in value.items()
+        }
     return value
 
 
@@ -74,7 +77,10 @@ def save(output: Path, name: str, value: object, secrets: tuple[str, ...]) -> No
 def request(host: str, path: str, token: str, body: Json | None = None) -> Json:
     if host not in {"api.github.com", "ai.api.cloud.yandex.net"}:
         raise ValueError("host_not_allowed")
-    headers = {"User-Agent": "q14-readonly-observer", "Content-Type": "application/json"}
+    headers = {
+        "User-Agent": "q14-readonly-observer",
+        "Content-Type": "application/json",
+    }
     scheme = "Bearer " if host == "api.github.com" else "Api-Key "
     headers["Authorization"] = scheme + token
     if host == "ai.api.cloud.yandex.net":
@@ -106,13 +112,17 @@ def request(host: str, path: str, token: str, body: Json | None = None) -> Json:
 
 
 def github(path: str) -> Json:
-    return request("api.github.com", f"/repos/{REPO}/{path}", env_require("GITHUB_TOKEN"))["data"]
+    return request(
+        "api.github.com", f"/repos/{REPO}/{path}", env_require("GITHUB_TOKEN")
+    )["data"]
 
 
 def git_text(path: str) -> str:
     if path not in FILES:
         raise ValueError("file_not_allowed")
-    return subprocess.check_output(["git", "show", f"{BASELINE}:{path}"], text=True, timeout=10)
+    return subprocess.check_output(
+        ["git", "show", f"{BASELINE}:{path}"], text=True, timeout=10
+    )
 
 
 def inventory() -> dict[str, Json]:
@@ -198,9 +208,19 @@ def validate_decision(value: object, evidence: list[Json]) -> Json:
     known = {item["read_id"] for item in evidence}
     for finding in value["findings"]:
         refs = finding.get("evidence")
-        if not isinstance(refs, list) or not refs or not all(ref in known for ref in refs):
+        if (
+            not isinstance(refs, list)
+            or not refs
+            or not all(ref in known for ref in refs)
+        ):
             raise ValueError("unread_evidence_cited")
-        for field in ("claim", "impact", "recommendation", "counterargument", "uncertainty"):
+        for field in (
+            "claim",
+            "impact",
+            "recommendation",
+            "counterargument",
+            "uncertainty",
+        ):
             if not isinstance(finding.get(field), str) or not finding[field].strip():
                 raise ValueError("finding_field_missing")
     return value
@@ -223,7 +243,8 @@ def observe(reads, sources, evidence, read, output, secrets) -> list[Json]:
 
 def inspect(sources, send, read, output: Path, secrets: tuple[str, ...]) -> Json:
     catalogue = {
-        key: {k: v for k, v in item.items() if k != "text"} for key, item in sources.items()
+        key: {k: v for k, v in item.items() if k != "text"}
+        for key, item in sources.items()
     }
     transcript: list[Json] = []
     evidence: list[Json] = []
@@ -245,7 +266,12 @@ def inspect(sources, send, read, output: Path, secrets: tuple[str, ...]) -> Json
         text = json.dumps(task, ensure_ascii=False)
         if len(text) + len(INSTRUCTIONS) > MAX_INPUT:
             raise ValueError("input_budget_exceeded")
-        save(output, f"input-{number}.json", {"instructions": INSTRUCTIONS, "task": task}, secrets)
+        save(
+            output,
+            f"input-{number}.json",
+            {"instructions": INSTRUCTIONS, "task": task},
+            secrets,
+        )
         call: Json = {
             "number": number,
             "status": "ATTEMPTED_NO_RETRY",
@@ -276,7 +302,11 @@ def inspect(sources, send, read, output: Path, secrets: tuple[str, ...]) -> Json
             save(output, "ledger.json", ledger, secrets)
             return decision
         reads = answer.get("reads")
-        if not isinstance(reads, list) or not 1 <= len(reads) <= 6 or number == MAX_CALLS:
+        if (
+            not isinstance(reads, list)
+            or not 1 <= len(reads) <= 6
+            or number == MAX_CALLS
+        ):
             raise ValueError("read_or_call_budget_invalid")
         observed = observe(reads, sources, evidence, read, output, secrets)
         transcript.append({"model_selected_reads": reads, "tool_results": observed})
@@ -325,7 +355,9 @@ def main() -> int:
         for finding in decision["findings"]:
             summary += json.dumps(finding, ensure_ascii=False, indent=2) + "\n\n"
         summary += decision["limitations"] + "\n"
-        (output / "model-answer.md").write_text(str(redact(summary, secrets)), encoding="utf-8")
+        (output / "model-answer.md").write_text(
+            str(redact(summary, secrets)), encoding="utf-8"
+        )
     except (
         OSError,
         ValueError,
@@ -340,7 +372,9 @@ def main() -> int:
             {
                 "status": "STOPPED_NO_RETRY",
                 "error_type": type(exc).__name__,
-                "detail": str(exc) if isinstance(exc, ValueError) else "operation_failed",
+                "detail": str(exc)
+                if isinstance(exc, ValueError)
+                else "operation_failed",
             },
             secrets,
         )

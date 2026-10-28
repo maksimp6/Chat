@@ -77,7 +77,9 @@ def handle_client(conn: socket.socket, store: MemoryStore, allowed_uid: int) -> 
         return
     try:
         result = _operate(store, receive(conn))
-        response = (json.dumps(result, ensure_ascii=False, separators=(",", ":")) + "\n").encode()
+        response = (
+            json.dumps(result, ensure_ascii=False, separators=(",", ":")) + "\n"
+        ).encode()
         if len(response) > MAX_RESPONSE:
             fallback = {"ok": False, "error": "response_too_large"}
             response = (json.dumps(fallback, separators=(",", ":")) + "\n").encode()
@@ -124,7 +126,9 @@ def serve(database: Path, socket_path: Path, allowed_uid: int) -> None:
                     now = time.monotonic()
                     while recent and now - recent[0] >= 1.0:
                         recent.popleft()
-                    if len(recent) >= MAX_REQUESTS_PER_SECOND or not slots.acquire(blocking=False):
+                    if len(recent) >= MAX_REQUESTS_PER_SECOND or not slots.acquire(
+                        blocking=False
+                    ):
                         conn.close()
                         continue
                     recent.append(now)

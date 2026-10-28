@@ -43,7 +43,10 @@ class Command:
             type(v) is not int for v in (self.x, self.y, self.button)
         ):
             raise MouseError("invalid command")
-        if not (-500 <= self.x <= 500 and -500 <= self.y <= 500) or self.button not in (1, 2):
+        if not (-500 <= self.x <= 500 and -500 <= self.y <= 500) or self.button not in (
+            1,
+            2,
+        ):
             raise MouseError("out of bounds")
         if self.action in ("down", "up", "right") and (self.x, self.y) != (0, 0):
             raise MouseError("button action requires zero deltas")
@@ -134,7 +137,9 @@ class RootSocketBackend:
 
 
 def _json(value: dict[str, Any]) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("ascii")
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("ascii")
 
 
 class InputBackend(Protocol):
@@ -207,7 +212,9 @@ class MouseModule:
 
     def start(self, *, authorized: bool, key: bytes) -> str:
         if authorized is not True or type(key) is not bytes or len(key) != 32:
-            raise MouseError("controller authentication and a protected 32-byte key required")
+            raise MouseError(
+                "controller authentication and a protected 32-byte key required"
+            )
         with self.lock:
             self._release()
             self.key = key
@@ -257,7 +264,11 @@ class MouseModule:
 
     def dispatch(self, packet: bytes) -> tuple[int, int]:
         with self.lock:
-            if not self.active or type(packet) is not bytes or not 0 < len(packet) <= MAX_PACKET:
+            if (
+                not self.active
+                or type(packet) is not bytes
+                or not 0 < len(packet) <= MAX_PACKET
+            ):
                 raise MouseError("unavailable")
             try:
                 envelope = json.loads(packet)
@@ -282,7 +293,9 @@ class MouseModule:
                 if (
                     key is None
                     or len(signature) != 32
-                    or not hmac.compare_digest(signature, hmac.digest(key, _json(grant), "sha256"))
+                    or not hmac.compare_digest(
+                        signature, hmac.digest(key, _json(grant), "sha256")
+                    )
                 ):
                     raise ValueError()
                 if (
@@ -320,7 +333,9 @@ class MouseModule:
             except Exception as exc:
                 # A failing foreground inspector cannot retain a drag lease.
                 self._fail_foreground(revoke=True)
-                raise MouseError("foreground verification failed; session revoked") from exc
+                raise MouseError(
+                    "foreground verification failed; session revoked"
+                ) from exc
             if focused is not True:
                 self._fail_foreground(revoke=False)
                 raise MouseError("unsafe foreground")
@@ -377,7 +392,11 @@ class MouseModule:
 
     def tick(self) -> None:
         with self.lock:
-            if self.held and self.deadline_ns is not None and self.clock() >= self.deadline_ns:
+            if (
+                self.held
+                and self.deadline_ns is not None
+                and self.clock() >= self.deadline_ns
+            ):
                 self._release()
                 self.hide()
 

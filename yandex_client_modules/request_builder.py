@@ -7,7 +7,11 @@ It deliberately has no HTTP, database, tracing, or MCP side effects.
 import math
 
 from core.config import get_model_uri
-from core.model_profiles import ultra_profiles, ultra_reasoning_controllable, ultra_request_defaults
+from core.model_profiles import (
+    ultra_profiles,
+    ultra_reasoning_controllable,
+    ultra_request_defaults,
+)
 from yandex_client_modules.metadata_validator import validate_metadata
 
 
@@ -41,7 +45,9 @@ def validate_generation_params(params):
             or not minimum <= value <= maximum
             or not math.isfinite(value)
         ):
-            raise ValueError(f"{name} must be a finite number between {minimum:g} and {maximum:g}")
+            raise ValueError(
+                f"{name} must be a finite number between {minimum:g} and {maximum:g}"
+            )
         validated[name] = float(value)
     for name in ("background", "store", "stream", "parallel_tool_calls"):
         if name in validated and not isinstance(validated[name], bool):
@@ -56,15 +62,25 @@ def validate_generation_params(params):
         or not isinstance(limit, int)
         or (limit != 0 and limit < 16)
     ):
-        raise ValueError("max_output_tokens must be 0 (no application cap) or an integer of at least 16")
+        raise ValueError(
+            "max_output_tokens must be 0 (no application cap) or an integer of at least 16"
+        )
     tool_limit = validated.get("max_tool_calls")
     if tool_limit is not None and (
-        isinstance(tool_limit, bool) or not isinstance(tool_limit, int) or tool_limit < 0
+        isinstance(tool_limit, bool)
+        or not isinstance(tool_limit, int)
+        or tool_limit < 0
     ):
-        raise ValueError("max_tool_calls must be null (provider default) or a non-negative integer")
+        raise ValueError(
+            "max_tool_calls must be null (provider default) or a non-negative integer"
+        )
     if "top_logprobs" in validated:
         value = validated["top_logprobs"]
-        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 20:
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or not 0 <= value <= 20
+        ):
             raise ValueError("top_logprobs must be an integer between 0 and 20")
     if "previous_response_id" in validated:
         value = validated["previous_response_id"]
@@ -75,8 +91,12 @@ def validate_generation_params(params):
             raise ValueError(f"{name} must be a string")
     if "reasoning_effort" in validated:
         effort = validated["reasoning_effort"]
-        if not isinstance(effort, str) or effort not in _REASONING_EFFORTS | {"disabled"}:
-            raise ValueError("reasoning_effort must be disabled, none, minimal, low, medium, high or xhigh")
+        if not isinstance(effort, str) or effort not in _REASONING_EFFORTS | {
+            "disabled"
+        }:
+            raise ValueError(
+                "reasoning_effort must be disabled, none, minimal, low, medium, high or xhigh"
+            )
     if "reasoning" in validated:
         reasoning = validated["reasoning"]
         if not isinstance(reasoning, dict):
@@ -84,7 +104,9 @@ def validate_generation_params(params):
         if "effort" in reasoning:
             effort = reasoning["effort"]
             if not isinstance(effort, str) or effort not in _REASONING_EFFORTS:
-                raise ValueError("reasoning.effort must be none, minimal, low, medium, high or xhigh")
+                raise ValueError(
+                    "reasoning.effort must be none, minimal, low, medium, high or xhigh"
+                )
     for name, allowed in (
         ("truncation", {"auto", "disabled"}),
         ("service_tier", {"auto", "default", "flex", "scale", "priority"}),
@@ -99,30 +121,46 @@ def validate_generation_params(params):
             raise ValueError("text must be an object")
         if "verbosity" in text:
             verbosity = text["verbosity"]
-            if not isinstance(verbosity, str) or verbosity not in {"low", "medium", "high"}:
+            if not isinstance(verbosity, str) or verbosity not in {
+                "low",
+                "medium",
+                "high",
+            }:
                 raise ValueError("text.verbosity must be low, medium or high")
         if "format" in text:
             text_format = text["format"]
             if not isinstance(text_format, dict):
                 raise ValueError("text.format must be an object")
             format_type = text_format.get("type")
-            if not isinstance(format_type, str) or format_type not in {"text", "json_schema", "json_object"}:
-                raise ValueError("text.format.type must be text, json_schema or json_object")
+            if not isinstance(format_type, str) or format_type not in {
+                "text",
+                "json_schema",
+                "json_object",
+            }:
+                raise ValueError(
+                    "text.format.type must be text, json_schema or json_object"
+                )
             if format_type == "json_schema":
                 if not isinstance(text_format.get("schema"), dict):
                     raise ValueError("text.format.schema must be an object")
                 name = text_format.get("name")
                 if not isinstance(name, str) or not name.strip():
                     raise ValueError("text.format.name must be a non-empty string")
-                if "strict" in text_format and not isinstance(text_format["strict"], bool):
+                if "strict" in text_format and not isinstance(
+                    text_format["strict"], bool
+                ):
                     raise ValueError("text.format.strict must be a boolean")
-                if "description" in text_format and not isinstance(text_format["description"], str):
+                if "description" in text_format and not isinstance(
+                    text_format["description"], str
+                ):
                     raise ValueError("text.format.description must be a string")
     if "tool_choice" in validated:
         choice = validated["tool_choice"]
         if isinstance(choice, str):
             if choice not in {"auto", "none", "required"}:
-                raise ValueError("tool_choice must be auto, none, required or a typed object")
+                raise ValueError(
+                    "tool_choice must be auto, none, required or a typed object"
+                )
         elif isinstance(choice, dict):
             choice_type = choice.get("type")
             if not isinstance(choice_type, str) or not choice_type.strip():
@@ -130,9 +168,13 @@ def validate_generation_params(params):
             if choice_type == "function" and (
                 not isinstance(choice.get("name"), str) or not choice["name"].strip()
             ):
-                raise ValueError("tool_choice.name must be a non-empty string for a function")
+                raise ValueError(
+                    "tool_choice.name must be a non-empty string for a function"
+                )
         else:
-            raise ValueError("tool_choice must be auto, none, required or a typed object")
+            raise ValueError(
+                "tool_choice must be auto, none, required or a typed object"
+            )
     return validated
 
 
@@ -192,13 +234,20 @@ def _sent_value(name, value):
         listed = [tool for tool in value if isinstance(tool, dict)]
         return {
             "count": len(listed),
-            "names": [str(tool.get("name") or tool.get("type") or "")[:128] for tool in listed],
+            "names": [
+                str(tool.get("name") or tool.get("type") or "")[:128] for tool in listed
+            ],
             "strict": sum(1 for tool in listed if tool.get("strict") is True),
         }
     if name == "input" and isinstance(value, list):
         return {
             "count": len(value),
-            "types": [str(item.get("type") or item.get("role") or "")[:32] if isinstance(item, dict) else "" for item in value][:50],
+            "types": [
+                str(item.get("type") or item.get("role") or "")[:32]
+                if isinstance(item, dict)
+                else ""
+                for item in value
+            ][:50],
         }
     return value
 
@@ -216,9 +265,17 @@ def explicit_parameters(model_key, payload):
         if name in ("max_output_tokens", "max_tokens"):
             reason = output.get("basis") or "no_application_output_cap"
         elif name == "reasoning":
-            reason = reasoning.get("basis") if reasoning.get("depth_control") is False else "reasoning_effort_disabled"
+            reason = (
+                reasoning.get("basis")
+                if reasoning.get("depth_control") is False
+                else "reasoning_effort_disabled"
+            )
         elif name == "tools":
-            reason = "photo_request_has_no_tool_loop" if "messages" in payload else "no_tools_in_request"
+            reason = (
+                "photo_request_has_no_tool_loop"
+                if "messages" in payload
+                else "no_tools_in_request"
+            )
         elif name == "max_tool_calls" and payload.get("tools"):
             reason = "provider_default"
         elif name in _TOOL_PARAMETERS:
@@ -321,14 +378,18 @@ def build_response_payload(
     raw_tools = params.get("tools")
     cleaned_tools = _clean_tools(raw_tools) if raw_tools is not None else []
     tool_choice = params.get("tool_choice", "auto")
-    if not cleaned_tools and (tool_choice == "required" or isinstance(tool_choice, dict)):
+    if not cleaned_tools and (
+        tool_choice == "required" or isinstance(tool_choice, dict)
+    ):
         raise ValueError("tool_choice requires an available tool in tools")
     if isinstance(tool_choice, dict) and tool_choice.get("type") == "function":
         if not any(
             tool.get("type") == "function" and tool.get("name") == tool_choice["name"]
             for tool in cleaned_tools
         ):
-            raise ValueError("tool_choice.name must name an available function in tools")
+            raise ValueError(
+                "tool_choice.name must name an available function in tools"
+            )
     if cleaned_tools:
         payload["tools"] = cleaned_tools
         payload["tool_choice"] = tool_choice
@@ -346,7 +407,9 @@ def build_response_payload(
 
     previous_response_id = params.get("previous_response_id")
     if previous_response_id and yandex_conv_id:
-        raise ValueError("previous_response_id cannot be combined with a provider conversation")
+        raise ValueError(
+            "previous_response_id cannot be combined with a provider conversation"
+        )
     if previous_response_id:
         payload["previous_response_id"] = previous_response_id
     if yandex_conv_id:

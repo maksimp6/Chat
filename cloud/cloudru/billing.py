@@ -96,7 +96,12 @@ def parse_consumption_total(payload: Any) -> dict[str, Any]:
                 row_currencies.add(currency)
             if len(row_currencies) > 1:
                 # A sum across currencies is meaningless; report it as unparseable.
-                return {"total_cost": None, "currency": None, "rows": counted, "complete": False}
+                return {
+                    "total_cost": None,
+                    "currency": None,
+                    "rows": counted,
+                    "complete": False,
+                }
             currency = next(iter(row_currencies), None)
             return {
                 "total_cost": total,
@@ -155,10 +160,12 @@ def estimate_container_runtime_cost(
     billable_seconds = active_seconds + idle_seconds
     hours = Decimal(billable_seconds) / Decimal(3600)
     quantum = Decimal("0.0000001")
-    cpu_rub = (hours * normalized["vcpu"] * normalized["vcpu_rub_per_hour"]).quantize(quantum)
-    memory_rub = (hours * normalized["memory_gb"] * normalized["memory_rub_per_gb_hour"]).quantize(
+    cpu_rub = (hours * normalized["vcpu"] * normalized["vcpu_rub_per_hour"]).quantize(
         quantum
     )
+    memory_rub = (
+        hours * normalized["memory_gb"] * normalized["memory_rub_per_gb_hour"]
+    ).quantize(quantum)
 
     return {
         "status": "estimated",
@@ -196,7 +203,9 @@ def reconcile_container_runtime_cost(
     variance = (actual - estimated).quantize(Decimal("0.0000001"))
     variance_percent = None
     if estimated:
-        variance_percent = (variance / estimated * Decimal(100)).quantize(Decimal("0.0001"))
+        variance_percent = (variance / estimated * Decimal(100)).quantize(
+            Decimal("0.0001")
+        )
 
     return {
         "status": "measured",

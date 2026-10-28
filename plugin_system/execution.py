@@ -7,7 +7,10 @@ from typing import Any, Mapping
 from invocation.context import InvocationContext
 from plugin_system.manager import PluginError, PluginManager
 from runtime import RuntimeDispatcher
-from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_providers.universal_tool_platform import (
+    UniversalToolCall,
+    UniversalToolExecutor,
+)
 
 
 class PluginExecutionGateway:
@@ -20,7 +23,9 @@ class PluginExecutionGateway:
 
     OPERATION = "plugin.tool.execute"
 
-    def __init__(self, manager: PluginManager, registry: Any, dispatcher: RuntimeDispatcher):
+    def __init__(
+        self, manager: PluginManager, registry: Any, dispatcher: RuntimeDispatcher
+    ):
         self.manager = manager
         self.executor = UniversalToolExecutor(registry)
         self.dispatcher = dispatcher
@@ -65,7 +70,9 @@ class PluginExecutionGateway:
         finally:
             self.dispatcher.unregister_runtime(runtime_id)
 
-    def _execute_in_scope(self, runtime_context, payload: Mapping[str, Any]) -> dict[str, Any]:
+    def _execute_in_scope(
+        self, runtime_context, payload: Mapping[str, Any]
+    ) -> dict[str, Any]:
         plugin_id = str(payload["plugin_id"])
         tool_name = str(payload["tool_name"])
         context = payload["context"]

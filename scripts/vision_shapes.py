@@ -43,7 +43,9 @@ TRUSTED_LABELS = frozenset(
 
 def _foreground(color: tuple[int, int, int]) -> bool:
     red, green, blue = color
-    return max(color) - min(color) > 24 and max(color) < 225 and red + green + blue < 550
+    return (
+        max(color) - min(color) > 24 and max(color) < 225 and red + green + blue < 550
+    )
 
 
 def _prepare_rgb(image_data: bytes) -> Image.Image:
@@ -150,14 +152,17 @@ def _descriptor(
 def _distance(query: dict, reference: dict) -> float:
     if len(query["grid"]) != GRID * GRID or len(reference["grid"]) != GRID * GRID:
         raise ValueError("invalid template descriptor")
-    mask_distance = sum(abs(a - b) for a, b in zip(query["grid"], reference["grid"])) / (
-        GRID * GRID
-    )
+    mask_distance = sum(
+        abs(a - b) for a, b in zip(query["grid"], reference["grid"])
+    ) / (GRID * GRID)
     shape_distance = min(1.0, abs(math.log(query["aspect"] / reference["aspect"])) / 2)
     fill_distance = abs(query["fill"] - reference["fill"])
     color_distance = abs(query["warmth"] - reference["warmth"])
     return (
-        0.65 * mask_distance + 0.16 * shape_distance + 0.07 * fill_distance + 0.12 * color_distance
+        0.65 * mask_distance
+        + 0.16 * shape_distance
+        + 0.07 * fill_distance
+        + 0.12 * color_distance
     )
 
 
@@ -196,7 +201,9 @@ def _assign_components(case: dict, components: list[dict]) -> list[dict]:
                 "outputs": [
                     {
                         "label": item["label"],
-                        "relative_bbox": _relative_box(item["bbox"], components[0]["bbox"]),
+                        "relative_bbox": _relative_box(
+                            item["bbox"], components[0]["bbox"]
+                        ),
                     }
                     for item in expected
                 ],
@@ -209,7 +216,9 @@ def _assign_components(case: dict, components: list[dict]) -> list[dict]:
     for item in expected:
         best_index = max(
             remaining,
-            key=lambda index: intersection_over_union(item["bbox"], components[index]["bbox"]),
+            key=lambda index: intersection_over_union(
+                item["bbox"], components[index]["bbox"]
+            ),
         )
         if intersection_over_union(item["bbox"], components[best_index]["bbox"]) < 0.3:
             raise ValueError("training foreground does not match ground truth")
@@ -240,7 +249,9 @@ def train(manifest: Path, gallery: Path) -> dict:
         if any(obj["label"] not in TRUSTED_LABELS for obj in case["objects"]):
             raise ValueError("untrusted object class in training annotations")
         if case.get("source_kind") != "cad_render":
-            raise ValueError("training from physical/private photos requires a new approval")
+            raise ValueError(
+                "training from physical/private photos requires a new approval"
+            )
         if case.get("annotation_status") != "reviewed":
             # Intentional: model may train on provisional labels for diagnostics,
             # but the resulting E2E benchmark must remain REVIEW_PENDING.
@@ -275,7 +286,11 @@ def _validate_descriptor(descriptor: object) -> None:
     if not isinstance(grid, list) or len(grid) != GRID * GRID:
         raise ValueError("invalid silhouette grid")
     for item in grid:
-        if not isinstance(item, (int, float)) or not math.isfinite(item) or not 0 <= item <= 1:
+        if (
+            not isinstance(item, (int, float))
+            or not math.isfinite(item)
+            or not 0 <= item <= 1
+        ):
             raise ValueError("invalid silhouette feature")
     for key, low, high in (
         ("aspect", 0.001, 100),
@@ -344,7 +359,11 @@ def predict(image_data: bytes, model: dict, *, max_distance: float = 0.15) -> di
             continue
         template = model["templates"][index]
         label = template["outputs"][0]["label"]
-        competing = [d for d, j in ranked if model["templates"][j]["outputs"][0]["label"] != label]
+        competing = [
+            d
+            for d, j in ranked
+            if model["templates"][j]["outputs"][0]["label"] != label
+        ]
         if competing and min(competing) - distance < 0.045:
             continue  # abstain rather than guess between near-identical classes
         confidence = round(max(0.51, 1 - distance * 1.65), 5)
@@ -352,7 +371,9 @@ def predict(image_data: bytes, model: dict, *, max_distance: float = 0.15) -> di
             box = _absolute_box(out["relative_bbox"], component["bbox"])
             if box[0] >= box[2] or box[1] >= box[3]:
                 continue
-            results.append({"label": out["label"], "bbox": box, "confidence": confidence})
+            results.append(
+                {"label": out["label"], "bbox": box, "confidence": confidence}
+            )
     return {"objects": results, "claims": []}
 
 

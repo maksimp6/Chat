@@ -52,6 +52,7 @@ provider_credentials_bp = Blueprint(
 @provider_credentials_bp.get("/yandex/issuance-status")
 def yandex_issuance_status():
     from provider_accounts.issued_credentials import issuance_status
+
     return jsonify(issuance_status()), 200, {"Cache-Control": "no-store"}
 
 
@@ -61,6 +62,7 @@ def import_runner_yandex_key():
     if not request.is_json:
         return jsonify({"error": "json_required"}), 415
     from provider_accounts.issued_credentials import ImportRejected, import_yandex_key
+
     try:
         result = import_yandex_key(request.get_json(silent=True))
         invalidate_model_discovery_cache()
@@ -70,6 +72,7 @@ def import_runner_yandex_key():
     except Exception:
         # Exception text may contain a secret; never log or return it.
         return jsonify({"error": "credential_storage_failed"}), 503
+
 
 CLOUDRU_DEFAULT_TTL = timedelta(days=1)
 
@@ -97,7 +100,9 @@ def _provider_client(provider: str, project_id: str | None = None):
     raise ValueError(f"Unsupported provider: {provider}")
 
 
-def _load_credential(provider: str, *, allow_expired: bool = False) -> ProviderCredential | None:
+def _load_credential(
+    provider: str, *, allow_expired: bool = False
+) -> ProviderCredential | None:
     conn = get_store()
     try:
         return get_active_credential(
@@ -124,7 +129,9 @@ def _metadata(credential: ProviderCredential | None) -> dict:
         "fingerprint": credential.fingerprint,
         "provider_key_id": credential.trace_key_id,
         "issued_at": credential.issued_at.isoformat() if credential.issued_at else None,
-        "expires_at": credential.expires_at.isoformat() if credential.expires_at else None,
+        "expires_at": credential.expires_at.isoformat()
+        if credential.expires_at
+        else None,
     }
 
 
@@ -174,7 +181,9 @@ def _status_for(provider: str) -> dict:
                 "due": bool(row["expires_at"] and rotation_needed(row["expires_at"])),
                 "active_key_verified": authorization_ok,
             },
-            "last_checked_at": str(row["last_checked_at"]) if row["last_checked_at"] else None,
+            "last_checked_at": str(row["last_checked_at"])
+            if row["last_checked_at"]
+            else None,
         }
 
     return {
@@ -202,7 +211,9 @@ def _perform_health_check(provider: str) -> dict:
         return {"status": "not_configured", "error": None}
     try:
         if provider == YANDEX:
-            _provider_client(provider, credential.project_id).validate_key(credential.api_key)
+            _provider_client(provider, credential.project_id).validate_key(
+                credential.api_key
+            )
         else:
             _provider_client(provider).validate_key(credential.api_key)
         error = None
@@ -250,7 +261,9 @@ def provider_credentials_status_check():
             results[provider] = _perform_health_check(provider)
     except CredentialCryptoError:
         # Covers a missing key and a key that does not match the stored ciphertext.
-        logger.warning("Provider credential unreadable with the configured encryption key")
+        logger.warning(
+            "Provider credential unreadable with the configured encryption key"
+        )
         return jsonify(
             {
                 "error": "credential_unreadable",
@@ -308,23 +321,29 @@ def cloudru_service_accounts():
     expires_raw = pick("expiresAt", "expires_at", "keyExpiresAt", "key_expires_at")
     if expires_raw:
         try:
-            if datetime.fromisoformat(expires_raw.replace("Z", "+00:00")) <= datetime.now(
-                timezone.utc
-            ):
+            if datetime.fromisoformat(
+                expires_raw.replace("Z", "+00:00")
+            ) <= datetime.now(timezone.utc):
                 return jsonify({"error": "cloudru_iam_master_key_expired"}), 401
         except ValueError:
             return jsonify({"error": "invalid_cloudru_iam_master_key_expiry"}), 400
 
     try:
-        accounts = CloudRuIamClient(key_id=key_id, key_secret=key_secret).list_service_accounts()
+        accounts = CloudRuIamClient(
+            key_id=key_id, key_secret=key_secret
+        ).list_service_accounts()
         return jsonify(
             {
                 "service_accounts": [
                     {
-                        "id": str(item.get("id") or item.get("service_account_id") or ""),
+                        "id": str(
+                            item.get("id") or item.get("service_account_id") or ""
+                        ),
                         "name": str(item.get("name") or ""),
                         "project_id": str(
-                            item.get("project_id") or item.get("target", {}).get("project_id") or ""
+                            item.get("project_id")
+                            or item.get("target", {}).get("project_id")
+                            or ""
                         ),
                     }
                     for item in accounts
@@ -365,7 +384,9 @@ def _revoke_replaced_yandex_key(previous: ProviderCredential) -> None:
         _provider_client(YANDEX, previous.project_id).revoke_key(key_id)
     except Exception as exc:
         logger.error(
-            "Replaced Yandex key %s could not be revoked: error=%s", key_id, type(exc).__name__
+            "Replaced Yandex key %s could not be revoked: error=%s",
+            key_id,
+            type(exc).__name__,
         )
 
 
@@ -391,12 +412,16 @@ def bootstrap_cloudru():
         "accessKeySecret",
         "access_key_secret",
     )
-    project_id = request.form.get("project_id", "").strip() or pick("projectId", "project_id")
+    project_id = request.form.get("project_id", "").strip() or pick(
+        "projectId", "project_id"
+    )
     requested_sa_id = request.form.get("service_account_id", "").strip() or pick(
         "serviceAccountId", "service_account_id"
     )
     if not key_id or not key_secret:
-        return jsonify({"error": "Cloud.ru IAM Key ID and Key Secret are required"}), 400
+        return jsonify(
+            {"error": "Cloud.ru IAM Key ID and Key Secret are required"}
+        ), 400
     if not requested_sa_id:
         return jsonify(
             {
@@ -426,7 +451,9 @@ def bootstrap_cloudru():
     iam_expires_at = None
     if iam_expires_raw:
         try:
-            iam_expires_at = datetime.fromisoformat(iam_expires_raw.replace("Z", "+00:00"))
+            iam_expires_at = datetime.fromisoformat(
+                iam_expires_raw.replace("Z", "+00:00")
+            )
             if iam_expires_at <= datetime.now(timezone.utc):
                 return jsonify({"error": "cloudru_iam_master_key_expired"}), 401
         except ValueError:
@@ -456,7 +483,9 @@ def bootstrap_cloudru():
             ), 502
 
         issued_id = api_key_id
-        provider = CloudRuApiKeyProvider(base_url=config.CLOUDRU_BASE_URL, iam_client=management)
+        provider = CloudRuApiKeyProvider(
+            base_url=config.CLOUDRU_BASE_URL, iam_client=management
+        )
         provider.validate_key(api_secret)
 
         conn = get_store()
@@ -495,8 +524,12 @@ def bootstrap_cloudru():
         )
     except PermissionError as exc:
         _discard_cloudru_key(management, issued_id)
-        logger.error("Cloud.ru key validation was refused: error=%s", type(exc).__name__)
-        return jsonify({"error": "Cloud.ru Foundation Models authorization failed"}), 401
+        logger.error(
+            "Cloud.ru key validation was refused: error=%s", type(exc).__name__
+        )
+        return jsonify(
+            {"error": "Cloud.ru Foundation Models authorization failed"}
+        ), 401
     except Exception as exc:
         _discard_cloudru_key(management, issued_id)
         logger.error("Cloud.ru bootstrap failed: error=%s", type(exc).__name__)
@@ -516,7 +549,10 @@ def update_provider_credentials():
     except Exception:
         logger.exception("Invalid provider credentials JSON payload")
         return jsonify(
-            {"error": "invalid_json", "detail": "Тело запроса должно содержать корректный JSON"}
+            {
+                "error": "invalid_json",
+                "detail": "Тело запроса должно содержать корректный JSON",
+            }
         ), 400
     if not isinstance(data, dict):
         return jsonify({"error": "JSON object is required"}), 400
@@ -551,15 +587,21 @@ def update_provider_credentials():
             }
         ), 400
     if not supplied:
-        return jsonify({"error": "Yandex Cloud API key or Cloud.ru API key is required"}), 400
+        return jsonify(
+            {"error": "Yandex Cloud API key or Cloud.ru API key is required"}
+        ), 400
     if any(len(value) > 4096 for _, value in supplied):
         return jsonify({"error": "API key is too long"}), 400
 
     stored_providers: list[str] = []
     try:
         for provider, api_key in supplied:
-            client = _provider_client(provider, yandex_project_id if provider == YANDEX else None)
-            logger.debug("provider credential validation started: provider=%s", provider)
+            client = _provider_client(
+                provider, yandex_project_id if provider == YANDEX else None
+            )
+            logger.debug(
+                "provider credential validation started: provider=%s", provider
+            )
             try:
                 client.validate_key(api_key)
             except PermissionError:
@@ -589,7 +631,9 @@ def update_provider_credentials():
                     }
                 ), 502
             else:
-                logger.debug("provider credential accepted for storage: provider=%s", provider)
+                logger.debug(
+                    "provider credential accepted for storage: provider=%s", provider
+                )
 
         conn = get_store()
         # The Yandex key being replaced is revoked only after the new one is stored, so the provider
@@ -598,11 +642,15 @@ def update_provider_credentials():
         supplied_keys = dict(supplied)
         try:
             previous_yandex = (
-                _load_credential(YANDEX, allow_expired=True) if YANDEX in supplied_keys else None
+                _load_credential(YANDEX, allow_expired=True)
+                if YANDEX in supplied_keys
+                else None
             )
         except CredentialCryptoError:
             # Without decrypting the stored key its identity and revocation are unknown, so replacement is refused.
-            logger.warning("Stored Yandex provider credential is unreadable with the configured encryption key")
+            logger.warning(
+                "Stored Yandex provider credential is unreadable with the configured encryption key"
+            )
             return jsonify(
                 {
                     "error": "credential_unreadable",
@@ -612,7 +660,8 @@ def update_provider_credentials():
                 }
             ), 503
         same_yandex_key = (
-            previous_yandex is not None and previous_yandex.api_key == supplied_keys[YANDEX]
+            previous_yandex is not None
+            and previous_yandex.api_key == supplied_keys[YANDEX]
         )
         for provider, api_key in supplied:
             keep_identity = provider == YANDEX and same_yandex_key
@@ -622,7 +671,9 @@ def update_provider_credentials():
                 str(yandex_project_id) if provider == YANDEX else "",
                 encrypt_secret,
                 provider,
-                provider_key_id=previous_yandex.provider_key_id if keep_identity else None,
+                provider_key_id=previous_yandex.provider_key_id
+                if keep_identity
+                else None,
                 ttl=timedelta(hours=12),
             )
             # Only a real provider request proves authorization. Yandex validation
