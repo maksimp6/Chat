@@ -19,8 +19,8 @@ DEFAULT_VECTOR_STORE_IDS = ("fvtvp6t2su0g5q4ft2ev",)
 # are read as the maximal ones. Later explicit choices carry the revision and stay.
 # Revision 2 raised every setting to its maximum; revision 3 turns live answers on
 # for a record that has no stream key yet. A stream key already stored is kept.
-# Revision 4 adds the cache category to a stored tool selection.
-SETTINGS_REVISION = 4
+# Revision 4 adds the cache category to a stored tool selection, revision 5 the helper one.
+SETTINGS_REVISION = 5
 
 
 def file_search_max_results(value: Any) -> int:
@@ -54,7 +54,8 @@ def upgrade_dialog_settings(settings: Any) -> Any:
     that nobody chose: every hosted tool is switched on and every capacity is raised
     to its maximum. Before revision 3, live (streamed) answers are switched on only when
     the record has no stream key: a stream value already stored, true or false, is kept.
-    Before revision 4, a stored tool selection gets the cache category.
+    Before revision 4, a stored tool selection gets the cache category; before
+    revision 5, the helper category.
     The record is stamped with the revision, so choices made after it are kept; a record
     already at revision 2 keeps its tool selection and later choices.
     """
@@ -99,7 +100,9 @@ def upgrade_dialog_settings(settings: Any) -> Any:
     # A selection saved before the cache category existed could not have chosen it.
     categories = upgraded.get("active_tool_categories")
     if revision < 4 and isinstance(categories, list) and "cache" not in categories:
-        upgraded["active_tool_categories"] = [*categories, "cache"]
+        categories = upgraded["active_tool_categories"] = [*categories, "cache"]
+    if revision < 5 and isinstance(categories, list) and "helper" not in categories:
+        upgraded["active_tool_categories"] = [*categories, "helper"]
     upgraded["settings_revision"] = SETTINGS_REVISION
     return upgraded
 

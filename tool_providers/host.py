@@ -19,7 +19,9 @@ class Host:
     EMBEDDING_MODELS: Any  # core.config.EMBEDDING_MODELS
     EmbeddingError: Any  # yandex_client_modules.embeddings.EmbeddingError
     KristallError: Any  # kristall.KristallError
+    LogosClient: Any  # chat.mcp_routes.LogosClient
     SSHRuntimeError: Any  # remote_runtime.ssh.SSHRuntimeError
+    TEXT_MODELS: Any  # core.config.TEXT_MODELS
     YandexClientError: Any  # yandex_client_modules.errors.YandexClientError
     YandexResponsesClient: Any  # yandex_client_modules.client.YandexResponsesClient
     assert_operation_allowed: (

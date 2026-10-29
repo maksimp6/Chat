@@ -30,6 +30,7 @@
 | rootagent | tool_providers/rootagent.py (composition/tool_sources.py) | 2 | rootagent_run (управление телефоном как юзер: status, probe, capture, tap, swipe, text, key, move, click как задания GitHub Actions на develop), rootagent_result (статус запуска и JSON-результат по run_id). Настройка и границы — [docs/redmi-root-agent.md](../redmi-root-agent.md#logos-tool) |
 | tty | tool_providers/tty.py (composition/tool_sources.py) | 6 | tty_open, tty_write, tty_read, tty_resize, tty_close, tty_list |
 | cache | tool_providers/cache.py | 3 | cache_append, cache_read, cache_search |
+| helper | tool_providers/helper.py | 1 | helper_delegate |
 
 ## Отложенная загрузка (defer_loading)
 
@@ -170,6 +171,27 @@ code interpreter) не откладываются. Выключено (наст�
 - **Лимиты.** Размер текста не ограничен (0 — без лимита приложения). Провайдер
   эмбеддингов ограничивает длину куска сам: слишком длинный кусок остаётся без векторов
   с ошибкой в `embedding_errors`; Files API принимает файл до 128 МБ.
+
+## Модель-помощник (категория helper)
+
+Определён в `tool_providers/helper.py` (`HELPER_TOOLS`), собственный источник реестра;
+доступен в диалоге, локальному агенту и через MCP, без подтверждения.
+
+| Инструмент | Что делает |
+| --- | --- |
+| helper_delegate | Поручить задачу модели-помощнику (`task`, `model` — ключ из `TEXT_MODELS`, `context`, `instructions`, `reasoning_effort` — `high` по умолчанию, `helper_conversation_id`). Помощник выполняет полный ход Логоса через `LogosClient.ask_with_mcp`: тот же цикл инструментов, инструменты и MCP-серверы вызывающего диалога (без диалога — все категории), свой разговор провайдера. Возвращает ответ, рассуждение, статус, `error`/`incomplete_details`, `usage` и `helper_conversation_id`; передав его снова, можно продолжить того же помощника |
+
+- **Инструкции.** Когда `helper_delegate` есть в запросе, к инструкциям модели
+  добавляется `HELPER_NOTE` (`yandex_client_modules/mcp_mixin.py`): делегировать
+  отдельные и параллельные части работы, передавать задачу целиком с контекстом,
+  проверять ответ помощника.
+- **Трассировка.** Запросы помощника записываются в трассировку вызывающего хода.
+- **Подтверждения.** Инструменты, требующие подтверждения владельца, помощник не
+  выполняет: они возвращаются в `pending_tools`.
+- **Лимиты.** Числа раундов, инструментов и глубины вложенности нет (0 — без лимита
+  приложения); помощник тоже может делегировать.
+- **Настройки.** Ревизия настроек диалога 5 добавляет категорию `helper` в сохранённый
+  выбор категорий.
 
 ## Bridge-инструменты MCP-сервера (logos_*)
 

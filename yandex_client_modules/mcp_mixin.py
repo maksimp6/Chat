@@ -73,6 +73,19 @@ CACHE_NOTE = (
     "всегда отдаёт весь текст целиком — и ищи в нём через cache_search."
 )
 
+# The helper tool (tool_providers/helper.py) lets the model hand parts of the work to
+# another model; without a note the model would not know it may delegate.
+HELPER_NOTE = (
+    "\n\nВ этом диалоге есть модель-помощник (инструмент helper_delegate): ей можно "
+    "поручить часть работы. Помощник выполняет полный ход Логоса с теми же "
+    "инструментами, в своём разговоре, и возвращает ответ. Делегируй ему задачи, "
+    "которые можно сделать отдельно или параллельно (поиск, разбор материалов, "
+    "проверку, черновик), и выбирай модель под задачу. Помощник не видит этот диалог: "
+    "передавай задачу целиком и нужный контекст. Чтобы продолжить с тем же "
+    "помощником, передай helper_conversation_id из прежнего результата. Ответ "
+    "помощника проверяй и не выдавай за свой без проверки; его ошибки называй дословно."
+)
+
 
 class YandexMcpMixin:
     def _execute_single_tool(
@@ -418,6 +431,12 @@ class YandexMcpMixin:
             ask_params["instructions"] = (
                 ask_params.get("instructions") or ""
             ) + CACHE_NOTE
+        if execution_policy is None and any(
+            tool.get("name") == "helper_delegate" for tool in local_tools
+        ):
+            ask_params["instructions"] = (
+                ask_params.get("instructions") or ""
+            ) + HELPER_NOTE
         if tools or execution_policy is not None:
             ask_params["tools"] = tools
         if not tools and ask_params.get("tool_choice") == "required":
