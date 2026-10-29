@@ -89,6 +89,17 @@ def _agent_shell():
     )
 
 
+def _browser():
+    from browser import host
+    from tool_providers.filesystem import resolve_tool_path
+    from tool_providers.filesystem import resolves_to_link_local
+
+    return host.Host(
+        resolve_tool_path=resolve_tool_path,
+        resolves_to_link_local=resolves_to_link_local,
+    )
+
+
 def _chat():
     from chat import host
     from core.config import CLASSIFIER_MODELS
@@ -907,6 +918,7 @@ _HOSTS = {
     "agent_memory": ("agent_memory.host", _agent_memory),
     "agent_runtime": ("agent_runtime.host", _agent_runtime),
     "agent_shell": ("agent_shell.host", _agent_shell),
+    "browser": ("browser.host", _browser),
     "chat": ("chat.host", _chat),
     "cloud": ("cloud.host", _cloud),
     "conversations": ("conversations.host", _conversations),

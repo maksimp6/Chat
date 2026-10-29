@@ -37,6 +37,12 @@ def _cloud_tools():
     return CLOUD_TOOLS
 
 
+def _browser_tools():
+    from browser.tools import BROWSER_TOOLS
+
+    return BROWSER_TOOLS
+
+
 # (category, loader, log label, exception logged instead of raised)
 SOURCES = (
     ("government", _government_tools, "Government", Exception),
@@ -44,4 +50,5 @@ SOURCES = (
     ("3d", _printing3d_tools, "3D Printing", Exception),
     ("3d", _model_editor_tools, "Model Editor", ImportError),
     ("cloud", _cloud_tools, "Cloud tools", Exception),
+    ("browser", _browser_tools, "Browser", Exception),
 )

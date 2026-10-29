@@ -26,6 +26,72 @@
 | partner | organization/partner_relations.py | 15 | partner.create/list/get/update/delete, partner.contact.create/list/update/delete, partner.message.prepare/send, partner.thread.get, partner.followup.create/complete, partner.status.update |
 | cloud | cloud/tools.py | 14 | cloud.resources.list/get, cloud.compute.list/status/start/stop/reboot, cloud.costs.summary, cloud.budget.status, cloud.metrics.query, cloud.logs.query, cloud.backup.create, cloud.ssh.exec, cloud.capabilities |
 | forge | forge/tools.py | 6 | printing3d.quote, printing3d.finance.assess/status/plan.set, printing3d.order.create, printing3d.orders.list, printing3d.treasury.summary |
+| browser | browser/tools.py (composition/tool_sources.py) | 17 | browser_open, browser_read, browser_find, browser_extract, browser_click, browser_fill_form, browser_act, browser_wait, browser_evaluate, browser_screenshot, browser_history, browser_tabs, browser_session, browser_cookies, browser_search, browser_request, browser_download |
+
+## Браузер (категория browser)
+
+Определены в `browser/tools.py` (`BROWSER_TOOLS`), подключаются через
+`composition/tool_sources.py` после категории `cloud`; доступны в диалоге и через MCP.
+Подробное описание — [browser/README.md](../../browser/README.md).
+
+| Инструмент | Что делает |
+| --- | --- |
+| browser_open | Открыть адрес во вкладке и сразу получить текст страницы с метками |
+| browser_read | Прочитать текущую страницу в нужном виде (view), раздел, элемент или отбор строк |
+| browser_find | Найти текст: раздел, ближайшая метка, смещение для browser_read |
+| browser_extract | Извлечь элементы по CSS-селектору: текст, Markdown, HTML или атрибуты |
+| browser_click | Нажать ссылку, кнопку, флажок; в chrome — также по координатам |
+| browser_fill_form | Заполнить форму и отправить её (GET/POST, urlencoded, multipart с файлами) |
+| browser_act | type, press, hover, scroll, select, check, uncheck, focus, clear |
+| browser_wait | Ждать адрес, элемент, текст, выражение, затишье сети или просто секунды |
+| browser_evaluate | Выполнить JavaScript на странице chrome; результат — JSON. Требует подтверждения вызова |
+| browser_screenshot | Снимок PNG/JPEG (окно, вся страница, элемент) или PDF |
+| browser_history | back, forward, reload, list |
+| browser_tabs | list, new, switch, close |
+| browser_session | list, status, configure, clear, reset, close |
+| browser_cookies | list (без значений), set, delete, clear. Требует подтверждения вызова |
+| browser_search | Поиск DuckDuckGo, DuckDuckGo Lite, Bing, all или свой шаблон |
+| browser_request | Произвольный HTTP-запрос: метод, заголовки, JSON, форма, multipart, сырое тело. Требует подтверждения вызова |
+| browser_download | Скачать файл потоком на диск (url, метка ссылки/изображения или документ вкладки) |
+
+- **Метки.** У ссылок, кнопок, полей, форм, таблиц и изображений в тексте стоят метки
+  `[L5]`, `[B2]`, `[I3]`, `[F1]`, `[T1]`, `[M4]`; их передают в `ref`. В chrome метки
+  живут в странице и не переиспользуются; после перехода метки новые. `N3` — запрос
+  в виде network (chrome).
+- **Виды (view).** content (основной текст, по умолчанию), page, text, html, outline,
+  links, interactive, forms, tables, images, meta, structured, feed, headers, json,
+  network, console; после перехода также none (только сводка).
+- **Части текста.** `max_chars` обязателен в инструментах, возвращающих текст: 0 — всё.
+  Продолжение — тем же вызовом с `offset=next_offset`. Ничего не обрезается молча:
+  всё пропущенное (реклама в поиске, двоичное тело, `max_bytes`) перечисляется в `notes`.
+- **Сессии.** У каждого диалога своя сессия (cookies, вкладки, история, настройки);
+  вызовы через MCP используют общую сессию `default`; параметр `session` выбирает
+  сессию явно. Сессии живут в памяти процесса до reset/close или перезапуска Logos.
+- **Движки.** По умолчанию — `http`: быстрый, без JavaScript. `chrome` — настоящий Chrome
+  через DevTools Protocol (если установлен); `auto` — сначала http, а страницы, собираемые
+  скриптами, и проверки «я не робот» — в chrome. Переключение на chrome и переоткрытие
+  страницы в chrome выполняются только по явному запросу движка `auto` или `chrome`
+  (аргумент `engine` или `default_engine` в настройках сессии). Действие, которое умеет
+  только chrome, во вкладке auto переоткрывает страницу в chrome, и действие повторяют с
+  новой меткой. Неизвестный движок — ошибка, а не тихая замена.
+- **Типичные цепочки.** browser_search → browser_open(url) → browser_read(view='outline')
+  → browser_read(section='2'); browser_open → browser_fill_form(fields, submit=true);
+  browser_open → browser_click(ref='L5') → browser_download(ref='L7', path='downloads/',
+  overwrite=false); browser_request(url, json_body, json_path) для API.
+- **Сохранённый список инструментов.** Если у диалога сохранён список категорий,
+  отметьте «Модуль: browser», иначе инструменты браузера модели не предлагаются.
+- **Безопасность.** Каждый запрос, перенаправление и каждый запрос Chrome проверяются
+  тем же запретом адресов link-local (метаданные облака), что и `http_fetch`. Браузер
+  не использует профиль, cookies и входы владельца: у каждой сессии чистое состояние.
+  Пароли, токены и значения cookies не показываются модели и не попадают в журналы и
+  трассировку.
+- **Подтверждение.** `browser_wait` с `expression` требует то же подтверждение, что `browser_evaluate`. `browser_request`, `browser_cookies` и `browser_evaluate` объявлены
+  с `requires_approval`: вызов без подтверждения возвращает фазу `approval_required` и
+  текст о том, что нужно. Сквозной путь подтверждения с запросом у пользователя в
+  репозитории пока не завершён.
+- **TLS.** Проверка сертификатов включена. Отключить её может только настройка владельца
+  `ignore_tls_errors` (`browser/settings.py`, по умолчанию выключена): модель этот
+  аргумент не передаёт и не меняет.
 
 ## Bridge-инструменты MCP-сервера (logos_*)
 

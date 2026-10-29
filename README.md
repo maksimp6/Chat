@@ -289,7 +289,7 @@ application; what it serves is assembled in `composition/web.py`), `start.sh`,
 | `mcp_server/`     | MCP server for Logos: protocol, transport, tools and runtime bridge                               |
 | `tool_providers/` | Tool registry and `UniversalToolExecutor`; git, filesystem, Termux, system, Wikipedia and more    |
 | `plugin_system/`  | Plugin manager, execution and routes; `plugins/` holds an example plugin manifest                 |
-| `browser/`        | Browser capability, adapter and orchestration package                                             |
+| `browser/`        | Browser tools for dialogs and MCP (HTTP and Chrome engines, search, forms, downloads), contracts and orchestration |
 | `remote_runtime/` | SSH runtime and branch-aware application environments                                             |
 | `remote_input/`   | Remote input module for integration, not deployed in the root service                             |
 | `rdc_connection/` | Server Remote Desktop Commander pairing integration                                               |

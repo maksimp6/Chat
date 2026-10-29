@@ -31,15 +31,15 @@ ROLE_ACTIONS = {
 class BrowserTaskBudget:
     max_seconds: float = 30.0
     max_tokens: int | None = None
-    max_output_chars: int = 8000
+    max_output_chars: int = 0
 
     def __post_init__(self) -> None:
         if self.max_seconds <= 0:
             raise ValueError("max_seconds must be > 0")
         if self.max_tokens is not None and self.max_tokens < 0:
             raise ValueError("max_tokens must be >= 0")
-        if self.max_output_chars <= 0:
-            raise ValueError("max_output_chars must be > 0")
+        if self.max_output_chars < 0:
+            raise ValueError("max_output_chars must be >= 0 (0 = no limit)")
 
 
 @dataclass(frozen=True)
@@ -148,7 +148,7 @@ def _serialized_size(value: Any) -> tuple[str, int]:
 
 def _compact_output(value: Any, max_chars: int) -> tuple[Any, int]:
     serialized, length = _serialized_size(value)
-    if length <= max_chars:
+    if max_chars <= 0 or length <= max_chars:
         return value, length
     return {
         "truncated": True,

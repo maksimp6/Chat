@@ -222,6 +222,7 @@ copies = [
 [[tool.logos.vendored]]
 canonical = "tool_providers/schema.py"
 copies = [
+    "browser/_vendor/schema.py",
     "cloud/_vendor/schema.py",
     "forge/_vendor/schema.py",
     "model_editor/_vendor/schema.py",
@@ -234,6 +235,7 @@ copies = [
     "agent_memory/_binding.py",
     "agent_runtime/_binding.py",
     "agent_shell/_binding.py",
+    "browser/_binding.py",
     "chat/_binding.py",
     "cloud/_binding.py",
     "conversations/_binding.py",

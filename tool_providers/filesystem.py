@@ -91,6 +91,10 @@ def _get_entry_path(path: str) -> str:
     return os.path.join(_get_abs_path(head), tail)
 
 
+# Public name for other units; they reach it through their host ports.
+resolve_tool_path = _get_abs_path
+
+
 def read_file(args: dict) -> dict:
     """Низкоуровневое позиционированное чтение файлов (аналог C fopen + fseek + fread)."""
     path = args.get("path") or args.get("file_path") or args.get("filename")
@@ -550,6 +554,10 @@ def _resolves_to_link_local(url: str) -> bool:
         except ValueError:
             continue
     return False
+
+
+# Public name for other units; they reach it through their host ports.
+resolves_to_link_local = _resolves_to_link_local
 
 
 class _LinkLocalGuardRedirect(urllib.request.HTTPRedirectHandler):

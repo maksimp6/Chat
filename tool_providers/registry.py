@@ -55,7 +55,7 @@ _TOOL_SOURCES: tuple[tuple[str, str, str, str, type[BaseException]], ...] = (
     ("runtime", "tool_providers.runtime_tools", "RUNTIME_TOOLS", "Runtime", Exception),
 )
 # Other units' sources (government, partner relations, 3D printing, model editor,
-# cloud) arrive through the external_tool_sources port and load after these.
+# cloud, browser) arrive through the external_tool_sources port and load after these.
 
 
 def _module_tools(module_name: str, attribute: str) -> Mapping[str, Any]:

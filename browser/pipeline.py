@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
 from browser.orchestration import BrowserDagResult, BrowserRoleDag, BrowserRoleTask
@@ -71,7 +71,7 @@ class SemanticBrowserWorker:
             raise ValueError("semantic snapshot worker result must be a mapping")
 
         max_nodes = int(
-            80 if task.metadata.get("max_nodes") is None else task.metadata["max_nodes"]
+            0 if task.metadata.get("max_nodes") is None else task.metadata["max_nodes"]
         )
         max_chars = int(task.metadata.get("max_chars") or task.budget.max_output_chars)
         interactive_only = bool(task.metadata.get("interactive_only", False))

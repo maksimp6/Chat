@@ -26,6 +26,14 @@ INTERACTIVE_ROLES = frozenset(
 )
 
 
+# Length caps of the semantic text, in characters. 0 means no limit (the default):
+# the text is then kept whole and nothing is cut.
+SEMANTIC_NAME_LIMIT = 0
+SEMANTIC_VALUE_LIMIT = 0
+SEMANTIC_URL_LIMIT = 0
+SEMANTIC_VERSION_LIMIT = 0
+
+
 def _stable_json(value: Any) -> str:
     return json.dumps(
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
@@ -38,7 +46,7 @@ def _bounded_text(value: Any, limit: int) -> str | None:
     text = str(value).strip()
     if not text:
         return None
-    if len(text) <= limit:
+    if limit <= 0 or len(text) <= limit:
         return text
     return text[: max(0, limit - 1)] + "…"
 
@@ -76,8 +84,8 @@ class SemanticNode:
         return cls(
             node_id=node_id,
             role=role,
-            name=_bounded_text(raw.get("name") or raw.get("label"), 240),
-            value=_bounded_text(_node_value(raw), 320),
+            name=_bounded_text(raw.get("name") or raw.get("label"), SEMANTIC_NAME_LIMIT),
+            value=_bounded_text(_node_value(raw), SEMANTIC_VALUE_LIMIT),
             states=_normalize_states(raw.get("states")),
         )
 
@@ -119,16 +127,16 @@ class SemanticSnapshot:
 def build_semantic_snapshot(
     raw: Mapping[str, Any],
     *,
-    max_nodes: int = 80,
-    max_chars: int = 8000,
+    max_nodes: int = 0,
+    max_chars: int = 0,
     interactive_only: bool = False,
 ) -> SemanticSnapshot:
     if not isinstance(raw, Mapping):
         raise TypeError("semantic snapshot input must be a mapping")
-    if max_nodes < 1:
-        raise ValueError("max_nodes must be >= 1")
-    if max_chars < 128:
-        raise ValueError("max_chars must be >= 128")
+    if max_nodes < 0:
+        raise ValueError("max_nodes must be >= 0 (0 = no limit)")
+    if 0 < max_chars < 128:
+        raise ValueError("max_chars must be 0 (no limit) or >= 128")
 
     raw_nodes = raw.get("nodes")
     if raw_nodes is None:
@@ -148,7 +156,7 @@ def build_semantic_snapshot(
         node = SemanticNode.from_mapping(item, index=index)
         if interactive_only and not node.interactive:
             continue
-        if len(nodes) >= max_nodes:
+        if max_nodes > 0 and len(nodes) >= max_nodes:
             truncated = True
             break
         nodes.append(node)
@@ -161,15 +169,15 @@ def build_semantic_snapshot(
     facts = {str(key): value for key, value in raw_facts.items()}
 
     snapshot = SemanticSnapshot(
-        url=_bounded_text(raw.get("url"), 1024),
-        title=_bounded_text(raw.get("title"), 320),
-        version=_bounded_text(raw.get("version"), 128),
+        url=_bounded_text(raw.get("url"), SEMANTIC_URL_LIMIT),
+        title=_bounded_text(raw.get("title"), SEMANTIC_VALUE_LIMIT),
+        version=_bounded_text(raw.get("version"), SEMANTIC_VERSION_LIMIT),
         nodes=tuple(nodes),
         facts=facts,
         truncated=truncated,
     )
 
-    while nodes and len(_stable_json(snapshot.to_mapping())) > max_chars:
+    while nodes and max_chars > 0 and len(_stable_json(snapshot.to_mapping())) > max_chars:
         nodes.pop()
         truncated = True
         snapshot = SemanticSnapshot(
@@ -181,7 +189,7 @@ def build_semantic_snapshot(
             truncated=True,
         )
 
-    if len(_stable_json(snapshot.to_mapping())) > max_chars and facts:
+    if max_chars > 0 and len(_stable_json(snapshot.to_mapping())) > max_chars and facts:
         compact_facts: dict[str, Any] = {}
         for key in sorted(facts):
             candidate = {**compact_facts, key: facts[key]}
@@ -193,7 +201,7 @@ def build_semantic_snapshot(
                 facts=candidate,
                 truncated=True,
             )
-            if len(_stable_json(candidate_snapshot.to_mapping())) > max_chars:
+            if max_chars > 0 and len(_stable_json(candidate_snapshot.to_mapping())) > max_chars:
                 break
             compact_facts = candidate
         snapshot = SemanticSnapshot(
@@ -367,6 +375,10 @@ __all__ = [
     "Evidence",
     "INTERACTIVE_ROLES",
     "MergedEvidence",
+    "SEMANTIC_NAME_LIMIT",
+    "SEMANTIC_URL_LIMIT",
+    "SEMANTIC_VALUE_LIMIT",
+    "SEMANTIC_VERSION_LIMIT",
     "SemanticDiff",
     "SemanticNode",
     "SemanticSnapshot",
