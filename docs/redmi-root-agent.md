@@ -163,3 +163,52 @@ exact counter transition, and independently validated native green frame.
 PNG files were retained in the successful phone job workspace; this native
 runner does not upload standard Actions artifacts. Frame hashes and the full
 sanitized acceptance report are in the linked job log.
+
+## Logos tool
+
+Logos reaches the RootAgent through two tools, `rootagent_run` and
+`rootagent_result` (category `rootagent`, source `tool_providers/rootagent.py`).
+`rootagent_run` dispatches the `rootagent_command` action of
+`.github/workflows/redmi9-app-server.yml` on `develop` and returns the run id at
+once; it never waits for the device. `rootagent_result` reads that run's status
+and, after the run completes, its JSON result. The device work happens only in
+that GitHub Actions job, on the existing `redmi9` runner.
+
+### What is configured, and by whom
+
+| Setting | Where it lives | Set by | Required value |
+| --- | --- | --- | --- |
+| Environment `rootagent-command` | GitHub repository settings, Environments | Repository owner | Required reviewers. GitHub creates the environment on first use with no reviewers, so configure them before the first dispatch. The job declares `environment: rootagent-command`. |
+| Token | Logos server environment variable `LOGOS_ROOTAGENT_DISPATCH_TOKEN` | Server operator | Fine-grained token with Actions read and write on this repository only |
+| Repository | Logos server environment variable `LOGOS_ROOTAGENT_REPOSITORY` | Server operator | `owner/name` of this repository |
+
+The token is never written to the repository, to logs, to tool results or to
+error text. If either variable is missing, the tool returns an explicit error
+and does not call GitHub.
+
+### What the job allows
+
+- The job runs only for `refs/heads/develop`. Other branches never start it.
+- Commands are `status`, `probe`, `capture`, `move` and `click`. There is no
+  `wake`, no text or key input, no unlock, no PIN, and no retry of an uncertain
+  input.
+- `status` and `probe` take no arguments. `capture` takes a package name.
+  `move` and `click` take `DX DY PACKAGE`, with `DX` and `DY` integers from
+  `-500` through `500`. The job validates the arguments before anything runs,
+  and the tool applies the same rules.
+- `capture`, `move` and `click` need the caller's approval, checked inside
+  `rootagent_run`. `status`, `probe` and `rootagent_result` need none.
+- The JSON result is uploaded as a workflow artifact, and for `capture` only,
+  the PNG too. Both have a retention of 1 day and nothing is committed. The PNG
+  is written to the RAM disk, never to flash.
+- The job has an 8-minute timeout.
+- `rootagent_native_check` and the device guard are unchanged. This job is the
+  only one in the workflow that uploads artifacts.
+
+### Reading a dispatch
+
+A successful `rootagent_run` means the job was accepted, not that the phone
+acted. The CLI's own rules still apply: a daemon `OK` is `submitted`, not
+`verified`. If GitHub accepts a dispatch but returns no run id, the tool says so
+and the run must not be dispatched again; find it in Actions on `develop` first.
+A dispatch that failed with no response is reported as unknown for the same reason.

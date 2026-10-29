@@ -10,7 +10,16 @@ on:
         required: true
         default: deploy
         type: choice
-        options: [deploy, screenshots, tools_self_check, verify_screenshots, rootagent_native_check, art_generate]
+        options: [deploy, screenshots, tools_self_check, verify_screenshots, rootagent_native_check, art_generate, rootagent_command]
+      rootagent_command:
+        description: "RootAgent command, used only with action rootagent_command"
+        required: false
+        type: choice
+        options: [status, probe, capture, move, click]
+      rootagent_args:
+        description: "Arguments for rootagent_command: move and click take 'DX DY PACKAGE', capture takes 'PACKAGE', status and probe take none"
+        required: false
+        type: string
 
 permissions: {}
 
@@ -420,3 +429,156 @@ jobs:
           if [ -f "$MEDIA_DIR/art.jpg" ]; then
             echo "picture bytes: $(wc -c < "$MEDIA_DIR/art.jpg")"
           fi
+
+  # Dispatched by the Logos tool rootagent_run. Only the five bounded commands below run here:
+  # no text, keys, unlock, PIN or retry. Runs only for develop, after the environment approves it.
+  rootagent_command:
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'rootagent_command' && github.ref == 'refs/heads/develop'
+    runs-on: redmi9
+    timeout-minutes: 8
+    environment: rootagent-command
+    permissions:
+      contents: read
+    steps:
+      - name: Validate the RootAgent request before anything runs
+        id: request
+        shell: bash
+        timeout-minutes: 1
+        env:
+          ROOTAGENT_COMMAND: ${{ inputs.rootagent_command }}
+          ROOTAGENT_ARGS: ${{ inputs.rootagent_args }}
+        run: |
+          set -euo pipefail
+          python -I - <<'PY'
+          import os
+          import re
+
+          COMMANDS = ("status", "probe", "capture", "move", "click")
+          ALLOWED = re.compile(r"[A-Za-z0-9_. -]*")
+          PACKAGE = re.compile(r"[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+")
+          INTEGER = re.compile(r"-?(?:0|[1-9][0-9]{0,2})")
+          command = os.environ.get("ROOTAGENT_COMMAND", "")
+          raw = os.environ.get("ROOTAGENT_ARGS", "")
+          if command not in COMMANDS:
+              raise SystemExit("rootagent_command must be one of status, probe, capture, move, click")
+          if ALLOWED.fullmatch(raw) is None:
+              raise SystemExit("rootagent_args may contain only letters, digits, underscore, dot, minus and spaces")
+          tokens = raw.split(" ") if raw else []
+          dx = dy = package = ""
+          if command in ("status", "probe"):
+              if tokens:
+                  raise SystemExit(f"{command} takes no arguments")
+          elif command == "capture":
+              if len(tokens) != 1 or PACKAGE.fullmatch(tokens[0]) is None:
+                  raise SystemExit("capture takes one package name, such as com.example.app")
+              package = tokens[0]
+          else:
+              if (
+                  len(tokens) != 3
+                  or INTEGER.fullmatch(tokens[0]) is None
+                  or INTEGER.fullmatch(tokens[1]) is None
+                  or PACKAGE.fullmatch(tokens[2]) is None
+              ):
+                  raise SystemExit(f"{command} takes DX DY PACKAGE: two integers and a package name")
+              dx, dy, package = int(tokens[0]), int(tokens[1]), tokens[2]
+              if not (-500 <= dx <= 500 and -500 <= dy <= 500):
+                  raise SystemExit("move and click deltas must be integers from -500 through 500")
+              dx, dy = str(dx), str(dy)
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"command={command}\n")
+              output.write(f"dx={dx}\n")
+              output.write(f"dy={dy}\n")
+              output.write(f"package={package}\n")
+          print(f"rootagent_command {command} accepted")
+          PY
+
+      - name: Mount the RAM disk for a capture only
+        id: media
+        if: steps.request.outputs.command == 'capture'
+        shell: bash
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
+          mkdir -p -m 700 "$RUNNER_TEMP/scripts"
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$RUNNER_TEMP/scripts/redmi_media_ram.sh"
+          # Media goes only to a fixed-size RAM disk: never to flash, wiped on unmount.
+          media=$(bash "$RUNNER_TEMP/scripts/redmi_media_ram.sh" mount)
+          echo "media=$media" >> "$GITHUB_OUTPUT"
+
+      - name: Run one bounded RootAgent command on the Redmi 9
+        id: run
+        shell: bash
+        timeout-minutes: 3
+        env:
+          ROOTAGENT_COMMAND: ${{ steps.request.outputs.command }}
+          ROOTAGENT_DX: ${{ steps.request.outputs.dx }}
+          ROOTAGENT_DY: ${{ steps.request.outputs.dy }}
+          ROOTAGENT_PACKAGE: ${{ steps.request.outputs.package }}
+          ROOTAGENT_MEDIA: ${{ steps.media.outputs.media }}
+        run: |
+          set -euo pipefail
+          test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
+          mkdir -p -m 700 "$RUNNER_TEMP/scripts"
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/redmi_root_agent.py" -o "$RUNNER_TEMP/scripts/redmi_root_agent.py"
+          case "$ROOTAGENT_COMMAND" in
+            status|probe)
+              argv=("$ROOTAGENT_COMMAND") ;;
+            capture)
+              argv=(capture --output "$ROOTAGENT_MEDIA/rootagent-capture.png" --expected-package "$ROOTAGENT_PACKAGE") ;;
+            move|click)
+              argv=("$ROOTAGENT_COMMAND" "$ROOTAGENT_DX" "$ROOTAGENT_DY" --expected-package "$ROOTAGENT_PACKAGE") ;;
+            *)
+              echo "unexpected command" >&2
+              exit 1 ;;
+          esac
+          # The CLI's JSON is the result. Its exit status is kept until the artifacts are uploaded.
+          set +e
+          python "$RUNNER_TEMP/scripts/redmi_root_agent.py" "${argv[@]}" > "$RUNNER_TEMP/rootagent-result.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/rootagent-result.json"
+          exit "$status"
+
+      - name: Record why no result was written
+        if: always() && steps.request.outcome == 'success'
+        shell: bash
+        timeout-minutes: 1
+        env:
+          MEDIA_OUTCOME: ${{ steps.media.outcome }}
+          RUN_OUTCOME: ${{ steps.run.outcome }}
+        run: |
+          set -euo pipefail
+          result="$RUNNER_TEMP/rootagent-result.json"
+          if [ -s "$result" ]; then
+            exit 0
+          fi
+          printf '{"ok": false, "phase": "job", "media_step": "%s", "run_step": "%s"}\n' "$MEDIA_OUTCOME" "$RUN_OUTCOME" > "$result"
+
+      - name: Upload the RootAgent result as a workflow artifact
+        if: always() && steps.request.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rootagent-command-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/rootagent-result.json
+          retention-days: 1
+          if-no-files-found: warn
+
+      - name: Upload the captured PNG as a workflow artifact
+        if: always() && steps.request.outcome == 'success' && steps.request.outputs.command == 'capture' && steps.media.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rootagent-capture-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.media.outputs.media }}/rootagent-capture.png
+          retention-days: 1
+          if-no-files-found: ignore
+
+      - name: Unmount the RAM disk
+        if: always() && steps.media.outcome != 'skipped'
+        shell: bash
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          bash "$RUNNER_TEMP/scripts/redmi_media_ram.sh" umount

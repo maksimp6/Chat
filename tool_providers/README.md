@@ -20,6 +20,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 | [`tool_providers.filesystem`](filesystem.py) | Инструменты стандартной библиотеки Python и файловой системы для Logos. Включает: |
 | [`tool_providers.registry`](registry.py) | Provider-agnostic registry for Logos tools. |
 | [`tool_providers.runtime_tools`](runtime_tools.py) | Universal tool definitions backed by the SSH Runtime. |
+| [`tool_providers.rootagent`](rootagent.py) | Logos tools `rootagent_run` and `rootagent_result` for the Redmi 9 RootAgent job on GitHub Actions. Registered as the `rootagent` external tool source through `composition/tool_sources.py`; not in `__all__`. |
 | [`tool_providers.universal_tool_platform`](universal_tool_platform.py) | Provider-agnostic tool contracts and execution pipeline for Logos. |
 
 Other units reach it only through their own ports:

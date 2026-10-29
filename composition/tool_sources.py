@@ -43,6 +43,12 @@ def _browser_tools():
     return BROWSER_TOOLS
 
 
+def _rootagent_tools():
+    from tool_providers.rootagent import ROOTAGENT_TOOLS
+
+    return ROOTAGENT_TOOLS
+
+
 # (category, loader, log label, exception logged instead of raised)
 SOURCES = (
     ("government", _government_tools, "Government", Exception),
@@ -51,4 +57,5 @@ SOURCES = (
     ("3d", _model_editor_tools, "Model Editor", ImportError),
     ("cloud", _cloud_tools, "Cloud tools", Exception),
     ("browser", _browser_tools, "Browser", Exception),
+    ("rootagent", _rootagent_tools, "Root agent", Exception),
 )
