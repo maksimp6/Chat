@@ -3,33 +3,60 @@
 Yandex AI Studio refuses a request with more than 100 tools ("The number of tools
 exceeds the maximum allowed limit of 100"), deferred tools included (#1703). When
 the turn's tools do not fit, each local category is sent as one function
-``tools_<category>`` whose description lists every tool of the category with its
-parameters; the model calls it with ``tool`` and ``arguments`` and the executor
-runs that tool. Every tool stays available; only the shape of the call changes.
+``tools_<category>`` whose description lists every tool of the category by name and
+synonyms (not its full description or parameters); the model calls it with ``tool``
+and ``arguments`` and the executor runs that tool. Parameters and usage examples are
+not inlined — the model looks them up in the index (cache_search / file_search).
+Every tool stays available; only the shape of the call changes.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 # The provider's documented maximum: a platform limit, not an application one.
 PROVIDER_TOOL_LIMIT = 100
 GROUP_PREFIX = "tools_"
 
+# Short words carry no search signal; dropped when synonyms are mined from a description.
+_STOPWORDS = frozenset(
+    """the a an and or of to in for on with by from into как что это или и в на для с по из
+    инструмент команда функция файл файла файлы когда если без это того которые тот эта этот
+    tool command function file files when returns return get set list the its their this that""".split()
+)
+_WORD = re.compile(r"[A-Za-zА-Яа-яЁё0-9]+")
+
 
 def group_name(category: str) -> str:
     return GROUP_PREFIX + category
 
 
+def _synonyms(tool: dict[str, Any]) -> str:
+    """Search keywords for a tool: its name parts plus salient words of its description.
+
+    Used instead of the full prose description so the grouped listing stays small while
+    the model can still recognise a tool by meaning. The parameter schema and usage
+    examples are not inlined — the model looks those up in the index (see group_tool).
+    """
+    name = str(tool.get("name") or "")
+    seen: list[str] = []
+    for token in re.split(r"[._]", name):
+        token = token.strip().lower()
+        if token and token not in seen:
+            seen.append(token)
+    for word in _WORD.findall(str(tool.get("description") or "")):
+        word = word.lower()
+        if len(word) >= 3 and word not in _STOPWORDS and word not in seen:
+            seen.append(word)
+        if len(seen) >= 10:
+            break
+    return ", ".join(seen)
+
+
 def _tool_line(tool: dict[str, Any]) -> str:
-    parameters = json.dumps(
-        tool.get("parameters") or {"type": "object", "properties": {}},
-        ensure_ascii=False,
-        separators=(",", ":"),
-    )
-    description = " ".join(str(tool.get("description") or "").split())
-    return f"- {tool['name']}: {description} Параметры (JSON Schema): {parameters}"
+    return f"- {tool['name']} — {_synonyms(tool)}"
 
 
 def group_tool(category: str, tools: list[dict[str, Any]]) -> dict[str, Any]:
@@ -37,8 +64,12 @@ def group_tool(category: str, tools: list[dict[str, Any]]) -> dict[str, Any]:
     names = [tool["name"] for tool in tools]
     description = (
         f"Категория инструментов «{category}». Вызови эту функцию с полем tool — имя "
-        "нужного инструмента — и полем arguments — объект его параметров по схеме ниже. "
-        "Инструменты категории:\n" + "\n".join(_tool_line(tool) for tool in tools)
+        "нужного инструмента — и полем arguments — объект его параметров.\n"
+        "Ниже только имена и синонимы (для узнавания), без параметров и примеров. "
+        "Чтобы узнать параметры и увидеть примеры вызова инструмента, найди их в индексе: "
+        "инструментом cache_search (накопленный индекс, туда же попадает архив диалогов) "
+        "или встроенным file_search по имени инструмента.\n"
+        "Инструменты (имя — синонимы):\n" + "\n".join(_tool_line(tool) for tool in tools)
     )
     grouped = {
         "type": "function",
