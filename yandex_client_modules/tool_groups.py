@@ -56,7 +56,7 @@ def _synonyms(tool: dict[str, Any]) -> str:
 
 
 def _tool_line(tool: dict[str, Any]) -> str:
-    return f"- {tool['name']} — {_synonyms(tool)}"
+    return f"- {tool['name']} {_synonyms(tool)}"
 
 
 def group_tool(category: str, tools: list[dict[str, Any]]) -> dict[str, Any]:
@@ -69,7 +69,7 @@ def group_tool(category: str, tools: list[dict[str, Any]]) -> dict[str, Any]:
         "Чтобы узнать параметры и увидеть примеры вызова инструмента, найди их в индексе: "
         "инструментом cache_search (накопленный индекс, туда же попадает архив диалогов) "
         "или встроенным file_search по имени инструмента.\n"
-        "Инструменты (имя — синонимы):\n" + "\n".join(_tool_line(tool) for tool in tools)
+        "Инструменты (имя и синонимы):\n" + "\n".join(_tool_line(tool) for tool in tools)
     )
     grouped = {
         "type": "function",
