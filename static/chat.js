@@ -2028,28 +2028,32 @@ document.addEventListener("DOMContentLoaded", function () {
       if (id !== null && Number.isInteger(index) && index > live.lastId) live.lastId = index;
     };
     let response = firstResponse;
-    while (response) {
-      const result = await readLiveStream(response, {
-        signal: stopSignal,
-        idleMs: LIVE_IDLE_MS,
-        onEvent: onEvent,
-        onRelease: function (release) { live.release = release; },
-      });
-      live.release = null;
-      if (result.done) {
-        document.removeEventListener("visibilitychange", onVisible);
-        const body = result.done.body && typeof result.done.body === "object" ? result.done.body : {};
-        // addMessage scrolls to the end; a reader who scrolled up keeps the same text in view, since the stored reply
-        // takes the bubble's place. The chat follows to the end only when it was there.
-        const box = live.el.parentNode;
-        const keepTop = box && !isPinned(box) ? box.scrollTop : null;
-        live.finish(outcome.render(body, Number(result.done.http_status) || 0, { live: true }));
-        if (keepTop !== null) box.scrollTop = keepTop;
-        return;
+    try {
+      while (response) {
+        const result = await readLiveStream(response, {
+          signal: stopSignal,
+          idleMs: LIVE_IDLE_MS,
+          onEvent: onEvent,
+          onRelease: function (release) { live.release = release; },
+        });
+        live.release = null;
+        if (result.done) {
+          const body = result.done.body && typeof result.done.body === "object" ? result.done.body : {};
+          // addMessage scrolls to the end; a reader who scrolled up keeps the same text in view, since the stored reply
+          // takes the bubble's place. The chat follows to the end only when it was there.
+          const box = live.el.parentNode;
+          const keepTop = box && !isPinned(box) ? box.scrollTop : null;
+          live.finish(outcome.render(body, Number(result.done.http_status) || 0, { live: true }));
+          if (keepTop !== null) box.scrollTop = keepTop;
+          return;
+        }
+        response = await reattachLiveTurn(turn, live, stopSignal, result.lastActivity, outcome);
       }
-      response = await reattachLiveTurn(turn, live, stopSignal, result.lastActivity, outcome);
+    } finally {
+      // Also on «Стоп» and a lost turn, which leave the loop by a throw.
+      live.release = null;
+      document.removeEventListener("visibilitychange", onVisible);
     }
-    document.removeEventListener("visibilitychange", onVisible);
   }
 
   // The server lost the turn in a restart. The question can be sent again with «Повторить» unless it had photos, which a
