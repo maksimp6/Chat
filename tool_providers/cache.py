@@ -1,7 +1,7 @@
 """The Logos cache: one long text that only grows (category ``cache``).
 
 ``CACHE_TOOLS`` holds three tools: ``cache_append`` adds text to the end,
-``cache_read`` reads the text or a part of it and ``cache_search`` finds places in
+``cache_read`` reads the whole text (it is only read in full) and ``cache_search`` finds places in
 it by substring, regular expression or meaning. The model and other tools write to
 one text shared by every dialog. Nothing in it is ever changed or removed.
 
@@ -305,22 +305,13 @@ def cache_append(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str
 
 
 def cache_read(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
-    """The cache text, whole or ``length`` characters from ``offset``."""
-    arguments = arguments if isinstance(arguments, Mapping) else {}
-    offset = arguments.get("offset") or 0
-    length = arguments.get("length") or 0
-    if type(offset) is not int or type(length) is not int or length < 0:
-        return _failure("offset and length must be integers", "validation")
+    """The whole cache text: it is only ever read in full."""
     text = _read_text()
-    start = max(0, len(text) + offset) if offset < 0 else min(offset, len(text))
-    end = min(start + length, len(text)) if length else len(text)
     return {
         "success": True,
         "path": str(cache_file_path()),
         "total_chars": len(text),
-        "start": start,
-        "end": end,
-        "text": text[start:end],
+        "text": text,
     }
 
 
@@ -515,28 +506,8 @@ CACHE_TOOLS: dict[str, dict[str, Any]] = {
     ),
     "cache_read": _definition(
         title="Cache: read",
-        description=(
-            "Read the cache text: all of it, or length characters from offset "
-            "(a negative offset counts from the end)."
-        ),
-        parameters=object_schema(
-            {
-                "offset": _optional(
-                    {
-                        "type": "integer",
-                        "description": "First character; negative: from the end; 0 or not given: start",
-                    }
-                ),
-                "length": _optional(
-                    {
-                        "type": "integer",
-                        "minimum": 0,
-                        "description": "Characters to read; 0 or not given: to the end",
-                    }
-                ),
-            },
-            [],
-        ),
+        description="Read the whole cache text, from the first piece to the last.",
+        parameters=object_schema({}, []),
         read_only=True,
         func=cache_read,
     ),
