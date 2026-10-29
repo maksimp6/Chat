@@ -68,6 +68,7 @@ legacy relative input through the existing root mouse daemon.
 | `swipe X Y X2 Y2 [--duration-ms MS]` | Swipe/scroll from (X, Y) to (X2, Y2) through root `input swipe` |
 | `text STR` | Type a string through root `input text` |
 | `key KEYCODE` | Send a key (e.g. `KEYCODE_HOME`, `KEYCODE_BACK`, `KEYCODE_ENTER`, or a number) through root `input keyevent` |
+| `browse URL --output PATH [--wait-ms MS]` | In one call: wake the display, dismiss a non-secure keyguard, open the URL with `am start -a VIEW`, wait, and capture the screen |
 | `move DX DY [--expected-package PACKAGE]` | Submit bounded relative mouse movement through the C daemon |
 | `click DX DY [--expected-package PACKAGE]` | Submit one bounded relative movement and left click through the C daemon |
 
@@ -188,7 +189,7 @@ that GitHub Actions job, on the existing `redmi9` runner.
 
 | Setting | Where it lives | Set by | Required value |
 | --- | --- | --- | --- |
-| Token | Logos server environment variable `LOGOS_ROOTAGENT_DISPATCH_TOKEN` | Server operator | Fine-grained token with Actions read and write on this repository only |
+| Token | Logos server environment variable `LOGOS_ROOTAGENT_DISPATCH_TOKEN` | Server operator | Fine-grained token on this repository only: Actions read and write, and Contents read and write (it writes `pending/<run_id>.json` and reads `runs/<run_id>.json` on the `rootagent-results` branch) |
 | Repository | Logos server environment variable `LOGOS_ROOTAGENT_REPOSITORY` | Server operator | `owner/name` of this repository |
 
 The token is never written to the repository, to logs, to tool results or to

@@ -45,7 +45,11 @@ COMMANDS = (
     "swipe",
     "text",
     "key",
+    "browse",
 )
+URL_PATTERN = r"https?://[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:[/?#][^\s]*)?"
+URL = re.compile(URL_PATTERN)
+URL_LIMIT = 2048
 DELTA_LIMIT = 500
 COORD_LIMIT = 99999
 DURATION_LIMIT = 60000
@@ -105,6 +109,11 @@ def _validated(args: Mapping[str, Any]) -> tuple[str, str]:
     package = args.get("package")
     if command in ("status", "probe"):
         return command, ""
+    if command == "browse":
+        url = args.get("url")
+        if not isinstance(url, str) or len(url) > URL_LIMIT or URL.fullmatch(url) is None:
+            raise ValueError("browse требует url вида https://ru.wikipedia.org")
+        return command, url
     if command == "capture":
         if package is None:
             return command, ""
@@ -235,6 +244,46 @@ def _dispatched_run(raw: bytes) -> tuple[int | None, str | None]:
     return payload["workflow_run_id"], html if isinstance(html, str) else None
 
 
+def _put_pending(
+    owner: str, name: str, token: str, run_id: int, command: str, args: str
+) -> None:
+    """Write this run's request to pending/<run_id>.json on the results branch."""
+
+    def send(method: str, path: str, body: Mapping[str, Any] | None = None) -> Any:
+        try:
+            _, raw = _github(method, _repository_url(owner, name, path), token, body)
+        except urllib.error.HTTPError as error:
+            if error.code == 404:
+                return None
+            raise _http_failure(error, token) from None
+        except Exception as error:
+            raise _Failure(
+                f"GitHub не ответил при записи запроса ({type(error).__name__})",
+                "execution",
+            ) from None
+        return json.loads(raw) if raw else {}
+
+    if send("GET", f"git/ref/heads/{RESULTS_BRANCH}") is None:
+        base = send("GET", f"git/ref/heads/{BRANCH}")
+        if not isinstance(base, dict):
+            raise _Failure(f"Не найдена ветка {BRANCH}", "execution")
+        send(
+            "POST",
+            "git/refs",
+            {"ref": f"refs/heads/{RESULTS_BRANCH}", "sha": base["object"]["sha"]},
+        )
+    content = json.dumps({"command": command, "args": args}).encode("utf-8")
+    send(
+        "PUT",
+        f"contents/pending/{run_id}.json",
+        {
+            "message": f"rootagent request {run_id}",
+            "content": base64.b64encode(content).decode("ascii"),
+            "branch": RESULTS_BRANCH,
+        },
+    )
+
+
 def _results_file(
     owner: str, name: str, token: str, path: str
 ) -> tuple[bool, bytes | None]:
@@ -307,6 +356,17 @@ def rootagent_run(
             ),
             "metadata": {"phase": "execution", "dispatch": "accepted", "command": command},
         }
+    # The phone runner's job reads its request from pending/<run_id>.json on the
+    # results branch (it cannot resolve workflow inputs), waiting up to a minute.
+    try:
+        _put_pending(owner, name, token, run_id, command, argument_text)
+    except _Failure as failure:
+        failure.result["error"] = (
+            f"Запуск {run_id} поставлен, но запрос не доставлен на ветку "
+            f"{RESULTS_BRANCH}: {failure.result['error']}"
+        )
+        failure.result["metadata"].update({"run_id": run_id, "dispatch": "accepted"})
+        return failure.result
     return {
         "success": True,
         "run_id": run_id,
@@ -434,6 +494,14 @@ _RUN_PROPERTIES = {
             "description": "Строка для ввода командой text (одна строка, без переводов строки)",
         }
     ),
+    "url": _optional(
+        {
+            "type": "string",
+            "maxLength": URL_LIMIT,
+            "pattern": "^" + URL_PATTERN + "$",
+            "description": "Адрес для browse: разбудить экран, открыть его в браузере и снять экран",
+        }
+    ),
     "keycode": _optional(
         {
             "type": "string",
@@ -474,7 +542,8 @@ ROOTAGENT_TOOLS: dict[str, dict[str, Any]] = {
         "description": (
             "Управлять телефоном Redmi 9 как пользователь через GitHub Actions: status, probe, "
             "capture (снимок экрана), tap (нажатие в точке), swipe (свайп), text (ввод строки), "
-            "key (клавиша, в т.ч. системная), move и click (относительная мышь). Задание идёт "
+            "key (клавиша, в т.ч. системная), browse (разбудить экран, открыть url в "
+            "браузере и сразу снять экран), move и click (относительная мышь). Задание идёт "
             "на ветке develop. Инструмент сразу возвращает run_id; результат читайте через "
             "rootagent_result. Успешный ответ означает, что запуск принят, а не что действие "
             "уже выполнено на телефоне."

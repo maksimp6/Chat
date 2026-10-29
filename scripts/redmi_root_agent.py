@@ -164,6 +164,17 @@ def _bounded_int(value, low, high):
 
 
 KEYCODE = re.compile(r"KEYCODE_[A-Z0-9_]+|[0-9]{1,4}")
+URL = re.compile(r"https?://[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:[/?#][^\s]*)?")
+
+
+def wake_display():
+    """Light the display within this call; a separate run would see it time out again."""
+    for keycode in ("KEYCODE_WAKEUP", "KEYCODE_POWER"):
+        if screen_state().get("display_on") is True:
+            return True
+        bounded_command(["/system/bin/input", "keyevent", keycode])
+        time.sleep(1.5)
+    return screen_state().get("display_on") is True
 
 
 def validate_png(png):
@@ -324,12 +335,14 @@ def worker(request):
         "swipe": {"x", "y", "x2", "y2"},
         "text": {"text"},
         "key": {"keycode"},
+        "browse": {"url"},
     }
     optional = {
         "capture": {"expected_package"},
         "move": {"expected_package"},
         "click": {"expected_package"},
         "swipe": {"duration_ms"},
+        "browse": {"wait_ms"},
     }
     if command not in required:
         raise AgentError("invalid_worker_request")
@@ -457,6 +470,44 @@ def worker(request):
             "submitted": True,
             "verified": False,
         }
+    if command == "browse":
+        url = request["url"]
+        if not isinstance(url, str) or len(url) > 2048 or URL.fullmatch(url) is None:
+            raise AgentError("invalid_url")
+        wait = request.get("wait_ms", 6000)
+        if not _bounded_int(wait, 0, 30000):
+            raise AgentError("invalid_wait")
+        # Wake, open and capture in one call: between separate runs the screen
+        # times out again, which is why a lone capture came back black.
+        display_on = wake_display()
+        try:
+            bounded_command(["/system/bin/wm", "dismiss-keyguard"])
+        except AgentError:
+            pass
+        bounded_command(
+            [
+                "/system/bin/am",
+                "start",
+                "-a",
+                "android.intent.action.VIEW",
+                "-d",
+                url,
+            ]
+        )
+        time.sleep(wait / 1000)
+        png = bounded_command(["/system/bin/screencap", "-p"], PNG_LIMIT, 15)
+        metadata = validate_png(png)
+        state = screen_state()
+        return {
+            **metadata,
+            "command": "browse",
+            "url": url,
+            "display_woken": display_on,
+            "display_on": state["display_on"],
+            "keyguard_locked_or_unknown": not state["unlocked"],
+            "focus_package": state["package"],
+            "png_base64": base64.b64encode(png).decode("ascii"),
+        }
     if command == "capture":
         expected = request.get("expected_package")
         if "expected_package" in request and (
@@ -555,8 +606,13 @@ def main():
         "swipe",
         "text",
         "key",
+        "browse",
     ):
         sub = commands.add_parser(command)
+        if command == "browse":
+            sub.add_argument("url")
+            sub.add_argument("--output", required=True)
+            sub.add_argument("--wait-ms", dest="wait_ms", type=int)
         if command == "capture":
             sub.add_argument("--output", required=True)
             sub.add_argument("--expected-package")

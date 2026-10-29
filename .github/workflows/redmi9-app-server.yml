@@ -15,7 +15,7 @@ on:
         description: "RootAgent command, used only with action rootagent_command"
         required: false
         type: choice
-        options: [status, probe, capture, move, click, tap, swipe, text, key]
+        options: [status, probe, capture, move, click, tap, swipe, text, key, browse]
       rootagent_args:
         description: "Args for rootagent_command: tap 'X Y'; swipe 'X Y X2 Y2 [DUR]'; text 'STRING'; key 'KEYCODE'; move/click 'DX DY [PACKAGE]'; capture 'PACKAGE' optional; status/probe none"
         required: false
@@ -452,7 +452,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          import base64, hashlib, json, os, re, subprocess, sys, tempfile
+          import base64, hashlib, json, os, re, subprocess, sys, tempfile, time
           import urllib.error, urllib.request
 
           REPO = os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat")
@@ -467,7 +467,8 @@ jobs:
           BRANCH = "rootagent-results"
 
           COMMANDS = ("status", "probe", "capture", "move", "click",
-                      "tap", "swipe", "text", "key")
+                      "tap", "swipe", "text", "key", "browse")
+          URL = re.compile(r"https?://[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:[/?#][^\s]*)?")
           STRICT = re.compile(r"[A-Za-z0-9_. -]*")
           PACKAGE = re.compile(r"[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+")
           DELTA = re.compile(r"-?(?:0|[1-9][0-9]{0,2})")
@@ -516,16 +517,32 @@ jobs:
               sys.exit(0)
 
 
-          def read_pending():
-              code, info = call("GET", API + "/contents/pending/request.json?ref=" + BRANCH)
+          def take(path):
+              code, info = call("GET", API + "/contents/" + path + "?ref=" + BRANCH)
               if code != 200 or not isinstance(info, dict) or not info.get("content"):
-                  return "status", ""
-              try:
-                  pend = json.loads(base64.b64decode(info["content"]))
-              except Exception:
-                  return "status", ""
-              call("DELETE", API + "/contents/pending/request.json",
+                  return None
+              call("DELETE", API + "/contents/" + path,
                    {"message": "consume request", "branch": BRANCH, "sha": info["sha"]})
+              try:
+                  return json.loads(base64.b64decode(info["content"]))
+              except Exception:
+                  return None
+
+
+          def read_pending():
+              # rootagent_run writes pending/<run_id>.json right after the dispatch
+              # returns the run id, so wait briefly for it; a manual request may use
+              # the shared pending/request.json; with neither, run status.
+              deadline = time.monotonic() + 60
+              while True:
+                  pend = take("pending/" + RUN_ID + ".json")
+                  if pend is None:
+                      pend = take("pending/request.json")
+                  if pend is not None or time.monotonic() >= deadline:
+                      break
+                  time.sleep(3)
+              if not isinstance(pend, dict):
+                  return "status", ""
               return str(pend.get("command", "status")), str(pend.get("args", "") or "")
 
 
@@ -533,6 +550,11 @@ jobs:
               if command not in COMMANDS:
                   raise ValueError("command must be one of " + ", ".join(COMMANDS))
               request = {"command": command}
+              if command == "browse":
+                  if len(raw) > 2048 or URL.fullmatch(raw) is None:
+                      raise ValueError("browse takes one http(s) URL")
+                  request["url"] = raw
+                  return request
               if command == "text":
                   if not raw or len(raw) > 4096 or any(c in raw for c in ("\x00", "\n", "\r")):
                       raise ValueError("text must be a non-empty single line up to 4096 chars")
@@ -602,7 +624,7 @@ jobs:
 
               argv = [sys.executable, cli_path, "--request", req_path]
               png_path = None
-              if command == "capture":
+              if command in ("capture", "browse"):
                   png_path = os.path.join(TEMP, "rootagent-capture.png")
                   argv += ["--output", png_path]
               proc = subprocess.run(argv, capture_output=True, text=True, timeout=180)
