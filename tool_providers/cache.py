@@ -417,6 +417,19 @@ def cache_search(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str
 # Definitions
 
 
+def _guarded(func: Any) -> Any:
+    """A tool whose storage path is not configured answers with the reason, not a generic error."""
+
+    def run(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
+        try:
+            return func(arguments, cfg)
+        except bound.KristallError as exc:
+            return _failure(str(exc), "storage")
+
+    run.__name__ = func.__name__
+    return run
+
+
 def _optional(schema: dict[str, Any]) -> dict[str, Any]:
     return {"anyOf": [schema, {"type": "null"}]}
 
@@ -474,14 +487,14 @@ CACHE_TOOLS: dict[str, dict[str, Any]] = {
             ["text"],
         ),
         read_only=False,
-        func=cache_append,
+        func=_guarded(cache_append),
     ),
     "cache_read": _definition(
         title="Cache: read",
         description="Read the whole cache text, from the first piece to the last.",
         parameters=object_schema({}, []),
         read_only=True,
-        func=cache_read,
+        func=_guarded(cache_read),
     ),
     "cache_search": _definition(
         title="Cache: search",
@@ -501,7 +514,7 @@ CACHE_TOOLS: dict[str, dict[str, Any]] = {
             ["query"],
         ),
         read_only=True,
-        func=cache_search,
+        func=_guarded(cache_search),
     ),
 }
 
