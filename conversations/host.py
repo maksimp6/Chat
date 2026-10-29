@@ -20,16 +20,13 @@ class Host:
     )
     ModelDiscoveryError: Any  # provider_accounts.model_discovery.ModelDiscoveryError
     delete_conversation: Any  # storage.records.delete_conversation
-    get_conv_settings: Any  # storage.records.get_conv_settings
     get_conversations: Any  # storage.records.get_conversations
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_memory_client: Any  # agent_memory.client.get_memory_client
     memory_file_path: Any  # storage.records.memory_file_path
     update_conversation_model: Any  # storage.records.update_conversation_model
     update_conversation_title: Any  # storage.records.update_conversation_title
-    upgrade_dialog_settings: (
-        Any  # yandex_client_modules.tool_config.upgrade_dialog_settings
-    )
+    global_settings: Any  # yandex_client_modules.tool_config.global_settings
     validate_dialog_model: (
         Any  # provider_accounts.model_discovery.validate_dialog_model
     )
@@ -49,24 +46,19 @@ __all__ = [
     "current",
     "provide",
     "delete_conversation",
-    "get_conv_settings",
     "get_conversations",
     "get_current_owner_id",
     "get_memory_client",
     "memory_file_path",
     "update_conversation_model",
     "update_conversation_title",
-    "upgrade_dialog_settings",
+    "global_settings",
     "validate_dialog_model",
 ]
 
 
 def delete_conversation(*args: Any, **kwargs: Any) -> Any:
     return current().delete_conversation(*args, **kwargs)
-
-
-def get_conv_settings(*args: Any, **kwargs: Any) -> Any:
-    return current().get_conv_settings(*args, **kwargs)
 
 
 def get_conversations(*args: Any, **kwargs: Any) -> Any:
@@ -93,8 +85,8 @@ def update_conversation_title(*args: Any, **kwargs: Any) -> Any:
     return current().update_conversation_title(*args, **kwargs)
 
 
-def upgrade_dialog_settings(*args: Any, **kwargs: Any) -> Any:
-    return current().upgrade_dialog_settings(*args, **kwargs)
+def global_settings(*args: Any, **kwargs: Any) -> Any:
+    return current().global_settings(*args, **kwargs)
 
 
 def validate_dialog_model(*args: Any, **kwargs: Any) -> Any:

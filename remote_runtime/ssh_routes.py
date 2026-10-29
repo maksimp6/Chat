@@ -1,85 +1,21 @@
-"""HTTP API of the SSH runtime: settings (read-only) and a connection test."""
+"""HTTP API of the SSH runtime: its settings, read-only."""
 
 from __future__ import annotations
 
 import logging
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
 
-from remote_runtime.host import bound, get_current_owner_id
-from remote_runtime.ssh import SSHRuntimeError
-from remote_runtime.ssh_settings import public_settings, test_connection
+from remote_runtime.host import bound
+from remote_runtime.ssh_settings import public_settings
 
 logger = logging.getLogger("logos.remote_runtime.ssh_routes")
 
-# What the SSH window says for each error: what happened and what to do. The SSH text
-# itself goes to the log only.
+# What the SSH window says when the settings cannot be read; the cause goes to the log.
 _DETAILS = {
     "ssh_settings_unreadable": (
         "Не удалось прочитать настройки SSH Runtime. Проверьте сохранённые цели "
         "и known_hosts в настройках на сервере: в окне они только для чтения."
-    ),
-    "target is required": "Укажите имя цели для проверки.",
-    "ssh_runtime_disabled": (
-        "SSH Runtime выключен в настройках на сервере (в окне они только для "
-        "чтения). Включите его там и повторите проверку."
-    ),
-    "ssh_settings_invalid": (
-        "Сохранённые настройки SSH Runtime не прошли проверку. "
-        "Исправьте JSON целей в настройках на сервере и повторите."
-    ),
-    "ssh_target_not_found": (
-        "Цель с таким именем не найдена. Проверьте имя в поле «Проверить target» "
-        "и в JSON целей."
-    ),
-    "ssh_user_invalid": (
-        "Пользователь Linux цели не задан или указан неверно: нужно до 64 символов, "
-        "только латинские буквы, цифры, точка, _ и -. Проверьте default_user "
-        "и identity_map в JSON цели."
-    ),
-    "ssh_user_not_allowed": (
-        "Пользователь Linux цели не входит в allowed_users. Добавьте его в "
-        "allowed_users или укажите другого default_user."
-    ),
-    "ssh_known_hosts_missing": (
-        "Не указан файл known_hosts. Укажите общий known_hosts или known_hosts "
-        "цели в настройках на сервере и повторите."
-    ),
-    "ssh_host_key_rejected": (
-        "Ключа сервера нет в known_hosts, или он изменился. Добавьте актуальный "
-        "ключ сервера в файл known_hosts и повторите."
-    ),
-    "ssh_host_not_found": "Имя сервера не найдено. Проверьте host в JSON цели.",
-    "ssh_connection_refused": (
-        "Сервер отказал в подключении. Проверьте host и port цели и что на сервере "
-        "запущен SSH."
-    ),
-    "ssh_host_unreachable": (
-        "Сервер недоступен по сети. Проверьте host цели и сеть сервера Logos."
-    ),
-    "ssh_connection_timeout": (
-        "Сервер не ответил за время подключения. Проверьте host, port "
-        "и доступность сервера."
-    ),
-    "ssh_identity_file_unavailable": (
-        "Файл ключа (identity_file) не найден или не читается на сервере Logos. "
-        "Проверьте путь в JSON цели и права файла."
-    ),
-    "ssh_authentication_failed": (
-        "Сервер не принял ключ SSH. Проверьте identity_file цели и что открытый ключ "
-        "добавлен в authorized_keys пользователя на сервере."
-    ),
-    "ssh_client_unavailable": (
-        "На сервере Logos не удалось запустить ssh. Установите OpenSSH-клиент "
-        "на сервере Logos."
-    ),
-    "ssh_connection_failed": (
-        "Не удалось подключиться по SSH. Проверьте host, port, пользователя "
-        "и ключ цели."
-    ),
-    "ssh_connection_test_failed": (
-        "Проверка не выполнена из-за ошибки сервера. Повторите позже; подробности "
-        "в журнале сервера."
     ),
 }
 
@@ -96,44 +32,9 @@ def get_ssh_runtime_settings():
         ), 400
 
 
-def test_ssh_runtime_connection():
-    try:
-        owner_id = get_current_owner_id()
-        data = request.get_json(silent=True) or {}
-        target = str(data.get("target") or "").strip()
-        if not target:
-            return jsonify(
-                {
-                    "error": "target is required",
-                    "detail": _DETAILS["target is required"],
-                }
-            ), 400
-        result = test_connection(target, owner_id)
-        return jsonify(result)
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
-    except SSHRuntimeError as exc:
-        # The cause code and its text go to the window; the SSH text is only logged.
-        code = exc.code if exc.code in _DETAILS else "ssh_connection_failed"
-        logger.warning("SSH Runtime connection test failed: %s: %s", code, exc)
-        return jsonify({"success": False, "error": code, "detail": _DETAILS[code]}), 400
-    except Exception:
-        logger.exception("SSH Runtime connection test failed")
-        return jsonify(
-            {
-                "success": False,
-                "error": "ssh_connection_test_failed",
-                "detail": _DETAILS["ssh_connection_test_failed"],
-            }
-        ), 400
-
-
 def install(app: Flask) -> None:
     """Serve the SSH runtime API; endpoints keep the view names."""
     app.add_url_rule(
         "/api/ssh-runtime/settings", view_func=get_ssh_runtime_settings, methods=["GET"]
     )
-    # Settings are read-only: they are shown, never saved through the API.
-    app.add_url_rule(
-        "/api/ssh-runtime/test", view_func=test_ssh_runtime_connection, methods=["POST"]
-    )
+    # Settings are read-only: they are shown, never saved or tested through the API.

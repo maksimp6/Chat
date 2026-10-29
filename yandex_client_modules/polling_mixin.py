@@ -34,6 +34,7 @@ class YandexPollingMixin:
         headers=None,
         *,
         on_event=None,
+        should_stop=None,
     ):
         # The deadline runs on the monotonic clock: a wall-clock jump on the phone
         # neither ends the wait early nor stretches it.
@@ -56,6 +57,8 @@ class YandexPollingMixin:
         # if the wait ends right after it.
         invalid_response = None
         while time.monotonic() - start < timeout:
+            if should_stop is not None and should_stop():
+                raise YandexClientError(f"Turn stopped by its owner while waiting for {task_id}")
             poll_start = time.time()
             resp = None
             exc = None

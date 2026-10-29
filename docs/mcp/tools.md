@@ -31,16 +31,20 @@
 | tty | tool_providers/tty.py (composition/tool_sources.py) | 6 | tty_open, tty_write, tty_read, tty_resize, tty_close, tty_list |
 | cache | tool_providers/cache.py | 3 | cache_append, cache_read, cache_search |
 
-## Настройки только для чтения
+## Настройки: общие и только для чтения
 
-Все настройки только для чтения: маршрутов `PUT /api/conversations/<conv_id>/settings`,
-`PUT /api/conversations/<conv_id>/tools`, `POST /api/mcp-servers`,
-`PUT /api/mcp-servers/<server_id>`, `PUT /api/memory/config` и
-`PUT /api/ssh-runtime/settings` нет. Окна «Инструменты», «Параметры», «SSH Runtime»,
-«MCP Серверы» и память показывают сохранённые значения без кнопок сохранения;
-MCP-сервер можно только удалить, SSH — проверить подключение, память — очистить.
-Цветовая схема хранится на устройстве и остаётся выбираемой. Описанные ниже
-переключатели окон показывают значения, которые применяет сервер.
+Настройки общие для всех диалогов: отдельных настроек у диалога нет, сохранённые
+раньше записи диалогов не читаются. Ход диалога берёт `global_settings()`
+(`yandex_client_modules/tool_config.py`) — все значения на максимуме, все категории
+инструментов, все MCP-серверы владельца. Браузер читает их из `GET /api/settings`.
+
+Изменить настройки через API нельзя: маршрутов `PUT /api/conversations/<conv_id>/settings`,
+`GET`/`PUT /api/conversations/<conv_id>/tools`, `POST /api/mcp-servers`,
+`PUT`/`DELETE /api/mcp-servers/<server_id>`, `PUT /api/memory/config`,
+`POST /api/memory/clear`, `PUT /api/ssh-runtime/settings` и `POST /api/ssh-runtime/test`
+нет. Окна «Инструменты», «Параметры», «SSH Runtime», «MCP Серверы» и память только
+показывают значения: полей для ввода и кнопок действий нет. Цветовая схема хранится на
+устройстве и остаётся выбираемой.
 
 ## Отложенная загрузка (defer_loading)
 

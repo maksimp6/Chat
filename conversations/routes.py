@@ -1,4 +1,4 @@
-"""HTTP API of one conversation: title, model, deletion and dialog settings."""
+"""HTTP API of conversations: title, model, deletion, and the global settings every dialog uses."""
 
 from __future__ import annotations
 
@@ -8,11 +8,10 @@ from conversations.ownership import _conversation_record, check_access, delete_o
 from conversations.host import (
     bound,
     delete_conversation,
-    get_conv_settings,
     get_current_owner_id,
+    global_settings,
     update_conversation_model,
     update_conversation_title,
-    upgrade_dialog_settings,
     validate_dialog_model,
 )
 
@@ -78,12 +77,11 @@ def remove_conv(conv_id):
     return jsonify({"status": "deleted"})
 
 
-def get_dialog_settings(conv_id):
-    owner_id = get_current_owner_id(required=False)
-    if not owner_id or not check_access(conv_id, owner_id):
-        return jsonify({"error": "conversation_not_found"}), 404
-    # Settings saved before the maximal defaults are shown as they are applied.
-    return jsonify(upgrade_dialog_settings(get_conv_settings(conv_id) or {}))
+def get_settings():
+    """The global settings every dialog uses; there are no per-dialog settings."""
+    if not get_current_owner_id(required=False):
+        return jsonify({"error": "owner_required"}), 401
+    return jsonify(global_settings())
 
 
 def install(app: Flask) -> None:
@@ -100,9 +98,5 @@ def install(app: Flask) -> None:
     app.add_url_rule(
         "/api/conversations/<conv_id>", view_func=remove_conv, methods=["DELETE"]
     )
-    # Settings are read-only: they are shown, never saved through the API.
-    app.add_url_rule(
-        "/api/conversations/<conv_id>/settings",
-        view_func=get_dialog_settings,
-        methods=["GET"],
-    )
+    # Settings are global and read-only: shown, never saved through the API.
+    app.add_url_rule("/api/settings", view_func=get_settings, methods=["GET"])

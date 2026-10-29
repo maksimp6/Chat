@@ -78,44 +78,9 @@
     }
   };
 
-  window.clearMemory = async function (category) {
-    var confirmed = await window.LogosDialog.confirm("Очистить память?", {
-      confirmText: "Очистить",
-      danger: true,
-    });
-    if (!confirmed) return;
-    try {
-      var response = await window.LogosDispatcher.request("/api/memory/clear", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category: category }),
-      });
-      if (!response.ok) throw new Error("HTTP " + response.status);
-      await window.loadMemoryData();
-    } catch (error) {
-      console.error("[Memory] Failed to clear memory:", error);
-      reportStatus("Не удалось очистить память.");
-    }
-  };
-
   function bindMemoryPanelEvents() {
     if (window.__logosMemoryPanelBound === true) return;
     window.__logosMemoryPanelBound = true;
-
-    document.addEventListener(
-      "click",
-      function (event) {
-        var target =
-          event.target && event.target.closest ? event.target.closest("#memoryClearBtn") : null;
-        if (!target) return;
-
-        if (target.id === "memoryClearBtn") {
-          event.preventDefault();
-          window.clearMemory(null);
-        }
-      },
-      true,
-    );
 
     document.addEventListener("logos:modal:before-open", function (event) {
       var detail = event && event.detail;

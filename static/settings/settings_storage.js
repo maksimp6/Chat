@@ -91,14 +91,10 @@
 
   var STORAGE_KEY = "logos_settings";
   var SKILLS_BACKUP_KEY = "logos_skills_backup";
-  var serverSettingsCache = {};
-  // Set when the stored settings of a dialog could not be read, so the cache holds local values or defaults.
-  var serverSettingsUnknown = {};
-  var globalSettingsCache = null; // cache
-
-  function convKey(convId) {
-    return STORAGE_KEY + "_conv_" + convId;
-  }
+  // Settings are global and read-only (GET /api/settings): one set for every dialog, nothing saved.
+  var serverSettings = null;
+  // Set when the server settings could not be read, so the windows show the defaults.
+  var serverSettingsUnknown = false;
 
   // The server publishes one canonical set of Ultra parameters per model.
   function ultraProfileFor(modelKey) {
@@ -131,53 +127,25 @@
     return settings;
   }
 
-  // Синхронная загрузка (из кэша или localStorage для обратной совместимости)
-  function load(convId) {
-    convId =
-      convId || (typeof currentConvId !== "undefined" && currentConvId ? currentConvId : null);
-    if (convId && serverSettingsCache[convId]) {
-      return applyUltraSettings(JSON.parse(JSON.stringify(serverSettingsCache[convId])));
-    }
-    var base = JSON.parse(JSON.stringify(DEFAULTS));
-    try {
-      var global = globalSettingsCache;
-      if (global === null) {
-        global = localStorage.getItem(STORAGE_KEY);
-        globalSettingsCache = global || "";
-      }
-      if (global) base = window.SettingsUI.deepMerge(base, upgradeLegacySettings(JSON.parse(global)));
-    } catch (e) {}
-    if (convId) {
-      try {
-        var conv = localStorage.getItem(convKey(convId));
-        if (conv) base = window.SettingsUI.deepMerge(base, upgradeLegacySettings(JSON.parse(conv)));
-      } catch (e) {}
-    }
+  // The global settings as last read from the server, else the defaults. A dialog id is
+  // accepted and ignored: no dialog has settings of its own.
+  function load() {
+    var base = JSON.parse(JSON.stringify(serverSettings || DEFAULTS));
     return applyUltraSettings(base);
   }
 
-  // The stored record merged over the defaults and the global copy, as the window shows it.
+  // The server's settings merged over the defaults, as the windows show them.
   function recordFrom(data) {
     var base = JSON.parse(JSON.stringify(DEFAULTS));
-    try {
-      var global = globalSettingsCache;
-      if (global === null) {
-        global = localStorage.getItem(STORAGE_KEY);
-        globalSettingsCache = global || "";
-      }
-      if (global) base = window.SettingsUI.deepMerge(base, upgradeLegacySettings(JSON.parse(global)));
-    } catch (e) {}
     if (data && Object.keys(data).length > 0) {
       base = window.SettingsUI.deepMerge(base, upgradeLegacySettings(data));
     }
     return applyUltraSettings(base);
   }
 
-  // Reads the stored record of a dialog; rejects when the server cannot be read.
-  function fetchRecord(convId) {
-    return window.LogosDispatcher.request("/api/conversations/" + convId + "/settings", null, {
-      timeoutMs: 5000,
-    })
+  // Reads the global settings; rejects when the server cannot be read.
+  function fetchRecord() {
+    return window.LogosDispatcher.request("/api/settings", null, { timeoutMs: 5000 })
       .then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
@@ -185,18 +153,17 @@
       .then(recordFrom);
   }
 
-  // Загрузка настроек с сервера при смене диалога
-  window.loadServerConvSettings = function (convId) {
-    if (!convId) return Promise.resolve(load(convId));
-    return fetchRecord(convId)
+  // Reads the global settings again (on every dialog switch); the dialog id is ignored.
+  window.loadServerConvSettings = function () {
+    return fetchRecord()
       .then(function (record) {
-        serverSettingsCache[convId] = record;
-        serverSettingsUnknown[convId] = false;
-        return record;
+        serverSettings = record;
+        serverSettingsUnknown = false;
+        return load();
       })
       .catch(function () {
-        serverSettingsUnknown[convId] = true;
-        return load(convId);
+        serverSettingsUnknown = true;
+        return load();
       });
   };
 
@@ -209,8 +176,8 @@
     ultraProfileFor: ultraProfileFor,
     applyUltraSettings: applyUltraSettings,
     load: load,
-    isUnknown: function (convId) {
-      return Boolean(serverSettingsUnknown[convId]);
+    isUnknown: function () {
+      return serverSettingsUnknown;
     },
   };
 })();
