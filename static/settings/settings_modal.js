@@ -38,7 +38,7 @@
       '<div style="margin-top:12px;">' +
         UI.chk(
           "tools-defer-en",
-          dl.enabled === true,
+          dl.enabled !== false,
           "<strong>⏳ Defer Loading</strong> (defer_loading: модель видит инструмент только после поиска инструментов провайдера)",
         ) +
         "</div>",

@@ -211,13 +211,14 @@ def normalize_tools_config(raw: Any) -> dict[str, Any]:
 def deferred_tool_categories(tools_config: Any) -> tuple[bool, set[str]]:
     """(on, eager categories) of the dialog's defer_loading setting.
 
-    When on, the application's function tools go to the provider with
-    ``defer_loading: true`` except those of the eager categories: the provider
-    shows a deferred tool to the model only after its tool search finds it.
-    Off (the setting absent) every tool is sent loaded, as before the setting.
+    On by default (settings at maximum): the application's function tools go to
+    the provider with ``defer_loading: true`` except those of the eager
+    categories, and the provider shows a deferred tool to the model only after
+    its tool search finds it. Only an explicit ``{"enabled": false}`` turns it
+    off; an absent setting means on.
     """
     config = tools_config.get("defer_loading") if isinstance(tools_config, dict) else None
-    if not isinstance(config, dict) or config.get("enabled") is not True:
+    if isinstance(config, dict) and config.get("enabled") is False:
         return False, set()
-    eager = config.get("eager_categories")
+    eager = config.get("eager_categories") if isinstance(config, dict) else None
     return True, set(eager) if isinstance(eager, list) else set()
