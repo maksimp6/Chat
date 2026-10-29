@@ -98,6 +98,7 @@ class Host:
         Any  # storage.records.maybe_update_conversation_title
     )
     mcp_storage: Any  # mcp_server.storage
+    mcp_oauth: Any  # mcp_server.oauth
     normalize_conversation_title: Any  # storage.records.normalize_conversation_title
     normalize_tools_config: (
         Any  # yandex_client_modules.tool_config.normalize_tools_config

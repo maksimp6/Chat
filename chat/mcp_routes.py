@@ -1,6 +1,6 @@
 """Маршруты чата с сохранением полной цепочки выполнения в БД."""
 
-from flask import Blueprint, copy_current_request_context, request, jsonify
+from flask import Blueprint, copy_current_request_context, request, jsonify, Response
 import contextvars
 import json as _json
 import threading
@@ -1997,6 +1997,52 @@ def handle_mcp_server_item(server_id):
             error_body("Сервер не найден", detail_of="mcp_server_not_found")
         ), 404
     return jsonify(_without_secrets(srv))
+
+
+@mcp_bp.route("/api/mcp-servers/<server_id>/oauth/start", methods=["POST"])
+def start_mcp_oauth(server_id):
+    """Begin an OAuth connect: return the authorization URL for the browser to open."""
+    owner_id = get_current_owner_id()
+    data = request.get_json(silent=True) or {}
+    redirect_uri = str(data.get("redirect_uri") or "").strip()
+    try:
+        authorize_url = bound.mcp_oauth.start(
+            server_id, owner_id=owner_id, redirect_uri=redirect_uri
+        )
+    except Exception as exc:  # OAuthError and network/validation failures
+        return jsonify(error_body(str(exc), detail_of="mcp_oauth_start_failed")), 400
+    return jsonify({"authorize_url": authorize_url})
+
+
+def _oauth_page(message):
+    """A tiny self-closing page shown in the OAuth popup/tab after the redirect back."""
+    safe = (message or "").replace("<", "&lt;").replace(">", "&gt;")
+    html = (
+        "<!doctype html><meta charset=utf-8>"
+        "<title>MCP OAuth</title>"
+        "<body style='font:15px system-ui;padding:24px;color:#222'>"
+        f"<p>{safe}</p><p>Можно закрыть эту вкладку.</p>"
+        "<script>try{setTimeout(function(){window.close()},1500)}catch(e){}</script>"
+    )
+    return Response(html, mimetype="text/html")
+
+
+@mcp_bp.route("/api/mcp/oauth/callback", methods=["GET"])
+def mcp_oauth_callback():
+    """Finish the connect: exchange the code and store the server's token."""
+    error = request.args.get("error")
+    if error:
+        description = request.args.get("error_description") or error
+        return _oauth_page("Авторизация отклонена: " + description)
+    code = request.args.get("code") or ""
+    state = request.args.get("state") or ""
+    if not code or not state:
+        return _oauth_page("Авторизация не завершена: нет code или state")
+    try:
+        name = bound.mcp_oauth.finish(state, code)
+    except Exception as exc:
+        return _oauth_page("Не удалось подключить: " + str(exc))
+    return _oauth_page(f"MCP-сервер «{name}» подключён.")
 
 
 @mcp_bp.route("/api/conversations", methods=["GET", "POST"])

@@ -178,6 +178,7 @@ def _chat():
     from agent_memory.manager import load_memory_config
     from storage.records import maybe_update_conversation_title
     import mcp_server.storage as mcp_storage
+    import mcp_server.oauth as mcp_oauth
     from storage.records import normalize_conversation_title
     from yandex_client_modules.tool_config import normalize_tools_config
     from storage.generated_images import open_image_file
@@ -269,6 +270,7 @@ def _chat():
         load_memory_config=load_memory_config,
         maybe_update_conversation_title=maybe_update_conversation_title,
         mcp_storage=mcp_storage,
+        mcp_oauth=mcp_oauth,
         normalize_conversation_title=normalize_conversation_title,
         normalize_tools_config=normalize_tools_config,
         open_image_file=open_image_file,

@@ -244,8 +244,10 @@
         '<div style="margin-bottom:8px;font-size:12px;color:var(--m-muted,#666);">⏳ Defer Loading — всегда включено для всех инструментов, включая MCP; отключить нельзя.</div>' +
         '<div style="display:flex;gap:8px;margin-top:10px;">' +
         UI.btn("mcp-ed-save", isNew ? "Создать" : "Сохранить", "accent") +
+        (isNew ? "" : UI.btn("mcp-ed-oauth", "⚡ Подключить (OAuth)")) +
         UI.btn("mcp-ed-cancel", "Отмена") +
-        "</div>";
+        "</div>" +
+        '<div id="mcp-ed-oauth-status" role="status" style="margin-top:6px;font-size:12px;color:var(--m-muted,#666);min-height:14px;"></div>';
 
       document.getElementById("mcp-mgr-list").insertAdjacentElement("beforebegin", e);
       editorEl = e;
@@ -254,6 +256,45 @@
         editorEl.remove();
         editorEl = null;
       });
+
+      var oauthBtn = document.getElementById("mcp-ed-oauth");
+      if (oauthBtn) {
+        oauthBtn.addEventListener("click", function () {
+          var status = document.getElementById("mcp-ed-oauth-status");
+          status.textContent = "Открываю окно авторизации…";
+          // Open the popup synchronously so the browser does not block it; fill it after.
+          var popup = window.open("", "mcp_oauth", "width=520,height=680");
+          var redirectUri = window.location.origin + "/api/mcp/oauth/callback";
+          window.LogosDispatcher.request(
+            "/api/mcp-servers/" + encodeURIComponent(srv.id) + "/oauth/start",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ redirect_uri: redirectUri }),
+            },
+          )
+            .then(function (r) {
+              return r.json().then(function (body) {
+                if (!r.ok || !body.authorize_url) {
+                  throw new Error((body && (body.message || body.error)) || "HTTP " + r.status);
+                }
+                return body.authorize_url;
+              });
+            })
+            .then(function (url) {
+              if (popup && !popup.closed) {
+                popup.location = url;
+              } else {
+                window.location = url;
+              }
+              status.textContent = "Подтвердите доступ в открывшемся окне, затем обновите список.";
+            })
+            .catch(function (error) {
+              if (popup && !popup.closed) popup.close();
+              status.textContent = "Не удалось начать авторизацию: " + (error.message || error);
+            });
+        });
+      }
 
       document.getElementById("mcp-ed-save").addEventListener("click", function () {
         var saveBtn = this;
