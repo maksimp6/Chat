@@ -167,14 +167,23 @@ KEYCODE = re.compile(r"KEYCODE_[A-Z0-9_]+|[0-9]{1,4}")
 URL = re.compile(r"https?://[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:[/?#][^\s]*)?")
 
 
+def wakefulness():
+    """PowerManager's wakefulness (Awake, Asleep, Dozing, Dreaming), or None."""
+    power = bounded_command(["/system/bin/dumpsys", "power"]).decode("utf-8", "replace")
+    match = re.search(r"\bmWakefulness=(\w+)", power)
+    return match.group(1) if match else None
+
+
 def wake_display():
-    """Light the display within this call; a separate run would see it time out again."""
-    for keycode in ("KEYCODE_WAKEUP", "KEYCODE_POWER"):
-        if screen_state().get("display_on") is True:
-            return True
-        bounded_command(["/system/bin/input", "keyevent", keycode])
+    """Wake the display within this call; a separate run would see it time out again.
+
+    KEYCODE_WAKEUP only: it wakes a sleeping device and does nothing to an awake
+    one, while KEYCODE_POWER toggles and would turn a just-woken screen off.
+    """
+    if wakefulness() != "Awake":
+        bounded_command(["/system/bin/input", "keyevent", "KEYCODE_WAKEUP"])
         time.sleep(1.5)
-    return screen_state().get("display_on") is True
+    return wakefulness()
 
 
 def validate_png(png):
@@ -479,7 +488,7 @@ def worker(request):
             raise AgentError("invalid_wait")
         # Wake, open and capture in one call: between separate runs the screen
         # times out again, which is why a lone capture came back black.
-        display_on = wake_display()
+        woken = wake_display()
         try:
             bounded_command(["/system/bin/wm", "dismiss-keyguard"])
         except AgentError:
@@ -502,7 +511,7 @@ def worker(request):
             **metadata,
             "command": "browse",
             "url": url,
-            "display_woken": display_on,
+            "wakefulness": woken,
             "display_on": state["display_on"],
             "keyguard_locked_or_unknown": not state["unlocked"],
             "focus_package": state["package"],
@@ -671,7 +680,8 @@ def run_client(args, output, runner_values):
     metadata = response["result"]
     if output is not None:
         png = base64.b64decode(metadata.pop("png_base64"), validate=True)
-        metadata = validate_png(png)
+        # Keep the worker's own fields (url, wakefulness, focus) next to the PNG's.
+        metadata.update(validate_png(png))
         save_capture(output, png)
         metadata["output"] = str(Path(output).absolute())
     print(json.dumps(metadata, ensure_ascii=False))
