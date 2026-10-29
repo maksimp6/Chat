@@ -447,8 +447,9 @@ jobs:
           ROOTAGENT_COMMAND: ${{ inputs.rootagent_command }}
           ROOTAGENT_ARGS: ${{ inputs.rootagent_args }}
         run: |
-          set -euo pipefail
-          python -I - <<'PY'
+          set -uo pipefail
+          result="$RUNNER_TEMP/rootagent-result.json"
+          out="$(python -I - <<'PY' 2>&1
           import json
           import os
           import re
@@ -520,10 +521,20 @@ jobs:
               output.write(f"command={command}\n")
           print(f"rootagent_command {command} accepted")
           PY
+          )"
+          status=$?
+          printf '%s\n' "$out"
+          if [ "$status" -ne 0 ]; then
+            printf '{"ok":false,"stage":"validate","exit":%s,"detail":%s}\n' \
+              "$status" "$(printf '%s' "$out" | python -I -c 'import json,sys; print(json.dumps(sys.stdin.read()[:2000]))')" > "$result"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "ok=true" >> "$GITHUB_OUTPUT"
 
       - name: Mount the RAM disk for a capture only
         id: media
-        if: steps.request.outputs.command == 'capture'
+        if: steps.request.outputs.ok == 'true' && steps.request.outputs.command == 'capture'
         shell: bash
         timeout-minutes: 2
         run: |
@@ -538,45 +549,53 @@ jobs:
 
       - name: Run one bounded RootAgent command on the Redmi 9
         id: run
+        if: steps.request.outputs.ok == 'true'
         shell: bash
         timeout-minutes: 3
         run: |
-          set -euo pipefail
-          test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
+          set -uo pipefail
+          result="$RUNNER_TEMP/rootagent-result.json"
+          model="$(/system/bin/getprop ro.product.model 2>&1)"
+          if [ "$model" != 'Redmi 9' ]; then
+            printf '{"ok":false,"stage":"model","detail":%s}\n' "$(printf '%s' "$model" | python -I -c 'import json,sys;print(json.dumps(sys.stdin.read()[:400]))')" > "$result"
+            cat "$result"; exit 0
+          fi
           mkdir -p -m 700 "$RUNNER_TEMP/scripts"
-          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
-            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/redmi_root_agent.py" -o "$RUNNER_TEMP/scripts/redmi_root_agent.py"
+          if ! curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/redmi_root_agent.py" -o "$RUNNER_TEMP/scripts/redmi_root_agent.py" 2>"$RUNNER_TEMP/curl.err"; then
+            printf '{"ok":false,"stage":"curl","detail":%s}\n' "$(cat "$RUNNER_TEMP/curl.err" | python -I -c 'import json,sys;print(json.dumps(sys.stdin.read()[:400]))')" > "$result"
+            cat "$result"; exit 0
+          fi
           # The validator wrote the whole request to this JSON file; the CLI reads it
           # with --request, so no argument passes through a shell line or environment.
           argv=(--request "$RUNNER_TEMP/rootagent-request.json")
           if [ "${{ steps.request.outputs.command }}" = "capture" ]; then
             argv+=(--output "${{ steps.media.outputs.media }}/rootagent-capture.png")
           fi
-          # The CLI's JSON is the result. Its exit status is kept until the artifacts are uploaded.
-          set +e
-          python "$RUNNER_TEMP/scripts/redmi_root_agent.py" "${argv[@]}" > "$RUNNER_TEMP/rootagent-result.json"
-          status=$?
-          set -e
-          cat "$RUNNER_TEMP/rootagent-result.json"
-          exit "$status"
+          out="$(python "$RUNNER_TEMP/scripts/redmi_root_agent.py" "${argv[@]}" 2>&1)"; status=$?
+          if [ "$status" -eq 0 ]; then
+            printf '%s\n' "$out" > "$result"
+          else
+            printf '{"ok":false,"stage":"cli","exit":%s,"detail":%s}\n' \
+              "$status" "$(printf '%s' "$out" | python -I -c 'import json,sys;print(json.dumps(sys.stdin.read()[:2000]))')" > "$result"
+          fi
+          cat "$result"
 
-      - name: Record why no result was written
-        if: always() && steps.request.outcome == 'success'
+      - name: Ensure a result file exists
+        if: always()
         shell: bash
         timeout-minutes: 1
-        env:
-          MEDIA_OUTCOME: ${{ steps.media.outcome }}
-          RUN_OUTCOME: ${{ steps.run.outcome }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           result="$RUNNER_TEMP/rootagent-result.json"
-          if [ -s "$result" ]; then
-            exit 0
+          if [ ! -s "$result" ]; then
+            printf '{"ok":false,"stage":"job","request_ok":"%s","run_outcome":"%s"}\n' \
+              "${{ steps.request.outputs.ok }}" "${{ steps.run.outcome }}" > "$result"
           fi
-          printf '{"ok": false, "phase": "job", "media_step": "%s", "run_step": "%s"}\n' "$MEDIA_OUTCOME" "$RUN_OUTCOME" > "$result"
+          cat "$result"
 
       - name: Upload the RootAgent result as a workflow artifact
-        if: always() && steps.request.outcome == 'success'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: rootagent-command-${{ github.run_id }}-${{ github.run_attempt }}
@@ -585,7 +604,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload the captured PNG as a workflow artifact
-        if: always() && steps.request.outcome == 'success' && steps.request.outputs.command == 'capture' && steps.media.outcome == 'success'
+        if: always() && steps.request.outputs.command == 'capture' && steps.media.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: rootagent-capture-${{ github.run_id }}-${{ github.run_attempt }}
