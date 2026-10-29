@@ -310,7 +310,7 @@ SCREENSHOT_ATTACHED = (
 )
 SCREENSHOT_DESCRIBED = (
     "снимок экрана не передан картинкой: выбранная модель не принимает изображения; "
-    "его описание — в screen_description, элементы экрана с координатами — в ui_elements"
+    "его описание с координатами элементов — в screen_description"
 )
 # A model that cannot see images gets the screenshot described by one that can.
 SCREEN_DESCRIBER_ROLE = (

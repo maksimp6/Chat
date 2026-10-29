@@ -45,7 +45,6 @@ BRANCH = "develop"
 COMMANDS = (
     "status",
     "probe",
-    "ui",
     "capture",
     "move",
     "click",
@@ -124,7 +123,7 @@ def _validated(args: Mapping[str, Any]) -> tuple[str, str]:
     if command not in COMMANDS:
         raise ValueError("command должна быть одной из: " + ", ".join(COMMANDS))
     package = args.get("package")
-    if command in ("status", "probe", "ui"):
+    if command in ("status", "probe"):
         return command, ""
     if command == "batch":
         steps = args.get("steps")
@@ -608,9 +607,7 @@ _RUN_PROPERTIES = {
         "type": "string",
         "enum": list(COMMANDS),
         "description": (
-            "status и probe читают состояние; ui читает экран текстом — все элементы с "
-            "текстом, описанием, id и center для tap (дёшево, без снимка); capture снимает "
-            "экран и тоже возвращает элементы; tap нажимает в точке "
+            "status и probe читают состояние; capture снимает экран; tap нажимает в точке "
             "(x, y); swipe проводит от (x, y) к (x2, y2); text вводит строку латиницей "
             "(ASCII); key шлёт клавишу (keycode); browse открывает url и снимает экран; "
             "batch выполняет steps подряд и снимает экран; move и click — относительное "
@@ -728,9 +725,8 @@ ROOTAGENT_TOOLS: dict[str, dict[str, Any]] = {
     "rootagent_run": {
         "title": "Redmi 9 RootAgent: запуск команды",
         "description": (
-            "Управлять телефоном Redmi 9 как пользователь: status, probe, ui (экран текстом: "
-            "элементы ui_elements с text, description, id, flags и center — нажимай tap в "
-            "center нужного элемента), capture (снимок экрана + ui_elements), tap (нажатие в точке), swipe (свайп), text (ввод строки), key (клавиша, "
+            "Управлять телефоном Redmi 9 как пользователь: status, probe, capture (снимок "
+            "экрана), tap (нажатие в точке), swipe (свайп), text (ввод строки), key (клавиша, "
             "в т.ч. системная), browse (разбудить экран, открыть url в браузере и сразу снять "
             "экран), move и click (относительная мышь). Когда Логос работает на самом телефоне, "
             "команда выполняется на устройстве напрямую и результат возвращается сразу в поле "

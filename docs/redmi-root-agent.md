@@ -62,9 +62,8 @@ legacy relative input through the existing root mouse daemon.
 | --- | --- |
 | `status` | Sanitized device, root, Keyguard, focus, screen size, and socket metadata; no input |
 | `probe` | Connect to the existing socket and verify root peer/executable hash; send no input command |
-| `ui` | Wake the display and return the screen as text: `ui_elements` from `uiautomator dump` with text, description, id, flags, bounds and center; no screenshot |
 | `wake` | If display-on is unconfirmed, submit one fixed relative `move 1 1`, without clicking; verify actual wake separately |
-| `capture --output PATH [--expected-package PACKAGE]` | Capture and validate the PNG, plus `ui_elements`; any expected package is reported, not enforced |
+| `capture --output PATH [--expected-package PACKAGE]` | Capture and validate the PNG; any expected package is reported, not enforced |
 | `tap X Y` | Tap absolute screen coordinates through root `input tap` |
 | `swipe X Y X2 Y2 [--duration-ms MS]` | Swipe/scroll from (X, Y) to (X2, Y2) through root `input swipe` |
 | `text STR` | Type a string through root `input text` |
@@ -197,12 +196,8 @@ the first model that reads images (`qwen3.6-35b-a3b` today) and the description 
 into `screen_description` of the result; a failed description is returned there as
 `error`.
 
-**The screen as text.** `ui` (no screenshot, cheap) and every `capture`, `browse`
-and `batch` also return `ui_elements` from `uiautomator dump`: each element with
-`text`, `description`, `id`, `class`, `flags` (clickable, editable, checked,
-scrollable, …), `bounds` and `center`. A model taps the `center` of the element it
-needs instead of guessing coordinates. A failed dump (for example a secure screen)
-comes back as `ui_error`; the screenshot still counts.
+The RootAgent uses no tool beyond the ones it already calls: `uiautomator` and any
+other added tool or dependency are banned by the owner.
 
 `text` (and a batch `text` step) types through a virtual US keyboard: printable ASCII
 and tab only. Cyrillic and emoji are refused by the tool before the phone is called.
