@@ -28,6 +28,7 @@ from chat.mcp_routes import _provider_conversation_id, logos_client_type
 from chat.host import (
     add_message,
     bound,
+    build_ai_billing_item,
     check_access,
     generate_realtime,
     get_current_owner_id,
@@ -428,12 +429,16 @@ def _process(session: VoiceSession) -> None:
                     "message": "Ответ получен, но расшифровка вашего аудио недоступна"
                 },
             )
+        # Priced like a chat turn; a model with no published price stays unknown (None), never 0 (#1665).
+        voice_cost = build_ai_billing_item(
+            session.model, result.usage or None, step=1, response_id=result.response_id
+        ).get("total_cost")
         if result.reply:
             add_message(
                 session.conversation_id,
                 "assistant",
                 result.reply,
-                cost=None,
+                cost=voice_cost,
                 usage=result.usage,
                 source="voice" if final_status == "completed" else "voice_partial",
                 trace={
@@ -456,7 +461,7 @@ def _process(session: VoiceSession) -> None:
                 session.conversation_id,
                 "assistant",
                 "[Голосовой ответ]",
-                cost=None,
+                cost=voice_cost,
                 usage=result.usage,
                 source="voice_audio",
                 attachments={

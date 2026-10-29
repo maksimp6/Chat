@@ -14,6 +14,7 @@ from flask import Blueprint, jsonify, request
 from chat._error_details import error_body
 from chat.host import (
     bound,
+    build_ai_billing_item,
     get_current_trace,
     get_model_uri,
     provider_request_headers,
@@ -28,6 +29,18 @@ UPSTREAM_TIMEOUT_SECONDS = 60
 MODEL_KEY = "yandexgpt-5.1"
 ROLES = {"system", "user", "assistant"}
 MAX_MESSAGES = 32
+
+
+def _cost(usage: dict | None) -> float | None:
+    """The reply's price from the native usage counters, None when they are missing (#1665)."""
+    if not isinstance(usage, dict):
+        return None
+    tokens = {
+        "input_tokens": int(usage.get("inputTextTokens") or 0),
+        "output_tokens": int(usage.get("completionTokens") or 0),
+        "total_tokens": int(usage.get("totalTokens") or 0),
+    }
+    return build_ai_billing_item(MODEL_KEY, tokens, step=1).get("total_cost")
 MAX_TEXT_CHARS = 32000
 MAX_INT64 = (1 << 63) - 1
 ALLOWED_FIELDS = {"model", "message", "messages", "temperature", "max_tokens"}
@@ -182,6 +195,7 @@ def create_completion():
                 model=model_uri,
                 reply=reply,
                 usage=usage,
+                cost=_cost(usage),
                 provider_status=status,
                 transport="completion",
             )
@@ -191,6 +205,7 @@ def create_completion():
             "model": model_uri,
             "reply": reply,
             "usage": usage,
+            "cost": _cost(usage),
             "provider_status": status,
             "provider_model_version": result.get("modelVersion"),
             "transport": "completion",

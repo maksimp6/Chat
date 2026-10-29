@@ -10,6 +10,7 @@ from flask import Blueprint, jsonify, request
 from chat._error_details import DETAILS, error_body
 from chat.host import (
     bound,
+    build_ai_billing_item,
     get_current_trace,
     provider_request_headers,
     record_usage,
@@ -190,4 +191,8 @@ def classify_text():
                 "model_version": result.get("modelVersion"),
             },
         )
-    return jsonify({"model": payload["modelUri"], **result})
+    # A classifier has no published price, so the cost is unknown (None), never 0 (#1665).
+    cost = build_ai_billing_item(
+        model, {"input_tokens": int(result.get("inputTokens") or 0)}, step=1
+    ).get("total_cost")
+    return jsonify({"model": payload["modelUri"], **result, "cost": cost})
