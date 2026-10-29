@@ -40,6 +40,7 @@
       },
       code_interpreter: { enabled: true },
       file_search: { enabled: true, vector_store_ids: "fvtvp6t2su0g5q4ft2ev", max_results: 50 },
+      defer_loading: { enabled: true, eager_categories: [] },
     },
     // Matches yandex_client_modules.tool_config.SETTINGS_REVISION.
     settings_revision: 6,
