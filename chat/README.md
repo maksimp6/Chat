@@ -24,6 +24,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 | [`chat.completion_routes`](completion_routes.py) | POST /api/completion: native synchronous YandexGPT Pro 5.1 completions. |
 | [`chat.embedding_routes`](embedding_routes.py) | POST /api/embeddings: the four public Yandex embedding models. |
 | [`chat.image_routes`](image_routes.py) | Generate one Alice AI ART picture per durable, conversation-bound request. |
+| [`chat.live_turns`](live_turns.py) | Live chat turns: the event log a browser reads as server-sent events while a turn runs, and the durable receipt that makes a turn re-sent with the same `request_id` run only once. |
 | [`chat.mcp_routes`](mcp_routes.py) | Маршруты чата с сохранением полной цепочки выполнения в БД. |
 | [`chat.voice_routes`](voice_routes.py) | HTTP/SSE facade for the selected Yandex Realtime WebSocket model. |
 

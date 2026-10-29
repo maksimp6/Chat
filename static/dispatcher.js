@@ -4,6 +4,8 @@
   const MAX_TIMEOUT_MS = 300000;
   const DEFAULT_TIMEOUT_MS = 10000;
   let activeRequests = 0;
+  // Work that outlives its request (a live answer still streaming after its headers) keeps the page busy too.
+  let holds = 0;
 
   function requestPath(input) {
     try {
@@ -56,6 +58,9 @@
   function request(input, init, options) {
     const settings = options || {};
     const requestedTimeout = Number(settings.timeoutMs);
+    // An explicit 0 means no total timeout: the caller bounds the request itself (a live answer runs as long as
+    // the turn does). A missing or invalid value still gets the default.
+    const unbounded = settings.timeoutMs === 0;
     const timeoutMs = Math.min(
       Number.isFinite(requestedTimeout) && requestedTimeout > 0
         ? Math.max(Math.trunc(requestedTimeout), 1)
@@ -63,7 +68,7 @@
       MAX_TIMEOUT_MS,
     );
     const requestInit = Object.assign({}, init || {});
-    if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    if (!unbounded && typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
       // The caller's signal (for example «Stop») and the timeout both end the request.
       requestInit.signal = requestInit.signal
         ? combineSignals(requestInit.signal, AbortSignal.timeout(timeoutMs))
@@ -105,6 +110,17 @@
     );
   }
 
+  // Marks the page busy until the returned release() is called; release() may be called more than once.
+  function hold() {
+    holds += 1;
+    let released = false;
+    return function release() {
+      if (released) return;
+      released = true;
+      holds = Math.max(holds - 1, 0);
+    };
+  }
+
   function dispatch(action, payload) {
     if (action !== "request") {
       return Promise.reject(new Error("Unknown dispatcher action: " + action));
@@ -116,6 +132,7 @@
   window.LogosDispatcher = Object.freeze({
     request,
     dispatch,
-    isBusy: () => activeRequests > 0,
+    hold,
+    isBusy: () => activeRequests + holds > 0,
   });
 })();

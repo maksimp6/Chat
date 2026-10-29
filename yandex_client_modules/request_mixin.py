@@ -4,7 +4,6 @@ import time
 import copy
 
 import math
-import requests
 from typing import Any, Callable
 
 
@@ -16,6 +15,10 @@ from yandex_client_modules.request_builder import (
 )
 from yandex_client_modules.request_receipt import build_request_manifest
 from yandex_client_modules.errors import YandexClientError
+from yandex_client_modules.stream_mixin import (
+    LiveStream,
+    emit_event,
+)
 from yandex_client_modules.host import (
     bound,
     get_current_owner_id,
@@ -220,6 +223,10 @@ class YandexRequestMixin:
         on_provider_input = params.get("on_provider_input")
         if on_provider_input is not None and not callable(on_provider_input):
             raise ValueError("on_provider_input must be callable or None")
+        # A live chat turn receives normalized progress events; nothing else is sent to it.
+        on_stream_event = params.get("on_stream_event")
+        if on_stream_event is not None and not callable(on_stream_event):
+            raise ValueError("on_stream_event must be callable or None")
         is_background = params.get("background", True)
         if is_background:
             params["store"] = True
@@ -264,81 +271,49 @@ class YandexRequestMixin:
                     "provider_quota", str(exc), error_type=exc.code
                 )
             raise
-        if (
-            execution_trace
-            and isinstance(execution_trace, bound.ExecutionTrace)
-            and quota_reservation is not None
-        ):
-            execution_trace.add_event(
-                "provider_quota_reserved",
-                {
-                    "user_id": quota_reservation.user_id,
-                    "policy": quota_reservation.policy_name,
-                    "request_number": quota_reservation.reserved_request_number,
-                    "period_reset_at": quota_reservation.period_reset_at,
-                },
-            )
-
-        trace_step_number = trace_step
-        if (
-            isinstance(execution_trace, bound.ExecutionTrace)
-            and trace_step_number is None
-        ):
-            trace_step_number = len(execution_trace.trace.get("api_requests", [])) + 1
-
-        self._log_request("POST", url, json=payload)
-        _capture_request_input(
-            execution_trace, payload, trace_step_number, on_provider_input
-        )
-        request_start_timestamp = time.time()
-        request_start_perf = time.perf_counter()
-        if execution_trace and isinstance(execution_trace, bound.ExecutionTrace):
-            execution_trace.add_api_request(
-                _sanitize_for_log(payload),
-                step_index=trace_step_number,
-                start_timestamp=request_start_timestamp,
-                provider_key_id=credential.trace_key_id,
-            )
-            execution_trace.add_event(
-                "api_request_sent",
-                {
-                    "method": "POST",
-                    "url": url,
-                    "step": trace_step_number,
-                    "correlation_id": execution_trace.get_step_correlation_id(
-                        trace_step_number
-                    ),
-                },
-            )
-
-        resp = None
         try:
-            resp = self._log_response(
-                self.session.post(
-                    url, json=payload, headers=headers, timeout=request_timeout
-                )
-            )
-            resp.raise_for_status()
-        except requests.RequestException as e:
-            # No answer was produced for the reserved request, so it does not count against the quota.
-            release_request(quota_reservation)
-            error_timestamp = time.time()
-            status_code = resp.status_code if resp is not None else None
-            error_detail = None
-            if resp is not None:
-                try:
-                    error_body = resp.json()
-                    error_detail = _sanitize_for_log(error_body)
-                except ValueError:
-                    error_detail = resp.text[:4000]
-
-            error_message = str(e)
-            if status_code is not None:
-                error_message = f"HTTP {status_code}: {error_message}"
-
-            if execution_trace and isinstance(execution_trace, bound.ExecutionTrace):
+            if (
+                execution_trace
+                and isinstance(execution_trace, bound.ExecutionTrace)
+                and quota_reservation is not None
+            ):
                 execution_trace.add_event(
-                    "api_request_error",
+                    "provider_quota_reserved",
+                    {
+                        "user_id": quota_reservation.user_id,
+                        "policy": quota_reservation.policy_name,
+                        "request_number": quota_reservation.reserved_request_number,
+                        "period_reset_at": quota_reservation.period_reset_at,
+                    },
+                )
+
+            trace_step_number = trace_step
+            if (
+                isinstance(execution_trace, bound.ExecutionTrace)
+                and trace_step_number is None
+            ):
+                trace_step_number = len(execution_trace.trace.get("api_requests", [])) + 1
+        except BaseException:
+            # Reserved but not yet sent: the quota reservation is returned.
+            release_request(quota_reservation)
+            raise
+
+        try:
+            self._log_request("POST", url, json=payload)
+            _capture_request_input(
+                execution_trace, payload, trace_step_number, on_provider_input
+            )
+            request_start_timestamp = time.time()
+            request_start_perf = time.perf_counter()
+            if execution_trace and isinstance(execution_trace, bound.ExecutionTrace):
+                execution_trace.add_api_request(
+                    _sanitize_for_log(payload),
+                    step_index=trace_step_number,
+                    start_timestamp=request_start_timestamp,
+                    provider_key_id=credential.trace_key_id,
+                )
+                execution_trace.add_event(
+                    "api_request_sent",
                     {
                         "method": "POST",
                         "url": url,
@@ -346,19 +321,57 @@ class YandexRequestMixin:
                         "correlation_id": execution_trace.get_step_correlation_id(
                             trace_step_number
                         ),
-                        "model": payload.get("model"),
-                        "status_code": status_code,
-                        "error": error_message,
-                        "detail": error_detail,
-                        "start_timestamp": request_start_timestamp,
-                        "end_timestamp": error_timestamp,
-                        "timing_ms": round(
-                            (time.perf_counter() - request_start_perf) * 1000, 2
-                        ),
                     },
                 )
+        except BaseException:
+            # A local failure before the POST means the provider never received the request,
+            # so its quota reservation is returned.
+            release_request(quota_reservation)
+            raise
 
-            raise YandexClientError(error_message, status_code=status_code) from e
+        try:
+            resp = self._post_response(
+                url,
+                payload,
+                headers,
+                request_timeout=request_timeout,
+                poll_timeout=poll_timeout,
+                trace=execution_trace,
+                step=trace_step_number,
+                on_event=on_stream_event,
+                request_start_timestamp=request_start_timestamp,
+                request_start_perf=request_start_perf,
+            )
+        except YandexClientError as exc:
+            # Released only when the POST is known not to have been accepted: it never
+            # reached the provider, or a rate limit stayed until the deadline. Any other
+            # failure after the request was sent may have been accepted, so it keeps the
+            # reservation.
+            if getattr(exc, "request_not_accepted", False):
+                release_request(quota_reservation)
+            raise
+
+        if isinstance(resp, LiveStream):
+            # From here on the provider may have accepted the request: a failure of the
+            # stream, a resume or a poll, or a failed answer, keeps the reservation.
+            result = self._finish_stream(
+                resp,
+                url=url,
+                headers=headers,
+                request_timeout=request_timeout,
+                poll_timeout=poll_timeout,
+                trace=execution_trace,
+                step=trace_step_number,
+                on_event=on_stream_event,
+                on_provider_response=on_provider_response,
+                request_start_timestamp=request_start_timestamp,
+                request_start_perf=request_start_perf,
+                provider_key_id=credential.trace_key_id,
+            )
+            if on_provider_response is not None:
+                on_provider_response(result)
+            _record_quota_usage(execution_trace, quota_reservation, result)
+            return result
 
         request_end_timestamp = time.time()
         request_duration_ms = round(
@@ -368,8 +381,7 @@ class YandexRequestMixin:
         try:
             data = resp.json()
         except ValueError as e:
-            # A 200 answer without JSON is not a usable reply, so the reserved request is not charged.
-            release_request(quota_reservation)
+            # A 200 answer means the provider took the request, so the reservation stays.
             if execution_trace and isinstance(execution_trace, bound.ExecutionTrace):
                 execution_trace.add_event(
                     "api_response_invalid_json",
@@ -429,6 +441,14 @@ class YandexRequestMixin:
             }
         if on_provider_response is not None:
             on_provider_response(data)
+        emit_event(
+            on_stream_event,
+            {
+                "kind": "response_status",
+                "status": data.get("status"),
+                "response_id": data.get("id"),
+            },
+        )
         task_id = data.get("id")
         status = data.get("status")
         if (
@@ -436,31 +456,20 @@ class YandexRequestMixin:
             or data.get("error") is not None
         ):
             _record_quota_usage(execution_trace, quota_reservation, data)
-            if status not in ("completed", "incomplete"):
-                # A failed or cancelled task produced no answer, so the reserved
-                # request is not charged; tokens the provider reported stay recorded.
-                release_request(quota_reservation)
             return data
         if not task_id:
-            # Nothing can be polled, so no answer comes for the reserved request.
-            release_request(quota_reservation)
             raise YandexClientError("Provider response has no task id to poll")
         wait_params = {"timeout": poll_timeout} if "poll_timeout" in params else {}
+        emit_event(on_stream_event, {"kind": "polling", "response_id": task_id})
         result = self._wait(
             task_id,
             execution_trace=execution_trace,
             trace_step=trace_step_number,
             headers=headers,
+            on_event=on_stream_event,
             **wait_params,
         )
         if on_provider_response is not None:
             on_provider_response(result)
         _record_quota_usage(execution_trace, quota_reservation, result)
-        if not isinstance(result, dict) or result.get("status") not in (
-            "completed",
-            "incomplete",
-        ):
-            # A failed or cancelled task produced no answer, so the reserved request is
-            # not charged; tokens the provider reported stay recorded.
-            release_request(quota_reservation)
         return result

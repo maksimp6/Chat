@@ -145,7 +145,12 @@ def delete_conversation(conv_id: str) -> None:
         for key, message in store.items(prefix="chat/message/").items():
             if message["conversation_id"] == conv_id:
                 tx.delete(key)
-        for prefix in ("chat/image_request/", "chat/message-source/"):
+        for prefix in (
+            "chat/image_request/",
+            "chat/message-source/",
+            "chat/message-request/",
+            "chat/turn_request/",
+        ):
             for key in store.items(prefix=prefix + conv_id + "/"):
                 tx.delete(key)
         for prefix in ("chat/conversation/", "chat/settings/", "chat/yandex/"):
@@ -179,6 +184,11 @@ def get_messages(conv_id: str) -> list[dict[str, Any]]:
     ]
 
 
+def _request_message_key(conv_id: str, role: str, request_id: str) -> str:
+    """The index from a turn request id to the message of one role that it stored."""
+    return "chat/message-request/" + conv_id + "/" + role + "/" + request_id
+
+
 def add_message(
     conv_id: str,
     role: str,
@@ -192,8 +202,14 @@ def add_message(
     attachments: Any = None,
     total_duration_ms: Any = None,
     deduplicate_source: bool = False,
+    request_id: str | None = None,
 ) -> int | None:
-    """Return the message ID only after its transaction has committed."""
+    """Return the message ID only after its transaction has committed.
+
+    With ``request_id`` the message carries that turn request id, and the index from the
+    request id to the message is committed in the same transaction. A request re-sent
+    after a restart finds the question it stored there and does not store it again.
+    """
     if not isinstance(content, str):
         content = json.dumps(content, ensure_ascii=False) if content is not None else ""
     now = int(time.time())
@@ -234,11 +250,14 @@ def add_message(
                 "trace": trace or {},
                 "source": source,
                 "attachments": attachments or {},
+                **({"request_id": request_id} if request_id is not None else {}),
             },
         )
         tx.set(key, {**record, "updated_at": now})
         if source_key is not None:
             tx.set(source_key, identity)
+        if request_id is not None:
+            tx.set(_request_message_key(conv_id, role, request_id), identity)
     return identity
 
 

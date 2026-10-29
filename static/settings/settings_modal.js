@@ -376,7 +376,7 @@
     },
     store: { id: "set-store", label: "Сохранять ответы", type: "checkbox", enabledByDefault: true },
     background: { id: "set-bg", label: "Фоновый опрос", type: "checkbox", enabledByDefault: true },
-    stream: { id: "set-stream", label: "Потоковый режим", type: "checkbox" },
+    stream: { id: "set-stream", label: "Потоковый режим", type: "checkbox", enabledByDefault: true },
     instructions: {
       id: "set-instructions", label: "Системный промпт (Instructions)",
       type: "textarea", extra: "height:70px;",

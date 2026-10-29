@@ -189,7 +189,14 @@ def get_user_policy(user_id: str) -> dict[str, Any]:
 
 
 def release_request(reservation: QuotaReservation | None) -> None:
-    """Return a reservation whose provider call produced no answer.
+    """Return the reservation of a request the provider is known not to have accepted.
+
+    Only a POST that never reached the provider, or a rate limit that stayed until its
+    retries ran out (HTTP 429, or the rate_limit_exceeded event before the response id), is
+    released. Every other request keeps its reservation, because any failure after the request
+    was sent may have been accepted: a 5xx (501 and 503 too), a 408 or 425, a timeout, a stream
+    that ended before it named its response, any other in-stream error event, a failed or
+    cancelled answer, an answer with no task id, and any other HTTP refusal.
 
     The counts are lowered only while the reserved period and rate window are still current, so a
     release never reduces a later period's usage.

@@ -53,8 +53,6 @@ def validate_generation_params(params):
     for name in ("background", "store", "stream", "parallel_tool_calls"):
         if name in validated and not isinstance(validated[name], bool):
             raise ValueError(f"{name} must be a boolean")
-    if validated.get("stream") is True:
-        raise ValueError("stream=true is not supported by the polling transport")
     if validated.get("background", True) and validated.get("store") is False:
         raise ValueError("background=true requires store=true")
     limit = validated.get("max_output_tokens")
@@ -417,8 +415,8 @@ def build_response_payload(
         "input": _response_input(params, message),
         "background": is_background,
         "store": params.get("store", True),
-        # The reply is polled, never read as a stream, so a stream request is never sent.
-        "stream": False,
+        # Stream only when the caller asks; the reply stays stored and pollable by id.
+        "stream": params.get("stream") is True,
     }
 
     validated_metadata = validate_metadata(metadata)

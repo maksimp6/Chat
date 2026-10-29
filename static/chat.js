@@ -259,15 +259,18 @@ var CHAT_ERROR_TEXTS = {
   tool_action_failed: "Инструмент не выполнил действие. Причина записана в журнале сервера. Попросите модель повторить действие в чате.",
   tool_execution_failed: "Сервер не завершил подтверждённое действие. Проверьте, выполнилось ли оно, прежде чем повторять.",
   approval_followup_failed: "Действие выполнено, но модель не дописала ответ. Повторять действие не нужно: проверьте результат в диалоге.",
+  turn_request_conflict: "Этот вопрос уже отправлен с другим текстом или фото. Отправьте его заново.",
+  turn_lost: "Сервер перезапустился, пока модель отвечала, и ответ не сохранился. Вопрос сохранён: нажмите «Повторить», чтобы получить ответ.",
+  turn_request_not_found: "Сервер не нашёл этот запрос. Если ответа нет в диалоге, отправьте вопрос ещё раз.",
 };
 
 function isRussianText(value) {
   return typeof value === "string" && /[А-Яа-яЁё]/.test(value);
 }
 
-// The Russian text for a failed request. A known code is named in plain words; the server's explanation then goes to
-// the console only, so the bubble says it once. Without a known code, the server's Russian explanation is the text.
-// A bare code and English server text (exception and library messages) go to the console only.
+// The Russian text for a failed request. The server's Russian explanation is the text when it is present, because the
+// server knows what was stored (a known code cannot tell); a known code names the failure without one. A bare code and
+// English server text (exception and library messages) go to the console only.
 function chatErrorReason(data, status, fallback) {
   var body = data && typeof data === "object" ? data : {};
   var code = body.error && typeof body.error === "object" ? body.error.code : body.error;
@@ -277,7 +280,7 @@ function chatErrorReason(data, status, fallback) {
   var own = !known && isRussianText(code) ? code : "";
   var detail = [body.detail, body.message].find(isRussianText) || "";
   console.warn("[CHAT] Request failed:", status || "no status", code || "", body.detail || body.message || "");
-  var text = known || detail || own || (body.type && isRussianText(body.title) ? body.title : "");
+  var text = detail || known || own || (body.type && isRussianText(body.title) ? body.title : "");
   if (!text) {
     text = fallback || (status >= 500
       ? "Сервер не смог ответить. Повторите запрос позже."
@@ -795,7 +798,7 @@ function loadHistory(convId) {
         const lastStored = stored[stored.length - 1];
         // A plain question with no answer yet is still being answered on the server: wait for it, as after a lost connection.
         if (lastStored && lastStored.role === "user" && !lastStored.source && typeof window.logosResumeWaitingTurn === "function") {
-          window.logosResumeWaitingTurn(convId, stored.length - 1);
+          window.logosResumeWaitingTurn(convId, stored.length - 1, lastStored);
         }
         if (!rendered) {
           const empty = document.createElement("div");
@@ -834,7 +837,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const sendBtn = document.getElementById("send-btn");
   const input = document.getElementById("msg-input");
   const pendingConversations = new Set();
-  // The chat request in flight for each conversation; «Стоп» aborts it from the UI.
+  // The chat request in flight for each conversation; «Стоп» aborts only this tab's connection, the server finishes the turn.
   const activeChatRequests = new Map();
   let creatingConversation = false;
   const turnStarts = new Map();
@@ -845,10 +848,18 @@ document.addEventListener("DOMContentLoaded", function () {
     return chatErrorReason(data, status);
   }
 
+  // «Стоп» ends only this tab's stream. Once the server has the question ('turn' event) it goes on with the answer; before
+  // that the server may not have the question at all, so the text goes back to the field (see sendTurn).
+  function stopNotice(accepted) {
+    return accepted
+      ? "Показ ответа остановлен. Сервер продолжает ответ: он появится в этом диалоге, когда сохранится."
+      : "Показ ответа остановлен до подтверждения сервером. Если вопрос дошёл до сервера, ответ появится в этом диалоге.";
+  }
+
   // Shows the reason in Russian. The browser's own message (for example «The operation was aborted») stays out of the chat.
   function chatErrorText(error) {
     if (error && error.name === "AbortError") {
-      return "Ответ остановлен. Сервер может дописать его: ответ появится в этом диалоге, когда сохранится.";
+      return stopNotice(false);
     }
     if (error && error.name === "TimeoutError") {
       return "Ответ не пришёл за 5 минут. Повторите запрос.";
@@ -1160,6 +1171,7 @@ document.addEventListener("DOMContentLoaded", function () {
         render();
       },
       remove: function () { clearInterval(timer); el.remove(); },
+      element: el,
     };
   }
 
@@ -1181,9 +1193,99 @@ document.addEventListener("DOMContentLoaded", function () {
     return messages[messages.length - 1].role === "assistant" ? "answered" : "pending";
   }
 
+  // An accepted turn whose count before the send failed (the phone was offline then) takes its baseline from the count
+  // once the server names the stored question: the question is the last message of a new turn, and was already counted
+  // for a retry of a stored one (the rule logosResumeWaitingTurn uses). Resolves to whether the turn has a baseline; a
+  // failed read is tried again on the next call.
+  function ensureTurnBaseline(turn) {
+    if (typeof turn.baselineCount === "number") return Promise.resolve(true);
+    if (!turn.accepted || !turn.conversationId) return Promise.resolve(false);
+    if (!turn.baselineRequest) {
+      turn.baselineRequest = fetchMessageCount(turn.conversationId).then(function (count) {
+        turn.baselineRequest = null;
+        if (typeof turn.baselineCount !== "number" && typeof count === "number") {
+          turn.baselineCount = turn.userMessageId ? count : Math.max(0, count - 1);
+          // A retry adds no question, so a count read after acceptance may already include its stored answer: the
+          // turn's receipt decides for it (needsTurnReceipt), and this baseline is only the fallback.
+          if (turn.userMessageId) turn.baselineLate = true;
+        }
+        return typeof turn.baselineCount === "number";
+      });
+    }
+    return turn.baselineRequest;
+  }
+
+  // A retry accepted by the server before its count was read cannot be judged by the count; its receipt can.
+  function needsTurnReceipt(turn) {
+    return Boolean(turn.chatRequestId) && Boolean(turn.userMessageId) && Boolean(turn.accepted) &&
+      (turn.baselineLate === true || typeof turn.baselineCount !== "number");
+  }
+
+  // The server's receipt of a sent turn: {status: "stored" | "lost" | "running", data}, or null when it cannot tell (no
+  // receipt, or no answer); the count rule decides then.
+  async function readTurnReceipt(turn, signal) {
+    if (!turn.chatRequestId || !turn.conversationId) return null;
+    const path = "/api/chat/turns/" + encodeURIComponent(turn.chatRequestId) +
+      "/events?conversation_id=" + encodeURIComponent(turn.conversationId);
+    const init = { method: "GET", headers: { Accept: "application/json" } };
+    if (signal) init.signal = signal;
+    try {
+      const response = await window.LogosDispatcher.request(path, init, { timeoutMs: 15000 });
+      // A turn still live on the server answers with its event stream: it is running, and nothing is read from it.
+      if (isEventStream(response)) {
+        discardBody(response);
+        return { status: "running" };
+      }
+      const data = await response.json().catch(function () { return null; });
+      if (data && data.status === "stored") return { status: "stored", data: data };
+      if (data && data.status === "lost") return { status: "lost", data: data };
+      if (response.status === 202) return { status: "running", data: data };
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // The turns this tab is answering, by conversation id, with their request ids. A reload keeps them, so an answer that is
+  // still streaming on the server is read again from its first event. sessionStorage can be blocked or full: every access
+  // is guarded, and without it the turn still runs, it just is not read again after a reload.
+  const LIVE_TURNS_KEY = "logos_live_turns";
+
+  function savedLiveTurns() {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(LIVE_TURNS_KEY) || "null");
+      return saved && typeof saved === "object" ? saved : {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function rememberLiveTurn(convId, requestId) {
+    try {
+      const saved = savedLiveTurns();
+      saved[convId] = requestId;
+      sessionStorage.setItem(LIVE_TURNS_KEY, JSON.stringify(saved));
+    } catch (error) {
+      // Not kept: a reload then waits for the answer in the stored history.
+    }
+  }
+
+  function forgetLiveTurn(convId, requestId) {
+    try {
+      const saved = savedLiveTurns();
+      if (saved[convId] !== requestId) return;
+      delete saved[convId];
+      sessionStorage.setItem(LIVE_TURNS_KEY, JSON.stringify(saved));
+    } catch (error) {
+      // Nothing was kept, so there is nothing to clear.
+    }
+  }
+
   function releaseTurn(turn, needsConversation) {
     if (turn.conversationId) pendingConversations.delete(turn.conversationId);
     if (turn.conversationId) activeChatRequests.delete(turn.conversationId);
+    // The turn is over for this tab, so a reload no longer reads it again.
+    if (turn.chatRequestId) forgetLiveTurn(turn.conversationId, turn.chatRequestId);
     if (needsConversation) creatingConversation = false;
     syncSendButton();
   }
@@ -1220,6 +1322,40 @@ document.addEventListener("DOMContentLoaded", function () {
     while (!recovery.cancelled && Date.now() - started < TURN_RECOVERY_MS) {
       await recoveryPause(recovery);
       if (recovery.cancelled) break;
+      if (needsTurnReceipt(turn)) {
+        const receipt = await readTurnReceipt(turn, recovery.signal);
+        if (recovery.cancelled) break;
+        if (receipt && receipt.status === "stored") {
+          if (turn.live) turn.live.remove();
+          if (currentConvId === turn.conversationId) loadHistory(turn.conversationId);
+          return;
+        }
+        if (receipt && receipt.status === "lost") {
+          if (typeof turn.onLost === "function") turn.onLost(receipt.data);
+          return;
+        }
+        if (receipt && receipt.status === "running") {
+          missing = 0;
+          if (turn.status) turn.status.setLabel("Вопрос сохранён, модель отвечает");
+          continue;
+        }
+      }
+      // An accepted turn sent while offline learns its baseline here; until then nothing can be compared. The count read
+      // takes no signal, so «Стоп» ends this wait without it (the shared read goes on for watchStoppedTurn).
+      if (typeof turn.baselineCount !== "number") {
+        let onStop = null;
+        const hasBaseline = await Promise.race([
+          ensureTurnBaseline(turn),
+          new Promise(function (resolve) {
+            onStop = function () { resolve(false); };
+            if (recovery.signal) recovery.signal.addEventListener("abort", onStop, { once: true });
+          }),
+        ]);
+        if (recovery.signal) recovery.signal.removeEventListener("abort", onStop);
+        if (recovery.cancelled) break;
+        if (!hasBaseline) continue;
+      }
+      if (recovery.cancelled) break;
       let status = null;
       try {
         const response = await window.LogosDispatcher.request(
@@ -1235,8 +1371,13 @@ document.addEventListener("DOMContentLoaded", function () {
         continue;
       }
       if (recovery.cancelled) break;
+      // A stored question (the server accepted it, or a retry of a stored one) adds no message while it is answered:
+      // an unchanged count means it is still pending, not that the server never received it.
+      if (status === "missing" && (turn.accepted || turn.userMessageId)) status = "pending";
       if (turn.status) turn.status.setLabel(status === "pending" ? "Вопрос сохранён, модель отвечает" : "Отправляем запрос");
       if (status === "answered") {
+        // The stored reply comes with the history; the live bubble of this turn gives way to it.
+        if (turn.live) turn.live.remove();
         if (currentConvId === turn.conversationId) loadHistory(turn.conversationId);
         return;
       }
@@ -1261,7 +1402,8 @@ document.addEventListener("DOMContentLoaded", function () {
   // newer message is on its way in it, the stored answer is shown as soon as it is saved (the history is read again, so
   // the «stopped» note gives way to what the server stored). Otherwise the answer comes with the next history load.
   async function watchStoppedTurn(turn) {
-    if (typeof turn.baselineCount !== "number") return;
+    // An accepted question is stored, so its baseline can still be read after a send made while offline.
+    if (typeof turn.baselineCount !== "number" && !turn.accepted) return;
     const convId = turn.conversationId;
     const startMark = turnStarts.get(convId) || 0;
     const started = Date.now();
@@ -1269,6 +1411,24 @@ document.addEventListener("DOMContentLoaded", function () {
     while (Date.now() - started < TURN_RECOVERY_MS) {
       await new Promise(function (resolve) { setTimeout(resolve, TURN_RECOVERY_POLL_MS); });
       if (currentConvId !== convId || pendingConversations.has(convId) || (turnStarts.get(convId) || 0) !== startMark) return;
+      if (needsTurnReceipt(turn)) {
+        const receipt = await readTurnReceipt(turn);
+        if (currentConvId !== convId || pendingConversations.has(convId) || (turnStarts.get(convId) || 0) !== startMark) return;
+        if (receipt && receipt.status === "stored") {
+          if (document.querySelector("#chatbox .approval-card")) return;
+          loadHistory(convId);
+          return;
+        }
+        if (receipt && receipt.status === "lost") {
+          if (typeof turn.onLost === "function") turn.onLost(receipt.data);
+          return;
+        }
+        if (receipt && receipt.status === "running") {
+          missing = 0;
+          continue;
+        }
+      }
+      if (typeof turn.baselineCount !== "number" && !(await ensureTurnBaseline(turn))) continue;
       let messages;
       try {
         const response = await window.LogosDispatcher.request("/api/conversations/" + convId + "/messages", undefined, { timeoutMs: 15000 });
@@ -1285,8 +1445,9 @@ document.addEventListener("DOMContentLoaded", function () {
         loadHistory(convId);
         return;
       }
-      // A retried question is already stored and adds no new message, so an unchanged count means it is still pending.
-      if (status === "missing" && !turn.userMessageId) {
+      // A retried or accepted question is already stored and adds no new message, so an unchanged count means it is
+      // still pending.
+      if (status === "missing" && !turn.userMessageId && !turn.accepted) {
         missing += 1;
         if (missing >= TURN_MISSING_POLLS) {
           // The server never received the question, so no answer will come for it.
@@ -1300,10 +1461,14 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // After a reload, or in another tab, a question with no answer yet is still being answered: its answer is awaited here.
-  window.logosResumeWaitingTurn = function (convId, baselineCount) {
+  // A turn this tab started is read again from its first event, so the text streamed so far comes back; the stored
+  // history decides when the server does not know the turn.
+  window.logosResumeWaitingTurn = function (convId, baselineCount, question) {
     if (pendingConversations.has(convId) || activeChatRequests.has(convId)) return;
     // The baseline is the count before the open question, so the question itself reads as pending.
     const turn = { conversationId: convId, baselineCount: baselineCount };
+    const savedRequestId = savedLiveTurns()[convId];
+    if (typeof savedRequestId === "string" && savedRequestId) turn.chatRequestId = savedRequestId;
     const recovery = newTurnRecovery();
     pendingConversations.add(convId);
     markTurnStart(convId);
@@ -1316,22 +1481,694 @@ document.addEventListener("DOMContentLoaded", function () {
       typingEl.innerHTML = "<span></span><span></span><span></span>";
       if (chatbox) chatbox.appendChild(typingEl);
       turn.status = createTurnStatus(chatbox, Date.now());
+      turn.typingEl = typingEl;
     }
+    // A live answer read again keeps the page busy until it ends, as the send that started it did.
+    if (turn.chatRequestId && typeof window.LogosDispatcher.hold === "function") turn.hold = window.LogosDispatcher.hold();
     syncSendButton();
-    recoverTurn(turn, recovery, function () {
-      // The question itself has disappeared: there is nothing left to wait for.
+    const resuming = turn.chatRequestId ? resumeSavedLiveTurn(turn, recovery, question) : Promise.resolve(false);
+    resuming.then(function (shown) {
+      if (shown) return null;
+      return recoverTurn(turn, recovery, function () {
+        // The question itself has disappeared: there is nothing left to wait for.
+      });
     }).finally(function () {
+      if (turn.hold) turn.hold();
       if (typingEl) typingEl.remove();
       if (turn.status) turn.status.remove();
       if (recovery.cancelled) {
         deliverApprovalOutput(convId, function () {
-          addMessage({ text: chatErrorText({ name: "AbortError" }), role: "error" });
+          addMessage({ text: stopNotice(true), role: "error" });
         });
         watchStoppedTurn(turn);
       }
       releaseTurn(turn, false);
     });
   };
+
+  // Live answers and automatic re-sends of a text or photo turn.
+  // The server sends a keep-alive every 15 s, so three silent periods mean the connection is gone. This ends only the
+  // connection, never the turn on the server. It is passed as an argument, where 0 means no bound.
+  const LIVE_IDLE_MS = 45000;
+  // A photo upload can outlast that window on a slow link: the wait for the headers of a send grows by the time its
+  // body needs at this rate (bytes per millisecond, about 32 KB/s).
+  const LIVE_UPLOAD_BYTES_PER_MS = 32;
+  // The live bubble is redrawn at most this often; a slow redraw (a long Markdown reply on a phone) spaces them further.
+  const LIVE_RENDER_MS = 250;
+  // Automatic re-sends and re-attachments pause for a random time within a window that doubles from the base up to the
+  // cap (full jitter). They go on for TURN_RECOVERY_MS after the last contact with the server.
+  const RESEND_BASE_MS = 1000;
+  const RESEND_WINDOW_CAP_MS = 15000;
+
+  function retryDelayMs(attempt) {
+    const span = Math.min(RESEND_WINDOW_CAP_MS, RESEND_BASE_MS * Math.pow(2, Math.max(attempt, 1) - 1));
+    return Math.random() * span;
+  }
+
+  // Seconds with a decimal comma, as the status line reads them.
+  function formatSeconds(ms) {
+    return (ms / 1000).toFixed(1).replace(".", ",");
+  }
+
+  function namedError(name, message) {
+    const error = new Error(message);
+    error.name = name;
+    return error;
+  }
+
+  function stoppedError() {
+    return namedError("AbortError", "Chat turn stopped");
+  }
+
+  // A pause that «Стоп» ends at once, with an AbortError.
+  function pauseFor(ms, signal) {
+    return new Promise(function (resolve, reject) {
+      if (signal && signal.aborted) {
+        reject(stoppedError());
+        return;
+      }
+      const timer = setTimeout(function () {
+        if (signal) signal.removeEventListener("abort", onAbort);
+        resolve();
+      }, ms);
+      function onAbort() {
+        clearTimeout(timer);
+        reject(stoppedError());
+      }
+      if (signal) signal.addEventListener("abort", onAbort, { once: true });
+    });
+  }
+
+  function setTurnLabel(turn, text) {
+    if (turn.status && typeof text === "string" && text) turn.status.setLabel(text);
+  }
+
+  function isPinned(chatbox) {
+    return chatbox.scrollHeight - chatbox.scrollTop - chatbox.clientHeight <= 80;
+  }
+
+  function responseType(response) {
+    try {
+      return String((response.headers && response.headers.get("Content-Type")) || "").toLowerCase();
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function isEventStream(response) {
+    return responseType(response).indexOf("text/event-stream") !== -1;
+  }
+
+  // A transient status (408, 425, 429, 503) that is neither the server's JSON nor its event stream is a proxy or gateway
+  // page: the turn may not have reached the server, so the same request is sent again. Other 5xx stay the server's error.
+  function isGatewayFailure(response) {
+    const type = responseType(response);
+    return [408, 425, 429, 503].indexOf(response.status) !== -1 &&
+      type.indexOf("json") === -1 && type.indexOf("text/event-stream") === -1;
+  }
+
+  function discardBody(response) {
+    try {
+      if (response.body && typeof response.body.cancel === "function") response.body.cancel().catch(function () {});
+    } catch (error) {
+      // The body is already closed.
+    }
+  }
+
+  // The live path needs a streamed response body; without one the turn takes the JSON path.
+  function liveTurnSupported(params) {
+    return Boolean(params) && params.stream === true &&
+      typeof ReadableStream === "function" && typeof TextDecoder === "function" &&
+      typeof Response === "function" && Boolean(Response.prototype) && "body" in Response.prototype;
+  }
+
+  // The chat list takes the conversation title the server stored.
+  function applyConversationTitle(convId, title) {
+    if (!title || typeof conversations === "undefined" || !Array.isArray(conversations)) return;
+    const conversation = conversations.find((item) => item.id === convId);
+    if (!conversation) return;
+    conversation.title = title;
+    localStorage.setItem("conversations", JSON.stringify(conversations));
+    if (typeof renderSidebar === "function") renderSidebar();
+  }
+
+  // One request of a turn. «Стоп» aborts it, also while its body is read; with idleMs, a request whose headers do not
+  // come in time is abandoned. That ends only the connection: the turn on the server goes on.
+  async function turnRequest(path, init, stopSignal, idleMs, timeoutMs) {
+    if (stopSignal.aborted) throw stoppedError();
+    const controller = new AbortController();
+    const abort = function () { controller.abort(); };
+    stopSignal.addEventListener("abort", abort, { once: true });
+    const idleTimer = idleMs > 0 ? setTimeout(abort, idleMs) : null;
+    try {
+      return await window.LogosDispatcher.request(path, Object.assign({}, init, { signal: controller.signal }), {
+        timeoutMs: timeoutMs,
+      });
+    } catch (error) {
+      stopSignal.removeEventListener("abort", abort);
+      throw error;
+    } finally {
+      if (idleTimer) clearTimeout(idleTimer);
+    }
+  }
+
+  // Sends a text or photo turn and returns the server's answer. A send that got no answer from the server (no
+  // connection, a gateway page, no headers in time on the live path) is sent again with the same request_id: the server
+  // runs that turn once and answers a repeat with its live replay, «running» or «stored».
+  async function postChatTurn(turn, body, live, stopSignal) {
+    const started = Date.now();
+    const headers = { "Content-Type": "application/json" };
+    if (live) headers.Accept = "text/event-stream";
+    const idleMs = live && LIVE_IDLE_MS > 0 ? LIVE_IDLE_MS + Math.ceil(body.length / LIVE_UPLOAD_BYTES_PER_MS) : 0;
+    for (let attempt = 1; ; attempt += 1) {
+      let response = null;
+      try {
+        response = await turnRequest(
+          "/api/chat",
+          { method: "POST", headers: headers, body: body },
+          stopSignal,
+          idleMs,
+          live ? 0 : 300000,
+        );
+      } catch (error) {
+        if (stopSignal.aborted) throw stoppedError();
+        // The JSON path keeps its 5-minute wait: after it the turn is recovered from the stored history.
+        if (!live && error && error.name === "TimeoutError") throw error;
+      }
+      if (response && !isGatewayFailure(response)) return response;
+      if (response) discardBody(response);
+      if (Date.now() - started > TURN_RECOVERY_MS) throw new TypeError("No server answer to the chat request");
+      const delay = retryDelayMs(attempt);
+      setTurnLabel(turn, "Нет связи с сервером: повтор через " + formatSeconds(delay) + " с (попытка " + attempt + ")");
+      await pauseFor(delay, stopSignal);
+      setTurnLabel(turn, "Отправляем запрос");
+    }
+  }
+
+  // Server-sent events of a live answer: `data:` lines are joined, `id:` is noted, comments (keep-alive) are skipped,
+  // and an unreadable event is skipped. push() returns the `done` event once it has arrived, null before.
+  function createSseParser(onEvent) {
+    let buffer = "";
+    let dataLines = [];
+    let eventId = null;
+    let done = null;
+    function dispatch() {
+      const hasData = dataLines.length > 0;
+      const raw = dataLines.join("\n");
+      const id = eventId;
+      dataLines = [];
+      eventId = null;
+      if (!hasData) return;
+      let event;
+      try {
+        event = JSON.parse(raw);
+      } catch (error) {
+        return;
+      }
+      if (!event || typeof event !== "object" || typeof event.type !== "string") return;
+      if (event.type === "done") {
+        done = event;
+        return;
+      }
+      try {
+        onEvent(event, id);
+      } catch (error) {
+        // A failed redraw does not end the turn: the stored reply replaces the bubble at `done`.
+        console.error("[CHAT] Live event failed:", event.type, error);
+      }
+    }
+    function readLine(line) {
+      if (line === "") {
+        dispatch();
+        return;
+      }
+      if (line.charAt(0) === ":") return;
+      const colon = line.indexOf(":");
+      const field = colon === -1 ? line : line.slice(0, colon);
+      let value = colon === -1 ? "" : line.slice(colon + 1);
+      if (value.charAt(0) === " ") value = value.slice(1);
+      if (field === "data") dataLines.push(value);
+      else if (field === "id") eventId = value;
+    }
+    return {
+      push: function (text) {
+        buffer += text;
+        let start = 0;
+        let newline;
+        while (!done && (newline = buffer.indexOf("\n", start)) !== -1) {
+          let line = buffer.slice(start, newline);
+          start = newline + 1;
+          if (line.charAt(line.length - 1) === "\r") line = line.slice(0, -1);
+          readLine(line);
+        }
+        buffer = buffer.slice(start);
+        return done;
+      },
+    };
+  }
+
+  // Reads a live answer. It resolves {done: event} at the `done` frame, and {done: null} when the stream ends without
+  // it or nothing (not even a keep-alive) came for idleMs: the connection broke, the turn goes on. «Стоп» throws an
+  // AbortError. lastActivity is when the server was last heard from.
+  async function readLiveStream(response, options) {
+    const signal = options.signal;
+    const idleMs = Number(options.idleMs) > 0 ? Number(options.idleMs) : 0;
+    const parser = createSseParser(options.onEvent);
+    let lastActivity = Date.now();
+    if (signal && signal.aborted) throw stoppedError();
+    if (!response.body || typeof response.body.getReader !== "function") {
+      // Without a streamed body the answer is read whole; it ends with the turn.
+      let whole;
+      try {
+        whole = await response.text();
+      } catch (error) {
+        if (signal && signal.aborted) throw stoppedError();
+        return { done: null, lastActivity: lastActivity };
+      }
+      if (signal && signal.aborted) throw stoppedError();
+      return { done: parser.push(whole), lastActivity: Date.now() };
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let idleTimer = null;
+    const cancel = function () {
+      try {
+        reader.cancel().catch(function () {});
+      } catch (error) {
+        // The stream is already closed.
+      }
+    };
+    const armIdle = function () {
+      if (!idleMs) return;
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(cancel, idleMs);
+    };
+    if (signal) signal.addEventListener("abort", cancel, { once: true });
+    armIdle();
+    try {
+      for (;;) {
+        let chunk;
+        try {
+          chunk = await reader.read();
+        } catch (error) {
+          if (signal && signal.aborted) throw stoppedError();
+          return { done: null, lastActivity: lastActivity };
+        }
+        if (signal && signal.aborted) throw stoppedError();
+        // A partial event at the end is dropped: without `done` the stream was interrupted.
+        if (chunk.done) return { done: parser.push(decoder.decode()), lastActivity: lastActivity };
+        lastActivity = Date.now();
+        armIdle();
+        const done = parser.push(decoder.decode(chunk.value, { stream: true }));
+        if (done) {
+          cancel();
+          return { done: done, lastActivity: lastActivity };
+        }
+      }
+    } finally {
+      if (idleTimer) clearTimeout(idleTimer);
+      if (signal) signal.removeEventListener("abort", cancel);
+    }
+  }
+
+  // The reply bubble of a live turn: text and reasoning as they arrive, redrawn at most every LIVE_RENDER_MS. It sits
+  // above the waiting dots and the status line; at `done` the stored reply takes its place.
+  function createLiveReply(turn) {
+    const el = document.createElement("div");
+    el.className = "msg bot live-reply";
+    el.setAttribute("aria-busy", "true");
+    // Shown once there is something to read.
+    el.hidden = true;
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    const details = document.createElement("details");
+    details.className = "reasoning-details";
+    details.hidden = true;
+    const summary = document.createElement("summary");
+    summary.className = "reasoning-summary";
+    summary.textContent = "🧠 Ход мыслей модели";
+    const reasoningEl = document.createElement("div");
+    reasoningEl.className = "reasoning-content";
+    details.append(summary, reasoningEl);
+    const textEl = document.createElement("div");
+    textEl.className = "live-text";
+    bubble.append(details, textEl);
+    el.appendChild(bubble);
+
+    // Committed: earlier parts of a reply cut by the provider's output limit. Round: the provider request in progress.
+    let committedText = "";
+    let roundText = "";
+    let committedReasoning = "";
+    let roundReasoning = "";
+    let shownText = "";
+    let shownReasoning = "";
+    let renderTimer = null;
+    let lastRenderAt = 0;
+    let lastRenderMs = 0;
+    let closed = false;
+    // A history load (switching chats and back) redraws the chat without this bubble: it is put back at the end.
+    const attachTimer = setInterval(ensureAttached, 1000);
+
+    function joinReasoning(first, second) {
+      return first && second ? first + "\n\n" + second : first || second;
+    }
+
+    function fullText() {
+      return committedText + roundText;
+    }
+
+    function fullReasoning() {
+      return joinReasoning(committedReasoning, roundReasoning);
+    }
+
+    function ensureAttached() {
+      if (closed || currentConvId !== turn.conversationId) return;
+      const chatbox = document.getElementById("chatbox");
+      if (!chatbox) return;
+      if (chatbox.dataset.conversationId && chatbox.dataset.conversationId !== turn.conversationId) return;
+      const tail = [el, turn.typingEl, turn.status ? turn.status.element : null].filter(Boolean);
+      let node = chatbox.lastElementChild;
+      for (let index = tail.length - 1; index >= 0; index -= 1) {
+        if (node !== tail[index]) {
+          const pinned = isPinned(chatbox);
+          tail.forEach(function (item) { chatbox.appendChild(item); });
+          if (pinned) chatbox.scrollTop = chatbox.scrollHeight;
+          return;
+        }
+        node = node.previousElementSibling;
+      }
+    }
+
+    function renderReasoning() {
+      const reasoning = fullReasoning();
+      details.hidden = !reasoning;
+      // A closed block is not redrawn: its text is drawn when it is opened.
+      if (details.open && reasoning !== shownReasoning) {
+        reasoningEl.innerHTML = parseMarkdown(reasoning);
+        shownReasoning = reasoning;
+      }
+    }
+
+    function render() {
+      if (renderTimer) {
+        clearTimeout(renderTimer);
+        renderTimer = null;
+      }
+      ensureAttached();
+      const started = performance.now();
+      const chatbox = el.parentNode;
+      // The chat follows the reply only when it was at its end.
+      const pinned = Boolean(chatbox) && isPinned(chatbox);
+      const text = fullText();
+      if (text !== shownText) {
+        textEl.innerHTML = parseMarkdown(text);
+        shownText = text;
+      }
+      renderReasoning();
+      el.hidden = !text && !fullReasoning();
+      if (pinned) chatbox.scrollTop = chatbox.scrollHeight;
+      lastRenderMs = performance.now() - started;
+      lastRenderAt = Date.now();
+    }
+
+    function scheduleRender() {
+      if (closed || renderTimer) return;
+      const wait = Math.max(0, lastRenderAt + Math.max(LIVE_RENDER_MS, 4 * lastRenderMs) - Date.now());
+      renderTimer = setTimeout(function () {
+        renderTimer = null;
+        if (!closed) render();
+      }, wait);
+    }
+
+    function close() {
+      closed = true;
+      clearInterval(attachTimer);
+      if (renderTimer) {
+        clearTimeout(renderTimer);
+        renderTimer = null;
+      }
+    }
+
+    function apply(event) {
+      if (closed) return;
+      if (event.type === "round") {
+        if (event.kind === "initial") {
+          committedText = "";
+          committedReasoning = "";
+        } else if (event.kind === "output_limit") {
+          // A continuation goes on from where the cut part stopped.
+          committedText += roundText;
+          committedReasoning = joinReasoning(committedReasoning, roundReasoning);
+        }
+        // The text of a round that called tools is not part of the stored reply.
+        roundText = "";
+        roundReasoning = "";
+      } else if (event.type === "delta") {
+        roundText += typeof event.text === "string" ? event.text : "";
+      } else if (event.type === "reasoning") {
+        roundReasoning += typeof event.text === "string" ? event.text : "";
+      } else if (event.type === "round_text") {
+        roundText = typeof event.text === "string" ? event.text : "";
+        roundReasoning = typeof event.reasoning === "string" ? event.reasoning : "";
+      } else {
+        return;
+      }
+      scheduleRender();
+    }
+
+    details.addEventListener("toggle", function () {
+      if (details.open) renderReasoning();
+    });
+    if (turn.typingEl && turn.typingEl.parentNode) turn.typingEl.before(el);
+    else ensureAttached();
+
+    return {
+      el: el,
+      // The index of the last event applied; a re-attachment asks for the events after it.
+      lastId: 0,
+      apply: apply,
+      ensureAttached: ensureAttached,
+      // The stored reply (or error) takes the bubble's place; without one the bubble leaves.
+      finish: function (node) {
+        close();
+        if (node && node !== el && el.isConnected) {
+          // A reasoning block the reader opened stays open in the stored reply, whose block starts closed; otherwise
+          // the content above the answer shrinks and the restored scroll position shows other text.
+          if (details.open && typeof node.querySelector === "function") {
+            const finalDetails = node.querySelector(".bubble > .reasoning-details");
+            if (finalDetails) finalDetails.open = true;
+          }
+          el.replaceWith(node);
+        } else el.remove();
+      },
+      // The stream ended before the stored reply: what came stays, marked as stopped. An empty bubble leaves.
+      freeze: function () {
+        if (closed) return;
+        render();
+        close();
+        if (!fullText() && !fullReasoning()) {
+          el.remove();
+          return;
+        }
+        el.removeAttribute("aria-busy");
+        el.classList.add("live-stopped");
+      },
+      remove: function () {
+        close();
+        el.remove();
+      },
+    };
+  }
+
+  // A «running» answer that names the stored question: the turn is awaited, never sent again, and its text is not put
+  // back for a second send.
+  function noteStoredQuestion(turn, data) {
+    if (data && Number.isInteger(data.user_message_id) && data.user_message_id > 0) {
+      turn.accepted = true;
+      turn.serverUserMessageId = data.user_message_id;
+      ensureTurnBaseline(turn);
+    }
+  }
+
+  // One live event: the question is stored, a status for the line under the dots, or reply text for the bubble.
+  function applyLiveEvent(turn, live, event) {
+    live.ensureAttached();
+    if (event.type === "turn") {
+      // From now on this turn is never sent again, only re-attached to.
+      turn.accepted = true;
+      if (Number.isInteger(event.user_message_id) && event.user_message_id > 0) {
+        turn.serverUserMessageId = event.user_message_id;
+      }
+      ensureTurnBaseline(turn);
+      applyConversationTitle(turn.conversationId, event.title);
+      setTurnLabel(turn, "Вопрос сохранён, модель отвечает");
+    } else if (event.type === "status" || event.type === "tool" || event.type === "retry") {
+      // Kept for a re-attachment: the server sends a status only when its phase changes, so the replay after a break
+      // may hold none.
+      if (typeof event.text === "string" && event.text) turn.liveLabel = event.text;
+      setTurnLabel(turn, event.text);
+    } else {
+      live.apply(event);
+    }
+  }
+
+  // After a broken live stream: reads the turn again from the event after the last one applied. Returns the new stream,
+  // or null when the turn's outcome was shown from a JSON answer. Throws LiveStreamLost when the server was not reached
+  // for TURN_RECOVERY_MS or no longer knows the request, and TurnRunningError when it runs but cannot be relayed: the
+  // stored history is then awaited instead.
+  async function reattachLiveTurn(turn, live, stopSignal, lastContact, outcome) {
+    const path = "/api/chat/turns/" + encodeURIComponent(turn.chatRequestId) +
+      "/events?conversation_id=" + encodeURIComponent(turn.conversationId);
+    for (let attempt = 1; ; attempt += 1) {
+      if (Date.now() - lastContact > TURN_RECOVERY_MS) throw namedError("LiveStreamLost", "Live answer stream lost");
+      const delay = retryDelayMs(attempt);
+      setTurnLabel(turn, "Связь с сервером прервалась: переподключаюсь через " + formatSeconds(delay) + " с (попытка " + attempt + ")");
+      await pauseFor(delay, stopSignal);
+      setTurnLabel(turn, "Подключаюсь к ответу снова");
+      let response;
+      try {
+        response = await turnRequest(
+          path,
+          { method: "GET", headers: { Accept: "text/event-stream", "Last-Event-ID": String(live.lastId) } },
+          stopSignal,
+          LIVE_IDLE_MS,
+          0,
+        );
+      } catch (error) {
+        if (stopSignal.aborted) throw stoppedError();
+        continue;
+      }
+      if (isEventStream(response)) {
+        setTurnLabel(turn, turn.liveLabel || (turn.accepted ? "Связь с сервером восстановлена, модель отвечает" : "Связь с сервером восстановлена"));
+        return response;
+      }
+      const data = await response.json().catch(function () { return null; });
+      if (stopSignal.aborted) throw stoppedError();
+      if (!data || typeof data !== "object") continue;
+      if (data.status === "stored") {
+        live.remove();
+        if (currentConvId === turn.conversationId) loadHistory(turn.conversationId);
+        return null;
+      }
+      if (data.status === "lost") {
+        outcome.lost(data);
+        return null;
+      }
+      if (response.status === 202) {
+        noteStoredQuestion(turn, data);
+        throw namedError("TurnRunningError", "The turn is still running on the server");
+      }
+      if (response.status === 404 && data.error === "turn_request_not_found") {
+        throw namedError("LiveStreamLost", "The server does not know this request");
+      }
+      if (response.status === 404 && data.error === "conversation_not_found") {
+        live.finish(outcome.render(data, 404));
+        return null;
+      }
+    }
+  }
+
+  // Follows a live answer to its `done`, re-attaching after every break, and shows its outcome.
+  async function followLiveTurn(turn, firstResponse, stopSignal, outcome) {
+    const live = createLiveReply(turn);
+    turn.live = live;
+    const onEvent = function (event, id) {
+      applyLiveEvent(turn, live, event);
+      const index = Number(id);
+      if (id !== null && Number.isInteger(index) && index > live.lastId) live.lastId = index;
+    };
+    let response = firstResponse;
+    while (response) {
+      const result = await readLiveStream(response, { signal: stopSignal, idleMs: LIVE_IDLE_MS, onEvent: onEvent });
+      if (result.done) {
+        const body = result.done.body && typeof result.done.body === "object" ? result.done.body : {};
+        // addMessage scrolls to the end; a reader who scrolled up keeps the same text in view, since the stored reply
+        // takes the bubble's place. The chat follows to the end only when it was there.
+        const box = live.el.parentNode;
+        const keepTop = box && !isPinned(box) ? box.scrollTop : null;
+        live.finish(outcome.render(body, Number(result.done.http_status) || 0, { live: true }));
+        if (keepTop !== null) box.scrollTop = keepTop;
+        return;
+      }
+      response = await reattachLiveTurn(turn, live, stopSignal, result.lastActivity, outcome);
+    }
+  }
+
+  // The server lost the turn in a restart. The question can be sent again with «Повторить» unless it had photos, which a
+  // reload does not keep. The server's explanation, when it sends one, says whether the question was stored.
+  function showReloadLost(turn, question, data) {
+    if (turn.live) turn.live.freeze();
+    // The lost notice is final for this request: a later history load must not read its saved request id again.
+    if (turn.chatRequestId) forgetLiveTurn(turn.conversationId, turn.chatRequestId);
+    const retryable = Boolean(question) && !(question.attachments && question.attachments.images);
+    deliverApprovalOutput(turn.conversationId, function () {
+      const lostNode = addMessage({
+        // Without a retry button the server's explanation may tell the user to press «Повторить», so the photo text is used.
+        text: retryable
+          ? data.detail || CHAT_ERROR_TEXTS.turn_lost
+          : "Сервер перезапустился, пока модель отвечала, и ответ не сохранился. Вопрос с фото отправьте заново.",
+        role: "error",
+        onRetry: retryable
+          ? function () {
+            return sendTurn({
+              text: question.text,
+              conversationId: turn.conversationId,
+              userMessageId: data.user_message_id || question.id,
+              replaces: lostNode,
+            });
+          }
+          : undefined,
+      });
+    });
+  }
+
+  // Reads again the answer of a turn this tab started, from its first event (Last-Event-ID 0). Resolves to true when
+  // nothing is left for the history recovery: the turn was shown, or it was stopped. Resolves to false when the server
+  // does not know the turn or cannot relay it; the stored history then decides. Never rejects.
+  async function resumeSavedLiveTurn(turn, recovery, question) {
+    let response;
+    try {
+      response = await turnRequest(
+        "/api/chat/turns/" + encodeURIComponent(turn.chatRequestId) +
+          "/events?conversation_id=" + encodeURIComponent(turn.conversationId),
+        { method: "GET", headers: { Accept: "text/event-stream", "Last-Event-ID": "0" } },
+        recovery.signal,
+        LIVE_IDLE_MS,
+        0,
+      );
+    } catch (error) {
+      return recovery.cancelled;
+    }
+    if (!isEventStream(response)) {
+      // Not streamed here: the stored reply, a lost turn, or nothing known (the history decides then).
+      const data = await response.json().catch(function () { return null; });
+      if (data && data.status === "stored") {
+        if (currentConvId === turn.conversationId) loadHistory(turn.conversationId);
+        return true;
+      }
+      if (data && data.status === "lost") {
+        showReloadLost(turn, question, data);
+        return true;
+      }
+      return recovery.cancelled;
+    }
+    const outcome = {
+      render: function () {
+        // The stored reply comes with the history, which is read again.
+        if (currentConvId === turn.conversationId) loadHistory(turn.conversationId);
+        return null;
+      },
+      lost: function (data) { showReloadLost(turn, question, data); },
+    };
+    try {
+      await followLiveTurn(turn, response, recovery.signal, outcome);
+      return true;
+    } catch (error) {
+      // A stream that broke for good, or a turn the server cannot relay: the stored history is awaited instead.
+      if (turn.live) turn.live.freeze();
+      return recovery.cancelled;
+    }
+  }
 
   // A live retry keeps its photos; a history retry only knows their count and asks for them again.
   async function sendTurn(retryRequest) {
@@ -1465,8 +2302,133 @@ document.addEventListener("DOMContentLoaded", function () {
         typingEl.innerHTML = "<span></span><span></span><span></span>";
         if (chatbox) chatbox.appendChild(typingEl);
         turn.status = createTurnStatus(chatbox, Date.now());
+        // A live reply is drawn above the dots and the status line.
+        turn.typingEl = typingEl;
       }
       const t0 = performance.now();
+      // Shows a finished turn: the JSON answer, the `done` of a live answer, or an image or voice result. Returns the
+      // message it added, or null.
+      const renderTurnResult = function (data, httpStatus, opts) {
+        const options = opts || {};
+        const clientTotalMs = Math.round(performance.now() - t0);
+        // The chat takes the conversation title the server stored, also when the turn then failed at the provider. A Problem
+        // Details body (it has «type») is skipped: its «title» describes the error.
+        if (!data.type) applyConversationTitle(turn.conversationId, data.title);
+        // A reply is persisted and comes back with the history; an approval request is not, so it waits for its chat.
+        if (data.requires_approval) {
+          deliverApprovalOutput(turn.conversationId, function () {
+            renderApprovalCard(data.tool_call, data.original_message || turn.text);
+          });
+          return null;
+        }
+        // The backend persists this turn; never paint its late answer into a different conversation.
+        if (currentConvId !== turn.conversationId) return null;
+        if (data.error === "conversation_not_found") {
+          // The chat was deleted elsewhere: it leaves this list, and the unsent text goes back to the field.
+          if (!input.value) input.value = turn.text;
+          window.LogosToast.error("Диалог удалён в другом окне или на другом устройстве.");
+          if (typeof deleteConv === "function") deleteConv(turn.conversationId);
+          return null;
+        }
+        if (data.error) {
+          // A question the server stored is not returned to the field: «Повторить» on its error sends it once.
+          let textReturned = false;
+          if (!data.user_message_id) {
+            restoreImages();
+            // The failed text goes back to the field, unless the user already started a new draft.
+            if (!input.value) {
+              input.value = turn.text;
+              textReturned = true;
+            }
+          }
+          const errorNode = addMessage({
+            text: data.reply || "⚠️ Ошибка: " + errorReasonText(data, httpStatus),
+            role: "error",
+            // A text that did not go back to the field can be put there with «Изменить»; photos would not follow it.
+            editText: textReturned || sentImages.length ? undefined : turn.text,
+            cost: data.cost || 0,
+            timings: data.timings,
+            totalDurationMs: clientTotalMs,
+            reasoning: data.reasoning,
+            usage: data.usage,
+            trace: data.trace,
+            onRetry: function () {
+              return sendTurn({
+                text: turn.text,
+                conversationId: turn.conversationId,
+                model: turn.model,
+                images: sentImages,
+                userMessageId: data.user_message_id || turn.userMessageId,
+                imageRequestId: turn.imageRequestId,
+                replaces: errorNode,
+              });
+            },
+          });
+          return errorNode;
+        }
+        if (data.reply) {
+          // The server's duration is the one stored with the reply, so the details read the same after a reload.
+          const replyNode = addMessage({
+            text: data.reply,
+            role: "bot",
+            cost: data.cost || 0,
+            timings: data.timings,
+            totalDurationMs: data.total_duration_ms || clientTotalMs,
+            reasoning: data.reasoning,
+            usage: data.usage,
+            trace: data.trace,
+            id: data.message_id,
+          });
+          // A reply taller than the chat opens at its first line, not its last. A live reply was read as it came.
+          const replyBox = document.getElementById("chatbox");
+          if (!options.live && replyNode && replyBox && replyNode.offsetHeight > replyBox.clientHeight) {
+            replyBox.scrollTop += replyNode.getBoundingClientRect().top - replyBox.getBoundingClientRect().top;
+          }
+          return replyNode;
+        }
+        restoreImages();
+        // Neither an answer nor an error came back, and the server may have stored the question:
+        // the text is not put back on its own, «Изменить» puts it into the field on request.
+        return addMessage({
+          text: "⚠️ Ошибка: " + chatErrorReason(data, httpStatus),
+          role: "error",
+          editText: sentImages.length ? undefined : turn.text,
+          cost: data.cost || 0,
+          timings: data.timings,
+          totalDurationMs: clientTotalMs,
+          reasoning: data.reasoning,
+          usage: data.usage,
+          trace: data.trace,
+        });
+      };
+      // The server restarted while the model answered: the question is stored, its answer is not. «Повторить» asks the
+      // stored question again (a new send with a new request id).
+      const showLost = function (data) {
+        if (turn.live) turn.live.freeze();
+        // The lost notice is final for this request: a later history load must not read its saved request id again.
+        if (turn.chatRequestId) forgetLiveTurn(turn.conversationId, turn.chatRequestId);
+        const storedId = Number.isInteger(data.user_message_id) && data.user_message_id > 0
+          ? data.user_message_id
+          : turn.serverUserMessageId || turn.userMessageId;
+        deliverApprovalOutput(turn.conversationId, function () {
+          const lostNode = addMessage({
+            text: data.detail || CHAT_ERROR_TEXTS.turn_lost,
+            role: "error",
+            onRetry: function () {
+              return sendTurn({
+                text: turn.text,
+                conversationId: turn.conversationId,
+                model: turn.model,
+                images: sentImages,
+                userMessageId: storedId,
+                replaces: lostNode,
+              });
+            },
+          });
+        });
+      };
+      // The recovery waits learn a lost turn from its receipt and show it the same way.
+      turn.onLost = showLost;
       let response;
       let data;
       if (isImageModel(turn.model)) {
@@ -1494,27 +2456,35 @@ document.addEventListener("DOMContentLoaded", function () {
       } else {
         // Counted before the send, so a lost connection can tell whether the server stored this turn.
         turn.baselineCount = await fetchMessageCount(turn.conversationId);
+        // One id per send: the automatic re-sends of this send reuse it, so the server runs the turn once.
+        // «Повторить» is a new send with a new id.
+        turn.chatRequestId = imageRequestId();
+        rememberLiveTurn(turn.conversationId, turn.chatRequestId);
         const chatController = new AbortController();
         activeChatRequests.set(turn.conversationId, chatController);
+        // A live answer keeps streaming after its headers: the page stays busy (no automatic reload) until the turn ends.
+        if (typeof window.LogosDispatcher.hold === "function") turn.hold = window.LogosDispatcher.hold();
         syncSendButton();
-        response = await window.LogosDispatcher.request("/api/chat", {
-          method: "POST",
-          signal: chatController.signal,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: turn.text,
-            conversation_id: turn.conversationId,
-            // Replaying the local bubble does not prove the server stored its user message.
-            retry: turn.userMessageId !== null,
-            retry_message_id: turn.userMessageId === null ? undefined : turn.userMessageId,
-            model: turn.model,
-            params: turn.params,
-            attachments: sentImages.map(function (image) {
-              return { data_url: image.dataUrl };
-            }),
+        const live = liveTurnSupported(turn.params);
+        response = await postChatTurn(turn, JSON.stringify({
+          message: turn.text,
+          conversation_id: turn.conversationId,
+          // Replaying the local bubble does not prove the server stored its user message.
+          retry: turn.userMessageId !== null,
+          retry_message_id: turn.userMessageId === null ? undefined : turn.userMessageId,
+          model: turn.model,
+          params: turn.params,
+          attachments: sentImages.map(function (image) {
+            return { data_url: image.dataUrl };
           }),
-        }, { timeoutMs: 300000 });
-        // A gateway page is not the server's answer. A 413 names its cause; other non-JSON answers are recovered like a lost connection.
+          request_id: turn.chatRequestId,
+        }), live, chatController.signal);
+        if (isEventStream(response)) {
+          await followLiveTurn(turn, response, chatController.signal, { render: renderTurnResult, lost: showLost });
+          return;
+        }
+        // A 413 names its cause; other non-JSON answers are recovered like a lost connection (a gateway page was
+        // already sent again).
         const body = await response.json().catch(() => null);
         if (body === null && chatController.signal.aborted) {
           // «Стоп» pressed while the answer was being read is a stop, not a lost connection.
@@ -1529,124 +2499,61 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
           throw new TypeError("Ответ сервера не распознан: HTTP " + response.status);
         }
-      }
-      const clientTotalMs = Math.round(performance.now() - t0);
-      // The chat takes the conversation title the server stored, also when the turn then failed at the provider. A Problem
-      // Details body (it has «type») is skipped: its «title» describes the error.
-      if (data.title && !data.type && typeof conversations !== "undefined" && Array.isArray(conversations)) {
-        const conversation = conversations.find((item) => item.id === turn.conversationId);
-        if (conversation) {
-          conversation.title = data.title;
-          localStorage.setItem("conversations", JSON.stringify(conversations));
-          if (typeof renderSidebar === "function") renderSidebar();
+        // A repeated send finds its turn on the server: still running, already stored, or lost with a restart.
+        if (response.status === 202 && data.status === "running") {
+          noteStoredQuestion(turn, data);
+          throw namedError("TurnRunningError", "The turn is still running on the server");
+        }
+        if (data.status === "stored") {
+          if (currentConvId === turn.conversationId) loadHistory(turn.conversationId);
+          return;
+        }
+        if (data.status === "lost") {
+          showLost(data);
+          return;
         }
       }
-      // A reply is persisted and comes back with the history; an approval request is not, so it waits for its chat.
-      if (data.requires_approval) {
-        deliverApprovalOutput(turn.conversationId, function () {
-          renderApprovalCard(data.tool_call, data.original_message || turn.text);
-        });
-        return;
-      }
-      // The backend persists this turn; never paint its late answer into a different conversation.
-      if (currentConvId !== turn.conversationId) return;
-      if (data.error === "conversation_not_found") {
-        // The chat was deleted elsewhere: it leaves this list, and the unsent text goes back to the field.
-        if (!input.value) input.value = turn.text;
-        window.LogosToast.error("Диалог удалён в другом окне или на другом устройстве.");
-        if (typeof deleteConv === "function") deleteConv(turn.conversationId);
-        return;
-      }
-      if (data.error) {
-        // A question the server stored is not returned to the field: «Повторить» on its error sends it once.
-        let textReturned = false;
-        if (!data.user_message_id) {
-          restoreImages();
-          // The failed text goes back to the field, unless the user already started a new draft.
-          if (!input.value) {
-            input.value = turn.text;
-            textReturned = true;
-          }
-        }
-        const errorNode = addMessage({
-          text: data.reply || "⚠️ Ошибка: " + errorReasonText(data, data.httpStatus || response.status),
-          role: "error",
-          // A text that did not go back to the field can be put there with «Изменить»; photos would not follow it.
-          editText: textReturned || sentImages.length ? undefined : turn.text,
-          cost: data.cost || 0,
-          timings: data.timings,
-          totalDurationMs: clientTotalMs,
-          reasoning: data.reasoning,
-          usage: data.usage,
-          trace: data.trace,
-          onRetry: function () {
-            return sendTurn({
-              text: turn.text,
-              conversationId: turn.conversationId,
-              model: turn.model,
-              images: sentImages,
-              userMessageId: data.user_message_id || turn.userMessageId,
-              imageRequestId: turn.imageRequestId,
-              replaces: errorNode,
-            });
-          },
-        });
-      } else if (data.reply) {
-        // The server's duration is the one stored with the reply, so the details read the same after a reload.
-        const replyNode = addMessage({
-          text: data.reply,
-          role: "bot",
-          cost: data.cost || 0,
-          timings: data.timings,
-          totalDurationMs: data.total_duration_ms || clientTotalMs,
-          reasoning: data.reasoning,
-          usage: data.usage,
-          trace: data.trace,
-          id: data.message_id,
-        });
-        // A reply taller than the chat opens at its first line, not its last.
-        const replyBox = document.getElementById("chatbox");
-        if (replyNode && replyBox && replyNode.offsetHeight > replyBox.clientHeight) {
-          replyBox.scrollTop += replyNode.getBoundingClientRect().top - replyBox.getBoundingClientRect().top;
-        }
-      } else {
-        restoreImages();
-        // Neither an answer nor an error came back, and the server may have stored the question:
-        // the text is not put back on its own, «Изменить» puts it into the field on request.
-        addMessage({
-          text: "⚠️ Ошибка: " + chatErrorReason(data, response.status),
-          role: "error",
-          editText: sentImages.length ? undefined : turn.text,
-          cost: data.cost || 0,
-          timings: data.timings,
-          totalDurationMs: clientTotalMs,
-          reasoning: data.reasoning,
-          usage: data.usage,
-          trace: data.trace,
-        });
-      }
+      renderTurnResult(data, data.httpStatus || response.status);
     } catch (error) {
       const stopped = Boolean(error) && error.name === "AbortError";
-      const canRecover = !stopped && !isImageModel(turn.model) && !isVoiceModel(turn.model) && typeof turn.baselineCount === "number";
+      // An accepted turn sent while offline has no count yet; recoverTurn reads it once the server is reached.
+      const canRecover = !stopped && !isImageModel(turn.model) && !isVoiceModel(turn.model) &&
+        (typeof turn.baselineCount === "number" || Boolean(turn.accepted));
       // The chat may have been left: its outcome is kept for it, and shown when it is opened again.
-      if (canRecover) {
+      if (stopped && turn.accepted) {
+        // The server stored the question and finishes the answer: the text is not put back (a send would store it
+        // twice). What already came stays in the chat until the stored answer replaces it.
+        if (turn.live) turn.live.freeze();
+        deliverApprovalOutput(turn.conversationId, function () {
+          addMessage({ text: stopNotice(true), role: "error" });
+        });
+        watchStoppedTurn(turn);
+      } else if (canRecover) {
         // The server may still answer: wait for the stored answer before offering the text again.
         recovering = true;
+        // Nothing more streams into the live reply; it gives way to the stored answer.
+        if (turn.live) turn.live.freeze();
         // The request's controller has nothing left to stop: «Остановить» now cancels the wait instead.
         const recovery = newTurnRecovery();
         activeChatRequests.set(turn.conversationId, recovery);
         syncSendButton();
         // The note names the cause: a slow answer is not a lost connection.
-        const waitNote = error && error.name === "TimeoutError"
-          ? "Ответ идёт дольше 5 минут. Ждём его, он сохраняется на сервере. Нажмите ■, чтобы перестать ждать."
-          : "Соединение прервалось. Ждём ответ, он сохраняется на сервере.";
+        const waitNote = error && error.name === "TurnRunningError"
+          ? "Ответ ещё формируется на сервере. Ждём его."
+          : error && error.name === "TimeoutError"
+            ? "Ответ идёт дольше 5 минут. Ждём его, он сохраняется на сервере. Нажмите ■, чтобы перестать ждать."
+            : "Соединение прервалось. Ждём ответ, он сохраняется на сервере.";
         deliverApprovalOutput(turn.conversationId, function () {
           addMessage({ text: waitNote, role: "error" });
         });
         recoverTurn(turn, recovery, function () {
+          if (turn.live) turn.live.remove();
           deliverApprovalOutput(turn.conversationId, function () {
-            restoreImages();
-            if (!input.value) input.value = turn.text;
+            // A question the server accepted is stored: it is not put back for a second send.
+            if (!turn.accepted) {
+              restoreImages();
+              if (!input.value) input.value = turn.text;
+            }
             addMessage({ text: chatErrorText(error), role: "error" });
           });
         }).finally(function () {
@@ -1654,9 +2561,11 @@ document.addEventListener("DOMContentLoaded", function () {
           // Stopped during the wait: the same outcome as stopping the request itself.
           if (recovery.cancelled) {
             deliverApprovalOutput(turn.conversationId, function () {
-              restoreImages();
-              if (!input.value) input.value = turn.text;
-              addMessage({ text: chatErrorText({ name: "AbortError" }), role: "error" });
+              if (!turn.accepted) {
+                restoreImages();
+                if (!input.value) input.value = turn.text;
+              }
+              addMessage({ text: stopNotice(turn.accepted), role: "error" });
             });
             watchStoppedTurn(turn);
           }
@@ -1675,14 +2584,22 @@ document.addEventListener("DOMContentLoaded", function () {
           });
         });
       } else {
+        if (turn.live) {
+          if (turn.accepted) turn.live.freeze();
+          else turn.live.remove();
+        }
         deliverApprovalOutput(turn.conversationId, function () {
-          restoreImages();
-          if (!input.value) input.value = turn.text;
-          addMessage({ text: chatErrorText(error), role: "error" });
+          // A question the server accepted is stored: it is not put back for a second send.
+          if (!turn.accepted) {
+            restoreImages();
+            if (!input.value) input.value = turn.text;
+          }
+          addMessage({ text: stopped ? stopNotice(false) : chatErrorText(error), role: "error" });
         });
         if (stopped) watchStoppedTurn(turn);
       }
     } finally {
+      if (turn.hold) turn.hold();
       if (typingEl) typingEl.remove();
       if (!recovering && turn.status) turn.status.remove();
       if (!recovering) releaseTurn(turn, needsConversation);

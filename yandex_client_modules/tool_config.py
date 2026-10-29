@@ -17,7 +17,9 @@ DEFAULT_VECTOR_STORE_IDS = ("fvtvp6t2su0g5q4ft2ev",)
 
 # Dialog settings saved before this revision carry the old medium/off defaults; they
 # are read as the maximal ones. Later explicit choices carry the revision and stay.
-SETTINGS_REVISION = 2
+# Revision 2 raised every setting to its maximum; revision 3 turns live answers on
+# for a record that has no stream key yet. A stream key already stored is kept.
+SETTINGS_REVISION = 3
 
 
 def file_search_max_results(value: Any) -> int:
@@ -45,44 +47,53 @@ def knowledge_vector_store_ids() -> list[str]:
 def upgrade_dialog_settings(settings: Any) -> Any:
     """Read settings saved before SETTINGS_REVISION at the maximal values.
 
-    Old records hold the former defaults (medium reasoning and verbosity, medium
-    search context, 20 File Search results, Code Interpreter off) that nobody chose.
-    Every hosted tool is switched on, every capacity is raised to its maximum, and
-    the record is stamped with the revision, so choices made after it are kept.
+    The upgrade runs revision by revision; a missing or non-integer revision is 0.
+    Before revision 2, records hold the former defaults (medium reasoning and
+    verbosity, medium search context, 20 File Search results, Code Interpreter off)
+    that nobody chose: every hosted tool is switched on and every capacity is raised
+    to its maximum. Before revision 3, live (streamed) answers are switched on only when
+    the record has no stream key: a stream value already stored, true or false, is kept.
+    The record is stamped with the revision, so choices made after it are kept; a record
+    already at revision 2 keeps its tool selection and later choices.
     """
     if not isinstance(settings, dict):
         return settings
     revision = settings.get("settings_revision")
-    if isinstance(revision, int) and not isinstance(revision, bool):
-        if revision >= SETTINGS_REVISION:
-            return settings
+    if not isinstance(revision, int) or isinstance(revision, bool):
+        revision = 0
+    if revision >= SETTINGS_REVISION:
+        return settings
     upgraded = dict(settings)
-    # An old tool selection would hide every category added since: all are on again.
-    upgraded.pop("active_tool_categories", None)
-    if upgraded.get("reasoning_effort") in (None, "low", "medium"):
-        upgraded["reasoning_effort"] = "high"
-    if upgraded.get("text_verbosity") in (None, "low", "medium", "concise", "verbose"):
-        upgraded["text_verbosity"] = "high"
-    if upgraded.get("truncation") == "auto":
-        upgraded["truncation"] = "disabled"
-    if "max_output_tokens" in upgraded:
-        upgraded["max_output_tokens"] = 0
-    if "max_tool_calls" in upgraded:
-        upgraded["max_tool_calls"] = None
-    if "parallel_tool_calls" in upgraded:
-        upgraded["parallel_tool_calls"] = True
-    tools = upgraded.get("tools_config")
-    tools = dict(tools) if isinstance(tools, dict) else {}
-    web = dict(tools.get("web_search") or {})
-    web["enabled"] = True
-    web["context_size"] = "high"
-    tools["web_search"] = web
-    tools["code_interpreter"] = {**dict(tools.get("code_interpreter") or {}), "enabled": True}
-    files = dict(tools.get("file_search") or {})
-    files["enabled"] = True
-    files["max_results"] = FILE_SEARCH_MAX_RESULTS
-    tools["file_search"] = files
-    upgraded["tools_config"] = tools
+    if revision < 2:
+        # An old tool selection would hide every category added since: all are on again.
+        upgraded.pop("active_tool_categories", None)
+        if upgraded.get("reasoning_effort") in (None, "low", "medium"):
+            upgraded["reasoning_effort"] = "high"
+        if upgraded.get("text_verbosity") in (None, "low", "medium", "concise", "verbose"):
+            upgraded["text_verbosity"] = "high"
+        if upgraded.get("truncation") == "auto":
+            upgraded["truncation"] = "disabled"
+        if "max_output_tokens" in upgraded:
+            upgraded["max_output_tokens"] = 0
+        if "max_tool_calls" in upgraded:
+            upgraded["max_tool_calls"] = None
+        if "parallel_tool_calls" in upgraded:
+            upgraded["parallel_tool_calls"] = True
+        tools = upgraded.get("tools_config")
+        tools = dict(tools) if isinstance(tools, dict) else {}
+        web = dict(tools.get("web_search") or {})
+        web["enabled"] = True
+        web["context_size"] = "high"
+        tools["web_search"] = web
+        tools["code_interpreter"] = {**dict(tools.get("code_interpreter") or {}), "enabled": True}
+        files = dict(tools.get("file_search") or {})
+        files["enabled"] = True
+        files["max_results"] = FILE_SEARCH_MAX_RESULTS
+        tools["file_search"] = files
+        upgraded["tools_config"] = tools
+    # Only a missing key takes the new default: a stored stream value is a choice and stays.
+    if revision < 3 and "stream" not in upgraded:
+        upgraded["stream"] = True
     upgraded["settings_revision"] = SETTINGS_REVISION
     return upgraded
 

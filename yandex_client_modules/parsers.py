@@ -20,6 +20,7 @@ def extract_reasoning_and_text(data):
         if not isinstance(item, dict):
             continue
 
+        item_reasoning = []
         content_list = item.get("content", [])
         if isinstance(content_list, list):
             for part in content_list:
@@ -28,7 +29,7 @@ def extract_reasoning_and_text(data):
                     p_text = part.get("text", "")
 
                     if p_type == "reasoning_text" and p_text:
-                        reasoning_parts.append(p_text)
+                        item_reasoning.append(p_text)
                     elif p_type in ("output_text", "text") and p_text:
                         text_parts.append(p_text)
                 elif isinstance(part, str):
@@ -36,6 +37,21 @@ def extract_reasoning_and_text(data):
 
         elif item.get("type") == "output_text" and item.get("text"):
             text_parts.append(str(item["text"]))
+
+        # A reasoning item without its full text keeps its summary: the same text a
+        # live turn showed while the summary streamed.
+        if item.get("type") == "reasoning" and not item_reasoning:
+            summary = item.get("summary")
+            if isinstance(summary, list):
+                item_reasoning.extend(
+                    entry["text"]
+                    for entry in summary
+                    if isinstance(entry, dict)
+                    and entry.get("type") == "summary_text"
+                    and isinstance(entry.get("text"), str)
+                    and entry["text"]
+                )
+        reasoning_parts.extend(item_reasoning)
 
     # Top-level "text" in a Responses result is the text config
     # ({"format": ..., "verbosity": ...}), not an answer: only strings count.

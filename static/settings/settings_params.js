@@ -47,7 +47,7 @@
       truncation: s.truncation || "disabled",
       store: booleanSetting(s.store, true, "store"),
       background: booleanSetting(s.background, true, "background"),
-      stream: booleanSetting(s.stream, false, "stream"),
+      stream: booleanSetting(s.stream, true, "stream"),
       instructions: s.instructions || "",
       tool_choice: s.tool_choice || "auto",
       parallel_tool_calls: booleanSetting(s.parallel_tool_calls, true, "parallel_tool_calls"),

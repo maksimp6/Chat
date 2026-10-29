@@ -1,4 +1,4 @@
-"""The Yandex AI Studio Responses API client, assembled from the request, polling, conversation, MCP and file mixins."""
+"""The Yandex AI Studio Responses API client, assembled from the request, polling, stream, conversation, MCP and file mixins."""
 
 import json
 import requests
@@ -8,6 +8,7 @@ from yandex_client_modules.api_logger import api_logger
 from yandex_client_modules.conversations import YandexConversationMixin
 from yandex_client_modules.request_mixin import YandexRequestMixin
 from yandex_client_modules.polling_mixin import YandexPollingMixin
+from yandex_client_modules.stream_mixin import YandexStreamMixin
 from yandex_client_modules.mcp_mixin import YandexMcpMixin
 
 from yandex_client_modules.files import YandexFileManagerMixin
@@ -16,6 +17,7 @@ from yandex_client_modules.files import YandexFileManagerMixin
 class YandexResponsesClient(
     YandexRequestMixin,
     YandexPollingMixin,
+    YandexStreamMixin,
     YandexConversationMixin,
     YandexMcpMixin,
     YandexFileManagerMixin,

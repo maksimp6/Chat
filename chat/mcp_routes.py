@@ -1,6 +1,7 @@
 """Маршруты чата с сохранением полной цепочки выполнения в БД."""
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, copy_current_request_context, request, jsonify
+import contextvars
 import json as _json
 import threading
 import logging
@@ -22,6 +23,7 @@ from chat._vendor.partial_output import (
 )
 from chat._vendor.provider_receipt import capture_provider_diagnostics
 from chat._vendor.responses_tool_loop import run_tool_loop, extract_function_calls
+from chat import live_turns
 from chat.host import (
     add_message,
     aggregate_billing,
@@ -195,6 +197,32 @@ def _cut_by_output_limit(response) -> bool:
     return isinstance(details, dict) and details.get("reason") == "max_output_tokens"
 
 
+def _without_function_calls(items):
+    """Output items without function calls, also inside message content.
+
+    A call cut by the output limit was never answered, so it must not travel on
+    unpaired into a later request or into the joined reply.
+    """
+    kept = []
+    for item in items or []:
+        if not isinstance(item, dict) or item.get("type") == "function_call":
+            continue
+        content = item.get("content")
+        if item.get("type") == "message" and isinstance(content, list):
+            item = {
+                **item,
+                "content": [
+                    piece
+                    for piece in content
+                    if not (
+                        isinstance(piece, dict) and piece.get("type") == "function_call"
+                    )
+                ],
+            }
+        kept.append(item)
+    return kept
+
+
 def _join_continued_parts(parts, last):
     """One response whose output is every part in order, so the reply text is whole.
 
@@ -203,23 +231,7 @@ def _join_continued_parts(parts, last):
     """
     output = []
     for part in parts:
-        for item in part.get("output") or []:
-            if not isinstance(item, dict) or item.get("type") == "function_call":
-                continue
-            content = item.get("content")
-            if item.get("type") == "message" and isinstance(content, list):
-                item = {
-                    **item,
-                    "content": [
-                        piece
-                        for piece in content
-                        if not (
-                            isinstance(piece, dict)
-                            and piece.get("type") == "function_call"
-                        )
-                    ],
-                }
-            output.append(item)
+        output.extend(_without_function_calls(part.get("output") or []))
     joined = dict(last) if isinstance(last, dict) else {}
     joined["output"] = output + list(joined.get("output") or [])
     joined["continued_response_ids"] = [part.get("id") for part in parts]
@@ -387,10 +399,45 @@ def _define_logos_client(base: type) -> type:
                 if execution_policy is not None
                 else {}
             )
+            # A live turn's receiver of progress events; base_params carries it into
+            # every tool round and continuation part.
+            sink = (params or {}).get("on_stream_event")
+            rounds = 0
+
+            def emit(event):
+                if sink is None:
+                    return
+                try:
+                    sink(event)
+                except Exception:
+                    logger.exception(
+                        "[CHAT] Live event %s was not delivered", event.get("kind")
+                    )
+
+            def start_round(round_kind, part=0):
+                """A new provider request of this turn starts."""
+                nonlocal rounds
+                rounds += 1
+                emit(
+                    {
+                        "kind": "round",
+                        "round": rounds,
+                        "round_kind": round_kind,
+                        "part": part,
+                    }
+                )
+
+            def round_result(response):
+                """The round's final text, the same extraction the stored reply uses."""
+                if sink is None or not isinstance(response, dict):
+                    return
+                reasoning, text = self.extract_reasoning_and_text(response)
+                emit({"kind": "round_result", "text": text, "reasoning": reasoning})
 
             # Owner's rule: the first request of every turn requires a tool call
             # (the provider gets "auto" when the turn has no tool at all); follow_up
             # releases it, so the model can answer once it has used a tool.
+            start_round("initial")
             response = self._ask_provider(
                 message=message,
                 model_key=model_key,
@@ -400,6 +447,7 @@ def _define_logos_client(base: type) -> type:
                 trace=trace,
                 **policy_kwargs,
             )
+            round_result(response)
             _record_provider_output(trace, response)
 
             base_params = dict(params or {})
@@ -407,14 +455,28 @@ def _define_logos_client(base: type) -> type:
 
             def execute_tool(call):
                 nonlocal tool_servers
-                if tool_servers is None:
-                    tool_servers = bound.mcp_storage.list_servers(
-                        owner_id=get_current_owner_id()
+                name = call.get("name")
+                emit({"kind": "tool_call", "phase": "start", "name": name})
+                try:
+                    if tool_servers is None:
+                        tool_servers = bound.mcp_storage.list_servers(
+                            owner_id=get_current_owner_id()
+                        )
+                    result = self._execute_single_tool(
+                        call, tool_servers, trace=trace, **policy_kwargs
                     )
-                result = self._execute_single_tool(
-                    call, tool_servers, trace=trace, **policy_kwargs
+                except Exception:
+                    emit({"kind": "tool_call", "phase": "failed", "name": name})
+                    raise
+                failed = result.get("error") is not None
+                emit(
+                    {
+                        "kind": "tool_call",
+                        "phase": "failed" if failed else "done",
+                        "name": name,
+                    }
                 )
-                if result.get("error") is not None:
+                if failed:
                     return {"error": result["error"], "tool": result.get("name")}
                 return result.get("result")
 
@@ -426,7 +488,7 @@ def _define_logos_client(base: type) -> type:
                 else list(initial_input)
             )
 
-            def follow_up(input_items):
+            def follow_up(input_items, round_kind, part=0):
                 """One more request of this turn, with the forced tool choice released."""
                 continuation_params = dict(base_params)
                 # The initial forced choice has been satisfied. Permit a final
@@ -444,6 +506,7 @@ def _define_logos_client(base: type) -> type:
                 continuation_params["background"] = base_params.get(
                     "background", True
                 )
+                start_round(round_kind, part)
                 response = self._ask_provider(
                     message="",
                     model_key=model_key,
@@ -453,6 +516,7 @@ def _define_logos_client(base: type) -> type:
                     trace=trace,
                     **policy_kwargs,
                 )
+                round_result(response)
                 _record_provider_output(trace, response)
                 return response
 
@@ -465,20 +529,21 @@ def _define_logos_client(base: type) -> type:
                             for item in input_items
                             if isinstance(item, dict)
                             and item.get("type") == "function_call_output"
-                        ]
+                        ],
+                        "tool",
                     )
                 continuation_history.extend(input_items)
-                return follow_up(list(continuation_history))
+                return follow_up(list(continuation_history), "tool")
 
-            def continue_after_output_limit(previous_response):
+            def continue_after_output_limit(previous_response, part):
                 # The provider conversation holds the cut answer; otherwise it joins the history.
                 request = {"role": "user", "content": OUTPUT_LIMIT_CONTINUE_PROMPT}
                 if conversation_id:
-                    return follow_up([request])
+                    return follow_up([request], "output_limit", part)
                 continuation_history.extend(
                     list(previous_response.get("output") or []) + [request]
                 )
-                return follow_up(list(continuation_history))
+                return follow_up(list(continuation_history), "output_limit", part)
 
             def run_tools(response):
                 if not extract_function_calls(response):
@@ -501,7 +566,24 @@ def _define_logos_client(base: type) -> type:
                         "provider_output_limit_continued",
                         {"part": len(parts), "response_id": response.get("id")},
                     )
-                response = run_tools(continue_after_output_limit(response))
+                response = run_tools(continue_after_output_limit(response, len(parts)))
+            if _cut_by_output_limit(response) and trace is not None:
+                stalled_reasoning, stalled_text = self.extract_reasoning_and_text(
+                    response
+                )
+                stalled_usage = self.extract_usage(response) or {}
+                trace.add_event(
+                    "provider_output_limit_stalled",
+                    {
+                        "part": len(parts) + 1,
+                        "response_id": response.get("id"),
+                        "reasoning_only": bool(stalled_reasoning.strip())
+                        and not stalled_text.strip(),
+                        "input_tokens": stalled_usage.get("input_tokens") or 0,
+                        "output_tokens": stalled_usage.get("output_tokens") or 0,
+                        "reasoning_tokens": stalled_usage.get("reasoning_tokens") or 0,
+                    },
+                )
             if parts:
                 response = _join_continued_parts(parts, response)
 
@@ -590,15 +672,26 @@ def _append_post_final_error(trace_data, source, message, error_type):
     )
 
 
-def _provider_conversation_id(client, conv_id, trace):
-    """Return the provider conversation behind a local chat, creating it on the first message."""
+def _provider_conversation_id(
+    client, conv_id, trace, *, retry_timeout=None, on_event=None
+):
+    """Return the provider conversation behind a local chat, creating it on the first message.
+
+    ``retry_timeout`` retries a transient creation failure for that many seconds (0: no
+    deadline); ``on_event`` hears each retry. Without them one request is sent.
+    """
     mapped = get_yandex_conversation(conv_id)
     if mapped:
         return mapped
     if not is_provider_pending(conv_id):
         # Chats created before this change already use the provider's id as their own id.
         return conv_id
-    created = client.create_conversation(execution_trace=trace)
+    options = {}
+    if retry_timeout is not None:
+        options["retry_timeout"] = retry_timeout
+    if on_event is not None:
+        options["on_event"] = on_event
+    created = client.create_conversation(execution_trace=trace, **options)
     provider_id = created.get("id") if isinstance(created, dict) else None
     if not provider_id:
         raise RuntimeError("Yandex conversation creation returned no ID")
@@ -695,7 +788,11 @@ def _execute_chat_model(message, model_key, invocation, params, trace):
     """Run one provider/tool turn and collect its terminal response."""
     client = logos_client_type()(bound.Config)
     provider_conversation_id = _provider_conversation_id(
-        client, invocation.conversation_id, trace
+        client,
+        invocation.conversation_id,
+        trace,
+        retry_timeout=params["poll_timeout"],
+        on_event=params.get("on_stream_event"),
     )
 
     if isinstance(trace, bound.ExecutionTrace):
@@ -758,6 +855,103 @@ class _EmptyModelReply(RuntimeError):
     """The provider completed the turn without text; the message is for the user."""
 
 
+def _output_limit_message(client, response, trace) -> str:
+    """What the person reads when the provider's output limit ended the reply: which
+    limit, the token counts of the last part and what to do."""
+    part = len(response.get("continued_response_ids") or []) + 1
+    usage = client.extract_usage(response) or {}
+    api_requests = trace.trace.get("api_requests") or []
+    payload = api_requests[-1].get("payload") if api_requests else None
+    cap = payload.get("max_output_tokens") if isinstance(payload, dict) else None
+    stalled = next(
+        (
+            event.get("payload") or {}
+            for event in reversed(trace.trace.get("events") or [])
+            if event.get("type") == "provider_output_limit_stalled"
+        ),
+        None,
+    )
+    if stalled is not None and "reasoning_only" in stalled:
+        reasoning_only = bool(stalled["reasoning_only"])
+    else:
+        reasoning, text = client.extract_reasoning_and_text(response)
+        reasoning_only = bool(reasoning.strip()) and not text.strip()
+    message = (
+        "Провайдер оборвал ответ на "
+        + (
+            "своём пределе длины вывода (Logos предел не задавал)"
+            if cap is None
+            else f"пределе max_output_tokens = {cap} из настроек"
+        )
+        + (f", часть {part}" if part > 1 else "")
+        + f": вход {usage.get('input_tokens') or 0} токенов, "
+        + f"выход {usage.get('output_tokens') or 0}, "
+        + f"из них рассуждения {usage.get('reasoning_tokens') or 0}. "
+    )
+    # A cap from the settings is the one limit the person can lift; the provider's own
+    # ceiling has no setting.
+    cap_hint = (
+        ""
+        if cap is None
+        else (
+            " Этот предел задан в Logos: очистите поле «Токены ответа» в настройках "
+            "(0 — максимум провайдера)."
+        )
+    )
+    # The limit can cut a part while the model writes a tool call: run_tool_loop runs
+    # nothing from an unfinished response, so those calls never ran. Only the last
+    # part can hold them (_join_continued_parts drops the calls of earlier parts).
+    cut_calls = extract_function_calls(response)
+    cut_names = list(
+        dict.fromkeys(str(call.get("name")) for call in cut_calls if call.get("name"))
+    )
+    if cut_calls:
+        if len(cut_names) > 1:
+            unfinished = (
+                f"вызовы инструментов {', '.join(cut_names)}: они не выполнялись"
+            )
+        else:
+            unfinished = (
+                "вызов инструмента"
+                + (f" {cut_names[0]}" if cut_names else "")
+                + ": он не выполнялся"
+            )
+        return message + (
+            f"Модель не успела дописать {unfinished}. Нажмите «Повторить»; если так "
+            "повторяется, попросите модель разбить действие на части."
+        ) + cap_hint
+    # The last part decides, not the first: a continuation can spend its whole output
+    # on reasoning after earlier parts wrote text. Hidden reasoning (no summary
+    # returned) shows only in that part's token counts. The reasoning depth is fixed
+    # by the model profile, so the advice names what the person can change.
+    last_usage = stalled if stalled is not None else usage
+    last_reasoning_tokens = last_usage.get("reasoning_tokens") or 0
+    hidden_reasoning = last_reasoning_tokens > 0 and (
+        part == 1 or last_reasoning_tokens >= (last_usage.get("output_tokens") or 0)
+    )
+    if reasoning_only or hidden_reasoning:
+        return message + (
+            (
+                "Модель потратила весь вывод продолжения на рассуждения и не "
+                "продолжила ответ. "
+                if part > 1
+                else "Модель потратила весь вывод на рассуждения и не начала ответ. "
+            )
+            + "Нажмите «Повторить»; если так повторяется, попросите ответить короче "
+            "или разбить ответ на части, либо выберите другую модель."
+        ) + cap_hint
+    if part == 1:
+        # No continuation was sent: the first part already came without answer text.
+        return message + (
+            "Модель не успела начать ответ. Нажмите «Повторить»; если диалог очень "
+            "длинный, начните новый диалог."
+        ) + cap_hint
+    return message + (
+        "Продолжение не добавило текста. Нажмите «Повторить»; если диалог очень "
+        "длинный, начните новый диалог."
+    ) + cap_hint
+
+
 def _build_chat_reply(client, response, trace) -> _ChatReply:
     """Interpret provider completion without publishing history or settling billing."""
     provider_message = None
@@ -782,26 +976,42 @@ def _build_chat_reply(client, response, trace) -> _ChatReply:
         or provider_diagnostics["provider_error_present"]
         or bool(pending_calls)
     )
+    # Cut by the provider's output limit. A tool call in such a part was cut while
+    # being written and never ran, so it is not an unresolved tool call.
+    cut_by_limit = (
+        not invalid_provider_response
+        and not provider_diagnostics["provider_error_present"]
+        and provider_status == "incomplete"
+        and provider_diagnostics.get("provider_reason") == "max_output_tokens"
+    )
     provider_error = None
     if provider_failed:
         provider_error = (
             "provider_invalid_response"
             if invalid_provider_response
+            else "provider_" + provider_status
+            if cut_by_limit
             else "provider_tool_calls_unresolved"
             if pending_calls
             else "provider_error"
             if provider_diagnostics["provider_error_present"]
             else "provider_" + provider_status
         )
+        limit_explained = False
         if invalid_provider_response:
             provider_message = "Провайдер вернул ответ неверного формата"
+        elif cut_by_limit:
+            # The machine code stays provider_incomplete; only the person's text says
+            # more, and it already names the limit, so no reason suffix follows.
+            provider_message = _output_limit_message(client, response, trace)
+            limit_explained = True
         elif pending_calls:
             provider_message = "Вызовы инструментов из ответа провайдера не завершены"
         elif provider_diagnostics["provider_error_present"]:
             provider_message = "Провайдер вернул ошибку"
         else:
             provider_message = "Ответ провайдера не завершён: " + provider_status
-        if provider_diagnostics.get("provider_reason"):
+        if provider_diagnostics.get("provider_reason") and not limit_explained:
             provider_message += " (" + provider_diagnostics["provider_reason"] + ")"
         trace.record_error(
             "provider_response", provider_message, error_type=provider_error
@@ -931,6 +1141,7 @@ def _finalize_chat_turn(
     conversation_title,
     user_message_id=None,
     model_key=None,
+    request_id=None,
 ):
     """Freeze the trace, settle billing, persist the reply, then finish its invocation."""
     reply = result.reply
@@ -1007,6 +1218,7 @@ def _finalize_chat_turn(
         },
         total_duration_ms=total_ms,
         source="error" if provider_failed else None,
+        request_id=request_id,
     )
     outcome = {
         "reply": reply,
@@ -1074,7 +1286,13 @@ def _turn_error_text(error):
         return PROVIDER_KEY_MISSING
     if isinstance(error, bound.ExpiredCredentialError):
         return PROVIDER_KEY_EXPIRED
-    return None
+    return _provider_user_text(error)
+
+
+def _provider_user_text(error):
+    """The Russian text a provider failure carries for the person, or None."""
+    text = getattr(error, "user_text", None)
+    return text if isinstance(text, str) and text.strip() else None
 
 
 def _chat_error_response(
@@ -1088,6 +1306,7 @@ def _chat_error_response(
     is_temperature_error,
     user_message_id=None,
     error_detail=None,
+    request_id=None,
 ):
     """Publish an error using only the invocation context established by this request.
 
@@ -1188,6 +1407,7 @@ def _chat_error_response(
             if invocation
             else {},
             source="error",
+            request_id=request_id,
         )
     if invocation is not None:
         fail_invocation(invocation.invocation_id, error={"message": recorded_error})
@@ -1210,9 +1430,148 @@ def _chat_error_response(
 
 @mcp_bp.route("/api/chat", methods=["POST"])
 def chat():
+    """POST /api/chat: one turn, answered as JSON or, with Accept: text/event-stream,
+    relayed live. A request_id makes a re-sent turn run only once."""
     import time as _time
 
     t_start = _time.perf_counter()
+    data = request.get_json(silent=True)  # cached for the turn's worker
+    wants_live = "text/event-stream" in (request.headers.get("Accept") or "")
+    admission = live_turns.admit(data, wants_live)
+    if admission is not None and admission.response is not None:
+        return admission.response
+    if wants_live:
+        return _start_live_turn(t_start, admission)
+    status, body = 500, {}
+    try:
+        rv = _chat_turn(t_start=t_start, admission=admission)
+        status, body = _response_parts(rv)
+    finally:
+        # Recorded even when the turn raised, so a re-sent request never runs twice.
+        if admission is not None:
+            admission.settle(status, body)
+    return rv
+
+
+def _response_parts(rv):
+    """(HTTP status, JSON body) of a view result: a (Response, status) tuple or a Response."""
+    response, status = rv, None
+    if isinstance(rv, tuple):
+        response = rv[0]
+        if len(rv) > 1 and isinstance(rv[1], int):
+            status = rv[1]
+    if status is None:
+        status = getattr(response, "status_code", 200)
+    get_json = getattr(response, "get_json", None)
+    body = get_json(silent=True) if callable(get_json) else None
+    return status, body if isinstance(body, dict) else {}
+
+
+# The answer of a live turn whose worker failed outside every handled path.
+_LIVE_TURN_FAILED = (
+    "Сервер не смог обработать запрос. Повторите его; причина записана в журнале сервера."
+)
+
+
+def _start_live_turn(t_start, admission):
+    """Run the turn in a worker thread and relay it as server-sent events.
+
+    A turn that ends before its question is stored answers with today's JSON. Once
+    the stream is open, a reader that disconnects (or presses «Стоп») never stops the
+    worker: it finishes every provider round, stores the reply, settles billing and
+    the receipt, then ends the event log.
+    """
+    live = admission.live if admission is not None else None
+    if live is None:
+        data = request.get_json(silent=True)
+        conv_id = data.get("conversation_id") if isinstance(data, dict) else None
+        live = live_turns.LiveTurn(
+            conv_id if isinstance(conv_id, str) else None,
+            uuid.uuid4().hex,
+            get_current_owner_id(required=False),
+        )
+        live_turns.register(live)
+    context = contextvars.copy_context()
+
+    @copy_current_request_context
+    def worker():
+        status, body = 500, None
+        try:
+            status, body = _response_parts(
+                _chat_turn(t_start=t_start, admission=admission, live=live)
+            )
+        except BaseException:
+            logger.exception("[CHAT] Живой ход завершился сбоем")
+            status = 500
+            body = {
+                "error": _LIVE_TURN_FAILED,
+                "reply": f"⚠️ Ошибка: {_LIVE_TURN_FAILED}",
+                "user_message_id": live.user_message_id,
+                "partial_output": None,
+                "trace": {},
+            }
+        finally:
+            # The receipt is settled first, so a reader that re-attaches after the
+            # live turn left the registry finds it done.
+            if admission is not None:
+                admission.settle(status, body)
+            live.finish(status, body if isinstance(body, dict) else {})
+
+    try:
+        threading.Thread(
+            target=lambda: context.run(worker), daemon=True, name="logos-chat-turn"
+        ).start()
+    except BaseException:
+        # No worker runs this turn (the phone may refuse a new thread): nothing was
+        # stored, so the receipt is released and a re-sent request runs again.
+        if admission is not None:
+            admission.settle(500, {})
+        live.finish(500, {})
+        raise
+    if live.wait_first() == "done":
+        done = live.done_event() or {}
+        return jsonify(done.get("body") or {}), done.get("http_status") or 500
+    return live_turns.sse_response(live, 0)
+
+
+def _event_position():
+    """The last event a reader has: Last-Event-ID, else ?after=, else 0."""
+    for raw in (request.headers.get("Last-Event-ID"), request.args.get("after")):
+        if raw is None:
+            continue
+        try:
+            value = int(str(raw).strip())
+        except ValueError:
+            return 0
+        return value if value >= 0 else 0
+    return 0
+
+
+@mcp_bp.route("/api/chat/turns/<request_id>/events", methods=["GET"])
+def chat_turn_events(request_id):
+    """Re-attach to a turn sent with this request_id: its live events, or how it ended."""
+    if not live_turns.REQUEST_ID_PATTERN.fullmatch(request_id or ""):
+        return jsonify(
+            error_body("invalid_params", message=live_turns.REQUEST_ID_MESSAGE)
+        ), 400
+    conv_id = request.args.get("conversation_id")
+    owner_id = get_current_owner_id(required=False)
+    if (
+        not isinstance(conv_id, str)
+        or not conv_id.strip()
+        or not check_access(conv_id, owner_id)
+    ):
+        return jsonify(error_body("conversation_not_found")), 404
+    live = live_turns.find(conv_id, request_id)
+    if live is not None and live.owner_id == owner_id:
+        return live_turns.sse_response(live, _event_position())
+    return live_turns.receipt_response(conv_id, request_id)
+
+
+def _chat_turn(*, t_start, admission=None, live=None):
+    """One chat turn, from the request body to the stored reply (the former body of chat())."""
+    import time as _time
+
     trace = None
     trace_token = None
     invocation = None
@@ -1222,6 +1581,8 @@ def chat():
     model_key = "yandexgpt-5-pro"
     error_message = None
     user_message_id = None
+    # The turn request id: the question, the reply and an error reply store it.
+    request_id = admission.request_id if admission is not None else None
 
     try:
         data = request.get_json(silent=True)
@@ -1319,6 +1680,11 @@ def chat():
                 "invocation_id": invocation.invocation_id,
                 "session_id": invocation.session_id,
                 "trace_id": invocation.trace_id,
+                **(
+                    {"request_id": data["request_id"]}
+                    if data.get("request_id") is not None
+                    else {}
+                ),
             }
         )
         # Added after set_request, so the trace records the request fields without the photos.
@@ -1361,17 +1727,24 @@ def chat():
                 base_instructions=params.get("instructions"),
             )
 
-        active_tools = conv_settings.get("active_tool_categories")
+        # Read through the settings upgrade, as GET /tools and GET /settings show it: a
+        # record saved before revision 2 holds a narrow selection the upgrade drops.
+        active_tools = upgrade_dialog_settings(conv_settings).get(
+            "active_tool_categories"
+        )
         if active_tools is not None:
             params["active_tool_categories"] = active_tools
 
         if user_message_id is None:
             # The photo count is kept with the message, so a reloaded chat still shows which turn had photos.
+            # The question carries the request id in the same commit: a request re-sent after
+            # a restart finds it and is not run again.
             user_message_id = add_message(
                 invocation.conversation_id,
                 "user",
                 message or "[Фото]",
                 attachments={"images": len(images)} if images else None,
+                request_id=request_id,
             )
             if user_message_id is None:
                 raise LookupError(
@@ -1381,7 +1754,21 @@ def chat():
             invocation.conversation_id,
             message,
         )
+        if admission is not None:
+            admission.mark_running(user_message_id, invocation)
+        if live is not None:
+            live.accept(
+                user_message_id=user_message_id,
+                invocation=invocation,
+                title=conversation_title,
+                model=model_key,
+            )
+            # Set after set_request, so the callable never enters the trace; every
+            # tool round and continuation part copies it from these params.
+            params["on_stream_event"] = live.provider_event
         result = _execute_chat_model(message, model_key, invocation, params, trace)
+        if live is not None:
+            live.provider_event({"kind": "finalizing"})
         total_ms = round((_time.perf_counter() - t_start) * 1000)
         return _finalize_chat_turn(
             invocation,
@@ -1392,6 +1779,7 @@ def chat():
             conversation_title=conversation_title,
             user_message_id=user_message_id,
             model_key=model_key,
+            request_id=request_id,
         )
     except Exception as e:
         logger.exception("[CHAT] Ошибка")
@@ -1402,10 +1790,15 @@ def chat():
         )
         turn_error_text = None if is_temperature_error else _turn_error_text(e)
         # An unexpected failure keeps its class and text for the log, the trace («Детали»)
-        # and the failed invocation; the reply says what to do in Russian.
+        # and the failed invocation; the reply says what to do in Russian. A provider
+        # failure with its own Russian text keeps its technical cause the same way.
         error_detail = (
             None
-            if is_temperature_error or turn_error_text
+            if is_temperature_error
+            else f"Ошибка провайдера ({type(e).__name__}: {internal_error_message[:200]})"
+            if turn_error_text is not None and turn_error_text == _provider_user_text(e)
+            else None
+            if turn_error_text
             else f"Внутренняя ошибка обработки запроса ({type(e).__name__}: {internal_error_message[:200]})"
         )
         error_message = (
@@ -1447,6 +1840,7 @@ def chat():
                 is_temperature_error=is_temperature_error,
                 user_message_id=user_message_id,
                 error_detail=error_detail,
+                request_id=request_id,
             )
         except Exception:
             logger.exception("[CHAT] Не удалось сохранить ExecutionTrace")
