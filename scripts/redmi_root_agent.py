@@ -199,6 +199,35 @@ def press_power_key():
         bounded_command(["/system/bin/sendevent", device, "0", "0", "0"])
 
 
+def browser_component(url):
+    """An explicit browser activity for the URL, so Android shows no app chooser."""
+    try:
+        listing = bounded_command(
+            [
+                "/system/bin/cmd",
+                "package",
+                "query-activities",
+                "--brief",
+                "-a",
+                "android.intent.action.VIEW",
+                "-c",
+                "android.intent.category.BROWSABLE",
+                "-d",
+                url,
+            ],
+            256 * 1024,
+        ).decode("utf-8", "replace")
+    except AgentError:
+        return None
+    found = [
+        item
+        for item in re.findall(r"\b([A-Za-z][\w.]*/[\w.$]+)", listing)
+        if not item.startswith("android/")
+    ]
+    preferred = [item for item in found if "iceraven" in item.lower()]
+    return (preferred or found or [None])[0]
+
+
 def mouse_nudge():
     with mouse_connection() as connection:
         submit_mouse(connection, "move", 1, 1)
@@ -539,16 +568,11 @@ def worker(request):
             bounded_command(["/system/bin/wm", "dismiss-keyguard"])
         except AgentError:
             pass
-        bounded_command(
-            [
-                "/system/bin/am",
-                "start",
-                "-a",
-                "android.intent.action.VIEW",
-                "-d",
-                url,
-            ]
-        )
+        component = browser_component(url)
+        start = ["/system/bin/am", "start", "-a", "android.intent.action.VIEW", "-d", url]
+        if component:
+            start += ["-n", component]
+        bounded_command(start)
         time.sleep(wait / 1000)
         png = bounded_command(["/system/bin/screencap", "-p"], PNG_LIMIT, 15)
         metadata = validate_png(png)
@@ -559,6 +583,7 @@ def worker(request):
             "url": url,
             "wakefulness": woken,
             "wake_attempts": wake_attempts,
+            "browser": component,
             "display_on": state["display_on"],
             "keyguard_locked_or_unknown": not state["unlocked"],
             "focus_package": state["package"],
