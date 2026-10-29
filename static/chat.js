@@ -413,6 +413,18 @@ function addMessage({
       if (window.LogosModelView && !storedReference) {
         const modelView = window.LogosModelView.render(traceObj);
         if (modelView) metaWrap.appendChild(modelView);
+      } else if (window.LogosModelView && storedReference && traceObj.invocation_id) {
+        metaWrap.appendChild(
+          window.LogosModelView.lazy(async function () {
+            const res = await window.LogosDispatcher.request(
+              `/api/invocations/${encodeURIComponent(traceObj.invocation_id)}/trace`,
+              {},
+              { timeoutMs: 60000 },
+            );
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            return res.json();
+          }),
+        );
       }
       if (window.LogosExecutionSurface && !storedReference) {
         const surface = window.LogosExecutionSurface.project(traceObj);

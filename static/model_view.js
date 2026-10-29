@@ -169,5 +169,37 @@
     return root;
   }
 
-  window.LogosModelView = { render: render, views: views };
+  // A stored message keeps only a reference to its trace: the block loads it when opened.
+  function lazy(load) {
+    var root = el("details", "msg-meta-details msg-model-view");
+    var summary = el("summary", "msg-meta-summary", "👁 Что видит модель");
+    root.appendChild(summary);
+    var state = "idle";
+    root.addEventListener("toggle", function () {
+      if (!root.open || state !== "idle") return;
+      state = "loading";
+      summary.textContent = "👁 Что видит модель · загружаем…";
+      Promise.resolve()
+        .then(load)
+        .then(function (trace) {
+          var full = trace && typeof trace === "object" ? render(trace) : null;
+          if (!full) {
+            state = "done";
+            summary.textContent = "👁 Что видит модель · нет данных: ответ получен до этой версии";
+            return;
+          }
+          state = "done";
+          summary.textContent = full.firstChild.textContent;
+          root.appendChild(full.lastChild);
+        })
+        .catch(function () {
+          state = "idle";
+          root.open = false;
+          summary.textContent = "👁 Что видит модель · не загрузилось, откройте ещё раз";
+        });
+    });
+    return root;
+  }
+
+  window.LogosModelView = { render: render, views: views, lazy: lazy };
 })();
