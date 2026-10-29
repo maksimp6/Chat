@@ -52,7 +52,7 @@ def _synonyms(tool: dict[str, Any]) -> str:
             seen.append(word)
         if len(seen) >= 10:
             break
-    return ", ".join(seen)
+    return " ".join(seen)
 
 
 def _tool_line(tool: dict[str, Any]) -> str:
