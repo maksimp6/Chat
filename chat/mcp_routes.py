@@ -206,6 +206,23 @@ TEXT_CALL_PROMPT = (
 )
 
 
+# Sent when a reply ends by announcing an action ("Добавлю:") that it never called.
+ANNOUNCED_CALL_PROMPT = (
+    "Ты закончил ответ обещанием действия (текст кончается двоеточием), но не "
+    "вызвал функцию, и действие не выполнено. Если оно нужно, вызови функцию сейчас "
+    "(у сгруппированных инструментов — функцию tools_<категория> с полями tool и "
+    "arguments). Если не нужно, дай итоговый ответ."
+)
+
+
+def _announced_without_call(text) -> str | None:
+    """The reply, stripped, when it ends on a colon: an action announced, not done.
+
+    Seen on 30.10 (#1710): "Не хватает поля max_chars. Добавлю:" and the turn ended."""
+    body = (text or "").strip()
+    return body if body.endswith(":") else None
+
+
 def _tool_call_written_as_text(text) -> str | None:
     """The call, normalized, when a reply is nothing but a tool call in JSON.
 
@@ -779,7 +796,8 @@ def _define_logos_client(base: type) -> type:
             if parts:
                 response = _join_continued_parts(parts, response)
 
-            # #1707: a reply that is only a tool call written as text did nothing.
+            # #1707: a reply that is only a tool call written as text did nothing, and
+            # #1710: one that ends announcing an action ("Добавлю:") did not do it.
             # The model is told so and gets another round; the same text again ends
             # the turn with it, so a model that keeps writing it cannot loop.
             told = set()
@@ -788,16 +806,22 @@ def _define_logos_client(base: type) -> type:
                 and response.get("status") == "completed"
                 and not extract_function_calls(response)
             ):
-                text_call = _tool_call_written_as_text(self.extract_text(response))
+                reply_text = self.extract_text(response)
+                text_call = _tool_call_written_as_text(reply_text)
+                prompt, event = TEXT_CALL_PROMPT, "tool_call_written_as_text"
+                if text_call is None:
+                    # #1710: an action announced ("Добавлю:") and never called.
+                    text_call = _announced_without_call(reply_text)
+                    prompt, event = ANNOUNCED_CALL_PROMPT, "call_announced_not_made"
                 if text_call is None or text_call in told:
                     break
                 told.add(text_call)
                 if trace is not None:
                     trace.add_event(
-                        "tool_call_written_as_text",
+                        event,
                         {"response_id": response.get("id"), "call": text_call[:500]},
                     )
-                request = {"role": "user", "content": TEXT_CALL_PROMPT}
+                request = {"role": "user", "content": prompt}
                 if conversation_id:
                     response = run_tools(follow_up([request], "text_call"))
                 else:
