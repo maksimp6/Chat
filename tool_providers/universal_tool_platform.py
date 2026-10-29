@@ -6,6 +6,7 @@ Adapters create a UniversalToolCall and hand it to UniversalToolExecutor.
 
 from __future__ import annotations
 
+import json
 import math
 import time
 import warnings
@@ -204,6 +205,38 @@ def _schema_runtime():
     )
 
 
+def _schema_hint(error: Any) -> str:
+    """What the schema wanted, so a model can fix the call (#1710).
+
+    Only names and constraints taken from the schema are shown, never an argument
+    value: the missing field names and their types, the allowed values of an enum,
+    the expected type."""
+    keyword = error.validator
+    expected = error.validator_value
+    if keyword == "required" and isinstance(error.instance, Mapping):
+        properties = error.schema.get("properties") if isinstance(error.schema, Mapping) else None
+        properties = properties if isinstance(properties, Mapping) else {}
+        missing = [
+            str(name) + _type_hint(properties.get(name))
+            for name in expected or ()
+            if name not in error.instance
+        ]
+        return f" (missing: {', '.join(missing)})" if missing else ""
+    if keyword == "enum" and isinstance(expected, list):
+        return " (allowed: " + ", ".join(json.dumps(item, ensure_ascii=False) for item in expected) + ")"
+    if keyword == "type":
+        return f" (expected: {expected})"
+    return ""
+
+
+def _type_hint(schema: Any) -> str:
+    if not isinstance(schema, Mapping):
+        return ""
+    options = schema.get("anyOf") if isinstance(schema.get("anyOf"), list) else [schema]
+    types = [str(option.get("type")) for option in options if isinstance(option, Mapping) and option.get("type")]
+    return f" ({' or '.join(types)})" if types else ""
+
+
 def validate_json_schema(
     value: Any, schema: Mapping[str, Any] | bool, path: str = "$"
 ) -> list[str]:
@@ -246,7 +279,7 @@ def validate_json_schema(
             error_path = _value_path(path, error.absolute_path)
             keyword = error.validator or "schema"
             # jsonschema's full messages can include repr(instance), including secrets.
-            errors.append(f"{error_path}: does not satisfy {keyword}")
+            errors.append(f"{error_path}: does not satisfy {keyword}{_schema_hint(error)}")
         return errors
     except SchemaError as exc:
         return [f"{_value_path(path, exc.absolute_path)}: invalid JSON Schema"]
