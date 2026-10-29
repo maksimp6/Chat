@@ -410,6 +410,10 @@ function addMessage({
     if (traceObj && typeof traceObj === "object" && Object.keys(traceObj).length > 0) {
       // A stored message keeps only a reference to its trace, which is read on demand; summarising the reference would show the run as unfinished.
       const storedReference = traceObj.storage === "invocation";
+      if (window.LogosModelView && !storedReference) {
+        const modelView = window.LogosModelView.render(traceObj);
+        if (modelView) metaWrap.appendChild(modelView);
+      }
       if (window.LogosExecutionSurface && !storedReference) {
         const surface = window.LogosExecutionSurface.project(traceObj);
         if (surface) metaWrap.appendChild(window.LogosExecutionSurface.render(surface));

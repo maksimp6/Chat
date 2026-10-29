@@ -213,3 +213,118 @@ def build_request_manifest(payload: dict[str, Any]) -> dict[str, Any]:
             for name in ("conversation", "previous_response_id", "prompt_cache_key")
         },
     }
+
+
+# One trace string holds at most 4000 characters, so long texts travel in parts.
+_VIEW_PART = 3900
+_VIEW_ITEMS = 48
+
+
+def _view_parts(text: str, limit: int = _VIEW_ITEMS) -> list[str]:
+    return [text[i : i + _VIEW_PART] for i in range(0, len(text), _VIEW_PART)][:limit]
+
+
+def _view_chars(value: Any) -> int:
+    try:
+        return len(json.dumps(value, ensure_ascii=False, sort_keys=True))
+    except (TypeError, ValueError):
+        return len(str(value))
+
+
+def _view_tool(tool: dict[str, Any]) -> tuple[str, str]:
+    """(group, name): function tools are grouped by the first word of their name."""
+    kind = str(tool.get("type") or "function")
+    if kind != "function":
+        return kind, str(tool.get("server_label") or tool.get("name") or kind)
+    function = tool.get("function") if isinstance(tool.get("function"), dict) else {}
+    name = str(tool.get("name") or function.get("name") or "?")
+    return re.split(r"[._]", name, maxsplit=1)[0] or name, name
+
+
+def _view_message_text(item: dict[str, Any]) -> str:
+    content = item.get("content")
+    if isinstance(content, str):
+        return content
+    texts = []
+    for part in content if isinstance(content, list) else ():
+        if isinstance(part, dict) and isinstance(part.get("text"), str):
+            texts.append(part["text"])
+        elif isinstance(part, dict):
+            texts.append(f"[{part.get('type', 'part')}]")
+    return "\n".join(texts)
+
+
+def build_model_view(payload: dict[str, Any]) -> dict[str, Any]:
+    """What this request shows the model, as readable text and sizes.
+
+    Instructions and message texts are kept whole, split into trace-sized parts.
+    Tool schemas are not copied, only each tool's name and size; tool outputs
+    only their size. The provider adds its stored conversation on top of this.
+    """
+    instructions = payload.get("instructions")
+    instructions = instructions if isinstance(instructions, str) else ""
+    tools = payload.get("tools") if isinstance(payload.get("tools"), list) else []
+    groups: dict[str, dict[str, Any]] = {}
+    for tool in tools:
+        if not isinstance(tool, dict):
+            continue
+        group, name = _view_tool(tool)
+        entry = groups.setdefault(group, {"group": group, "count": 0, "chars": 0, "sized": []})
+        size = _view_chars(tool)
+        entry["count"] += 1
+        entry["chars"] += size
+        entry["sized"].append((size, name))
+    tool_groups = []
+    for entry in sorted(groups.values(), key=lambda item: -item["chars"]):
+        sized = sorted(entry.pop("sized"), reverse=True)
+        entry["names"] = ", ".join(f"{name} {size}" for size, name in sized)[:_VIEW_PART]
+        tool_groups.append(entry)
+
+    raw_input = payload.get("input")
+    if isinstance(raw_input, str):
+        items: list[Any] = [{"type": "message", "role": "user", "content": raw_input}]
+    else:
+        items = raw_input if isinstance(raw_input, list) else []
+    input_rows = []
+    for item in items[:_VIEW_ITEMS]:
+        if not isinstance(item, dict):
+            continue
+        kind = str(item.get("type") or "message")
+        row: dict[str, Any] = {"type": kind, "chars": _view_chars(item)}
+        if isinstance(item.get("role"), str):
+            row["role"] = item["role"]
+        if kind == "message":
+            row["text_parts"] = _view_parts(_view_message_text(item), 10)
+        elif kind == "function_call" and isinstance(item.get("name"), str):
+            row["name"] = item["name"]
+        input_rows.append(row)
+    if len(items) > _VIEW_ITEMS:
+        input_rows.append({"type": "omitted", "count": len(items) - _VIEW_ITEMS})
+
+    choice = payload.get("tool_choice")
+    model = payload.get("model")
+    return {
+        "model": model
+        if isinstance(model, str) and not _CREDENTIAL_MARKER.search(model)
+        else None,
+        "tool_choice": choice if isinstance(choice, str) or choice is None else json.dumps(choice),
+        "payload_chars": _view_chars(payload),
+        "instructions": {"chars": len(instructions), "text_parts": _view_parts(instructions)},
+        "tools": {
+            "count": len(tools),
+            "chars": _view_chars(tools) if tools else 0,
+            "groups": tool_groups[:_VIEW_ITEMS],
+        },
+        "input": {
+            "count": len(items),
+            "chars": _view_chars(raw_input) if raw_input is not None else 0,
+            "items": input_rows,
+        },
+        "history": {
+            "provider_conversation": bool(payload.get("conversation")),
+            "previous_response": bool(payload.get("previous_response_id")),
+            "truncation": payload.get("truncation")
+            if isinstance(payload.get("truncation"), str)
+            else None,
+        },
+    }

@@ -147,7 +147,7 @@ kristall = "chat/image_request/<id>/<request>, chat/message/<n>"
 
 [[operation]]
 name = "Trace, cost and treasury of a reply"
-ui = "static/execution_surface.js, static/trace_summary.js, static/treasury.js"
+ui = "static/execution_surface.js, static/trace_summary.js, static/model_view.js, static/treasury.js"
 routes = ["GET /api/invocations/<invocation_id>/trace", "GET /api/treasury/account"]
 backend = ["runtime.api:api_get_invocation_trace", "economy.treasury_routes:treasury_account"]
 units = ["runtime", "invocation", "observability", "economy", "api", "storage", "kristall"]

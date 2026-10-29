@@ -2300,3 +2300,33 @@ body {
   border-radius: 8px;
   font-size: 15px;
 }
+
+/* "What the model sees": the hidden part of each provider request. */
+.logos-pro-app .msg-model-view-request {
+  border-top: 1px solid var(--border-color, rgba(127, 127, 127, 0.3));
+  padding: 6px 0;
+}
+.logos-pro-app .msg-model-view-head {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.logos-pro-app .msg-model-view-row {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+.logos-pro-app .msg-model-view-names {
+  font-size: 0.85em;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+.logos-pro-app .msg-model-view-pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 22em;
+  overflow: auto;
+  font-size: 0.85em;
+  margin: 4px 0;
+}
+.logos-pro-app .msg-model-view-fold-summary {
+  cursor: pointer;
+}

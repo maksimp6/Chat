@@ -13,7 +13,7 @@ from yandex_client_modules.request_builder import (
     ultra_applied_event,
     validate_generation_params,
 )
-from yandex_client_modules.request_receipt import build_request_manifest
+from yandex_client_modules.request_receipt import build_model_view, build_request_manifest
 from yandex_client_modules.errors import YandexClientError
 from yandex_client_modules.stream_mixin import (
     LiveStream,
@@ -69,6 +69,10 @@ def _capture_request_input(
                 "correlation_id": correlation_id,
                 "manifest": manifest,
             },
+        )
+        # What the model is shown by this request, readable in the reply's details.
+        execution_trace.add_event(
+            "model_view", {"step": step, "view": build_model_view(payload)}
         )
     if callback is not None:
         callback(
