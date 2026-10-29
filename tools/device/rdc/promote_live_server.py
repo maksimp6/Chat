@@ -135,8 +135,8 @@ def main():
     try:
         new = start_service(SERVER)
         check_ready(new, strict=True)
-        # A return from /screen/semantics validates the previously broken
-        # accessibility helper with the pinned ANDROID_SERIAL, no UI text logged.
+        # A return from /screen/semantics validates the screen reader
+        # (android_screen_dom) on the bound device, no UI text logged.
         sem_status, sem = request("/screen/semantics")
         if sem_status != 200:
             raise RuntimeError("Screen semantics unavailable on updated Live Server")

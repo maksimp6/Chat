@@ -308,9 +308,18 @@ def _take_screenshots(value: Any, note: str) -> tuple[Any, list[str]]:
 SCREENSHOT_ATTACHED = (
     "снимок экрана приложен к следующему запросу как изображение (input_image)"
 )
-SCREENSHOT_NOT_SHOWN = (
-    "снимок экрана не передан модели: выбранная модель не принимает изображения; "
-    "размер и sha256 снимка указаны рядом"
+SCREENSHOT_DESCRIBED = (
+    "снимок экрана не передан картинкой: выбранная модель не принимает изображения; "
+    "его описание с координатами элементов — в screen_description"
+)
+# A model that cannot see images gets the screenshot described by one that can.
+SCREEN_DESCRIBER_ROLE = (
+    "Ты описываешь снимки экрана телефона для другой модели, которая их не видит и "
+    "управляет телефоном нажатиями по координатам. Опиши каждый снимок по порядку: "
+    "какое приложение и экран открыты; весь видимый текст дословно; кнопки, поля "
+    "ввода, переключатели и ссылки с координатами их центра в пикселях снимка "
+    "(x слева направо, y сверху вниз); открытые клавиатуру, диалоги и уведомления. "
+    "Описывай только то, что видно; чего не разобрать, так и скажи."
 )
 
 
@@ -540,11 +549,48 @@ def _define_logos_client(base: type) -> type:
                 sees_images = model_key in image_input_model_keys()
                 output, images = _take_screenshots(
                     result.get("result"),
-                    SCREENSHOT_ATTACHED if sees_images else SCREENSHOT_NOT_SHOWN,
+                    SCREENSHOT_ATTACHED if sees_images else SCREENSHOT_DESCRIBED,
                 )
                 if sees_images:
                     screenshots.extend(images)
+                elif images:
+                    description = describe_screenshots(images)
+                    output = (
+                        {**output, "screen_description": description}
+                        if isinstance(output, dict)
+                        else {"result": output, "screen_description": description}
+                    )
                 return output
+
+            def describe_screenshots(images):
+                """The screenshots described in text by a model that reads images."""
+                describers = sorted(image_input_model_keys())
+                if not describers:
+                    return {"error": "no_image_model: ни одна модель не принимает изображения"}
+                describer = describers[0]
+                try:
+                    response = self.ask(
+                        "Опиши эти снимки экрана телефона.",
+                        describer,
+                        params={
+                            "instructions": SCREEN_DESCRIBER_ROLE,
+                            "input_images": images,
+                            "reasoning_effort": "high",
+                            "should_stop": should_stop,
+                        },
+                        execution_trace=trace,
+                    )
+                except Exception as exc:
+                    # Reported to the model in the tool output, which names it to the owner.
+                    logger.warning("[CHAT] Снимок экрана не описан: %s", exc)
+                    return {"model": describer, "error": f"{type(exc).__name__}: {exc}"}
+                _, text = self.extract_reasoning_and_text(response)
+                return {
+                    "model": describer,
+                    "status": response.get("status"),
+                    "text": text,
+                    "error": response.get("error"),
+                }
 
             # Screenshots taken from this round's tool outputs, for the next request.
             screenshots = []

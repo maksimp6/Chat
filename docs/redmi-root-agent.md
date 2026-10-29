@@ -191,8 +191,13 @@ The model never receives the screenshot as text: a function output is a string, 
 megabytes of base64 there could not be seen and would fill the context (#1708). The
 chat tool loop (`chat/mcp_routes.py::_take_screenshots`) replaces every `png_base64`
 with a note and, for a model that reads images, attaches the PNG to the next request
-as an `input_image`; for any other model the note says it was not shown (size and
-sha256 stay in the result).
+as an `input_image`. For any other model the screenshot is described in text by
+the first model that reads images (`qwen3.6-35b-a3b` today) and the description goes
+into `screen_description` of the result; a failed description is returned there as
+`error`.
+
+The RootAgent uses no tool beyond the ones it already calls: `uiautomator` and any
+other added tool or dependency are banned by the owner.
 
 `text` (and a batch `text` step) types through a virtual US keyboard: printable ASCII
 and tab only. Cyrillic and emoji are refused by the tool before the phone is called.
