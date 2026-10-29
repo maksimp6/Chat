@@ -196,11 +196,14 @@ def _refresh_index() -> tuple[dict[str, Any], dict[str, Any]]:
     errors: dict[str, Any] = {}
     state_path = _index_state_path()
     with _locked(_index_lock, state_path):
-        previous = (
-            json.loads(state_path.read_text(encoding="utf-8"))
-            if state_path.exists()
-            else {}
-        )
+        previous = {}
+        if state_path.exists():
+            try:
+                loaded = json.loads(state_path.read_text(encoding="utf-8"))
+                previous = loaded if isinstance(loaded, dict) else {}
+            except (OSError, ValueError):
+                # A damaged state file must not block the index forever: the upload replaces it.
+                logger.warning("[CACHE] index state unreadable; starting from none")
         text = _read_text()
         try:
             client = bound.YandexResponsesClient(bound.Config)
@@ -350,7 +353,9 @@ def cache_append(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str
         "conversation_id": conversation_id,
     }
     with _jobs_lock:
+        # Each finished job is reported once: the next append shows it, then the list is empty.
         previous = dict(_last_job)
+        _last_job.clear()
     _enqueue({**piece, "path": str(path), "text": text})
     return {
         "success": True,

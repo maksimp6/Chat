@@ -248,6 +248,7 @@ class LiveStream:
         self.resp = resp
         self.events = events
         self.pending = list(pending)
+        self.should_stop = None
         self.response_id = None
         self.last_seq = None
         # output_index -> the item from response.output_item.done
@@ -560,8 +561,10 @@ class YandexStreamMixin:
         request_start_timestamp,
         request_start_perf,
         provider_key_id=None,
+        should_stop=None,
     ):
         """Read a streamed reply to its terminal state; resume or poll it when it breaks."""
+        live.should_stop = should_stop
         live.url = url
         live.headers = headers
         live.request_timeout = request_timeout
@@ -636,6 +639,11 @@ class YandexStreamMixin:
         """Read events until the reply ends: ("terminal", response) or ("interrupted", cause)."""
         try:
             while True:
+                # «Стоп» of the owner: the read ends here, whatever the provider still sends.
+                if live.should_stop is not None and live.should_stop():
+                    raise YandexClientError(
+                        "Turn stopped by its owner while the provider stream was read"
+                    )
                 event = live.next_event()
                 if event is None:
                     return "interrupted", "eof"

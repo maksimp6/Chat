@@ -393,6 +393,7 @@ class YandexRequestMixin:
                 request_start_timestamp=request_start_timestamp,
                 request_start_perf=request_start_perf,
                 provider_key_id=credential.trace_key_id,
+                should_stop=should_stop,
             )
             if on_provider_response is not None:
                 on_provider_response(result)

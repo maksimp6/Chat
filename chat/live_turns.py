@@ -442,6 +442,48 @@ def find(conversation_id: Any, request_id: Any) -> LiveTurn | None:
         return _registry.get(_key(conversation_id, request_id))
 
 
+class StopToken:
+    """«Стоп» for a turn answered as JSON: no event log, only the stop and the provider response to cancel."""
+
+    def __init__(self, conversation_id: Any, request_id: str, owner_id: Any):
+        self.conversation_id = conversation_id
+        self.request_id = request_id
+        self.owner_id = owner_id
+        self.finished = False
+        self.response_id: str | None = None
+        self.stop_requested = threading.Event()
+
+    def request_stop(self) -> str | None:
+        self.stop_requested.set()
+        return self.response_id
+
+    def provider_event(self, event: dict[str, Any]) -> None:
+        response_id = event.get("response_id") if isinstance(event, dict) else None
+        if isinstance(response_id, str) and response_id:
+            self.response_id = response_id
+
+
+_stoppable: dict[str, StopToken] = {}
+
+
+def register_stop(token: StopToken) -> None:
+    with _registry_lock:
+        _stoppable[_key(token.conversation_id, token.request_id)] = token
+
+
+def unregister_stop(token: StopToken) -> None:
+    token.finished = True
+    with _registry_lock:
+        key = _key(token.conversation_id, token.request_id)
+        if _stoppable.get(key) is token:
+            del _stoppable[key]
+
+
+def find_stop(conversation_id: Any, request_id: Any) -> StopToken | None:
+    with _registry_lock:
+        return _stoppable.get(_key(conversation_id, request_id))
+
+
 def unregister(live: LiveTurn) -> None:
     with _registry_lock:
         key = _key(live.conversation_id, live.request_id)

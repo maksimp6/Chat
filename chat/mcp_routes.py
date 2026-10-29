@@ -1728,10 +1728,21 @@ def chat():
     if wants_live:
         return _start_live_turn(t_start, admission)
     status, body = 500, {}
+    # A turn answered as JSON can still be stopped («Стоп»): it has a stop token while it runs.
+    token = None
+    if admission is not None and isinstance(data, dict):
+        conv_id = data.get("conversation_id")
+        if isinstance(conv_id, str) and isinstance(data.get("request_id"), str):
+            token = live_turns.StopToken(
+                conv_id, data["request_id"], get_current_owner_id(required=False)
+            )
+            live_turns.register_stop(token)
     try:
-        rv = _chat_turn(t_start=t_start, admission=admission)
+        rv = _chat_turn(t_start=t_start, admission=admission, stop=token)
         status, body = _response_parts(rv)
     finally:
+        if token is not None:
+            live_turns.unregister_stop(token)
         # Recorded even when the turn raised, so a re-sent request never runs twice.
         if admission is not None:
             admission.settle(status, body)
@@ -1834,7 +1845,7 @@ def chat_turn_stop(request_id):
         or not check_access(conv_id, owner_id)
     ):
         return jsonify(error_body("conversation_not_found")), 404
-    live = live_turns.find(conv_id, request_id)
+    live = live_turns.find(conv_id, request_id) or live_turns.find_stop(conv_id, request_id)
     if live is None or live.owner_id != owner_id or live.finished:
         return jsonify({"status": "not_running"})
     response_id = live.request_stop()
@@ -1891,7 +1902,7 @@ def chat_turn_events(request_id):
     return live_turns.receipt_response(conv_id, request_id)
 
 
-def _chat_turn(*, t_start, admission=None, live=None):
+def _chat_turn(*, t_start, admission=None, live=None, stop=None):
     """One chat turn, from the request body to the stored reply (the former body of chat())."""
     import time as _time
 
@@ -2084,6 +2095,9 @@ def _chat_turn(*, t_start, admission=None, live=None):
             # tool round and continuation part copies it from these params.
             params["on_stream_event"] = live.provider_event
             params["should_stop"] = live.stop_requested.is_set
+        elif stop is not None:
+            params["on_stream_event"] = stop.provider_event
+            params["should_stop"] = stop.stop_requested.is_set
         result = _execute_chat_model(message, model_key, invocation, params, trace)
         if live is not None:
             live.provider_event({"kind": "finalizing"})
@@ -2100,7 +2114,8 @@ def _chat_turn(*, t_start, admission=None, live=None):
             request_id=request_id,
         )
     except Exception as e:
-        if live is not None and live.stop_requested.is_set() and not isinstance(
+        stopper = live if live is not None else stop
+        if stopper is not None and stopper.stop_requested.is_set() and not isinstance(
             e, _TurnStopped
         ):
             # Whatever the cancelled provider request raised, the cause is «Стоп».

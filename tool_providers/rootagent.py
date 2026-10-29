@@ -689,8 +689,11 @@ _RUN_PROPERTIES = {
     ),
     "keycode": _optional(
         {
-            "type": "string",
-            "pattern": "^(?:" + KEYCODE_PATTERN + ")$",
+            # A key name, or its Android number (0..9999) as the schema's second branch.
+            "anyOf": [
+                {"type": "string", "pattern": "^(?:" + KEYCODE_PATTERN + ")$"},
+                {"type": "integer", "minimum": 0, "maximum": 9999},
+            ],
             "description": "Клавиша для key: имя вида KEYCODE_HOME, KEYCODE_BACK или число",
         }
     ),
