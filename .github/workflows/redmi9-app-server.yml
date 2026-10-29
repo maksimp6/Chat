@@ -15,9 +15,9 @@ on:
         description: "RootAgent command, used only with action rootagent_command"
         required: false
         type: choice
-        options: [status, probe, capture, move, click]
+        options: [status, probe, capture, move, click, tap, swipe, text, key]
       rootagent_args:
-        description: "Arguments for rootagent_command: move and click take 'DX DY PACKAGE', capture takes 'PACKAGE', status and probe take none"
+        description: "Args for rootagent_command: tap 'X Y'; swipe 'X Y X2 Y2 [DUR]'; text 'STRING'; key 'KEYCODE'; move/click 'DX DY [PACKAGE]'; capture 'PACKAGE' optional; status/probe none"
         required: false
         type: string
 
