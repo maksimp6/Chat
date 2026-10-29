@@ -297,6 +297,21 @@ def linux_key(token):
     return ANDROID_KEYS[name]
 
 
+def wait_reader_device(name, timeout=8.0):
+    deadline = time.monotonic() + timeout
+    time.sleep(0.5)
+    while time.monotonic() < deadline:
+        report = bounded_command(
+            ["/system/bin/dumpsys", "input"], 4 * 1024 * 1024, 15
+        ).decode("utf-8", "replace")
+        reader = report.split("Input Reader State", 1)
+        if len(reader) == 2 and name in reader[1].split("Input Dispatcher State", 1)[0]:
+            time.sleep(0.4)
+            return True
+        time.sleep(0.3)
+    raise AgentError("virtual_input_device_not_registered")
+
+
 class VirtualDevice:
     """One uinput device that lives only for this call."""
 
@@ -333,8 +348,11 @@ class VirtualDevice:
         except Exception:
             os.close(self.fd)
             raise
-        # Android's InputReader needs a moment to add the new device.
-        time.sleep(1.5)
+        # Android's InputReader configures a new device asynchronously; an event
+        # sent before that is queued with the next one, so a tap's down and up
+        # arrive together and the page ignores the zero-length touch. Wait until
+        # the reader lists the device, then a little more.
+        wait_reader_device(name)
 
     def emit(self, kind, code, value):
         os.write(self.fd, struct.pack("llHHi", 0, 0, kind, code, value))
@@ -398,7 +416,7 @@ class Injector:
 
     def tap(self, x, y):
         device = self._down(x, y)
-        time.sleep(0.08)
+        time.sleep(0.12)
         self._up(device)
         time.sleep(0.15)
 
