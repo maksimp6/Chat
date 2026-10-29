@@ -7,7 +7,11 @@ it found there. The model and other tools write to one text shared by every dial
 Nothing in it is ever changed or removed.
 
 Each append is one piece of the text: a heading line (time, source, dialog) and the
-appended text. Every piece is embedded with each model of ``EMBEDDING_MODELS`` (v2
+appended text. ``cache_append`` writes the piece and returns at once; one background
+thread then embeds it and refreshes the index, so a turn never waits for either. The
+result of the last finished background job (its ``embedding_errors`` and
+``index_errors``) comes back with the next append. Pieces still queued when the
+process stops keep their text but get no vectors. Every piece is embedded with each model of ``EMBEDDING_MODELS`` (v2
 models at their largest size); the vectors are kept beside the text with the model
 URI each came from, so the version of every embedding model is recorded. A model
 that fails is listed in the piece's ``embedding_errors``; the text is appended either
@@ -33,8 +37,11 @@ size of the text (0 means no application limit).
 from __future__ import annotations
 
 import contextlib
+import contextvars
 import fcntl
 import json
+import logging
+import queue
 import threading
 from collections.abc import Iterator, Mapping
 from datetime import UTC, datetime
@@ -65,8 +72,15 @@ SEARCH_ROLE = (
     "подходящего нет, так и скажи. Не придумывай записи, даты и источники."
 )
 _TRANSPORTS = ["responses_api", "local_agent", "mcp"]
+logger = logging.getLogger("logos.tool_providers.cache")
 _text_lock = threading.Lock()
+_vectors_lock = threading.Lock()
 _index_lock = threading.Lock()
+# Pieces waiting for their embeddings and the index refresh, and the last one done.
+_jobs: queue.Queue[tuple[dict[str, Any], contextvars.Context]] = queue.Queue()
+_jobs_lock = threading.Lock()
+_last_job: dict[str, Any] = {}
+_worker_thread: threading.Thread | None = None
 
 
 def cache_file_path() -> Path:
@@ -233,38 +247,85 @@ def _refresh_index() -> tuple[dict[str, Any], dict[str, Any]]:
 # Tools
 
 
-def _piece_public(piece: Mapping[str, Any], text: str | None = None) -> dict[str, Any]:
-    """A piece without its vectors; with its text when the whole text is given."""
-    result = {key: value for key, value in piece.items() if key != "embeddings"}
-    result["embeddings"] = {
-        name: {key: value for key, value in record.items() if key != "vector"}
-        for name, record in (piece.get("embeddings") or {}).items()
-    }
-    if text is not None:
-        start = piece.get("start") or 0
-        result["text"] = text[start : start + (piece.get("chars") or 0)]
-    return result
-
-
-def cache_append(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
-    """Append text to the end of the cache, embed it with every model, refresh the index."""
-    text = arguments.get("text") if isinstance(arguments, Mapping) else None
-    if not isinstance(text, str) or not text.strip():
-        return _failure("text must be a non-empty string", "validation")
-    source = arguments.get("source")
-    source = source.strip() if isinstance(source, str) and source.strip() else "model"
-
-    trace = _trace_of(cfg)
+def _process(piece: dict[str, Any]) -> None:
+    """Embed one appended piece with every model and record its vectors."""
     embeddings: dict[str, Any] = {}
     embedding_errors: dict[str, Any] = {}
     tokens = 0
     for name, spec in _embedding_models().items():
-        record = _embed(text, name, spec, trace)
+        record = _embed(piece["text"], name, spec, None)
         tokens += record.get("tokens") or 0
         if "error" in record:
             embedding_errors[name] = record
         else:
             embeddings[name] = record
+    record = {key: value for key, value in piece.items() if key not in ("text", "path")}
+    record.update(
+        embedding_tokens=tokens,
+        embeddings=embeddings,
+        embedding_errors=embedding_errors,
+    )
+    path = _vectors_path()
+    with _locked(_vectors_lock, path), path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    with _jobs_lock:
+        _last_job.clear()
+        _last_job.update(
+            start=piece["start"],
+            created_at=piece["created_at"],
+            finished_at=datetime.now(UTC).isoformat(),
+            embedding_errors=embedding_errors,
+        )
+
+
+def _worker() -> None:
+    """Embed queued pieces in order; refresh the index once the queue is empty.
+
+    Each piece runs in a copy of its caller's context, so the runtime data root and
+    the credential are the caller's. Index refreshes wait until the queue is empty:
+    one upload per cache file carries every piece appended meanwhile.
+    """
+    pending: dict[str, contextvars.Context] = {}
+    while True:
+        piece, context = _jobs.get()
+        try:
+            context.run(_process, piece)
+        except Exception:
+            logger.exception("[CACHE] piece at %s was not embedded", piece.get("start"))
+            with _jobs_lock:
+                _last_job.update(start=piece.get("start"), crashed="embedding")
+        pending[piece["path"]] = context
+        if _jobs.empty():
+            for context in pending.values():
+                try:
+                    index, index_errors = context.run(_refresh_index)
+                except Exception:
+                    logger.exception("[CACHE] the index was not refreshed")
+                    index, index_errors = {}, {"refresh": {"error": "crashed"}}
+                with _jobs_lock:
+                    _last_job.update(index=index, index_errors=index_errors)
+            pending.clear()
+        _jobs.task_done()
+
+
+def _enqueue(piece: dict[str, Any]) -> None:
+    global _worker_thread
+    with _jobs_lock:
+        if _worker_thread is None or not _worker_thread.is_alive():
+            _worker_thread = threading.Thread(
+                target=_worker, name="logos-cache", daemon=True
+            )
+            _worker_thread.start()
+    _jobs.put((piece, contextvars.copy_context()))
+
+
+def cache_append(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
+    """Append text to the end of the cache now; embeddings and the index follow in the background."""
+    text = arguments.get("text") if isinstance(arguments, Mapping) else None
+    if not isinstance(text, str) or not text.strip():
+        return _failure("text must be a non-empty string", "validation")
+    source = arguments.get("source")
+    source = source.strip() if isinstance(source, str) and source.strip() else "model"
 
     created_at = datetime.now(UTC).isoformat()
     conversation_id = _conversation_of(cfg)
@@ -278,28 +339,22 @@ def cache_append(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str
         with path.open("a", encoding="utf-8") as handle:
             handle.write(separator + piece_text)
             handle.flush()
-        piece = {
-            "start": start,
-            "chars": len(piece_text),
-            "created_at": created_at,
-            "source": source,
-            "conversation_id": conversation_id,
-            "embedding_tokens": tokens,
-            "embeddings": embeddings,
-            "embedding_errors": embedding_errors,
-        }
-        with _vectors_path().open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(piece, ensure_ascii=False) + "\n")
-        total = start + len(piece_text)
-
-    index, index_errors = _refresh_index()
+    piece = {
+        "start": start,
+        "chars": len(piece_text),
+        "created_at": created_at,
+        "source": source,
+        "conversation_id": conversation_id,
+    }
+    with _jobs_lock:
+        previous = dict(_last_job)
+    _enqueue({**piece, "path": str(path), "text": text})
     return {
         "success": True,
         "path": str(path),
-        "total_chars": total,
-        "piece": _piece_public(piece),
-        "index": index,
-        "index_errors": index_errors,
+        "total_chars": start + len(piece_text),
+        "piece": piece,
+        "background": {"queued": _jobs.qsize(), "previous": previous or None},
     }
 
 
@@ -382,12 +437,13 @@ CACHE_TOOLS: dict[str, dict[str, Any]] = {
         description=(
             "Append text to the end of the Logos cache: one long text that only grows "
             "and is never changed or cut. The appended piece gets a heading line (time, "
-            "source, dialog) and is embedded with every embedding model "
-            "(text-search-doc, text-search-query, text-embeddings-v2-doc, "
-            "text-embeddings-v2-query), each vector stored with its model version. "
-            "The whole text is then put in the index (the knowledge vector stores "
-            "file_search searches). Use it every turn to record your own message and "
-            "how you see this turn."
+            "source, dialog); the call returns at once. In the background the piece is "
+            "embedded with every embedding model (text-search-doc, text-search-query, "
+            "text-embeddings-v2-doc, text-embeddings-v2-query), each vector stored with "
+            "its model version, and the whole text is put in the index (the knowledge "
+            "vector stores file_search searches); background.previous reports the last "
+            "finished background job and its errors. Use it every turn to record your "
+            "own message and how you see this turn."
         ),
         parameters=object_schema(
             {
