@@ -189,6 +189,18 @@ OUTPUT_LIMIT_CONTINUE_PROMPT = (
 )
 
 
+# Sent when the cut part held only reasoning (#1705). The provider did not return
+# that reasoning into the next request (input grew by the prompt alone), so the
+# model started thinking from scratch and hit the limit again, round after round.
+# Its own reasoning goes back to it, and it is asked to go on from there.
+REASONING_CUT_CONTINUE_PROMPT = (
+    "Твоё предыдущее рассуждение оборвалось из-за ограничения длины вывода, ещё до "
+    "ответа. Ниже — то, что ты уже успел продумать. Не начинай рассуждать заново: "
+    "продолжи с этого места и переходи к ответу пользователю или к вызову нужного "
+    "инструмента.\n\nТвоё рассуждение до обрыва:\n"
+)
+
+
 def _cut_by_output_limit(response) -> bool:
     """True when the provider stopped this response at its output-token limit."""
     if not isinstance(response, dict) or response.get("status") != "incomplete":
@@ -545,7 +557,27 @@ def _define_logos_client(base: type) -> type:
 
             def continue_after_output_limit(previous_response, part):
                 # The provider conversation holds the cut answer; otherwise it joins the history.
-                request = {"role": "user", "content": OUTPUT_LIMIT_CONTINUE_PROMPT}
+                prompt = OUTPUT_LIMIT_CONTINUE_PROMPT
+                cut_reasoning, cut_text = self.extract_reasoning_and_text(
+                    previous_response
+                )
+                if not cut_text.strip() and not extract_function_calls(
+                    previous_response
+                ):
+                    # Only reasoning was cut: give it back instead of "go on" (#1705).
+                    prompt = REASONING_CUT_CONTINUE_PROMPT + (
+                        cut_reasoning.strip() or "(текст рассуждения провайдер не вернул)"
+                    )
+                    if trace is not None:
+                        trace.add_event(
+                            "provider_reasoning_cut_returned",
+                            {
+                                "part": part,
+                                "response_id": previous_response.get("id"),
+                                "reasoning_chars": len(cut_reasoning),
+                            },
+                        )
+                request = {"role": "user", "content": prompt}
                 if conversation_id:
                     return follow_up([request], "output_limit", part)
                 continuation_history.extend(
