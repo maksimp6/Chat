@@ -21,7 +21,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 | [`tool_providers.registry`](registry.py) | Provider-agnostic registry for Logos tools. |
 | [`tool_providers.runtime_tools`](runtime_tools.py) | Universal tool definitions backed by the SSH Runtime. |
 | [`tool_providers.rootagent`](rootagent.py) | Logos tools `rootagent_run` and `rootagent_result` for the Redmi 9 RootAgent job on GitHub Actions. Registered as the `rootagent` external tool source through `composition/tool_sources.py`; not in `__all__`. |
-| [`tool_providers.cache`](cache.py) | Append-only cache (category `cache`): cache_append, cache_read, cache_search. Each entry is embedded with every embedding model and stores each vector with its model version; search by substring, regex or meaning. File `logos.cache.jsonl` beside the memory file. Not in `__all__`. |
+| [`tool_providers.cache`](cache.py) | Append-only cache (category `cache`): cache_append, cache_read, cache_search. Each entry is embedded with every embedding model and stores each vector with its model version; every entry is also uploaded to the knowledge vector stores (the index File Search searches); search by substring, regex or meaning. File `logos.cache.jsonl` beside the memory file. Not in `__all__`. |
 | [`tool_providers.tty`](tty.py) | PTY terminal sessions (category `tty`): tty_open, tty_write, tty_read, tty_resize, tty_close, tty_list. Owner-checked; opening needs the owner's approval. Not yet verified on the Redmi (Termux). |
 | [`tool_providers.universal_tool_platform`](universal_tool_platform.py) | Provider-agnostic tool contracts and execution pipeline for Logos. |
 
@@ -49,15 +49,19 @@ Everything `tool_providers` uses from other units is a field of `Host` in [`tool
 
 | Port | Provided by |
 | --- | --- |
+| `Config` | `core.config.Config` |
 | `EMBEDDING_MODELS` | `core.config.EMBEDDING_MODELS` |
 | `EmbeddingError` | `yandex_client_modules.embeddings.EmbeddingError` |
 | `KristallError` | `kristall.KristallError` |
 | `SSHRuntimeError` | `remote_runtime.ssh.SSHRuntimeError` |
 | `build_runtime` | `remote_runtime.ssh_settings.build_runtime` |
+| `YandexClientError` | `yandex_client_modules.errors.YandexClientError` |
+| `YandexResponsesClient` | `yandex_client_modules.client.YandexResponsesClient` |
 | `cosine_similarity` | `yandex_client_modules.embeddings.cosine_similarity` |
 | `embed_texts` | `yandex_client_modules.embeddings.embed_texts` |
 | `enqueue_local_tool_job` | `agent_runtime.local_gateway.enqueue_local_tool_job` |
 | `external_tool_sources` | `composition.tool_sources.SOURCES` |
+| `knowledge_vector_store_ids` | `yandex_client_modules.tool_config.knowledge_vector_store_ids` |
 | `memory_file_path` | `storage.records.memory_file_path` |
 | `wait_for_local_tool_job` | `agent_runtime.local_gateway.wait_for_local_tool_job` |
 

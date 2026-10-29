@@ -12,6 +12,12 @@ in ``embedding_errors``; the text is stored either way. A semantic search embeds
 question with the query models and compares it with each stored vector: a document
 vector with its paired query model, a query vector with the same model.
 
+Every entry is also put in the index: it is uploaded as a Markdown file
+(``logos-cache-<key>.md``) and added to each knowledge vector store
+(``knowledge_vector_store_ids``), the store the dialog's File Search searches. The
+entry keeps the file id and each store's answer; a failed upload or store is listed in
+``index_errors``, and the entry is stored either way.
+
 The cache is one JSON Lines file next to the memory file (``logos.cache.jsonl``).
 Appends hold an exclusive file lock, so processes sharing the file do not interleave.
 There is no limit on the number or size of entries (0 means no application limit).
@@ -23,16 +29,23 @@ import fcntl
 import json
 import re
 import threading
+import uuid
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from tool_providers.host import bound, cosine_similarity, embed_texts, memory_file_path
+from tool_providers.host import (
+    bound,
+    cosine_similarity,
+    embed_texts,
+    knowledge_vector_store_ids,
+    memory_file_path,
+)
 from tool_providers.schema import object_schema
 
 CACHE_FILE_NAME = "logos.cache.jsonl"
-CACHE_FORMAT_VERSION = 1
+CACHE_FORMAT_VERSION = 2
 SEARCH_MODES = ("all", "text", "regex", "semantic")
 _TRANSPORTS = ["responses_api", "local_agent", "mcp"]
 _lock = threading.Lock()
@@ -128,6 +141,60 @@ def _trace_of(cfg: Mapping[str, Any] | None) -> Any:
 
 
 # ---------------------------------------------------------------------------
+# Index (knowledge vector stores)
+
+
+def _index_document(entry: Mapping[str, Any]) -> str:
+    """The entry as the Markdown file File Search reads: its fields, then the text."""
+    fields = [
+        ("key", entry.get("key")),
+        ("created_at", entry.get("created_at")),
+        ("source", entry.get("source")),
+        ("tags", ", ".join(entry.get("tags") or [])),
+        ("conversation_id", entry.get("conversation_id")),
+        ("transport", entry.get("transport")),
+        ("user_id", entry.get("user_id")),
+    ]
+    header = "\n".join(f"- {name}: {value}" for name, value in fields if value)
+    return (
+        f"# Logos cache entry {entry.get('key')}\n\n{header}\n\n{entry.get('text')}\n"
+    )
+
+
+def _index(entry: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Upload the entry and add it to every knowledge vector store: (index, errors)."""
+    # Provider errors, credential errors (RuntimeError) and network errors (OSError).
+    failures = (bound.YandexClientError, RuntimeError, OSError, ValueError)
+    filename = f"logos-cache-{entry.get('key')}.md"
+    index: dict[str, Any] = {"filename": filename, "file_id": None, "vector_stores": {}}
+    errors: dict[str, Any] = {}
+    try:
+        client = bound.YandexResponsesClient(bound.Config)
+        uploaded = client.upload_file(
+            _index_document(entry).encode("utf-8"), filename, purpose="assistants"
+        )
+    except failures as exc:
+        errors["upload"] = {"error": type(exc).__name__, "message": str(exc)}
+        return index, errors
+    file_id = uploaded.get("id") if isinstance(uploaded, Mapping) else None
+    if not file_id:
+        errors["upload"] = {"error": "no_file_id", "message": str(uploaded)}
+        return index, errors
+    index["file_id"] = file_id
+    for store_id in knowledge_vector_store_ids():
+        try:
+            added = client.add_file_to_vs(store_id, file_id)
+        except failures as exc:
+            errors[store_id] = {"error": type(exc).__name__, "message": str(exc)}
+            continue
+        index["vector_stores"][store_id] = {
+            "id": added.get("id") if isinstance(added, Mapping) else None,
+            "status": added.get("status") if isinstance(added, Mapping) else None,
+        }
+    return index, errors
+
+
+# ---------------------------------------------------------------------------
 # Storage
 
 
@@ -180,9 +247,12 @@ def cache_append(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str
         else:
             embeddings[name] = record
 
+    created_at = datetime.now(UTC)
     entry: dict[str, Any] = {
         "format_version": CACHE_FORMAT_VERSION,
-        "created_at": datetime.now(UTC).isoformat(),
+        # Names the entry before it has an id: the index file is uploaded first.
+        "key": f"{created_at:%Y%m%dT%H%M%S%fZ}-{uuid.uuid4().hex[:8]}",
+        "created_at": created_at.isoformat(),
         "source": source,
         "tags": list(dict.fromkeys(tags)),
         **_caller(cfg),
@@ -192,6 +262,7 @@ def cache_append(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str
         "embeddings": embeddings,
         "embedding_errors": errors,
     }
+    entry["index"], entry["index_errors"] = _index(entry)
     path = cache_file_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     with _lock, path.open("a+", encoding="utf-8") as handle:
@@ -440,7 +511,8 @@ CACHE_TOOLS: dict[str, dict[str, Any]] = {
             "Append a text to the Logos cache. The cache only grows: an entry is never "
             "changed or removed. The text is embedded with every embedding model "
             "(text-search-doc, text-search-query, text-embeddings-v2-doc, "
-            "text-embeddings-v2-query) and each vector is stored with its model version. "
+            "text-embeddings-v2-query) and each vector is stored with its model version; the "
+            "entry is also put in the index (the knowledge vector stores file_search searches). "
             "Use it every turn to record your own message and how you see this turn."
         ),
         parameters=object_schema(
