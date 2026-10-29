@@ -37,6 +37,7 @@ from chat.host import (
     get_model_uri,
     maybe_update_conversation_title,
     reserve_request,
+    upgrade_dialog_settings,
 )
 
 
@@ -244,7 +245,9 @@ def _speechkit_turn(
     if session.cancelled.is_set():
         raise bound.RealtimeError("Голосовая сессия отменена")
     client = logos_client_type()(bound.Config)
-    settings = get_conv_settings(session.conversation_id) or {}
+    # Upgraded first, as the tools window shows it: a record saved before revision 2
+    # holds a narrow tool selection that the upgrade drops.
+    settings = upgrade_dialog_settings(get_conv_settings(session.conversation_id) or {})
     params = {"instructions": session.instructions} if session.instructions else {}
     if settings.get("active_tool_categories") is not None:
         params["active_tool_categories"] = settings["active_tool_categories"]
