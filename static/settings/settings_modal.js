@@ -36,15 +36,9 @@
       '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:12px;">Управление локальными и встроенными инструментами. Отключенные инструменты не передаются модели.</div>',
       '<h3 style="font-size:14px;margin:12px 0 8px;">Локальные инструменты</h3>',
       '<div id="tools-category-list" style="display:flex;flex-direction:column;gap:8px;">Загрузка инструментов...</div>',
-      '<div style="margin-top:12px;">' +
-        UI.chk(
-          "tools-defer-en",
-          dl.enabled !== false,
-          "<strong>⏳ Defer Loading</strong> (defer_loading: модель видит инструмент только после поиска инструментов провайдера)",
-        ) +
-        "</div>",
+      '<div style="margin-top:12px;font-size:13px;"><strong>⏳ Defer Loading</strong> — всегда включено: модель видит инструмент только после поиска инструментов провайдера. Отключить нельзя.</div>',
       '<div style="margin-top:8px;">' +
-        UI.lbl("Категории без отложенной загрузки") +
+        UI.lbl("Категории без отложенной загрузки (всегда загружены)") +
         UI.inp("tools-defer-eager", "text", eager, {"placeholder": "rootagent, filesystem"}) +
         "</div>",
       '<hr style="margin:18px 0;border:none;border-top:1px solid var(--m-border,#ddd);">',

@@ -455,6 +455,14 @@ def _define_logos_client(base: type) -> type:
             def execute_tool(call):
                 nonlocal tool_servers
                 name = call.get("name")
+                if isinstance(name, str) and name.startswith("tools_"):
+                    # A whole category sent as one function: show the tool it runs.
+                    try:
+                        inner = _json.loads(call.get("arguments") or "{}")
+                    except (TypeError, ValueError):
+                        inner = call.get("arguments")
+                    if isinstance(inner, dict) and isinstance(inner.get("tool"), str):
+                        name = inner["tool"]
                 emit({"kind": "tool_call", "phase": "start", "name": name})
                 try:
                     if tool_servers is None:

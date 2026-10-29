@@ -6,6 +6,7 @@ from typing import Any
 
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_client_modules.api_logger import api_logger
+from yandex_client_modules.tool_groups import fit_tools, unwrap_call
 from yandex_client_modules.tool_config import (
     deferred_tool_categories,
     file_search_max_results,
@@ -119,6 +120,18 @@ class YandexMcpMixin:
                         raise ValueError(
                             "Invalid tool arguments: expected a valid JSON object"
                         ) from None
+                if not isinstance(args, dict):
+                    raise ValueError("Invalid tool arguments: expected a JSON object")
+                # A tools_<category> call stands for one tool of that category (#1703).
+                inner_name, args = unwrap_call(
+                    name, args, bound.registry.get_tools_by_category
+                )
+                if inner_name != name and isinstance(trace, bound.ExecutionTrace):
+                    trace.add_event(
+                        "tool_group_call",
+                        {"group": name, "tool": inner_name, "call_id": call_id},
+                    )
+                name = inner_name
                 if not isinstance(args, dict):
                     raise ValueError("Invalid tool arguments: expected a JSON object")
             except ValueError as exc:
@@ -260,9 +273,10 @@ class YandexMcpMixin:
                 }
                 if s.get("server_description"):
                     mcp_tool["server_description"] = s["server_description"]
-                # The server's own "Defer Loading" switch: its tools wait for the tool search.
-                if s.get("defer_loading") is True:
-                    mcp_tool["defer_loading"] = True
+                # Defer loading is always on across the whole tool surface: an MCP
+                # server's tools, like the local ones, wait for the provider's tool
+                # search instead of loading eagerly.
+                mcp_tool["defer_loading"] = True
                 mcp_tools.append(mcp_tool)
 
         active_cats = None
@@ -368,6 +382,7 @@ class YandexMcpMixin:
         tools = mcp_tools + hosted_tools if execution_policy is None else []
 
         local_tools: list[dict[str, Any]] = []
+        local_by_category: list[tuple[str, list[dict[str, Any]]]] = []
         defer_on, eager_categories = deferred_tool_categories(tools_config)
         for category in active_cats:
             try:
@@ -377,7 +392,7 @@ class YandexMcpMixin:
                         {**tool, "defer_loading": True} for tool in category_tools
                     ]
                 if category_tools:
-                    local_tools.extend(
+                    offered = [
                         tool
                         for tool in category_tools
                         if execution_policy is None
@@ -390,13 +405,26 @@ class YandexMcpMixin:
                             is not None
                             and execution_policy.allows_tool(definition)
                         )
-                    )
+                    ]
+                    local_tools.extend(offered)
+                    local_by_category.append((category, offered))
             except Exception as e:
                 api_logger.error(f"[TOOLS] Ошибка категории {category}: {e}")
                 note("tool_category", f"tool category {category} left out: {e}")
 
-        if local_tools:
-            tools.extend(local_tools)
+        # Over the provider's 100-tool limit each category goes as one function (#1703).
+        sent_local, grouped_into = fit_tools(local_by_category, len(tools))
+        if grouped_into and trace is not None and isinstance(trace, bound.ExecutionTrace):
+            trace.add_event(
+                "tools_grouped_by_category",
+                {
+                    "tools": len(local_tools),
+                    "functions": len(sent_local),
+                    "other_tools": len(tools),
+                },
+            )
+        if sent_local:
+            tools.extend(sent_local)
 
         # The server owns the tool list: a caller's "tools" entry never reaches the provider.
         ask_params = dict(params)
@@ -426,21 +454,27 @@ class YandexMcpMixin:
             ) + CACHE_NOTE
         if tools or execution_policy is not None:
             ask_params["tools"] = tools
+        # The function that carries cache_append: itself, or its category's group
+        # function when the tools are grouped (#1703); None without the cache.
+        cache_function = grouped_into.get("cache_append") or (
+            "cache_append"
+            if any(tool.get("name") == "cache_append" for tool in tools)
+            else None
+        )
         if not tools and ask_params.get("tool_choice") == "required":
             # Nothing to call (every tool switched off): a required call cannot be met.
             ask_params["tool_choice"] = "auto"
             note("tool_choice", "tool_choice required released to auto: no tool in this turn")
-        elif ask_params.get("tool_choice") == "required" and any(
-            tool.get("name") == "cache_append" for tool in tools
-        ):
+        elif ask_params.get("tool_choice") == "required" and cache_function:
             # The owner's rule: every turn starts by writing the user's question to the cache.
             # The forced tool is sent loaded, since a deferred one is hidden until a tool search.
             ask_params["tools"] = tools = [
                 {key: value for key, value in tool.items() if key != "defer_loading"}
-                if tool.get("name") == "cache_append"
+                if tool.get("name") == cache_function
                 else tool
                 for tool in tools
             ]
+            # A grouped cache_append is mapped to its group function below.
             ask_params["tool_choice"] = {"type": "function", "name": "cache_append"}
         elif ask_params.get("tool_choice") == "required" and not any(
             tool.get("type") in ("function", "mcp") for tool in tools
@@ -452,6 +486,23 @@ class YandexMcpMixin:
             ask_params["tool_choice"] = {
                 "type": "file_search" if "file_search" in hosted_types else hosted_types[0]
             }
+        choice = ask_params.get("tool_choice")
+        if (
+            isinstance(choice, dict)
+            and choice.get("type") == "function"
+            and choice.get("name") in grouped_into
+        ):
+            # The chosen tool now sits inside its category's function: force the group
+            # and say which tool of it, so the choice is not widened to the category.
+            ask_params["tool_choice"] = {**choice, "name": grouped_into[choice["name"]]}
+            ask_params["instructions"] = (ask_params.get("instructions") or "") + (
+                f"\n\nВызови {grouped_into[choice['name']]} с tool=\"{choice['name']}\"."
+            )
+            if trace is not None and isinstance(trace, bound.ExecutionTrace):
+                trace.add_event(
+                    "tool_choice_grouped",
+                    {"tool": choice["name"], "group": grouped_into[choice["name"]]},
+                )
 
         if trace is not None and isinstance(trace, bound.ExecutionTrace):
             ask_params["execution_trace"] = trace
