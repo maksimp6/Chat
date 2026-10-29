@@ -809,10 +809,14 @@ def _storage():
 
 def _tool_providers():
     from tool_providers import host
+    from core.config import EMBEDDING_MODELS
+    from yandex_client_modules.embeddings import EmbeddingError
     from kristall import KristallError
     from remote_runtime.ssh import SSHRuntimeError
     from remote_runtime.ssh_settings import assert_operation_allowed
     from remote_runtime.ssh_settings import build_runtime
+    from yandex_client_modules.embeddings import cosine_similarity
+    from yandex_client_modules.embeddings import embed_texts
     from agent_runtime.local_gateway import enqueue_local_tool_job
     from composition.tool_sources import SOURCES as external_tool_sources
     from storage.records import memory_file_path
@@ -820,10 +824,14 @@ def _tool_providers():
     from agent_runtime.local_gateway import wait_for_local_tool_job
 
     return host.Host(
+        EMBEDDING_MODELS=EMBEDDING_MODELS,
+        EmbeddingError=EmbeddingError,
         KristallError=KristallError,
         SSHRuntimeError=SSHRuntimeError,
         assert_operation_allowed=assert_operation_allowed,
         build_runtime=build_runtime,
+        cosine_similarity=cosine_similarity,
+        embed_texts=embed_texts,
         enqueue_local_tool_job=enqueue_local_tool_job,
         external_tool_sources=external_tool_sources,
         memory_file_path=memory_file_path,

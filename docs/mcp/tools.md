@@ -29,6 +29,7 @@
 | browser | browser/tools.py (composition/tool_sources.py) | 17 | browser_open, browser_read, browser_find, browser_extract, browser_click, browser_fill_form, browser_act, browser_wait, browser_evaluate, browser_screenshot, browser_history, browser_tabs, browser_session, browser_cookies, browser_search, browser_request, browser_download |
 | rootagent | tool_providers/rootagent.py (composition/tool_sources.py) | 2 | rootagent_run (управление телефоном как юзер: status, probe, capture, tap, swipe, text, key, move, click как задания GitHub Actions на develop), rootagent_result (статус запуска и JSON-результат по run_id). Настройка и границы — [docs/redmi-root-agent.md](../redmi-root-agent.md#logos-tool) |
 | tty | tool_providers/tty.py (composition/tool_sources.py) | 6 | tty_open, tty_write, tty_read, tty_resize, tty_close, tty_list |
+| cache | tool_providers/cache.py | 3 | cache_append, cache_read, cache_search |
 
 ## Отложенная загрузка (defer_loading)
 
@@ -140,6 +141,31 @@ code interpreter) не откладываются. Выключено (наст�
   лимита приложения). Сессии живут в памяти процесса; при штатном завершении процесса
   открытые сессии закрываются, при аварийном завершении или SIGTERM — нет.
 - **Вывод.** Вывод терминала и аргумент `data` не попадают в трассировку открытым текстом.
+
+## Кэш (категория cache)
+
+Определены в `tool_providers/cache.py` (`CACHE_TOOLS`), собственный источник реестра;
+доступны в диалоге, локальному агенту и через MCP, без подтверждения. Кэш общий для
+модели и инструментов всех диалогов: файл JSON Lines `logos.cache.jsonl` рядом с файлом
+памяти (`storage.records.memory_file_path`). Записи только добавляются; изменения и
+удаления нет.
+
+| Инструмент | Что делает |
+| --- | --- |
+| cache_append | Добавить текст (`source`: `model` или имя инструмента, `tags`). Текст встраивается каждой моделью из `EMBEDDING_MODELS` (text-search-doc, text-search-query, text-embeddings-v2-doc, text-embeddings-v2-query; v2 — в наибольшем размере 768); у каждого вектора хранится URI модели с версией. Модель, которая не ответила, попадает в `embedding_errors`, текст сохраняется всё равно |
+| cache_read | Записи по `ids` или по фильтрам (диалог, источник, метка), `order`, `offset`, `limit` (0 — все). Векторы не возвращаются: только модели, их версии, размеры и токены |
+| cache_search | `mode`: `text` (подстрока), `regex`, `semantic` (все записи по косинусной близости), `all` (по умолчанию: семантический ранг и отметка совпадения текста). Вопрос встраивается моделями запросов: doc-векторы сравниваются с парной query-моделью, query-векторы — с той же. У каждого результата балл по каждой модели и итоговый `score` (`rank_by`: `mean` или одна модель) |
+
+- **Инструкции.** Когда `cache_append` есть в запросе, к инструкциям модели добавляется
+  `CACHE_NOTE` (`yandex_client_modules/mcp_mixin.py`): в каждом ходе перед финальным
+  ответом записать в кэш свой ответ целиком и то, как модель видит ход (вход, инструкции,
+  инструменты, основания, неуверенность), а ошибки кэша называть в ответе. Это тратит
+  токены (четыре эмбеддинга на запись, два на поиск) ради диагностики самовосприятия модели.
+- **Настройки.** Ревизия настроек диалога 4 добавляет категорию `cache` в сохранённый
+  выбор категорий.
+- **Лимиты.** Числа и размера записей нет (0 — без лимита приложения). Провайдер
+  эмбеддингов ограничивает длину текста сам: слишком длинная запись остаётся без векторов
+  с ошибкой в `embedding_errors`.
 
 ## Bridge-инструменты MCP-сервера (logos_*)
 
