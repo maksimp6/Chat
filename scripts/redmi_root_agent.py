@@ -22,6 +22,7 @@ import struct
 import subprocess
 import sys
 import time
+import xml.etree.ElementTree as ElementTree
 import zlib
 from pathlib import Path
 
@@ -563,6 +564,77 @@ def wake_display():
     return wakefulness(), attempts
 
 
+UI_DUMP = "/data/local/tmp/rootagent-ui.xml"
+UI_DUMP_LIMIT = 16 * 1024 * 1024
+BOUNDS = re.compile(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]")
+UI_FLAGS = ("clickable", "long-clickable", "checkable", "checked", "scrollable",
+            "focused", "selected", "password")
+
+
+def ui_snapshot():
+    """The screen as text: every element with text, a description, an id or an action.
+
+    uiautomator dump gives the view tree with exact bounds, so a model that cannot
+    see the screenshot still knows what is on screen and where to tap (center).
+    A failed dump is reported as ui_error, never raised: the screenshot still counts.
+    """
+    try:
+        os.unlink(UI_DUMP)
+    except FileNotFoundError:
+        pass
+    try:
+        bounded_command(["/system/bin/uiautomator", "dump", UI_DUMP], 64 * 1024, 30)
+        with open(UI_DUMP, "rb") as handle:
+            raw = handle.read(UI_DUMP_LIMIT + 1)
+    except (AgentError, OSError) as error:
+        return {"ui_error": str(error) if isinstance(error, AgentError) else type(error).__name__}
+    finally:
+        try:
+            os.unlink(UI_DUMP)
+        except FileNotFoundError:
+            pass
+    if len(raw) > UI_DUMP_LIMIT:
+        return {"ui_error": "ui_dump_limit"}
+    try:
+        root = ElementTree.fromstring(raw)
+    except ElementTree.ParseError:
+        return {"ui_error": "ui_dump_unreadable"}
+    elements, packages = [], []
+    for node in root.iter("node"):
+        package = node.get("package") or ""
+        if package and package not in packages:
+            packages.append(package)
+        text = node.get("text") or ""
+        description = node.get("content-desc") or ""
+        resource = node.get("resource-id") or ""
+        kind = (node.get("class") or "").rsplit(".", 1)[-1]
+        flags = [flag for flag in UI_FLAGS if node.get(flag) == "true"]
+        editable = kind.endswith("EditText")
+        if not (text or description or resource or flags or editable):
+            continue
+        match = BOUNDS.fullmatch(node.get("bounds") or "")
+        if match is None:
+            continue
+        x1, y1, x2, y2 = (int(value) for value in match.groups())
+        if x2 <= x1 or y2 <= y1:
+            continue
+        element = {"center": [(x1 + x2) // 2, (y1 + y2) // 2], "bounds": [x1, y1, x2, y2]}
+        if text:
+            element["text"] = text
+        if description:
+            element["description"] = description
+        if resource:
+            element["id"] = resource
+        if kind:
+            element["class"] = kind
+        if editable:
+            flags.append("editable")
+        if flags:
+            element["flags"] = flags
+        elements.append(element)
+    return {"ui_packages": packages, "ui_elements": elements}
+
+
 def validate_png(png):
     if not 8 < len(png) <= PNG_LIMIT or png[:8] != b"\x89PNG\r\n\x1a\n":
         raise AgentError("invalid_png")
@@ -713,6 +785,7 @@ def worker(request):
     required = {
         "status": set(),
         "probe": set(),
+        "ui": set(),
         "wake": set(),
         "capture": set(),
         "move": {"dx", "dy"},
@@ -760,6 +833,25 @@ def worker(request):
             "screen_width": width,
             "screen_height": height,
             "mouse_metadata_valid": mouse_ready,
+        }
+    if command == "ui":
+        # The screen as text only, without a screenshot: cheap enough for every step.
+        woken, wake_attempts = wake_display()
+        state = screen_state()
+        try:
+            width, height = screen_size()
+        except AgentError:
+            width = height = None
+        return {
+            "command": "ui",
+            "wakefulness": woken,
+            "wake_attempts": wake_attempts,
+            "display_on": state["display_on"],
+            "keyguard_locked_or_unknown": not state["unlocked"],
+            "focus_package": state["package"],
+            "screen_width": width,
+            "screen_height": height,
+            **ui_snapshot(),
         }
     if command == "probe":
         with mouse_connection():
@@ -892,6 +984,7 @@ def worker(request):
         state = screen_state()
         return {
             **metadata,
+            **ui_snapshot(),
             "command": "browse",
             "url": url,
             "wakefulness": woken,
@@ -929,6 +1022,7 @@ def worker(request):
         state = screen_state()
         return {
             **metadata,
+            **ui_snapshot(),
             "command": "batch",
             "steps_done": done,
             "diagnostics": diagnostics,
@@ -954,6 +1048,7 @@ def worker(request):
             metadata["expected_package_matches"] = state["package"] == expected
         return {
             **metadata,
+            **ui_snapshot(),
             "wakefulness": woken,
             "wake_attempts": wake_attempts,
             "focus_package": state["package"],
@@ -1052,6 +1147,7 @@ def main():
     for command in (
         "status",
         "probe",
+        "ui",
         "capture",
         "move",
         "click",

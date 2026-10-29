@@ -62,8 +62,9 @@ legacy relative input through the existing root mouse daemon.
 | --- | --- |
 | `status` | Sanitized device, root, Keyguard, focus, screen size, and socket metadata; no input |
 | `probe` | Connect to the existing socket and verify root peer/executable hash; send no input command |
+| `ui` | Wake the display and return the screen as text: `ui_elements` from `uiautomator dump` with text, description, id, flags, bounds and center; no screenshot |
 | `wake` | If display-on is unconfirmed, submit one fixed relative `move 1 1`, without clicking; verify actual wake separately |
-| `capture --output PATH [--expected-package PACKAGE]` | Capture and validate the PNG; any expected package is reported, not enforced |
+| `capture --output PATH [--expected-package PACKAGE]` | Capture and validate the PNG, plus `ui_elements`; any expected package is reported, not enforced |
 | `tap X Y` | Tap absolute screen coordinates through root `input tap` |
 | `swipe X Y X2 Y2 [--duration-ms MS]` | Swipe/scroll from (X, Y) to (X2, Y2) through root `input swipe` |
 | `text STR` | Type a string through root `input text` |
@@ -191,8 +192,17 @@ The model never receives the screenshot as text: a function output is a string, 
 megabytes of base64 there could not be seen and would fill the context (#1708). The
 chat tool loop (`chat/mcp_routes.py::_take_screenshots`) replaces every `png_base64`
 with a note and, for a model that reads images, attaches the PNG to the next request
-as an `input_image`; for any other model the note says it was not shown (size and
-sha256 stay in the result).
+as an `input_image`. For any other model the screenshot is described in text by
+the first model that reads images (`qwen3.6-35b-a3b` today) and the description goes
+into `screen_description` of the result; a failed description is returned there as
+`error`.
+
+**The screen as text.** `ui` (no screenshot, cheap) and every `capture`, `browse`
+and `batch` also return `ui_elements` from `uiautomator dump`: each element with
+`text`, `description`, `id`, `class`, `flags` (clickable, editable, checked,
+scrollable, …), `bounds` and `center`. A model taps the `center` of the element it
+needs instead of guessing coordinates. A failed dump (for example a secure screen)
+comes back as `ui_error`; the screenshot still counts.
 
 `text` (and a batch `text` step) types through a virtual US keyboard: printable ASCII
 and tab only. Cyrillic and emoji are refused by the tool before the phone is called.
