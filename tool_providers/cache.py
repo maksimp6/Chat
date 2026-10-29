@@ -13,7 +13,7 @@ URI each came from, so the version of every embedding model is recorded. A model
 that fails is listed in the piece's ``embedding_errors``; the text is appended either
 way.
 
-The search is a helper model (one of ``TEXT_MODELS``, chosen by the caller): it gets
+The search is a helper model (``SEARCH_MODEL``, DeepSeek V4.1 Flash): it gets
 the whole cache text and the question in one provider request without tools, and its
 answer is returned with the request's status, errors and usage. The request is
 recorded on the caller's execution trace.
@@ -53,8 +53,8 @@ CACHE_FILE_NAME = "logos.cache.md"
 VECTORS_FILE_NAME = "logos.cache.vectors.jsonl"
 INDEX_STATE_FILE_NAME = "logos.cache.index.json"
 INDEX_FILE_NAME = "logos-cache.md"
-# The dialog settings' own maximum is "high"; "xhigh" is offered where the model has it.
-REASONING_EFFORTS = ("high", "xhigh", "medium", "low", "minimal", "none")
+# The search model: the text model with the largest context window (1M tokens).
+SEARCH_MODEL = "deepseek-v4.1-flash"
 SEARCH_ROLE = (
     "Ты — модель-помощник Логоса для поиска в кэше. Кэш — один длинный текст, который "
     "только растёт: в него дописывают модель и инструменты всех диалогов; каждый кусок "
@@ -320,23 +320,14 @@ def cache_search(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str
     query = arguments.get("query")
     if not isinstance(query, str) or not query.strip():
         return _failure("query must be a non-empty string", "validation")
-    model = arguments.get("model")
-    models = dict(bound.TEXT_MODELS)
-    if model not in models:
-        return _failure(
-            "model must be one of the text models", "validation", models=sorted(models)
-        )
-    effort = arguments.get("reasoning_effort") or "high"
-    if effort not in REASONING_EFFORTS:
-        return _failure("unknown reasoning_effort", "validation")
 
     text = _read_text()
     client = bound.YandexResponsesClient(bound.Config)
     response = client.ask(
         f"Запрос основной модели:\n{query.strip()}\n\n"
         f"Весь текст кэша ({len(text)} символов):\n\n{text}",
-        model,
-        params={"instructions": SEARCH_ROLE, "reasoning_effort": effort},
+        SEARCH_MODEL,
+        params={"instructions": SEARCH_ROLE, "reasoning_effort": "high"},
         execution_trace=_trace_of(cfg),
     )
     reasoning, answer = client.extract_reasoning_and_text(response)
@@ -344,7 +335,7 @@ def cache_search(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str
         "success": True,
         "path": str(cache_file_path()),
         "total_chars": len(text),
-        "model": model,
+        "model": SEARCH_MODEL,
         "response_id": response.get("id"),
         "status": response.get("status"),
         "error": response.get("error"),
@@ -429,8 +420,7 @@ CACHE_TOOLS: dict[str, dict[str, Any]] = {
         description=(
             "Search the cache with a helper model: it reads the whole cache text and "
             "answers the query with the places it found, quoted with their headings "
-            "(time, source, dialog), and a short conclusion. Choose the helper model "
-            "for the search."
+            "(time, source, dialog), and a short conclusion."
         ),
         parameters=object_schema(
             {
@@ -439,23 +429,8 @@ CACHE_TOOLS: dict[str, dict[str, Any]] = {
                     "minLength": 1,
                     "description": "What to find in the cache, in full",
                 },
-                "model": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": (
-                        "Text model key of the helper, e.g. deepseek-v4.1-flash, "
-                        "logos-runtime, yandexgpt-5.1, qwen3.6-35b-a3b"
-                    ),
-                },
-                "reasoning_effort": _optional(
-                    {
-                        "type": "string",
-                        "enum": list(REASONING_EFFORTS),
-                        "description": "Helper's reasoning depth: high when not given",
-                    }
-                ),
             },
-            ["query", "model"],
+            ["query"],
         ),
         read_only=True,
         func=cache_search,
@@ -467,7 +442,7 @@ __all__ = [
     "CACHE_FILE_NAME",
     "CACHE_TOOLS",
     "INDEX_FILE_NAME",
-    "REASONING_EFFORTS",
+    "SEARCH_MODEL",
     "SEARCH_ROLE",
     "cache_append",
     "cache_file_path",

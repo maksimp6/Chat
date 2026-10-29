@@ -21,7 +21,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 | [`tool_providers.registry`](registry.py) | Provider-agnostic registry for Logos tools. |
 | [`tool_providers.runtime_tools`](runtime_tools.py) | Universal tool definitions backed by the SSH Runtime. |
 | [`tool_providers.rootagent`](rootagent.py) | Logos tools `rootagent_run` and `rootagent_result` for the Redmi 9 RootAgent job on GitHub Actions. Registered as the `rootagent` external tool source through `composition/tool_sources.py`; not in `__all__`. |
-| [`tool_providers.cache`](cache.py) | The cache (category `cache`): one long text that only grows (`logos.cache.md` beside the memory file); cache_append, cache_read (whole text only), cache_search. Each appended piece is embedded with every embedding model, each vector kept with its model version; after every append the whole text is uploaded as one file to the knowledge vector stores (the index File Search searches), replacing the previous upload. cache_search is a helper model (chosen by the caller) that reads the whole text and answers the query. Not in `__all__`. |
+| [`tool_providers.cache`](cache.py) | The cache (category `cache`): one long text that only grows (`logos.cache.md` beside the memory file); cache_append, cache_read (whole text only), cache_search. Each appended piece is embedded with every embedding model, each vector kept with its model version; after every append the whole text is uploaded as one file to the knowledge vector stores (the index File Search searches), replacing the previous upload. cache_search is a helper model (DeepSeek V4.1 Flash) that reads the whole text and answers the query. Not in `__all__`. |
 | [`tool_providers.tty`](tty.py) | PTY terminal sessions (category `tty`): tty_open, tty_write, tty_read, tty_resize, tty_close, tty_list. Owner-checked; opening needs the owner's approval. Not yet verified on the Redmi (Termux). |
 | [`tool_providers.universal_tool_platform`](universal_tool_platform.py) | Provider-agnostic tool contracts and execution pipeline for Logos. |
 
@@ -55,7 +55,6 @@ Everything `tool_providers` uses from other units is a field of `Host` in [`tool
 | `KristallError` | `kristall.KristallError` |
 | `SSHRuntimeError` | `remote_runtime.ssh.SSHRuntimeError` |
 | `build_runtime` | `remote_runtime.ssh_settings.build_runtime` |
-| `TEXT_MODELS` | `core.config.TEXT_MODELS` |
 | `YandexClientError` | `yandex_client_modules.errors.YandexClientError` |
 | `YandexResponsesClient` | `yandex_client_modules.client.YandexResponsesClient` |
 | `embed_texts` | `yandex_client_modules.embeddings.embed_texts` |

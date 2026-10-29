@@ -814,7 +814,6 @@ def _tool_providers():
     from yandex_client_modules.embeddings import EmbeddingError
     from kristall import KristallError
     from remote_runtime.ssh import SSHRuntimeError
-    from core.config import TEXT_MODELS
     from yandex_client_modules.errors import YandexClientError
     from yandex_client_modules.client import YandexResponsesClient
     from remote_runtime.ssh_settings import assert_operation_allowed
@@ -833,7 +832,6 @@ def _tool_providers():
         EmbeddingError=EmbeddingError,
         KristallError=KristallError,
         SSHRuntimeError=SSHRuntimeError,
-        TEXT_MODELS=TEXT_MODELS,
         YandexClientError=YandexClientError,
         YandexResponsesClient=YandexResponsesClient,
         assert_operation_allowed=assert_operation_allowed,
