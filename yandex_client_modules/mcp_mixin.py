@@ -55,6 +55,22 @@ FILE_SEARCH_ON_NOTE = (
     "содержит, так и скажи."
 )
 
+# The cache tools (tool_providers/cache.py) record how the model sees each turn: every
+# answer goes to the cache, so the owner can read and search it later.
+CACHE_NOTE = (
+    "\n\nВ этом диалоге подключён кэш (инструменты cache_append, cache_read, "
+    "cache_search): общий журнал, который только дополняется; каждая запись получает "
+    "векторы всех моделей эмбеддингов с их версиями и попадает в индекс — векторное "
+    "хранилище знаний, где её находит file_search. Используй кэш активно, в каждом "
+    "ходе. Перед финальным ответом вызови cache_append (source: model) и запиши в кэш "
+    "свой ответ пользователю целиком, а после него — как ты видишь этот ход: что "
+    "пришло на вход, какие инструкции и инструменты ты видишь, на что опирается ответ "
+    "и в чём ты не уверен. Затем дай пользователю тот же ответ. Если cache_append "
+    "вернул ошибку, embedding_errors или index_errors, сообщи об этом в ответе дословно. "
+    "Когда нужен прежний контекст или прежние твои ответы, ищи их через cache_search "
+    "и cache_read."
+)
+
 
 class YandexMcpMixin:
     def _execute_single_tool(
@@ -394,6 +410,12 @@ class YandexMcpMixin:
             ask_params["instructions"] = (ask_params.get("instructions") or "") + (
                 FILE_SEARCH_ON_NOTE if file_search_active else FILE_SEARCH_OFF_NOTE
             )
+        if execution_policy is None and any(
+            tool.get("name") == "cache_append" for tool in local_tools
+        ):
+            ask_params["instructions"] = (
+                ask_params.get("instructions") or ""
+            ) + CACHE_NOTE
         if tools or execution_policy is not None:
             ask_params["tools"] = tools
         if not tools and ask_params.get("tool_choice") == "required":

@@ -53,6 +53,7 @@ _TOOL_SOURCES: tuple[tuple[str, str, str, str, type[BaseException]], ...] = (
     ("profiler", "tool_providers.profiler", "PROFILER_TOOLS", "Profiler", Exception),
     ("theme", "tool_providers.theme", "THEME_TOOLS", "Theme", Exception),
     ("runtime", "tool_providers.runtime_tools", "RUNTIME_TOOLS", "Runtime", Exception),
+    ("cache", "tool_providers.cache", "CACHE_TOOLS", "Cache", Exception),
 )
 # Other units' sources (government, partner relations, 3D printing, model editor,
 # cloud, browser, root agent) arrive through the external_tool_sources port and load after these.

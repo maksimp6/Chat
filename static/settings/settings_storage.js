@@ -42,7 +42,7 @@
       file_search: { enabled: true, vector_store_ids: "fvtvp6t2su0g5q4ft2ev", max_results: 50 },
     },
     // Matches yandex_client_modules.tool_config.SETTINGS_REVISION.
-    settings_revision: 3,
+    settings_revision: 4,
     conv_metadata: "",
     voice: "kirill",
     response_mode: "audio",
@@ -52,12 +52,13 @@
     vad_prefix_padding_ms: 300,
   };
 
-  var SETTINGS_REVISION = 3;
+  var SETTINGS_REVISION = 4;
 
   // Copies saved before SETTINGS_REVISION are upgraded one revision at a time, as the server upgrades them
   // (yandex_client_modules.tool_config.upgrade_dialog_settings); a missing or non-integer revision counts as 0.
   // Revision 2: the former medium/off defaults nobody chose are read at the maximal values.
   // Revision 3: live answers (stream) are on for a copy with no stream key; a stored stream value, true or false, is kept.
+  // Revision 4: the server adds the cache category to a stored tool selection; a local copy keeps none.
   function upgradeLegacySettings(settings) {
     if (!settings || typeof settings !== "object") return settings;
     var revision = Number.isInteger(settings.settings_revision) ? settings.settings_revision : 0;
