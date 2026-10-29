@@ -24,7 +24,6 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
   overflow-wrap: anywhere;
   opacity: 1;
-  transition: opacity 0.3s ease;
 }
 
 .logos-toast-error {
@@ -36,8 +35,3 @@
   opacity: 0;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .logos-toast {
-    transition: none;
-  }
-}
