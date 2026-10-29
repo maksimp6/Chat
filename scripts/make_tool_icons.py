@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Generate one 24px SVG icon per Logos tool, from a fixed set of glyphs.
 
-Tool names are read statically from tool_providers/*.py and browser/tools.py (the
-same keys the registry exposes). Each tool gets the first glyph whose keyword
+Tool names are read statically from tool_providers/*.py and the tool files of the
+units listed in UNIT_TOOL_FILES (the same keys the registry exposes). Each tool gets the first glyph whose keyword
 appears in its name; unmatched tools get the generic glyph. Output:
 static/icons/tools/<tool>.svg and static/icons/tools/index.json.
 
@@ -11,9 +11,9 @@ Run from the repository root: python3 scripts/make_tool_icons.py
 
 from __future__ import annotations
 
+import ast
 import json
 import pathlib
-import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -90,7 +90,10 @@ RULES = [
     (("toast", "dialog", "conversation", "chat", "message"), "chat"),
     (("tts", "voice", "audio", "speak", "sound", "volume", "speech"), "speaker"),
     (("location", "gps", "wifi"), "pin"),
-    (("budget", "cost", "money", "treasury", "billing", "price", "payment", "quota"), "coin"),
+    (
+        ("budget", "cost", "money", "treasury", "billing", "price", "payment", "quota"),
+        "coin",
+    ),
     (("cloud", "yandex", "bucket", "compute", "provider"), "cloud"),
     (("secret", "credential", "password", "token", "lock", "key"), "lock"),
     (("3d", "print", "model", "stl"), "printer"),
@@ -100,14 +103,54 @@ RULES = [
 ]
 
 
+# Tool files of the other units that contribute categories through composition/tool_sources.py.
+UNIT_TOOL_FILES = (
+    "browser/tools.py",
+    "conversations/tools.py",
+    "photo_tasks/tools.py",
+    "scheduler/tools.py",
+    "semantic_cache/tools.py",
+)
+
+
+def _tool_dict_keys(tree: ast.Module) -> set[str]:
+    """String keys of every module-level ``*_TOOLS = {...}`` or ``TOOL_REGISTRY = {...}``
+    dict: the names the registry exposes."""
+    names: set[str] = set()
+    for node in tree.body:
+        targets = (
+            node.targets
+            if isinstance(node, ast.Assign)
+            else [node.target]
+            if isinstance(node, ast.AnnAssign)
+            else []
+        )
+        value = getattr(node, "value", None)
+        if not isinstance(value, ast.Dict):
+            continue
+        if not any(
+            isinstance(t, ast.Name)
+            and (t.id.endswith("_TOOLS") or t.id == "TOOL_REGISTRY")
+            for t in targets
+        ):
+            continue
+        for key in value.keys:
+            if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                names.add(key.value)
+    return names
+
+
 def tool_names() -> list[str]:
     names: set[str] = set()
-    for path in sorted((ROOT / "tool_providers").glob("*.py")):
-        text = path.read_text(encoding="utf-8")
-        names.update(re.findall(r'^    "([a-z][a-z0-9_]+)":\s*\{', text, re.M))
-    browser = ROOT / "browser" / "tools.py"
-    if browser.exists():
-        names.update(re.findall(r'^    "(browser_[a-z_]+)": _tool\(', browser.read_text(encoding="utf-8"), re.M))
+    files = sorted((ROOT / "tool_providers").glob("*.py")) + [
+        ROOT / rel for rel in UNIT_TOOL_FILES
+    ]
+    for path in files:
+        if not path.exists():
+            continue
+        names.update(
+            _tool_dict_keys(ast.parse(path.read_text(encoding="utf-8"), str(path)))
+        )
     return sorted(names)
 
 
@@ -140,7 +183,9 @@ def main() -> int:
         glyph = glyph_for(name)
         (OUT / f"{name}.svg").write_text(svg_for(glyph), encoding="utf-8")
         index[name] = glyph
-    (OUT / "index.json").write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (OUT / "index.json").write_text(
+        json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     print(f"tools: {len(names)}")
     return 0
 
