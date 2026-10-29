@@ -1,1 +1,0 @@
-{"command": "batch", "args": "[{\"browse\": \"http://127.0.0.1:8080/\"}, {\"wait\": 7000}, {\"tap\": [468, 1945]}, {\"wait\": 1200}, {\"text\": \"Second check, answer in Russian in one sentence: what is 2+2? Punctuation test: , . : ? ! ( )\"}, {\"wait\": 800}, {\"key\": \"KEYCODE_ENTER\"}, {\"wait\": 45000}]"}
