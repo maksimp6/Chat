@@ -46,7 +46,9 @@ COMMANDS = (
     "text",
     "key",
     "browse",
+    "batch",
 )
+BATCH_LIMIT = 30
 URL_PATTERN = r"https?://[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:[/?#][^\s]*)?"
 URL = re.compile(URL_PATTERN)
 URL_LIMIT = 2048
@@ -109,6 +111,17 @@ def _validated(args: Mapping[str, Any]) -> tuple[str, str]:
     package = args.get("package")
     if command in ("status", "probe"):
         return command, ""
+    if command == "batch":
+        steps = args.get("steps")
+        if not isinstance(steps, list) or not 1 <= len(steps) <= BATCH_LIMIT or any(
+            not isinstance(step, dict) or len(step) != 1 for step in steps
+        ):
+            raise ValueError(
+                "batch требует steps: список из 1..30 шагов вида "
+                '{"tap": [x, y]}, {"text": "..."}, {"key": "KEYCODE_ENTER"}, '
+                '{"swipe": [x, y, x2, y2]}, {"wait": мс}, {"browse": "https://..."}'
+            )
+        return command, json.dumps(steps, ensure_ascii=False)
     if command == "browse":
         url = args.get("url")
         if not isinstance(url, str) or len(url) > URL_LIMIT or URL.fullmatch(url) is None:
@@ -492,6 +505,19 @@ _RUN_PROPERTIES = {
             "minLength": 1,
             "maxLength": TEXT_LIMIT,
             "description": "Строка для ввода командой text (одна строка, без переводов строки)",
+        }
+    ),
+    "steps": _optional(
+        {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": BATCH_LIMIT,
+            "items": {"type": "object", "minProperties": 1, "maxProperties": 1},
+            "description": (
+                "Шаги batch, выполняются подряд за один вызов, в конце снимок экрана: "
+                '{"tap": [x, y]}, {"swipe": [x, y, x2, y2, мс?]}, {"text": "ASCII"}, '
+                '{"key": "KEYCODE_ENTER"}, {"wait": мс}, {"browse": "https://..."}'
+            ),
         }
     ),
     "url": _optional(

@@ -228,6 +228,68 @@ def browser_component(url):
     return (preferred or found or [None])[0]
 
 
+def open_url(url):
+    if not isinstance(url, str) or len(url) > 2048 or URL.fullmatch(url) is None:
+        raise AgentError("invalid_url")
+    component = browser_component(url)
+    start = ["/system/bin/am", "start", "-a", "android.intent.action.VIEW", "-d", url]
+    if component:
+        start += ["-n", component]
+    bounded_command(start)
+    return component
+
+
+def run_step(step, width, height):
+    """One user action of a batch: tap, swipe, text, key, wait or browse."""
+    if not isinstance(step, dict) or len(step) != 1:
+        raise AgentError("invalid_batch_step")
+    ((kind, value),) = step.items()
+    input_cmd = "/system/bin/input"
+    if kind == "tap":
+        if (
+            not isinstance(value, list)
+            or len(value) != 2
+            or not _bounded_int(value[0], 0, width)
+            or not _bounded_int(value[1], 0, height)
+        ):
+            raise AgentError("invalid_batch_tap")
+        bounded_command([input_cmd, "tap", str(value[0]), str(value[1])])
+    elif kind == "swipe":
+        limits = (width, height, width, height, 60000)
+        if (
+            not isinstance(value, list)
+            or len(value) not in (4, 5)
+            or any(not _bounded_int(v, 0, lim) for v, lim in zip(value, limits))
+        ):
+            raise AgentError("invalid_batch_swipe")
+        bounded_command([input_cmd, "swipe", *(str(v) for v in value)])
+    elif kind == "text":
+        # Android's input text types ASCII only.
+        if (
+            not isinstance(value, str)
+            or not value
+            or len(value) > 4096
+            or not value.isascii()
+            or any(c in value for c in "\x00\n\r")
+        ):
+            raise AgentError("invalid_batch_text")
+        bounded_command([input_cmd, "text", value.replace(" ", "%s")])
+    elif kind == "key":
+        token = str(value) if type(value) is int else value
+        if not isinstance(token, str) or KEYCODE.fullmatch(token) is None:
+            raise AgentError("invalid_batch_key")
+        bounded_command([input_cmd, "keyevent", token])
+    elif kind == "wait":
+        if not _bounded_int(value, 0, 120000):
+            raise AgentError("invalid_batch_wait")
+        time.sleep(value / 1000)
+    elif kind == "browse":
+        open_url(value)
+    else:
+        raise AgentError("invalid_batch_step")
+    return kind
+
+
 def mouse_nudge():
     with mouse_connection() as connection:
         submit_mouse(connection, "move", 1, 1)
@@ -420,6 +482,7 @@ def worker(request):
         "text": {"text"},
         "key": {"keycode"},
         "browse": {"url"},
+        "batch": {"steps"},
     }
     optional = {
         "capture": {"expected_package"},
@@ -568,11 +631,7 @@ def worker(request):
             bounded_command(["/system/bin/wm", "dismiss-keyguard"])
         except AgentError:
             pass
-        component = browser_component(url)
-        start = ["/system/bin/am", "start", "-a", "android.intent.action.VIEW", "-d", url]
-        if component:
-            start += ["-n", component]
-        bounded_command(start)
+        component = open_url(url)
         time.sleep(wait / 1000)
         png = bounded_command(["/system/bin/screencap", "-p"], PNG_LIMIT, 15)
         metadata = validate_png(png)
@@ -589,14 +648,45 @@ def worker(request):
             "focus_package": state["package"],
             "png_base64": base64.b64encode(png).decode("ascii"),
         }
+    if command == "batch":
+        steps = request["steps"]
+        if not isinstance(steps, list) or not 1 <= len(steps) <= 30:
+            raise AgentError("invalid_batch")
+        waits = sum(
+            s.get("wait", 0) for s in steps if isinstance(s, dict) and type(s.get("wait")) is int
+        )
+        if waits > 150000:
+            raise AgentError("batch_wait_limit")
+        # All actions in one call, so the screen cannot time out between them.
+        woken, wake_attempts = wake_display()
+        try:
+            bounded_command(["/system/bin/wm", "dismiss-keyguard"])
+        except AgentError:
+            pass
+        width, height = screen_size()
+        done = [run_step(step, width, height) for step in steps]
+        png = bounded_command(["/system/bin/screencap", "-p"], PNG_LIMIT, 15)
+        metadata = validate_png(png)
+        state = screen_state()
+        return {
+            **metadata,
+            "command": "batch",
+            "steps_done": done,
+            "wakefulness": woken,
+            "wake_attempts": wake_attempts,
+            "display_on": state["display_on"],
+            "focus_package": state["package"],
+            "png_base64": base64.b64encode(png).decode("ascii"),
+        }
     if command == "capture":
         expected = request.get("expected_package")
         if "expected_package" in request and (
             not isinstance(expected, str) or PACKAGE.fullmatch(expected) is None
         ):
             raise AgentError("invalid_capture_request")
-        # A capture is never blocked by screen state: it returns whatever the
-        # display shows. Any expected package is reported, not enforced.
+        # A capture is never blocked by screen state: it wakes the display and
+        # returns whatever it shows. Any expected package is reported, not enforced.
+        woken, wake_attempts = wake_display()
         png = bounded_command(["/system/bin/screencap", "-p"], PNG_LIMIT, 15)
         metadata = validate_png(png)
         state = screen_state()
@@ -604,6 +694,8 @@ def worker(request):
             metadata["expected_package_matches"] = state["package"] == expected
         return {
             **metadata,
+            "wakefulness": woken,
+            "wake_attempts": wake_attempts,
             "focus_package": state["package"],
             "png_base64": base64.b64encode(png).decode("ascii"),
         }
@@ -742,7 +834,7 @@ def run_client(args, output, runner_values):
         input=json.dumps(args).encode(),
         capture_output=True,
         env=environment,
-        timeout=75,
+        timeout=300,
     )
     if len(result.stdout) > 13 * 1024 * 1024:
         raise AgentError("worker_reply_limit")

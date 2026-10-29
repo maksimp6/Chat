@@ -15,7 +15,7 @@ on:
         description: "RootAgent command, used only with action rootagent_command"
         required: false
         type: choice
-        options: [status, probe, capture, move, click, tap, swipe, text, key, browse]
+        options: [status, probe, capture, move, click, tap, swipe, text, key, browse, batch]
       rootagent_args:
         description: "Args for rootagent_command: tap 'X Y'; swipe 'X Y X2 Y2 [DUR]'; text 'STRING'; key 'KEYCODE'; move/click 'DX DY [PACKAGE]'; capture 'PACKAGE' optional; status/probe none"
         required: false
@@ -467,7 +467,7 @@ jobs:
           BRANCH = "rootagent-results"
 
           COMMANDS = ("status", "probe", "capture", "move", "click",
-                      "tap", "swipe", "text", "key", "browse")
+                      "tap", "swipe", "text", "key", "browse", "batch")
           URL = re.compile(r"https?://[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:[/?#][^\s]*)?")
           STRICT = re.compile(r"[A-Za-z0-9_. -]*")
           PACKAGE = re.compile(r"[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+")
@@ -550,6 +550,16 @@ jobs:
               if command not in COMMANDS:
                   raise ValueError("command must be one of " + ", ".join(COMMANDS))
               request = {"command": command}
+              if command == "batch":
+                  # args: a JSON list of one-key steps; the device worker checks each one.
+                  try:
+                      steps = json.loads(raw)
+                  except ValueError:
+                      raise ValueError("batch takes a JSON list of steps") from None
+                  if not isinstance(steps, list) or not 1 <= len(steps) <= 30:
+                      raise ValueError("batch takes 1..30 steps")
+                  request["steps"] = steps
+                  return request
               if command == "browse":
                   if len(raw) > 2048 or URL.fullmatch(raw) is None:
                       raise ValueError("browse takes one http(s) URL")
@@ -624,10 +634,10 @@ jobs:
 
               argv = [sys.executable, cli_path, "--request", req_path]
               png_path = None
-              if command in ("capture", "browse"):
+              if command in ("capture", "browse", "batch"):
                   png_path = os.path.join(TEMP, "rootagent-capture.png")
                   argv += ["--output", png_path]
-              proc = subprocess.run(argv, capture_output=True, text=True, timeout=180)
+              proc = subprocess.run(argv, capture_output=True, text=True, timeout=330)
               if proc.returncode != 0:
                   finish({"ok": False, "stage": "cli", "command": command,
                           "exit": proc.returncode,
