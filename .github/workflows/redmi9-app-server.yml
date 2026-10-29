@@ -439,9 +439,10 @@ jobs:
     # This phone runner is a small custom runner (scripts/redmi_python_runner.py):
     # validate_job accepts only single run steps, env limited to literals /
     # github.token / secrets.* / inputs.*, no uses actions, and no ${{ step }}
-    # expressions in the script. So the whole command runs in ONE Python step that
-    # validates the request, drives the device CLI, and publishes the result (and
-    # any capture PNG) to the rootagent-results branch through the GitHub API.
+    # expressions in the script. Only github.token is used in env here (the proven
+    # path); the command is read from pending/request.json on the rootagent-results
+    # branch, so nothing depends on inputs.* resolution. The whole command runs in
+    # ONE Python step that drives the device CLI and publishes the result/PNG.
     permissions:
       contents: write
     steps:
@@ -450,8 +451,6 @@ jobs:
         timeout-minutes: 7
         env:
           GH_TOKEN: ${{ github.token }}
-          ROOTAGENT_COMMAND: ${{ inputs.rootagent_command }}
-          ROOTAGENT_ARGS: ${{ inputs.rootagent_args }}
         run: |
           import base64, hashlib, json, os, re, subprocess, sys
           import urllib.error, urllib.request
@@ -463,8 +462,6 @@ jobs:
           RUN_ID = os.environ.get("GITHUB_RUN_ID", "0")
           API = "https://api.github.com/repos/" + REPO
           BRANCH = "rootagent-results"
-          command = os.environ.get("ROOTAGENT_COMMAND", "")
-          raw = os.environ.get("ROOTAGENT_ARGS", "")
 
           COMMANDS = ("status", "probe", "capture", "move", "click",
                       "tap", "swipe", "text", "key")
@@ -499,20 +496,37 @@ jobs:
               print("published " + path + ": HTTP " + str(status))
 
 
-          def finish(result):
-              print(json.dumps(result)[:1500])
+          def ensure_branch():
               exists, _ = call("GET", API + "/git/ref/heads/" + BRANCH)
               if exists == 404:
                   _, ref = call("GET", API + "/git/ref/heads/develop")
                   if isinstance(ref, dict):
                       call("POST", API + "/git/refs",
                            {"ref": "refs/heads/" + BRANCH, "sha": ref["object"]["sha"]})
+
+
+          def finish(result):
+              print(json.dumps(result)[:1500])
+              ensure_branch()
               put_file("runs/" + RUN_ID + ".json",
                        json.dumps(result).encode(), "rootagent result " + RUN_ID)
               sys.exit(0)
 
 
-          def build_request():
+          def read_pending():
+              code, info = call("GET", API + "/contents/pending/request.json?ref=" + BRANCH)
+              if code != 200 or not isinstance(info, dict) or not info.get("content"):
+                  return "status", ""
+              try:
+                  pend = json.loads(base64.b64decode(info["content"]))
+              except Exception:
+                  return "status", ""
+              call("DELETE", API + "/contents/pending/request.json",
+                   {"message": "consume request", "branch": BRANCH, "sha": info["sha"]})
+              return str(pend.get("command", "status")), str(pend.get("args", "") or "")
+
+
+          def build_request(command, raw):
               if command not in COMMANDS:
                   raise ValueError("command must be one of " + ", ".join(COMMANDS))
               request = {"command": command}
@@ -561,10 +575,12 @@ jobs:
 
 
           try:
+              command, raw = read_pending()
               try:
-                  request = build_request()
+                  request = build_request(command, raw)
               except ValueError as error:
-                  finish({"ok": False, "stage": "validate", "detail": str(error)})
+                  finish({"ok": False, "stage": "validate",
+                          "command": command, "detail": str(error)})
 
               req_path = os.path.join(TEMP, "rootagent-request.json")
               with open(req_path, "w", encoding="utf-8") as handle:
@@ -578,7 +594,8 @@ jobs:
                       with open(cli_path, "wb") as handle:
                           handle.write(resp.read())
               except Exception as error:
-                  finish({"ok": False, "stage": "download", "detail": type(error).__name__})
+                  finish({"ok": False, "stage": "download",
+                          "command": command, "detail": type(error).__name__})
 
               argv = [sys.executable, cli_path, "--request", req_path]
               png_path = None
@@ -587,12 +604,14 @@ jobs:
                   argv += ["--output", png_path]
               proc = subprocess.run(argv, capture_output=True, text=True, timeout=180)
               if proc.returncode != 0:
-                  finish({"ok": False, "stage": "cli", "exit": proc.returncode,
+                  finish({"ok": False, "stage": "cli", "command": command,
+                          "exit": proc.returncode,
                           "detail": (proc.stdout + proc.stderr)[:2000]})
               try:
                   meta = json.loads(proc.stdout)
               except ValueError:
-                  finish({"ok": False, "stage": "cli_output", "detail": proc.stdout[:2000]})
+                  finish({"ok": False, "stage": "cli_output",
+                          "command": command, "detail": proc.stdout[:2000]})
 
               result = {"ok": True, "command": command, "result": meta}
               if png_path and os.path.isfile(png_path):
