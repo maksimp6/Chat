@@ -9,7 +9,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 - **List dialogs**: `GET /api/conversations`
 - **Create a dialog**: `POST /api/conversations`
 - **Open a dialog and read its history**: `GET /api/conversations/<conv_id>/messages`
-- **Dialog settings and tools**: `GET /api/conversations/<conv_id>/settings`, `PUT /api/conversations/<conv_id>/settings`, `GET /api/tools/categories`, `PUT /api/conversations/<conv_id>/tools`
+- **Dialog settings and tools**: `GET /api/conversations/<conv_id>/settings`, `GET /api/tools/categories`
 - **Rename a dialog or change its model**: `PATCH /api/conversations/<conv_id>`
 - **Send a message (the turn)**: `POST /api/chat`
 - **Delete a dialog**: `DELETE /api/conversations/<conv_id>`

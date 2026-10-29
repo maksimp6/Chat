@@ -190,7 +190,6 @@ def _chat():
     from yandex_client_modules.image_generation import generate_image as request_image
     from provider_accounts.quotas import reserve_request
     from observability.trace_manager import reset_current_trace
-    from storage.records import save_conv_settings
     from agent_memory.extractor import save_global_memory_facts
     from storage.generated_images import save_image_file
     from conversations.ownership import set_owner
@@ -281,7 +280,6 @@ def _chat():
         request_image=request_image,
         reserve_request=reserve_request,
         reset_current_trace=reset_current_trace,
-        save_conv_settings=save_conv_settings,
         save_global_memory_facts=save_global_memory_facts,
         save_image_file=save_image_file,
         set_owner=set_owner,
@@ -336,13 +334,10 @@ def _conversations():
     from economy.treasury_identity import get_current_owner_id
     from agent_memory.client import get_memory_client
     from storage.records import memory_file_path
-    from yandex_client_modules.tool_config import normalize_tools_config
-    from storage.records import save_conv_settings
     from storage.records import update_conversation_model
     from storage.records import update_conversation_title
     from yandex_client_modules.tool_config import upgrade_dialog_settings
     from provider_accounts.model_discovery import validate_dialog_model
-    from yandex_client_modules.request_builder import validate_generation_params
 
     return host.Host(
         ConversationOwnershipStore=ConversationOwnershipStore,
@@ -353,13 +348,10 @@ def _conversations():
         get_current_owner_id=get_current_owner_id,
         get_memory_client=get_memory_client,
         memory_file_path=memory_file_path,
-        normalize_tools_config=normalize_tools_config,
-        save_conv_settings=save_conv_settings,
         update_conversation_model=update_conversation_model,
         update_conversation_title=update_conversation_title,
         upgrade_dialog_settings=upgrade_dialog_settings,
         validate_dialog_model=validate_dialog_model,
-        validate_generation_params=validate_generation_params,
     )
 
 

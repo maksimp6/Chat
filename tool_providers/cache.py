@@ -455,7 +455,7 @@ CACHE_TOOLS: dict[str, dict[str, Any]] = {
                 "source": _optional(
                     {
                         "type": "string",
-                        "description": "Who writes it: model (when not given) or a tool name",
+                        "description": "Who writes it: user (the question), model (when not given) or a tool name",
                     }
                 ),
             },

@@ -92,8 +92,6 @@
   var STORAGE_KEY = "logos_settings";
   var SKILLS_BACKUP_KEY = "logos_skills_backup";
   var serverSettingsCache = {};
-  // Bumped on every save, so a load that started before it cannot overwrite it.
-  var settingsSaveVersion = {};
   // Set when the stored settings of a dialog could not be read, so the cache holds local values or defaults.
   var serverSettingsUnknown = {};
   var globalSettingsCache = null; // cache
@@ -158,50 +156,6 @@
     return applyUltraSettings(base);
   }
 
-  // Сохранение локально сразу; для диалога — и на сервер (нативное хранилище Kristall).
-  // Промис отклоняется, если сервер не принял копию, чтобы окно могло остаться открытым.
-  function save(settings, convId) {
-    settings = applyUltraSettings(Object.assign({}, settings));
-    convId =
-      convId || (typeof currentConvId !== "undefined" && currentConvId ? currentConvId : null);
-    if (!convId) {
-      globalSettingsCache = JSON.stringify(settings);
-      localStorage.setItem(STORAGE_KEY, globalSettingsCache);
-      return Promise.resolve();
-    }
-    var previousCache = serverSettingsCache[convId];
-    var previousLocal = localStorage.getItem(convKey(convId));
-    settingsSaveVersion[convId] = (settingsSaveVersion[convId] || 0) + 1;
-    serverSettingsCache[convId] = settings;
-    localStorage.setItem(convKey(convId), JSON.stringify(settings));
-    return window.LogosDispatcher.request("/api/conversations/" + convId + "/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings),
-    })
-      .then(function (r) {
-        if (r.ok) return null;
-        return r.json().catch(function () { return {}; }).then(function (body) {
-          var error = new Error(body && body.message ? body.message : "HTTP " + r.status);
-          error.serverMessage = Boolean(body && body.message);
-          throw error;
-        });
-      })
-      .then(
-        function () {
-          serverSettingsUnknown[convId] = false;
-        },
-        function (error) {
-          // A refused copy must not stay in the cache or localStorage, or a reload would show it as saved.
-          if (previousCache === undefined) delete serverSettingsCache[convId];
-          else serverSettingsCache[convId] = previousCache;
-          if (previousLocal === null) localStorage.removeItem(convKey(convId));
-          else localStorage.setItem(convKey(convId), previousLocal);
-          throw error;
-        },
-      );
-  }
-
   // The stored record merged over the defaults and the global copy, as the window shows it.
   function recordFrom(data) {
     var base = JSON.parse(JSON.stringify(DEFAULTS));
@@ -234,11 +188,8 @@
   // Загрузка настроек с сервера при смене диалога
   window.loadServerConvSettings = function (convId) {
     if (!convId) return Promise.resolve(load(convId));
-    var versionAtRequest = settingsSaveVersion[convId] || 0;
     return fetchRecord(convId)
       .then(function (record) {
-        // A save made while this GET was in flight is newer than the server snapshot it returned.
-        if ((settingsSaveVersion[convId] || 0) !== versionAtRequest) return load(convId);
         serverSettingsCache[convId] = record;
         serverSettingsUnknown[convId] = false;
         return record;
@@ -247,28 +198,6 @@
         serverSettingsUnknown[convId] = true;
         return load(convId);
       });
-  };
-
-  // Writes only `changes` onto the stored record. The record is read again first, so values saved
-  // from another tab or device are kept, and nothing is written when that read fails.
-  function saveChanges(changes, convId) {
-    if (!convId) return save(Object.assign(load(null), changes), null);
-    return fetchRecord(convId).then(function (record) {
-      // Tool selection is saved by PUT /tools; a settings save must not write back a copy of it.
-      delete record.active_tool_categories;
-      var storedTools = record.tools_config || {};
-      var merged = Object.assign(record, changes);
-      // tools_config is merged tool by tool, so a tool that `changes` does not name keeps its stored value.
-      if (changes.tools_config) {
-        merged.tools_config = Object.assign({}, storedTools, changes.tools_config);
-      }
-      return save(merged, convId);
-    });
-  }
-
-  // «Сброс» only supplies the generation defaults; the caller saves the keys it resets.
-  window.resetSettings = function () {
-    return applyUltraSettings(JSON.parse(JSON.stringify(DEFAULTS)));
   };
 
   window.SettingsStorage = {
@@ -280,8 +209,6 @@
     ultraProfileFor: ultraProfileFor,
     applyUltraSettings: applyUltraSettings,
     load: load,
-    save: save,
-    saveChanges: saveChanges,
     isUnknown: function (convId) {
       return Boolean(serverSettingsUnknown[convId]);
     },

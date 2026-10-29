@@ -73,13 +73,10 @@ name = "Dialog settings and tools"
 ui = "static/settings/settings_storage.js, static/settings/settings_modal.js"
 routes = [
     "GET /api/conversations/<conv_id>/settings",
-    "PUT /api/conversations/<conv_id>/settings",
     "GET /api/tools/categories",
-    "PUT /api/conversations/<conv_id>/tools",
 ]
 backend = [
     "conversations.routes:get_dialog_settings",
-    "conversations.routes:save_dialog_settings",
     "chat.mcp_routes:list_tool_categories",
     "chat.mcp_routes:conv_tools",
 ]
@@ -117,7 +114,7 @@ kristall = "chat/message/<n>, chat/yandex/<id>, runtime_session:<sid>, runtime_i
 [[operation]]
 name = "Tools during the turn"
 ui = "results appear in the reply; MCP servers in static/settings/settings_modal.js"
-routes = ["POST /api/chat", "GET /api/mcp-servers", "POST /api/mcp-servers"]
+routes = ["POST /api/chat", "GET /api/mcp-servers"]
 backend = ["yandex_client_modules.mcp_mixin:YandexMcpMixin.ask_with_mcp", "chat.mcp_routes:handle_mcp_servers"]
 units = ["yandex_client_modules", "tool_providers", "mcp_server", "agent_memory", "workspace", "storage", "kristall"]
 kristall = "mcp/server/*, mcp/conversation/<id>, global_fact:*"
@@ -156,10 +153,9 @@ kristall = "runtime_invocation:<iid>, treasury/account/<owner>, treasury/ledger/
 [[operation]]
 name = "Global memory used by every dialog"
 ui = "static/memory_panel.js"
-routes = ["GET /api/memory/manage", "PUT /api/memory/config", "POST /api/memory/clear"]
+routes = ["GET /api/memory/manage", "POST /api/memory/clear"]
 backend = [
     "agent_memory.routes:api_memory_panel_data",
-    "agent_memory.routes:api_update_memory_config",
     "agent_memory.routes:api_clear_memory",
 ]
 units = ["agent_memory", "storage", "kristall"]

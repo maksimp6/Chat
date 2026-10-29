@@ -1,4 +1,4 @@
-"""HTTP API of the SSH runtime: settings and a connection test."""
+"""HTTP API of the SSH runtime: settings (read-only) and a connection test."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from flask import Flask, jsonify, request
 
 from remote_runtime.host import bound, get_current_owner_id
 from remote_runtime.ssh import SSHRuntimeError
-from remote_runtime.ssh_settings import public_settings, save_settings, test_connection
+from remote_runtime.ssh_settings import public_settings, test_connection
 
 logger = logging.getLogger("logos.remote_runtime.ssh_routes")
 
@@ -17,22 +17,16 @@ logger = logging.getLogger("logos.remote_runtime.ssh_routes")
 _DETAILS = {
     "ssh_settings_unreadable": (
         "Не удалось прочитать настройки SSH Runtime. Проверьте сохранённые цели "
-        "и known_hosts и сохраните настройки заново."
-    ),
-    "settings must be an object": (
-        "Сервер не получил настройки. Обновите страницу и сохраните снова."
-    ),
-    "ssh_settings_rejected": (
-        "Настройки SSH Runtime не сохранены: проверьте поля формы и JSON целей."
+        "и known_hosts в настройках на сервере: в окне они только для чтения."
     ),
     "target is required": "Укажите имя цели для проверки.",
     "ssh_runtime_disabled": (
-        "SSH Runtime выключен. Включите «SSH Runtime включён», сохраните настройки "
-        "и повторите проверку."
+        "SSH Runtime выключен в настройках на сервере (в окне они только для "
+        "чтения). Включите его там и повторите проверку."
     ),
     "ssh_settings_invalid": (
         "Сохранённые настройки SSH Runtime не прошли проверку. "
-        "Исправьте JSON целей, сохраните и повторите."
+        "Исправьте JSON целей в настройках на сервере и повторите."
     ),
     "ssh_target_not_found": (
         "Цель с таким именем не найдена. Проверьте имя в поле «Проверить target» "
@@ -49,7 +43,7 @@ _DETAILS = {
     ),
     "ssh_known_hosts_missing": (
         "Не указан файл known_hosts. Укажите общий known_hosts или known_hosts "
-        "в цели, сохраните и повторите."
+        "цели в настройках на сервере и повторите."
     ),
     "ssh_host_key_rejected": (
         "Ключа сервера нет в known_hosts, или он изменился. Добавьте актуальный "
@@ -102,27 +96,6 @@ def get_ssh_runtime_settings():
         ), 400
 
 
-def put_ssh_runtime_settings():
-    try:
-        data = request.get_json(silent=True) or {}
-        if not isinstance(data, dict):
-            return jsonify(
-                {
-                    "error": "settings must be an object",
-                    "detail": _DETAILS["settings must be an object"],
-                }
-            ), 400
-        saved = save_settings(data)
-        return jsonify({"status": "ok", "settings": saved})
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
-    except Exception as exc:
-        logger.exception("Failed to save SSH Runtime settings")
-        return jsonify(
-            {"error": str(exc), "detail": _DETAILS["ssh_settings_rejected"]}
-        ), 400
-
-
 def test_ssh_runtime_connection():
     try:
         owner_id = get_current_owner_id()
@@ -160,9 +133,7 @@ def install(app: Flask) -> None:
     app.add_url_rule(
         "/api/ssh-runtime/settings", view_func=get_ssh_runtime_settings, methods=["GET"]
     )
-    app.add_url_rule(
-        "/api/ssh-runtime/settings", view_func=put_ssh_runtime_settings, methods=["PUT"]
-    )
+    # Settings are read-only: they are shown, never saved through the API.
     app.add_url_rule(
         "/api/ssh-runtime/test", view_func=test_ssh_runtime_connection, methods=["POST"]
     )

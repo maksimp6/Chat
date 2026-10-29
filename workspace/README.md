@@ -6,7 +6,7 @@ The workspace HTTP API: Files and Vector Stores, and a bounded project tree.
 
 Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
 
-- **Tools during the turn**: `POST /api/chat`, `GET /api/mcp-servers`, `POST /api/mcp-servers`
+- **Tools during the turn**: `POST /api/chat`, `GET /api/mcp-servers`
 
 ## Public API
 

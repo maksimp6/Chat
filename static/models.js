@@ -156,11 +156,6 @@ function createConversation(modelKey, options) {
       if (existing >= 0) conversations[existing] = conversation;
       else conversations.unshift(conversation);
       localStorage.setItem("conversations", JSON.stringify(conversations));
-      // A new chat has no settings record on the server, so the server would not apply the global settings the
-      // UI shows (#A-006). Store them with the chat; a failure leaves the chat usable with its defaults.
-      if (window.SettingsStorage) {
-        Promise.resolve(window.SettingsStorage.save(window.SettingsStorage.load(data.id), data.id)).catch(function () {});
-      }
       if (options.select !== false && currentConvId === selectedBeforeCreation) {
         await selectConv(data.id);
       } else if (typeof renderSidebar === "function") {

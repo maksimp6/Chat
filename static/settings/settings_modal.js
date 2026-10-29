@@ -1,23 +1,24 @@
 (function () {
   "use strict";
 
-  // A refusal that carries the server's reason is shown with it; any other failure says nothing was saved.
-  function saveFailureText(error, subject) {
-    if (error && error.serverMessage) return "Не сохранено: " + error.message;
-    return "Не удалось сохранить " + subject + " на сервер. Изменения не сохранены, повторите попытку.";
+  // Settings are read-only: the windows show them, nothing is saved (the server has no save route).
+  var READ_ONLY_NOTE =
+    "Настройки только для чтения: всё стоит на максимуме, изменить их здесь нельзя.";
+
+  function disableControls(root) {
+    root.querySelectorAll("input, select, textarea").forEach(function (control) {
+      control.disabled = true;
+    });
   }
 
-  // === 1. Модальное окно локальных инструментов (Tools) с немедленным сохранением в БД ===
+  // === 1. Модальное окно локальных инструментов (Tools), только для чтения ===
   window.openToolsModal = function () {
     var UI = window.SettingsUI;
     var CoreUI = window.LogosCoreAPI.ui;
     var Storage = window.SettingsStorage;
-    // The dialog this window was opened for; a save must not follow a later switch.
     var convId = currentConvId;
     var settings = Storage.load(convId);
     var unknownAtOpen = Boolean(convId) && Storage.isUnknown(convId);
-    // The category selection as it was loaded when the window opened (null until the list loads).
-    var openCategories = null;
     var cfg = settings.tools_config || {};
     var ws = cfg.web_search || {};
     var fs = cfg.file_search || {};
@@ -104,11 +105,9 @@
         UI.inp("tools-fs-max", "number", fs.max_results || 50, {"min": "1", "max": "50"}) +
         "</div>",
       '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">Эти инструменты выполняются на стороне Yandex AI Studio. Они независимы от MCP и локального Tool Registry.</div>',
-      '<div id="tools-status" role="status" style="color:var(--m-danger,#c33);font-size:12px;min-height:16px;"></div>',
-      '<div class="settings-modal-footer" style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;border-top:1px solid var(--m-border,#ddd);padding-top:12px;">',
-      ' <button class="logos-btn settings-contract-btn" id="tools-save-btn">Сохранить инструменты</button>',
-      "</div>",
+      '<div id="tools-status" role="status" style="color:var(--m-muted,#666);font-size:12px;min-height:16px;margin-top:12px;"></div>',
     ].join("");
+    disableControls(md);
     var ov = CoreUI.modal.create({
       id: "tools-modal-custom",
       title: "🧰 Инструменты",
@@ -197,7 +196,6 @@
           activeData && activeData.active_tool_categories !== null
             ? activeData.active_tool_categories
             : Object.keys(categories);
-        openCategories = active.slice();
         listEl.innerHTML = Object.keys(categories)
           .map(function (cat) {
             var isChecked = active.indexOf(cat) !== -1;
@@ -205,7 +203,7 @@
             var count = (categories[cat] || []).length;
             return (
               '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--m-border,#ddd);border-radius:6px;background:var(--m-card,#fff);cursor:pointer;">' +
-              '<input type="checkbox" class="tool-cat-chk" value="' +
+              '<input type="checkbox" class="tool-cat-chk" disabled value="' +
               UI.escapeHtml(cat) +
               '" ' +
               (isChecked ? "checked" : "") +
@@ -219,11 +217,9 @@
             );
           })
           .join("");
-        toolsSaveBtn.disabled = false;
       })
       .catch(function (error) {
         console.error("[SETTINGS] Tool categories load failed:", error);
-        toolsSaveBtn.disabled = true;
         var listEl = document.getElementById("tools-category-list");
         if (!listEl) return;
         listEl.replaceChildren();
@@ -244,96 +240,10 @@
         listEl.append(message, retry);
       });
     }
-    var toolsSaveBtn = document.getElementById("tools-save-btn");
-    // Saving before the list has loaded would send an empty selection, so the button waits for it.
-    toolsSaveBtn.disabled = true;
-    if (unknownAtOpen) {
-      document.getElementById("tools-status").textContent =
-        "Настройки инструментов этого диалога не загружены с сервера. Сохранение недоступно: выберите диалог заново.";
-    }
+    document.getElementById("tools-status").textContent = unknownAtOpen
+      ? "Настройки инструментов этого диалога не загружены с сервера: показаны значения по умолчанию. " + READ_ONLY_NOTE
+      : READ_ONLY_NOTE;
     loadCategories();
-
-    toolsSaveBtn.addEventListener("click", function () {
-      var status = document.getElementById("tools-status");
-      status.textContent = "";
-      if (currentConvId !== convId) {
-        status.textContent =
-          "Диалог сменился, пока открыто окно: инструменты не сохранены. Откройте инструменты заново.";
-        return;
-      }
-      if (unknownAtOpen) {
-        status.textContent =
-          "Настройки инструментов этого диалога не загружены с сервера. Выберите диалог заново.";
-        return;
-      }
-      var selected = [];
-      document.querySelectorAll(".tool-cat-chk:checked").forEach(function (chk) {
-        selected.push(chk.value);
-      });
-      var toolsConfig = {
-        web_search: {
-          enabled: document.getElementById("tools-ws-en").checked,
-          context_size: document.getElementById("tools-ws-context").value,
-          allowed_domains: document.getElementById("tools-ws-allow").value.trim(),
-          blocked_domains: document.getElementById("tools-ws-block").value.trim(),
-        },
-        code_interpreter: { enabled: document.getElementById("tools-ci-en").checked },
-        defer_loading: {
-          enabled: document.getElementById("tools-defer-en").checked,
-          eager_categories: document
-            .getElementById("tools-defer-eager")
-            .value.split(",")
-            .map(function (part) {
-              return part.trim();
-            })
-            .filter(Boolean),
-        },
-        file_search: {
-          enabled: document.getElementById("tools-fs-en").checked,
-          vector_store_ids: document.getElementById("tools-fs-vids").value.trim(),
-          max_results: Math.min(
-            50,
-            Math.max(1, parseInt(document.getElementById("tools-fs-max").value, 10) || 50),
-          ),
-        },
-      };
-      if (!convId) {
-        // Categories are stored per dialog: keep the config locally and say so, rather than closing silently.
-        Storage.saveChanges({ tools_config: toolsConfig }, null);
-        status.textContent =
-          "Категории инструментов сохраняются в беседе. Откройте или создайте беседу и повторите.";
-        return;
-      }
-      // The category list is written only when this window changed it, so a change made elsewhere is kept.
-      var sameSelection =
-        openCategories !== null &&
-        JSON.stringify(selected.slice().sort()) === JSON.stringify(openCategories.slice().sort());
-      var localSave = sameSelection
-        ? Promise.resolve()
-        : window.LogosDispatcher.request("/api/conversations/" + convId + "/tools", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ active_tool_categories: selected }),
-          }).then(function (r) {
-            if (!r.ok) throw new Error("HTTP " + r.status);
-          });
-      // Only the tools this window changed are written, each over the stored record, so a tool left
-      // alone here keeps the value stored now, and other settings stay as saved.
-      var changedTools = {};
-      Object.keys(toolsConfig).forEach(function (key) {
-        if (JSON.stringify(toolsConfig[key]) !== JSON.stringify((settings.tools_config || {})[key])) {
-          changedTools[key] = toolsConfig[key];
-        }
-      });
-      var changes = {};
-      if (Object.keys(changedTools).length) changes.tools_config = changedTools;
-      var settingsSave = Object.keys(changes).length
-        ? Storage.saveChanges(changes, convId)
-        : Promise.resolve();
-      Promise.all([localSave, settingsSave]).then(closeModal, function (error) {
-        status.textContent = saveFailureText(error, "инструменты");
-      });
-    });
   };
 
   // === 2. Полное окно конфигурации параметров LLM ===
@@ -467,21 +377,10 @@
     },
   };
 
-  function readSettingsField(field, element) {
-    if (field.type === "checkbox") return element.checked;
-    if (field.read === "float") {
-      var number = parseFloat(element.value);
-      return Number.isNaN(number) ? field.fallback : number;
-    }
-    if (field.read === "integer") return parseInt(element.value, 10) || field.fallback;
-    return field.read === "trim" ? element.value.trim() : element.value;
-  }
-
   window.openSettingsModal = function () {
     var UI = window.SettingsUI;
     var CoreUI = window.LogosCoreAPI.ui;
     var Storage = window.SettingsStorage;
-    // The dialog this window was opened for; a save must not follow a later switch.
     var convId = currentConvId;
     var settings = Storage.load(convId);
     var unknownAtOpen = Boolean(convId) && Storage.isUnknown(convId);
@@ -631,11 +530,7 @@
     ].join("");
 
     var footer = [
-      '<div id="set-status" role="status" style="color:var(--m-danger,#c33);font-size:12px;min-height:16px;margin-top:auto;"></div>',
-      '<div class="settings-modal-footer" style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;border-top:1px solid var(--m-border,#ddd);padding-top:14px;">',
-      '    <button class="logos-btn settings-contract-btn" id="set-reset-btn">Сброс</button>',
-      '    <button class="logos-btn settings-btn-accent" id="set-save-btn">Сохранить параметры</button>',
-      "</div>",
+      '<div id="set-status" role="status" style="color:var(--m-muted,#666);font-size:12px;min-height:16px;margin-top:auto;"></div>',
     ].join("");
 
     md.innerHTML = tabsHeader + tabGen + tabOutput + tabRouting + tabAdv + tabTheme + footer;
@@ -649,25 +544,16 @@
     function closeModal() {
       CoreUI.modal.close(ov);
     }
-    function showSaveError(error) {
-      md.querySelector("#set-status").textContent = saveFailureText(error, "параметры");
-    }
-    function leftConversation() {
-      md.querySelector("#set-status").textContent =
-        "Диалог сменился, пока открыто окно: параметры не сохранены. Откройте настройки заново.";
-    }
-    if (unknownAtOpen) {
-      md.querySelector("#set-status").textContent =
-        "Сохранённые параметры этого диалога не загружены: показаны локальные значения или значения по умолчанию. При сохранении записываются только изменённые поля.";
-    }
+    md.querySelector("#set-status").textContent = unknownAtOpen
+      ? "Сохранённые параметры этого диалога не загружены: показаны локальные значения или значения по умолчанию. " + READ_ONLY_NOTE
+      : READ_ONLY_NOTE;
     ov.addEventListener("click", function (e) {
       if (e.target === ov) closeModal();
     });
 
-    // Truncation and reasoning are fixed by Ultra; the output cap stays editable.
-    Object.keys(SETTINGS_FIELDS).forEach(function (key) {
-      if (ultra && SETTINGS_FIELDS[key].ultraFixed) fieldElement(key).disabled = true;
-    });
+    // Every parameter is read-only; only the colour scheme (kept on this device) can be chosen.
+    disableControls(md);
+    md.querySelector("#set-theme").disabled = false;
 
     md.querySelectorAll(".llm-tab-btn").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -693,38 +579,6 @@
         this.value === "json" ? "block" : "none";
     });
 
-    md.querySelector("#set-reset-btn").addEventListener("click", function () {
-      window.LogosDialog.confirm("Сбросить параметры генерации к значениям по умолчанию?", {
-        confirmText: "Сбросить",
-      }).then(function (confirmed) {
-        if (!confirmed) return;
-        if (currentConvId !== convId) return leftConversation();
-        var defs = window.resetSettings();
-        // Only the generation fields are reset; tools and the other saved settings stay as stored.
-        var resetChanges = {};
-        Object.keys(SETTINGS_FIELDS).forEach(function (key) {
-          resetChanges[key] = defs[key];
-        });
-        Storage.saveChanges(resetChanges, convId).then(closeModal, showSaveError);
-      });
-    });
-
-    md.querySelector("#set-save-btn").addEventListener("click", function () {
-      if (currentConvId !== convId) return leftConversation();
-      var edited = {};
-      Object.keys(SETTINGS_FIELDS).forEach(function (key) {
-        edited[key] = readSettingsField(SETTINGS_FIELDS[key], fieldElement(key));
-      });
-      if (ultra) applyUltraProfile(edited, ultra);
-      // Only the fields the user changed are written; the rest keep the values stored now.
-      var changes = {};
-      Object.keys(edited).forEach(function (key) {
-        if (JSON.stringify(edited[key]) !== JSON.stringify(settings[key])) {
-          changes[key] = edited[key];
-        }
-      });
-      Storage.saveChanges(changes, convId).then(closeModal, showSaveError);
-    });
   };
 })();
 
