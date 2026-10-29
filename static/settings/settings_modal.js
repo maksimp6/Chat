@@ -22,6 +22,8 @@
     var ws = cfg.web_search || {};
     var fs = cfg.file_search || {};
     var ci = cfg.code_interpreter || {};
+    var dl = cfg.defer_loading || {};
+    var eager = Array.isArray(dl.eager_categories) ? dl.eager_categories.join(", ") : dl.eager_categories || "";
 
     var existing = document.getElementById("tools-modal-custom");
     if (existing) existing.remove();
@@ -33,6 +35,17 @@
       '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:12px;">Управление локальными и встроенными инструментами. Отключенные инструменты не передаются модели.</div>',
       '<h3 style="font-size:14px;margin:12px 0 8px;">Локальные инструменты</h3>',
       '<div id="tools-category-list" style="display:flex;flex-direction:column;gap:8px;">Загрузка инструментов...</div>',
+      '<div style="margin-top:12px;">' +
+        UI.chk(
+          "tools-defer-en",
+          dl.enabled === true,
+          "<strong>⏳ Defer Loading</strong> (defer_loading: модель видит инструмент только после поиска инструментов провайдера)",
+        ) +
+        "</div>",
+      '<div style="margin-top:8px;">' +
+        UI.lbl("Категории без отложенной загрузки") +
+        UI.inp("tools-defer-eager", "text", eager, {"placeholder": "rootagent, filesystem"}) +
+        "</div>",
       '<hr style="margin:18px 0;border:none;border-top:1px solid var(--m-border,#ddd);">',
       '<h3 style="font-size:14px;margin:12px 0 8px;">Встроенные инструменты Yandex AI Studio</h3>',
       UI.chk(
@@ -265,6 +278,16 @@
           blocked_domains: document.getElementById("tools-ws-block").value.trim(),
         },
         code_interpreter: { enabled: document.getElementById("tools-ci-en").checked },
+        defer_loading: {
+          enabled: document.getElementById("tools-defer-en").checked,
+          eager_categories: document
+            .getElementById("tools-defer-eager")
+            .value.split(",")
+            .map(function (part) {
+              return part.trim();
+            })
+            .filter(Boolean),
+        },
         file_search: {
           enabled: document.getElementById("tools-fs-en").checked,
           vector_store_ids: document.getElementById("tools-fs-vids").value.trim(),

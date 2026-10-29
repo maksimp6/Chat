@@ -40,6 +40,7 @@
         input: number(usage.input_tokens),
         cached: number(details.cached_tokens),
         output: number(usage.output_tokens),
+        total: number(usage.total_tokens),
       };
     });
     return byStep;
@@ -70,8 +71,9 @@
     var list = el("div", "msg-model-view-list");
     (tools.groups || []).forEach(function (group) {
       var row = el("div", "msg-model-view-row");
+      var deferred = number(group.deferred) ? " · отложено " + fmt(group.deferred) : "";
       row.appendChild(
-        el("strong", "", group.group + " · " + fmt(group.count) + " шт. · " + fmt(group.chars) + " симв."),
+        el("strong", "", group.group + " · " + fmt(group.count) + " шт." + deferred + " · " + fmt(group.chars) + " симв."),
       );
       if (group.names) row.appendChild(el("div", "msg-model-view-names", group.names));
       list.appendChild(row);
@@ -115,6 +117,7 @@
           fmt(instructions.chars) +
           " симв. · инструменты " +
           fmt(tools.count) +
+          (number(tools.deferred) ? ", отложено " + fmt(tools.deferred) : "") +
           " (" +
           fmt(tools.chars) +
           " симв.)",
@@ -134,6 +137,8 @@
         head.push(
           "токены: вход " + fmt(tokens.input) + " (кэш " + fmt(tokens.cached) + ") · выход " + fmt(tokens.output),
         );
+        var hosted = tokens.total - tokens.input - tokens.output;
+        if (tokens.total) head.push("всего " + fmt(tokens.total) + (hosted > 0 ? " (инструменты провайдера " + fmt(hosted) + ")" : ""));
       }
       block.appendChild(el("div", "msg-model-view-head", head.join(" · ")));
 
@@ -149,13 +154,16 @@
       }
 
       var tl = view.tools || {};
-      var toolsKey = fmt(tl.count) + "/" + fmt(tl.chars);
+      var toolsKey = fmt(tl.count) + "/" + fmt(tl.deferred) + "/" + fmt(tl.chars);
       if (toolsKey === seenTools) {
         block.appendChild(
           el("div", "msg-model-view-row", "Инструменты: те же, что в запросе 1 (" + fmt(tl.count) + " шт., " + fmt(tl.chars) + " симв.)"),
         );
       } else {
-        block.appendChild(fold("Инструменты · " + fmt(tl.count) + " шт. · " + fmt(tl.chars) + " симв.", renderTools(tl)));
+        var tlDeferred = number(tl.deferred) ? " (отложено " + fmt(tl.deferred) + ")" : "";
+        block.appendChild(
+          fold("Инструменты · " + fmt(tl.count) + " шт." + tlDeferred + " · " + fmt(tl.chars) + " симв.", renderTools(tl)),
+        );
         if (seenTools === null) seenTools = toolsKey;
       }
 

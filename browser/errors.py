@@ -368,11 +368,6 @@ E_SEARCH_CUSTOM = _Literal(
 )
 E_SEARCH_PAGE_SIZE = _Literal("Для {offset} в url_template нужен page_size")
 
-# Approval: the call is refused until the caller approves it.
-E_APPROVAL_REQUIRED = Message(
-    "Для «{tool}» нужно подтверждение владельца: без него действие не выполнено"
-)
-
 # Argument validation
 E_ARG_TYPE = Message("Параметр {name} должен быть {expected} (получено: {value})")
 E_ARG_NEGATIVE = Message("Параметр {name} не может быть меньше 0 (получено: {value})")

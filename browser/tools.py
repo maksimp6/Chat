@@ -16,7 +16,7 @@ from typing import Any, Callable, Mapping
 
 from browser._vendor.schema import object_schema
 from browser.context import CallContext
-from browser.errors import E_APPROVAL_REQUIRED, BrowserError
+from browser.errors import BrowserError
 
 logger = logging.getLogger("logos.browser.tools")
 
@@ -157,24 +157,10 @@ OVERWRITE = _boolean("Перезаписать существующий файл
 INCLUDE_HIDDEN = _boolean("Показать и скрытые элементы")
 
 
-def _approved(cfg: Mapping[str, Any] | None) -> bool:
-    """The caller's approval flag, read from the universal call in cfg["_universal_context"]."""
-    context = cfg.get("_universal_context") if isinstance(cfg, Mapping) else None
-    call = context.get("call") if isinstance(context, Mapping) else None
-    return bool(getattr(call, "approved", False)) if call is not None else False
-
-
-def _handler(
-    name: str,
-    requires_approval: bool = False,
-    approval_when: Callable[[Mapping[str, Any]], bool] | None = None,
-) -> Callable[..., dict[str, Any]]:
+def _handler(name: str) -> Callable[..., dict[str, Any]]:
     """The registry function of one tool: run its operation, map BrowserError to a result."""
 
     def run(arguments: Mapping[str, Any] | None, cfg: Mapping[str, Any] | None = None) -> dict[str, Any]:
-        gated = requires_approval or (approval_when is not None and approval_when(arguments or {}))
-        if gated and not _approved(cfg):
-            return BrowserError(E_APPROVAL_REQUIRED.format(tool=name), kind="approval_required").to_result()
         args = dict(arguments or {})
         ctx = CallContext(name, args, cfg)
         try:
@@ -206,8 +192,6 @@ def _tool(
     risk: str,
     redact_args: tuple[str, ...] | list[str] = (),
     requires_chrome: bool = False,
-    requires_approval: bool = False,
-    approval_when: Callable[[Mapping[str, Any]], bool] | None = None,
 ) -> dict[str, Any]:
     """One registry definition; every property not in ``required`` accepts null."""
     shaped = {
@@ -221,7 +205,7 @@ def _tool(
         "capabilities": ["browser"],
         "risk_level": risk,
         "read_only": read_only,
-        "requires_approval": requires_approval,
+        "requires_approval": False,
         "supported_transports": list(_TRANSPORTS),
         "executor": {"type": "local"},
         "metadata": {
@@ -232,7 +216,7 @@ def _tool(
             "trace_redact_arguments": list(redact_args),
             "trace_redact_result_fields": list(_RESULT_REDACT),
         },
-        "func": _handler(name, requires_approval, approval_when),
+        "func": _handler(name),
     }
 
 
@@ -550,8 +534,6 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
         read_only=True,
         risk="low",
         requires_chrome=True,
-        # A JavaScript expression runs in the page, so it needs the same approval as browser_evaluate.
-        approval_when=lambda args: bool(args.get("expression")),
     ),
     "browser_evaluate": _tool(
         "browser_evaluate",
@@ -579,7 +561,6 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
         read_only=False,
         risk="high",
         requires_chrome=True,
-        requires_approval=True,
     ),
     "browser_screenshot": _tool(
         "browser_screenshot",
@@ -792,7 +773,6 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
         read_only=False,
         risk="high",
         redact_args=("value",),
-        requires_approval=True,
     ),
     "browser_search": _tool(
         "browser_search",
@@ -909,7 +889,6 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
         read_only=False,
         risk="high",
         redact_args=("headers", "body", "body_base64", "json_body", "form"),
-        requires_approval=True,
     ),
     "browser_download": _tool(
         "browser_download",

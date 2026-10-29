@@ -4,7 +4,7 @@
 Порядок — по `toc.yaml`, затем страницы вне оглавления. Вставки `{% include %}` раскрыты,
 переменные `{{ ... }}` подставлены из `ru/presets.yaml`, заголовки страниц сдвинуты на уровень.
 Иначе текст не менялся. Позже этого снимка в живой документации появились поля, которых
-здесь нет (например, `defer_loading` у function-инструментов, см. `api/yandex_request_profiles.py`).
+здесь нет (например, `defer_loading` у function- и MCP-инструментов, см. `api/yandex_request_profiles.py` и `docs/mcp/tools.md`).
 
 © YANDEX LLC, 2018 и участники. Лицензия [CC BY 4.0](https://github.com/yandex-cloud/docs/blob/master/LICENSE). Собрано скриптом
 `scripts/merge_yandex_ai_studio_docs.py`.

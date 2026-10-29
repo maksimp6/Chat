@@ -515,6 +515,8 @@ def _clean_mcp_tool(tool):
         cleaned["connector_id"] = cid
     if tool.get("server_description"):
         cleaned["server_description"] = tool["server_description"]
+    if tool.get("defer_loading") is True:
+        cleaned["defer_loading"] = True
     # The application runs MCP tools without an approval pause. The provider
     # contract accepts "never" and "always"; stale saved policy cannot restore a gate.
     cleaned["require_approval"] = "never"

@@ -30,6 +30,21 @@
 | rootagent | tool_providers/rootagent.py (composition/tool_sources.py) | 2 | rootagent_run (управление телефоном как юзер: status, probe, capture, tap, swipe, text, key, move, click как задания GitHub Actions на develop), rootagent_result (статус запуска и JSON-результат по run_id). Настройка и границы — [docs/redmi-root-agent.md](../redmi-root-agent.md#logos-tool) |
 | tty | tool_providers/tty.py (composition/tool_sources.py) | 6 | tty_open, tty_write, tty_read, tty_resize, tty_close, tty_list |
 
+## Отложенная загрузка (defer_loading)
+
+В окне «Инструменты» диалога переключатель **Defer Loading** сохраняет
+`tools_config.defer_loading = {"enabled": true, "eager_categories": [...]}`
+(`yandex_client_modules/tool_config.py`). Включённый, он отправляет локальные
+function-инструменты провайдеру с `defer_loading: true`, кроме категорий из
+`eager_categories`: Yandex AI Studio показывает модели отложенный инструмент только
+после своего поиска инструментов (элементы `tool_search_call`/`tool_search_output`).
+У MCP-сервера тот же флаг — его собственный переключатель «Defer Loading»
+(`mcp_server/storage.py`), он уходит в MCP-инструмент запроса вместе с
+`server_description`. Встроенные инструменты провайдера (web search, file search,
+code interpreter) не откладываются. Выключено (настройки нет) — все инструменты
+идут загруженными, как раньше. Сколько инструментов отложено, видно в «👁 Что
+видит модель».
+
 ## Браузер (категория browser)
 
 Определены в `browser/tools.py` (`BROWSER_TOOLS`), подключаются через
@@ -46,14 +61,14 @@
 | browser_fill_form | Заполнить форму и отправить её (GET/POST, urlencoded, multipart с файлами) |
 | browser_act | type, press, hover, scroll, select, check, uncheck, focus, clear |
 | browser_wait | Ждать адрес, элемент, текст, выражение, затишье сети или просто секунды |
-| browser_evaluate | Выполнить JavaScript на странице chrome; результат — JSON. Требует подтверждения вызова |
+| browser_evaluate | Выполнить JavaScript на странице chrome; результат — JSON |
 | browser_screenshot | Снимок PNG/JPEG (окно, вся страница, элемент) или PDF |
 | browser_history | back, forward, reload, list |
 | browser_tabs | list, new, switch, close |
 | browser_session | list, status, configure, clear, reset, close |
-| browser_cookies | list (без значений), set, delete, clear. Требует подтверждения вызова |
+| browser_cookies | list (без значений), set, delete, clear |
 | browser_search | Поиск DuckDuckGo, DuckDuckGo Lite, Bing, all или свой шаблон |
-| browser_request | Произвольный HTTP-запрос: метод, заголовки, JSON, форма, multipart, сырое тело. Требует подтверждения вызова |
+| browser_request | Произвольный HTTP-запрос: метод, заголовки, JSON, форма, multipart, сырое тело |
 | browser_download | Скачать файл потоком на диск (url, метка ссылки/изображения или документ вкладки) |
 
 - **Метки.** У ссылок, кнопок, полей, форм, таблиц и изображений в тексте стоят метки
@@ -87,10 +102,9 @@
   не использует профиль, cookies и входы владельца: у каждой сессии чистое состояние.
   Пароли, токены и значения cookies не показываются модели и не попадают в журналы и
   трассировку.
-- **Подтверждение.** `browser_wait` с `expression` требует то же подтверждение, что `browser_evaluate`. `browser_request`, `browser_cookies` и `browser_evaluate` объявлены
-  с `requires_approval`: вызов без подтверждения возвращает фазу `approval_required` и
-  текст о том, что нужно. Сквозной путь подтверждения с запросом у пользователя в
-  репозитории пока не завершён.
+- **Без подтверждения.** Все инструменты браузера, включая `browser_request`,
+  `browser_cookies`, `browser_evaluate` и `browser_wait` с `expression`, выполняются сразу,
+  как и остальная платформа (`restrictions_lifted`).
 - **TLS.** Проверка сертификатов включена. Отключить её может только настройка владельца
   `ignore_tls_errors` (`browser/settings.py`, по умолчанию выключена): модель этот
   аргумент не передаёт и не меняет.

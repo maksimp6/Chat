@@ -346,9 +346,16 @@ function addMessage({
     usageSummary.textContent = `📊 Токены: ${usage.total_tokens || 0} (вход: ${usage.input_tokens || 0}, выход: ${usage.output_tokens || 0})`;
     const usageDetails = document.createElement("div");
     usageDetails.className = "msg-meta-detail-list";
+    // The provider counts its hosted tools (web search, file search, code) in the total but not
+    // in input or output: the remainder is shown, so the parts add up to the total.
+    const providerTools = Math.max(
+      0,
+      (usage.total_tokens || 0) - (usage.input_tokens || 0) - (usage.output_tokens || 0),
+    );
     [
       ["💾 Кэшированные:", usage.cached_tokens || 0],
       ["🧰 Инструменты:", usage.tool_tokens || 0],
+      ["🌐 Инструменты провайдера (всего − вход − выход):", providerTools],
       ["🧠 Рассуждения:", usage.reasoning_tokens || 0],
     ].forEach(function (item) {
       const row = document.createElement("div");

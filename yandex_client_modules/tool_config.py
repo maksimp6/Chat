@@ -179,4 +179,32 @@ def normalize_tools_config(raw: Any) -> dict[str, Any]:
                     raise ValueError(f"{path}.max_results must be an integer") from None
                 normalized["max_results"] = file_search_max_results(count)
         result[name] = normalized
+    if "defer_loading" in raw:
+        config = raw["defer_loading"]
+        path = "tools_config.defer_loading"
+        if not isinstance(config, dict):
+            raise ValueError(f"{path} must be a JSON object")
+        normalized = dict(config)
+        if "enabled" in config:
+            normalized["enabled"] = _enabled(config["enabled"], f"{path}.enabled")
+        if "eager_categories" in config:
+            normalized["eager_categories"] = _entries(
+                config["eager_categories"], f"{path}.eager_categories"
+            )
+        result["defer_loading"] = normalized
     return result
+
+
+def deferred_tool_categories(tools_config: Any) -> tuple[bool, set[str]]:
+    """(on, eager categories) of the dialog's defer_loading setting.
+
+    When on, the application's function tools go to the provider with
+    ``defer_loading: true`` except those of the eager categories: the provider
+    shows a deferred tool to the model only after its tool search finds it.
+    Off (the setting absent) every tool is sent loaded, as before the setting.
+    """
+    config = tools_config.get("defer_loading") if isinstance(tools_config, dict) else None
+    if not isinstance(config, dict) or config.get("enabled") is not True:
+        return False, set()
+    eager = config.get("eager_categories")
+    return True, set(eager) if isinstance(eager, list) else set()

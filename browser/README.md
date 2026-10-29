@@ -76,14 +76,14 @@ Everything `browser` uses from other units is a field of `Host` in [`browser/hos
 | `browser_fill_form` | Fill a form (text, lists, checkboxes, radios, files) and optionally submit it. |
 | `browser_act` | type, press, hover, scroll, select, check, uncheck, focus, clear. |
 | `browser_wait` | Wait for an address, element, text, expression or network quiet (chrome), or seconds. |
-| `browser_evaluate` | Run JavaScript in the page (chrome); JSON result and console lines. Needs the caller's approval. |
+| `browser_evaluate` | Run JavaScript in the page (chrome); JSON result and console lines. |
 | `browser_screenshot` | PNG/JPEG of the viewport, full page or an element, or a PDF (chrome). |
 | `browser_history` | back, forward (stored copy in http), reload (repeats POST), list. |
 | `browser_tabs` | list, new, switch, close. |
 | `browser_session` | list, status, configure (user agent, language, headers, engine, window, JavaScript, images, dialogs, proxy), clear, reset, close. |
-| `browser_cookies` | list (names, attributes, length and fingerprint, never values), set, delete, clear. Needs the caller's approval. |
+| `browser_cookies` | list (names, attributes, length and fingerprint, never values), set, delete, clear. |
 | `browser_search` | DuckDuckGo, DuckDuckGo Lite, Bing, both (`all`) or a custom template; ads are counted, not shown. |
-| `browser_request` | Any HTTP request: method, headers, query, JSON, form, multipart, raw or base64 body; `{{cookie:NAME}}` placeholders. Needs the caller's approval. |
+| `browser_request` | Any HTTP request: method, headers, query, JSON, form, multipart, raw or base64 body; `{{cookie:NAME}}` placeholders. |
 | `browser_download` | Stream a file to disk by URL, by link/image ref, or the tab's current document. |
 
 - **Refs.** Links, buttons, fields, forms, tables and media carry `[L5]`, `[B2]`, `[I3]`, `[F1]`, `[T1]`, `[M4]` in the text; tools take them as `ref` (`L5`, `[L5]` and `l5` are the same). In the http engine refs follow document order and stay stable for a history entry; in chrome they are stamped into the live page, grow monotonically and are never reused within a document. `N3` names a request of the network view.
@@ -102,4 +102,4 @@ Everything `browser` uses from other units is a field of `Host` in [`browser/hos
 - Downloads, screenshots and PDFs are written atomically through a hidden temporary file; paths follow the filesystem tools' rule.
 - While Chrome runs, its DevTools port listens on 127.0.0.1 only.
 - **TLS.** Certificate checking is on. `ignore_tls_errors` is an owner setting of `SessionSettings` ([`browser/settings.py`](settings.py), default off): the tool schema and `browser_session(action='configure')` do not accept it, so the model cannot pass or change it.
-- **Approval.** `browser_request`, `browser_cookies` and `browser_evaluate` are declared with `requires_approval`; `browser_wait` needs the same approval when it is given an `expression`. A call without the caller's approval fails with phase `approval_required` and a text that says what is needed; no token is invented in the tool. The approval round-trip with the user interface is not finished in the repository.
+- **No approval gate.** Every tool runs on the call as given, like the rest of the platform (`restrictions_lifted`); no call waits for an owner confirmation.

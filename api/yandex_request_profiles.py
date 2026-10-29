@@ -208,6 +208,7 @@ TOOLS = union(
             "authorization": S,
             "headers": STRING_MAP,
             "server_description": S,
+            "defer_loading": B,
             "allowed_tools": union(
                 array(S), obj({"tool_names": array(S), "read_only": B})
             ),

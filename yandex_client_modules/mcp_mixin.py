@@ -7,6 +7,7 @@ from typing import Any
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_client_modules.api_logger import api_logger
 from yandex_client_modules.tool_config import (
+    deferred_tool_categories,
     file_search_max_results,
     knowledge_vector_store_ids,
     normalize_tools_config,
@@ -225,16 +226,20 @@ class YandexMcpMixin:
             if s.get("server_url") or (s.get("connector_id") or "").startswith(
                 "connector_"
             ):
-                mcp_tools.append(
-                    {
-                        "type": "mcp",
-                        "server_label": s.get("server_label") or s.get("name"),
-                        "server_url": s.get("server_url"),
-                        "connector_id": s.get("connector_id"),
-                        "authorization": s.get("authorization"),
-                        "require_approval": "never",
-                    }
-                )
+                mcp_tool = {
+                    "type": "mcp",
+                    "server_label": s.get("server_label") or s.get("name"),
+                    "server_url": s.get("server_url"),
+                    "connector_id": s.get("connector_id"),
+                    "authorization": s.get("authorization"),
+                    "require_approval": "never",
+                }
+                if s.get("server_description"):
+                    mcp_tool["server_description"] = s["server_description"]
+                # The server's own "Defer Loading" switch: its tools wait for the tool search.
+                if s.get("defer_loading") is True:
+                    mcp_tool["defer_loading"] = True
+                mcp_tools.append(mcp_tool)
 
         active_cats = None
         if settings_id:
@@ -339,9 +344,14 @@ class YandexMcpMixin:
         tools = mcp_tools + hosted_tools if execution_policy is None else []
 
         local_tools: list[dict[str, Any]] = []
+        defer_on, eager_categories = deferred_tool_categories(tools_config)
         for category in active_cats:
             try:
                 category_tools = bound.registry.get_tools_by_category(category)
+                if category_tools and defer_on and category not in eager_categories:
+                    category_tools = [
+                        {**tool, "defer_loading": True} for tool in category_tools
+                    ]
                 if category_tools:
                     local_tools.extend(
                         tool

@@ -269,10 +269,14 @@ def build_model_view(payload: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(tool, dict):
             continue
         group, name = _view_tool(tool)
-        entry = groups.setdefault(group, {"group": group, "count": 0, "chars": 0, "sized": []})
+        entry = groups.setdefault(
+            group, {"group": group, "count": 0, "chars": 0, "deferred": 0, "sized": []}
+        )
         size = _view_chars(tool)
         entry["count"] += 1
         entry["chars"] += size
+        # A deferred tool is not shown to the model until its tool search finds it.
+        entry["deferred"] += 1 if tool.get("defer_loading") is True else 0
         entry["sized"].append((size, name))
     tool_groups = []
     for entry in sorted(groups.values(), key=lambda item: -item["chars"]):
@@ -313,6 +317,7 @@ def build_model_view(payload: dict[str, Any]) -> dict[str, Any]:
         "tools": {
             "count": len(tools),
             "chars": _view_chars(tools) if tools else 0,
+            "deferred": sum(entry["deferred"] for entry in groups.values()),
             "groups": tool_groups[:_VIEW_ITEMS],
         },
         "input": {
