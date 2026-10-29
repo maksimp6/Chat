@@ -124,7 +124,7 @@ def read_file(args: dict) -> dict:
         try:
             offset = int(args.get("offset", 0))
         except (ValueError, TypeError):
-            offset = 0
+            return {"error": "Параметр 'offset' должен быть целым числом"}
 
         max_chunk = 64 * 1024
         raw_length = args.get("length") or args.get("size") or args.get("count")
@@ -230,6 +230,8 @@ def write_file(args: dict) -> dict:
                 }
 
         old_content = ""
+        backup_file = None
+        backup_warning = None
         if os.path.isfile(abs_path):
             try:
                 with open(abs_path, encoding="utf-8", errors="replace") as f:
@@ -241,6 +243,8 @@ def write_file(args: dict) -> dict:
                 backup_file = os.path.join(BACKUP_DIR, f"{rel_name}.{stamp}.bak")
                 shutil.copy2(abs_path, backup_file)
             except Exception as be:
+                backup_file = None
+                backup_warning = f"Бэкап не создан: {be}"
                 logger.warning(f"[FS] Не удалось создать бэкап {path}: {be}")
 
         if (
@@ -267,7 +271,7 @@ def write_file(args: dict) -> dict:
             )
         )
 
-        return {
+        result = {
             "success": True,
             "path": path,
             "message": (
@@ -275,8 +279,14 @@ def write_file(args: dict) -> dict:
                 if abs_path.endswith(".py")
                 else f"Файл '{path}' сохранен."
             ),
-            "diff": "\n".join(diff[:60]) if diff else "(файл создан заново)",
+            "diff": "\n".join(diff) if diff else "(файл создан заново)",
+            "backup": (
+                os.path.relpath(backup_file, BASE_DIR) if backup_file else None
+            ),
         }
+        if backup_warning:
+            result["warning"] = backup_warning
+        return result
     except Exception as e:
         if tmp_path and os.path.exists(tmp_path):
             try:
@@ -595,9 +605,16 @@ def http_fetch(args: dict) -> dict:
             url, headers={"User-Agent": "LogosPro-StdLib/1.0", "Accept": "*/*"}
         )
         with _GUARDED_OPENER.open(req, timeout=timeout) as resp:
-            raw = resp.read(max_bytes)
+            # One byte past the read size tells whether the 256 KB read cut the body.
+            raw = resp.read(max_bytes + 1)
+            truncated = len(raw) > max_bytes
+            raw = raw[:max_bytes]
             status_code = resp.getcode()
             headers = dict(resp.info())
+            try:
+                total_size = int(headers.get("Content-Length"))
+            except (TypeError, ValueError):
+                total_size = None
 
             text = raw.decode("utf-8", errors="replace")
             return {
@@ -605,8 +622,10 @@ def http_fetch(args: dict) -> dict:
                 "url": url,
                 "status": status_code,
                 "bytes_received": len(raw),
-                "headers": {k: headers[k] for k in list(headers.keys())[:10]},
-                "body": text[:2000],
+                "truncated": truncated,
+                "total_size": total_size,
+                "headers": headers,
+                "body": text,
             }
     except urllib.error.HTTPError as he:
         return {
@@ -739,7 +758,7 @@ def glob_search(args: dict) -> dict:
         full_pattern = os.path.join(BASE_DIR, pattern.lstrip("/"))
         matches = glob.glob(full_pattern, recursive=True)
         results = []
-        for p in sorted(matches)[:100]:
+        for p in sorted(matches):
             rel = os.path.relpath(p, BASE_DIR)
             if not rel.startswith((".", "__pycache__")):
                 try:
