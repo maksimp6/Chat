@@ -457,15 +457,69 @@ def _find_open_case(fp: str, token: str) -> int | None:
     return items[0]["number"] if items else None
 
 
+# A case that could not be filed (no token, GitHub unreachable) waits here and is
+# filed by the next filing that can reach GitHub (#1701: on the phone every case
+# was dropped with a log warning only).
+_queue_lock = threading.Lock()
+
+
+def _pending_path() -> Path:
+    return Path(
+        os.environ.get("LOGOS_COURT_PENDING")
+        or _keys_dir().parent / "court-pending.jsonl"
+    )
+
+
+def _queue(report: dict[str, Any], reason: str) -> None:
+    path = _pending_path()
+    entry = {"queued_at": datetime.now(UTC).isoformat(), "reason": reason, "report": report}
+    with _queue_lock:
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
+        try:
+            path.chmod(0o600)
+        except OSError:
+            pass
+    log.error(
+        "court case queued in %s, not filed (%s): %s", path, reason, _message(report)
+    )
+
+
+def _file_pending(token: str) -> None:
+    """File every queued case in order; each leaves the queue once it is filed."""
+    path = _pending_path()
+    with _queue_lock:
+        if not path.exists():
+            return
+        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        while lines:
+            try:
+                report = json.loads(lines[0])["report"]
+            except (ValueError, KeyError, TypeError):
+                log.error("court queue: unreadable entry dropped: %s", lines[0][:200])
+                lines.pop(0)
+                path.write_text("".join(line + "\n" for line in lines), encoding="utf-8")
+                continue
+            _file_one(report, token)
+            lines.pop(0)
+            path.write_text("".join(line + "\n" for line in lines), encoding="utf-8")
+        path.unlink()
+
+
 def file_case_now(report: dict[str, Any]) -> str | None:
-    """Open the case, or add the repeat to the open one; return its URL."""
+    """Open the case, or add the repeat to the open one; return its URL.
+
+    Without a token the case is queued and filed later; queued cases go first."""
     token = _token()
     if not token:
-        log.warning(
-            "court case not filed, no LOGOS_COURT_TOKEN/GITHUB_TOKEN: %s",
-            _message(report),
-        )
+        _queue(report, "no LOGOS_COURT_TOKEN/GITHUB_TOKEN/GH_TOKEN")
         return None
+    _file_pending(token)
+    return _file_one(report, token)
+
+
+def _file_one(report: dict[str, Any], token: str) -> str:
     now = datetime.now(UTC)
     fp = fingerprint(report)
     repo = _repo()
@@ -504,8 +558,9 @@ def file_case_now(report: dict[str, Any]) -> str | None:
 def _file_logged(report: dict[str, Any]) -> None:
     try:
         file_case_now(report)
-    except Exception:
+    except Exception as exc:
         log.exception("court case filing failed: %s", _message(report))
+        _queue(report, f"{type(exc).__name__}: {exc}")
 
 
 def file_case(report: dict[str, Any]) -> None:

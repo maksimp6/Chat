@@ -26,7 +26,8 @@ None. The unit imports only the standard library and its own modules.
 
 | Variable | Meaning |
 | --- | --- |
-| `LOGOS_COURT_TOKEN`, else `GITHUB_TOKEN`, else `GH_TOKEN` | Token that may create issues and comments. Without one no case is filed and the error is logged as `court case not filed`. |
+| `LOGOS_COURT_TOKEN`, else `GITHUB_TOKEN`, else `GH_TOKEN` | Token that may create issues and comments. Without one (or when GitHub fails) the case is queued and logged at ERROR level; the next filing that has a token files every queued case first, in order. |
+| `LOGOS_COURT_PENDING` | Queue of cases not yet filed (JSONL, owner-only), `~/.config/logos/court-pending.jsonl`. A case leaves it only once it is filed. |
 | `LOGOS_COURT_REPO` | Repository of the Court, `maksimp6/Chat`. |
 | `LOGOS_COURT_KEYS_DIR` | Directory of the month keys (`YYYY-MM.agekey`, made on first use; `.published` marks a published one), `~/.config/logos/court-keys`. |
 
