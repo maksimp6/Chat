@@ -366,7 +366,12 @@ class Injector:
 
     def _keyboard(self):
         if self.keys is None:
-            codes = {KEY_LEFTSHIFT, *ANDROID_KEYS.values()}
+            # Every key that text or key can press must be declared, punctuation included.
+            codes = {
+                KEY_LEFTSHIFT,
+                *ANDROID_KEYS.values(),
+                *(code for code, _ in ASCII_KEYS.values()),
+            }
             self.keys = VirtualDevice("rootagent-keys", keys=sorted(codes))
         return self.keys
 
