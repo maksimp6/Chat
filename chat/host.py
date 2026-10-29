@@ -80,7 +80,6 @@ class Host:
     file_court_case: Any  # court.filing.file_case
     finish_invocation: Any  # invocation.manager.finish_invocation
     generate_realtime: Any  # yandex_client_modules.realtime.generate_realtime
-    get_conv_settings: Any  # storage.records.get_conv_settings
     get_conversation_title: Any  # storage.records.get_conversation_title
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_current_trace: Any  # observability.trace_manager.get_current_trace
@@ -99,9 +98,6 @@ class Host:
     )
     mcp_storage: Any  # mcp_server.storage
     normalize_conversation_title: Any  # storage.records.normalize_conversation_title
-    normalize_tools_config: (
-        Any  # yandex_client_modules.tool_config.normalize_tools_config
-    )
     open_image_file: Any  # storage.generated_images.open_image_file
     persist_invocation_trace: Any  # invocation.manager.persist_invocation_trace
     provider_request_headers: (
@@ -121,9 +117,6 @@ class Host:
     settle_billing_to_treasury: Any  # economy.billing.settle_billing_to_treasury
     start_invocation: Any  # invocation.manager.start_invocation
     traced_operation: Any  # observability.trace_manager.traced_operation
-    upgrade_dialog_settings: (
-        Any  # yandex_client_modules.tool_config.upgrade_dialog_settings
-    )
     validate_dialog_model: (
         Any  # provider_accounts.model_discovery.validate_dialog_model
     )
@@ -162,7 +155,6 @@ __all__ = [
     "file_court_case",
     "finish_invocation",
     "generate_realtime",
-    "get_conv_settings",
     "get_conversation_title",
     "get_current_owner_id",
     "get_current_trace",
@@ -178,7 +170,6 @@ __all__ = [
     "load_memory_config",
     "maybe_update_conversation_title",
     "normalize_conversation_title",
-    "normalize_tools_config",
     "open_image_file",
     "persist_invocation_trace",
     "provider_request_headers",
@@ -195,7 +186,6 @@ __all__ = [
     "settle_billing_to_treasury",
     "start_invocation",
     "traced_operation",
-    "upgrade_dialog_settings",
     "validate_dialog_model",
     "validate_generation_params",
 ]
@@ -269,10 +259,6 @@ def generate_realtime(*args: Any, **kwargs: Any) -> Any:
     return current().generate_realtime(*args, **kwargs)
 
 
-def get_conv_settings(*args: Any, **kwargs: Any) -> Any:
-    return current().get_conv_settings(*args, **kwargs)
-
-
 def get_conversation_title(*args: Any, **kwargs: Any) -> Any:
     return current().get_conversation_title(*args, **kwargs)
 
@@ -333,10 +319,6 @@ def normalize_conversation_title(*args: Any, **kwargs: Any) -> Any:
     return current().normalize_conversation_title(*args, **kwargs)
 
 
-def normalize_tools_config(*args: Any, **kwargs: Any) -> Any:
-    return current().normalize_tools_config(*args, **kwargs)
-
-
 def open_image_file(*args: Any, **kwargs: Any) -> Any:
     return current().open_image_file(*args, **kwargs)
 
@@ -395,10 +377,6 @@ def settle_billing_to_treasury(*args: Any, **kwargs: Any) -> Any:
 
 def start_invocation(*args: Any, **kwargs: Any) -> Any:
     return current().start_invocation(*args, **kwargs)
-
-
-def upgrade_dialog_settings(*args: Any, **kwargs: Any) -> Any:
-    return current().upgrade_dialog_settings(*args, **kwargs)
 
 
 def validate_dialog_model(*args: Any, **kwargs: Any) -> Any:

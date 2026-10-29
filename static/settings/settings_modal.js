@@ -3,7 +3,7 @@
 
   // Settings are read-only: the windows show them, nothing is saved (the server has no save route).
   var READ_ONLY_NOTE =
-    "Настройки только для чтения: всё стоит на максимуме, изменить их здесь нельзя.";
+    "Настройки общие для всех диалогов и только для чтения: всё стоит на максимуме, изменить их здесь нельзя.";
 
   function disableControls(root) {
     root.querySelectorAll("input, select, textarea").forEach(function (control) {
@@ -16,9 +16,8 @@
     var UI = window.SettingsUI;
     var CoreUI = window.LogosCoreAPI.ui;
     var Storage = window.SettingsStorage;
-    var convId = currentConvId;
-    var settings = Storage.load(convId);
-    var unknownAtOpen = Boolean(convId) && Storage.isUnknown(convId);
+    var settings = Storage.load();
+    var unknownAtOpen = Storage.isUnknown();
     var cfg = settings.tools_config || {};
     var ws = cfg.web_search || {};
     var fs = cfg.file_search || {};
@@ -152,9 +151,6 @@
     // Why the list did not load: the server's answer (with its HTTP status) or no answer at all.
     function categoriesErrorText(error) {
       var status = error && error.status;
-      if (status === 404 && error.code === "conversation_not_found") {
-        return "Диалог не найден на сервере: его удалили. Закройте окно и выберите другой диалог.";
-      }
       if (status >= 500) {
         return "Ошибка на сервере (код " + status + "): список инструментов не получен. Нажмите «Повторить» позже.";
       }
@@ -175,11 +171,8 @@
     if (loadingEl) loadingEl.textContent = "Загрузка инструментов...";
     Promise.all([
       window.LogosDispatcher.request("/api/tools/categories").then(readOk),
-      currentConvId
-        ? window.LogosDispatcher.request("/api/conversations/" + currentConvId + "/tools").then(
-            readOk,
-          )
-        : Promise.resolve({ active_tool_categories: null }),
+      // Settings are global: every category is active in every dialog.
+      Promise.resolve({ active_tool_categories: null }),
     ])
       .then(function (results) {
         var catData = results[0];
@@ -235,7 +228,7 @@
       });
     }
     document.getElementById("tools-status").textContent = unknownAtOpen
-      ? "Настройки инструментов этого диалога не загружены с сервера: показаны значения по умолчанию. " + READ_ONLY_NOTE
+      ? "Общие настройки не загружены с сервера: показаны значения по умолчанию. " + READ_ONLY_NOTE
       : READ_ONLY_NOTE;
     loadCategories();
   };
@@ -375,9 +368,8 @@
     var UI = window.SettingsUI;
     var CoreUI = window.LogosCoreAPI.ui;
     var Storage = window.SettingsStorage;
-    var convId = currentConvId;
-    var settings = Storage.load(convId);
-    var unknownAtOpen = Boolean(convId) && Storage.isUnknown(convId);
+    var settings = Storage.load();
+    var unknownAtOpen = Storage.isUnknown();
     var ultra = ultraProfileFor(typeof currentModel !== "undefined" ? currentModel : "");
     if (ultra) settings = applyUltraProfile(settings, ultra);
 
@@ -539,7 +531,7 @@
       CoreUI.modal.close(ov);
     }
     md.querySelector("#set-status").textContent = unknownAtOpen
-      ? "Сохранённые параметры этого диалога не загружены: показаны локальные значения или значения по умолчанию. " + READ_ONLY_NOTE
+      ? "Общие настройки не загружены с сервера: показаны значения по умолчанию. " + READ_ONLY_NOTE
       : READ_ONLY_NOTE;
     ov.addEventListener("click", function (e) {
       if (e.target === ov) closeModal();

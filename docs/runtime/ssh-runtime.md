@@ -33,17 +33,7 @@ Command output is bounded by `max_output_bytes` to prevent an SSH call from exha
 
 Returns the current structured SSH Runtime settings and the last connection-test result. The endpoint requires a trusted Logos owner identity.
 
-Settings are read-only: there is no endpoint that saves them. The SSH window shows them without a save button.
-
-`POST /api/ssh-runtime/test`
-
-Body:
-
-```json
-{"target":"preview"}
-```
-
-The target must already exist in the saved configuration. The test executes only the fixed remote command `true`, using the trusted Logos identity mapping.
+Settings are read-only: there is no endpoint that saves or tests them. The SSH window shows them without buttons.
 
 ## Example
 

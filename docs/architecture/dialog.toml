@@ -69,19 +69,18 @@ units = ["chat", "conversations", "storage", "kristall"]
 kristall = "chat/message/<n>"
 
 [[operation]]
-name = "Dialog settings and tools"
+name = "Settings and tools (global, read-only)"
 ui = "static/settings/settings_storage.js, static/settings/settings_modal.js"
 routes = [
-    "GET /api/conversations/<conv_id>/settings",
+    "GET /api/settings",
     "GET /api/tools/categories",
 ]
 backend = [
-    "conversations.routes:get_dialog_settings",
+    "conversations.routes:get_settings",
     "chat.mcp_routes:list_tool_categories",
-    "chat.mcp_routes:conv_tools",
 ]
-units = ["conversations", "chat", "yandex_client_modules", "tool_providers", "storage", "kristall"]
-kristall = "chat/settings/<id>"
+units = ["conversations", "chat", "yandex_client_modules", "tool_providers"]
+kristall = "— (nothing stored: global maximal settings)"
 
 [[operation]]
 name = "Rename a dialog or change its model"
@@ -117,7 +116,7 @@ ui = "results appear in the reply; MCP servers in static/settings/settings_modal
 routes = ["POST /api/chat", "GET /api/mcp-servers"]
 backend = ["yandex_client_modules.mcp_mixin:YandexMcpMixin.ask_with_mcp", "chat.mcp_routes:handle_mcp_servers"]
 units = ["yandex_client_modules", "tool_providers", "mcp_server", "agent_memory", "workspace", "storage", "kristall"]
-kristall = "mcp/server/*, mcp/conversation/<id>, global_fact:*"
+kristall = "mcp/server/*, global_fact:*"
 
 [[operation]]
 name = "Approve a tool action"
@@ -153,11 +152,8 @@ kristall = "runtime_invocation:<iid>, treasury/account/<owner>, treasury/ledger/
 [[operation]]
 name = "Global memory used by every dialog"
 ui = "static/memory_panel.js"
-routes = ["GET /api/memory/manage", "POST /api/memory/clear"]
-backend = [
-    "agent_memory.routes:api_memory_panel_data",
-    "agent_memory.routes:api_clear_memory",
-]
+routes = ["GET /api/memory/manage"]
+backend = ["agent_memory.routes:api_memory_panel_data"]
 units = ["agent_memory", "storage", "kristall"]
 kristall = "global_memory_config, global_fact:*"
 

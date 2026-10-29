@@ -209,6 +209,24 @@ def provider_request_headers(credential) -> dict[str, str]:
 
 
 class YandexRequestMixin:
+    def cancel_response(self, response_id):
+        """Cancel a background response at the provider; returns its answer as JSON."""
+        credential = _resolve_global_provider_credential(self)
+        url = self.responses_url + "/" + str(response_id) + "/cancel"
+        self._log_request("POST", url)
+        resp = self._log_response(
+            self.session.post(url, headers=provider_request_headers(credential), timeout=15)
+        )
+        if resp.status_code >= 400:
+            raise YandexClientError(
+                f"Provider cancel HTTP {resp.status_code} for response {response_id}",
+                status_code=resp.status_code,
+            )
+        try:
+            return resp.json()
+        except ValueError:
+            return {}
+
     def ask(
         self,
         message,
@@ -231,6 +249,10 @@ class YandexRequestMixin:
         on_stream_event = params.get("on_stream_event")
         if on_stream_event is not None and not callable(on_stream_event):
             raise ValueError("on_stream_event must be callable or None")
+        # «Стоп» of a live turn: polling ends as soon as it is set.
+        should_stop = params.get("should_stop")
+        if should_stop is not None and not callable(should_stop):
+            raise ValueError("should_stop must be callable or None")
         is_background = params.get("background", True)
         if is_background:
             params["store"] = True
@@ -471,6 +493,7 @@ class YandexRequestMixin:
             trace_step=trace_step_number,
             headers=headers,
             on_event=on_stream_event,
+            should_stop=should_stop,
             **wait_params,
         )
         if on_provider_response is not None:

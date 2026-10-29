@@ -30,14 +30,12 @@ from chat.host import (
     bound,
     check_access,
     generate_realtime,
-    get_conv_settings,
     get_current_owner_id,
     get_messages,
     get_model_discovery,
     get_model_uri,
     maybe_update_conversation_title,
     reserve_request,
-    upgrade_dialog_settings,
 )
 
 
@@ -245,12 +243,8 @@ def _speechkit_turn(
     if session.cancelled.is_set():
         raise bound.RealtimeError("Голосовая сессия отменена")
     client = logos_client_type()(bound.Config)
-    # Upgraded first, as the tools window shows it: a record saved before revision 2
-    # holds a narrow tool selection that the upgrade drops.
-    settings = upgrade_dialog_settings(get_conv_settings(session.conversation_id) or {})
+    # Settings are global: the dialog turn takes every tool category.
     params = {"instructions": session.instructions} if session.instructions else {}
-    if settings.get("active_tool_categories") is not None:
-        params["active_tool_categories"] = settings["active_tool_categories"]
     response = client.ask_with_mcp(
         message=transcript,
         model_key=session.model,
@@ -618,10 +612,8 @@ def create_voice_session():
         return jsonify(error_body("response_mode_must_be_audio_both_or_text")), 400
     if model == bound.TTS_MODEL and mode == "text":
         return jsonify(error_body("speech_tts_live_requires_audio_output")), 400
-    settings = get_conv_settings(conversation_id) or {}
-    if not isinstance(settings, dict):
-        return jsonify(error_body("invalid_conversation_settings")), 400
-    instructions = data.get("instructions", settings.get("instructions"))
+    # Settings are global: no per-dialog instructions are stored.
+    instructions = data.get("instructions")
     if instructions is not None and not isinstance(instructions, str):
         return jsonify(error_body("instructions_must_be_text")), 400
     try:

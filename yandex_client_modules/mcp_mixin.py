@@ -10,14 +10,13 @@ from yandex_client_modules.tool_groups import fit_tools, unwrap_call
 from yandex_client_modules.tool_config import (
     deferred_tool_categories,
     file_search_max_results,
+    global_settings,
     knowledge_vector_store_ids,
     normalize_tools_config,
-    upgrade_dialog_settings,
 )
 from yandex_client_modules.host import (
     bound,
     get_controlled_memory_summary,
-    get_conv_settings,
     get_current_owner_id,
 )
 
@@ -245,10 +244,9 @@ class YandexMcpMixin:
 
         enabled_servers = []
         if settings_id:
-            # A failed read must not turn into "no MCP servers": the turn fails with the cause.
-            enabled_servers = bound.mcp_storage.get_enabled_servers_for_conv(
-                settings_id, owner_id=owner_id
-            )
+            # Settings are global: every configured server serves every dialog. A failed
+            # read must not turn into "no MCP servers": the turn fails with the cause.
+            enabled_servers = bound.mcp_storage.list_servers(owner_id=owner_id)
 
         for s in enabled_servers if execution_policy is None else []:
             if (s.get("config") or {}).get("requires_authorization") and not s.get(
@@ -279,15 +277,8 @@ class YandexMcpMixin:
                 mcp_tool["defer_loading"] = True
                 mcp_tools.append(mcp_tool)
 
-        active_cats = None
-        if settings_id:
-            # A failed read must not enable every category, including the ones the
-            # user turned off: the turn fails with the cause instead.
-            preferences = upgrade_dialog_settings(get_conv_settings(settings_id) or {})
-            active_cats = preferences.get("active_tool_categories")
-
-        if active_cats is None:
-            active_cats = params.get("active_tool_categories")
+        # Settings are global (no per-dialog record): a dialog turn uses every category.
+        active_cats = None if settings_id else params.get("active_tool_categories")
         if not isinstance(active_cats, list):
             active_cats = None
         if active_cats is None:
@@ -296,12 +287,8 @@ class YandexMcpMixin:
             active_cats = list(bound.registry.get_available_categories())
 
         hosted_tools = []
-        # A failed read must not turn a disabled web search back on.
-        conv_settings = get_conv_settings(settings_id) or {} if settings_id else {}
-        if not isinstance(conv_settings, dict):
-            raise ValueError("Conversation settings must be a JSON object")
-        if conv_settings:
-            conv_settings = upgrade_dialog_settings(conv_settings)
+        # A dialog turn takes the global settings; a turn without a dialog its params.
+        conv_settings = global_settings() if settings_id else {}
         raw_tools_config = conv_settings.get(
             "tools_config", params.get("tools_config", {})
         )

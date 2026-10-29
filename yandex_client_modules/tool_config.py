@@ -111,6 +111,15 @@ def upgrade_dialog_settings(settings: Any) -> Any:
     return upgraded
 
 
+def global_settings() -> dict[str, Any]:
+    """The one settings set of every dialog, at the maximal values.
+
+    There are no per-dialog settings and nothing saves settings: a stored dialog
+    record is not read. Every tool category is active (no selection is stored).
+    """
+    return upgrade_dialog_settings({})
+
+
 # WIKIFUNCTIONS-CANDIDATE WF-03: https://www.wikifunctions.org/wiki/Z10079 + Z10047.
 # Заменить строковую ветку преобразования boolean композицией trim/lowercase;
 # адаптер сохраняет bool без преобразования, только true/false и прежний ValueError/path.

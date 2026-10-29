@@ -162,7 +162,6 @@ def _chat():
     from court.filing import file_case as file_court_case
     from invocation.manager import finish_invocation
     from yandex_client_modules.realtime import generate_realtime
-    from storage.records import get_conv_settings
     from storage.records import get_conversation_title
     from economy.treasury_identity import get_current_owner_id
     from observability.trace_manager import get_current_trace
@@ -179,7 +178,6 @@ def _chat():
     from storage.records import maybe_update_conversation_title
     import mcp_server.storage as mcp_storage
     from storage.records import normalize_conversation_title
-    from yandex_client_modules.tool_config import normalize_tools_config
     from storage.generated_images import open_image_file
     from invocation.manager import persist_invocation_trace
     from yandex_client_modules.request_mixin import provider_request_headers
@@ -197,7 +195,6 @@ def _chat():
     from economy.billing import settle_billing_to_treasury
     from invocation.manager import start_invocation
     from observability.trace_manager import traced_operation
-    from yandex_client_modules.tool_config import upgrade_dialog_settings
     from provider_accounts.model_discovery import validate_dialog_model
     from yandex_client_modules.request_builder import validate_generation_params
 
@@ -252,7 +249,6 @@ def _chat():
         file_court_case=file_court_case,
         finish_invocation=finish_invocation,
         generate_realtime=generate_realtime,
-        get_conv_settings=get_conv_settings,
         get_conversation_title=get_conversation_title,
         get_current_owner_id=get_current_owner_id,
         get_current_trace=get_current_trace,
@@ -269,7 +265,6 @@ def _chat():
         maybe_update_conversation_title=maybe_update_conversation_title,
         mcp_storage=mcp_storage,
         normalize_conversation_title=normalize_conversation_title,
-        normalize_tools_config=normalize_tools_config,
         open_image_file=open_image_file,
         persist_invocation_trace=persist_invocation_trace,
         provider_request_headers=provider_request_headers,
@@ -287,7 +282,6 @@ def _chat():
         settle_billing_to_treasury=settle_billing_to_treasury,
         start_invocation=start_invocation,
         traced_operation=traced_operation,
-        upgrade_dialog_settings=upgrade_dialog_settings,
         validate_dialog_model=validate_dialog_model,
         validate_generation_params=validate_generation_params,
     )
@@ -329,28 +323,26 @@ def _conversations():
     from agent_memory.conversation_ownership_store import ConversationOwnershipStore
     from provider_accounts.model_discovery import ModelDiscoveryError
     from storage.records import delete_conversation
-    from storage.records import get_conv_settings
     from storage.records import get_conversations
     from economy.treasury_identity import get_current_owner_id
     from agent_memory.client import get_memory_client
     from storage.records import memory_file_path
     from storage.records import update_conversation_model
     from storage.records import update_conversation_title
-    from yandex_client_modules.tool_config import upgrade_dialog_settings
+    from yandex_client_modules.tool_config import global_settings
     from provider_accounts.model_discovery import validate_dialog_model
 
     return host.Host(
         ConversationOwnershipStore=ConversationOwnershipStore,
         ModelDiscoveryError=ModelDiscoveryError,
         delete_conversation=delete_conversation,
-        get_conv_settings=get_conv_settings,
         get_conversations=get_conversations,
         get_current_owner_id=get_current_owner_id,
         get_memory_client=get_memory_client,
         memory_file_path=memory_file_path,
         update_conversation_model=update_conversation_model,
         update_conversation_title=update_conversation_title,
-        upgrade_dialog_settings=upgrade_dialog_settings,
+        global_settings=global_settings,
         validate_dialog_model=validate_dialog_model,
     )
 
@@ -887,7 +879,6 @@ def _yandex_client_modules():
     from secret_store.credential_crypto import decrypt_secret
     from secret_store.credential_crypto import encrypt_secret
     from agent_memory.manager import get_controlled_memory_summary
-    from storage.records import get_conv_settings
     from economy.treasury_identity import get_current_owner_id
     from core.config import get_model_uri
     from storage.records import get_store
@@ -914,7 +905,6 @@ def _yandex_client_modules():
         decrypt_secret=decrypt_secret,
         encrypt_secret=encrypt_secret,
         get_controlled_memory_summary=get_controlled_memory_summary,
-        get_conv_settings=get_conv_settings,
         get_current_owner_id=get_current_owner_id,
         get_model_uri=get_model_uri,
         get_store=get_store,

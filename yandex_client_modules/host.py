@@ -30,7 +30,6 @@ class Host:
     get_controlled_memory_summary: (
         Any  # agent_memory.manager.get_controlled_memory_summary
     )
-    get_conv_settings: Any  # storage.records.get_conv_settings
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_model_uri: Any  # core.config.get_model_uri
     get_store: Any  # storage.records.get_store
@@ -64,7 +63,6 @@ __all__ = [
     "current",
     "provide",
     "get_controlled_memory_summary",
-    "get_conv_settings",
     "get_current_owner_id",
     "get_model_uri",
     "get_store",
@@ -81,10 +79,6 @@ __all__ = [
 
 def get_controlled_memory_summary(*args: Any, **kwargs: Any) -> Any:
     return current().get_controlled_memory_summary(*args, **kwargs)
-
-
-def get_conv_settings(*args: Any, **kwargs: Any) -> Any:
-    return current().get_conv_settings(*args, **kwargs)
 
 
 def get_current_owner_id(*args: Any, **kwargs: Any) -> Any:

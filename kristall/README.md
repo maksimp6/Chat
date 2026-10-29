@@ -10,14 +10,13 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 - **List dialogs**: `GET /api/conversations`
 - **Create a dialog**: `POST /api/conversations`
 - **Open a dialog and read its history**: `GET /api/conversations/<conv_id>/messages`
-- **Dialog settings and tools**: `GET /api/conversations/<conv_id>/settings`, `GET /api/tools/categories`
 - **Rename a dialog or change its model**: `PATCH /api/conversations/<conv_id>`
 - **Send a message (the turn)**: `POST /api/chat`
 - **Tools during the turn**: `POST /api/chat`, `GET /api/mcp-servers`
 - **Approve a tool action**: `POST /api/mcp/execute-approved`
 - **Photos, pictures and voice**: `POST /api/images/generate`, `GET /api/images/requests/<request_id>`, `POST /api/voice/session`, `GET /api/voice/events`, `POST /api/voice/text`, `POST /api/voice/audio`
 - **Trace, cost and treasury of a reply**: `GET /api/invocations/<invocation_id>/trace`, `GET /api/treasury/account`
-- **Global memory used by every dialog**: `GET /api/memory/manage`, `POST /api/memory/clear`
+- **Global memory used by every dialog**: `GET /api/memory/manage`
 - **Delete a dialog**: `DELETE /api/conversations/<conv_id>`
 - **Read dialogs from outside (MCP)**: `POST {MCP_PATH}`
 

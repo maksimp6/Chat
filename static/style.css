@@ -1112,19 +1112,6 @@ body {
   color: #fff;
 }
 
-.logos-pro-app .memory-clear {
-  margin-bottom: 15px;
-}
-
-.logos-pro-app .memory-clear-btn {
-  padding: 6px 12px;
-  border: 0;
-  border-radius: 4px;
-  background: var(--danger-strong);
-  color: #fff;
-  cursor: pointer;
-}
-
 .logos-pro-app .memory-facts-title {
   margin: 0 0 8px;
   font-size: 14px;

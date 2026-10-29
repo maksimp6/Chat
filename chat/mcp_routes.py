@@ -39,7 +39,6 @@ from chat.host import (
     fail_invocation,
     file_court_case,
     finish_invocation,
-    get_conv_settings,
     get_conversation_title,
     get_current_owner_id,
     get_message,
@@ -49,11 +48,9 @@ from chat.host import (
     list_owned_conversations,
     maybe_update_conversation_title,
     normalize_conversation_title,
-    normalize_tools_config,
     persist_invocation_trace,
     record_yandex_mcp_activity,
     reset_current_trace,
-    upgrade_dialog_settings,
     set_owner,
     set_yandex_conversation,
     settle_billing_to_treasury,
@@ -413,7 +410,13 @@ def _define_logos_client(base: type) -> type:
             # A live turn's receiver of progress events; base_params carries it into
             # every tool round and continuation part.
             sink = (params or {}).get("on_stream_event")
+            should_stop = (params or {}).get("should_stop")
             rounds = 0
+
+            def stop_check():
+                """«Стоп»: no new provider request or tool call starts after it."""
+                if callable(should_stop) and should_stop():
+                    raise _TurnStopped(TURN_STOPPED_TEXT)
 
             def emit(event):
                 if sink is None:
@@ -460,6 +463,7 @@ def _define_logos_client(base: type) -> type:
             )
             round_result(response)
             _record_provider_output(trace, response)
+            stop_check()
 
             base_params = dict(params or {})
             tool_servers = None
@@ -475,6 +479,7 @@ def _define_logos_client(base: type) -> type:
                         inner = call.get("arguments")
                     if isinstance(inner, dict) and isinstance(inner.get("tool"), str):
                         name = inner["tool"]
+                stop_check()
                 emit({"kind": "tool_call", "phase": "start", "name": name})
                 try:
                     if tool_servers is None:
@@ -525,6 +530,7 @@ def _define_logos_client(base: type) -> type:
                 continuation_params["background"] = base_params.get(
                     "background", True
                 )
+                stop_check()
                 start_round(round_kind, part)
                 response = self._ask_provider(
                     message="",
@@ -888,6 +894,16 @@ def _execute_chat_model(message, model_key, invocation, params, trace):
             )
 
     return _build_chat_reply(client, response, trace)
+
+
+TURN_STOPPED_TEXT = (
+    "Ход остановлен кнопкой «Стоп»: ответ провайдера отменён, новые запросы к модели "
+    "и вызовы инструментов не запускались."
+)
+
+
+class _TurnStopped(RuntimeError):
+    """The owner pressed «Стоп»; the message is for the user."""
 
 
 class _EmptyModelReply(RuntimeError):
@@ -1319,7 +1335,7 @@ def _finalize_chat_turn(
 
 def _turn_error_text(error):
     """Russian text for a failure the user can fix, or None; the exception is logged."""
-    if isinstance(error, _EmptyModelReply):
+    if isinstance(error, (_EmptyModelReply, _TurnStopped)):
         return str(error)
     if isinstance(error, bound.NoActiveCredentialError):
         return PROVIDER_KEY_MISSING
@@ -1573,6 +1589,44 @@ def _start_live_turn(t_start, admission):
     return live_turns.sse_response(live, 0)
 
 
+@mcp_bp.route("/api/chat/turns/<request_id>/stop", methods=["POST"])
+def chat_turn_stop(request_id):
+    """«Стоп»: stop the running turn on the server and cancel its provider request."""
+    if not live_turns.REQUEST_ID_PATTERN.fullmatch(request_id or ""):
+        return jsonify(
+            error_body("invalid_params", message=live_turns.REQUEST_ID_MESSAGE)
+        ), 400
+    conv_id = request.args.get("conversation_id")
+    owner_id = get_current_owner_id(required=False)
+    if (
+        not isinstance(conv_id, str)
+        or not conv_id.strip()
+        or not check_access(conv_id, owner_id)
+    ):
+        return jsonify(error_body("conversation_not_found")), 404
+    live = live_turns.find(conv_id, request_id)
+    if live is None or live.owner_id != owner_id or live.finished:
+        return jsonify({"status": "not_running"})
+    response_id = live.request_stop()
+    cancelled, cancel_error = False, None
+    if response_id:
+        try:
+            logos_client_type()(bound.Config).cancel_response(response_id)
+            cancelled = True
+        except Exception as exc:
+            # The turn still stops at its next step; the provider may finish this request.
+            logger.warning("[CHAT] Ответ %s не отменён у провайдера: %s", response_id, exc)
+            cancel_error = f"{type(exc).__name__}: {exc}"
+    return jsonify(
+        {
+            "status": "stopping",
+            "response_id": response_id,
+            "provider_cancelled": cancelled,
+            "provider_cancel_error": cancel_error,
+        }
+    )
+
+
 def _event_position():
     """The last event a reader has: Last-Event-ID, else ?after=, else 0."""
     for raw in (request.headers.get("Last-Event-ID"), request.args.get("after")):
@@ -1684,18 +1738,6 @@ def _chat_turn(*, t_start, admission=None, live=None):
         owner_id = get_current_owner_id(required=False)
         if not check_access(conv_id, owner_id):
             return jsonify(error_body("conversation_not_found")), 404
-        conv_settings = get_conv_settings(conv_id) or {}
-        if not isinstance(conv_settings, dict):
-            return jsonify(
-                error_body(
-                    "invalid_settings",
-                    message="conversation settings must be an object",
-                )
-            ), 400
-        try:
-            normalize_tools_config(conv_settings.get("tools_config", {}))
-        except ValueError as exc:
-            return jsonify(error_body("invalid_settings", message=str(exc))), 400
         if retry and retry_message_id is not None:
             original = get_message(conv_id, retry_message_id)
             if (
@@ -1778,13 +1820,6 @@ def _chat_turn(*, t_start, admission=None, live=None):
                 base_instructions=params.get("instructions"),
             )
 
-        # Read through the settings upgrade, as GET /tools and GET /settings show it: a
-        # record saved before revision 2 holds a narrow selection the upgrade drops.
-        active_tools = upgrade_dialog_settings(conv_settings).get(
-            "active_tool_categories"
-        )
-        if active_tools is not None:
-            params["active_tool_categories"] = active_tools
 
         if user_message_id is None:
             # The photo count is kept with the message, so a reloaded chat still shows which turn had photos.
@@ -1818,6 +1853,7 @@ def _chat_turn(*, t_start, admission=None, live=None):
             # Set after set_request, so the callable never enters the trace; every
             # tool round and continuation part copies it from these params.
             params["on_stream_event"] = live.provider_event
+            params["should_stop"] = live.stop_requested.is_set
         result = _execute_chat_model(message, model_key, invocation, params, trace)
         if live is not None:
             live.provider_event({"kind": "finalizing"})
@@ -1834,6 +1870,11 @@ def _chat_turn(*, t_start, admission=None, live=None):
             request_id=request_id,
         )
     except Exception as e:
+        if live is not None and live.stop_requested.is_set() and not isinstance(
+            e, _TurnStopped
+        ):
+            # Whatever the cancelled provider request raised, the cause is «Стоп».
+            e = _TurnStopped(TURN_STOPPED_TEXT)
         logger.exception("[CHAT] Ошибка")
         internal_error_message = str(e)
         is_temperature_error = (
@@ -1929,17 +1970,6 @@ def list_tool_categories():
     return jsonify({"categories": bound.registry.get_available_categories()})
 
 
-# Settings are read-only: the tool selection is shown, never changed through the API.
-@mcp_bp.route("/api/conversations/<conv_id>/tools", methods=["GET"])
-def conv_tools(conv_id):
-    owner_id = get_current_owner_id(required=False)
-    if not check_access(conv_id, owner_id):
-        return jsonify(error_body("conversation_not_found")), 404
-    settings = upgrade_dialog_settings(get_conv_settings(conv_id) or {})
-    cats = settings.get("active_tool_categories")
-    if cats is None:
-        cats = list(bound.registry.get_available_categories().keys())
-    return jsonify({"active_tool_categories": cats})
 
 
 # Stored server credentials are not echoed back to the browser.
@@ -1953,7 +1983,7 @@ def _without_secrets(record):
     return public
 
 
-# Settings are read-only: servers are listed, read and deleted here, never created or changed.
+# Settings are read-only: servers are listed and read here, never created, changed or deleted.
 @mcp_bp.route("/api/mcp-servers", methods=["GET"])
 def handle_mcp_servers():
     owner_id = get_current_owner_id()
@@ -1961,13 +1991,9 @@ def handle_mcp_servers():
     return jsonify({"data": [_without_secrets(srv) for srv in servers]})
 
 
-@mcp_bp.route("/api/mcp-servers/<server_id>", methods=["GET", "DELETE"])
+@mcp_bp.route("/api/mcp-servers/<server_id>", methods=["GET"])
 def handle_mcp_server_item(server_id):
     owner_id = get_current_owner_id()
-    if request.method == "DELETE":
-        bound.mcp_storage.delete_server(server_id, owner_id)
-        return jsonify({"status": "deleted"})
-
     srv = bound.mcp_storage.get_server(server_id, owner_id=owner_id)
     if not srv:
         return jsonify(

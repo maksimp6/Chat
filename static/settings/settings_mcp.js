@@ -51,7 +51,7 @@
     var md = document.createElement("div");
     md.className = "settings-mcp-body";
     md.innerHTML =
-      '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:10px;">Настройки только для чтения: серверы нельзя добавить или изменить здесь, только удалить.</div>' +
+      '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:10px;">Настройки только для чтения: серверы показаны без изменения.</div>' +
       '<div id="mcp-mgr-list"></div>';
 
     var ov = CoreUI.modal.create({
@@ -91,33 +91,10 @@
             '<div style="font-size:12px;color:var(--m-muted,#666);">' +
             UI.escapeHtml(connInfo) +
             "</div></div>" +
-            '<div style="display:flex;gap:6px;">' +
-            '<button class="logos-btn mcp-del-btn settings-contract-btn" data-id="' +
-            UI.escapeHtml(srv.id) +
-            '">Удалить</button>' +
-            "</div></div>"
+            "</div>"
           );
         })
         .join("");
-
-      list.querySelectorAll(".mcp-del-btn").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          var sid = this.getAttribute("data-id");
-          window.LogosDialog.confirm("Удалить MCP сервер?", { confirmText: "Удалить", danger: true }).then(
-            function (confirmed) {
-              if (!confirmed) return;
-              window.LogosDispatcher.request("/api/mcp-servers/" + encodeURIComponent(sid), { method: "DELETE" })
-                .then(function (r) {
-                  if (!r.ok) throw new Error("HTTP " + r.status);
-                  refreshList();
-                })
-                .catch(function (e) {
-                  LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
-                });
-            },
-          );
-        });
-      });
     }
 
     function renderLoadError() {
