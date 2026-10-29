@@ -1,0 +1,1 @@
+{"ok": true, "command": "status", "result": {"model": "Redmi 9", "device": "galahad", "root_uid": 0, "keyguard_locked_or_unknown": false, "display_on": false, "focus_present": false, "focus_package": null, "screen_width": 1080, "screen_height": 2340, "mouse_metadata_valid": true}}
