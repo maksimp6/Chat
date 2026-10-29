@@ -333,6 +333,33 @@ function buildDetails(content, usage, totalDurationMs, cost) {
   return details;
 }
 
+// The Clipboard API exists only in secure contexts (https or localhost), and the phone reaches the app over plain http on the LAN.
+// Without it the text goes through a selected textarea and execCommand, as the trace viewer does.
+function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    return navigator.clipboard.writeText(text).catch(() => copyThroughSelection(text));
+  }
+  return copyThroughSelection(text);
+}
+
+function copyThroughSelection(text) {
+  const field = document.createElement("textarea");
+  field.value = text;
+  field.setAttribute("readonly", "");
+  field.style.position = "fixed";
+  field.style.opacity = "0";
+  document.body.appendChild(field);
+  field.select();
+  let copied = false;
+  try {
+    copied = document.execCommand("copy");
+  } catch (_) {
+    copied = false;
+  }
+  field.remove();
+  return copied ? Promise.resolve() : Promise.reject(new Error("Copy was refused"));
+}
+
 function addMessage({
   text,
   role,
@@ -418,12 +445,10 @@ function addMessage({
 
   copyBtn.addEventListener("click", function () {
     // A denied or missing clipboard must show a result, not an unhandled rejection.
-    Promise.resolve()
-      .then(() => navigator.clipboard.writeText(text))
-      .then(
-        () => window.LogosToast.show("Скопировано"),
-        () => window.LogosToast.error("Не удалось скопировать"),
-      );
+    copyText(text).then(
+      () => window.LogosToast.show("Скопировано"),
+      () => window.LogosToast.error("Не удалось скопировать"),
+    );
   });
   actions.appendChild(copyBtn);
   msg.appendChild(actions);
