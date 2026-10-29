@@ -197,9 +197,8 @@ def normalize_tools_config(raw: Any) -> dict[str, Any]:
         path = "tools_config.defer_loading"
         if not isinstance(config, dict):
             raise ValueError(f"{path} must be a JSON object")
-        normalized = dict(config)
-        if "enabled" in config:
-            normalized["enabled"] = _enabled(config["enabled"], f"{path}.enabled")
+        # Defer loading is always on and has no enable flag; only the eager list is kept.
+        normalized = {k: v for k, v in config.items() if k != "enabled"}
         if "eager_categories" in config:
             normalized["eager_categories"] = _entries(
                 config["eager_categories"], f"{path}.eager_categories"
@@ -211,14 +210,12 @@ def normalize_tools_config(raw: Any) -> dict[str, Any]:
 def deferred_tool_categories(tools_config: Any) -> tuple[bool, set[str]]:
     """(on, eager categories) of the dialog's defer_loading setting.
 
-    On by default (settings at maximum): the application's function tools go to
-    the provider with ``defer_loading: true`` except those of the eager
-    categories, and the provider shows a deferred tool to the model only after
-    its tool search finds it. Only an explicit ``{"enabled": false}`` turns it
-    off; an absent setting means on.
+    Always on (settings at maximum; it cannot be turned off): every application
+    function tool goes to the provider with ``defer_loading: true`` except those
+    of the eager categories, and the provider shows a deferred tool to the model
+    only after its tool search finds it. The only knob is the eager-category
+    list, which keeps a few categories loaded eagerly.
     """
     config = tools_config.get("defer_loading") if isinstance(tools_config, dict) else None
-    if isinstance(config, dict) and config.get("enabled") is False:
-        return False, set()
     eager = config.get("eager_categories") if isinstance(config, dict) else None
     return True, set(eager) if isinstance(eager, list) else set()
